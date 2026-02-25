@@ -9,8 +9,34 @@ type KpiResponse = {
   error?: string;
 };
 
+type TrendDirection = "up" | "down" | "flat";
+
+type TrendMeta = {
+  direction: TrendDirection;
+  symbol: string;
+  percent: string;
+};
+
 const ENTITIES: EntityName[] = ["Unigentamos", "pngwn", "Diyesu Decor"];
 const PRIORITIES = ["P1", "P2", "P3"] as const;
+
+function extractTrend(value: string): TrendMeta | null {
+  const match = value.match(/[\(\[]?\s*([↑↓↔])\s*([0-9]+(?:\.[0-9]+)?%)\s*[\)\]]?/);
+  if (!match) {
+    return null;
+  }
+
+  const symbol = match[1];
+  const percent = match[2];
+
+  if (symbol === "↑") {
+    return { direction: "up", symbol, percent };
+  }
+  if (symbol === "↓") {
+    return { direction: "down", symbol, percent };
+  }
+  return { direction: "flat", symbol, percent };
+}
 
 export default function KpiManager() {
   const [items, setItems] = useState<KpiEntry[]>([]);
@@ -66,21 +92,28 @@ export default function KpiManager() {
     void refresh();
   }, []);
 
-  const sorted = useMemo(
+  const groupedItems = useMemo(
     () =>
-      [...items].sort((a, b) =>
-        `${a.entity}:${a.name}`.localeCompare(`${b.entity}:${b.name}`)
-      ),
+      ENTITIES.map((entityName) => {
+        const entityItems = items
+          .filter((item) => item.entity === entityName)
+          .sort((a, b) => a.name.localeCompare(b.name));
+
+        return {
+          entity: entityName,
+          items: entityItems
+        };
+      }),
     [items]
   );
 
   return (
     <section className="card" style={{ marginTop: 12 }}>
       <h2>KPI Tracker</h2>
-      <p className="muted">Persisted values (saved in local app data for MVP).</p>
+      <p className="muted">Grouped by brand for quick weekly review.</p>
       {error && <p className="pill warn">{error}</p>}
 
-      <form onSubmit={onSubmit} className="inline-form">
+      <form onSubmit={onSubmit} className="inline-form" style={{ marginBottom: 12 }}>
         <label>
           Entity
           <select value={entity} onChange={(e) => setEntity(e.target.value as EntityName)}>
@@ -96,7 +129,7 @@ export default function KpiManager() {
           <input
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Example: Waitlist Signups (Weekly)"
+            placeholder="Example: Waitlist Signups (Past 7 Days)"
             required
           />
         </label>
@@ -135,38 +168,51 @@ export default function KpiManager() {
       {loading ? (
         <p className="muted">Loading KPI values...</p>
       ) : (
-        <table style={{ marginTop: 12 }}>
-          <thead>
-            <tr>
-              <th>Entity</th>
-              <th>Name</th>
-              <th>Value</th>
-              <th>Link</th>
-              <th>Priority</th>
-              <th>Updated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sorted.map((item) => (
-              <tr key={item.id}>
-                <td>{item.entity}</td>
-                <td>{item.name}</td>
-                <td>{item.value}</td>
-                <td>
-                  {item.link ? (
-                    <a href={item.link} target="_blank" rel="noreferrer">
-                      Open
-                    </a>
-                  ) : (
-                    ""
-                  )}
-                </td>
-                <td>{item.priority}</td>
-                <td>{new Date(item.updatedAt).toLocaleString()}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="kpi-groups">
+          {groupedItems.map((group) => (
+            <article className="kpi-group" key={group.entity}>
+              <div className="kpi-group-header">
+                <h3>{group.entity}</h3>
+                <span className="pill">{group.items.length} KPIs</span>
+              </div>
+
+              {group.items.length === 0 ? (
+                <p className="muted">No KPIs yet.</p>
+              ) : (
+                <div className="kpi-card-grid">
+                  {group.items.map((item) => {
+                    const trend = extractTrend(item.value);
+
+                    return (
+                      <article className="kpi-value-card" key={item.id}>
+                        <p className="kpi-name">{item.name}</p>
+                        <p className="kpi-value">{item.value}</p>
+
+                        <div className="kpi-meta-row">
+                          <span className="pill p1">{item.priority}</span>
+                          {trend && (
+                            <span className={`trend trend-${trend.direction}`}>
+                              {trend.symbol} {trend.percent}
+                            </span>
+                          )}
+                          {item.link && (
+                            <a href={item.link} target="_blank" rel="noreferrer" className="kpi-link">
+                              Open link
+                            </a>
+                          )}
+                        </div>
+
+                        <p className="kpi-updated muted">
+                          Updated {new Date(item.updatedAt).toLocaleString()}
+                        </p>
+                      </article>
+                    );
+                  })}
+                </div>
+              )}
+            </article>
+          ))}
+        </div>
       )}
     </section>
   );

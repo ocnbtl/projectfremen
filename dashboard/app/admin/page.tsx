@@ -1,4 +1,4 @@
-import { ACTION_ITEMS, KPI_CARDS } from "../../lib/seed-data";
+import { ACTION_ITEMS } from "../../lib/seed-data";
 import RotatingWelcome from "../../components/RotatingWelcome";
 import KpiManager from "../../components/KpiManager";
 import DocsIndexPanel from "../../components/DocsIndexPanel";
@@ -94,22 +94,6 @@ export default function AdminPage() {
             </tbody>
           </table>
         </article>
-      </section>
-
-      <section className="card" style={{ marginTop: 12 }}>
-        <h2>KPI Snapshot (Starter)</h2>
-        <div className="grid grid-2">
-          {KPI_CARDS.map((card) => (
-            <article className="card" key={card.id}>
-              <p className="muted" style={{ marginTop: 0 }}>
-                {card.entity}
-              </p>
-              <h3 style={{ marginBottom: 6 }}>{card.name}</h3>
-              <p style={{ margin: "0 0 8px" }}>{card.value}</p>
-              <span className="pill p1">{card.priority}</span>
-            </article>
-          ))}
-        </div>
       </section>
 
       <KpiManager />
