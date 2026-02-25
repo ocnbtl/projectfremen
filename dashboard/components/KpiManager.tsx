@@ -13,7 +13,6 @@ type TrendDirection = "up" | "down" | "flat";
 
 type TrendMeta = {
   direction: TrendDirection;
-  symbol: string;
   percent: string;
 };
 
@@ -24,24 +23,76 @@ type ProgressMeta = {
 };
 
 const ENTITIES: EntityName[] = ["Unigentamos", "pngwn", "Diyesu Decor"];
-const PRIORITIES = ["P1", "P2", "P3"] as const;
+const DEFAULT_STALE_DAYS = 7;
+const STALE_DAYS_STORAGE_KEY = "kpi-stale-days";
+
+const BRAND_CLASS_BY_ENTITY: Record<EntityName, "fremen" | "iceflake" | "pint"> = {
+  Unigentamos: "fremen",
+  pngwn: "iceflake",
+  "Diyesu Decor": "pint"
+};
+
+const KPI_ORDER_BY_ENTITY: Record<EntityName, string[]> = {
+  Unigentamos: ["Documentation Coverage", "Open Blockers"],
+  pngwn: [
+    "Waitlist Signups (Total)",
+    "Waitlist Signups (Past 7 Days)",
+    "Total Website Impressions",
+    "Errors Reported in Sentry",
+    "Unread Emails (Zoho)"
+  ],
+  "Diyesu Decor": [
+    "Pins Published This Week",
+    "Blogs Published This Week",
+    "Outbound Clicks from Pinterest",
+    "Total Website Impressions",
+    "Total Email Newsletter Signups",
+    "Email Newsletter Signups (Past 7 Days)",
+    "Unread Emails (Zoho)"
+  ]
+};
+
+function normalizeLabel(value: string): string {
+  return value.trim().toLowerCase();
+}
+
+function getKpiOrder(entity: EntityName, name: string): number {
+  const order = KPI_ORDER_BY_ENTITY[entity] ?? [];
+  const idx = order.findIndex((label) => normalizeLabel(label) === normalizeLabel(name));
+  return idx === -1 ? Number.MAX_SAFE_INTEGER : idx;
+}
 
 function extractTrend(value: string): TrendMeta | null {
-  const match = value.match(/[\(\[]?\s*([↑↓↔])\s*([0-9]+(?:\.[0-9]+)?%)\s*[\)\]]?/);
-  if (!match) {
-    return null;
+  const arrowMatch = value.match(/([↑↓↔])\s*([0-9]+(?:\.[0-9]+)?%)/);
+  if (arrowMatch) {
+    const symbol = arrowMatch[1];
+    const percent = arrowMatch[2];
+
+    if (symbol === "↑") {
+      return { direction: "up", percent };
+    }
+    if (symbol === "↓") {
+      return { direction: "down", percent };
+    }
+    return { direction: "flat", percent };
   }
 
-  const symbol = match[1];
-  const percent = match[2];
+  const signMatch = value.match(/([+-])\s*([0-9]+(?:\.[0-9]+)?%)/);
+  if (signMatch) {
+    return {
+      direction: signMatch[1] === "+" ? "up" : "down",
+      percent: signMatch[2]
+    };
+  }
 
-  if (symbol === "↑") {
-    return { direction: "up", symbol, percent };
-  }
-  if (symbol === "↓") {
-    return { direction: "down", symbol, percent };
-  }
-  return { direction: "flat", symbol, percent };
+  return null;
+}
+
+function stripTrendFromValue(value: string): string {
+  return value
+    .replace(/\s*[\(\[]?\s*[↑↓↔]\s*[0-9]+(?:\.[0-9]+)?%\s*[\)\]]?\s*$/, "")
+    .replace(/\s*[\(\[]?\s*[+-]\s*[0-9]+(?:\.[0-9]+)?%\s*[\)\]]?\s*$/, "")
+    .trim();
 }
 
 function extractProgress(value: string): ProgressMeta | null {
@@ -61,6 +112,15 @@ function extractProgress(value: string): ProgressMeta | null {
   return { current, target, percent };
 }
 
+function isStale(updatedAt: string, staleDays: number): boolean {
+  const parsed = Date.parse(updatedAt);
+  if (Number.isNaN(parsed)) {
+    return false;
+  }
+  const maxAgeMs = staleDays * 24 * 60 * 60 * 1000;
+  return Date.now() - parsed > maxAgeMs;
+}
+
 export default function KpiManager() {
   const [items, setItems] = useState<KpiEntry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -70,7 +130,7 @@ export default function KpiManager() {
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
   const [link, setLink] = useState("");
-  const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>("P1");
+  const [staleDays, setStaleDays] = useState(DEFAULT_STALE_DAYS);
   const [saving, setSaving] = useState(false);
 
   async function refresh() {
@@ -92,10 +152,16 @@ export default function KpiManager() {
     setSaving(true);
     setError("");
 
+    if (!name.trim()) {
+      setError("Select a KPI name before saving.");
+      setSaving(false);
+      return;
+    }
+
     const res = await fetch("/api/kpis", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entity, name, value, priority, link })
+      body: JSON.stringify({ entity, name, value, priority: "P1", link })
     });
     const payload = (await res.json()) as KpiResponse;
     if (!res.ok || !payload.ok) {
@@ -105,7 +171,6 @@ export default function KpiManager() {
     }
 
     setItems(payload.items);
-    setName("");
     setValue("");
     setLink("");
     setSaving(false);
@@ -115,15 +180,68 @@ export default function KpiManager() {
     void refresh();
   }, []);
 
+  useEffect(() => {
+    const raw = window.localStorage.getItem(STALE_DAYS_STORAGE_KEY);
+    if (!raw) {
+      return;
+    }
+
+    const parsed = Number(raw);
+    if (Number.isFinite(parsed) && parsed >= 1 && parsed <= 365) {
+      setStaleDays(parsed);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem(STALE_DAYS_STORAGE_KEY, String(staleDays));
+  }, [staleDays]);
+
+  const kpiNameOptions = useMemo(() => {
+    const baseNames = KPI_ORDER_BY_ENTITY[entity] ?? [];
+    const existingNames = items
+      .filter((item) => item.entity === entity)
+      .map((item) => item.name);
+
+    const merged: string[] = [...baseNames];
+    for (const existingName of existingNames) {
+      if (!merged.some((candidate) => normalizeLabel(candidate) === normalizeLabel(existingName))) {
+        merged.push(existingName);
+      }
+    }
+    return merged;
+  }, [entity, items]);
+
+  useEffect(() => {
+    if (kpiNameOptions.length === 0) {
+      setName("");
+      return;
+    }
+
+    const validCurrent = kpiNameOptions.some(
+      (optionName) => normalizeLabel(optionName) === normalizeLabel(name)
+    );
+    if (!validCurrent) {
+      setName(kpiNameOptions[0]);
+    }
+  }, [kpiNameOptions, name]);
+
   const groupedItems = useMemo(
     () =>
       ENTITIES.map((entityName) => {
         const entityItems = items
           .filter((item) => item.entity === entityName)
-          .sort((a, b) => a.name.localeCompare(b.name));
+          .sort((a, b) => {
+            const aOrder = getKpiOrder(entityName, a.name);
+            const bOrder = getKpiOrder(entityName, b.name);
+            if (aOrder !== bOrder) {
+              return aOrder - bOrder;
+            }
+            return a.name.localeCompare(b.name);
+          });
 
         return {
           entity: entityName,
+          brandClass: BRAND_CLASS_BY_ENTITY[entityName],
           items: entityItems
         };
       }),
@@ -136,7 +254,7 @@ export default function KpiManager() {
       <p className="muted">Grouped by brand for quick weekly review.</p>
       {error && <p className="pill warn">{error}</p>}
 
-      <form onSubmit={onSubmit} className="inline-form" style={{ marginBottom: 12 }}>
+      <form onSubmit={onSubmit} className="inline-form kpi-form" style={{ marginBottom: 12 }}>
         <label>
           Entity
           <select value={entity} onChange={(e) => setEntity(e.target.value as EntityName)}>
@@ -149,19 +267,24 @@ export default function KpiManager() {
         </label>
         <label>
           KPI Name
-          <input
+          <select
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Example: Waitlist Signups (Past 7 Days)"
             required
-          />
+          >
+            {kpiNameOptions.map((kpiName) => (
+              <option key={kpiName} value={kpiName}>
+                {kpiName}
+              </option>
+            ))}
+          </select>
         </label>
-        <label>
+        <label className="value-field">
           Value
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Example: 38 (↑ 12%)"
+            placeholder="38 (+12%)"
             required
           />
         </label>
@@ -173,19 +296,25 @@ export default function KpiManager() {
             placeholder="https://sentry.io/..."
           />
         </label>
-        <label>
-          Priority
-          <select value={priority} onChange={(e) => setPriority(e.target.value as "P1" | "P2" | "P3")}>
-            {PRIORITIES.map((item) => (
-              <option key={item} value={item}>
-                {item}
-              </option>
-            ))}
-          </select>
-        </label>
         <button type="submit" disabled={saving}>
           {saving ? "Saving..." : "Save KPI"}
         </button>
+        <label className="stale-inline-field">
+          Stale Days
+          <input
+            type="number"
+            min={1}
+            max={365}
+            value={staleDays}
+            onChange={(event) => {
+              const next = Number(event.target.value);
+              if (!Number.isFinite(next)) {
+                return;
+              }
+              setStaleDays(Math.max(1, Math.min(365, Math.round(next))));
+            }}
+          />
+        </label>
       </form>
 
       {loading ? (
@@ -193,7 +322,7 @@ export default function KpiManager() {
       ) : (
         <div className="kpi-groups">
           {groupedItems.map((group) => (
-            <article className="kpi-group" key={group.entity}>
+            <article className={`kpi-group kpi-group-${group.brandClass}`} key={group.entity}>
               <div className="kpi-group-header">
                 <h3>{group.entity}</h3>
                 <span className="pill">{group.items.length} KPIs</span>
@@ -205,12 +334,29 @@ export default function KpiManager() {
                 <div className="kpi-card-grid">
                   {group.items.map((item) => {
                     const trend = extractTrend(item.value);
-                    const progress = extractProgress(item.value);
+                    const displayValue = stripTrendFromValue(item.value);
+                    const progress = extractProgress(displayValue);
+                    const stale = isStale(item.updatedAt, staleDays);
 
                     return (
-                      <article className="kpi-value-card" key={item.id}>
+                      <article className={`kpi-value-card ${stale ? "is-stale" : ""}`} key={item.id}>
+                        {stale && (
+                          <span
+                            className="stale-dot"
+                            title={`Stale KPI: not updated in the last ${staleDays} days`}
+                            aria-label="Stale KPI"
+                          />
+                        )}
                         <p className="kpi-name">{item.name}</p>
-                        <p className="kpi-value">{item.value}</p>
+                        <div className="kpi-value-row">
+                          <p className="kpi-value">{displayValue || item.value}</p>
+                          {trend && (
+                            <span className={`trend trend-${trend.direction}`}>
+                              {trend.direction === "up" ? "+" : trend.direction === "down" ? "-" : ""}
+                              {trend.percent}
+                            </span>
+                          )}
+                        </div>
                         {progress && (
                           <div className="kpi-progress-wrap" aria-label={`${progress.current} of ${progress.target}`}>
                             <div className="kpi-progress-track">
@@ -226,12 +372,6 @@ export default function KpiManager() {
                         )}
 
                         <div className="kpi-meta-row">
-                          <span className="pill p1">{item.priority}</span>
-                          {trend && (
-                            <span className={`trend trend-${trend.direction}`}>
-                              {trend.symbol} {trend.percent}
-                            </span>
-                          )}
                           {item.link && (
                             <a href={item.link} target="_blank" rel="noreferrer" className="kpi-link">
                               Open link

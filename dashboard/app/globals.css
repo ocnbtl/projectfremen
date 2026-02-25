@@ -155,7 +155,7 @@ select {
 
 .inline-form {
   display: grid;
-  gap: 10px;
+  gap: 8px;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   align-items: end;
 }
@@ -164,16 +164,120 @@ select {
   margin-bottom: 12px;
 }
 
+.kpi-form {
+  grid-template-columns:
+    120px
+    220px
+    125px
+    200px
+    160px
+    90px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding-bottom: 2px;
+}
+
+.kpi-form button {
+  margin-bottom: 12px;
+}
+
+.kpi-form label,
+.kpi-form button {
+  min-width: 0;
+}
+
+.stale-inline-field input {
+  margin-bottom: 12px;
+}
+
+.stale-inline-field {
+  white-space: nowrap;
+}
+
+.value-field input {
+  max-width: 150px;
+}
+
+.stale-inline-field input {
+  max-width: 92px;
+}
+
+.entity-card {
+  --entity-accent: #2b7a49;
+  --entity-soft: #e8f3ec;
+  border-left: 4px solid var(--entity-accent);
+}
+
+.entity-card h3 {
+  color: var(--entity-accent);
+}
+
+.entity-card-fremen {
+  --entity-accent: #2b7a49;
+  --entity-soft: #e8f3ec;
+}
+
+.entity-card-iceflake {
+  --entity-accent: #2d5fa6;
+  --entity-soft: #e9f0fb;
+}
+
+.entity-card-pint {
+  --entity-accent: #bc6a1f;
+  --entity-soft: #fbeedf;
+}
+
+.entity-pill {
+  font-weight: 600;
+  border-color: transparent;
+}
+
+.entity-pill-fremen {
+  color: #1e5f3a;
+  background: #e8f3ec;
+}
+
+.entity-pill-iceflake {
+  color: #214c89;
+  background: #e9f0fb;
+}
+
+.entity-pill-pint {
+  color: #9a5316;
+  background: #fbeedf;
+}
+
 .kpi-groups {
   display: grid;
   gap: 12px;
 }
 
 .kpi-group {
-  border: 1px solid var(--line);
+  --entity-accent: #2b7a49;
+  --entity-soft: #eef7f1;
+  --entity-line: #c4ddcd;
+  border: 1px solid var(--entity-line);
   border-radius: 14px;
-  background: linear-gradient(180deg, #f9fcfa 0%, #f4f8f5 100%);
+  background: linear-gradient(180deg, var(--entity-soft) 0%, #f8fbf9 100%);
   padding: 14px;
+}
+
+.kpi-group-fremen {
+  --entity-accent: #2b7a49;
+  --entity-soft: #eef7f1;
+  --entity-line: #c4ddcd;
+}
+
+.kpi-group-iceflake {
+  --entity-accent: #2d5fa6;
+  --entity-soft: #edf3fd;
+  --entity-line: #c4d6f1;
+}
+
+.kpi-group-pint {
+  --entity-accent: #bc6a1f;
+  --entity-soft: #fdf3e8;
+  --entity-line: #efd2b5;
 }
 
 .kpi-group-header {
@@ -186,6 +290,7 @@ select {
 
 .kpi-group-header h3 {
   margin: 0;
+  color: var(--entity-accent);
 }
 
 .kpi-card-grid {
@@ -195,17 +300,40 @@ select {
 }
 
 .kpi-value-card {
+  position: relative;
   background: #ffffff;
-  border: 1px solid #cfddd3;
+  border: 1px solid var(--entity-line);
   border-radius: 12px;
   padding: 12px;
   box-shadow: 0 1px 0 rgba(20, 33, 27, 0.03);
 }
 
+.kpi-value-card.is-stale {
+  border-color: #e3a6a6;
+}
+
+.stale-dot {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #d33f3f;
+  box-shadow: 0 0 0 3px #fdeaea;
+}
+
 .kpi-name {
   margin: 0;
-  color: var(--muted);
-  font-size: 13px;
+  color: var(--entity-accent);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.kpi-value-row {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
 }
 
 .kpi-value {
@@ -213,7 +341,7 @@ select {
   font-size: 26px;
   line-height: 1.2;
   font-weight: 700;
-  color: #173428;
+  color: var(--ink);
 }
 
 .kpi-progress-wrap {
@@ -224,14 +352,14 @@ select {
   width: 100%;
   height: 8px;
   border-radius: 999px;
-  background: #e7efe9;
+  background: var(--entity-soft);
   overflow: hidden;
 }
 
 .kpi-progress-fill {
   height: 100%;
   border-radius: 999px;
-  background: linear-gradient(90deg, #2d6b4a 0%, #439463 100%);
+  background: linear-gradient(90deg, var(--entity-accent) 0%, var(--entity-accent) 100%);
   transition: width 220ms ease;
 }
 
@@ -246,12 +374,14 @@ select {
   align-items: center;
   flex-wrap: wrap;
   gap: 8px;
+  min-height: 18px;
 }
 
 .kpi-link {
   font-size: 13px;
   text-decoration: none;
   border-bottom: 1px solid currentColor;
+  color: var(--entity-accent);
 }
 
 .kpi-updated {
@@ -262,26 +392,19 @@ select {
 .trend {
   display: inline-flex;
   align-items: center;
-  border-radius: 999px;
-  padding: 2px 8px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .trend-up {
-  color: #185f39;
-  background: #e4f5eb;
-  border: 1px solid #bdddc9;
+  color: #1b7c46;
 }
 
 .trend-down {
-  color: #8d241f;
-  background: #fbe9e7;
-  border: 1px solid #f0c4bf;
+  color: #b23333;
 }
 
 .trend-flat {
-  color: #5a5f5b;
-  background: #edf1ee;
-  border: 1px solid #d6ddd8;
+  color: #606764;
 }

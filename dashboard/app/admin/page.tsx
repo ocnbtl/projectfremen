@@ -13,19 +13,28 @@ const ENTITIES = [
   {
     name: "Unigentamos",
     type: "Holding / umbrella",
-    status: "Active planning"
+    status: "Active planning",
+    theme: "fremen"
   },
   {
     name: "pngwn",
     type: "Brand project (Project Iceflake)",
-    status: "Website build"
+    status: "Website build",
+    theme: "iceflake"
   },
   {
     name: "Diyesu Decor",
     type: "Brand project (Project Pint)",
-    status: "Content ops build"
+    status: "Content ops build",
+    theme: "pint"
   }
 ];
+
+const ENTITY_THEME_BY_NAME: Record<string, "fremen" | "iceflake" | "pint"> = {
+  Unigentamos: "fremen",
+  pngwn: "iceflake",
+  "Diyesu Decor": "pint"
+};
 
 export default function AdminPage() {
   return (
@@ -40,11 +49,11 @@ export default function AdminPage() {
 
       <section className="grid grid-3">
         {ENTITIES.map((entity) => (
-          <article className="card" key={entity.name}>
+          <article className={`card entity-card entity-card-${entity.theme}`} key={entity.name}>
             <h3>{entity.name}</h3>
             <p className="muted">{entity.type}</p>
             <p>
-              <span className="pill">{entity.status}</span>
+              <span className={`pill entity-pill entity-pill-${entity.theme}`}>{entity.status}</span>
             </p>
           </article>
         ))}
@@ -66,7 +75,11 @@ export default function AdminPage() {
               {ACTION_ITEMS.map((item) => (
                 <tr key={item.id}>
                   <td>{item.title}</td>
-                  <td>{item.entity}</td>
+                  <td>
+                    <span className={`pill entity-pill entity-pill-${ENTITY_THEME_BY_NAME[item.entity]}`}>
+                      {item.entity}
+                    </span>
+                  </td>
                   <td>{item.due}</td>
                   <td>{item.status}</td>
                 </tr>
