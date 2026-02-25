@@ -17,6 +17,12 @@ type TrendMeta = {
   percent: string;
 };
 
+type ProgressMeta = {
+  current: number;
+  target: number;
+  percent: number;
+};
+
 const ENTITIES: EntityName[] = ["Unigentamos", "pngwn", "Diyesu Decor"];
 const PRIORITIES = ["P1", "P2", "P3"] as const;
 
@@ -36,6 +42,23 @@ function extractTrend(value: string): TrendMeta | null {
     return { direction: "down", symbol, percent };
   }
   return { direction: "flat", symbol, percent };
+}
+
+function extractProgress(value: string): ProgressMeta | null {
+  const match = value.match(/(-?\d+(?:\.\d+)?)\s*\/\s*(-?\d+(?:\.\d+)?)/);
+  if (!match) {
+    return null;
+  }
+
+  const current = Number(match[1]);
+  const target = Number(match[2]);
+
+  if (!Number.isFinite(current) || !Number.isFinite(target) || target <= 0) {
+    return null;
+  }
+
+  const percent = Math.min(100, Math.max(0, (current / target) * 100));
+  return { current, target, percent };
 }
 
 export default function KpiManager() {
@@ -182,11 +205,25 @@ export default function KpiManager() {
                 <div className="kpi-card-grid">
                   {group.items.map((item) => {
                     const trend = extractTrend(item.value);
+                    const progress = extractProgress(item.value);
 
                     return (
                       <article className="kpi-value-card" key={item.id}>
                         <p className="kpi-name">{item.name}</p>
                         <p className="kpi-value">{item.value}</p>
+                        {progress && (
+                          <div className="kpi-progress-wrap" aria-label={`${progress.current} of ${progress.target}`}>
+                            <div className="kpi-progress-track">
+                              <div
+                                className="kpi-progress-fill"
+                                style={{ width: `${progress.percent.toFixed(2)}%` }}
+                              />
+                            </div>
+                            <p className="kpi-progress-label">
+                              {progress.current} / {progress.target} ({Math.round(progress.percent)}%)
+                            </p>
+                          </div>
+                        )}
 
                         <div className="kpi-meta-row">
                           <span className="pill p1">{item.priority}</span>
