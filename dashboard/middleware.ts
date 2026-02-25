@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { buildAdminSessionToken } from "./lib/auth";
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   if (!request.nextUrl.pathname.startsWith("/admin")) {
     return NextResponse.next();
   }
@@ -11,7 +12,10 @@ export function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get("admin_session")?.value;
-  const expected = process.env.ADMIN_PASSWORD;
+  const adminPassword = process.env.ADMIN_PASSWORD;
+  const expected = adminPassword
+    ? await buildAdminSessionToken(adminPassword)
+    : undefined;
 
   if (!expected || !token || token !== expected) {
     return NextResponse.redirect(new URL("/admin/login", request.url));

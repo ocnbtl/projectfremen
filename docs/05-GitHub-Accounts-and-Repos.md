@@ -34,5 +34,5 @@ Then each repo remote URL points to the correct alias.
 ## Immediate Repo Actions
 
 1. Create `projectfremen` on `@ocnbtl`.
-2. Initialize local git in `/Users/ocean/Documents/Project Fremen`.
+2. Initialize local git in your local `Project Fremen` repo root.
 3. Push the current plan/docs and dashboard scaffold as first commit.

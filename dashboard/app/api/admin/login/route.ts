@@ -1,16 +1,20 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
+import { buildAdminSessionToken } from "../../../../lib/auth";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
   const password = String(formData.get("password") ?? "");
+  const adminPassword = process.env.ADMIN_PASSWORD;
 
-  if (!process.env.ADMIN_PASSWORD || password !== process.env.ADMIN_PASSWORD) {
+  if (!adminPassword || password !== adminPassword) {
     return NextResponse.redirect(new URL("/admin/login?error=1", request.url));
   }
 
   const jar = await cookies();
-  jar.set("admin_session", process.env.ADMIN_PASSWORD, {
+  const sessionToken = await buildAdminSessionToken(adminPassword);
+
+  jar.set("admin_session", sessionToken, {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
