@@ -50,28 +50,28 @@ export const KPI_CARDS: KpiCard[] = [
     id: "K-001",
     entity: "Unigentamos",
     name: "Documentation Coverage",
-    value: "0 / 12 areas complete",
+    value: "0 / 12",
     priority: "P1"
   },
   {
     id: "K-002",
-    entity: "pngwn",
-    name: "Waitlist Signups (Weekly)",
-    value: "TBD",
+    entity: "Unigentamos",
+    name: "Open Blockers",
+    value: "0",
     priority: "P1"
   },
   {
     id: "K-003",
-    entity: "Diyesu Decor",
-    name: "Content Shipped (Weekly)",
-    value: "TBD",
+    entity: "pngwn",
+    name: "Waitlist Signups (Total)",
+    value: "0",
     priority: "P1"
   },
   {
     id: "K-004",
-    entity: "Unigentamos",
-    name: "Open Blockers",
-    value: "0",
+    entity: "Diyesu Decor",
+    name: "Pins Published This Week",
+    value: "0 / 25",
     priority: "P1"
   }
 ];

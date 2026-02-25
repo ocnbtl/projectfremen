@@ -20,6 +20,7 @@ export default function KpiManager() {
   const [entity, setEntity] = useState<EntityName>("Unigentamos");
   const [name, setName] = useState("");
   const [value, setValue] = useState("");
+  const [link, setLink] = useState("");
   const [priority, setPriority] = useState<(typeof PRIORITIES)[number]>("P1");
   const [saving, setSaving] = useState(false);
 
@@ -45,7 +46,7 @@ export default function KpiManager() {
     const res = await fetch("/api/kpis", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ entity, name, value, priority })
+      body: JSON.stringify({ entity, name, value, priority, link })
     });
     const payload = (await res.json()) as KpiResponse;
     if (!res.ok || !payload.ok) {
@@ -57,6 +58,7 @@ export default function KpiManager() {
     setItems(payload.items);
     setName("");
     setValue("");
+    setLink("");
     setSaving(false);
   }
 
@@ -103,8 +105,16 @@ export default function KpiManager() {
           <input
             value={value}
             onChange={(e) => setValue(e.target.value)}
-            placeholder="Example: 38"
+            placeholder="Example: 38 (↑ 12%)"
             required
+          />
+        </label>
+        <label>
+          Link (Optional)
+          <input
+            value={link}
+            onChange={(e) => setLink(e.target.value)}
+            placeholder="https://sentry.io/..."
           />
         </label>
         <label>
@@ -131,6 +141,7 @@ export default function KpiManager() {
               <th>Entity</th>
               <th>Name</th>
               <th>Value</th>
+              <th>Link</th>
               <th>Priority</th>
               <th>Updated</th>
             </tr>
@@ -141,6 +152,15 @@ export default function KpiManager() {
                 <td>{item.entity}</td>
                 <td>{item.name}</td>
                 <td>{item.value}</td>
+                <td>
+                  {item.link ? (
+                    <a href={item.link} target="_blank" rel="noreferrer">
+                      Open
+                    </a>
+                  ) : (
+                    ""
+                  )}
+                </td>
                 <td>{item.priority}</td>
                 <td>{new Date(item.updatedAt).toLocaleString()}</td>
               </tr>

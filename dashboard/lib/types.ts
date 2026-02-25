@@ -6,6 +6,7 @@ export type KpiEntry = {
   name: string;
   value: string;
   priority: "P1" | "P2" | "P3";
+  link?: string;
   updatedAt: string;
 };
 
