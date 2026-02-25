@@ -1,14 +1,14 @@
 export type ActionItem = {
   id: string;
   title: string;
-  entity: "Unigentamos" | "pngwn" | "Diyesu Decor";
+  entity: "Unigentamos" | "pngwn" | "Ranosa Decor";
   due: string;
   status: "due_now" | "upcoming" | "blocked";
 };
 
 export type KpiCard = {
   id: string;
-  entity: "Unigentamos" | "pngwn" | "Diyesu Decor";
+  entity: "Unigentamos" | "pngwn" | "Ranosa Decor";
   name: string;
   value: string;
   priority: "P1" | "P2" | "P3";
@@ -39,7 +39,7 @@ export const ACTION_ITEMS: ActionItem[] = [
   {
     id: "A-004",
     title: "Confirm weekly operating packet flow",
-    entity: "Diyesu Decor",
+    entity: "Ranosa Decor",
     due: "This week",
     status: "upcoming"
   }
@@ -62,7 +62,7 @@ export const KPI_CARDS: KpiCard[] = [
   },
   {
     id: "K-003",
-    entity: "Diyesu Decor",
+    entity: "Ranosa Decor",
     name: "Content Shipped (Weekly)",
     value: "TBD",
     priority: "P1"

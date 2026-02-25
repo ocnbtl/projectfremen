@@ -27,7 +27,7 @@ Use a simple three-level priority:
 4. P2: Brand asset readiness score
 5. P3: Legal/admin readiness score
 
-## Diyesu Decor (Project Pint) Starter KPIs
+## Ranosa Decor (Project Pint) Starter KPIs
 
 1. P1: Content output shipped (pins/posts per week)
 2. P1: Outbound click performance trend

@@ -49,6 +49,6 @@ Website hierarchy is operational, not note-lineage:
 1. Holding entity: Unigentamos
 2. Brand units:
    - pngwn
-   - Diyesu Decor
+   - Ranosa Decor
 
 This hierarchy is represented in app data tables, not as Obsidian parent-child note mapping.

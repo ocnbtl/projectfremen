@@ -1,5 +1,7 @@
 import { ACTION_ITEMS, KPI_CARDS } from "../../lib/seed-data";
 import RotatingWelcome from "../../components/RotatingWelcome";
+import KpiManager from "../../components/KpiManager";
+import DocsIndexPanel from "../../components/DocsIndexPanel";
 
 const UPCOMING_REVIEWS = [
   { label: "Weekly Review", due: "Monday 9:00 AM" },
@@ -19,7 +21,7 @@ const ENTITIES = [
     status: "Website build"
   },
   {
-    name: "Ranosa Decor",
+    name: "Diyesu Decor",
     type: "Brand project (Project Pint)",
     status: "Content ops build"
   }
@@ -110,12 +112,16 @@ export default function AdminPage() {
         </div>
       </section>
 
+      <KpiManager />
+
+      <DocsIndexPanel />
+
       <section className="card" style={{ marginTop: 12 }}>
         <h2>MVP Notes</h2>
         <ul>
           <li>Obsidian relationship semantics are preserved.</li>
           <li>Project hierarchy is operational in app data, not note lineage.</li>
-          <li>Next feature: GitHub document indexing and metadata filters.</li>
+          <li>Docs index and KPI persistence are now available in admin panels.</li>
         </ul>
       </section>
     </main>

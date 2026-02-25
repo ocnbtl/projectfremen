@@ -1,0 +1,26 @@
+[
+  {
+    "id": "kpi-unigentamos-doc-coverage",
+    "entity": "Unigentamos",
+    "name": "Documentation Coverage",
+    "value": "0 / 12 areas complete",
+    "priority": "P1",
+    "updatedAt": "2026-02-25T00:00:00.000Z"
+  },
+  {
+    "id": "kpi-pngwn-waitlist",
+    "entity": "pngwn",
+    "name": "Waitlist Signups (Weekly)",
+    "value": "TBD",
+    "priority": "P1",
+    "updatedAt": "2026-02-25T00:00:00.000Z"
+  },
+  {
+    "id": "kpi-diyesu-content",
+    "entity": "Diyesu Decor",
+    "name": "Content Shipped (Weekly)",
+    "value": "TBD",
+    "priority": "P1",
+    "updatedAt": "2026-02-25T00:00:00.000Z"
+  }
+]

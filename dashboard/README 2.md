@@ -9,9 +9,7 @@ This is the fast-start scaffold for the Unigentamos internal admin dashboard.
 3. Admin dashboard (`/admin`)
 4. Rotating welcome text component
 5. Seed task and KPI cards
-6. Basic founder-only cookie auth proxy
-7. Persisted KPI API (`GET/POST /api/kpis`)
-8. GitHub docs index APIs (`GET /api/docs`, `POST /api/docs/sync`)
+6. Basic founder-only cookie auth middleware
 
 ## Environment
 
@@ -19,9 +17,6 @@ Create `.env.local`:
 
 ```bash
 ADMIN_PASSWORD=change-me
-GITHUB_TOKEN=
-DOCS_REPOS=ocnbtl/projectfremen:main,pngwn-zero/pngwn-web:main,ocnbtl/projectpint:main
-DOCS_MAX_FILES=120
 ```
 
 ## Run
@@ -37,5 +32,4 @@ Then open `http://localhost:3000`.
 
 1. Auth is intentionally simple for MVP speed.
 2. Replace auth with stronger mechanism before multi-user rollout.
-3. `GITHUB_TOKEN` is optional but recommended to avoid rate limits while syncing docs.
-4. KPI and docs data are stored in local `dashboard/data/*.json` for MVP.
+3. Next step is adding GitHub doc indexing + Postgres persistence.

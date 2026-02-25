@@ -7,7 +7,7 @@ export default function HomePage() {
       <section className="card">
         <h1>Unigentamos Admin</h1>
         <p className="muted">
-          Unified operations dashboard for Unigentamos, pngwn, and Diyesu Decor.
+          Unified operations dashboard for Unigentamos, pngwn, and Ranosa Decor.
         </p>
         <RotatingWelcome />
         <p style={{ marginTop: 16 }}>

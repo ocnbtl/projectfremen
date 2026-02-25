@@ -7,7 +7,7 @@
 3. Kept project identities separate in Obsidian:
    - `Project Fremen` (Unigentamos workstream)
    - `Project Iceflake` (pngwn workstream)
-   - `Project Pint` (Diyesu Decor workstream)
+   - `Project Pint` (Ranosa Decor workstream)
 4. Moved parent-company hierarchy to the web admin data model (not vault note hierarchy).
 
 ## Operating Model (Simple)
@@ -28,7 +28,7 @@ Each area must have owner, status, next review date, and evidence/doc link.
 2. Legal and compliance tracking.
 3. Finance and monthly close.
 4. Tax readiness.
-5. Brand oversight (pngwn / Diyesu Decor).
+5. Brand oversight (pngwn / Ranosa Decor).
 6. KPI tracking.
 7. Risk and issue log.
 8. Decisions and rationale log.

@@ -26,7 +26,7 @@ Exit criteria:
 4. Implement project cards for:
    - Unigentamos
    - pngwn
-   - Diyesu Decor
+   - Ranosa Decor
 5. Add rotating welcome header text options.
 
 Exit criteria:
