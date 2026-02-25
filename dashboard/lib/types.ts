@@ -1,4 +1,5 @@
 export type EntityName = "Unigentamos" | "pngwn" | "Diyesu Decor";
+export type ReviewKind = "weekly" | "monthly";
 
 export type KpiEntry = {
   id: string;
@@ -28,4 +29,13 @@ export type DocsIndexItem = {
 export type DocsIndexState = {
   lastSynced: string | null;
   items: DocsIndexItem[];
+};
+
+export type ReviewEntry = {
+  id: string;
+  kind: ReviewKind;
+  scheduledFor: string; // YYYY-MM-DD local date
+  createdAt: string;
+  updatedAt: string;
+  values: Record<string, string>;
 };

@@ -20,3 +20,6 @@ This repository currently contains:
 1. Read `docs/01-Updated-Operating-Plan.md`.
 2. Run the Day 0 checklist in `docs/02-Execution-Checklist-Day0-Day2.md`.
 3. Use `dashboard/` as the MVP admin app starting point.
+4. Run `docs/06-Weekly-Review.md` once per week.
+5. Run `docs/07-Monthly-Review.md` once per month.
+6. Keep KPI meaning stable with `docs/08-KPI-Definitions.md`.

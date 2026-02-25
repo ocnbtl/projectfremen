@@ -1,32 +1,31 @@
+import Link from "next/link";
 import { ACTION_ITEMS } from "../../lib/seed-data";
 import RotatingWelcome from "../../components/RotatingWelcome";
 import KpiManager from "../../components/KpiManager";
 import DocsIndexPanel from "../../components/DocsIndexPanel";
-
-const UPCOMING_REVIEWS = [
-  { label: "Weekly Review", due: "Monday 9:00 AM" },
-  { label: "Monthly Review", due: "1st business day 10:00 AM" },
-  { label: "KPI Refresh", due: "Friday 4:00 PM" }
-];
+import ReviewActions from "../../components/ReviewActions";
 
 const ENTITIES = [
   {
     name: "Unigentamos",
     type: "Holding / umbrella",
     status: "Active planning",
-    theme: "fremen"
+    theme: "fremen",
+    slug: "unigentamos"
   },
   {
     name: "pngwn",
     type: "Brand project (Project Iceflake)",
     status: "Website build",
-    theme: "iceflake"
+    theme: "iceflake",
+    slug: "pngwn"
   },
   {
     name: "Diyesu Decor",
     type: "Brand project (Project Pint)",
     status: "Content ops build",
-    theme: "pint"
+    theme: "pint",
+    slug: "diyesu-decor"
   }
 ];
 
@@ -49,13 +48,15 @@ export default function AdminPage() {
 
       <section className="grid grid-3">
         {ENTITIES.map((entity) => (
-          <article className={`card entity-card entity-card-${entity.theme}`} key={entity.name}>
-            <h3>{entity.name}</h3>
-            <p className="muted">{entity.type}</p>
-            <p>
-              <span className={`pill entity-pill entity-pill-${entity.theme}`}>{entity.status}</span>
-            </p>
-          </article>
+          <Link href={`/admin/entities/${entity.slug}`} className="entity-card-link" key={entity.name}>
+            <article className={`card entity-card entity-card-${entity.theme}`}>
+              <h3>{entity.name}</h3>
+              <p className="muted">{entity.type}</p>
+              <p>
+                <span className={`pill entity-pill entity-pill-${entity.theme}`}>{entity.status}</span>
+              </p>
+            </article>
+          </Link>
         ))}
       </section>
 
@@ -88,25 +89,7 @@ export default function AdminPage() {
           </table>
         </article>
 
-        <article className="card">
-          <h2>Upcoming Reviews</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Review</th>
-                <th>When</th>
-              </tr>
-            </thead>
-            <tbody>
-              {UPCOMING_REVIEWS.map((review) => (
-                <tr key={review.label}>
-                  <td>{review.label}</td>
-                  <td>{review.due}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </article>
+        <ReviewActions />
       </section>
 
       <KpiManager />

@@ -12,6 +12,11 @@ This is the fast-start scaffold for the Unigentamos internal admin dashboard.
 6. Basic founder-only cookie auth proxy
 7. Persisted KPI API (`GET/POST /api/kpis`)
 8. GitHub docs index APIs (`GET /api/docs`, `POST /api/docs/sync`)
+9. Review entries APIs (`GET/POST/PATCH/DELETE /api/reviews`)
+10. Review pages (`/admin/reviews/weekly`, `/admin/reviews/monthly`)
+11. Review entry form pages (`/admin/reviews/weekly/[entryId]`, `/admin/reviews/monthly/[entryId]`)
+12. Entity hub pages (`/admin/entities/unigentamos`, `/admin/entities/pngwn`, `/admin/entities/diyesu-decor`)
+13. Editable entity focus goals (`GET/POST /api/entity-goals`)
 
 ## Environment
 

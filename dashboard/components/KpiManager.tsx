@@ -23,7 +23,7 @@ type ProgressMeta = {
 };
 
 const ENTITIES: EntityName[] = ["Unigentamos", "pngwn", "Diyesu Decor"];
-const DEFAULT_STALE_DAYS = 7;
+const DEFAULT_STALE_DAYS = 14;
 const STALE_DAYS_STORAGE_KEY = "kpi-stale-days";
 
 const BRAND_CLASS_BY_ENTITY: Record<EntityName, "fremen" | "iceflake" | "pint"> = {
