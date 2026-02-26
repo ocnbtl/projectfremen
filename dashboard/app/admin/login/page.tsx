@@ -1,26 +1,16 @@
-export default function AdminLoginPage({
+import AnimatedLandingPage from "../../../components/AnimatedLandingPage";
+
+export default async function AdminLoginPage({
   searchParams
 }: {
-  searchParams: { error?: string };
+  searchParams: Promise<{ error?: string }>;
 }) {
-  const hasError = searchParams.error === "1";
-
+  const params = await searchParams;
   return (
-    <main className="shell">
-      <div className="login-wrap card">
-        <h1>Admin Login</h1>
-        <p className="muted">Founder-only access for MVP.</p>
-        {hasError && (
-          <p className="pill warn" role="alert">
-            Invalid password. Try again.
-          </p>
-        )}
-        <form action="/api/admin/login" method="post" style={{ marginTop: 16 }}>
-          <label htmlFor="password">Password</label>
-          <input id="password" name="password" type="password" required />
-          <button type="submit">Sign in</button>
-        </form>
-      </div>
-    </main>
+    <AnimatedLandingPage
+      hasError={params.error === "1"}
+      errorPath="/admin/login"
+      showBackLink
+    />
   );
 }

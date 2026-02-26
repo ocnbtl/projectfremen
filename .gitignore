@@ -15,3 +15,7 @@ node_modules/
 # TypeScript caches
 *.tsbuildinfo
 **/*.tsbuildinfo
+
+# Local recovery snapshots
+.repair-backups/
+.git-repair-backups/
