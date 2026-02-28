@@ -23,3 +23,5 @@ This repository currently contains:
 4. Run `docs/06-Weekly-Review.md` once per week.
 5. Run `docs/07-Monthly-Review.md` once per month.
 6. Keep KPI meaning stable with `docs/08-KPI-Definitions.md`.
+7. Use `docs/09-Deployment-Runbook.md` for production deployment steps.
+8. Use `docs/10-Release-Checklist.md` before each release.
