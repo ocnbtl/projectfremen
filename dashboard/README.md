@@ -34,6 +34,7 @@ SENTRY_API_BASE_URL=https://sentry.io/api/0
 SENTRY_KPI_QUERY=is:unresolved
 SENTRY_KPI_ENTITY=pngwn
 SENTRY_KPI_NAME=Errors Reported in Sentry
+OBSIDIAN_EXPORT_DIR=
 ```
 
 ## Run
@@ -52,3 +53,4 @@ Then open `http://localhost:3000`.
 3. `GITHUB_TOKEN` is optional but recommended to avoid rate limits while syncing docs.
 4. KPI and docs data are stored in local `dashboard/data/*.json` for MVP.
 5. Sentry KPI sync is optional and requires `SENTRY_*` env vars.
+6. Obsidian export is manual and available in admin via `/api/exports/obsidian`.

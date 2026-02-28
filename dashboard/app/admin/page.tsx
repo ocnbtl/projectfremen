@@ -4,6 +4,7 @@ import RotatingWelcome from "../../components/RotatingWelcome";
 import KpiManager from "../../components/KpiManager";
 import DocsIndexPanel from "../../components/DocsIndexPanel";
 import ReviewActions from "../../components/ReviewActions";
+import ObsidianExportPanel from "../../components/ObsidianExportPanel";
 
 const ENTITIES = [
   {
@@ -95,6 +96,8 @@ export default function AdminPage() {
       <KpiManager />
 
       <DocsIndexPanel />
+
+      <ObsidianExportPanel />
 
       <section className="card" style={{ marginTop: 12 }}>
         <h2>MVP Notes</h2>

@@ -28,3 +28,4 @@ This repository currently contains:
 9. Use `docs/11-Auth-Hardening.md` for current security controls and limits.
 10. Use `docs/12-KPI-External-Integration-Sentry.md` for first external KPI connector setup.
 11. Use `docs/13-Obsidian-Export-Strategy.md` for planned export design.
+12. Use `docs/14-Obsidian-Export-Runbook.md` for implemented export operations.
