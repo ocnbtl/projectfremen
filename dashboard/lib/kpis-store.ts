@@ -96,6 +96,15 @@ const DEFAULT_KPIS: KpiEntry[] = [
     updatedAt: seedTimestamp
   },
   {
+    id: "kpi-diyesu-sentry-errors",
+    entity: "Diyesu Decor",
+    name: "Errors Reported in Sentry",
+    value: "0",
+    priority: "P1",
+    link: "https://sentry.io/",
+    updatedAt: seedTimestamp
+  },
+  {
     id: "kpi-diyesu-newsletter-total",
     entity: "Diyesu Decor",
     name: "Total Email Newsletter Signups",
@@ -123,7 +132,27 @@ const DEFAULT_KPIS: KpiEntry[] = [
 ];
 
 export async function readKpis(): Promise<KpiEntry[]> {
-  return readJsonFile<KpiEntry[]>(FILE_NAME, DEFAULT_KPIS);
+  const existing = await readJsonFile<KpiEntry[]>(FILE_NAME, DEFAULT_KPIS);
+  const next = [...existing];
+  let changed = false;
+
+  for (const seed of DEFAULT_KPIS) {
+    const found = next.some(
+      (item) =>
+        item.entity.toLowerCase() === seed.entity.toLowerCase() &&
+        item.name.toLowerCase() === seed.name.toLowerCase()
+    );
+    if (!found) {
+      next.push(seed);
+      changed = true;
+    }
+  }
+
+  if (changed) {
+    await writeJsonFile(FILE_NAME, next);
+  }
+
+  return next;
 }
 
 export async function upsertKpi(

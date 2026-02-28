@@ -16,6 +16,10 @@ node_modules/
 *.tsbuildinfo
 **/*.tsbuildinfo
 
+# macOS Finder metadata
+.DS_Store
+**/.DS_Store
+
 # Local recovery snapshots
 .repair-backups/
 .git-repair-backups/

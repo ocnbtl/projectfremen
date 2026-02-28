@@ -95,9 +95,9 @@ export default function AdminPage() {
 
       <KpiManager />
 
-      <DocsIndexPanel />
-
       <ObsidianExportPanel />
+
+      <DocsIndexPanel />
 
       <section className="card" style={{ marginTop: 12 }}>
         <h2>MVP Notes</h2>

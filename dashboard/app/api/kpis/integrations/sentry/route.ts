@@ -17,8 +17,7 @@ export async function GET(request: Request) {
     ok: true,
     configured: status.configured,
     missing: status.missing,
-    entity: status.entity,
-    kpiName: status.kpiName
+    targets: status.targets
   });
 }
 
@@ -51,18 +50,26 @@ export async function POST(request: Request) {
         detail: synced.missing.join(",")
       });
       return NextResponse.json(
-        { ok: false, error: "Sentry integration is not configured", missing: synced.missing },
+        {
+          ok: false,
+          error: "Sentry integration is not configured",
+          missing: synced.missing,
+          targets: synced.targets
+        },
         { status: 400 }
       );
     }
 
-    const items = await upsertKpi({
-      entity: synced.entity,
-      name: synced.kpiName,
-      value: synced.value,
-      priority: "P1",
-      link: synced.link
-    });
+    let items: Awaited<ReturnType<typeof upsertKpi>> = [];
+    for (const target of synced.synced) {
+      items = await upsertKpi({
+        entity: target.entity,
+        name: target.kpiName,
+        value: target.value,
+        priority: "P1",
+        link: target.link
+      });
+    }
 
     await appendAuditEvent({
       at: new Date().toISOString(),
@@ -71,19 +78,15 @@ export async function POST(request: Request) {
       method: "POST",
       ip: getRequestIp(request),
       status: "ok",
-      detail: `issues=${synced.issueCount};pages=${synced.pages}`
+      detail: synced.synced
+        .map((target) => `${target.entity}:${target.issueCount}`)
+        .join(";")
     });
 
     return NextResponse.json({
       ok: true,
       items,
-      synced: {
-        entity: synced.entity,
-        kpiName: synced.kpiName,
-        issueCount: synced.issueCount,
-        pages: synced.pages,
-        value: synced.value
-      }
+      synced: synced.synced
     });
   } catch (error) {
     await appendAuditEvent({
@@ -105,4 +108,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

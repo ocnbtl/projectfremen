@@ -11,7 +11,12 @@ Use this checklist for every production release.
 3. [ ] Required env vars exist in Vercel:
    - `ADMIN_PASSWORD`
    - `DOCS_REPOS`
-4. [ ] Local verification passed:
+4. [ ] Optional integration env vars reviewed (if using Sentry/exports):
+   - `SENTRY_AUTH_TOKEN`
+   - `SENTRY_ORG_SLUG`
+   - `SENTRY_PROJECT_SLUG_PNGWN`
+   - `SENTRY_PROJECT_SLUG_DIYESU`
+5. [ ] Local verification passed:
    - `cd "/Users/ocean/Documents/Project Fremen/dashboard"`
    - `npm run typecheck`
    - `npm run build`

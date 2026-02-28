@@ -31,6 +31,12 @@ This runbook is for deploying Project Fremen (`dashboard/`) to Vercel with safe,
    - `GITHUB_TOKEN` (recommended)
    - `DOCS_REPOS` (required for docs sync behavior)
    - `DOCS_MAX_FILES` (optional, default `120`)
+   - `SENTRY_AUTH_TOKEN` (optional, for KPI integration)
+   - `SENTRY_ORG_SLUG` (optional, for KPI integration)
+   - `SENTRY_PROJECT_SLUG_PNGWN` (optional, for KPI integration)
+   - `SENTRY_PROJECT_SLUG_DIYESU` (optional, for KPI integration)
+   - `SENTRY_KPI_QUERY` (optional, default `is:unresolved`)
+   - `OBSIDIAN_EXPORT_DIR` (optional, export output override)
 5. Save and trigger first deploy.
 
 ## Environment Variables (Values Redacted)
@@ -42,6 +48,12 @@ ADMIN_PASSWORD=<REDACTED>
 GITHUB_TOKEN=<REDACTED_OPTIONAL>
 DOCS_REPOS=ocnbtl/projectfremen:main,pngwn-zero/pngwn-web:main,ocnbtl/projectpint:main
 DOCS_MAX_FILES=120
+SENTRY_AUTH_TOKEN=<REDACTED_OPTIONAL>
+SENTRY_ORG_SLUG=<REDACTED_OPTIONAL>
+SENTRY_PROJECT_SLUG_PNGWN=<REDACTED_OPTIONAL>
+SENTRY_PROJECT_SLUG_DIYESU=<REDACTED_OPTIONAL>
+SENTRY_KPI_QUERY=is:unresolved
+OBSIDIAN_EXPORT_DIR=<REDACTED_OPTIONAL_ABSOLUTE_PATH>
 ```
 
 ## Pre-Deploy Local Gate (Required)

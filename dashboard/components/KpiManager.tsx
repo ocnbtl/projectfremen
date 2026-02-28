@@ -27,8 +27,7 @@ type SentryConfigPayload = {
   ok: boolean;
   configured?: boolean;
   missing?: string[];
-  entity?: EntityName;
-  kpiName?: string;
+  targets?: Array<{ entity: EntityName; kpiName: string }>;
   error?: string;
 };
 
@@ -36,13 +35,14 @@ type SentrySyncPayload = {
   ok: boolean;
   items?: KpiEntry[];
   missing?: string[];
-  synced?: {
+  targets?: Array<{ entity: EntityName; kpiName: string }>;
+  synced?: Array<{
     entity: EntityName;
     kpiName: string;
     issueCount: number;
     pages: number;
     value: string;
-  };
+  }>;
   error?: string;
 };
 
@@ -70,6 +70,7 @@ const KPI_ORDER_BY_ENTITY: Record<EntityName, string[]> = {
     "Blogs Published This Week",
     "Outbound Clicks from Pinterest",
     "Total Website Impressions",
+    "Errors Reported in Sentry",
     "Total Email Newsletter Signups",
     "Email Newsletter Signups (Past 7 Days)",
     "Unread Emails (Zoho)"
@@ -158,6 +159,7 @@ export default function KpiManager() {
   const [saving, setSaving] = useState(false);
   const [sentryConfigured, setSentryConfigured] = useState<boolean | null>(null);
   const [sentryMissing, setSentryMissing] = useState<string[]>([]);
+  const [sentryTargets, setSentryTargets] = useState<Array<{ entity: EntityName; kpiName: string }>>([]);
   const [sentrySyncing, setSentrySyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
 
@@ -210,11 +212,13 @@ export default function KpiManager() {
     if (!res.ok || !payload.ok) {
       setSentryConfigured(false);
       setSentryMissing([]);
+      setSentryTargets([]);
       return;
     }
 
     setSentryConfigured(Boolean(payload.configured));
     setSentryMissing(payload.missing || []);
+    setSentryTargets(payload.targets || []);
   }
 
   async function syncSentryKpi() {
@@ -231,15 +235,18 @@ export default function KpiManager() {
       if (!res.ok || !payload.ok || !payload.items) {
         setError(payload.error || "Sentry KPI sync failed");
         setSentryMissing(payload.missing || sentryMissing);
+        setSentryTargets(payload.targets || sentryTargets);
         setSentryConfigured(false);
         return;
       }
 
       setItems(payload.items);
       setSentryConfigured(true);
-      if (payload.synced) {
+      if (payload.synced && payload.synced.length > 0) {
         setSyncMessage(
-          `Synced ${payload.synced.kpiName}: ${payload.synced.value} (${payload.synced.pages} page${payload.synced.pages === 1 ? "" : "s"})`
+          `Synced Sentry KPIs: ${payload.synced
+            .map((item) => `${item.entity}=${item.value}`)
+            .join(", ")}`
         );
       }
     } catch {
@@ -392,20 +399,26 @@ export default function KpiManager() {
         </label>
       </form>
 
-      <div className="inline-form" style={{ marginBottom: 12 }}>
+      <div className="sentry-sync-row" style={{ marginBottom: 12 }}>
         <button
           type="button"
           onClick={syncSentryKpi}
-          disabled={sentrySyncing || sentryConfigured === false}
+          disabled={sentrySyncing}
+          className="sentry-sync-button"
         >
-          {sentrySyncing ? "Syncing Sentry..." : "Sync Sentry Errors KPI"}
+          {sentrySyncing ? "Syncing Sentry..." : "Sync Sentry KPIs (pngwn + Diyesu Decor)"}
         </button>
         {sentryConfigured === false ? (
           <p className="muted" style={{ margin: 0 }}>
             Sentry sync disabled. Missing: {sentryMissing.length ? sentryMissing.join(", ") : "unknown"}
           </p>
         ) : sentryConfigured === true ? (
-          <p className="muted" style={{ margin: 0 }}>Sentry sync ready.</p>
+          <p className="muted" style={{ margin: 0 }}>
+            Sentry sync ready for:{" "}
+            {sentryTargets.length
+              ? sentryTargets.map((item) => item.entity).join(", ")
+              : "pngwn, Diyesu Decor"}
+          </p>
         ) : (
           <p className="muted" style={{ margin: 0 }}>Checking Sentry config...</p>
         )}

@@ -196,6 +196,15 @@ select {
   margin-bottom: 12px;
 }
 
+.sentry-sync-row {
+  display: grid;
+  gap: 6px;
+}
+
+.sentry-sync-button {
+  max-width: 520px;
+}
+
 .kpi-form label,
 .kpi-form button {
   min-width: 0;
