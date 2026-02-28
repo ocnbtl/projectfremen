@@ -26,3 +26,5 @@ This repository currently contains:
 7. Use `docs/09-Deployment-Runbook.md` for production deployment steps.
 8. Use `docs/10-Release-Checklist.md` before each release.
 9. Use `docs/11-Auth-Hardening.md` for current security controls and limits.
+10. Use `docs/12-KPI-External-Integration-Sentry.md` for first external KPI connector setup.
+11. Use `docs/13-Obsidian-Export-Strategy.md` for planned export design.

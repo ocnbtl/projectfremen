@@ -23,6 +23,29 @@ type ProgressMeta = {
   percent: number;
 };
 
+type SentryConfigPayload = {
+  ok: boolean;
+  configured?: boolean;
+  missing?: string[];
+  entity?: EntityName;
+  kpiName?: string;
+  error?: string;
+};
+
+type SentrySyncPayload = {
+  ok: boolean;
+  items?: KpiEntry[];
+  missing?: string[];
+  synced?: {
+    entity: EntityName;
+    kpiName: string;
+    issueCount: number;
+    pages: number;
+    value: string;
+  };
+  error?: string;
+};
+
 const ENTITIES: EntityName[] = ["Unigentamos", "pngwn", "Diyesu Decor"];
 const DEFAULT_STALE_DAYS = 14;
 const STALE_DAYS_STORAGE_KEY = "kpi-stale-days";
@@ -133,6 +156,10 @@ export default function KpiManager() {
   const [link, setLink] = useState("");
   const [staleDays, setStaleDays] = useState(DEFAULT_STALE_DAYS);
   const [saving, setSaving] = useState(false);
+  const [sentryConfigured, setSentryConfigured] = useState<boolean | null>(null);
+  const [sentryMissing, setSentryMissing] = useState<string[]>([]);
+  const [sentrySyncing, setSentrySyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState("");
 
   async function refresh() {
     setLoading(true);
@@ -177,8 +204,54 @@ export default function KpiManager() {
     setSaving(false);
   }
 
+  async function loadSentryStatus() {
+    const res = await fetch("/api/kpis/integrations/sentry", { cache: "no-store" });
+    const payload = (await res.json()) as SentryConfigPayload;
+    if (!res.ok || !payload.ok) {
+      setSentryConfigured(false);
+      setSentryMissing([]);
+      return;
+    }
+
+    setSentryConfigured(Boolean(payload.configured));
+    setSentryMissing(payload.missing || []);
+  }
+
+  async function syncSentryKpi() {
+    setSentrySyncing(true);
+    setSyncMessage("");
+    setError("");
+    try {
+      const res = await fetch("/api/kpis/integrations/sentry", {
+        method: "POST",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({})
+      });
+      const payload = (await res.json()) as SentrySyncPayload;
+      if (!res.ok || !payload.ok || !payload.items) {
+        setError(payload.error || "Sentry KPI sync failed");
+        setSentryMissing(payload.missing || sentryMissing);
+        setSentryConfigured(false);
+        return;
+      }
+
+      setItems(payload.items);
+      setSentryConfigured(true);
+      if (payload.synced) {
+        setSyncMessage(
+          `Synced ${payload.synced.kpiName}: ${payload.synced.value} (${payload.synced.pages} page${payload.synced.pages === 1 ? "" : "s"})`
+        );
+      }
+    } catch {
+      setError("Sentry KPI sync failed");
+    } finally {
+      setSentrySyncing(false);
+    }
+  }
+
   useEffect(() => {
     void refresh();
+    void loadSentryStatus();
   }, []);
 
   useEffect(() => {
@@ -254,6 +327,7 @@ export default function KpiManager() {
       <h2>KPI Tracker</h2>
       <p className="muted">Grouped by brand for quick weekly review.</p>
       {error && <p className="pill warn">{error}</p>}
+      {syncMessage && <p className="pill">{syncMessage}</p>}
 
       <form onSubmit={onSubmit} className="inline-form kpi-form" style={{ marginBottom: 12 }}>
         <label>
@@ -317,6 +391,25 @@ export default function KpiManager() {
           />
         </label>
       </form>
+
+      <div className="inline-form" style={{ marginBottom: 12 }}>
+        <button
+          type="button"
+          onClick={syncSentryKpi}
+          disabled={sentrySyncing || sentryConfigured === false}
+        >
+          {sentrySyncing ? "Syncing Sentry..." : "Sync Sentry Errors KPI"}
+        </button>
+        {sentryConfigured === false ? (
+          <p className="muted" style={{ margin: 0 }}>
+            Sentry sync disabled. Missing: {sentryMissing.length ? sentryMissing.join(", ") : "unknown"}
+          </p>
+        ) : sentryConfigured === true ? (
+          <p className="muted" style={{ margin: 0 }}>Sentry sync ready.</p>
+        ) : (
+          <p className="muted" style={{ margin: 0 }}>Checking Sentry config...</p>
+        )}
+      </div>
 
       {loading ? (
         <p className="muted">Loading KPI values...</p>
