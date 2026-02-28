@@ -25,3 +25,4 @@ This repository currently contains:
 6. Keep KPI meaning stable with `docs/08-KPI-Definitions.md`.
 7. Use `docs/09-Deployment-Runbook.md` for production deployment steps.
 8. Use `docs/10-Release-Checklist.md` before each release.
+9. Use `docs/11-Auth-Hardening.md` for current security controls and limits.

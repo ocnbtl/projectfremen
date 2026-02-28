@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import type { EntityName, KpiEntry } from "../lib/types";
 
 type KpiResponse = {
@@ -160,7 +161,7 @@ export default function KpiManager() {
 
     const res = await fetch("/api/kpis", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: buildJsonHeadersWithCsrf(),
       body: JSON.stringify({ entity, name, value, priority: "P1", link })
     });
     const payload = (await res.json()) as KpiResponse;

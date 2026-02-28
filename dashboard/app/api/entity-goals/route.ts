@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
+import { appendAuditEvent, getRequestIp } from "../../../lib/audit-log";
+import { isCsrfRequestValid } from "../../../lib/csrf";
 import { readEntityGoals, writeEntityGoals } from "../../../lib/entity-goals-store";
 import { getEntityHubBySlug } from "../../../lib/entity-hub";
 
@@ -26,6 +28,17 @@ export async function POST(request: Request) {
   if (!(await hasAdminSession())) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  if (!isCsrfRequestValid(request)) {
+    await appendAuditEvent({
+      at: new Date().toISOString(),
+      action: "entity_goals.update.csrf_failed",
+      path: new URL(request.url).pathname,
+      method: "POST",
+      ip: getRequestIp(request),
+      status: "denied"
+    });
+    return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
+  }
 
   const body = (await request.json()) as {
     slug?: string;
@@ -41,5 +54,14 @@ export async function POST(request: Request) {
   }
 
   const saved = await writeEntityGoals(slug, goals);
+  await appendAuditEvent({
+    at: new Date().toISOString(),
+    action: "entity_goals.update.success",
+    path: new URL(request.url).pathname,
+    method: "POST",
+    ip: getRequestIp(request),
+    status: "ok",
+    detail: slug
+  });
   return NextResponse.json({ ok: true, goals: saved });
 }

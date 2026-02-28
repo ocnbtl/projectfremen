@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { buildCsrfHeaders } from "../lib/client-csrf";
 import type { DocsIndexItem } from "../lib/types";
 
 type DocsPayload = {
@@ -45,7 +46,7 @@ export default function DocsIndexPanel() {
   async function syncDocs() {
     setSyncing(true);
     setError("");
-    const res = await fetch("/api/docs/sync", { method: "POST" });
+    const res = await fetch("/api/docs/sync", { method: "POST", headers: buildCsrfHeaders() });
     const payload = (await res.json()) as SyncPayload;
     if (!res.ok || !payload.ok) {
       setError(payload.error || "Docs sync failed");

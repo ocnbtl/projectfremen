@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
+import { appendAuditEvent, getRequestIp } from "../../../lib/audit-log";
+import { isCsrfRequestValid } from "../../../lib/csrf";
 import { readKpis, upsertKpi } from "../../../lib/kpis-store";
 import type { EntityName } from "../../../lib/types";
 
@@ -19,6 +21,17 @@ export async function GET() {
 export async function POST(request: Request) {
   if (!(await hasAdminSession())) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isCsrfRequestValid(request)) {
+    await appendAuditEvent({
+      at: new Date().toISOString(),
+      action: "kpi.upsert.csrf_failed",
+      path: new URL(request.url).pathname,
+      method: "POST",
+      ip: getRequestIp(request),
+      status: "denied"
+    });
+    return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
   }
 
   const body = (await request.json()) as {
@@ -61,5 +74,16 @@ export async function POST(request: Request) {
     priority: priority as "P1" | "P2" | "P3",
     link
   });
+
+  await appendAuditEvent({
+    at: new Date().toISOString(),
+    action: "kpi.upsert.success",
+    path: new URL(request.url).pathname,
+    method: "POST",
+    ip: getRequestIp(request),
+    status: "ok",
+    detail: `${entity}:${name}`
+  });
+
   return NextResponse.json({ ok: true, items });
 }

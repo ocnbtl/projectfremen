@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { buildAdminSessionToken } from "./lib/auth";
+import { buildCsrfToken, ADMIN_CSRF_COOKIE_NAME } from "./lib/csrf";
 
 export async function proxy(request: NextRequest) {
   if (!request.nextUrl.pathname.startsWith("/admin")) {
@@ -21,7 +22,18 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/admin/login", request.url));
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  if (!request.cookies.get(ADMIN_CSRF_COOKIE_NAME)?.value) {
+    response.cookies.set(ADMIN_CSRF_COOKIE_NAME, buildCsrfToken(), {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      path: "/",
+      maxAge: 60 * 60 * 12
+    });
+  }
+
+  return response;
 }
 
 export const config = {

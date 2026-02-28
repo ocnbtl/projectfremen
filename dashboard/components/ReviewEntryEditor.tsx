@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { buildCsrfHeaders, buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import { getReviewFields } from "../lib/review-templates";
 import { formatMonthDay } from "../lib/review-schedule";
 import type { ReviewEntry, ReviewKind } from "../lib/types";
@@ -73,7 +74,7 @@ export default function ReviewEntryEditor({
 
     const res = await fetch("/api/reviews", {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: buildJsonHeadersWithCsrf(),
       body: JSON.stringify({
         id: entryId,
         kind,
@@ -118,7 +119,8 @@ export default function ReviewEntryEditor({
 
     const params = new URLSearchParams({ id: entryId, kind });
     const res = await fetch(`/api/reviews?${params.toString()}`, {
-      method: "DELETE"
+      method: "DELETE",
+      headers: buildCsrfHeaders()
     });
 
     const payload = (await res.json()) as ReviewsResponse;

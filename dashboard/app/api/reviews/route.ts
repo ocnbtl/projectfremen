@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
+import { appendAuditEvent, getRequestIp } from "../../../lib/audit-log";
+import { isCsrfRequestValid } from "../../../lib/csrf";
 import {
   createReviewEntry,
   deleteReviewEntry,
@@ -55,6 +57,17 @@ export async function POST(request: Request) {
   if (!(await hasAdminSession())) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
+  if (!isCsrfRequestValid(request)) {
+    await appendAuditEvent({
+      at: new Date().toISOString(),
+      action: "reviews.create.csrf_failed",
+      path: new URL(request.url).pathname,
+      method: "POST",
+      ip: getRequestIp(request),
+      status: "denied"
+    });
+    return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
+  }
 
   const body = (await request.json()) as {
     kind?: string;
@@ -75,12 +88,32 @@ export async function POST(request: Request) {
   }
 
   const result = await createReviewEntry({ kind, scheduledFor });
+  await appendAuditEvent({
+    at: new Date().toISOString(),
+    action: "reviews.create.success",
+    path: new URL(request.url).pathname,
+    method: "POST",
+    ip: getRequestIp(request),
+    status: "ok",
+    detail: `${kind}:${result.item.id}`
+  });
   return NextResponse.json({ ok: true, item: result.item, items: result.items });
 }
 
 export async function PATCH(request: Request) {
   if (!(await hasAdminSession())) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isCsrfRequestValid(request)) {
+    await appendAuditEvent({
+      at: new Date().toISOString(),
+      action: "reviews.update.csrf_failed",
+      path: new URL(request.url).pathname,
+      method: "PATCH",
+      ip: getRequestIp(request),
+      status: "denied"
+    });
+    return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
   }
 
   const body = (await request.json()) as {
@@ -128,12 +161,33 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ ok: false, error: "Review entry not found" }, { status: 404 });
   }
 
+  await appendAuditEvent({
+    at: new Date().toISOString(),
+    action: "reviews.update.success",
+    path: new URL(request.url).pathname,
+    method: "PATCH",
+    ip: getRequestIp(request),
+    status: "ok",
+    detail: `${kind}:${id}`
+  });
+
   return NextResponse.json({ ok: true, item: result.item, items: result.items });
 }
 
 export async function DELETE(request: Request) {
   if (!(await hasAdminSession())) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isCsrfRequestValid(request)) {
+    await appendAuditEvent({
+      at: new Date().toISOString(),
+      action: "reviews.delete.csrf_failed",
+      path: new URL(request.url).pathname,
+      method: "DELETE",
+      ip: getRequestIp(request),
+      status: "denied"
+    });
+    return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
   }
 
   const url = new URL(request.url);
@@ -151,6 +205,16 @@ export async function DELETE(request: Request) {
   if (!result.deleted) {
     return NextResponse.json({ ok: false, error: "Review entry not found" }, { status: 404 });
   }
+
+  await appendAuditEvent({
+    at: new Date().toISOString(),
+    action: "reviews.delete.success",
+    path: new URL(request.url).pathname,
+    method: "DELETE",
+    ip: getRequestIp(request),
+    status: "ok",
+    detail: `${kind}:${id}`
+  });
 
   return NextResponse.json({ ok: true, items: result.items });
 }

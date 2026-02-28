@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { buildCsrfHeaders, buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import {
   daysUntil,
   formatLocalIsoDate,
@@ -81,7 +82,7 @@ export default function ReviewEntriesPanel({
 
     const res = await fetch("/api/reviews", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: buildJsonHeadersWithCsrf(),
       body: JSON.stringify({ kind, scheduledFor: nextDateIso })
     });
 
@@ -106,7 +107,8 @@ export default function ReviewEntriesPanel({
 
     const params = new URLSearchParams({ id, kind });
     const res = await fetch(`/api/reviews?${params.toString()}`, {
-      method: "DELETE"
+      method: "DELETE",
+      headers: buildCsrfHeaders()
     });
 
     const payload = (await res.json()) as ReviewsResponse;

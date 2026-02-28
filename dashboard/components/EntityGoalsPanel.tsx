@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 
 type GoalsResponse = {
   ok: boolean;
@@ -39,7 +40,7 @@ export default function EntityGoalsPanel({
 
     const res = await fetch("/api/entity-goals", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: buildJsonHeadersWithCsrf(),
       body: JSON.stringify({ slug, goals: draftGoals })
     });
     const payload = (await res.json()) as GoalsResponse;
