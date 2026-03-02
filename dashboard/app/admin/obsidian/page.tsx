@@ -14,7 +14,7 @@ export default async function AdminObsidianPage() {
           </p>
         </div>
         <Link href="/admin" className="review-back-link">
-          Back to Dashboard
+          Back to Home
         </Link>
       </header>
 

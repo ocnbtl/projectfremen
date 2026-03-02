@@ -131,7 +131,7 @@ export default function ReviewEntriesPanel({
       <div className="review-page-header">
         <h2 style={{ marginBottom: 0 }}>{title} Review Entries</h2>
         <Link href="/admin" className="review-back-link">
-          Back to Dashboard
+          Back to Home
         </Link>
       </div>
 

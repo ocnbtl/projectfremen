@@ -122,7 +122,7 @@ export default async function EntityHubPage({
           </p>
         </div>
         <Link href="/admin" className="review-back-link">
-          Back to Dashboard
+          Back to Home
         </Link>
       </header>
 

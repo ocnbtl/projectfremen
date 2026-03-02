@@ -405,12 +405,12 @@ select {
 
 .kpi-form {
   grid-template-columns:
-    120px
-    220px
-    125px
+    110px
     200px
-    160px
-    240px
+    120px
+    180px
+    130px
+    150px
     90px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -424,6 +424,13 @@ select {
 .kpi-form label,
 .kpi-form button {
   min-width: 0;
+}
+
+.kpi-save-button,
+.kpi-sync-button {
+  width: 100%;
+  padding-left: 12px;
+  padding-right: 12px;
 }
 
 .stale-inline-field input {
@@ -715,9 +722,83 @@ select {
 }
 
 .review-back-link {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 1px solid rgba(13, 45, 66, 0.3);
+  background: linear-gradient(180deg, #fdfefe 0%, #e4edf5 100%);
+  color: #0d2d42;
   text-decoration: none;
-  border-bottom: 1px solid currentColor;
   font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  box-shadow: 0 8px 18px rgba(13, 45, 66, 0.12);
+  transition:
+    transform 180ms ease,
+    box-shadow 220ms ease,
+    border-color 220ms ease,
+    color 220ms ease;
+  overflow: hidden;
+}
+
+.review-back-link::before {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  background: linear-gradient(120deg, rgba(13, 45, 66, 0.08), rgba(255, 78, 0, 0.16));
+  opacity: 0;
+  transition: opacity 220ms ease;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.review-back-link::after {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: -35%;
+  width: 34%;
+  height: 200%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.65), transparent);
+  transform: skewX(-18deg);
+  opacity: 0;
+  transition:
+    transform 420ms ease,
+    opacity 220ms ease;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.review-back-link:hover {
+  transform: translateY(-1px);
+  border-color: rgba(13, 45, 66, 0.5);
+  box-shadow: 0 12px 26px rgba(13, 45, 66, 0.2);
+  color: #08283a;
+}
+
+.review-back-link:hover::before {
+  opacity: 1;
+}
+
+.review-back-link:hover::after {
+  opacity: 1;
+  transform: translateX(290%) skewX(-18deg);
+}
+
+.review-back-link:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: 0 6px 14px rgba(13, 45, 66, 0.16);
+}
+
+.review-back-link:focus-visible {
+  outline: 2px solid rgba(255, 78, 0, 0.55);
+  outline-offset: 2px;
 }
 
 .review-create-row {

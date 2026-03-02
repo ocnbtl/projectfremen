@@ -398,11 +398,11 @@ export default function KpiManager() {
             placeholder="https://sentry.io/..."
           />
         </label>
-        <button type="submit" disabled={saving}>
+        <button type="submit" disabled={saving} className="kpi-save-button">
           {saving ? "Saving..." : "Save KPI"}
         </button>
-        <button type="button" onClick={syncSentryKpi} disabled={sentrySyncing}>
-          {sentrySyncing ? "Syncing Sentry..." : "Sync Sentry KPIs (pngwn + Diyesu Decor)"}
+        <button type="button" onClick={syncSentryKpi} disabled={sentrySyncing} className="kpi-sync-button">
+          {sentrySyncing ? "Syncing Sentry..." : "Sync Sentry KPI"}
         </button>
         <label className="stale-inline-field">
           Stale Days
