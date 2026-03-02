@@ -85,7 +85,6 @@ export default function CurrentGoalsPanel({ initialItems }: { initialItems: Home
         item.goals.map((goal, idx) => ({
           key: `${item.slug}-${idx}-${goal}`,
           goal,
-          entity: item.entity,
           theme: item.theme
         }))
       ),
@@ -104,7 +103,6 @@ export default function CurrentGoalsPanel({ initialItems }: { initialItems: Home
             <li className={`admin-goal-item admin-goal-item-${item.theme}`} key={item.key}>
               <span className={`admin-goal-marker admin-goal-marker-${item.theme}`} aria-hidden />
               <span className="admin-goal-text">{item.goal}</span>
-              <span className="admin-goal-entity">{item.entity}</span>
             </li>
           ))}
         </ul>

@@ -238,13 +238,15 @@ a {
 }
 
 .admin-goals-list {
-  gap: 8px;
+  gap: 5px;
 }
 
-.admin-goal-item {
-  grid-template-columns: 8px minmax(0, 1fr) auto;
-  gap: 8px;
+.admin-goals-list .admin-goal-item {
+  grid-template-columns: 8px minmax(0, 1fr);
+  gap: 9px;
   align-items: center;
+  padding: 0 0 5px;
+  min-height: 24px;
 }
 
 .admin-goal-marker {
@@ -267,17 +269,29 @@ a {
 }
 
 .admin-goal-text {
+  display: block;
   color: #e6f1fb;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 13px;
 }
 
-.admin-goal-entity {
-  color: rgba(195, 215, 235, 0.78);
-  font-size: 12px;
+.admin-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.admin-section-heading h2 {
+  margin: 0;
   white-space: nowrap;
 }
 
 .admin-review-links {
-  margin-top: 10px;
+  margin-top: 0;
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
@@ -1181,6 +1195,12 @@ select {
   .admin-home-left {
     order: 2;
     gap: 20px;
+  }
+
+  .admin-section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
   }
 
   .admin-quick-links {

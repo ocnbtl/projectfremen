@@ -102,7 +102,17 @@ export default async function AdminPage({
           <CurrentGoalsPanel initialItems={goalItems} />
 
           <section className="admin-plain-section">
-            <h2>Upcoming Reviews</h2>
+            <div className="admin-section-heading">
+              <h2>Upcoming Reviews</h2>
+              <div className="admin-review-links">
+                <Link href="/admin/reviews/weekly" className="admin-review-link">
+                  Weekly Hub
+                </Link>
+                <Link href="/admin/reviews/monthly" className="admin-review-link">
+                  Monthly Hub
+                </Link>
+              </div>
+            </div>
             <ul className="admin-plain-list admin-review-list">
               {reviewRows.map((item) => (
                 <li key={item.name}>
@@ -113,14 +123,6 @@ export default async function AdminPage({
                 </li>
               ))}
             </ul>
-            <div className="admin-review-links">
-              <Link href="/admin/reviews/weekly" className="admin-review-link">
-                Weekly Hub
-              </Link>
-              <Link href="/admin/reviews/monthly" className="admin-review-link">
-                Monthly Hub
-              </Link>
-            </div>
           </section>
         </div>
 
