@@ -340,20 +340,18 @@ export default function AnimatedLandingPage({
               </p>
             )}
 
-            <label htmlFor="password" className="landing-label">
-              Founder Access
-            </label>
             <input
               id="password"
               name="password"
               type="password"
+              aria-label="Password"
               placeholder="password"
               className="landing-input"
               required
             />
 
             <button type="submit" className="landing-submit">
-              Enter Admin
+              Enter
             </button>
           </form>
           <img

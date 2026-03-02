@@ -11,12 +11,28 @@ export async function GET(request: Request) {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
-  const preview = await runObsidianExport("dry-run");
-  return NextResponse.json({
-    ok: true,
-    rootDir: preview.rootDir,
-    itemCount: preview.items.length
-  });
+  try {
+    const preview = await runObsidianExport("dry-run");
+    return NextResponse.json({
+      ok: true,
+      rootDir: preview.rootDir,
+      itemCount: preview.items.length
+    });
+  } catch (error) {
+    await appendAuditEvent({
+      at: new Date().toISOString(),
+      action: "obsidian.export.preview_error",
+      path: new URL(request.url).pathname,
+      method: "GET",
+      ip: getRequestIp(request),
+      status: "error",
+      detail: error instanceof Error ? error.message : "Preview failed"
+    });
+    return NextResponse.json(
+      { ok: false, error: error instanceof Error ? error.message : "Export preview failed" },
+      { status: 500 }
+    );
+  }
 }
 
 export async function POST(request: Request) {
@@ -73,4 +89,3 @@ export async function POST(request: Request) {
     );
   }
 }
-

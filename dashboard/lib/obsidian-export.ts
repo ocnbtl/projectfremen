@@ -5,6 +5,7 @@ import { readKpis } from "./kpis-store";
 import { getReviewFields } from "./review-templates";
 import { readReviews } from "./reviews-store";
 import type { ReviewEntry } from "./types";
+import { getWritableDataDir } from "./file-store";
 
 type ExportMode = "dry-run" | "write";
 type ExportItemKind = "weekly" | "monthly" | "kpi_snapshot";
@@ -34,12 +35,13 @@ function escapeYaml(value: string): string {
   return value.replace(/"/g, '\\"');
 }
 
-function exportRootDir(): string {
+async function exportRootDir(): Promise<string> {
   const configured = process.env.OBSIDIAN_EXPORT_DIR?.trim();
   if (configured) {
     return configured;
   }
-  return path.join(process.cwd(), "data", "exports", "obsidian");
+  const dataDir = await getWritableDataDir();
+  return path.join(dataDir, "exports", "obsidian");
 }
 
 function todayIsoDate(): string {
@@ -201,7 +203,7 @@ async function plannedKpiTarget(rootDir: string): Promise<{
 }
 
 export async function runObsidianExport(mode: ExportMode): Promise<ObsidianExportResult> {
-  const rootDir = exportRootDir();
+  const rootDir = await exportRootDir();
   const reviewPlan = await plannedReviewTargets(rootDir);
   const kpiPlan = await plannedKpiTarget(rootDir);
 
@@ -233,4 +235,3 @@ export async function runObsidianExport(mode: ExportMode): Promise<ObsidianExpor
     items
   };
 }
-

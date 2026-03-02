@@ -166,15 +166,21 @@ export default function KpiManager() {
   async function refresh() {
     setLoading(true);
     setError("");
-    const res = await fetch("/api/kpis", { cache: "no-store" });
-    const payload = (await res.json()) as KpiResponse;
-    if (!res.ok || !payload.ok) {
-      setError(payload.error || "Failed to load KPIs");
+    try {
+      const res = await fetch("/api/kpis", { cache: "no-store" });
+      const payload = (await res
+        .json()
+        .catch(() => ({ ok: false, items: [], error: "Invalid server response" }))) as KpiResponse;
+      if (!res.ok || !payload.ok) {
+        setError(payload.error || "Failed to load KPIs");
+        return;
+      }
+      setItems(payload.items);
+    } catch {
+      setError("Failed to load KPIs");
+    } finally {
       setLoading(false);
-      return;
     }
-    setItems(payload.items);
-    setLoading(false);
   }
 
   async function onSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -207,18 +213,26 @@ export default function KpiManager() {
   }
 
   async function loadSentryStatus() {
-    const res = await fetch("/api/kpis/integrations/sentry", { cache: "no-store" });
-    const payload = (await res.json()) as SentryConfigPayload;
-    if (!res.ok || !payload.ok) {
+    try {
+      const res = await fetch("/api/kpis/integrations/sentry", { cache: "no-store" });
+      const payload = (await res
+        .json()
+        .catch(() => ({ ok: false, configured: false, missing: [] }))) as SentryConfigPayload;
+      if (!res.ok || !payload.ok) {
+        setSentryConfigured(false);
+        setSentryMissing(payload.missing || []);
+        setSentryTargets(payload.targets || []);
+        return;
+      }
+
+      setSentryConfigured(Boolean(payload.configured));
+      setSentryMissing(payload.missing || []);
+      setSentryTargets(payload.targets || []);
+    } catch {
       setSentryConfigured(false);
       setSentryMissing([]);
       setSentryTargets([]);
-      return;
     }
-
-    setSentryConfigured(Boolean(payload.configured));
-    setSentryMissing(payload.missing || []);
-    setSentryTargets(payload.targets || []);
   }
 
   async function syncSentryKpi() {
@@ -231,12 +245,18 @@ export default function KpiManager() {
         headers: buildJsonHeadersWithCsrf(),
         body: JSON.stringify({})
       });
-      const payload = (await res.json()) as SentrySyncPayload;
+      const payload = (await res
+        .json()
+        .catch(() => ({ ok: false, error: "Invalid server response" }))) as SentrySyncPayload;
       if (!res.ok || !payload.ok || !payload.items) {
         setError(payload.error || "Sentry KPI sync failed");
-        setSentryMissing(payload.missing || sentryMissing);
-        setSentryTargets(payload.targets || sentryTargets);
-        setSentryConfigured(false);
+        if (payload.missing) {
+          setSentryMissing(payload.missing);
+          setSentryConfigured(false);
+        }
+        if (payload.targets) {
+          setSentryTargets(payload.targets);
+        }
         return;
       }
 

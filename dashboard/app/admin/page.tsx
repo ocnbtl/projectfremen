@@ -44,7 +44,7 @@ export default function AdminPage() {
           <h1 style={{ margin: 0 }}>Action Center</h1>
           <RotatingWelcome />
         </div>
-        <div className="pill">MVP Mode: Founder-only</div>
+        <div className="pill topbar-mode-pill">Founder-only mode</div>
       </header>
 
       <section className="grid grid-3">

@@ -32,16 +32,22 @@ export default function ObsidianExportPanel() {
   async function loadPreview() {
     setLoading(true);
     setError("");
-    const res = await fetch("/api/exports/obsidian", { cache: "no-store" });
-    const payload = (await res.json()) as ExportPreviewPayload;
-    if (!res.ok || !payload.ok) {
-      setError(payload.error || "Failed to load export preview");
+    try {
+      const res = await fetch("/api/exports/obsidian", { cache: "no-store" });
+      const payload = (await res
+        .json()
+        .catch(() => ({ ok: false, error: "Invalid server response" }))) as ExportPreviewPayload;
+      if (!res.ok || !payload.ok) {
+        setError(payload.error || "Failed to load export preview");
+        return;
+      }
+      setRootDir(payload.rootDir || "");
+      setItemCount(typeof payload.itemCount === "number" ? payload.itemCount : null);
+    } catch {
+      setError("Failed to load export preview");
+    } finally {
       setLoading(false);
-      return;
     }
-    setRootDir(payload.rootDir || "");
-    setItemCount(typeof payload.itemCount === "number" ? payload.itemCount : null);
-    setLoading(false);
   }
 
   async function runExport(dryRun: boolean) {
@@ -58,7 +64,9 @@ export default function ObsidianExportPanel() {
         headers: buildJsonHeadersWithCsrf(),
         body: JSON.stringify({ dryRun })
       });
-      const payload = (await res.json()) as ExportRunPayload;
+      const payload = (await res
+        .json()
+        .catch(() => ({ ok: false, error: "Invalid server response" }))) as ExportRunPayload;
       if (!res.ok || !payload.ok) {
         setError(payload.error || "Export failed");
         return;
@@ -121,4 +129,3 @@ export default function ObsidianExportPanel() {
     </section>
   );
 }
-

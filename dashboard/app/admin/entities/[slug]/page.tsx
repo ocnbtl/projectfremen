@@ -90,9 +90,9 @@ export default async function EntityHubPage({
   }
 
   const [allKpis, docsState, goals] = await Promise.all([
-    readKpis(),
-    readDocsIndex(),
-    readEntityGoals(config.slug, config.defaultGoals)
+    readKpis().catch(() => []),
+    readDocsIndex().catch(() => ({ lastSynced: null, items: [] })),
+    readEntityGoals(config.slug, config.defaultGoals).catch(() => config.defaultGoals)
   ]);
 
   const kpis = sortEntityKpis(

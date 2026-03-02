@@ -99,6 +99,11 @@ a {
   color: var(--warn);
 }
 
+.topbar-mode-pill {
+  align-self: flex-start;
+  font-weight: 600;
+}
+
 .welcome-line {
   margin: 8px 0 0;
   font-size: 18px;

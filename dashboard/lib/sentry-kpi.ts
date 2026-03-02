@@ -179,10 +179,9 @@ export async function syncSentryErrorsKpi(): Promise<SentryKpiSyncResult> {
   }> = [];
 
   for (const target of config.targets) {
-    const mergedQuery = `project:${target.projectSlug} ${config.query}`.trim();
     const firstUrl =
-      `${config.apiBaseUrl}/organizations/${encodeURIComponent(config.orgSlug)}` +
-      `/issues/?limit=100&query=${encodeURIComponent(mergedQuery)}`;
+      `${config.apiBaseUrl}/projects/${encodeURIComponent(config.orgSlug)}` +
+      `/${encodeURIComponent(target.projectSlug)}/issues/?limit=100&query=${encodeURIComponent(config.query)}`;
 
     let nextUrl: string | null = firstUrl;
     let pageCount = 0;
@@ -198,7 +197,13 @@ export async function syncSentryErrorsKpi(): Promise<SentryKpiSyncResult> {
       });
 
       if (!response.ok) {
-        throw new Error(`Sentry request failed (${response.status}) for ${target.projectSlug}`);
+        const raw = await response.text().catch(() => "");
+        const detail = raw.replace(/\s+/g, " ").trim().slice(0, 160);
+        throw new Error(
+          detail
+            ? `Sentry request failed (${response.status}) for ${target.projectSlug}: ${detail}`
+            : `Sentry request failed (${response.status}) for ${target.projectSlug}`
+        );
       }
 
       const payload = (await response.json()) as unknown;

@@ -31,30 +31,42 @@ export default function DocsIndexPanel() {
   async function loadDocs() {
     setLoading(true);
     setError("");
-    const res = await fetch("/api/docs", { cache: "no-store" });
-    const payload = (await res.json()) as DocsPayload;
-    if (!res.ok || !payload.ok) {
-      setError(payload.error || "Failed to load docs index");
+    try {
+      const res = await fetch("/api/docs", { cache: "no-store" });
+      const payload = (await res
+        .json()
+        .catch(() => ({ ok: false, lastSynced: null, items: [], error: "Invalid server response" }))) as DocsPayload;
+      if (!res.ok || !payload.ok) {
+        setError(payload.error || "Failed to load docs index");
+        return;
+      }
+      setItems(payload.items);
+      setLastSynced(payload.lastSynced);
+    } catch {
+      setError("Failed to load docs index");
+    } finally {
       setLoading(false);
-      return;
     }
-    setItems(payload.items);
-    setLastSynced(payload.lastSynced);
-    setLoading(false);
   }
 
   async function syncDocs() {
     setSyncing(true);
     setError("");
-    const res = await fetch("/api/docs/sync", { method: "POST", headers: buildCsrfHeaders() });
-    const payload = (await res.json()) as SyncPayload;
-    if (!res.ok || !payload.ok) {
-      setError(payload.error || "Docs sync failed");
+    try {
+      const res = await fetch("/api/docs/sync", { method: "POST", headers: buildCsrfHeaders() });
+      const payload = (await res
+        .json()
+        .catch(() => ({ ok: false, error: "Invalid server response" }))) as SyncPayload;
+      if (!res.ok || !payload.ok) {
+        setError(payload.error || "Docs sync failed");
+        return;
+      }
+      await loadDocs();
+    } catch {
+      setError("Docs sync failed");
+    } finally {
       setSyncing(false);
-      return;
     }
-    await loadDocs();
-    setSyncing(false);
   }
 
   useEffect(() => {
