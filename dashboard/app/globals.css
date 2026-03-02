@@ -716,19 +716,20 @@ select {
 .review-page-header {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
   gap: 10px;
   flex-wrap: wrap;
 }
 
 .review-back-link {
   position: relative;
+  isolation: isolate;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 36px;
-  min-width: 174px;
-  padding: 0 24px;
+  min-height: 32px;
+  min-width: 210px;
+  padding: 0 30px;
   border-radius: 999px;
   border: 1px solid rgba(13, 45, 66, 0.3);
   background: linear-gradient(180deg, #fdfefe 0%, #e4edf5 100%);
@@ -748,6 +749,25 @@ select {
   overflow: hidden;
 }
 
+.review-back-link::before {
+  content: "";
+  position: absolute;
+  inset: -58%;
+  border-radius: 50%;
+  background: conic-gradient(
+    from 0deg,
+    #ff4e00 0deg 90deg,
+    #0d2d42 90deg 180deg,
+    #174d36 180deg 270deg,
+    #4d342a 270deg 360deg
+  );
+  opacity: 0;
+  transform: rotate(0deg) scale(1.08);
+  transition: opacity 180ms ease;
+  pointer-events: none;
+  z-index: 0;
+}
+
 .review-back-link::after {
   content: "";
   position: absolute;
@@ -759,19 +779,26 @@ select {
     linear-gradient(#000 0 0) content-box,
     linear-gradient(#000 0 0);
   -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
   mask-composite: exclude;
   opacity: 0;
   pointer-events: none;
+  z-index: 2;
 }
 
 .review-back-link:hover {
   transform: translateY(-1px);
   border-color: rgba(220, 234, 247, 0.45);
-  background-image: linear-gradient(120deg, #ff4e00 0%, #0d2d42 31%, #174d36 66%, #4d342a 100%);
-  background-size: 220% 220%;
-  background-position: 100% 50%;
+  background: rgba(7, 23, 35, 0.2);
   box-shadow: 0 12px 26px rgba(13, 45, 66, 0.2);
   color: #f5f9ff;
+}
+
+.review-back-link:hover::before {
+  opacity: 1;
+  animation: back-home-swirl 1600ms linear infinite;
 }
 
 .review-back-link:active {
@@ -779,7 +806,8 @@ select {
   box-shadow: 0 6px 14px rgba(13, 45, 66, 0.16);
 }
 
-.review-back-link:active::after {
+.review-back-link:active::after,
+.review-back-link:focus-visible::after {
   animation: back-home-outline-sweep 460ms linear forwards;
 }
 
@@ -788,23 +816,38 @@ select {
   outline-offset: 2px;
 }
 
+@keyframes back-home-swirl {
+  0% {
+    transform: rotate(0deg) scale(1.08);
+  }
+  100% {
+    transform: rotate(360deg) scale(1.08);
+  }
+}
+
 @keyframes back-home-outline-sweep {
   0% {
     opacity: 1;
-    background: conic-gradient(from -90deg, #ff4e00 0deg 4deg, transparent 4deg 360deg);
+    background: conic-gradient(from -90deg, #ff4e00 0deg 9deg, transparent 9deg 360deg);
   }
-  30% {
-    opacity: 1;
-    background: conic-gradient(from -90deg, #ff4e00 0deg 110deg, transparent 110deg 360deg);
-  }
-  60% {
+  34% {
     opacity: 1;
     background: conic-gradient(
       from -90deg,
-      #ff4e00 0deg 150deg,
-      #0d2d42 150deg 230deg,
-      #174d36 230deg 280deg,
-      transparent 280deg 360deg
+      #ff4e00 0deg 102deg,
+      #0d2d42 102deg 124deg,
+      transparent 124deg 360deg
+    );
+  }
+  68% {
+    opacity: 1;
+    background: conic-gradient(
+      from -90deg,
+      #ff4e00 0deg 122deg,
+      #0d2d42 122deg 210deg,
+      #174d36 210deg 266deg,
+      #4d342a 266deg 292deg,
+      transparent 292deg 360deg
     );
   }
   100% {
@@ -812,9 +855,9 @@ select {
     background: conic-gradient(
       from -90deg,
       #ff4e00 0deg 90deg,
-      #0d2d42 90deg 190deg,
-      #174d36 190deg 280deg,
-      #4d342a 280deg 360deg
+      #0d2d42 90deg 180deg,
+      #174d36 180deg 270deg,
+      #4d342a 270deg 360deg
     );
   }
 }
