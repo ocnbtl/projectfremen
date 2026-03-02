@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ACTION_ITEMS } from "../../../../lib/seed-data";
 import { readDocsIndex } from "../../../../lib/docs-sync";
+import { normalizeGoalItems } from "../../../../lib/entity-goals";
 import { getEntityHubBySlug, filterDocsForEntity, sortEntityKpis } from "../../../../lib/entity-hub";
 import EntityGoalsPanel from "../../../../components/EntityGoalsPanel";
 import { readEntityGoals } from "../../../../lib/entity-goals-store";
@@ -94,7 +95,7 @@ export default async function EntityHubPage({
   const [allKpis, docsState, goals] = await Promise.all([
     readKpis().catch(() => []),
     readDocsIndex().catch(() => ({ lastSynced: null, items: [] })),
-    readEntityGoals(config.slug, config.defaultGoals).catch(() => config.defaultGoals)
+    readEntityGoals(config.slug, config.defaultGoals).catch(() => normalizeGoalItems(config.defaultGoals))
   ]);
 
   const kpis = sortEntityKpis(

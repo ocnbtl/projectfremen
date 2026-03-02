@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
 import { appendAuditEvent, getRequestIp } from "../../../lib/audit-log";
 import { isCsrfRequestValid } from "../../../lib/csrf";
+import { normalizeGoalItems, type EntityGoalItem } from "../../../lib/entity-goals";
 import { readEntityGoals, writeEntityGoals } from "../../../lib/entity-goals-store";
 import { ENTITY_HUBS, getEntityHubBySlug } from "../../../lib/entity-hub";
 
@@ -53,11 +54,11 @@ export async function POST(request: Request) {
 
   const body = (await request.json()) as {
     slug?: string;
-    goals?: string[];
+    goals?: Array<string | EntityGoalItem | { text?: unknown; done?: unknown }>;
   };
 
   const slug = body.slug?.trim() || "";
-  const goals = Array.isArray(body.goals) ? body.goals.map((item) => String(item || "")) : [];
+  const goals = normalizeGoalItems(Array.isArray(body.goals) ? body.goals : []);
 
   const hub = getEntityHubBySlug(slug);
   if (!hub) {

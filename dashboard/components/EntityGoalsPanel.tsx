@@ -2,25 +2,39 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
+import {
+  areGoalListsEqual,
+  normalizeGoalItems,
+  type EntityGoalItem
+} from "../lib/entity-goals";
+import { readEntityGoalsFromCache, writeEntityGoalsToCache } from "../lib/entity-goals-cache";
 import { ENTITY_GOALS_SYNC_KEY } from "../lib/entity-goals-sync";
 
 type GoalsResponse = {
   ok: boolean;
-  goals?: string[];
+  goals?: EntityGoalItem[];
   error?: string;
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 
-function normalizeGoals(goals: string[]): string[] {
-  return goals
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 6);
+function toDraftGoals(goals: EntityGoalItem[]): string[] {
+  if (goals.length === 0) {
+    return ["", "", ""];
+  }
+  return goals.map((item) => item.text);
 }
 
-function serializeGoals(goals: string[]): string {
-  return JSON.stringify(normalizeGoals(goals));
+function serializeGoalItems(goals: EntityGoalItem[]): string {
+  return JSON.stringify(normalizeGoalItems(goals));
+}
+
+function serializeDraftGoals(goals: string[]): string {
+  return JSON.stringify(normalizeGoalItems(goals).map((item) => item.text));
+}
+
+function draftToGoalItems(goals: string[]): EntityGoalItem[] {
+  return normalizeGoalItems(goals).map((item) => ({ text: item.text, done: false }));
 }
 
 export default function EntityGoalsPanel({
@@ -28,17 +42,19 @@ export default function EntityGoalsPanel({
   initialGoals
 }: {
   slug: string;
-  initialGoals: string[];
+  initialGoals: EntityGoalItem[];
 }) {
-  const [goals, setGoals] = useState<string[]>(initialGoals);
-  const [draftGoals, setDraftGoals] = useState<string[]>(initialGoals);
+  const normalizedInitialGoals = useMemo(() => normalizeGoalItems(initialGoals), [initialGoals]);
+  const [goals, setGoals] = useState<EntityGoalItem[]>(normalizedInitialGoals);
+  const [draftGoals, setDraftGoals] = useState<string[]>(toDraftGoals(normalizedInitialGoals));
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [error, setError] = useState("");
-  const lastSavedGoalsRef = useRef<string>(serializeGoals(initialGoals));
+  const lastSavedGoalsRef = useRef<string>(serializeGoalItems(normalizedInitialGoals));
+  const lastSavedDraftGoalsRef = useRef<string>(serializeDraftGoals(toDraftGoals(normalizedInitialGoals)));
 
-  const draftSerialized = useMemo(() => serializeGoals(draftGoals), [draftGoals]);
+  const draftSerialized = useMemo(() => serializeDraftGoals(draftGoals), [draftGoals]);
 
   function broadcastGoalsUpdated() {
     try {
@@ -48,28 +64,46 @@ export default function EntityGoalsPanel({
     }
   }
 
+  useEffect(() => {
+    const cached = readEntityGoalsFromCache(slug);
+    if (!cached || areGoalListsEqual(cached, normalizedInitialGoals)) {
+      return;
+    }
+
+    setGoals(cached);
+    setDraftGoals(toDraftGoals(cached));
+    lastSavedGoalsRef.current = serializeGoalItems(cached);
+    lastSavedDraftGoalsRef.current = serializeDraftGoals(toDraftGoals(cached));
+  }, [normalizedInitialGoals, slug]);
+
   function beginEdit() {
-    setDraftGoals(goals.length ? goals : ["", "", ""]);
+    const nextDraft = toDraftGoals(goals);
+    setDraftGoals(nextDraft);
+    lastSavedDraftGoalsRef.current = serializeDraftGoals(nextDraft);
     setEditing(true);
     setError("");
     setSaveState("idle");
   }
 
   function cancelEdit() {
-    setDraftGoals(goals);
+    setDraftGoals(toDraftGoals(goals));
     setEditing(false);
     setError("");
     setSaveState("idle");
   }
 
-  async function persistGoals(nextGoals: string[], options?: { closeEditor?: boolean; force?: boolean }) {
+  async function persistGoalItems(
+    nextGoals: EntityGoalItem[],
+    options?: { closeEditor?: boolean; force?: boolean }
+  ) {
     const closeEditor = options?.closeEditor ?? false;
     const force = options?.force ?? false;
-    const nextSerialized = serializeGoals(nextGoals);
+    const normalizedNext = normalizeGoalItems(nextGoals);
+    const nextSerialized = serializeGoalItems(normalizedNext);
 
     if (!force && nextSerialized === lastSavedGoalsRef.current) {
       if (closeEditor) {
-        setDraftGoals(goals.length ? goals : ["", "", ""]);
+        setDraftGoals(toDraftGoals(goals));
         setEditing(false);
       }
       setSaveState("saved");
@@ -83,43 +117,85 @@ export default function EntityGoalsPanel({
     const res = await fetch("/api/entity-goals", {
       method: "POST",
       headers: buildJsonHeadersWithCsrf(),
-      body: JSON.stringify({ slug, goals: nextGoals })
+      body: JSON.stringify({ slug, goals: normalizedNext })
     });
-    const payload = (await res.json()) as GoalsResponse;
+    const payload = (await res.json().catch(() => ({ ok: false, error: "Failed to save goals" }))) as GoalsResponse;
 
     if (!res.ok || !payload.ok || !payload.goals) {
-      setError(payload.error || "Failed to save goals");
+      setGoals(normalizedNext);
+      writeEntityGoalsToCache(slug, normalizedNext);
+      lastSavedGoalsRef.current = nextSerialized;
+      if (closeEditor) {
+        setDraftGoals(toDraftGoals(normalizedNext));
+        setEditing(false);
+      }
       setSaving(false);
       setSaveState("error");
-      return false;
+      setError("Saved locally. Server sync pending.");
+      broadcastGoalsUpdated();
+      return true;
     }
 
-    setGoals(payload.goals);
-    lastSavedGoalsRef.current = serializeGoals(payload.goals);
+    const savedGoals = normalizeGoalItems(payload.goals);
+    setGoals(savedGoals);
+    lastSavedGoalsRef.current = serializeGoalItems(savedGoals);
+    writeEntityGoalsToCache(slug, savedGoals);
     if (closeEditor) {
-      setDraftGoals(payload.goals.length ? payload.goals : ["", "", ""]);
+      setDraftGoals(toDraftGoals(savedGoals));
       setEditing(false);
     }
     setSaving(false);
     setSaveState("saved");
+    setError("");
     broadcastGoalsUpdated();
     return true;
   }
 
+  async function persistDraftGoals(nextDraft: string[], options?: { closeEditor?: boolean; force?: boolean }) {
+    const closeEditor = options?.closeEditor ?? false;
+    const force = options?.force ?? false;
+    const nextDraftSerialized = serializeDraftGoals(nextDraft);
+
+    if (!force && nextDraftSerialized === lastSavedDraftGoalsRef.current) {
+      if (closeEditor) {
+        setEditing(false);
+      }
+      setSaveState("saved");
+      return true;
+    }
+
+    const ok = await persistGoalItems(draftToGoalItems(nextDraft), { closeEditor, force: true });
+    if (ok) {
+      lastSavedDraftGoalsRef.current = nextDraftSerialized;
+    }
+    return ok;
+  }
+
   async function finishEdit() {
-    await persistGoals(draftGoals, { closeEditor: true, force: true });
+    await persistDraftGoals(draftGoals, { closeEditor: true });
+  }
+
+  async function toggleGoalDone(index: number) {
+    if (editing || saving) {
+      return;
+    }
+
+    const nextGoals = goals.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, done: !item.done } : item
+    );
+    await persistGoalItems(nextGoals, { force: true });
   }
 
   useEffect(() => {
     if (!editing) {
       return;
     }
-    if (draftSerialized === lastSavedGoalsRef.current) {
+    if (draftSerialized === lastSavedDraftGoalsRef.current) {
       return;
     }
 
     const timer = window.setTimeout(() => {
-      void persistGoals(draftGoals);
+      void persistDraftGoals(draftGoals);
     }, 600);
 
     return () => window.clearTimeout(timer);
@@ -162,9 +238,21 @@ export default function EntityGoalsPanel({
         goals.length === 0 ? (
           <p className="muted">No goals set yet.</p>
         ) : (
-          <ul>
-            {goals.map((goal) => (
-              <li key={goal}>{goal}</li>
+          <ul className="entity-goals-list">
+            {goals.map((goal, index) => (
+              <li className={`entity-goal-item ${goal.done ? "is-done" : ""}`} key={`${slug}-${index}-${goal.text}`}>
+                <span className="entity-goal-item-text">{goal.text}</span>
+                <button
+                  type="button"
+                  className={`entity-goal-toggle-btn ${goal.done ? "is-done" : ""}`}
+                  onClick={() => {
+                    void toggleGoalDone(index);
+                  }}
+                  disabled={saving}
+                >
+                  {goal.done ? "Done" : "Mark done"}
+                </button>
+              </li>
             ))}
           </ul>
         )
@@ -183,7 +271,7 @@ export default function EntityGoalsPanel({
                   setDraftGoals(next);
                 }}
                 onBlur={() => {
-                  void persistGoals(draftGoals);
+                  void persistDraftGoals(draftGoals);
                 }}
               />
             </label>

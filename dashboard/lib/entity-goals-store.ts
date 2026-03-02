@@ -1,34 +1,37 @@
 import { readJsonFile, writeJsonFile } from "./file-store";
+import { normalizeGoalItems, type EntityGoalItem } from "./entity-goals";
 
 const FILE_NAME = "entity-goals.json";
 
 type EntityGoalsState = {
-  goalsBySlug: Record<string, string[]>;
+  goalsBySlug: Record<
+    string,
+    Array<string | EntityGoalItem | { text?: unknown; done?: unknown }>
+  >;
 };
 
 const EMPTY_STATE: EntityGoalsState = {
   goalsBySlug: {}
 };
 
-function normalizeGoals(goals: string[]): string[] {
-  return goals
-    .map((item) => item.trim())
-    .filter(Boolean)
-    .slice(0, 6);
-}
-
-export async function readEntityGoals(slug: string, defaults: string[]): Promise<string[]> {
+export async function readEntityGoals(
+  slug: string,
+  defaults: string[]
+): Promise<EntityGoalItem[]> {
   const state = await readJsonFile<EntityGoalsState>(FILE_NAME, EMPTY_STATE);
   const existing = state.goalsBySlug[slug];
   if (!existing || existing.length === 0) {
-    return defaults;
+    return normalizeGoalItems(defaults);
   }
-  return normalizeGoals(existing);
+  return normalizeGoalItems(existing);
 }
 
-export async function writeEntityGoals(slug: string, goals: string[]): Promise<string[]> {
+export async function writeEntityGoals(
+  slug: string,
+  goals: Array<string | EntityGoalItem | { text?: unknown; done?: unknown }>
+): Promise<EntityGoalItem[]> {
   const state = await readJsonFile<EntityGoalsState>(FILE_NAME, EMPTY_STATE);
-  const normalized = normalizeGoals(goals);
+  const normalized = normalizeGoalItems(goals);
 
   const nextState: EntityGoalsState = {
     goalsBySlug: {
