@@ -739,6 +739,7 @@ select {
   letter-spacing: 0.01em;
   box-shadow: 0 8px 18px rgba(13, 45, 66, 0.12);
   transition:
+    border-radius 170ms cubic-bezier(0.33, 0, 0.12, 1),
     transform 180ms ease,
     box-shadow 220ms ease,
     border-color 220ms ease,
@@ -747,20 +748,12 @@ select {
 }
 
 .review-back-link:hover {
+  border-radius: 2px;
   transform: translateY(-1px);
   border-color: rgba(11, 34, 49, 0.5);
-  background-image: linear-gradient(
-    112deg,
-    #ff4e00 0%,
-    #ff8a52 20%,
-    #0d2d42 40%,
-    #2a6b95 56%,
-    #174d36 72%,
-    #2e6b4a 86%,
-    #4d342a 100%
-  );
+  background: linear-gradient(180deg, #fdfefe 0%, #e4edf5 100%);
   box-shadow: 0 12px 26px rgba(13, 45, 66, 0.2);
-  color: #f5f9ff;
+  color: #0d2d42;
 }
 
 .review-back-link:active {
