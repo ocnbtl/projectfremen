@@ -189,7 +189,7 @@ a {
 
 .admin-clock-line {
   margin: 0;
-  font-size: clamp(29px, 4vw, 52px);
+  font-size: clamp(20px, 2.7vw, 38px);
   color: #f5f9ff;
   letter-spacing: 0.01em;
   line-height: 1.12;
@@ -410,6 +410,7 @@ select {
     125px
     200px
     160px
+    240px
     90px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
@@ -418,15 +419,6 @@ select {
 
 .kpi-form button {
   margin-bottom: 12px;
-}
-
-.sentry-sync-row {
-  display: grid;
-  gap: 6px;
-}
-
-.sentry-sync-button {
-  max-width: 520px;
 }
 
 .kpi-form label,
@@ -1090,7 +1082,7 @@ select {
   }
 
   .admin-clock-line {
-    font-size: clamp(24px, 6.4vw, 34px);
+    font-size: clamp(20px, 5.6vw, 30px);
   }
 
   .admin-clock-time-line {

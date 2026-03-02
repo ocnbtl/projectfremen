@@ -157,9 +157,9 @@ export default function KpiManager() {
   const [link, setLink] = useState("");
   const [staleDays, setStaleDays] = useState(DEFAULT_STALE_DAYS);
   const [saving, setSaving] = useState(false);
-  const [sentryConfigured, setSentryConfigured] = useState<boolean | null>(null);
-  const [sentryMissing, setSentryMissing] = useState<string[]>([]);
-  const [sentryTargets, setSentryTargets] = useState<Array<{ entity: EntityName; kpiName: string }>>([]);
+  const [, setSentryConfigured] = useState<boolean | null>(null);
+  const [, setSentryMissing] = useState<string[]>([]);
+  const [, setSentryTargets] = useState<Array<{ entity: EntityName; kpiName: string }>>([]);
   const [sentrySyncing, setSentrySyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState("");
 
@@ -401,6 +401,9 @@ export default function KpiManager() {
         <button type="submit" disabled={saving}>
           {saving ? "Saving..." : "Save KPI"}
         </button>
+        <button type="button" onClick={syncSentryKpi} disabled={sentrySyncing}>
+          {sentrySyncing ? "Syncing Sentry..." : "Sync Sentry KPIs (pngwn + Diyesu Decor)"}
+        </button>
         <label className="stale-inline-field">
           Stale Days
           <input
@@ -418,31 +421,6 @@ export default function KpiManager() {
           />
         </label>
       </form>
-
-      <div className="sentry-sync-row" style={{ marginBottom: 12 }}>
-        <button
-          type="button"
-          onClick={syncSentryKpi}
-          disabled={sentrySyncing}
-          className="sentry-sync-button"
-        >
-          {sentrySyncing ? "Syncing Sentry..." : "Sync Sentry KPIs (pngwn + Diyesu Decor)"}
-        </button>
-        {sentryConfigured === false ? (
-          <p className="muted" style={{ margin: 0 }}>
-            Sentry sync disabled. Missing: {sentryMissing.length ? sentryMissing.join(", ") : "unknown"}
-          </p>
-        ) : sentryConfigured === true ? (
-          <p className="muted" style={{ margin: 0 }}>
-            Sentry sync ready for:{" "}
-            {sentryTargets.length
-              ? sentryTargets.map((item) => item.entity).join(", ")
-              : "pngwn, Diyesu Decor"}
-          </p>
-        ) : (
-          <p className="muted" style={{ margin: 0 }}>Checking Sentry config...</p>
-        )}
-      </div>
 
       {loading ? (
         <p className="muted">Loading KPI values...</p>
