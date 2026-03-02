@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       status: "denied",
       detail: `retryAfterSeconds=${allowance.retryAfterSeconds}`
     });
-    return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url));
+    return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url), { status: 303 });
   }
 
   if (!isSameOriginRequest(request)) {
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
       ip,
       status: "denied"
     });
-    return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url));
+    return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url), { status: 303 });
   }
 
   if (!adminPassword || password !== adminPassword) {
@@ -82,7 +82,7 @@ export async function POST(request: Request) {
       ip,
       status: "denied"
     });
-    return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url));
+    return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url), { status: 303 });
   }
 
   recordLoginResult(ip, true);
@@ -114,5 +114,5 @@ export async function POST(request: Request) {
     status: "ok"
   });
 
-  return NextResponse.redirect(new URL(successPath, request.url));
+  return NextResponse.redirect(new URL(successPath, request.url), { status: 303 });
 }
