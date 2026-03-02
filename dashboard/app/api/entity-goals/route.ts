@@ -3,7 +3,7 @@ import { hasAdminSession } from "../../../lib/admin-session";
 import { appendAuditEvent, getRequestIp } from "../../../lib/audit-log";
 import { isCsrfRequestValid } from "../../../lib/csrf";
 import { readEntityGoals, writeEntityGoals } from "../../../lib/entity-goals-store";
-import { getEntityHubBySlug } from "../../../lib/entity-hub";
+import { ENTITY_HUBS, getEntityHubBySlug } from "../../../lib/entity-hub";
 
 export const runtime = "nodejs";
 
@@ -14,6 +14,17 @@ export async function GET(request: Request) {
 
   const url = new URL(request.url);
   const slug = url.searchParams.get("slug")?.trim() || "";
+
+  if (!slug) {
+    const items = await Promise.all(
+      ENTITY_HUBS.map(async (hub) => ({
+        slug: hub.slug,
+        entity: hub.entity,
+        goals: await readEntityGoals(hub.slug, hub.defaultGoals)
+      }))
+    );
+    return NextResponse.json({ ok: true, items });
+  }
 
   const hub = getEntityHubBySlug(slug);
   if (!hub) {

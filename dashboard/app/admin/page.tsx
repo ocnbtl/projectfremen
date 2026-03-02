@@ -1,7 +1,9 @@
 import Link from "next/link";
 import AdminWelcomeIntro from "../../components/AdminWelcomeIntro";
+import CurrentGoalsPanel, { type HomeGoalItem } from "../../components/CurrentGoalsPanel";
 import DashboardClockHero from "../../components/DashboardClockHero";
-import { ACTION_ITEMS } from "../../lib/seed-data";
+import { readEntityGoals } from "../../lib/entity-goals-store";
+import { ENTITY_HUBS } from "../../lib/entity-hub";
 import { requireAdminSession } from "../../lib/require-admin";
 import {
   daysUntil,
@@ -29,10 +31,10 @@ const ENTITIES = [
   }
 ];
 
-const ENTITY_THEME_BY_NAME: Record<string, "fremen" | "iceflake" | "pint"> = {
-  Unigentamos: "fremen",
+const ENTITY_THEME_BY_SLUG: Record<string, "fremen" | "iceflake" | "pint"> = {
+  unigentamos: "fremen",
   pngwn: "iceflake",
-  "Diyesu Decor": "pint"
+  "diyesu-decor": "pint"
 };
 
 function getReviewRows(now: Date): Array<{ name: string; when: string; cadence: string }> {
@@ -69,6 +71,14 @@ export default async function AdminPage({
   const params = await searchParams;
   const playIntro = params.welcome === "1";
   const reviewRows = getReviewRows(new Date());
+  const goalItems: HomeGoalItem[] = await Promise.all(
+    ENTITY_HUBS.map(async (hub) => ({
+      slug: hub.slug,
+      entity: hub.entity,
+      theme: ENTITY_THEME_BY_SLUG[hub.slug] || "fremen",
+      goals: await readEntityGoals(hub.slug, hub.defaultGoals)
+    }))
+  );
 
   return (
     <main className="admin-shell admin-home-shell">
@@ -89,20 +99,7 @@ export default async function AdminPage({
       <section className="admin-home-grid">
         <div className="admin-home-left">
           <AdminWelcomeIntro playIntro={playIntro} />
-
-          <section className="admin-plain-section">
-            <h2>Due Now and Upcoming</h2>
-            <ul className="admin-plain-list">
-              {ACTION_ITEMS.map((item) => (
-                <li key={item.id}>
-                  <span>{item.title}</span>
-                  <span className={`pill entity-pill entity-pill-${ENTITY_THEME_BY_NAME[item.entity]}`}>
-                    {item.entity}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <CurrentGoalsPanel initialItems={goalItems} />
 
           <section className="admin-plain-section">
             <h2>Upcoming Reviews</h2>
@@ -116,6 +113,14 @@ export default async function AdminPage({
                 </li>
               ))}
             </ul>
+            <div className="admin-review-links">
+              <Link href="/admin/reviews/weekly" className="admin-review-link">
+                Weekly Hub
+              </Link>
+              <Link href="/admin/reviews/monthly" className="admin-review-link">
+                Monthly Hub
+              </Link>
+            </div>
           </section>
         </div>
 

@@ -237,6 +237,75 @@ a {
   color: rgba(207, 224, 241, 0.88);
 }
 
+.admin-goals-list {
+  gap: 8px;
+}
+
+.admin-goal-item {
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.admin-goal-marker {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(8, 18, 28, 0.35);
+}
+
+.admin-goal-marker-fremen {
+  background: #2d9d65;
+}
+
+.admin-goal-marker-iceflake {
+  background: #4f84d2;
+}
+
+.admin-goal-marker-pint {
+  background: #cb7f3e;
+}
+
+.admin-goal-text {
+  color: #e6f1fb;
+}
+
+.admin-goal-entity {
+  color: rgba(195, 215, 235, 0.78);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.admin-review-links {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-review-link {
+  width: auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 26px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(178, 202, 224, 0.42);
+  color: rgba(226, 239, 251, 0.94);
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  transition: border-color 130ms ease, background 130ms ease, color 130ms ease;
+}
+
+.admin-review-link:hover {
+  border-color: rgba(212, 230, 248, 0.72);
+  background: rgba(13, 45, 66, 0.32);
+  color: #ffffff;
+}
+
 .admin-quick-links {
   display: grid;
   gap: 14px;
