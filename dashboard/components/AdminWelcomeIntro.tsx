@@ -19,8 +19,6 @@ export default function AdminWelcomeIntro({
   );
 
   const messageLength = useMemo(() => WELCOME_MESSAGE.length, []);
-  const persistentMessage = playIntro ? typedText || " " : WELCOME_MESSAGE;
-
   useEffect(() => {
     if (!playIntro) {
       return;
@@ -86,10 +84,6 @@ export default function AdminWelcomeIntro({
           </div>
         </div>
       )}
-
-      <p className="admin-welcome-typed" aria-live="polite">
-        {persistentMessage}
-      </p>
     </>
   );
 }

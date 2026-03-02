@@ -1,30 +1,28 @@
 import Link from "next/link";
-import { ACTION_ITEMS } from "../../lib/seed-data";
-import KpiManager from "../../components/KpiManager";
-import DocsIndexPanel from "../../components/DocsIndexPanel";
-import ObsidianExportPanel from "../../components/ObsidianExportPanel";
 import AdminWelcomeIntro from "../../components/AdminWelcomeIntro";
-import UpcomingReviewSummary from "../../components/UpcomingReviewSummary";
+import DashboardClockHero from "../../components/DashboardClockHero";
+import { ACTION_ITEMS } from "../../lib/seed-data";
+import {
+  daysUntil,
+  formatMonthDay,
+  getNextFirstSunday,
+  getNextFriday,
+  getNextSunday
+} from "../../lib/review-schedule";
 
 const ENTITIES = [
   {
     name: "Unigentamos",
-    type: "Holding / umbrella",
-    status: "Active planning",
     theme: "fremen",
     slug: "unigentamos"
   },
   {
     name: "pngwn",
-    type: "Brand project (Project Iceflake)",
-    status: "Website build",
     theme: "iceflake",
     slug: "pngwn"
   },
   {
     name: "Diyesu Decor",
-    type: "Brand project (Project Pint)",
-    status: "Content ops build",
     theme: "pint",
     slug: "diyesu-decor"
   }
@@ -36,6 +34,31 @@ const ENTITY_THEME_BY_NAME: Record<string, "fremen" | "iceflake" | "pint"> = {
   "Diyesu Decor": "pint"
 };
 
+function getReviewRows(now: Date): Array<{ name: string; when: string; cadence: string }> {
+  const weekly = getNextSunday(now);
+  const monthly = getNextFirstSunday(now);
+  const kpiRefresh = getNextFriday(now);
+  const dayLabel = (days: number) => `${days} day${days === 1 ? "" : "s"}`;
+
+  return [
+    {
+      name: "Weekly Review",
+      when: `${formatMonthDay(weekly)} (${dayLabel(daysUntil(weekly, now))})`,
+      cadence: "Sunday"
+    },
+    {
+      name: "Monthly Review",
+      when: `${formatMonthDay(monthly)} (${dayLabel(daysUntil(monthly, now))})`,
+      cadence: "1st Sunday"
+    },
+    {
+      name: "KPI Refresh",
+      when: `${formatMonthDay(kpiRefresh)} (${dayLabel(daysUntil(kpiRefresh, now))})`,
+      cadence: "Friday"
+    }
+  ];
+}
+
 export default async function AdminPage({
   searchParams
 }: {
@@ -43,9 +66,10 @@ export default async function AdminPage({
 }) {
   const params = await searchParams;
   const playIntro = params.welcome === "1";
+  const reviewRows = getReviewRows(new Date());
 
   return (
-    <main className="admin-shell">
+    <main className="admin-shell admin-home-shell">
       <header className="admin-floating-nav">
         <nav className="admin-entity-nav" aria-label="Entity navigation">
           {ENTITIES.map((entity) => (
@@ -60,67 +84,55 @@ export default async function AdminPage({
         </nav>
       </header>
 
-      <section className="admin-overview-grid">
-        <div className="admin-overview-left">
+      <section className="admin-home-grid">
+        <div className="admin-home-left">
           <AdminWelcomeIntro playIntro={playIntro} />
 
-          <article className="card admin-slate-card">
+          <section className="admin-plain-section">
             <h2>Due Now and Upcoming</h2>
-            <table className="admin-compact-table">
-              <thead>
-                <tr>
-                  <th>Item</th>
-                  <th>Entity</th>
-                  <th>Due</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ACTION_ITEMS.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.title}</td>
-                    <td>
-                      <span className={`pill entity-pill entity-pill-${ENTITY_THEME_BY_NAME[item.entity]}`}>
-                        {item.entity}
-                      </span>
-                    </td>
-                    <td>{item.due}</td>
-                    <td>{item.status}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </article>
+            <ul className="admin-plain-list">
+              {ACTION_ITEMS.map((item) => (
+                <li key={item.id}>
+                  <span>{item.title}</span>
+                  <span className={`pill entity-pill entity-pill-${ENTITY_THEME_BY_NAME[item.entity]}`}>
+                    {item.entity}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
 
-          <UpcomingReviewSummary />
+          <section className="admin-plain-section">
+            <h2>Upcoming Reviews</h2>
+            <ul className="admin-plain-list admin-review-list">
+              {reviewRows.map((item) => (
+                <li key={item.name}>
+                  <span>{item.name}</span>
+                  <span className="admin-review-when">
+                    {item.when} ({item.cadence})
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
         </div>
 
-        <aside className="card admin-quick-nav-card">
-          <p className="admin-quick-nav-kicker">Quick Navigation</p>
-          <a href="#kpi-tracker" className="admin-quick-nav-link">
+        <div className="admin-home-center">
+          <DashboardClockHero />
+        </div>
+
+        <aside className="admin-quick-links">
+          <Link href="/admin/kpis" className="admin-quick-link">
             KPI Tracker
-          </a>
-          <a href="#obsidian-export" className="admin-quick-nav-link">
+          </Link>
+          <Link href="/admin/obsidian" className="admin-quick-link">
             Obsidian Export
-          </a>
-          <a href="#github-sync" className="admin-quick-nav-link">
+          </Link>
+          <Link href="/admin/docs" className="admin-quick-link">
             GitHub Sync
-          </a>
+          </Link>
         </aside>
       </section>
-
-      <section id="kpi-tracker" className="admin-anchor-section">
-        <KpiManager />
-      </section>
-
-      <section id="obsidian-export" className="admin-anchor-section">
-        <ObsidianExportPanel />
-      </section>
-
-      <section id="github-sync" className="admin-anchor-section">
-        <DocsIndexPanel />
-      </section>
-
     </main>
   );
 }
