@@ -15,17 +15,17 @@ import {
 
 const ENTITIES = [
   {
-    name: "Unigentamos",
+    name: "Project Fremen",
     theme: "fremen",
     slug: "unigentamos"
   },
   {
-    name: "pngwn",
+    name: "Project Iceflake",
     theme: "iceflake",
     slug: "pngwn"
   },
   {
-    name: "Diyesu Decor",
+    name: "Project Pint",
     theme: "pint",
     slug: "diyesu-decor"
   }
@@ -37,27 +37,26 @@ const ENTITY_THEME_BY_SLUG: Record<string, "fremen" | "iceflake" | "pint"> = {
   "diyesu-decor": "pint"
 };
 
-function getReviewRows(now: Date): Array<{ name: string; when: string; cadence: string }> {
+function getReviewRows(now: Date): Array<{ name: string; when: string }> {
   const weekly = getNextSunday(now);
   const monthly = getNextFirstSunday(now);
   const kpiRefresh = getNextFriday(now);
   const dayLabel = (days: number) => `${days} day${days === 1 ? "" : "s"}`;
+  const formatReviewWhen = (date: Date, dayName: string) =>
+    `${formatMonthDay(date)} (${dayName} in ${dayLabel(daysUntil(date, now))})`;
 
   return [
     {
       name: "Weekly Review",
-      when: `${formatMonthDay(weekly)} (${dayLabel(daysUntil(weekly, now))})`,
-      cadence: "Sunday"
+      when: formatReviewWhen(weekly, "Sunday")
     },
     {
       name: "Monthly Review",
-      when: `${formatMonthDay(monthly)} (${dayLabel(daysUntil(monthly, now))})`,
-      cadence: "1st Sunday"
+      when: formatReviewWhen(monthly, "Sunday")
     },
     {
       name: "KPI Refresh",
-      when: `${formatMonthDay(kpiRefresh)} (${dayLabel(daysUntil(kpiRefresh, now))})`,
-      cadence: "Friday"
+      when: formatReviewWhen(kpiRefresh, "Friday")
     }
   ];
 }
@@ -106,10 +105,10 @@ export default async function AdminPage({
               <h2>Upcoming Reviews</h2>
               <div className="admin-review-links">
                 <Link href="/admin/reviews/weekly" className="admin-review-link">
-                  Weekly Hub
+                  Weekly
                 </Link>
                 <Link href="/admin/reviews/monthly" className="admin-review-link">
-                  Monthly Hub
+                  Monthly
                 </Link>
               </div>
             </div>
@@ -117,9 +116,7 @@ export default async function AdminPage({
               {reviewRows.map((item) => (
                 <li key={item.name}>
                   <span>{item.name}</span>
-                  <span className="admin-review-when">
-                    {item.when} ({item.cadence})
-                  </span>
+                  <span className="admin-review-when">{item.when}</span>
                 </li>
               ))}
             </ul>

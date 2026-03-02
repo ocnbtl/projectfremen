@@ -74,11 +74,6 @@ a {
   gap: 8px;
   flex-wrap: wrap;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(208, 223, 237, 0.22);
-  border-radius: 999px;
-  padding: 8px;
-  backdrop-filter: blur(6px);
 }
 
 .admin-entity-link {
@@ -294,7 +289,7 @@ a {
   margin-top: 0;
   display: flex;
   gap: 8px;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
 }
 
 .admin-review-link {
@@ -1229,7 +1224,7 @@ select {
   }
 
   .admin-entity-nav {
-    border-radius: 16px;
+    justify-content: flex-start;
   }
 
   .landing-back-link {
