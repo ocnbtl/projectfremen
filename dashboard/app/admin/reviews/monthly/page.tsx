@@ -1,10 +1,12 @@
 import ReviewEntriesPanel from "../../../../components/ReviewEntriesPanel";
+import { requireAdminSession } from "../../../../lib/require-admin";
 
 export default async function MonthlyReviewPage({
   searchParams
 }: {
   searchParams: Promise<{ scheduledFor?: string }>;
 }) {
+  await requireAdminSession();
   const params = await searchParams;
 
   return (

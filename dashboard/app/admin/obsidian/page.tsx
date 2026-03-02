@@ -1,7 +1,9 @@
 import Link from "next/link";
 import ObsidianExportPanel from "../../../components/ObsidianExportPanel";
+import { requireAdminSession } from "../../../lib/require-admin";
 
-export default function AdminObsidianPage() {
+export default async function AdminObsidianPage() {
+  await requireAdminSession();
   return (
     <main className="shell">
       <header className="topbar">

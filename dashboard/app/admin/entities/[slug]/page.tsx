@@ -6,6 +6,7 @@ import { getEntityHubBySlug, filterDocsForEntity, sortEntityKpis } from "../../.
 import EntityGoalsPanel from "../../../../components/EntityGoalsPanel";
 import { readEntityGoals } from "../../../../lib/entity-goals-store";
 import { readKpis } from "../../../../lib/kpis-store";
+import { requireAdminSession } from "../../../../lib/require-admin";
 
 function parseTrend(value: string): { direction: "up" | "down" | "flat"; percent: string } | null {
   const arrowMatch = value.match(/([↑↓↔])\s*([0-9]+(?:\.[0-9]+)?%)/);
@@ -82,6 +83,7 @@ export default async function EntityHubPage({
 }: {
   params: Promise<{ slug: string }>;
 }) {
+  await requireAdminSession();
   const { slug } = await params;
   const config = getEntityHubBySlug(slug);
 

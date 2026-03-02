@@ -1,7 +1,9 @@
 import Link from "next/link";
 import DocsIndexPanel from "../../../components/DocsIndexPanel";
+import { requireAdminSession } from "../../../lib/require-admin";
 
-export default function AdminDocsPage() {
+export default async function AdminDocsPage() {
+  await requireAdminSession();
   return (
     <main className="shell">
       <header className="topbar">

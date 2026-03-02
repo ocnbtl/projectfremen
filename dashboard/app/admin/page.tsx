@@ -2,6 +2,7 @@ import Link from "next/link";
 import AdminWelcomeIntro from "../../components/AdminWelcomeIntro";
 import DashboardClockHero from "../../components/DashboardClockHero";
 import { ACTION_ITEMS } from "../../lib/seed-data";
+import { requireAdminSession } from "../../lib/require-admin";
 import {
   daysUntil,
   formatMonthDay,
@@ -64,6 +65,7 @@ export default async function AdminPage({
 }: {
   searchParams: Promise<{ welcome?: string }>;
 }) {
+  await requireAdminSession();
   const params = await searchParams;
   const playIntro = params.welcome === "1";
   const reviewRows = getReviewRows(new Date());

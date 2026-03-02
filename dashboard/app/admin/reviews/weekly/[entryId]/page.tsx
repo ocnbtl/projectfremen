@@ -1,10 +1,12 @@
 import ReviewEntryEditor from "../../../../../components/ReviewEntryEditor";
+import { requireAdminSession } from "../../../../../lib/require-admin";
 
 export default async function WeeklyReviewEntryPage({
   params
 }: {
   params: Promise<{ entryId: string }>;
 }) {
+  await requireAdminSession();
   const { entryId } = await params;
 
   return (
