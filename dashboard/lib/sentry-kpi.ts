@@ -17,6 +17,12 @@ type SentryConfig = {
   }>;
 };
 
+type SentryProjectSummary = {
+  id: string;
+  slug: string;
+  name: string;
+};
+
 export type SentryKpiConfigStatus = {
   configured: boolean;
   missing: string[];
@@ -126,6 +132,121 @@ function buildIssuesUiLink(orgSlug: string, projectSlug: string): string {
   return `https://sentry.io/organizations/${orgSlug}/issues/?project=${encodeURIComponent(projectSlug)}`;
 }
 
+function normalizeProjectInput(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\//, "")
+    .split("/")
+    .filter(Boolean)
+    .pop() || "";
+}
+
+function slugifyToken(value: string): string {
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+async function fetchOrganizationProjects(config: SentryConfig): Promise<SentryProjectSummary[]> {
+  const firstUrl =
+    `${config.apiBaseUrl}/organizations/${encodeURIComponent(config.orgSlug)}` +
+    "/projects/?per_page=200";
+  const projects: SentryProjectSummary[] = [];
+  let nextUrl: string | null = firstUrl;
+  let pageCount = 0;
+
+  while (nextUrl && pageCount < MAX_PAGES) {
+    const response = await fetch(nextUrl, {
+      headers: {
+        Authorization: `Bearer ${config.token}`,
+        Accept: "application/json"
+      },
+      cache: "no-store"
+    });
+
+    if (!response.ok) {
+      break;
+    }
+
+    const payload = (await response.json()) as unknown;
+    if (!Array.isArray(payload)) {
+      break;
+    }
+
+    for (const rawProject of payload) {
+      if (!rawProject || typeof rawProject !== "object") {
+        continue;
+      }
+      const project = rawProject as { id?: unknown; slug?: unknown; name?: unknown };
+      const slug = typeof project.slug === "string" ? project.slug.trim() : "";
+      const id = typeof project.id === "string" ? project.id.trim() : "";
+      const name = typeof project.name === "string" ? project.name.trim() : "";
+      if (!slug) {
+        continue;
+      }
+      projects.push({
+        id,
+        slug,
+        name
+      });
+    }
+
+    pageCount += 1;
+    const { nextUrl: nextCandidate, hasMore } = parseNextLink(response.headers.get("link"));
+    if (!nextCandidate || !hasMore) {
+      nextUrl = null;
+    } else {
+      nextUrl = resolveNextUrl(config.apiBaseUrl, nextCandidate);
+    }
+  }
+
+  return projects;
+}
+
+function resolveProjectSlug(input: string, projects: SentryProjectSummary[]): string {
+  const normalizedInput = normalizeProjectInput(input);
+  if (!normalizedInput || projects.length === 0) {
+    return input.trim();
+  }
+
+  const slugToken = slugifyToken(normalizedInput);
+
+  const exact = projects.find((project) => {
+    const projectSlug = project.slug.toLowerCase();
+    const projectName = project.name.toLowerCase();
+    return (
+      projectSlug === normalizedInput ||
+      projectSlug === slugToken ||
+      projectName === normalizedInput ||
+      projectName === slugToken ||
+      project.id === normalizedInput
+    );
+  });
+  if (exact) {
+    return exact.slug;
+  }
+
+  const fuzzyMatches = projects.filter((project) => {
+    const projectSlug = project.slug.toLowerCase();
+    const projectName = project.name.toLowerCase();
+    return (
+      projectSlug.includes(slugToken) ||
+      slugToken.includes(projectSlug) ||
+      projectName.includes(normalizedInput)
+    );
+  });
+
+  if (fuzzyMatches.length === 1) {
+    return fuzzyMatches[0].slug;
+  }
+
+  return input.trim();
+}
+
 export function getSentryKpiConfigStatus(): SentryKpiConfigStatus {
   const { config, missing } = parseConfig();
   const fallbackTargets: Array<{ entity: EntityName; kpiName: string }> = [
@@ -177,11 +298,13 @@ export async function syncSentryErrorsKpi(): Promise<SentryKpiSyncResult> {
     link: string;
     projectSlug: string;
   }> = [];
+  const orgProjects = await fetchOrganizationProjects(config).catch(() => []);
 
   for (const target of config.targets) {
+    const resolvedProjectSlug = resolveProjectSlug(target.projectSlug, orgProjects);
     const firstUrl =
       `${config.apiBaseUrl}/projects/${encodeURIComponent(config.orgSlug)}` +
-      `/${encodeURIComponent(target.projectSlug)}/issues/?limit=100&query=${encodeURIComponent(config.query)}`;
+      `/${encodeURIComponent(resolvedProjectSlug)}/issues/?limit=100&query=${encodeURIComponent(config.query)}`;
 
     let nextUrl: string | null = firstUrl;
     let pageCount = 0;
@@ -199,16 +322,20 @@ export async function syncSentryErrorsKpi(): Promise<SentryKpiSyncResult> {
       if (!response.ok) {
         const raw = await response.text().catch(() => "");
         const detail = raw.replace(/\s+/g, " ").trim().slice(0, 160);
+        const slugHint =
+          resolvedProjectSlug === target.projectSlug
+            ? resolvedProjectSlug
+            : `${target.projectSlug} -> ${resolvedProjectSlug}`;
         throw new Error(
           detail
-            ? `Sentry request failed (${response.status}) for ${target.projectSlug}: ${detail}`
-            : `Sentry request failed (${response.status}) for ${target.projectSlug}`
+            ? `Sentry request failed (${response.status}) for ${slugHint}: ${detail}`
+            : `Sentry request failed (${response.status}) for ${slugHint}`
         );
       }
 
       const payload = (await response.json()) as unknown;
       if (!Array.isArray(payload)) {
-        throw new Error(`Unexpected Sentry response shape for ${target.projectSlug}`);
+        throw new Error(`Unexpected Sentry response shape for ${resolvedProjectSlug}`);
       }
 
       issueCount += payload.length;
@@ -228,8 +355,8 @@ export async function syncSentryErrorsKpi(): Promise<SentryKpiSyncResult> {
       value: String(issueCount),
       issueCount,
       pages: pageCount,
-      link: buildIssuesUiLink(config.orgSlug, target.projectSlug),
-      projectSlug: target.projectSlug
+      link: buildIssuesUiLink(config.orgSlug, resolvedProjectSlug),
+      projectSlug: resolvedProjectSlug
     });
   }
 

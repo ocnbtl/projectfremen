@@ -1,10 +1,10 @@
 import Link from "next/link";
 import { ACTION_ITEMS } from "../../lib/seed-data";
-import RotatingWelcome from "../../components/RotatingWelcome";
 import KpiManager from "../../components/KpiManager";
 import DocsIndexPanel from "../../components/DocsIndexPanel";
-import ReviewActions from "../../components/ReviewActions";
 import ObsidianExportPanel from "../../components/ObsidianExportPanel";
+import AdminWelcomeIntro from "../../components/AdminWelcomeIntro";
+import UpcomingReviewSummary from "../../components/UpcomingReviewSummary";
 
 const ENTITIES = [
   {
@@ -36,77 +36,91 @@ const ENTITY_THEME_BY_NAME: Record<string, "fremen" | "iceflake" | "pint"> = {
   "Diyesu Decor": "pint"
 };
 
-export default function AdminPage() {
+export default async function AdminPage({
+  searchParams
+}: {
+  searchParams: Promise<{ welcome?: string }>;
+}) {
+  const params = await searchParams;
+  const playIntro = params.welcome === "1";
+
   return (
-    <main className="shell">
-      <header className="topbar">
-        <div>
-          <h1 style={{ margin: 0 }}>Action Center</h1>
-          <RotatingWelcome />
-        </div>
-        <div className="pill topbar-mode-pill">Founder-only mode</div>
+    <main className="admin-shell">
+      <header className="admin-floating-nav">
+        <nav className="admin-entity-nav" aria-label="Entity navigation">
+          {ENTITIES.map((entity) => (
+            <Link
+              href={`/admin/entities/${entity.slug}`}
+              className={`admin-entity-link admin-entity-link-${entity.theme}`}
+              key={entity.name}
+            >
+              <span>{entity.name}</span>
+            </Link>
+          ))}
+        </nav>
       </header>
 
-      <section className="grid grid-3">
-        {ENTITIES.map((entity) => (
-          <Link href={`/admin/entities/${entity.slug}`} className="entity-card-link" key={entity.name}>
-            <article className={`card entity-card entity-card-${entity.theme}`}>
-              <h3>{entity.name}</h3>
-              <p className="muted">{entity.type}</p>
-              <p>
-                <span className={`pill entity-pill entity-pill-${entity.theme}`}>{entity.status}</span>
-              </p>
-            </article>
-          </Link>
-        ))}
-      </section>
+      <section className="admin-overview-grid">
+        <div className="admin-overview-left">
+          <AdminWelcomeIntro playIntro={playIntro} />
 
-      <section className="grid grid-2" style={{ marginTop: 12 }}>
-        <article className="card">
-          <h2>Due Now and Upcoming</h2>
-          <table>
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Entity</th>
-                <th>Due</th>
-                <th>Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ACTION_ITEMS.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.title}</td>
-                  <td>
-                    <span className={`pill entity-pill entity-pill-${ENTITY_THEME_BY_NAME[item.entity]}`}>
-                      {item.entity}
-                    </span>
-                  </td>
-                  <td>{item.due}</td>
-                  <td>{item.status}</td>
+          <article className="card admin-slate-card">
+            <h2>Due Now and Upcoming</h2>
+            <table className="admin-compact-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>Entity</th>
+                  <th>Due</th>
+                  <th>Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </article>
+              </thead>
+              <tbody>
+                {ACTION_ITEMS.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.title}</td>
+                    <td>
+                      <span className={`pill entity-pill entity-pill-${ENTITY_THEME_BY_NAME[item.entity]}`}>
+                        {item.entity}
+                      </span>
+                    </td>
+                    <td>{item.due}</td>
+                    <td>{item.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </article>
 
-        <ReviewActions />
+          <UpcomingReviewSummary />
+        </div>
+
+        <aside className="card admin-quick-nav-card">
+          <p className="admin-quick-nav-kicker">Quick Navigation</p>
+          <a href="#kpi-tracker" className="admin-quick-nav-link">
+            KPI Tracker
+          </a>
+          <a href="#obsidian-export" className="admin-quick-nav-link">
+            Obsidian Export
+          </a>
+          <a href="#github-sync" className="admin-quick-nav-link">
+            GitHub Sync
+          </a>
+        </aside>
       </section>
 
-      <KpiManager />
-
-      <ObsidianExportPanel />
-
-      <DocsIndexPanel />
-
-      <section className="card" style={{ marginTop: 12 }}>
-        <h2>MVP Notes</h2>
-        <ul>
-          <li>Obsidian relationship semantics are preserved.</li>
-          <li>Project hierarchy is operational in app data, not note lineage.</li>
-          <li>Docs index and KPI persistence are now available in admin panels.</li>
-        </ul>
+      <section id="kpi-tracker" className="admin-anchor-section">
+        <KpiManager />
       </section>
+
+      <section id="obsidian-export" className="admin-anchor-section">
+        <ObsidianExportPanel />
+      </section>
+
+      <section id="github-sync" className="admin-anchor-section">
+        <DocsIndexPanel />
+      </section>
+
     </main>
   );
 }

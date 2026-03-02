@@ -332,7 +332,7 @@ export default function AnimatedLandingPage({
         >
           <form action="/api/admin/login" method="post" className="landing-login-form">
             <input type="hidden" name="errorPath" value={errorPath} />
-            <input type="hidden" name="successPath" value="/admin" />
+            <input type="hidden" name="successPath" value="/admin?welcome=1" />
 
             {hasError && (
               <p className="landing-error" role="alert">
