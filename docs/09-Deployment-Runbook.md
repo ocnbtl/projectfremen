@@ -29,6 +29,9 @@ This runbook is for deploying Project Fremen (`dashboard/`) to Vercel with safe,
 4. Add Environment Variables in Vercel Project Settings:
    - `ADMIN_PASSWORD` (required)
    - `ADMIN_SESSION_SECRET` (recommended)
+   - `SUPABASE_URL` (required for durable serverless persistence)
+   - `SUPABASE_SERVICE_ROLE_KEY` (required for durable serverless persistence)
+   - `FREMEN_REQUIRE_SUPABASE` (recommended: `true` in production)
    - `GITHUB_TOKEN` (recommended)
    - `DOCS_REPOS` (required for docs sync behavior)
    - `DOCS_MAX_FILES` (optional, default `120`)
@@ -50,6 +53,9 @@ Copy names from `dashboard/.env.example` only:
 ```bash
 ADMIN_PASSWORD=<REDACTED>
 ADMIN_SESSION_SECRET=<REDACTED_OPTIONAL>
+SUPABASE_URL=<REDACTED_SUPABASE_PROJECT_URL>
+SUPABASE_SERVICE_ROLE_KEY=<REDACTED_SUPABASE_SERVICE_ROLE_KEY>
+FREMEN_REQUIRE_SUPABASE=true
 GITHUB_TOKEN=<REDACTED_OPTIONAL>
 DOCS_REPOS=ocnbtl/projectfremen:main,pngwn-zero/pngwn-web:main,ocnbtl/projectpint:main
 DOCS_MAX_FILES=120
@@ -63,6 +69,10 @@ SENTRY_PROJECT_SLUG_DIYESU=<REDACTED_OPTIONAL>
 SENTRY_KPI_QUERY=is:unresolved
 OBSIDIAN_EXPORT_DIR=<REDACTED_OPTIONAL_ABSOLUTE_PATH>
 ```
+
+Supabase table setup is documented in:
+
+1. `docs/13-Supabase-Persistence.md`
 
 ## Pre-Deploy Local Gate (Required)
 

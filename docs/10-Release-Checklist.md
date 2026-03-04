@@ -13,6 +13,9 @@ Use this checklist for every production release.
 3. [ ] Required env vars exist in Vercel:
    - `ADMIN_PASSWORD`
    - `ADMIN_SESSION_SECRET` (recommended)
+   - `SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `FREMEN_REQUIRE_SUPABASE=true` (recommended)
    - `DOCS_REPOS`
 4. [ ] Optional integration env vars reviewed (if using Sentry/exports):
    - `SENTRY_AUTH_TOKEN`

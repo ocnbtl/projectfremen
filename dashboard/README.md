@@ -25,6 +25,9 @@ Create `.env.local`:
 ```bash
 ADMIN_PASSWORD=change-me
 ADMIN_SESSION_SECRET=
+SUPABASE_URL=
+SUPABASE_SERVICE_ROLE_KEY=
+FREMEN_REQUIRE_SUPABASE=false
 GITHUB_TOKEN=
 DOCS_REPOS=ocnbtl/projectfremen:main,pngwn-zero/pngwn-web:main,ocnbtl/projectpint:main
 DOCS_MAX_FILES=120
@@ -56,6 +59,7 @@ Then open `http://localhost:3000`.
 1. Auth is intentionally simple for MVP speed.
 2. Replace auth with stronger mechanism before multi-user rollout.
 3. `GITHUB_TOKEN` is optional but recommended to avoid rate limits while syncing docs.
-4. KPI and docs data are stored in local `dashboard/data/*.json` for MVP.
-5. Sentry KPI sync updates both pngwn and Diyesu Decor and requires `SENTRY_*` env vars.
-6. Obsidian export is manual and available in admin via `/api/exports/obsidian`.
+4. Runtime state can be persisted to Supabase `public.app_state` when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set.
+5. Without Supabase config, state uses local `dashboard/data/*.json` (or `/tmp` fallback in read-only environments).
+6. Sentry KPI sync updates both pngwn and Diyesu Decor and requires `SENTRY_*` env vars.
+7. Obsidian export is manual and available in admin via `/api/exports/obsidian`.

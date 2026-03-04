@@ -6,9 +6,20 @@ const STATIC_DATA_DIR = path.join(process.cwd(), "data");
 const FALLBACK_DATA_DIR = path.join("/tmp", "project-fremen-data");
 const REQUIRE_PERSISTENT_DATA =
   process.env.FREMEN_REQUIRE_PERSISTENT_DATA?.trim().toLowerCase() === "true";
+const REQUIRE_SUPABASE =
+  process.env.FREMEN_REQUIRE_SUPABASE?.trim().toLowerCase() === "true";
+const SUPABASE_URL = process.env.SUPABASE_URL?.trim() || "";
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || "";
 let resolvedDataDirPromise: Promise<string> | null = null;
 const writeQueues = new Map<string, Promise<void>>();
 let ephemeralWarningShown = false;
+
+type SupabaseConfig = {
+  url: string;
+  serviceRoleKey: string;
+};
+
+let supabaseConfigWarningShown = false;
 
 async function canWriteDirectory(dir: string): Promise<boolean> {
   try {
@@ -48,6 +59,32 @@ async function resolveDataDirectory(): Promise<string> {
   return FALLBACK_DATA_DIR;
 }
 
+function getSupabaseConfig(): SupabaseConfig | null {
+  const hasUrl = Boolean(SUPABASE_URL);
+  const hasKey = Boolean(SUPABASE_SERVICE_ROLE_KEY);
+  const configured = hasUrl && hasKey;
+
+  if (!configured) {
+    if (REQUIRE_SUPABASE) {
+      throw new Error(
+        "Supabase is required but not fully configured. Set SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY."
+      );
+    }
+    if ((hasUrl || hasKey) && !supabaseConfigWarningShown) {
+      supabaseConfigWarningShown = true;
+      console.warn(
+        "[project-fremen] Partial Supabase config detected. Both SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required; falling back to filesystem store."
+      );
+    }
+    return null;
+  }
+
+  return {
+    url: SUPABASE_URL.replace(/\/+$/, ""),
+    serviceRoleKey: SUPABASE_SERVICE_ROLE_KEY
+  };
+}
+
 async function getDataDirectory(): Promise<string> {
   if (!resolvedDataDirPromise) {
     resolvedDataDirPromise = resolveDataDirectory();
@@ -82,10 +119,77 @@ async function tryReadJsonFile<T>(filePath: string): Promise<T | null> {
   }
 }
 
+function supabaseHeaders(config: SupabaseConfig): Record<string, string> {
+  return {
+    apikey: config.serviceRoleKey,
+    Authorization: `Bearer ${config.serviceRoleKey}`,
+    "Content-Type": "application/json"
+  };
+}
+
+async function readJsonFromSupabase<T>(fileName: string, config: SupabaseConfig): Promise<T | null> {
+  const query = new URLSearchParams({
+    select: "value",
+    key: `eq.${fileName}`,
+    limit: "1"
+  });
+  const response = await fetch(`${config.url}/rest/v1/app_state?${query.toString()}`, {
+    method: "GET",
+    headers: supabaseHeaders(config),
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    throw new Error(`Supabase read failed (${response.status}) for key ${fileName}`);
+  }
+
+  const rows = (await response.json().catch(() => [])) as Array<{ value?: unknown }>;
+  if (!Array.isArray(rows) || rows.length === 0) {
+    return null;
+  }
+
+  return (rows[0]?.value as T | undefined) ?? null;
+}
+
+async function writeJsonToSupabase<T>(fileName: string, value: T, config: SupabaseConfig): Promise<void> {
+  const payload = [{ key: fileName, value }];
+  const response = await fetch(
+    `${config.url}/rest/v1/app_state?on_conflict=key`,
+    {
+      method: "POST",
+      headers: {
+        ...supabaseHeaders(config),
+        Prefer: "resolution=merge-duplicates,return=minimal"
+      },
+      body: JSON.stringify(payload),
+      cache: "no-store"
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Supabase write failed (${response.status}) for key ${fileName}`);
+  }
+}
+
 export async function readJsonFile<T>(fileName: string, fallback: T): Promise<T> {
   const pendingWrite = getPendingWrite(fileName);
   if (pendingWrite) {
     await pendingWrite.catch(() => undefined);
+  }
+
+  const supabase = getSupabaseConfig();
+  if (supabase) {
+    const value = await readJsonFromSupabase<T>(fileName, supabase);
+    if (value !== null) {
+      return value;
+    }
+
+    const staticPath = path.join(STATIC_DATA_DIR, fileName);
+    const staticValue = await tryReadJsonFile<T>(staticPath);
+    if (staticValue !== null) {
+      await writeJsonToSupabase(fileName, staticValue, supabase);
+      return staticValue;
+    }
+
+    return fallback;
   }
 
   const dataDir = await getDataDirectory();
@@ -113,6 +217,12 @@ export async function readJsonFile<T>(fileName: string, fallback: T): Promise<T>
 
 export async function writeJsonFile<T>(fileName: string, value: T): Promise<void> {
   await withWriteLock(fileName, async () => {
+    const supabase = getSupabaseConfig();
+    if (supabase) {
+      await writeJsonToSupabase(fileName, value, supabase);
+      return;
+    }
+
     const dataDir = await getDataDirectory();
     await mkdir(dataDir, { recursive: true });
     const filePath = path.join(dataDir, fileName);
@@ -127,6 +237,9 @@ export async function getWritableDataDir(): Promise<string> {
 }
 
 export async function isEphemeralDataDirActive(): Promise<boolean> {
+  if (getSupabaseConfig()) {
+    return false;
+  }
   const dataDir = await getDataDirectory();
   return path.resolve(dataDir).startsWith(path.resolve(FALLBACK_DATA_DIR));
 }
