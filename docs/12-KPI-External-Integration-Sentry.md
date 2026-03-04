@@ -24,7 +24,9 @@ This phase adds the first external KPI connector in a safe, non-destructive way.
 
 ```bash
 SENTRY_AUTH_TOKEN=<REDACTED>
-SENTRY_ORG_SLUG=<REDACTED>
+SENTRY_ORG_SLUG=<REDACTED_DEFAULT_ORG>
+SENTRY_ORG_SLUG_PNGWN=<REDACTED_OPTIONAL_OVERRIDE>
+SENTRY_ORG_SLUG_DIYESU=<REDACTED_OPTIONAL_OVERRIDE>
 SENTRY_PROJECT_SLUG_PNGWN=<REDACTED>
 SENTRY_PROJECT_SLUG_DIYESU=<REDACTED>
 ```
@@ -41,6 +43,8 @@ SENTRY_KPI_NAME_DIYESU=Errors Reported in Sentry
 ## Behavior Notes
 
 1. If env vars are missing, sync is disabled and UI shows missing keys.
+   - If each project is in a different Sentry org, set both `SENTRY_ORG_SLUG_PNGWN` and `SENTRY_ORG_SLUG_DIYESU`.
+   - If both projects are in one org, `SENTRY_ORG_SLUG` alone is enough.
 2. Sync writes value as a simple number string (e.g. `17`).
 3. KPI links are set to the Sentry issues pages for each configured project.
 4. Sync activity is logged to `dashboard/data/audit-log.json`.

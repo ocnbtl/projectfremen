@@ -8,12 +8,17 @@ Use this checklist for every production release.
    - `cd "/Users/ocean/Documents/Project Fremen"`
    - `/usr/bin/git status -sb`
 2. [ ] No secret values in tracked files.
+   - If adding individual files with dynamic route segments, quote bracketed paths:
+     - Example: `git add 'dashboard/app/admin/entities/[slug]/page.tsx'`
 3. [ ] Required env vars exist in Vercel:
    - `ADMIN_PASSWORD`
+   - `ADMIN_SESSION_SECRET` (recommended)
    - `DOCS_REPOS`
 4. [ ] Optional integration env vars reviewed (if using Sentry/exports):
    - `SENTRY_AUTH_TOKEN`
-   - `SENTRY_ORG_SLUG`
+   - `SENTRY_ORG_SLUG` (or per-project org slugs below)
+   - `SENTRY_ORG_SLUG_PNGWN`
+   - `SENTRY_ORG_SLUG_DIYESU`
    - `SENTRY_PROJECT_SLUG_PNGWN`
    - `SENTRY_PROJECT_SLUG_DIYESU`
 5. [ ] Local verification passed:

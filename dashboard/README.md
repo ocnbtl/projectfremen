@@ -9,7 +9,7 @@ This is the fast-start scaffold for the Unigentamos internal admin dashboard.
 3. Admin dashboard (`/admin`)
 4. Rotating welcome text component
 5. Seed task and KPI cards
-6. Basic founder-only cookie auth proxy
+6. Founder-only cookie auth with server-side admin guards + API auth checks
 7. Persisted KPI API (`GET/POST /api/kpis`)
 8. GitHub docs index APIs (`GET /api/docs`, `POST /api/docs/sync`)
 9. Review entries APIs (`GET/POST/PATCH/DELETE /api/reviews`)
@@ -24,11 +24,15 @@ Create `.env.local`:
 
 ```bash
 ADMIN_PASSWORD=change-me
+ADMIN_SESSION_SECRET=
 GITHUB_TOKEN=
 DOCS_REPOS=ocnbtl/projectfremen:main,pngwn-zero/pngwn-web:main,ocnbtl/projectpint:main
 DOCS_MAX_FILES=120
+FREMEN_DATA_DIR=
 SENTRY_AUTH_TOKEN=
 SENTRY_ORG_SLUG=
+SENTRY_ORG_SLUG_PNGWN=
+SENTRY_ORG_SLUG_DIYESU=
 SENTRY_PROJECT_SLUG_PNGWN=
 SENTRY_PROJECT_SLUG_DIYESU=
 SENTRY_API_BASE_URL=https://sentry.io/api/0

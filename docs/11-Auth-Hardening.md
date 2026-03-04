@@ -25,10 +25,17 @@ This document records the Phase 2 security hardening applied after deployment st
    - Local file: `dashboard/data/audit-log.json`
    - Retention cap: latest 500 events
    - Events include login attempts, CSRF failures, and successful write actions
+5. Signed expiring admin sessions:
+   - `admin_session` now uses signed, per-login token payloads with expiry
+   - Signing secret source: `ADMIN_SESSION_SECRET` (or fallback to `ADMIN_PASSWORD`)
+   - Legacy deterministic session tokens remain accepted for compatibility during transition
+6. Logout API:
+   - `POST /api/admin/logout` clears `admin_session` and `admin_csrf`
+   - Requires existing session + valid CSRF token
 
 ## Notes
 
-1. `admin_csrf` is issued on successful login and also backfilled by `proxy.ts` for valid admin sessions.
+1. `admin_csrf` is issued on successful login and validated on all state-changing API routes.
 2. Audit logging is fail-open by design (if write fails, request flow continues).
 3. `dashboard/data/audit-log.json` is ignored in `dashboard/.gitignore` to avoid accidental commits.
 
@@ -39,6 +46,7 @@ This document records the Phase 2 security hardening applied after deployment st
    - not shared across multiple server instances
 2. This is still single-founder auth (no RBAC/user accounts yet).
 3. No external SIEM/log shipping yet.
+4. Sessions are stateless; full revocation of all active sessions still depends on rotating `ADMIN_SESSION_SECRET` (or `ADMIN_PASSWORD` fallback).
 
 ## Verification Targets
 
@@ -46,4 +54,3 @@ This document records the Phase 2 security hardening applied after deployment st
 2. Write endpoints without CSRF header return `403`.
 3. Write endpoints with valid CSRF header succeed.
 4. Admin review/KPI/entity/docs write flows continue to work from UI after login.
-

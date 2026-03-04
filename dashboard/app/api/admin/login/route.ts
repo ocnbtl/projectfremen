@@ -1,9 +1,11 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
-import { buildAdminSessionToken } from "../../../../lib/auth";
-import { appendAuditEvent, getRequestIp } from "../../../../lib/audit-log";
+import { buildSignedAdminSessionToken, getAdminSessionSecret } from "../../../../lib/auth";
+import { appendAuditEvent, getLoginRateLimitKey, getRequestIp } from "../../../../lib/audit-log";
 import { buildCsrfToken, ADMIN_CSRF_COOKIE_NAME } from "../../../../lib/csrf";
 import { checkLoginAllowance, recordLoginResult } from "../../../../lib/login-rate-limit";
+
+const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
 
 function sanitizePath(value: string, fallback: string) {
   if (!value || !value.startsWith("/")) {
@@ -43,7 +45,8 @@ export async function POST(request: Request) {
   const successPath = sanitizePath(String(formData.get("successPath") ?? ""), "/admin");
   const adminPassword = process.env.ADMIN_PASSWORD;
   const ip = getRequestIp(request);
-  const allowance = checkLoginAllowance(ip);
+  const rateLimitKey = getLoginRateLimitKey(request);
+  const allowance = checkLoginAllowance(rateLimitKey);
   const path = new URL(request.url).pathname;
 
   if (!allowance.allowed) {
@@ -60,7 +63,7 @@ export async function POST(request: Request) {
   }
 
   if (!isSameOriginRequest(request)) {
-    recordLoginResult(ip, false);
+    recordLoginResult(rateLimitKey, false);
     await appendAuditEvent({
       at: new Date().toISOString(),
       action: "admin.login.cross_origin_denied",
@@ -73,7 +76,7 @@ export async function POST(request: Request) {
   }
 
   if (!adminPassword || password !== adminPassword) {
-    recordLoginResult(ip, false);
+    recordLoginResult(rateLimitKey, false);
     await appendAuditEvent({
       at: new Date().toISOString(),
       action: "admin.login.failed",
@@ -85,9 +88,12 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url), { status: 303 });
   }
 
-  recordLoginResult(ip, true);
+  recordLoginResult(rateLimitKey, true);
   const jar = await cookies();
-  const sessionToken = await buildAdminSessionToken(adminPassword);
+  const sessionToken = buildSignedAdminSessionToken(
+    getAdminSessionSecret(adminPassword),
+    SESSION_MAX_AGE_SECONDS
+  );
   const csrfToken = buildCsrfToken();
 
   jar.set("admin_session", sessionToken, {
@@ -95,14 +101,14 @@ export async function POST(request: Request) {
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 12
+    maxAge: SESSION_MAX_AGE_SECONDS
   });
   jar.set(ADMIN_CSRF_COOKIE_NAME, csrfToken, {
     httpOnly: false,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",
     path: "/",
-    maxAge: 60 * 60 * 12
+    maxAge: SESSION_MAX_AGE_SECONDS
   });
 
   await appendAuditEvent({

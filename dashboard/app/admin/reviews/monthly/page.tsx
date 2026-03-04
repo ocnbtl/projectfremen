@@ -1,3 +1,4 @@
+import Link from "next/link";
 import ReviewEntriesPanel from "../../../../components/ReviewEntriesPanel";
 import { requireAdminSession } from "../../../../lib/require-admin";
 
@@ -18,6 +19,9 @@ export default async function MonthlyReviewPage({
             First-Sunday cadence. Use this page to keep a running history of monthly check-ins.
           </p>
         </div>
+        <Link href="/admin" className="review-back-link">
+          Back to Home
+        </Link>
       </header>
 
       <ReviewEntriesPanel kind="monthly" initialScheduledFor={params.scheduledFor} />

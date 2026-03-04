@@ -21,21 +21,33 @@ function cleanText(value: string, maxLength: number): string {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+function firstForwardedValue(value: string): string {
+  return value.split(",")[0]?.trim() || "";
+}
+
 export function getRequestIp(request: Request): string {
-  const forwarded = request.headers.get("x-forwarded-for") || "";
-  if (forwarded) {
-    const first = forwarded.split(",")[0]?.trim() || "";
-    if (first) {
-      return cleanText(first, 120);
+  const directHeaders = ["x-vercel-forwarded-for", "cf-connecting-ip", "x-real-ip"];
+  for (const header of directHeaders) {
+    const raw = request.headers.get(header) || "";
+    const value = firstForwardedValue(raw);
+    if (value) {
+      return cleanText(value, 120);
     }
   }
 
-  const realIp = request.headers.get("x-real-ip") || "";
-  if (realIp.trim()) {
-    return cleanText(realIp, 120);
+  const forwarded = request.headers.get("x-forwarded-for") || "";
+  const forwardedFirst = firstForwardedValue(forwarded);
+  if (forwardedFirst) {
+    return cleanText(forwardedFirst, 120);
   }
 
   return "unknown";
+}
+
+export function getLoginRateLimitKey(request: Request): string {
+  const ip = getRequestIp(request);
+  const userAgent = cleanText(request.headers.get("user-agent") || "unknown", 160).toLowerCase();
+  return `${ip}|${userAgent}`;
 }
 
 export async function appendAuditEvent(event: AuditEvent): Promise<void> {
@@ -59,4 +71,3 @@ export async function appendAuditEvent(event: AuditEvent): Promise<void> {
     // Audit logging must never break primary request behavior.
   }
 }
-

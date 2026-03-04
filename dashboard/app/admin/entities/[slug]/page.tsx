@@ -34,6 +34,13 @@ function parseTrend(value: string): { direction: "up" | "down" | "flat"; percent
   return null;
 }
 
+function stripTrendFromValue(value: string): string {
+  return value
+    .replace(/\s*[\(\[]?\s*[↑↓↔]\s*[0-9]+(?:\.[0-9]+)?%\s*[\)\]]?\s*$/, "")
+    .replace(/\s*[\(\[]?\s*[+-]\s*[0-9]+(?:\.[0-9]+)?%\s*[\)\]]?\s*$/, "")
+    .trim();
+}
+
 function parseRatio(value: string): { current: number; target: number; percent: number } | null {
   const match = value.match(/(-?\d+(?:\.\d+)?)\s*\/\s*(-?\d+(?:\.\d+)?)/);
   if (!match) {
@@ -164,7 +171,21 @@ export default async function EntityHubPage({
             {kpis.map((kpi) => (
               <article className="entity-hub-kpi-card" key={kpi.id}>
                 <p className="entity-hub-kpi-name">{kpi.name}</p>
-                <p className="entity-hub-kpi-value">{kpi.value}</p>
+                {(() => {
+                  const trend = parseTrend(kpi.value);
+                  const displayValue = trend ? stripTrendFromValue(kpi.value) || kpi.value : kpi.value;
+                  return (
+                    <div className="entity-hub-kpi-value-row">
+                      <p className="entity-hub-kpi-value">{displayValue}</p>
+                      {trend && (
+                        <span className={`trend trend-${trend.direction}`}>
+                          {trend.direction === "up" ? "+" : trend.direction === "down" ? "-" : ""}
+                          {trend.percent}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })()}
                 <p className="muted" style={{ margin: "0 0 6px" }}>
                   Updated {new Date(kpi.updatedAt).toLocaleString()}
                 </p>

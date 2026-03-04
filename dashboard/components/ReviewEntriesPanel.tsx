@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -130,9 +129,6 @@ export default function ReviewEntriesPanel({
     <section className="card review-page-card" style={{ marginTop: 12 }}>
       <div className="review-page-header">
         <h2 style={{ marginBottom: 0 }}>{title} Review Entries</h2>
-        <Link href="/admin" className="review-back-link">
-          Back to Home
-        </Link>
       </div>
 
       <p className="muted" style={{ marginTop: 6 }}>

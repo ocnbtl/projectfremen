@@ -33,8 +33,20 @@ function serializeDraftGoals(goals: string[]): string {
   return JSON.stringify(normalizeGoalItems(goals).map((item) => item.text));
 }
 
-function draftToGoalItems(goals: string[]): EntityGoalItem[] {
-  return normalizeGoalItems(goals).map((item) => ({ text: item.text, done: false }));
+function draftToGoalItems(goals: string[], previousGoals: EntityGoalItem[]): EntityGoalItem[] {
+  const normalized = normalizeGoalItems(goals);
+  const usedPreviousIndexes = new Set<number>();
+
+  return normalized.map((item) => {
+    const previousIndex = previousGoals.findIndex(
+      (previous, index) => !usedPreviousIndexes.has(index) && previous.text === item.text
+    );
+    if (previousIndex >= 0) {
+      usedPreviousIndexes.add(previousIndex);
+      return { text: item.text, done: previousGoals[previousIndex].done };
+    }
+    return { text: item.text, done: false };
+  });
 }
 
 export default function EntityGoalsPanel({
@@ -53,6 +65,8 @@ export default function EntityGoalsPanel({
   const [error, setError] = useState("");
   const lastSavedGoalsRef = useRef<string>(serializeGoalItems(normalizedInitialGoals));
   const lastSavedDraftGoalsRef = useRef<string>(serializeDraftGoals(toDraftGoals(normalizedInitialGoals)));
+  const lastFailedGoalsRef = useRef<string>("");
+  const lastFailedDraftGoalsRef = useRef<string>("");
 
   const draftSerialized = useMemo(() => serializeDraftGoals(draftGoals), [draftGoals]);
 
@@ -80,6 +94,7 @@ export default function EntityGoalsPanel({
     const nextDraft = toDraftGoals(goals);
     setDraftGoals(nextDraft);
     lastSavedDraftGoalsRef.current = serializeDraftGoals(nextDraft);
+    lastFailedDraftGoalsRef.current = "";
     setEditing(true);
     setError("");
     setSaveState("idle");
@@ -87,6 +102,7 @@ export default function EntityGoalsPanel({
 
   function cancelEdit() {
     setDraftGoals(toDraftGoals(goals));
+    lastFailedDraftGoalsRef.current = "";
     setEditing(false);
     setError("");
     setSaveState("idle");
@@ -109,6 +125,9 @@ export default function EntityGoalsPanel({
       setSaveState("saved");
       return true;
     }
+    if (!force && nextSerialized === lastFailedGoalsRef.current) {
+      return false;
+    }
 
     setSaving(true);
     setSaveState("saving");
@@ -124,21 +143,18 @@ export default function EntityGoalsPanel({
     if (!res.ok || !payload.ok || !payload.goals) {
       setGoals(normalizedNext);
       writeEntityGoalsToCache(slug, normalizedNext);
-      lastSavedGoalsRef.current = nextSerialized;
-      if (closeEditor) {
-        setDraftGoals(toDraftGoals(normalizedNext));
-        setEditing(false);
-      }
+      lastFailedGoalsRef.current = nextSerialized;
       setSaving(false);
       setSaveState("error");
       setError("Saved locally. Server sync pending.");
       broadcastGoalsUpdated();
-      return true;
+      return false;
     }
 
     const savedGoals = normalizeGoalItems(payload.goals);
     setGoals(savedGoals);
     lastSavedGoalsRef.current = serializeGoalItems(savedGoals);
+    lastFailedGoalsRef.current = "";
     writeEntityGoalsToCache(slug, savedGoals);
     if (closeEditor) {
       setDraftGoals(toDraftGoals(savedGoals));
@@ -163,12 +179,18 @@ export default function EntityGoalsPanel({
       setSaveState("saved");
       return true;
     }
+    if (!force && nextDraftSerialized === lastFailedDraftGoalsRef.current) {
+      return false;
+    }
 
-    const ok = await persistGoalItems(draftToGoalItems(nextDraft), { closeEditor, force: true });
+    const ok = await persistGoalItems(draftToGoalItems(nextDraft, goals), { closeEditor, force: true });
     if (ok) {
       lastSavedDraftGoalsRef.current = nextDraftSerialized;
+      lastFailedDraftGoalsRef.current = "";
+      return true;
     }
-    return ok;
+    lastFailedDraftGoalsRef.current = nextDraftSerialized;
+    return false;
   }
 
   async function finishEdit() {
@@ -250,7 +272,7 @@ export default function EntityGoalsPanel({
                   }}
                   disabled={saving}
                 >
-                  {goal.done ? "Done" : "Mark done"}
+                  {goal.done ? "Undo" : "Done"}
                 </button>
               </li>
             ))}

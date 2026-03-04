@@ -28,11 +28,15 @@ This runbook is for deploying Project Fremen (`dashboard/`) to Vercel with safe,
    - Production Branch: `main`
 4. Add Environment Variables in Vercel Project Settings:
    - `ADMIN_PASSWORD` (required)
+   - `ADMIN_SESSION_SECRET` (recommended)
    - `GITHUB_TOKEN` (recommended)
    - `DOCS_REPOS` (required for docs sync behavior)
    - `DOCS_MAX_FILES` (optional, default `120`)
+   - `FREMEN_DATA_DIR` (recommended for non-serverless persistent filesystem targets)
    - `SENTRY_AUTH_TOKEN` (optional, for KPI integration)
    - `SENTRY_ORG_SLUG` (optional, for KPI integration)
+   - `SENTRY_ORG_SLUG_PNGWN` (optional, per-project org override)
+   - `SENTRY_ORG_SLUG_DIYESU` (optional, per-project org override)
    - `SENTRY_PROJECT_SLUG_PNGWN` (optional, for KPI integration)
    - `SENTRY_PROJECT_SLUG_DIYESU` (optional, for KPI integration)
    - `SENTRY_KPI_QUERY` (optional, default `is:unresolved`)
@@ -45,11 +49,15 @@ Copy names from `dashboard/.env.example` only:
 
 ```bash
 ADMIN_PASSWORD=<REDACTED>
+ADMIN_SESSION_SECRET=<REDACTED_OPTIONAL>
 GITHUB_TOKEN=<REDACTED_OPTIONAL>
 DOCS_REPOS=ocnbtl/projectfremen:main,pngwn-zero/pngwn-web:main,ocnbtl/projectpint:main
 DOCS_MAX_FILES=120
+FREMEN_DATA_DIR=<REDACTED_OPTIONAL_ABSOLUTE_PATH>
 SENTRY_AUTH_TOKEN=<REDACTED_OPTIONAL>
-SENTRY_ORG_SLUG=<REDACTED_OPTIONAL>
+SENTRY_ORG_SLUG=<REDACTED_OPTIONAL_DEFAULT_ORG>
+SENTRY_ORG_SLUG_PNGWN=<REDACTED_OPTIONAL_OVERRIDE>
+SENTRY_ORG_SLUG_DIYESU=<REDACTED_OPTIONAL_OVERRIDE>
 SENTRY_PROJECT_SLUG_PNGWN=<REDACTED_OPTIONAL>
 SENTRY_PROJECT_SLUG_DIYESU=<REDACTED_OPTIONAL>
 SENTRY_KPI_QUERY=is:unresolved
