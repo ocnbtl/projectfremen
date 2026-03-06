@@ -112,6 +112,11 @@ Expected:
 1. Rows appear for `kpis.json`, `reviews.json`, `entity-goals.json`.
 2. Data remains after tab close and after redeploy.
 
+Current production verification:
+
+1. Confirmed on 2026-03-06 after production smoke: `audit-log.json`, `kpis.json`, `reviews.json`, `entity-goals.json`, and `docs-index.json` were present in `public.app_state`.
+2. Updates from the live site changed `updated_at` as expected.
+
 ## 6) Fallback Behavior
 
 1. If Supabase env vars are not set, app falls back to filesystem store.

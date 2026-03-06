@@ -8,6 +8,8 @@ This runbook is for deploying Project Fremen (`dashboard/`) to Vercel with safe,
 2. Production branch: `main` (**CONFIRMED 2026-02-28**).
 3. Staging environment: **Not used currently (CONFIRMED 2026-02-28, founder-only)**.
 4. Production domain: `unigentamos.com` (**CONFIRMED 2026-02-28**).
+5. `www.unigentamos.com` redirects to `https://unigentamos.com` (**CONFIRMED 2026-03-06**).
+6. Vercel Analytics is enabled in code and reporting production traffic (**CONFIRMED 2026-03-06**, deploy commit `075b3ed`).
 
 ## Security Rules
 
@@ -124,6 +126,7 @@ Expected:
 1. `/` returns `200`.
 2. `/admin/login` returns `200`.
 3. unauthenticated `/api/kpis` returns `401`.
+4. `https://www.unigentamos.com` redirects to `https://unigentamos.com`.
 
 Manual browser smoke:
 1. Login with founder password.
@@ -131,6 +134,7 @@ Manual browser smoke:
 3. Create + delete one weekly review entry.
 4. Create + delete one monthly review entry.
 5. Run `Sync From GitHub` and verify `Last sync` updates.
+6. Confirm Vercel Analytics records at least one page view after browsing production.
 
 ## Rollback (Vercel)
 

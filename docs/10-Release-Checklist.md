@@ -43,10 +43,12 @@ Use this checklist for every production release.
 1. [ ] `GET https://unigentamos.com/` returns `200`.
 2. [ ] `GET https://unigentamos.com/admin/login` returns `200`.
 3. [ ] Unauthenticated `GET https://unigentamos.com/api/kpis` returns `401`.
-4. [ ] Founder login succeeds and redirects to `/admin`.
-5. [ ] Weekly review create/edit/delete succeeds.
-6. [ ] Monthly review create/edit/delete succeeds.
-7. [ ] Docs sync updates `lastSynced`.
+4. [ ] `GET https://www.unigentamos.com/` redirects to `https://unigentamos.com`.
+5. [ ] Founder login succeeds and redirects to `/admin`.
+6. [ ] Weekly review create/edit/delete succeeds.
+7. [ ] Monthly review create/edit/delete succeeds.
+8. [ ] Docs sync updates `lastSynced`.
+9. [ ] Vercel Analytics records at least one production page view after browsing.
 
 ## Rollback Criteria
 
