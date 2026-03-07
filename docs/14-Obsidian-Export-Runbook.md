@@ -41,7 +41,8 @@ Conflict policy:
 
 1. Export route requires existing admin session.
 2. Export route enforces CSRF token on `POST`.
-3. Export actions are written to `dashboard/data/audit-log.json`.
+3. Export actions are written through `lib/file-store.ts` to the `audit-log.json` logical key.
+4. In production, those audit events persist in Supabase `public.app_state`.
 
 ## Admin UI
 
@@ -56,4 +57,4 @@ From `/admin`:
 1. Export is one-way only (dashboard -> markdown files).
 2. Export directory is git-ignored (`dashboard/data/exports/`).
 3. Export format follows strategy in `docs/13-Obsidian-Export-Strategy.md`.
-
+4. Production flow has been manually verified end to end.

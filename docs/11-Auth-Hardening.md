@@ -22,7 +22,10 @@ This document records the Phase 2 security hardening applied after deployment st
 3. Same-origin login request check:
    - `Origin`/`Referer` must match request origin when present
 4. Minimal audit logging:
-   - Local file: `dashboard/data/audit-log.json`
+   - Logical key: `audit-log.json`
+   - Persistence path: `lib/file-store.ts`
+   - Production storage: Supabase `public.app_state`
+   - Local fallback: `dashboard/data/audit-log.json` (or `/tmp` fallback when needed)
    - Retention cap: latest 500 events
    - Events include login attempts, CSRF failures, and successful write actions
 5. Signed expiring admin sessions:
@@ -37,7 +40,8 @@ This document records the Phase 2 security hardening applied after deployment st
 
 1. `admin_csrf` is issued on successful login and validated on all state-changing API routes.
 2. Audit logging is fail-open by design (if write fails, request flow continues).
-3. `dashboard/data/audit-log.json` is ignored in `dashboard/.gitignore` to avoid accidental commits.
+3. Admin protection intentionally stays page-level/server-side; do not reintroduce middleware auth casually.
+4. `dashboard/data/audit-log.json` remains git-ignored for local fallback usage.
 
 ## Known Limitations
 
@@ -54,3 +58,4 @@ This document records the Phase 2 security hardening applied after deployment st
 2. Write endpoints without CSRF header return `403`.
 3. Write endpoints with valid CSRF header succeed.
 4. Admin review/KPI/entity/docs write flows continue to work from UI after login.
+5. Logout clears `admin_session` and `admin_csrf`.

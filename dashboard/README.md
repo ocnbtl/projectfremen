@@ -1,22 +1,35 @@
-# Unigentamos Admin Dashboard (MVP Scaffold)
+# Unigentamos Command Center
 
-This is the fast-start scaffold for the Unigentamos internal admin dashboard.
+This is the current Next.js admin and command-center app for Unigentamos, deployed on Vercel at `https://unigentamos.com`.
 
-## Included
+## Current Production Baseline
 
-1. Landing page (`/`)
-2. Admin login (`/admin/login`)
-3. Admin dashboard (`/admin`)
-4. Rotating welcome text component
-5. Seed task and KPI cards
-6. Founder-only cookie auth with server-side admin guards + API auth checks
-7. Persisted KPI API (`GET/POST /api/kpis`)
-8. GitHub docs index APIs (`GET /api/docs`, `POST /api/docs/sync`)
-9. Review entries APIs (`GET/POST/PATCH/DELETE /api/reviews`)
-10. Review pages (`/admin/reviews/weekly`, `/admin/reviews/monthly`)
-11. Review entry form pages (`/admin/reviews/weekly/[entryId]`, `/admin/reviews/monthly/[entryId]`)
-12. Entity hub pages (`/admin/entities/unigentamos`, `/admin/entities/pngwn`, `/admin/entities/diyesu-decor`)
-13. Editable entity focus goals (`GET/POST /api/entity-goals`)
+1. Public landing page at `/` with founder login entry.
+2. Admin login at `/admin/login`.
+3. Admin command center at `/admin`.
+4. Entity hubs at:
+   - `/admin/entities/unigentamos`
+   - `/admin/entities/pngwn`
+   - `/admin/entities/diyesu-decor`
+5. KPI tracker at `/admin/kpis`.
+6. GitHub docs sync at `/admin/docs`.
+7. Obsidian export at `/admin/obsidian`.
+8. Weekly and monthly review hubs plus entry detail pages.
+9. Current Goals on the home page, sourced from entity goals.
+10. Goal autosave, cross-view sync, and persistent completion state.
+11. Vercel Analytics enabled and reporting in production.
+12. `www.unigentamos.com` redirecting to `https://unigentamos.com`.
+
+## Security + Persistence
+
+1. Auth uses founder-password login with signed expiring sessions.
+2. Admin protection is page-level and server-side via `require-admin` helpers.
+3. Middleware/proxy auth is intentionally not used.
+4. State-changing admin APIs require CSRF validation.
+5. Runtime state persists through `lib/file-store.ts`.
+6. Production persistence is Supabase `public.app_state` when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are configured.
+7. `FREMEN_REQUIRE_SUPABASE=true` is the intended production setting.
+8. Audit events, KPIs, reviews, docs index, and entity goals are stored through the same persistence layer.
 
 ## Environment
 
@@ -54,12 +67,22 @@ npm run dev
 
 Then open `http://localhost:3000`.
 
+## Key Routes + APIs
+
+1. `GET/POST /api/kpis`
+2. `GET/POST /api/kpis/integrations/sentry`
+3. `GET /api/docs`
+4. `POST /api/docs/sync`
+5. `GET/POST/PATCH/DELETE /api/reviews`
+6. `GET/POST /api/entity-goals`
+7. `GET/POST /api/exports/obsidian`
+8. `POST /api/admin/login`
+9. `POST /api/admin/logout`
+
 ## Notes
 
-1. Auth is intentionally simple for MVP speed.
-2. Replace auth with stronger mechanism before multi-user rollout.
-3. `GITHUB_TOKEN` is optional but recommended to avoid rate limits while syncing docs.
-4. Runtime state can be persisted to Supabase `public.app_state` when `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set.
-5. Without Supabase config, state uses local `dashboard/data/*.json` (or `/tmp` fallback in read-only environments).
-6. Sentry KPI sync updates both pngwn and Diyesu Decor and requires `SENTRY_*` env vars.
-7. Obsidian export is manual and available in admin via `/api/exports/obsidian`.
+1. `GITHUB_TOKEN` is optional but recommended to avoid rate limits during docs sync.
+2. Without Supabase config, local development falls back to filesystem persistence.
+3. Sentry KPI sync currently targets `pngwn` and `Diyesu Decor` and requires the `SENTRY_*` env vars.
+4. The public site title and site metadata should read `Unigentamos`, not `Unigentamos Admin`.
+5. The current production baseline is also documented in `docs/09-Deployment-Runbook.md`, `docs/10-Release-Checklist.md`, and `docs/13-Supabase-Persistence.md`.

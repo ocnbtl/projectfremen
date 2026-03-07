@@ -6,7 +6,7 @@ This phase adds the first external KPI connector in a safe, non-destructive way.
 
 1. Connector target: Sentry unresolved issue count.
 2. Data target KPI: `Errors Reported in Sentry`.
-3. Synced entities: `pngwn` and `Diyesu Decor`.
+3. Synced entities: `pngwn` (`Project Iceflake`) and `Diyesu Decor` (`Project Pint`).
 4. Trigger: manual admin action from KPI panel.
 5. Safety: no automatic overwrite unless admin clicks sync.
 
@@ -47,7 +47,8 @@ SENTRY_KPI_NAME_DIYESU=Errors Reported in Sentry
    - If both projects are in one org, `SENTRY_ORG_SLUG` alone is enough.
 2. Sync writes value as a simple number string (e.g. `17`).
 3. KPI links are set to the Sentry issues pages for each configured project.
-4. Sync activity is logged to `dashboard/data/audit-log.json`.
+4. Sync activity is logged through `lib/file-store.ts` to the `audit-log.json` logical key.
+5. In production, audit events persist in Supabase `public.app_state`.
 
 ## Verification Checklist
 
@@ -58,3 +59,4 @@ SENTRY_KPI_NAME_DIYESU=Errors Reported in Sentry
    - `Sentry sync disabled. Missing: ...` when not configured.
 4. Click `Sync Sentry KPIs (pngwn + Diyesu Decor)`.
 5. Confirm both entity KPI values and timestamps update.
+6. Confirm `kpis.json` and `audit-log.json` `updated_at` change in Supabase after sync.
