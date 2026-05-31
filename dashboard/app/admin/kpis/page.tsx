@@ -2,6 +2,8 @@ import Link from "next/link";
 import KpiManager from "../../../components/KpiManager";
 import { requireAdminSession } from "../../../lib/require-admin";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminKpisPage() {
   await requireAdminSession();
   return (

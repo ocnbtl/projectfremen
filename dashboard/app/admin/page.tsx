@@ -13,6 +13,8 @@ import {
   getNextSunday
 } from "../../lib/review-schedule";
 
+export const dynamic = "force-dynamic";
+
 const ENTITIES = [
   {
     name: "Project Fremen",
@@ -120,6 +122,16 @@ export default async function AdminPage({
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="admin-personal-entry" aria-label="Personal operations">
+            <div>
+              <p>Founder system</p>
+              <h2>Personal Ops</h2>
+            </div>
+            <Link href="/admin/personal" className="admin-personal-entry-link">
+              Open
+            </Link>
           </section>
         </div>
 

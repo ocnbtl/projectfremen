@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "regress": "node ./scripts/regression-harness.mjs"
   },
   "dependencies": {
     "@vercel/analytics": "^1.6.1",

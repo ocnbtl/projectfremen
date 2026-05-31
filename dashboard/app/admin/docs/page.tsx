@@ -2,6 +2,8 @@ import Link from "next/link";
 import DocsIndexPanel from "../../../components/DocsIndexPanel";
 import { requireAdminSession } from "../../../lib/require-admin";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminDocsPage() {
   await requireAdminSession();
   return (

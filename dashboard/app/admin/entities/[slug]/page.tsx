@@ -9,6 +9,8 @@ import { readEntityGoals } from "../../../../lib/entity-goals-store";
 import { readKpis } from "../../../../lib/kpis-store";
 import { requireAdminSession } from "../../../../lib/require-admin";
 
+export const dynamic = "force-dynamic";
+
 function parseTrend(value: string): { direction: "up" | "down" | "flat"; percent: string } | null {
   const arrowMatch = value.match(/([↑↓↔])\s*([0-9]+(?:\.[0-9]+)?%)/);
   if (arrowMatch) {

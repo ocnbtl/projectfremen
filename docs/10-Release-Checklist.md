@@ -26,8 +26,7 @@ Use this checklist for every production release.
    - `SENTRY_PROJECT_SLUG_DIYESU`
 5. [ ] Local verification passed:
    - `cd "/Users/ocean/Documents/Project Fremen/dashboard"`
-   - `npm run typecheck`
-   - `npm run build`
+   - `npm run regress`
 
 ## Release
 

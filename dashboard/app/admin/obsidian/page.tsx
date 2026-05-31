@@ -2,6 +2,8 @@ import Link from "next/link";
 import ObsidianExportPanel from "../../../components/ObsidianExportPanel";
 import { requireAdminSession } from "../../../lib/require-admin";
 
+export const dynamic = "force-dynamic";
+
 export default async function AdminObsidianPage() {
   await requireAdminSession();
   return (

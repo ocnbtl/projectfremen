@@ -83,14 +83,14 @@ Run exactly:
 ```bash
 cd "/Users/ocean/Documents/Project Fremen/dashboard"
 npm install
-npm run typecheck
-npm run build
+npm run regress
 ```
 
 Expected:
-1. `typecheck` exits `0`.
-2. `build` exits `0`.
-3. No secret values printed.
+1. The regression harness exits `0`.
+2. Typecheck and production build pass inside the harness.
+3. Locked local smoke checks pass on the isolated server.
+4. No secret values printed.
 
 ## Deployment Procedure (Normal Release)
 

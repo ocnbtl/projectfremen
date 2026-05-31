@@ -1,6 +1,8 @@
 import ReviewEntryEditor from "../../../../../components/ReviewEntryEditor";
 import { requireAdminSession } from "../../../../../lib/require-admin";
 
+export const dynamic = "force-dynamic";
+
 export default async function WeeklyReviewEntryPage({
   params
 }: {

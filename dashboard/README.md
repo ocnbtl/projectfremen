@@ -67,6 +67,36 @@ npm run dev
 
 Then open `http://localhost:3000`.
 
+## Regression Harness
+
+Run this after changes:
+
+```bash
+npm run regress
+```
+
+What it does:
+
+1. Runs `npm run typecheck`.
+2. Runs `npm run build`.
+3. Starts an isolated local production server on a temporary data directory.
+4. Verifies locked flows without touching Supabase or production state:
+   - public landing and admin login
+   - unauthenticated API protection
+   - admin login/logout
+   - Current Goals persistence and home/entity sync
+   - KPI create/read
+   - weekly review create/update
+   - docs index load
+   - Obsidian export preview/dry-run
+   - Sentry integration status route
+
+Notes:
+
+1. The harness intentionally clears Supabase credentials and uses a temp local data store.
+2. External network actions such as GitHub docs sync and Sentry sync are reported as skips by default, not passes.
+3. If the harness fails, it preserves its temp data directory path in the output for debugging.
+
 ## Key Routes + APIs
 
 1. `GET/POST /api/kpis`

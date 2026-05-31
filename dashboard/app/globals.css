@@ -366,6 +366,54 @@ a {
   color: #ffffff;
 }
 
+.admin-personal-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 14px 0 0;
+  border-top: 1px solid rgba(185, 208, 229, 0.28);
+}
+
+.admin-personal-entry p {
+  margin: 0 0 4px;
+  color: rgba(224, 237, 250, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.admin-personal-entry h2 {
+  margin: 0;
+  color: #edf6ff;
+  font-size: 20px;
+  letter-spacing: 0.01em;
+}
+
+.admin-personal-entry-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 72px;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid rgba(178, 202, 224, 0.5);
+  border-radius: 8px;
+  color: rgba(226, 239, 251, 0.96);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 700;
+  background: rgba(13, 45, 66, 0.28);
+  transition: border-color 130ms ease, background 130ms ease, color 130ms ease;
+}
+
+.admin-personal-entry-link:hover {
+  border-color: rgba(212, 230, 248, 0.76);
+  background: rgba(13, 45, 66, 0.44);
+  color: #ffffff;
+}
+
 .admin-quick-links {
   display: grid;
   gap: 14px;
@@ -402,6 +450,159 @@ a {
   border-radius: 16px;
   padding: 16px;
   box-shadow: 0 10px 24px rgba(16, 32, 38, 0.06);
+}
+
+.personal-ops-shell {
+  max-width: 1240px;
+}
+
+.personal-ops-kicker {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.personal-ops-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 16px;
+  margin-top: 16px;
+  align-items: start;
+}
+
+.personal-ops-main,
+.personal-ops-side {
+  display: grid;
+  gap: 16px;
+}
+
+.personal-ops-stat h3 {
+  margin: 8px 0 0;
+  font-size: 34px;
+  color: var(--ink);
+}
+
+.personal-domain-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.personal-ops-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.personal-ops-section-heading h2,
+.personal-ops-side h2 {
+  margin: 0;
+}
+
+.personal-ops-section-heading span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  color: #254451;
+  background: #e7f2ed;
+  border: 1px solid #cfe2d9;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.personal-domain-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.personal-domain-card {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 18px rgba(16, 32, 38, 0.05);
+}
+
+.personal-domain-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.personal-domain-card h3 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--ink);
+}
+
+.personal-domain-card p {
+  margin: 10px 0 12px;
+  color: #38515b;
+  line-height: 1.45;
+}
+
+.personal-domain-card dl {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.personal-domain-card dt {
+  margin: 0 0 3px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.personal-domain-card dd {
+  margin: 0;
+  color: #243f4a;
+  line-height: 1.4;
+}
+
+.personal-sensitivity {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.personal-sensitivity-reference {
+  color: #38515b;
+  background: #edf3f5;
+  border: 1px solid #d9e4e8;
+}
+
+.personal-sensitivity-private {
+  color: #174c32;
+  background: #e7f4ed;
+  border: 1px solid #c8e2d3;
+}
+
+.personal-sensitivity-sensitive {
+  color: #743615;
+  background: #fff0e7;
+  border: 1px solid #f0d0bd;
+}
+
+.personal-guardrail-list {
+  margin: 12px 0 0;
+  padding-left: 18px;
+  color: #334d58;
+  line-height: 1.5;
 }
 
 .card h2,
@@ -1339,6 +1540,11 @@ select {
     justify-items: start;
     gap: 12px;
     margin-top: 4px;
+  }
+
+  .personal-ops-layout,
+  .personal-domain-grid {
+    grid-template-columns: 1fr;
   }
 
   .admin-clock-hero {
