@@ -53,11 +53,12 @@ Phase 1: protected shell and architecture baseline.
 3. Add static domain definitions and guardrails.
 4. Extend the regression harness to check protection and rendering.
 
-Phase 2: source inventory.
+Phase 2: source inventory and navigable domain detail.
 
 1. Inventory Obsidian vault folders and candidate source documents.
 2. Decide per-domain sync direction.
 3. Document which data stays in Obsidian and which appears in the dashboard.
+4. Add protected domain detail pages that show workflow lanes, source candidates, privacy boundaries, and blocked-until rules without ingesting personal data.
 
 Phase 3: first real module.
 

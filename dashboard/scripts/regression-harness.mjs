@@ -293,6 +293,17 @@ async function main() {
     );
     pass("Unauthenticated Personal Ops page redirects to login");
 
+    const unauthPersonalDetail = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
+    assert(
+      unauthPersonalDetail.response.status === 307,
+      `Expected /admin/personal/travel to redirect when unauthenticated, got ${describeStatus(unauthPersonalDetail.response)}`
+    );
+    assert(
+      unauthPersonalDetail.response.headers.get("location")?.includes("/admin/login"),
+      "Unauthenticated Personal Ops detail redirect did not point to admin login"
+    );
+    pass("Unauthenticated Personal Ops detail page redirects to login");
+
     logStep("Logging in as admin");
     const loginBody = new URLSearchParams({
       password: serverEnv.ADMIN_PASSWORD,
@@ -322,10 +333,17 @@ async function main() {
 
     const personalPage = await requestText(server.baseUrl, cookieJar, "/admin/personal");
     assert(personalPage.response.ok, `Personal Ops page failed: ${describeStatus(personalPage.response)}`);
-    for (const expected of ["Personal Ops", "AI Monitoring", "Finance", "Travel", "Architecture Guardrails"]) {
+    for (const expected of ["Personal Ops", "AI Monitoring", "Finance", "Travel", "Architecture Guardrails", "Open Travel"]) {
       assert(personalPage.body.includes(expected), `Personal Ops page missing expected text: ${expected}`);
     }
     pass("Personal Ops shell loads with domain map and guardrails");
+
+    const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
+    assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);
+    for (const expected of ["Travel", "Workflow Lanes", "Source Inventory", "Privacy Boundary", "trip command board"]) {
+      assert(personalTravelPage.body.includes(expected), `Personal Ops Travel page missing expected text: ${expected}`);
+    }
+    pass("Personal Ops detail route loads with workflows, sources, and privacy boundary");
 
     const entityPage = await requestText(server.baseUrl, cookieJar, "/admin/entities/unigentamos");
     assert(entityPage.response.ok, `Entity page failed: ${describeStatus(entityPage.response)}`);
