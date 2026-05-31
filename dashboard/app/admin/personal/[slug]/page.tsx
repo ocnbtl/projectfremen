@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import PersonalRecordsPanel from "../../../../components/PersonalRecordsPanel";
 import {
   getPersonalSystemDomain,
   PERSONAL_SYSTEM_DOMAINS,
   type PersonalSystemSensitivity,
   type PersonalSystemStatus
 } from "../../../../lib/personal-systems";
+import { getRecordsForDomain, readPersonalRecords } from "../../../../lib/personal-records-store";
 import { requireAdminSession } from "../../../../lib/require-admin";
 
 export const dynamic = "force-dynamic";
@@ -17,15 +19,15 @@ const SENSITIVITY_LABELS: Record<PersonalSystemSensitivity, string> = {
 };
 
 const STATUS_LABELS: Record<PersonalSystemStatus, string> = {
-  inventory: "Inventory",
-  planned: "Planned",
-  blocked: "Blocked"
+  active: "Active",
+  designing: "Designing",
+  guarded: "Guarded"
 };
 
-const SOURCE_STATUS_LABELS = {
-  candidate: "Candidate",
-  "needs-inventory": "Needs inventory",
-  blocked: "Blocked"
+const FIELD_STATUS_LABELS = {
+  ready: "Ready",
+  planned: "Planned",
+  guarded: "Guarded"
 };
 
 export default async function PersonalDomainPage({
@@ -40,6 +42,9 @@ export default async function PersonalDomainPage({
   if (!domain) {
     notFound();
   }
+
+  const allRecords = await readPersonalRecords().catch(() => []);
+  const domainRecords = getRecordsForDomain(allRecords, domain.slug);
 
   return (
     <main className="shell personal-ops-shell">
@@ -77,14 +82,20 @@ export default async function PersonalDomainPage({
           <strong>{domain.workflows.length}</strong>
         </article>
         <article className="personal-metric">
-          <p>Sources</p>
-          <strong>{domain.sources.length}</strong>
+          <p>Fields</p>
+          <strong>{domain.fields.length}</strong>
         </article>
         <article className="personal-metric">
-          <p>Ingestion</p>
-          <strong>0</strong>
+          <p>Records</p>
+          <strong>{domainRecords.length}</strong>
         </article>
       </section>
+
+      <PersonalRecordsPanel
+        domain={domain}
+        domains={PERSONAL_SYSTEM_DOMAINS}
+        initialRecords={allRecords}
+      />
 
       <section className="personal-domain-detail-layout">
         <div className="personal-domain-detail-main">
@@ -105,18 +116,18 @@ export default async function PersonalDomainPage({
 
           <section className="personal-panel">
             <div className="personal-ops-section-heading">
-              <h2>Source Inventory</h2>
-              <span>Read-only plan</span>
+              <h2>Database Fields</h2>
+              <span>Native model</span>
             </div>
             <div className="personal-source-list">
-              {domain.sources.map((source) => (
-                <article className="personal-source-row" key={source.label}>
+              {domain.fields.map((field) => (
+                <article className="personal-source-row" key={field.label}>
                   <div>
-                    <h3>{source.label}</h3>
-                    <p>{source.detail}</p>
+                    <h3>{field.label}</h3>
+                    <p>{field.detail}</p>
                   </div>
-                  <span className={`personal-source-status personal-source-status-${source.status}`}>
-                    {SOURCE_STATUS_LABELS[source.status]}
+                  <span className={`personal-source-status personal-source-status-${field.status}`}>
+                    {FIELD_STATUS_LABELS[field.status]}
                   </span>
                 </article>
               ))}
@@ -136,8 +147,8 @@ export default async function PersonalDomainPage({
           </section>
 
           <section className="personal-panel">
-            <h2>Blocked Until</h2>
-            <p>{domain.blockedUntil}</p>
+            <h2>Data Boundary</h2>
+            <p>{domain.dataBoundary}</p>
           </section>
         </aside>
       </section>

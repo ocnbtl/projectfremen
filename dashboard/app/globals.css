@@ -689,7 +689,13 @@ a {
   font-weight: 800;
 }
 
-.personal-status-inventory {
+.personal-status-active {
+  color: #124832;
+  background: #e7f4ed;
+  border: 1px solid #c8e2d3;
+}
+
+.personal-status-designing {
   color: #234452;
   background: #e8f2f6;
   border: 1px solid #cadee7;
@@ -701,6 +707,7 @@ a {
   border: 1px solid #c8e2d3;
 }
 
+.personal-status-guarded,
 .personal-status-blocked {
   color: #743615;
   background: #fff0e7;
@@ -922,12 +929,19 @@ a {
   border: 1px solid #c8e2d3;
 }
 
-.personal-source-status-needs-inventory {
+.personal-source-status-ready {
+  color: #124832;
+  background: #e7f4ed;
+  border: 1px solid #c8e2d3;
+}
+
+.personal-source-status-planned {
   color: #234452;
   background: #e8f2f6;
   border: 1px solid #cadee7;
 }
 
+.personal-source-status-guarded,
 .personal-source-status-blocked {
   color: #743615;
   background: #fff0e7;
@@ -944,6 +958,232 @@ a {
   gap: 8px;
   flex-wrap: wrap;
   margin-top: 14px;
+}
+
+.personal-record-workspace {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.82fr) minmax(0, 1.18fr);
+  gap: 14px;
+  align-items: start;
+  margin: 14px 0;
+}
+
+.personal-record-form-wrap,
+.personal-record-list-wrap {
+  padding: 16px;
+  border: 1px solid #d5e2e7;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 8px 18px rgba(16, 32, 38, 0.05);
+}
+
+.personal-record-form {
+  display: grid;
+  gap: 10px;
+}
+
+.personal-record-form label {
+  color: #2d4650;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.personal-record-form input,
+.personal-record-form select,
+.personal-record-form textarea {
+  width: 100%;
+  margin-top: 6px;
+  margin-bottom: 0;
+}
+
+.personal-record-form textarea {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #ffffff;
+  color: var(--ink);
+  font: inherit;
+  resize: vertical;
+}
+
+.personal-record-form-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.personal-record-form-row + .personal-record-form-row {
+  grid-template-columns: minmax(130px, 0.45fr) minmax(0, 1fr);
+}
+
+.personal-related-domains {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid #d9e5e8;
+  border-radius: 8px;
+}
+
+.personal-related-domains legend {
+  padding: 0 6px;
+  color: #2d4650;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.personal-related-domains > div {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.personal-related-domains label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid #d9e5e8;
+  border-radius: 8px;
+  background: #fbfdfd;
+  color: #294852;
+  font-size: 12px;
+}
+
+.personal-related-domains input {
+  display: inline-block;
+  width: auto;
+  margin: 0;
+}
+
+.personal-record-error {
+  margin: 0;
+  color: #9f3e1f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.personal-record-list {
+  display: grid;
+  gap: 10px;
+}
+
+.personal-record-card {
+  padding: 12px;
+  border: 1px solid #d9e5e8;
+  border-radius: 8px;
+  background: #fbfdfd;
+}
+
+.personal-record-card-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: start;
+}
+
+.personal-record-card-header p {
+  margin: 0 0 3px;
+  color: #59707a;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.personal-record-card h3 {
+  margin: 0;
+  color: #102026;
+  font-size: 18px;
+}
+
+.personal-record-badges,
+.personal-record-chip-row,
+.personal-record-actions,
+.personal-record-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.personal-record-badges {
+  justify-content: flex-end;
+}
+
+.personal-record-badges span,
+.personal-record-chip-row span,
+.personal-record-meta span,
+.personal-record-meta a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  border-radius: 8px;
+  border: 1px solid #d9e5e8;
+  background: #ffffff;
+  color: #294852;
+  font-size: 11px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.personal-record-status-active {
+  border-color: #c8e2d3 !important;
+  background: #e7f4ed !important;
+  color: #124832 !important;
+}
+
+.personal-record-status-waiting {
+  border-color: #cadee7 !important;
+  background: #e8f2f6 !important;
+  color: #234452 !important;
+}
+
+.personal-record-status-done {
+  border-color: #c9dfc7 !important;
+  background: #edf6ea !important;
+  color: #24521c !important;
+}
+
+.personal-record-status-archived {
+  border-color: #d9e4e8 !important;
+  background: #f2f5f6 !important;
+  color: #596a70 !important;
+}
+
+.personal-record-body {
+  margin: 10px 0;
+  color: #38515b;
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
+
+.personal-record-meta {
+  margin-top: 8px;
+}
+
+.personal-record-chip-row {
+  margin-top: 8px;
+}
+
+.personal-record-actions {
+  margin-top: 10px;
+}
+
+.personal-record-actions button {
+  width: auto;
+  min-height: 30px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: #123445;
+  font-size: 12px;
+}
+
+.personal-record-actions button:disabled {
+  opacity: 0.46;
+  cursor: default;
+  transform: none;
+  box-shadow: none;
 }
 
 .card h2,
@@ -1887,7 +2127,8 @@ select {
   .personal-ops-command,
   .personal-domain-grid,
   .personal-domain-hero,
-  .personal-domain-detail-layout {
+  .personal-domain-detail-layout,
+  .personal-record-workspace {
     grid-template-columns: 1fr;
   }
 
@@ -1938,7 +2179,9 @@ select {
 
 @media (max-width: 640px) {
   .personal-command-actions,
-  .personal-source-row {
+  .personal-source-row,
+  .personal-record-form-row,
+  .personal-record-form-row + .personal-record-form-row {
     grid-template-columns: 1fr;
   }
 }

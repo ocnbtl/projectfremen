@@ -282,6 +282,13 @@ async function main() {
     assert(unauthKpis.response.status === 401, `Expected /api/kpis to return 401, got ${describeStatus(unauthKpis.response)}`);
     pass("Unauthenticated KPI API is blocked");
 
+    const unauthPersonalRecords = await requestJson(server.baseUrl, cookieJar, "/api/personal/records");
+    assert(
+      unauthPersonalRecords.response.status === 401,
+      `Expected /api/personal/records to return 401, got ${describeStatus(unauthPersonalRecords.response)}`
+    );
+    pass("Unauthenticated Personal Ops records API is blocked");
+
     const unauthPersonal = await requestText(server.baseUrl, cookieJar, "/admin/personal");
     assert(
       unauthPersonal.response.status === 307,
@@ -333,14 +340,14 @@ async function main() {
 
     const personalPage = await requestText(server.baseUrl, cookieJar, "/admin/personal");
     assert(personalPage.response.ok, `Personal Ops page failed: ${describeStatus(personalPage.response)}`);
-    for (const expected of ["Personal Ops", "AI Monitoring", "Finance", "Travel", "Architecture Guardrails", "Open Travel"]) {
+    for (const expected of ["Personal Ops", "AI Monitoring", "Finance", "Travel", "Architecture Guardrails", "Open Travel", "Native Database"]) {
       assert(personalPage.body.includes(expected), `Personal Ops page missing expected text: ${expected}`);
     }
     pass("Personal Ops shell loads with domain map and guardrails");
 
     const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
     assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);
-    for (const expected of ["Travel", "Workflow Lanes", "Source Inventory", "Privacy Boundary", "trip command board"]) {
+    for (const expected of ["Travel", "Record Something", "Saved Records", "Database Fields", "Privacy Boundary", "trip command board"]) {
       assert(personalTravelPage.body.includes(expected), `Personal Ops Travel page missing expected text: ${expected}`);
     }
     pass("Personal Ops detail route loads with workflows, sources, and privacy boundary");
@@ -360,6 +367,41 @@ async function main() {
 
     const csrfToken = cookieJar.get("admin_csrf");
     assert(csrfToken, "CSRF token missing after login");
+
+    logStep("Checking Personal Ops record persistence");
+    const personalRecordTitle = `${testRunId}-travel-record`;
+    const createPersonalRecord = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        domain: "travel",
+        title: personalRecordTitle,
+        kind: "task",
+        status: "active",
+        priority: "P1",
+        body: "Regression-created travel planning record.",
+        tags: ["regression", "travel"],
+        relatedDomains: ["notes-docs"]
+      })
+    });
+    assert(
+      createPersonalRecord.response.ok && createPersonalRecord.payload?.ok,
+      `Personal record create failed: ${JSON.stringify(createPersonalRecord.payload)}`
+    );
+
+    const personalRecords = await requestJson(server.baseUrl, cookieJar, "/api/personal/records?domain=travel");
+    assert(personalRecords.response.ok && personalRecords.payload?.ok, "Personal records GET failed");
+    assert(
+      personalRecords.payload.items?.some((item) => item.title === personalRecordTitle && item.domain === "travel"),
+      "Saved Personal Ops record was not returned by domain GET"
+    );
+
+    const personalTravelAfterSave = await requestText(server.baseUrl, cookieJar, `/admin/personal/travel?record=${Date.now()}`);
+    assert(personalTravelAfterSave.body.includes(personalRecordTitle), "Saved Personal Ops record missing from Travel page");
+    pass("Personal Ops record create/read/render flow works");
 
     logStep("Checking Current Goals persistence and sync");
     const goalMarker = `${testRunId}-goal`;

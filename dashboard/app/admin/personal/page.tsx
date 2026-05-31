@@ -5,6 +5,7 @@ import {
   type PersonalSystemSensitivity,
   type PersonalSystemStatus
 } from "../../../lib/personal-systems";
+import { readPersonalRecords } from "../../../lib/personal-records-store";
 import { requireAdminSession } from "../../../lib/require-admin";
 
 export const dynamic = "force-dynamic";
@@ -16,17 +17,18 @@ const SENSITIVITY_LABELS: Record<PersonalSystemSensitivity, string> = {
 };
 
 const STATUS_LABELS: Record<PersonalSystemStatus, string> = {
-  inventory: "Inventory",
-  planned: "Planned",
-  blocked: "Blocked"
+  active: "Active",
+  designing: "Designing",
+  guarded: "Guarded"
 };
 
 export default async function PersonalOpsPage() {
   await requireAdminSession();
 
+  const records = await readPersonalRecords().catch(() => []);
   const sensitiveCount = PERSONAL_SYSTEM_DOMAINS.filter((item) => item.sensitivity === "sensitive").length;
-  const plannedCount = PERSONAL_SYSTEM_DOMAINS.filter((item) => item.status === "planned").length;
-  const nextDomains = PERSONAL_SYSTEM_DOMAINS.filter((item) => item.status !== "blocked").slice(0, 3);
+  const activeCount = PERSONAL_SYSTEM_DOMAINS.filter((item) => item.status === "active").length;
+  const nextDomains = PERSONAL_SYSTEM_DOMAINS.filter((item) => item.status === "active").slice(0, 3);
 
   return (
     <main className="shell personal-ops-shell">
@@ -35,8 +37,8 @@ export default async function PersonalOpsPage() {
           <p className="muted personal-ops-kicker">Founder system</p>
           <h1 style={{ margin: 0 }}>Personal Ops</h1>
           <p className="muted" style={{ margin: "8px 0 0" }}>
-            A protected planning layer for Obsidian-linked daily systems, kept separate from the
-            current project command center.
+            A protected, dashboard-native database for daily systems, kept separate from the
+            project command center.
           </p>
         </div>
         <Link href="/admin" className="review-back-link">
@@ -47,10 +49,11 @@ export default async function PersonalOpsPage() {
       <section className="personal-ops-command">
         <div>
           <p className="personal-domain-eyebrow">Current build posture</p>
-          <h2>Inventory first, then activate the lowest-risk modules.</h2>
+          <h2>Record first, then specialize the modules around real data.</h2>
           <p>
-            Travel, notes/docs, and university archives can become useful without account-level
-            integrations. Finance and family stay blocked until privacy and storage rules are explicit.
+            Personal Ops now saves native records in Unigentamos. A record can belong to one
+            domain, overlap with others, carry notes or file references, and become the input for
+            future custom views.
           </p>
         </div>
         <div className="personal-command-actions">
@@ -69,8 +72,8 @@ export default async function PersonalOpsPage() {
           <h3>{sensitiveCount}</h3>
         </article>
         <article className="card personal-ops-stat">
-          <p className="muted" style={{ margin: 0 }}>Planned modules</p>
-          <h3>{plannedCount}</h3>
+          <p className="muted" style={{ margin: 0 }}>Saved records</p>
+          <h3>{records.length}</h3>
         </article>
       </section>
 
@@ -79,7 +82,7 @@ export default async function PersonalOpsPage() {
           <section className="personal-domain-panel">
             <div className="personal-ops-section-heading">
               <h2>Domain Map</h2>
-              <span>First slice</span>
+              <span>{activeCount} active</span>
             </div>
             <div className="personal-domain-grid">
               {PERSONAL_SYSTEM_DOMAINS.map((domain) => (
@@ -98,8 +101,8 @@ export default async function PersonalOpsPage() {
                   <p>{domain.summary}</p>
                   <dl>
                     <div>
-                      <dt>Source</dt>
-                      <dd>{domain.sourceStatus}</dd>
+                      <dt>Database</dt>
+                      <dd>{domain.systemStatus}</dd>
                     </div>
                     <div>
                       <dt>Next</dt>
@@ -138,10 +141,10 @@ export default async function PersonalOpsPage() {
           </section>
 
           <section className="card">
-            <h2>Obsidian Source Inventory</h2>
+            <h2>Native Database</h2>
             <p className="muted">
-              Vault folders, sync direction, and export ownership are intentionally unconfirmed here.
-              The next step is inventory, not broad ingestion.
+              Personal records are saved through the same authenticated app persistence layer as KPIs,
+              reviews, and Current Goals. No Obsidian import/export path is required.
             </p>
           </section>
         </aside>

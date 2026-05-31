@@ -1,9 +1,9 @@
 export type PersonalSystemSensitivity = "reference" | "private" | "sensitive";
-export type PersonalSystemStatus = "inventory" | "planned" | "blocked";
+export type PersonalSystemStatus = "active" | "designing" | "guarded";
 
-export type PersonalSystemSource = {
+export type PersonalSystemField = {
   label: string;
-  status: "candidate" | "needs-inventory" | "blocked";
+  status: "ready" | "planned" | "guarded";
   detail: string;
 };
 
@@ -13,14 +13,14 @@ export type PersonalSystemDomain = {
   shortLabel: string;
   summary: string;
   operatingView: string;
-  sourceStatus: string;
+  systemStatus: string;
   sensitivity: PersonalSystemSensitivity;
   status: PersonalSystemStatus;
   nextStep: string;
   workflows: string[];
-  sources: PersonalSystemSource[];
+  fields: PersonalSystemField[];
   privacyBoundary: string;
-  blockedUntil: string;
+  dataBoundary: string;
 };
 
 export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
@@ -28,121 +28,121 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     slug: "ai-monitoring",
     label: "AI Monitoring",
     shortLabel: "AI",
-    summary: "Track AI work sessions, outputs, decisions, and follow-up actions.",
+    summary: "Track AI work sessions, outputs, decisions, and follow-up actions inside Unigentamos.",
     operatingView: "A session ledger that separates durable decisions from transient chat output.",
-    sourceStatus: "Obsidian and Codex history to be inventoried before ingestion.",
+    systemStatus: "Native records are ready for session notes, decisions, and follow-ups.",
     sensitivity: "private",
-    status: "inventory",
-    nextStep: "Define session metadata and what stays in notes versus dashboard state.",
+    status: "active",
+    nextStep: "Start recording durable AI decisions and implementation follow-ups.",
     workflows: [
       "Daily AI work log with project, tool, outcome, and follow-up status.",
       "Decision register for choices that should survive beyond one chat thread.",
       "Review queue for outputs that need implementation, verification, or archival."
     ],
-    sources: [
+    fields: [
       {
-        label: "Codex thread history",
-        status: "candidate",
-        detail: "Use as review context only until a durable export shape is approved."
+        label: "Session summary",
+        status: "ready",
+        detail: "Store the useful result, decision, or follow-up, not the raw transcript."
       },
       {
-        label: "Obsidian AI notes",
-        status: "needs-inventory",
-        detail: "Folder names, note templates, and retention rules are not mapped yet."
+        label: "Related domains",
+        status: "ready",
+        detail: "Link an AI record to travel, jobs, notes, or project work when it overlaps."
       }
     ],
     privacyBoundary: "Do not persist raw chat transcripts or account tokens in the dashboard.",
-    blockedUntil: "Session metadata, retention policy, and redaction rules are explicit."
+    dataBoundary: "Keep records short, outcome-oriented, and safe to resurface later."
   },
   {
     slug: "notes-docs",
     label: "Notes and Docs",
     shortLabel: "Notes",
-    summary: "Connect durable notes, active documents, thoughts, and reference material.",
-    operatingView: "A read-only index of active notes, durable docs, and source-of-truth locations.",
-    sourceStatus: "Obsidian vault structure not yet mapped.",
+    summary: "Create durable notes, active documents, thoughts, and reference material.",
+    operatingView: "A native note workspace where records can overlap with every other domain.",
+    systemStatus: "Native note records are ready for capture and cross-domain linking.",
     sensitivity: "private",
-    status: "inventory",
-    nextStep: "Inventory vault folders and choose read-only versus export-backed sync.",
+    status: "active",
+    nextStep: "Use this as the default capture lane for durable notes and reusable context.",
     workflows: [
-      "Surface current working notes without moving their source of truth.",
+      "Capture current working notes directly in the system.",
       "Separate evergreen references from active project drafts and personal thoughts.",
       "Flag stale docs that need archive, promotion, or deletion decisions."
     ],
-    sources: [
+    fields: [
       {
-        label: "Obsidian vault",
-        status: "needs-inventory",
-        detail: "Candidate folders should be listed before any local file scanning is added."
+        label: "Note body",
+        status: "ready",
+        detail: "Long-form text is stored on the record and can be linked to other domains."
       },
       {
-        label: "GitHub docs index",
-        status: "candidate",
-        detail: "Existing docs sync can inform project docs but should not absorb private notes."
+        label: "Link or file reference",
+        status: "ready",
+        detail: "Store a URL or plain file reference when the record points at a document."
       }
     ],
-    privacyBoundary: "Start read-only. Do not copy private notes into Supabase without a storage decision.",
-    blockedUntil: "Vault root, folder taxonomy, and sync direction are documented."
+    privacyBoundary: "Private notes stay behind the existing admin session and CSRF protection.",
+    dataBoundary: "This is the source of truth for new notes created in the website."
   },
   {
     slug: "finance",
     label: "Finance",
     shortLabel: "Finance",
-    summary: "Summarize finances with clean graphs and strategic review surfaces.",
+    summary: "Summarize finances with clean graphs, manual snapshots, and strategic review surfaces.",
     operatingView: "A high-level planning surface for aggregates, not account-level transaction storage.",
-    sourceStatus: "No accounts, balances, or transactions collected in this slice.",
+    systemStatus: "Manual aggregate records are allowed; account integrations remain out of scope.",
     sensitivity: "sensitive",
-    status: "blocked",
-    nextStep: "Decide local-only, manual summary, or external-account integration boundaries.",
+    status: "guarded",
+    nextStep: "Capture only manual summaries, goals, and decisions until detailed rules exist.",
     workflows: [
-      "Monthly summary snapshot with manually entered totals if approved later.",
+      "Monthly summary snapshot with manually entered totals.",
       "Goal and runway views that avoid exposing raw transactions by default.",
       "Integration decision record before any bank, spreadsheet, or app connection."
     ],
-    sources: [
+    fields: [
       {
         label: "Manual monthly summary",
-        status: "candidate",
-        detail: "Lowest-risk starting point after the privacy model is approved."
+        status: "ready",
+        detail: "Use record text for aggregate summaries, decisions, and review notes."
       },
       {
-        label: "External finance tools",
-        status: "blocked",
-        detail: "No account integrations until credentials, storage, and deletion rules are written."
+        label: "Account-level detail",
+        status: "guarded",
+        detail: "Avoid account numbers, raw transactions, credentials, and confirmation codes."
       }
     ],
-    privacyBoundary: "No balances, transactions, account identifiers, or credentials in this phase.",
-    blockedUntil: "Finance storage, access, redaction, and backup rules are approved."
+    privacyBoundary: "No credentials, account identifiers, or raw transaction feeds.",
+    dataBoundary: "Finance records should be manual, summarized, and intentionally sparse."
   },
   {
     slug: "family",
     label: "Family",
     shortLabel: "Family",
-    summary: "Keep relationship context, notes, important dates, and care reminders organized.",
+    summary: "Keep relationship context, important dates, and care reminders organized.",
     operatingView: "A private reminder and relationship-context layer with strict data minimization.",
-    sourceStatus: "No family profile data collected in this slice.",
+    systemStatus: "Minimal private records are allowed when they are useful and respectful.",
     sensitivity: "sensitive",
-    status: "blocked",
-    nextStep: "Define what belongs in private notes before any dashboard persistence.",
+    status: "guarded",
+    nextStep: "Start with dates, reminders, and lightweight context instead of broad profiles.",
     workflows: [
-      "Important dates and reminders after a minimal-field policy exists.",
-      "Context notes that remain in Obsidian unless intentionally promoted.",
+      "Important dates and reminders with minimal personal detail.",
+      "Context notes that support better follow-through.",
       "Care or follow-up prompts with no unnecessary sensitive detail."
     ],
-    sources: [
+    fields: [
       {
-        label: "Private notes",
-        status: "blocked",
-        detail: "Do not scan or import until consent, minimization, and edit/delete rules are clear."
+        label: "Reminder context",
+        status: "ready",
+        detail: "Store only what helps you act thoughtfully later."
       },
       {
-        label: "Calendar reminders",
-        status: "candidate",
-        detail: "Could become metadata-only if a calendar integration is approved later."
+        label: "Sensitive profile detail",
+        status: "guarded",
+        detail: "Avoid medical, legal, or highly personal details unless a stricter model exists."
       }
     ],
-    privacyBoundary: "No personal profiles, health details, or relationship notes in dashboard storage yet.",
-    blockedUntil: "A minimization policy and delete workflow exist."
+    privacyBoundary: "Minimize private details and avoid storing information that does not serve a clear purpose.",
+    dataBoundary: "Records should be editable, concise, and easy to archive."
   },
   {
     slug: "jobs",
@@ -150,89 +150,89 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     shortLabel: "Jobs",
     summary: "Track job history, applications, opportunities, and supporting materials.",
     operatingView: "A pipeline board for opportunities, stages, materials, and follow-up dates.",
-    sourceStatus: "Historical sources and active pipeline are not yet connected.",
+    systemStatus: "Native records are ready for opportunities, materials, and follow-ups.",
     sensitivity: "private",
-    status: "planned",
-    nextStep: "Model application stages, source documents, and archive rules.",
+    status: "active",
+    nextStep: "Use records for active opportunities and next follow-up actions.",
     workflows: [
       "Active opportunity list with status, owner action, and next follow-up.",
       "Document checklist for resume, portfolio, cover letter, and notes.",
       "Archive lane for past roles and applications after source locations are known."
     ],
-    sources: [
+    fields: [
       {
-        label: "Application materials",
-        status: "needs-inventory",
-        detail: "File locations and naming conventions need mapping before indexing."
+        label: "Opportunity record",
+        status: "ready",
+        detail: "Track company, role, stage, follow-up, and supporting notes in one record."
       },
       {
-        label: "Opportunity notes",
-        status: "needs-inventory",
-        detail: "Likely Obsidian-backed, but source-of-truth is not confirmed."
+        label: "Material reference",
+        status: "ready",
+        detail: "Link to a resume, portfolio, or document reference without uploading files yet."
       }
     ],
-    privacyBoundary: "No employer contacts, compensation details, or application documents ingested yet.",
-    blockedUntil: "Pipeline stages and archive rules are defined."
+    privacyBoundary: "Avoid sensitive compensation or employer contact details unless needed.",
+    dataBoundary: "Jobs records live in the website and can be linked to notes/docs."
   },
   {
     slug: "travel",
     label: "Travel",
     shortLabel: "Travel",
     summary: "Plan trips with itinerary state, map-ready locations, bookings, and constraints.",
-    operatingView: "A trip command board that can later feed map and globe views.",
-    sourceStatus: "Trip notes and booking confirmations need source inventory.",
+    operatingView: "A trip command board for itineraries, constraints, stops, and booking tasks.",
+    systemStatus: "Native records are ready for trip plans, stops, constraints, and checklists.",
     sensitivity: "private",
-    status: "planned",
-    nextStep: "Start with a read-only trip index before map or globe implementation.",
+    status: "active",
+    nextStep: "Create trip records first; map and globe views can read from those records later.",
     workflows: [
       "Trip index with dates, route status, lodging status, and constraint flags.",
       "Map-ready stop list after location source and privacy rules are known.",
       "Booking confirmation checklist that references sources without storing secrets."
     ],
-    sources: [
+    fields: [
       {
-        label: "Trip notes",
-        status: "needs-inventory",
-        detail: "Obsidian or document artifacts can seed the first read-only trip index."
+        label: "Trip or stop record",
+        status: "ready",
+        detail: "Store dates, places, constraints, and next actions as native records."
       },
       {
-        label: "Booking confirmations",
-        status: "candidate",
-        detail: "Metadata-only references are acceptable later; confirmation numbers stay out."
+        label: "Booking reference",
+        status: "guarded",
+        detail: "Use metadata-only references; keep confirmation numbers and payment details out."
       }
     ],
     privacyBoundary: "No live location, confirmation numbers, payment details, or private address data.",
-    blockedUntil: "Trip source inventory and location redaction rules are documented."
+    dataBoundary: "Travel records are dashboard-native and can later power a map view."
   },
   {
     slug: "university-notes",
     label: "University Notes",
     shortLabel: "University",
-    summary: "Expose past coursework, notes, and reference material as searchable context.",
+    summary: "Capture coursework, notes, and reference material as searchable context.",
     operatingView: "A curated archive browser for coursework and reusable reference material.",
-    sourceStatus: "Archive location and folder taxonomy not yet confirmed.",
+    systemStatus: "Native archive records are ready for course notes and references.",
     sensitivity: "reference",
-    status: "inventory",
-    nextStep: "Identify archive roots and decide whether this is search-only or curated.",
+    status: "designing",
+    nextStep: "Create curated course/reference records before adding search or file upload.",
     workflows: [
       "Course index grouped by term, class, and topic.",
       "Reusable reference highlights promoted into the broader notes system.",
       "Archive cleanup queue for duplicate or obsolete material."
     ],
-    sources: [
+    fields: [
       {
-        label: "Course archive",
-        status: "needs-inventory",
-        detail: "Root folder and file types need confirmation."
+        label: "Course note",
+        status: "ready",
+        detail: "Store class, topic, and durable reference notes directly."
       },
       {
-        label: "Reference notes",
-        status: "candidate",
-        detail: "Good candidate for read-only search before any structured persistence."
+        label: "File attachment",
+        status: "planned",
+        detail: "File upload can come later after the record model is stable."
       }
     ],
     privacyBoundary: "Avoid ingesting grades, student records, or third-party personal information.",
-    blockedUntil: "Archive roots and allowed file categories are listed."
+    dataBoundary: "Curated notes live here; raw archive imports wait until upload rules exist."
   },
   {
     slug: "related-systems",
@@ -240,37 +240,37 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     shortLabel: "Systems",
     summary: "Reserve space for other personal tools that should connect later.",
     operatingView: "A triage shelf for repeated workflows before they deserve a first-class module.",
-    sourceStatus: "No external applications connected in this slice.",
+    systemStatus: "Native records are ready for candidate workflows and system ideas.",
     sensitivity: "private",
-    status: "planned",
+    status: "designing",
     nextStep: "Promote only after a real workflow repeats enough to deserve a module.",
     workflows: [
       "Capture candidate systems without committing to integrations too early.",
       "Track why a workflow should become a module and what data it would need.",
       "Retire placeholders that do not produce repeated operational value."
     ],
-    sources: [
+    fields: [
       {
-        label: "Future app inventory",
-        status: "candidate",
-        detail: "Airtable, calendars, files, or other tools can be evaluated one by one."
+        label: "Candidate system",
+        status: "ready",
+        detail: "Record repeated workflows and promote them only when they prove useful."
       },
       {
-        label: "Manual workflow notes",
-        status: "needs-inventory",
-        detail: "Only promote after a repeated workflow is visible."
+        label: "External app integration",
+        status: "planned",
+        detail: "Any connector gets a separate safety review before implementation."
       }
     ],
     privacyBoundary: "No new external app connections without an integration-specific review.",
-    blockedUntil: "A repeated workflow and source owner are identified."
+    dataBoundary: "This module tracks future candidates; it is not an integration layer yet."
   }
 ];
 
 export const PERSONAL_SYSTEM_GUARDRAILS = [
   "Founder-only admin surface attached to the existing command center.",
-  "No new public routes, auth middleware, or production network calls in the first slice.",
-  "No sensitive finance, family, or job data ingestion until storage and privacy rules are explicit.",
-  "Obsidian remains a source-of-truth candidate; sync direction must be chosen per domain."
+  "No new auth middleware, public endpoints, or production network calls for Personal Ops records.",
+  "Personal Ops records use the existing app_state persistence layer.",
+  "Sensitive domains use manual, minimized records until a stricter model is needed."
 ];
 
 export function getPersonalSystemDomain(slug: string) {
