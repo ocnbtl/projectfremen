@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { ADMIN_NAV_ITEMS } from "../lib/admin-navigation";
 
@@ -15,6 +16,7 @@ export type AdminChromeProps = {
   sidebarSummary?: string;
   sidebarItems?: SidebarItem[];
   sidebarActions?: SidebarItem[];
+  sidebarChildren?: ReactNode;
 };
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
@@ -23,6 +25,7 @@ const AI_MODEL_STORAGE_KEY = "local-ai-model";
 
 function AdminTopNav() {
   const [projectsOpen, setProjectsOpen] = useState(false);
+  const closeProjects = () => setProjectsOpen(false);
 
   return (
     <header className="admin-global-topnav">
@@ -44,11 +47,11 @@ function AdminTopNav() {
                 <span aria-hidden="true">v</span>
               </button>
               <div className="admin-project-menu" hidden={!projectsOpen}>
-                <Link href={item.href || "/admin/projects"} className="admin-project-menu-overview">
+                <Link href={item.href || "/admin/projects"} className="admin-project-menu-overview" onClick={closeProjects}>
                   All projects
                 </Link>
                 {item.children.map((project) => (
-                  <Link href={project.href} className="admin-project-menu-item" key={project.slug}>
+                  <Link href={project.href} className="admin-project-menu-item" key={project.slug} onClick={closeProjects}>
                     <span>{project.shortLabel}</span>
                     <small>{project.status === "active" ? "Active" : "Planned"}</small>
                   </Link>
@@ -70,12 +73,14 @@ function AdminPageSidebar({
   title,
   summary,
   items = [],
-  actions = []
+  actions = [],
+  children
 }: {
   title: string;
   summary?: string;
   items?: SidebarItem[];
   actions?: SidebarItem[];
+  children?: ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
 
@@ -117,6 +122,7 @@ function AdminPageSidebar({
               ))}
             </dl>
           )}
+          {children && <div className="admin-page-sidebar-content">{children}</div>}
           {actions.length > 0 && (
             <div className="admin-page-sidebar-actions">
               {actions.map((action) =>
@@ -286,7 +292,8 @@ export default function AdminChrome({
   sidebarTitle,
   sidebarSummary,
   sidebarItems,
-  sidebarActions
+  sidebarActions,
+  sidebarChildren
 }: AdminChromeProps) {
   return (
     <>
@@ -296,7 +303,9 @@ export default function AdminChrome({
         summary={sidebarSummary}
         items={sidebarItems}
         actions={sidebarActions}
-      />
+      >
+        {sidebarChildren}
+      </AdminPageSidebar>
       <LocalAiLauncher />
     </>
   );

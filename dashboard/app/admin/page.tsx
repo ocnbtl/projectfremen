@@ -95,62 +95,41 @@ export default async function AdminPage({
         sidebarActions={[
           { label: "Personal Ops", href: "/admin/personal" },
           { label: "KPI Tracker", href: "/admin/kpis" },
-          { label: "Weekly Review", href: "/admin/reviews/weekly" }
+          { label: "Obsidian Export", href: "/admin/obsidian" },
+          { label: "GitHub Sync", href: "/admin/docs" }
         ]}
+        sidebarChildren={
+          <>
+            <CurrentGoalsPanel initialItems={goalItems} />
+            <section className="admin-plain-section">
+              <div className="admin-section-heading">
+                <h2>Upcoming Reviews</h2>
+                <div className="admin-review-links">
+                  <Link href="/admin/reviews/weekly" className="admin-review-link">
+                    Weekly
+                  </Link>
+                  <Link href="/admin/reviews/monthly" className="admin-review-link">
+                    Monthly
+                  </Link>
+                </div>
+              </div>
+              <ul className="admin-plain-list admin-review-list">
+                {reviewRows.map((item) => (
+                  <li key={item.name}>
+                    <span>{item.name}</span>
+                    <span className="admin-review-when">{item.when}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          </>
+        }
       />
       <section className="admin-home-grid">
-        <div className="admin-home-left">
-          <AdminWelcomeIntro playIntro={playIntro} />
-          <CurrentGoalsPanel initialItems={goalItems} />
-
-          <section className="admin-plain-section">
-            <div className="admin-section-heading">
-              <h2>Upcoming Reviews</h2>
-              <div className="admin-review-links">
-                <Link href="/admin/reviews/weekly" className="admin-review-link">
-                  Weekly
-                </Link>
-                <Link href="/admin/reviews/monthly" className="admin-review-link">
-                  Monthly
-                </Link>
-              </div>
-            </div>
-            <ul className="admin-plain-list admin-review-list">
-              {reviewRows.map((item) => (
-                <li key={item.name}>
-                  <span>{item.name}</span>
-                  <span className="admin-review-when">{item.when}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="admin-personal-entry" aria-label="Personal operations">
-            <div>
-              <p>Founder system</p>
-              <h2>Personal Ops</h2>
-            </div>
-            <Link href="/admin/personal" className="admin-personal-entry-link">
-              Open
-            </Link>
-          </section>
-        </div>
-
         <div className="admin-home-center">
+          <AdminWelcomeIntro playIntro={playIntro} />
           <DashboardClockHero />
         </div>
-
-        <aside className="admin-quick-links">
-          <Link href="/admin/kpis" className="admin-quick-link">
-            KPI Tracker
-          </Link>
-          <Link href="/admin/obsidian" className="admin-quick-link">
-            Obsidian Export
-          </Link>
-          <Link href="/admin/docs" className="admin-quick-link">
-            GitHub Sync
-          </Link>
-        </aside>
       </section>
     </main>
   );

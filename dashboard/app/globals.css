@@ -137,6 +137,10 @@ a {
   box-shadow: 0 18px 42px rgba(16, 32, 38, 0.18);
 }
 
+.admin-project-menu[hidden] {
+  display: none;
+}
+
 .admin-project-menu-overview,
 .admin-project-menu-item {
   display: flex;
@@ -168,7 +172,8 @@ a {
   top: 82px;
   left: 16px;
   z-index: 70;
-  width: 250px;
+  width: 286px;
+  max-height: calc(100vh - 100px);
   min-height: 54px;
   border: 1px solid rgba(191, 210, 219, 0.82);
   border-radius: 20px;
@@ -221,9 +226,12 @@ a {
 }
 
 .admin-page-sidebar-inner {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 12px;
+  max-height: calc(100vh - 102px);
   padding: 54px 14px 14px;
+  overflow: auto;
 }
 
 .admin-page-sidebar-inner > p {
@@ -281,6 +289,9 @@ a {
 .admin-page-sidebar-actions {
   display: grid;
   gap: 8px;
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #dfe9ed;
 }
 
 .admin-page-sidebar-actions a,
@@ -297,6 +308,85 @@ a {
   font-size: 12px;
   font-weight: 900;
   text-decoration: none;
+}
+
+.admin-page-sidebar-content {
+  display: grid;
+  gap: 14px;
+}
+
+.admin-page-sidebar-content .admin-plain-section {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-page-sidebar-content .admin-plain-section h2 {
+  margin: 0;
+  color: #102026;
+  font-size: 16px;
+}
+
+.admin-page-sidebar-content .admin-section-heading {
+  align-items: flex-start;
+  margin: 0;
+}
+
+.admin-page-sidebar-content .admin-review-links {
+  gap: 5px;
+}
+
+.admin-page-sidebar-content .admin-review-link {
+  min-height: 24px;
+  border-color: #bfd2db;
+  color: #123445;
+  background: #ffffff;
+  font-size: 11px;
+}
+
+.admin-page-sidebar-content .admin-plain-list {
+  gap: 7px;
+}
+
+.admin-page-sidebar-content .admin-plain-list li {
+  gap: 8px;
+  padding: 0 0 7px;
+  border-color: #dfe9ed;
+  color: #243d47;
+  font-size: 12px;
+}
+
+.admin-page-sidebar-content .admin-review-list li {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.admin-page-sidebar-content .admin-review-when {
+  color: #60747c;
+}
+
+.admin-page-sidebar-content .admin-goals-list .admin-goal-item {
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  min-height: 30px;
+  padding-bottom: 6px;
+}
+
+.admin-page-sidebar-content .admin-goal-text {
+  color: #17313b;
+}
+
+.admin-page-sidebar-content .admin-goals-list .admin-goal-item.is-done .admin-goal-text {
+  color: #174d36;
+}
+
+.admin-page-sidebar-content .admin-goal-toggle {
+  border-color: #bfd2db;
+  background: #ffffff;
+  color: #123445;
+}
+
+.admin-page-sidebar-content .admin-goal-toggle.is-done {
+  border-color: #9acbb1;
+  background: #e5f0ea;
+  color: #174d36;
 }
 
 .local-ai-widget {
@@ -552,9 +642,10 @@ a {
 
 .admin-home-grid {
   display: grid;
-  grid-template-columns: minmax(280px, 360px) minmax(0, 1fr) minmax(120px, 180px);
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(18px, 3vw, 42px);
   align-items: center;
+  justify-items: center;
   min-height: calc(100vh - 140px);
 }
 
@@ -567,6 +658,7 @@ a {
 .admin-home-center {
   display: grid;
   place-items: center;
+  width: 100%;
   min-height: 280px;
 }
 
