@@ -347,7 +347,7 @@ async function main() {
 
     const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
     assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);
-    for (const expected of ["Travel", "Record Something", "Saved Records", "Database Fields", "Privacy Boundary", "trip command board"]) {
+    for (const expected of ["Travel", "Record Note", "Core Properties", "Time and Review", "Saved Records", "Database Fields", "Privacy Boundary", "trip command board"]) {
       assert(personalTravelPage.body.includes(expected), `Personal Ops Travel page missing expected text: ${expected}`);
     }
     pass("Personal Ops detail route loads with workflows, sources, and privacy boundary");
@@ -379,10 +379,17 @@ async function main() {
       body: JSON.stringify({
         domain: "travel",
         title: personalRecordTitle,
-        kind: "task",
-        status: "active",
+        className: "task",
+        status: "idea",
         priority: "P1",
         body: "Regression-created travel planning record.",
+        areas: ["Travel"],
+        subjects: ["VanLife"],
+        projects: ["Project Fremen"],
+        intents: ["implement", "retain"],
+        time: {
+          reviewCadence: "P1W"
+        },
         tags: ["regression", "travel"],
         relatedDomains: ["notes-docs"]
       })
@@ -395,7 +402,14 @@ async function main() {
     const personalRecords = await requestJson(server.baseUrl, cookieJar, "/api/personal/records?domain=travel");
     assert(personalRecords.response.ok && personalRecords.payload?.ok, "Personal records GET failed");
     assert(
-      personalRecords.payload.items?.some((item) => item.title === personalRecordTitle && item.domain === "travel"),
+      personalRecords.payload.items?.some(
+        (item) =>
+          item.title === personalRecordTitle &&
+          item.domain === "travel" &&
+          item.createdMeta?.uid &&
+          item.growth === "seed" &&
+          item.time?.nextReview
+      ),
       "Saved Personal Ops record was not returned by domain GET"
     );
 

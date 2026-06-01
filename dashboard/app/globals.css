@@ -982,6 +982,55 @@ a {
   gap: 10px;
 }
 
+.personal-property-group {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #d9e5e8;
+  border-radius: 8px;
+  background: #fbfdfd;
+}
+
+.personal-property-group summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+  color: #14313d;
+  font-size: 15px;
+  font-weight: 900;
+}
+
+.personal-property-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.personal-property-heading h3 {
+  margin: 0;
+  color: #14313d;
+  font-size: 15px;
+}
+
+.personal-info-tip {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  border: 1px solid #bfd2db;
+  background: #ffffff;
+  color: #123445;
+  font-size: 13px;
+  font-weight: 900;
+  cursor: help;
+}
+
 .personal-record-form label {
   color: #2d4650;
   font-size: 13px;
@@ -1133,18 +1182,34 @@ a {
   color: #124832 !important;
 }
 
+.personal-record-status-idea,
+.personal-record-status-draft,
 .personal-record-status-waiting {
   border-color: #cadee7 !important;
   background: #e8f2f6 !important;
   color: #234452 !important;
 }
 
+.personal-record-status-next {
+  border-color: #bfd2db !important;
+  background: #ffffff !important;
+  color: #123445 !important;
+}
+
+.personal-record-status-blocked {
+  border-color: #f0d0bd !important;
+  background: #fff0e7 !important;
+  color: #743615 !important;
+}
+
+.personal-record-status-completed,
 .personal-record-status-done {
   border-color: #c9dfc7 !important;
   background: #edf6ea !important;
   color: #24521c !important;
 }
 
+.personal-record-status-inactive,
 .personal-record-status-archived {
   border-color: #d9e4e8 !important;
   background: #f2f5f6 !important;
@@ -1168,6 +1233,47 @@ a {
 
 .personal-record-actions {
   margin-top: 10px;
+}
+
+.personal-record-details {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid #e0e9ec;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.personal-record-details summary {
+  cursor: pointer;
+  color: #294852;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.personal-record-details dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 10px 0 0;
+}
+
+.personal-record-details div {
+  min-width: 0;
+}
+
+.personal-record-details dt {
+  color: #60747c;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.personal-record-details dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  color: #294852;
+  font-size: 12px;
 }
 
 .personal-record-actions button {
@@ -2181,7 +2287,8 @@ select {
   .personal-command-actions,
   .personal-source-row,
   .personal-record-form-row,
-  .personal-record-form-row + .personal-record-form-row {
+  .personal-record-form-row + .personal-record-form-row,
+  .personal-record-details dl {
     grid-template-columns: 1fr;
   }
 }
