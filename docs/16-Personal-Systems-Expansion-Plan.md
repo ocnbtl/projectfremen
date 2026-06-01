@@ -37,14 +37,17 @@ The current slice stores personal records in `personal-records.json` through the
 Each personal record can have:
 
 1. Primary domain.
-2. Related domains, so notes/files/tasks can overlap across modules.
-3. Class: assignment, interaction, person, resource, org, list, daily, meeting, note, prompt, task, project, event, file, decision, or metric.
-4. Status: idea, draft, active, completed, blocked, inactive, or next.
-5. Privacy, stage, growth, intent, areas, subjects, projects, tags, source links, relationship links, time fields, review fields, and created-time metadata.
+2. Class: assignment, interaction, person, resource, org, list, daily, meeting, note, prompt, task, project, event, file, decision, or metric.
+3. Status: idea, draft, active, completed, blocked, inactive, or next.
+4. Privacy, stage, growth, intent, areas, subjects, projects, source links, relationship links, time fields, review fields, and created-time metadata.
+
+Retired first-slice fields: priority, tags, and related domains. They are intentionally not part of the personal-note model. A record's primary domain is a workspace context, while overlap should be represented through areas, subjects, projects, source links, stakeholders, directional links, and related-note relationships.
 
 Auto-filled fields include UID, Created ISO, readable Created, created date/year/month/quarter/week slices, weekday, growth, last review, processed-on, and next review when a review cadence exists.
 
 Relationship fields include north/south, east/west, stakeholders/stakeholdings, internal sources, external sources, and related notes. North/south, east/west, related, and stakeholder links should stay reciprocal at the data layer.
+
+Each saved record must have its own protected detail page. Domain pages can show previews and excerpts, but the complete property model must be visible both during note creation through grouped expansion panels and after save on the record detail page.
 
 Sensitive domains such as finance and family should use minimized, manual records. Account credentials, raw transaction feeds, medical details, and other high-sensitivity payloads remain out of scope.
 
@@ -61,9 +64,10 @@ Phase 2: source inventory and navigable domain detail.
 
 1. Add protected domain detail pages.
 2. Add native personal-record persistence.
-3. Add record creation, status updates, related domains, tags, and link/file references.
+3. Add record creation, status updates, relationship fields, source fields, and link/file references.
 4. Keep all Personal Ops APIs behind the existing admin session and CSRF checks.
 5. Add grouped note properties with visible core fields and expandable hidden relationship/metadata sections.
+6. Add a desktop-first Personal Ops layout with a persistent desktop/mobile preview toggle for implementation QA.
 
 Phase 3: first real module.
 

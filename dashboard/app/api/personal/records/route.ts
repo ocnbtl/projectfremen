@@ -51,17 +51,14 @@ export async function POST(request: Request) {
       privacy: String(body.privacy ?? ""),
       stage: String(body.stage ?? ""),
       status: String(body.status ?? ""),
-      priority: String(body.priority ?? ""),
       body: String(body.body ?? ""),
       happensOn: String(body.happensOn ?? ""),
       url: String(body.url ?? ""),
-      tags: Array.isArray(body.tags) ? body.tags.map(String) : [],
       areas: Array.isArray(body.areas) ? body.areas.map(String) : [],
       subjects: Array.isArray(body.subjects) ? body.subjects.map(String) : [],
       projects: Array.isArray(body.projects) ? body.projects.map(String) : [],
       intents: Array.isArray(body.intents) ? body.intents.map(String) : [],
       externalSources: Array.isArray(body.externalSources) ? body.externalSources.map(String) : [],
-      relatedDomains: Array.isArray(body.relatedDomains) ? body.relatedDomains.map(String) : [],
       relations: typeof body.relations === "object" && body.relations ? body.relations : {},
       time: typeof body.time === "object" && body.time ? body.time : {}
     });
@@ -109,7 +106,6 @@ export async function PATCH(request: Request) {
     }
     const items = await updatePersonalRecord(id, {
       status: typeof body.status === "string" ? body.status : undefined,
-      priority: typeof body.priority === "string" ? body.priority : undefined,
       action: body.action === "review" ? "review" : undefined
     });
     return NextResponse.json({ ok: true, items });

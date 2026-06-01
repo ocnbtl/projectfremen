@@ -1,21 +1,30 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import type { PersonalSystemDomain } from "../lib/personal-systems";
 import type {
   PersonalRecord,
   PersonalRecordClass,
+  PersonalRecordCreatedMeta,
+  PersonalRecordGrowth,
   PersonalRecordIntent,
-  PersonalRecordPriority,
+  PersonalRecordKnowledgeShape,
   PersonalRecordStage,
-  PersonalRecordStatus
+  PersonalRecordStatus,
+  PersonalRecordTime
 } from "../lib/personal-records-store";
 
 type RecordsResponse = {
   ok: boolean;
   items?: PersonalRecord[];
   error?: string;
+};
+
+type PropertyItem = {
+  label: string;
+  value?: string | string[] | null;
 };
 
 const STATUS_OPTIONS: PersonalRecordStatus[] = [
@@ -68,7 +77,15 @@ const RECORD_INTENTS: PersonalRecordIntent[] = [
   "understand"
 ];
 
-const KNOWLEDGE_SHAPES = ["", "observation", "claim", "procedure", "process", "collection", "reference"];
+const KNOWLEDGE_SHAPES: PersonalRecordKnowledgeShape[] = [
+  "",
+  "observation",
+  "claim",
+  "procedure",
+  "process",
+  "collection",
+  "reference"
+];
 const RECORD_AREAS = ["AI", "Finance", "Relationships", "Career", "Personal", "Travel", "University", "Health", "Home"];
 const RECORD_SUBJECTS = [
   "Beliefs",
@@ -97,6 +114,16 @@ const RECORD_PROJECTS = [
   "Project Pint"
 ];
 
+const WEEKDAY_NUMBER: Record<string, string> = {
+  Monday: "1",
+  Tuesday: "2",
+  Wednesday: "3",
+  Thursday: "4",
+  Friday: "5",
+  Saturday: "6",
+  Sunday: "7"
+};
+
 function labelize(value: string) {
   if (!value) {
     return "None";
@@ -121,14 +148,117 @@ function formatDate(value: string) {
   return new Date(parsed).toLocaleDateString();
 }
 
-function getVisibleRecords(records: PersonalRecord[], domain: string) {
-  return records.filter((record) => record.domain === domain || record.relatedDomains.includes(domain));
+function pad(value: number, length = 2) {
+  return String(value).padStart(length, "0");
 }
 
-function optionRecords(records: PersonalRecord[], currentDomain: string) {
-  return records
-    .filter((record) => record.domain === currentDomain || record.relatedDomains.includes(currentDomain))
-    .slice(0, 30);
+function getNewYorkParts(date: Date) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/New_York",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+    weekday: "long"
+  });
+  const parts = Object.fromEntries(formatter.formatToParts(date).map((part) => [part.type, part.value]));
+  return {
+    year: parts.year,
+    month: parts.month,
+    day: parts.day,
+    hour: parts.hour,
+    minute: parts.minute,
+    second: parts.second,
+    weekday: parts.weekday
+  };
+}
+
+function getIsoWeek(date: Date) {
+  const target = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+  const day = target.getUTCDay() || 7;
+  target.setUTCDate(target.getUTCDate() + 4 - day);
+  const yearStart = new Date(Date.UTC(target.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+  return { year: target.getUTCFullYear(), week };
+}
+
+function buildClientCreatedPreview(): PersonalRecordCreatedMeta {
+  const date = new Date();
+  const parts = getNewYorkParts(date);
+  const quarter = `Q${Math.ceil(Number(parts.month) / 3)}`;
+  const isoWeek = getIsoWeek(date);
+  return {
+    uid: `${parts.year}${parts.month}${parts.day}${parts.hour}${parts.minute}${parts.second}${pad(date.getMilliseconds(), 3)}`,
+    createdIso: date.toISOString(),
+    created: new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short"
+    }).format(date),
+    createdDate: `${parts.year}-${parts.month}-${parts.day}`,
+    createdYear: parts.year,
+    createdMonth: parts.month,
+    createdYearMonth: `${parts.year}-${parts.month}`,
+    createdQuarter: quarter,
+    createdYearQuarter: `${parts.year}-${quarter}`,
+    createdWeek: `W${pad(isoWeek.week)}`,
+    createdYearWeek: `${isoWeek.year}-W${pad(isoWeek.week)}`,
+    createdWeekdayName: parts.weekday,
+    createdWeekdayNumber: WEEKDAY_NUMBER[parts.weekday] || "-"
+  };
+}
+
+function addMonths(date: Date, months: number) {
+  const next = new Date(date);
+  const day = next.getUTCDate();
+  next.setUTCMonth(next.getUTCMonth() + months, 1);
+  const maxDay = new Date(Date.UTC(next.getUTCFullYear(), next.getUTCMonth() + 1, 0)).getUTCDate();
+  next.setUTCDate(Math.min(day, maxDay));
+  return next;
+}
+
+function dateOnly(date: Date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function calculateNextReview(lastReview: string, cadence: string): string | undefined {
+  const match = cadence.trim().toUpperCase().match(/^P(\d+)([DWMY])$/);
+  if (!match) {
+    return undefined;
+  }
+  const amount = Number(match[1]);
+  const base = new Date(lastReview);
+  if (!Number.isFinite(amount) || amount <= 0 || Number.isNaN(base.getTime())) {
+    return undefined;
+  }
+  if (match[2] === "D") return dateOnly(new Date(base.getTime() + amount * 86400000));
+  if (match[2] === "W") return dateOnly(new Date(base.getTime() + amount * 7 * 86400000));
+  if (match[2] === "M") return dateOnly(addMonths(base, amount));
+  return dateOnly(addMonths(base, amount * 12));
+}
+
+function calculateGrowthPreview(body: string, relationCount: number): PersonalRecordGrowth {
+  const wordCount = body.trim().split(/\s+/).filter(Boolean).length;
+  if (relationCount >= 18 || wordCount >= 5000) return "jungle";
+  if (relationCount >= 10 || wordCount >= 2500) return "forest";
+  if (wordCount >= 900) return "tree";
+  if (wordCount >= 180) return "plant";
+  return "seed";
+}
+
+function getVisibleRecords(records: PersonalRecord[], domain: string) {
+  return records.filter((record) => record.domain === domain);
+}
+
+function optionRecords(records: PersonalRecord[]) {
+  return records.slice(0, 50);
 }
 
 function InfoTip({ text }: { text: string }) {
@@ -139,9 +269,110 @@ function InfoTip({ text }: { text: string }) {
   );
 }
 
+function displayValue(value?: string | string[] | null) {
+  if (Array.isArray(value)) {
+    return value.length > 0 ? value.join(", ") : "-";
+  }
+  return value || "-";
+}
+
+function PropertyGrid({ items }: { items: PropertyItem[] }) {
+  return (
+    <dl className="personal-property-grid">
+      {items.map((item) => (
+        <div key={item.label}>
+          <dt>{item.label}</dt>
+          <dd>{displayValue(item.value)}</dd>
+        </div>
+      ))}
+    </dl>
+  );
+}
+
+function formatRelation(ids: string[], recordById: Map<string, PersonalRecord>) {
+  return ids.map((id) => recordById.get(id)?.title || id);
+}
+
+function createdPropertyItems(meta: PersonalRecordCreatedMeta): PropertyItem[] {
+  return [
+    { label: "UID", value: meta.uid },
+    { label: "Created_ISO", value: meta.createdIso },
+    { label: "Created", value: meta.created },
+    { label: "Created_Date", value: meta.createdDate },
+    { label: "Created_Year", value: meta.createdYear },
+    { label: "Created_Month", value: meta.createdMonth },
+    { label: "Created_YearMonth", value: meta.createdYearMonth },
+    { label: "Created_Quarter", value: meta.createdQuarter },
+    { label: "Created_YearQuarter", value: meta.createdYearQuarter },
+    { label: "Created_Week", value: meta.createdWeek },
+    { label: "Created_YearWeek", value: meta.createdYearWeek },
+    { label: "Created_WeekdayName", value: meta.createdWeekdayName },
+    { label: "Created_WeekdayNumber", value: meta.createdWeekdayNumber }
+  ];
+}
+
+function recordPropertyItems(
+  record: PersonalRecord,
+  recordById: Map<string, PersonalRecord>
+): { title: string; items: PropertyItem[] }[] {
+  return [
+    {
+      title: "Core",
+      items: [
+        { label: "Name", value: record.title },
+        { label: "Privacy", value: labelize(record.privacy) },
+        { label: "Class", value: labelize(record.className) },
+        { label: "Kind", value: labelize(record.knowledgeShape) },
+        { label: "Stage", value: labelize(record.stage) },
+        { label: "Status", value: STATUS_LABELS[record.status] },
+        { label: "Growth", value: labelize(record.growth) },
+        { label: "Intent", value: record.intents.map(labelize) }
+      ]
+    },
+    {
+      title: "Organization",
+      items: [
+        { label: "Areas", value: record.areas },
+        { label: "Subjects", value: record.subjects },
+        { label: "Projects", value: record.projects },
+        { label: "Related", value: formatRelation(record.relations.related, recordById) }
+      ]
+    },
+    {
+      title: "Relationships",
+      items: [
+        { label: "North", value: formatRelation(record.relations.north, recordById) },
+        { label: "South", value: formatRelation(record.relations.south, recordById) },
+        { label: "East", value: formatRelation(record.relations.east, recordById) },
+        { label: "West", value: formatRelation(record.relations.west, recordById) },
+        { label: "Stakeholders", value: formatRelation(record.relations.stakeholders, recordById) },
+        { label: "Stakeholdings", value: formatRelation(record.relations.stakeholdings, recordById) },
+        { label: "Internal_Source", value: formatRelation(record.relations.internalSources, recordById) },
+        { label: "External_Source", value: record.externalSources }
+      ]
+    },
+    {
+      title: "Time and Review",
+      items: [
+        { label: "Start_Date", value: record.time.startDate },
+        { label: "Start_Time", value: record.time.startTime },
+        { label: "Due_Date", value: record.time.dueDate },
+        { label: "Due_Time", value: record.time.dueTime },
+        { label: "Review_Cadence", value: record.time.reviewCadence },
+        { label: "Next_Review", value: record.time.nextReview },
+        { label: "Last_Review", value: record.time.lastReview },
+        { label: "Processed_On", value: record.time.processedOn }
+      ]
+    },
+    {
+      title: "Created Metadata",
+      items: createdPropertyItems(record.createdMeta)
+    }
+  ];
+}
+
 export default function PersonalRecordsPanel({
   domain,
-  domains,
   initialRecords
 }: {
   domain: PersonalSystemDomain;
@@ -152,16 +383,14 @@ export default function PersonalRecordsPanel({
   const [title, setTitle] = useState("");
   const [className, setClassName] = useState<PersonalRecordClass>("note");
   const [status, setStatus] = useState<PersonalRecordStatus>("idea");
-  const [priority, setPriority] = useState<PersonalRecordPriority>("P2");
   const [body, setBody] = useState("");
   const [privacy, setPrivacy] = useState<"private" | "shared">("private");
   const [stage, setStage] = useState<PersonalRecordStage>("processed");
-  const [knowledgeShape, setKnowledgeShape] = useState("");
+  const [knowledgeShape, setKnowledgeShape] = useState<PersonalRecordKnowledgeShape>("");
   const [areas, setAreas] = useState<string[]>([]);
   const [subjects, setSubjects] = useState<string[]>([]);
   const [projects, setProjects] = useState<string[]>([]);
   const [intents, setIntents] = useState<PersonalRecordIntent[]>([]);
-  const [tags, setTags] = useState("");
   const [url, setUrl] = useState("");
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -169,7 +398,6 @@ export default function PersonalRecordsPanel({
   const [dueTime, setDueTime] = useState("");
   const [reviewCadence, setReviewCadence] = useState("");
   const [nextReview, setNextReview] = useState("");
-  const [relatedDomains, setRelatedDomains] = useState<string[]>([]);
   const [related, setRelated] = useState<string[]>([]);
   const [north, setNorth] = useState<string[]>([]);
   const [south, setSouth] = useState<string[]>([]);
@@ -180,13 +408,26 @@ export default function PersonalRecordsPanel({
   const [externalSources, setExternalSources] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [createdPreview] = useState(() => buildClientCreatedPreview());
 
   const visibleRecords = useMemo(
     () => getVisibleRecords(records, domain.slug),
     [domain.slug, records]
   );
-  const relationOptions = useMemo(() => optionRecords(records, domain.slug), [domain.slug, records]);
-  const otherDomains = domains.filter((item) => item.slug !== domain.slug);
+  const relationOptions = useMemo(() => optionRecords(records), [records]);
+  const recordById = useMemo(() => new Map(records.map((record) => [record.id, record])), [records]);
+  const relationCount = north.length + south.length + east.length + west.length + internalSources.length + related.length;
+  const growthPreview = calculateGrowthPreview(body, relationCount);
+  const previewTime: PersonalRecordTime = {
+    startDate: startDate || undefined,
+    startTime: startTime || undefined,
+    dueDate: dueDate || undefined,
+    dueTime: dueTime || undefined,
+    reviewCadence: reviewCadence.trim().toUpperCase() || undefined,
+    nextReview: nextReview || calculateNextReview(createdPreview.createdIso, reviewCadence) || undefined,
+    lastReview: createdPreview.createdIso,
+    processedOn: stage === "processed" ? createdPreview.createdDate : undefined
+  };
 
   function toggleValue<T extends string>(value: T, setter: Dispatch<SetStateAction<T[]>>) {
     setter((current) =>
@@ -213,19 +454,16 @@ export default function PersonalRecordsPanel({
         title,
         className,
         status,
-        priority,
         body,
         privacy,
         stage,
         knowledgeShape,
         url,
-        tags: splitList(tags),
         areas,
         subjects,
         projects,
         intents,
         externalSources: splitList(externalSources),
-        relatedDomains,
         relations: {
           north,
           south,
@@ -259,7 +497,6 @@ export default function PersonalRecordsPanel({
     setTitle("");
     setClassName("note");
     setStatus("idea");
-    setPriority("P2");
     setBody("");
     setPrivacy("private");
     setStage("processed");
@@ -268,7 +505,6 @@ export default function PersonalRecordsPanel({
     setSubjects([]);
     setProjects([]);
     setIntents([]);
-    setTags("");
     setUrl("");
     setStartDate("");
     setStartTime("");
@@ -276,7 +512,6 @@ export default function PersonalRecordsPanel({
     setDueTime("");
     setReviewCadence("");
     setNextReview("");
-    setRelatedDomains([]);
     setRelated([]);
     setNorth([]);
     setSouth([]);
@@ -327,9 +562,9 @@ export default function PersonalRecordsPanel({
           <div className="personal-property-group">
             <div className="personal-property-heading">
               <h3>Core Properties</h3>
-              <InfoTip text="Name is manual. Class defaults to Note. Status defaults to Idea. Growth is calculated automatically from note size and relationships." />
+              <InfoTip text="Name is manual. Class defaults to Note. Status defaults to Idea. Growth is calculated automatically from note size and relationship density." />
             </div>
-            <div className="personal-record-form-row">
+            <div className="personal-record-form-row personal-record-form-row-compact">
               <label>
                 Class
                 <select
@@ -356,17 +591,6 @@ export default function PersonalRecordsPanel({
                   ))}
                 </select>
               </label>
-              <label>
-                Priority
-                <select
-                  value={priority}
-                  onChange={(event) => setPriority(event.target.value as PersonalRecordPriority)}
-                >
-                  <option value="P1">P1</option>
-                  <option value="P2">P2</option>
-                  <option value="P3">P3</option>
-                </select>
-              </label>
             </div>
           </div>
 
@@ -376,14 +600,14 @@ export default function PersonalRecordsPanel({
               value={body}
               onChange={(event) => setBody(event.target.value)}
               placeholder="Record the useful context, decision, next action, citation, or reference."
-              rows={6}
+              rows={7}
             />
           </label>
 
           <div className="personal-property-group">
             <div className="personal-property-heading">
               <h3>Organization</h3>
-              <InfoTip text="Areas are broad lanes. Subjects are narrower themes. Projects connect notes to active bodies of work. Related domains make a note appear in other Personal Ops modules." />
+              <InfoTip text="Areas are broad lanes. Subjects are narrower themes. Projects connect notes to active bodies of work. Notes are not folder-bound; overlap should come through relationships and these properties." />
             </div>
             <fieldset className="personal-related-domains">
               <legend>Areas</legend>
@@ -430,21 +654,6 @@ export default function PersonalRecordsPanel({
                 ))}
               </div>
             </fieldset>
-            <fieldset className="personal-related-domains">
-              <legend>Related Domains</legend>
-              <div>
-                {otherDomains.map((item) => (
-                  <label key={item.slug}>
-                    <input
-                      type="checkbox"
-                      checked={relatedDomains.includes(item.slug)}
-                      onChange={() => toggleValue(item.slug, setRelatedDomains)}
-                    />
-                    {item.shortLabel}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
           </div>
 
           <div className="personal-property-group">
@@ -476,29 +685,29 @@ export default function PersonalRecordsPanel({
             </div>
             <div className="personal-record-form-row">
               <label>
-                Start Date
+                Start_Date
                 <input type="date" value={startDate} onChange={(event) => setStartDate(event.target.value)} />
               </label>
               <label>
-                Start Time
+                Start_Time
                 <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
               </label>
               <label>
-                Due Date
+                Due_Date
                 <input type="date" value={dueDate} onChange={(event) => setDueDate(event.target.value)} />
               </label>
             </div>
             <div className="personal-record-form-row">
               <label>
-                Due Time
+                Due_Time
                 <input type="time" value={dueTime} onChange={(event) => setDueTime(event.target.value)} />
               </label>
               <label>
-                Review Cadence
+                Review_Cadence
                 <input value={reviewCadence} onChange={(event) => setReviewCadence(event.target.value)} placeholder="P1W" />
               </label>
               <label>
-                Next Review
+                Next_Review
                 <input type="date" value={nextReview} onChange={(event) => setNextReview(event.target.value)} />
               </label>
             </div>
@@ -506,8 +715,8 @@ export default function PersonalRecordsPanel({
 
           <details className="personal-property-group">
             <summary>
-              Hidden Properties
-              <InfoTip text="Hidden defaults include UID, privacy, processing stage, created time slices, directional relationships, sources, and citation-style links." />
+              Hidden and Auto Properties
+              <InfoTip text="Hidden defaults include UID, privacy, processing stage, kind, created time slices, source links, and generated review metadata. This group exposes every stored property before save." />
             </summary>
             <div className="personal-record-form-row">
               <label>
@@ -525,8 +734,11 @@ export default function PersonalRecordsPanel({
                 </select>
               </label>
               <label>
-                Knowledge Shape
-                <select value={knowledgeShape} onChange={(event) => setKnowledgeShape(event.target.value)}>
+                Kind
+                <select
+                  value={knowledgeShape}
+                  onChange={(event) => setKnowledgeShape(event.target.value as PersonalRecordKnowledgeShape)}
+                >
                   {KNOWLEDGE_SHAPES.map((option) => (
                     <option value={option} key={option || "blank"}>
                       {labelize(option)}
@@ -536,42 +748,48 @@ export default function PersonalRecordsPanel({
               </label>
             </div>
             <label>
-              Tags
-              <input value={tags} onChange={(event) => setTags(event.target.value)} placeholder="comma, separated, tags" />
-            </label>
-            <label>
               Link or File Reference
               <input value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://..." />
             </label>
             <label>
-              External Sources
+              External_Source
               <input
                 value={externalSources}
                 onChange={(event) => setExternalSources(event.target.value)}
                 placeholder="https://article.example, https://paper.example"
               />
             </label>
+            <PropertyGrid
+              items={[
+                { label: "Growth", value: labelize(growthPreview) },
+                { label: "Stakeholdings", value: "Generated reciprocally after save" },
+                { label: "Last_Review", value: previewTime.lastReview },
+                { label: "Next_Review", value: previewTime.nextReview },
+                { label: "Processed_On", value: previewTime.processedOn },
+                ...createdPropertyItems(createdPreview)
+              ]}
+            />
           </details>
 
-          {relationOptions.length > 0 && (
-            <details className="personal-property-group">
-              <summary>
-                Relationships
-                <InfoTip text="North/South are parent-child. East/West are sequence links. Setting one direction automatically writes the reciprocal direction on the linked record. Stakeholders write stakeholdings back to the selected person or org record." />
-              </summary>
-              {[
-                ["North", north, setNorth],
-                ["South", south, setSouth],
-                ["West", west, setWest],
-                ["East", east, setEast],
-                ["Stakeholders", stakeholders, setStakeholders],
-                ["Internal Sources", internalSources, setInternalSources],
-                ["Related", related, setRelated]
-              ].map(([label, values, setter]) => (
-                <fieldset className="personal-related-domains" key={label as string}>
-                  <legend>{label as string}</legend>
-                  <div>
-                    {relationOptions.map((record) => (
+          <details className="personal-property-group">
+            <summary>
+              Relationships
+              <InfoTip text="North/South are parent-child. East/West are sequence links. Setting one direction automatically writes the reciprocal direction on the linked record. Stakeholders write stakeholdings back to the selected person or org record." />
+            </summary>
+            {[
+              ["North", north, setNorth],
+              ["South", south, setSouth],
+              ["West", west, setWest],
+              ["East", east, setEast],
+              ["Stakeholders", stakeholders, setStakeholders],
+              ["Internal_Source", internalSources, setInternalSources],
+              ["Related", related, setRelated]
+            ].map(([label, values, setter]) => (
+              <fieldset className="personal-related-domains" key={label as string}>
+                <legend>{label as string}</legend>
+                <div>
+                  {relationOptions.length > 0 ? (
+                    relationOptions.map((record) => (
                       <label key={record.id}>
                         <input
                           type="checkbox"
@@ -580,12 +798,14 @@ export default function PersonalRecordsPanel({
                         />
                         {record.title}
                       </label>
-                    ))}
-                  </div>
-                </fieldset>
-              ))}
-            </details>
-          )}
+                    ))
+                  ) : (
+                    <span className="personal-empty-property">No saved notes available yet</span>
+                  )}
+                </div>
+              </fieldset>
+            ))}
+          </details>
 
           {error && <p className="personal-record-error">{error}</p>}
           <button type="submit" disabled={saving}>
@@ -611,10 +831,11 @@ export default function PersonalRecordsPanel({
                 <div className="personal-record-card-header">
                   <div>
                     <p>{record.className} / {record.growth}</p>
-                    <h3>{record.title}</h3>
+                    <h3>
+                      <Link href={`/admin/personal/records/${record.id}`}>{record.title}</Link>
+                    </h3>
                   </div>
                   <div className="personal-record-badges">
-                    <span>{record.priority}</span>
                     <span className={`personal-record-status personal-record-status-${record.status}`}>
                       {STATUS_LABELS[record.status]}
                     </span>
@@ -638,36 +859,26 @@ export default function PersonalRecordsPanel({
                 {(record.areas.length > 0 ||
                   record.subjects.length > 0 ||
                   record.projects.length > 0 ||
-                  record.intents.length > 0 ||
-                  record.tags.length > 0 ||
-                  record.relatedDomains.length > 0) && (
+                  record.intents.length > 0) && (
                   <div className="personal-record-chip-row">
-                    {[...record.areas, ...record.subjects, ...record.projects, ...record.intents, ...record.tags].map((tag) => (
+                    {[...record.areas, ...record.subjects, ...record.projects, ...record.intents].map((tag) => (
                       <span key={tag}>{tag}</span>
-                    ))}
-                    {record.relatedDomains.map((slug) => (
-                      <span key={slug}>
-                        {domains.find((item) => item.slug === slug)?.shortLabel || slug}
-                      </span>
                     ))}
                   </div>
                 )}
 
                 <details className="personal-record-details">
-                  <summary>Properties</summary>
-                  <dl>
-                    <div><dt>UID</dt><dd>{record.createdMeta.uid}</dd></div>
-                    <div><dt>Privacy</dt><dd>{labelize(record.privacy)}</dd></div>
-                    <div><dt>Stage</dt><dd>{labelize(record.stage)}</dd></div>
-                    <div><dt>Created ISO</dt><dd>{record.createdMeta.createdIso}</dd></div>
-                    <div><dt>Created YearMonth</dt><dd>{record.createdMeta.createdYearMonth}</dd></div>
-                    <div><dt>Created YearWeek</dt><dd>{record.createdMeta.createdYearWeek}</dd></div>
-                    <div><dt>Last Review</dt><dd>{record.time.lastReview || "-"}</dd></div>
-                    <div><dt>Processed On</dt><dd>{record.time.processedOn || "-"}</dd></div>
-                  </dl>
+                  <summary>All Properties</summary>
+                  {recordPropertyItems(record, recordById).map((group) => (
+                    <section className="personal-record-property-section" key={group.title}>
+                      <h4>{group.title}</h4>
+                      <PropertyGrid items={group.items} />
+                    </section>
+                  ))}
                 </details>
 
                 <div className="personal-record-actions">
+                  <Link href={`/admin/personal/records/${record.id}`}>Open note</Link>
                   <button type="button" onClick={() => patchRecord(record.id, { action: "review" })}>
                     Reviewed
                   </button>

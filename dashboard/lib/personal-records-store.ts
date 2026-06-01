@@ -1,5 +1,5 @@
 import { readJsonFile, writeJsonFile } from "./file-store";
-import { getPersonalSystemDomain, PERSONAL_SYSTEM_DOMAINS } from "./personal-systems";
+import { getPersonalSystemDomain } from "./personal-systems";
 
 export type PersonalRecordClass =
   | "assignment"
@@ -28,7 +28,6 @@ export type PersonalRecordStatus =
   | "blocked"
   | "inactive"
   | "next";
-export type PersonalRecordPriority = "P1" | "P2" | "P3";
 export type PersonalRecordGrowth = "seed" | "plant" | "tree" | "forest" | "jungle";
 export type PersonalRecordIntent =
   | "connect"
@@ -95,17 +94,14 @@ export type PersonalRecord = {
   privacy: PersonalRecordPrivacy;
   stage: PersonalRecordStage;
   status: PersonalRecordStatus;
-  priority: PersonalRecordPriority;
   growth: PersonalRecordGrowth;
   body: string;
   url?: string;
-  tags: string[];
   areas: string[];
   subjects: string[];
   projects: string[];
   intents: PersonalRecordIntent[];
   externalSources: string[];
-  relatedDomains: string[];
   relations: PersonalRecordRelations;
   time: PersonalRecordTime;
   createdMeta: PersonalRecordCreatedMeta;
@@ -122,17 +118,14 @@ export type PersonalRecordInput = {
   privacy?: string;
   stage?: string;
   status?: string;
-  priority?: string;
   body?: string;
   happensOn?: string;
   url?: string;
-  tags?: string[];
   areas?: string[];
   subjects?: string[];
   projects?: string[];
   intents?: string[];
   externalSources?: string[];
-  relatedDomains?: string[];
   relations?: Partial<PersonalRecordRelations>;
   time?: PersonalRecordTime;
 };
@@ -166,7 +159,6 @@ export const PERSONAL_RECORD_STATUSES: PersonalRecordStatus[] = [
   "inactive",
   "next"
 ];
-export const PERSONAL_RECORD_PRIORITIES: PersonalRecordPriority[] = ["P1", "P2", "P3"];
 export const PERSONAL_RECORD_INTENTS: PersonalRecordIntent[] = [
   "connect",
   "create",
@@ -338,12 +330,6 @@ function sanitizeRecordIds(values: string[] | undefined): string[] {
   return sanitizeList(values, 80);
 }
 
-function sanitizeRelatedDomains(primaryDomain: string, values: string[] | undefined): string[] {
-  return sanitizeList(values)
-    .filter((slug) => slug !== primaryDomain && isAllowedDomain(slug))
-    .slice(0, PERSONAL_SYSTEM_DOMAINS.length - 1);
-}
-
 function pickClass(value: string | undefined): PersonalRecordClass {
   const normalized = value?.trim().toLowerCase();
   if (normalized === "event") return "event";
@@ -362,12 +348,6 @@ function pickStatus(value: string | undefined): PersonalRecordStatus {
   return PERSONAL_RECORD_STATUSES.includes(normalized as PersonalRecordStatus)
     ? (normalized as PersonalRecordStatus)
     : "idea";
-}
-
-function pickPriority(value: string | undefined): PersonalRecordPriority {
-  return PERSONAL_RECORD_PRIORITIES.includes(value as PersonalRecordPriority)
-    ? (value as PersonalRecordPriority)
-    : "P2";
 }
 
 function pickPrivacy(value: string | undefined): PersonalRecordPrivacy {
@@ -529,11 +509,9 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     privacy: pickPrivacy(raw.privacy as string | undefined),
     stage,
     status: pickStatus(raw.status as string | undefined),
-    priority: pickPriority(raw.priority as string | undefined),
     growth: "seed",
     body,
     url: typeof raw.url === "string" && raw.url.trim() ? raw.url.trim() : undefined,
-    tags: sanitizeList(raw.tags as string[] | undefined),
     areas: sanitizeList(raw.areas as string[] | undefined),
     subjects: sanitizeList(raw.subjects as string[] | undefined),
     projects: sanitizeList(raw.projects as string[] | undefined),
@@ -541,7 +519,6 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
       PERSONAL_RECORD_INTENTS.includes(item as PersonalRecordIntent)
     ) as PersonalRecordIntent[],
     externalSources: sanitizeList(raw.externalSources as string[] | undefined),
-    relatedDomains: sanitizeRelatedDomains(typeof raw.domain === "string" ? raw.domain : "notes-docs", raw.relatedDomains as string[] | undefined),
     relations,
     time: normalizeTime(raw.time, createdMeta, stage),
     createdMeta,
@@ -561,7 +538,7 @@ export async function readPersonalRecords(): Promise<PersonalRecord[]> {
 }
 
 export function getRecordsForDomain(records: PersonalRecord[], domain: string): PersonalRecord[] {
-  return records.filter((record) => record.domain === domain || record.relatedDomains.includes(domain));
+  return records.filter((record) => record.domain === domain);
 }
 
 export async function createPersonalRecord(input: PersonalRecordInput): Promise<PersonalRecord[]> {
@@ -593,11 +570,9 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
     privacy: pickPrivacy(input.privacy),
     stage,
     status: pickStatus(input.status),
-    priority: pickPriority(input.priority),
     growth: "seed",
     body: input.body?.trim() || "",
     url: url || undefined,
-    tags: sanitizeList(input.tags),
     areas: sanitizeList(input.areas),
     subjects: sanitizeList(input.subjects),
     projects: sanitizeList(input.projects),
@@ -605,7 +580,6 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
       PERSONAL_RECORD_INTENTS.includes(item as PersonalRecordIntent)
     ) as PersonalRecordIntent[],
     externalSources: sanitizeList(input.externalSources),
-    relatedDomains: sanitizeRelatedDomains(domain, input.relatedDomains),
     relations,
     time: normalizeTime(
       {
@@ -628,7 +602,7 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
 
 export async function updatePersonalRecord(
   id: string,
-  patch: Partial<Pick<PersonalRecord, "status" | "priority">> & { action?: "review" }
+  patch: Partial<Pick<PersonalRecord, "status">> & { action?: "review" }
 ): Promise<PersonalRecord[]> {
   const existing = await readPersonalRecords();
   const idx = existing.findIndex((record) => record.id === id);
@@ -650,9 +624,6 @@ export async function updatePersonalRecord(
     status: PERSONAL_RECORD_STATUSES.includes(patch.status as PersonalRecordStatus)
       ? (patch.status as PersonalRecordStatus)
       : current.status,
-    priority: PERSONAL_RECORD_PRIORITIES.includes(patch.priority as PersonalRecordPriority)
-      ? (patch.priority as PersonalRecordPriority)
-      : current.priority,
     time,
     updatedAt: now
   };

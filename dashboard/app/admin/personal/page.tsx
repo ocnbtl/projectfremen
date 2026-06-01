@@ -1,4 +1,5 @@
 import Link from "next/link";
+import PersonalViewportToggle from "../../../components/PersonalViewportToggle";
 import {
   PERSONAL_SYSTEM_DOMAINS,
   PERSONAL_SYSTEM_GUARDRAILS,
@@ -32,6 +33,7 @@ export default async function PersonalOpsPage() {
 
   return (
     <main className="shell personal-ops-shell">
+      <PersonalViewportToggle />
       <header className="topbar">
         <div>
           <p className="muted personal-ops-kicker">Founder system</p>

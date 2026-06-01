@@ -453,7 +453,7 @@ a {
 }
 
 .personal-ops-shell {
-  max-width: 1240px;
+  max-width: 1560px;
 }
 
 .personal-ops-shell .card,
@@ -962,10 +962,10 @@ a {
 
 .personal-record-workspace {
   display: grid;
-  grid-template-columns: minmax(320px, 0.82fr) minmax(0, 1.18fr);
-  gap: 14px;
+  grid-template-columns: minmax(520px, 0.86fr) minmax(620px, 1.14fr);
+  gap: 16px;
   align-items: start;
-  margin: 14px 0;
+  margin: 16px 0;
 }
 
 .personal-record-form-wrap,
@@ -1062,7 +1062,11 @@ a {
 }
 
 .personal-record-form-row + .personal-record-form-row {
-  grid-template-columns: minmax(130px, 0.45fr) minmax(0, 1fr);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.personal-record-form-row-compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .personal-related-domains {
@@ -1105,6 +1109,12 @@ a {
   margin: 0;
 }
 
+.personal-empty-property {
+  color: #60747c;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .personal-record-error {
   margin: 0;
   color: #9f3e1f;
@@ -1144,6 +1154,15 @@ a {
   margin: 0;
   color: #102026;
   font-size: 18px;
+}
+
+.personal-record-card h3 a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.personal-record-card h3 a:hover {
+  text-decoration: underline;
 }
 
 .personal-record-badges,
@@ -1250,18 +1269,22 @@ a {
   font-weight: 900;
 }
 
-.personal-record-details dl {
+.personal-property-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin: 10px 0 0;
 }
 
-.personal-record-details div {
+.personal-property-grid div {
   min-width: 0;
+  padding: 8px;
+  border: 1px solid #edf3f5;
+  border-radius: 8px;
+  background: #fbfdfd;
 }
 
-.personal-record-details dt {
+.personal-property-grid dt {
   color: #60747c;
   font-size: 11px;
   font-weight: 900;
@@ -1269,20 +1292,44 @@ a {
   text-transform: uppercase;
 }
 
-.personal-record-details dd {
+.personal-property-grid dd {
   margin: 3px 0 0;
   overflow-wrap: anywhere;
   color: #294852;
   font-size: 12px;
 }
 
-.personal-record-actions button {
+.personal-record-property-section {
+  margin-top: 12px;
+}
+
+.personal-record-property-section h3,
+.personal-record-property-section h4 {
+  margin: 0 0 4px;
+  color: #14313d;
+  font-size: 14px;
+}
+
+.personal-record-property-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.personal-record-actions button,
+.personal-record-actions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   width: auto;
   min-height: 30px;
   padding: 0 10px;
+  border: 0;
   border-radius: 8px;
   background: #123445;
+  color: #ffffff;
   font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
 }
 
 .personal-record-actions button:disabled {
@@ -1290,6 +1337,100 @@ a {
   cursor: default;
   transform: none;
   box-shadow: none;
+}
+
+.personal-record-detail-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(320px, 0.55fr);
+  gap: 16px;
+  align-items: start;
+  margin: 16px 0;
+}
+
+.personal-record-detail-body {
+  margin: 0;
+  color: #294852;
+  font-size: 17px;
+  line-height: 1.58;
+  white-space: pre-wrap;
+}
+
+.personal-preview-toggle {
+  position: fixed;
+  top: 82px;
+  right: 18px;
+  z-index: 60;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid #bfd2db;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  color: #123445;
+  box-shadow: 0 10px 24px rgba(16, 32, 38, 0.12);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.personal-preview-toggle-icon {
+  display: inline-block;
+  border: 2px solid currentColor;
+  border-radius: 4px;
+  transition: width 160ms ease, height 160ms ease;
+}
+
+.personal-preview-toggle-icon.is-desktop {
+  width: 22px;
+  height: 14px;
+}
+
+.personal-preview-toggle-icon.is-mobile {
+  width: 13px;
+  height: 22px;
+}
+
+html[data-personal-preview="mobile"] .personal-ops-shell {
+  max-width: 430px;
+  padding-left: 12px;
+  padding-right: 12px;
+}
+
+html[data-personal-preview="mobile"] .personal-ops-layout,
+html[data-personal-preview="mobile"] .personal-ops-command,
+html[data-personal-preview="mobile"] .personal-domain-grid,
+html[data-personal-preview="mobile"] .personal-domain-hero,
+html[data-personal-preview="mobile"] .personal-domain-detail-layout,
+html[data-personal-preview="mobile"] .personal-record-workspace,
+html[data-personal-preview="mobile"] .personal-record-detail-layout,
+html[data-personal-preview="mobile"] .grid-3 {
+  grid-template-columns: 1fr;
+}
+
+html[data-personal-preview="mobile"] .topbar,
+html[data-personal-preview="mobile"] .personal-domain-topbar,
+html[data-personal-preview="mobile"] .personal-record-card-header {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+html[data-personal-preview="mobile"] .personal-domain-hero h2,
+html[data-personal-preview="mobile"] .personal-ops-command h2 {
+  font-size: clamp(34px, 11vw, 46px);
+}
+
+html[data-personal-preview="mobile"] .personal-record-form-row,
+html[data-personal-preview="mobile"] .personal-record-form-row + .personal-record-form-row,
+html[data-personal-preview="mobile"] .personal-property-grid,
+html[data-personal-preview="mobile"] .personal-command-actions {
+  grid-template-columns: 1fr;
+}
+
+html[data-personal-preview="mobile"] .personal-preview-toggle {
+  top: 76px;
+  right: 12px;
 }
 
 .card h2,
@@ -2288,7 +2429,7 @@ select {
   .personal-source-row,
   .personal-record-form-row,
   .personal-record-form-row + .personal-record-form-row,
-  .personal-record-details dl {
+  .personal-property-grid {
     grid-template-columns: 1fr;
   }
 }

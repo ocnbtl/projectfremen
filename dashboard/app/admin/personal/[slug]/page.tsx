@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PersonalRecordsPanel from "../../../../components/PersonalRecordsPanel";
+import PersonalViewportToggle from "../../../../components/PersonalViewportToggle";
 import {
   getPersonalSystemDomain,
   PERSONAL_SYSTEM_DOMAINS,
@@ -48,6 +49,7 @@ export default async function PersonalDomainPage({
 
   return (
     <main className="shell personal-ops-shell">
+      <PersonalViewportToggle />
       <header className="topbar personal-domain-topbar">
         <div>
           <p className="muted personal-ops-kicker">Personal Ops domain</p>

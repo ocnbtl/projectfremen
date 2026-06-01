@@ -381,7 +381,6 @@ async function main() {
         title: personalRecordTitle,
         className: "task",
         status: "idea",
-        priority: "P1",
         body: "Regression-created travel planning record.",
         areas: ["Travel"],
         subjects: ["VanLife"],
@@ -389,9 +388,7 @@ async function main() {
         intents: ["implement", "retain"],
         time: {
           reviewCadence: "P1W"
-        },
-        tags: ["regression", "travel"],
-        relatedDomains: ["notes-docs"]
+        }
       })
     });
     assert(
@@ -401,21 +398,35 @@ async function main() {
 
     const personalRecords = await requestJson(server.baseUrl, cookieJar, "/api/personal/records?domain=travel");
     assert(personalRecords.response.ok && personalRecords.payload?.ok, "Personal records GET failed");
-    assert(
-      personalRecords.payload.items?.some(
-        (item) =>
-          item.title === personalRecordTitle &&
-          item.domain === "travel" &&
-          item.createdMeta?.uid &&
-          item.growth === "seed" &&
-          item.time?.nextReview
-      ),
-      "Saved Personal Ops record was not returned by domain GET"
+    const savedPersonalRecord = personalRecords.payload.items?.find(
+      (item) =>
+        item.title === personalRecordTitle &&
+        item.domain === "travel" &&
+        item.createdMeta?.uid &&
+        item.createdMeta?.createdYearMonth &&
+        item.createdMeta?.createdQuarter &&
+        item.growth === "seed" &&
+        item.time?.nextReview &&
+        !("priority" in item) &&
+        !("tags" in item) &&
+        !("relatedDomains" in item)
     );
+    assert(savedPersonalRecord, "Saved Personal Ops record was not returned by domain GET with the full property model");
 
     const personalTravelAfterSave = await requestText(server.baseUrl, cookieJar, `/admin/personal/travel?record=${Date.now()}`);
     assert(personalTravelAfterSave.body.includes(personalRecordTitle), "Saved Personal Ops record missing from Travel page");
-    pass("Personal Ops record create/read/render flow works");
+    assert(personalTravelAfterSave.body.includes("All Properties"), "Travel page missing full properties disclosure");
+
+    const personalRecordDetail = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/personal/records/${savedPersonalRecord.id}?record=${Date.now()}`
+    );
+    assert(personalRecordDetail.response.ok, `Personal record detail failed: ${describeStatus(personalRecordDetail.response)}`);
+    for (const expected of [personalRecordTitle, "All Properties", "Created_YearMonth", "Created_Quarter", "Review_Cadence"]) {
+      assert(personalRecordDetail.body.includes(expected), `Personal record detail missing expected text: ${expected}`);
+    }
+    pass("Personal Ops record create/read/render/detail flow works");
 
     logStep("Checking Current Goals persistence and sync");
     const goalMarker = `${testRunId}-goal`;
