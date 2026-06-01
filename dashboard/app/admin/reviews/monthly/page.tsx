@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AdminChrome from "../../../../components/AdminChrome";
 import ReviewEntriesPanel from "../../../../components/ReviewEntriesPanel";
 import { requireAdminSession } from "../../../../lib/require-admin";
 
@@ -13,7 +14,19 @@ export default async function MonthlyReviewPage({
   const params = await searchParams;
 
   return (
-    <main className="shell">
+    <main className="shell admin-chrome-main">
+      <AdminChrome
+        sidebarTitle="Monthly Review"
+        sidebarSummary="First-Sunday cadence for higher-level review history."
+        sidebarItems={[
+          { label: "Cadence", value: "Monthly" },
+          { label: "Default day", value: "First Sunday" }
+        ]}
+        sidebarActions={[
+          { label: "Weekly Review", href: "/admin/reviews/weekly" },
+          { label: "Current Goals", href: "/admin" }
+        ]}
+      />
       <header className="topbar">
         <div>
           <h1 style={{ margin: 0 }}>Monthly Review</h1>

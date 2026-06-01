@@ -1,3 +1,4 @@
+import AdminChrome from "../../../../../components/AdminChrome";
 import ReviewEntryEditor from "../../../../../components/ReviewEntryEditor";
 import { requireAdminSession } from "../../../../../lib/require-admin";
 
@@ -12,7 +13,19 @@ export default async function MonthlyReviewEntryPage({
   const { entryId } = await params;
 
   return (
-    <main className="shell">
+    <main className="shell admin-chrome-main">
+      <AdminChrome
+        sidebarTitle="Monthly Form"
+        sidebarSummary="Autosaved monthly review entry."
+        sidebarItems={[
+          { label: "Cadence", value: "Monthly" },
+          { label: "Entry", value: entryId }
+        ]}
+        sidebarActions={[
+          { label: "Monthly List", href: "/admin/reviews/monthly" },
+          { label: "Home", href: "/admin" }
+        ]}
+      />
       <header className="topbar">
         <div>
           <h1 style={{ margin: 0 }}>Monthly Review Form</h1>

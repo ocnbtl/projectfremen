@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AdminChrome from "../../components/AdminChrome";
 import AdminWelcomeIntro from "../../components/AdminWelcomeIntro";
 import CurrentGoalsPanel, { type HomeGoalItem } from "../../components/CurrentGoalsPanel";
 import DashboardClockHero from "../../components/DashboardClockHero";
@@ -82,21 +83,21 @@ export default async function AdminPage({
   );
 
   return (
-    <main className="admin-shell admin-home-shell">
-      <header className="admin-floating-nav">
-        <nav className="admin-entity-nav" aria-label="Entity navigation">
-          {ENTITIES.map((entity) => (
-            <Link
-              href={`/admin/entities/${entity.slug}`}
-              className={`admin-entity-link admin-entity-link-${entity.theme}`}
-              key={entity.name}
-            >
-              <span>{entity.name}</span>
-            </Link>
-          ))}
-        </nav>
-      </header>
-
+    <main className="admin-shell admin-home-shell admin-chrome-main">
+      <AdminChrome
+        sidebarTitle="Command Center"
+        sidebarSummary="Home base for projects, reviews, KPIs, and personal systems."
+        sidebarItems={[
+          { label: "Projects", value: String(ENTITIES.length) },
+          { label: "Goal lanes", value: String(goalItems.length) },
+          { label: "Reviews", value: String(reviewRows.length) }
+        ]}
+        sidebarActions={[
+          { label: "Personal Ops", href: "/admin/personal" },
+          { label: "KPI Tracker", href: "/admin/kpis" },
+          { label: "Weekly Review", href: "/admin/reviews/weekly" }
+        ]}
+      />
       <section className="admin-home-grid">
         <div className="admin-home-left">
           <AdminWelcomeIntro playIntro={playIntro} />

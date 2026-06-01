@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AdminChrome from "../../../components/AdminChrome";
 import PersonalViewportToggle from "../../../components/PersonalViewportToggle";
 import {
   PERSONAL_SYSTEM_DOMAINS,
@@ -32,7 +33,21 @@ export default async function PersonalOpsPage() {
   const nextDomains = PERSONAL_SYSTEM_DOMAINS.filter((item) => item.status === "active").slice(0, 3);
 
   return (
-    <main className="shell personal-ops-shell">
+    <main className="shell personal-ops-shell admin-chrome-main">
+      <AdminChrome
+        sidebarTitle="Personal Ops"
+        sidebarSummary="Native life-system database, separate from the project command center."
+        sidebarItems={[
+          { label: "Domains", value: String(PERSONAL_SYSTEM_DOMAINS.length) },
+          { label: "Sensitive", value: String(sensitiveCount) },
+          { label: "Saved records", value: String(records.length) }
+        ]}
+        sidebarActions={[
+          { label: "Notes", href: "/admin/personal/notes-docs" },
+          { label: "People", href: "/admin/people" },
+          { label: "Travel", href: "/admin/personal/travel" }
+        ]}
+      />
       <PersonalViewportToggle />
       <header className="topbar">
         <div>

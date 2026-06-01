@@ -1,4 +1,5 @@
 import Link from "next/link";
+import AdminChrome from "../../../components/AdminChrome";
 import KpiManager from "../../../components/KpiManager";
 import { requireAdminSession } from "../../../lib/require-admin";
 
@@ -7,7 +8,19 @@ export const dynamic = "force-dynamic";
 export default async function AdminKpisPage() {
   await requireAdminSession();
   return (
-    <main className="shell">
+    <main className="shell admin-chrome-main">
+      <AdminChrome
+        sidebarTitle="KPI Tracker"
+        sidebarSummary="Update high-level project metrics and source links."
+        sidebarItems={[
+          { label: "Surface", value: "Metrics" },
+          { label: "Access", value: "Admin only" }
+        ]}
+        sidebarActions={[
+          { label: "Projects", href: "/admin/projects" },
+          { label: "Weekly Review", href: "/admin/reviews/weekly" }
+        ]}
+      />
       <header className="topbar">
         <div>
           <h1 style={{ margin: 0 }}>KPI Tracker</h1>

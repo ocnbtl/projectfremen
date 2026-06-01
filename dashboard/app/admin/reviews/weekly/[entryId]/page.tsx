@@ -1,3 +1,4 @@
+import AdminChrome from "../../../../../components/AdminChrome";
 import ReviewEntryEditor from "../../../../../components/ReviewEntryEditor";
 import { requireAdminSession } from "../../../../../lib/require-admin";
 
@@ -12,7 +13,19 @@ export default async function WeeklyReviewEntryPage({
   const { entryId } = await params;
 
   return (
-    <main className="shell">
+    <main className="shell admin-chrome-main">
+      <AdminChrome
+        sidebarTitle="Weekly Form"
+        sidebarSummary="Autosaved weekly review entry."
+        sidebarItems={[
+          { label: "Cadence", value: "Weekly" },
+          { label: "Entry", value: entryId }
+        ]}
+        sidebarActions={[
+          { label: "Weekly List", href: "/admin/reviews/weekly" },
+          { label: "Home", href: "/admin" }
+        ]}
+      />
       <header className="topbar">
         <div>
           <h1 style={{ margin: 0 }}>Weekly Review Form</h1>

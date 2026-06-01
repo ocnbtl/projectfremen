@@ -19,6 +19,12 @@ The current Personal Ops direction is dashboard-native. New personal records are
 
 The new area is `/admin/personal`, protected by the existing `requireAdminSession()` pattern. It is a founder-only surface for daily-life systems and should remain visibly distinct from the current three project lanes.
 
+The broader admin app now uses a permanent top navigation bar for high-level areas. Projects is a dropdown sorted alphabetically: Blacktube, Fremen, Iceflake, Pacific, and Pint. Notes, People, Media, Personal Ops, and Reviews are top-level destinations that can later grow into dropdowns when their internal structure is clearer.
+
+Each protected admin page can also define a page-specific left sidebar. The sidebar is collapsible from a circular upper-left control and should summarize the current page, show useful counts or status, and expose quick actions without replacing the page content.
+
+The local AI assistant is a client-side, local-only launcher. Its first implementation is designed to call a localhost-compatible model server, such as Ollama, directly from the user's browser and only after the user opens the panel. It must not introduce production network calls, hosted-model dependencies, or third-party AI data sharing.
+
 Initial domains:
 
 1. AI monitoring: session records, output tracking, decisions, follow-up actions.

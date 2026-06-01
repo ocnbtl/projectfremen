@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdminChrome from "../../../../components/AdminChrome";
 import { ACTION_ITEMS } from "../../../../lib/seed-data";
 import { readDocsIndex } from "../../../../lib/docs-sync";
 import { normalizeGoalItems } from "../../../../lib/entity-goals";
@@ -123,7 +124,21 @@ export default async function EntityHubPage({
   const insights = buildInsights(kpis, entityTasks.length);
 
   return (
-    <main className="shell">
+    <main className="shell admin-chrome-main">
+      <AdminChrome
+        sidebarTitle={config.projectLabel.replace("Project ", "")}
+        sidebarSummary={config.shortDescription}
+        sidebarItems={[
+          { label: "KPIs", value: String(kpis.length) },
+          { label: "Docs", value: String(docs.length) },
+          { label: "Tasks", value: String(entityTasks.length) }
+        ]}
+        sidebarActions={[
+          { label: "KPI Tracker", href: "/admin/kpis" },
+          { label: "Docs", href: "/admin/docs" },
+          { label: "Projects", href: "/admin/projects" }
+        ]}
+      />
       <header className="topbar">
         <div>
           <h1 style={{ margin: 0 }}>{config.heading}</h1>

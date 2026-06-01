@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import AdminChrome from "../../../../../components/AdminChrome";
 import PersonalViewportToggle from "../../../../../components/PersonalViewportToggle";
 import { getPersonalSystemDomain } from "../../../../../lib/personal-systems";
 import {
@@ -148,7 +149,21 @@ export default async function PersonalRecordPage({
   const recordById = new Map(records.map((item) => [item.id, item]));
 
   return (
-    <main className="shell personal-ops-shell personal-record-detail-shell">
+    <main className="shell personal-ops-shell personal-record-detail-shell admin-chrome-main">
+      <AdminChrome
+        sidebarTitle="Note"
+        sidebarSummary={record.title}
+        sidebarItems={[
+          { label: "Class", value: labelize(record.className) },
+          { label: "Status", value: STATUS_LABELS[record.status] },
+          { label: "Growth", value: labelize(record.growth) },
+          { label: "Review", value: record.time.nextReview || "None" }
+        ]}
+        sidebarActions={[
+          { label: `Back to ${domain?.shortLabel || "Domain"}`, href: `/admin/personal/${record.domain}` },
+          { label: "All Notes", href: "/admin/notes" }
+        ]}
+      />
       <PersonalViewportToggle />
       <header className="topbar personal-domain-topbar">
         <div>

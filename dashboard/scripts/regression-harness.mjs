@@ -332,7 +332,7 @@ async function main() {
     logStep("Checking protected pages and locked navigation");
     const adminHome = await requestText(server.baseUrl, cookieJar, `/admin?run=${encodeURIComponent(testRunId)}`);
     assert(adminHome.response.ok, `Admin home failed: ${describeStatus(adminHome.response)}`);
-    for (const expected of ["Project Fremen", "Project Iceflake", "Project Pint", "Current Goals", "Weekly", "Monthly"]) {
+    for (const expected of ["Projects", "Blacktube", "Fremen", "Iceflake", "Pacific", "Pint", "Notes", "People", "Media", "Current Goals", "Weekly", "Monthly", "AI"]) {
       assert(adminHome.body.includes(expected), `Admin home missing expected text: ${expected}`);
     }
     assert(adminHome.body.includes("Personal Ops"), "Admin home missing Personal Ops entry point");
@@ -340,10 +340,32 @@ async function main() {
 
     const personalPage = await requestText(server.baseUrl, cookieJar, "/admin/personal");
     assert(personalPage.response.ok, `Personal Ops page failed: ${describeStatus(personalPage.response)}`);
-    for (const expected of ["Personal Ops", "AI Monitoring", "Finance", "Travel", "Architecture Guardrails", "Open Travel", "Native Database"]) {
+    for (const expected of ["Projects", "Notes", "People", "Media", "Personal Ops", "AI Monitoring", "Finance", "Travel", "Architecture Guardrails", "Open Travel", "Native Database"]) {
       assert(personalPage.body.includes(expected), `Personal Ops page missing expected text: ${expected}`);
     }
     pass("Personal Ops shell loads with domain map and guardrails");
+
+    const projectsPage = await requestText(server.baseUrl, cookieJar, "/admin/projects");
+    assert(projectsPage.response.ok, `Projects page failed: ${describeStatus(projectsPage.response)}`);
+    for (const expected of ["Projects", "Project Blacktube", "Project Fremen", "Project Iceflake", "Project Pacific", "Project Pint"]) {
+      assert(projectsPage.body.includes(expected), `Projects page missing expected text: ${expected}`);
+    }
+    pass("Projects hub loads with top-level project navigation");
+
+    const notesPage = await requestText(server.baseUrl, cookieJar, "/admin/notes");
+    assert(notesPage.response.ok, `Notes page failed: ${describeStatus(notesPage.response)}`);
+    assert(notesPage.body.includes("Vault"), "Notes page missing Vault section");
+    pass("Notes hub loads");
+
+    const peoplePage = await requestText(server.baseUrl, cookieJar, "/admin/people");
+    assert(peoplePage.response.ok, `People page failed: ${describeStatus(peoplePage.response)}`);
+    assert(peoplePage.body.includes("CRM"), "People page missing CRM text");
+    pass("People hub loads");
+
+    const mediaPage = await requestText(server.baseUrl, cookieJar, "/admin/media");
+    assert(mediaPage.response.ok, `Media page failed: ${describeStatus(mediaPage.response)}`);
+    assert(mediaPage.body.includes("Media Boundary"), "Media page missing boundary text");
+    pass("Media hub loads");
 
     const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
     assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);
