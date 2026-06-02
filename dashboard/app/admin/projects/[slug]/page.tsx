@@ -49,7 +49,7 @@ export default async function ProjectPlaceholderPage({
       <section className="card">
         <h2>Planned Workspace</h2>
         <p className="muted">
-          Use Notes or Personal Ops records for now. This page exists so top navigation remains
+          Use Notes or Personal Ops notes for now. This page exists so top navigation remains
           stable while the project system grows.
         </p>
       </section>

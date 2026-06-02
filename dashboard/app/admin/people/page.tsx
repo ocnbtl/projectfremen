@@ -21,7 +21,7 @@ export default async function PeoplePage() {
         ]}
         sidebarActions={[
           { label: "Family Domain", href: "/admin/personal/family" },
-          { label: "Record Person", href: "/admin/personal/notes-docs" }
+          { label: "Create Person Note", href: "/admin/personal/notes-docs" }
         ]}
       />
       <header className="topbar">
@@ -39,7 +39,7 @@ export default async function PeoplePage() {
       <section className="card">
         <h2>CRM Starting Point</h2>
         <p className="muted">
-          People and organization records already work through the note class system. The next
+          People and organization notes already work through the note class system. The next
           slice can add profile views, reminders, important dates, and relationship timelines.
         </p>
       </section>

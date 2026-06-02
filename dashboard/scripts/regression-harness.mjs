@@ -332,7 +332,7 @@ async function main() {
     logStep("Checking protected pages and locked navigation");
     const adminHome = await requestText(server.baseUrl, cookieJar, `/admin?run=${encodeURIComponent(testRunId)}`);
     assert(adminHome.response.ok, `Admin home failed: ${describeStatus(adminHome.response)}`);
-    for (const expected of ["Projects", "Blacktube", "Fremen", "Iceflake", "Pacific", "Pint", "Notes", "People", "Media", "Current Goals", "Weekly", "Monthly", "AI"]) {
+    for (const expected of ["Projects", "Blacktube", "Fremen", "Iceflake", "Pacific", "Pint", "Notes", "People", "Media", "Resources", "Finance", "Current Goals", "Weekly", "Monthly", "AI"]) {
       assert(adminHome.body.includes(expected), `Admin home missing expected text: ${expected}`);
     }
     assert(adminHome.body.includes("Personal Ops"), "Admin home missing Personal Ops entry point");
@@ -367,9 +367,19 @@ async function main() {
     assert(mediaPage.body.includes("Media Boundary"), "Media page missing boundary text");
     pass("Media hub loads");
 
+    const resourcesPage = await requestText(server.baseUrl, cookieJar, "/admin/resources");
+    assert(resourcesPage.response.ok, `Resources page failed: ${describeStatus(resourcesPage.response)}`);
+    assert(resourcesPage.body.includes("Resource library"), "Resources page missing library text");
+    pass("Resources hub loads");
+
+    const financePage = await requestText(server.baseUrl, cookieJar, "/admin/finance");
+    assert(financePage.response.ok, `Finance page failed: ${describeStatus(financePage.response)}`);
+    assert(financePage.body.includes("Finance command view"), "Finance page missing command view text");
+    pass("Finance hub loads");
+
     const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
     assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);
-    for (const expected of ["Travel", "Record Note", "Core Properties", "Time and Review", "Saved Records", "Database Fields", "Privacy Boundary", "trip command board"]) {
+    for (const expected of ["Travel", "Create Note", "Core Properties", "Time and Review", "Saved Notes", "Database Fields", "Privacy Boundary", "trip command board"]) {
       assert(personalTravelPage.body.includes(expected), `Personal Ops Travel page missing expected text: ${expected}`);
     }
     pass("Personal Ops detail route loads with workflows, sources, and privacy boundary");

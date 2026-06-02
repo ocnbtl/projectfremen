@@ -61,7 +61,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
     label: "Notes",
     href: "/admin/notes",
-    description: "Vault, daily notes, references"
+    description: "Dashboard-native notes"
   },
   {
     label: "People",
@@ -71,7 +71,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   {
     label: "Media",
     href: "/admin/media",
-    description: "Photos, videos, songs"
+    description: "Files, images, attachments"
   },
   {
     label: "Personal Ops",
@@ -82,6 +82,16 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: "Reviews",
     href: "/admin/reviews/weekly",
     description: "Weekly and monthly cadence"
+  },
+  {
+    label: "Resources",
+    href: "/admin/resources",
+    description: "Articles, podcasts, posts, references"
+  },
+  {
+    label: "Finance",
+    href: "/admin/finance",
+    description: "Cash flow and review prep"
   }
 ];
 

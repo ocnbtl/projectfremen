@@ -17,10 +17,10 @@ export default async function NotesPage() {
         sidebarSummary="Vault-style note navigation without folder lock-in."
         sidebarItems={[
           { label: "Native notes", value: String(notes.length) },
-          { label: "All records", value: String(records.length) }
+          { label: "All notes", value: String(records.length) }
         ]}
         sidebarActions={[
-          { label: "Record Note", href: "/admin/personal/notes-docs" },
+          { label: "Create Note", href: "/admin/personal/notes-docs" },
           { label: "Personal Ops", href: "/admin/personal" }
         ]}
       />
@@ -32,7 +32,7 @@ export default async function NotesPage() {
           </p>
         </div>
         <Link href="/admin/personal/notes-docs" className="review-back-link">
-          Record Note
+          Create Note
         </Link>
       </header>
 

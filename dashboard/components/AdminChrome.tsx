@@ -65,6 +65,11 @@ function AdminTopNav() {
           )
         )}
       </nav>
+      <div className="admin-command-search" role="search" aria-label="Admin command search">
+        <span aria-hidden="true">/</span>
+        <input aria-label="Search notes, files, people, reviews" placeholder="Search notes, files, people, reviews" />
+        <kbd>cmd k</kbd>
+      </div>
     </header>
   );
 }
@@ -275,7 +280,7 @@ function LocalAiLauncher() {
             <textarea
               value={prompt}
               onChange={(event) => setPrompt(event.target.value)}
-              placeholder="Ask about this page, find a record, or plan a change..."
+              placeholder="Ask about this page, find a note, or plan a change..."
               rows={3}
             />
             <button type="submit" disabled={!canSend || busy}>
@@ -306,6 +311,186 @@ export default function AdminChrome({
       >
         {sidebarChildren}
       </AdminPageSidebar>
+      <style>{`
+        .admin-global-topnav {
+          width: min(1220px, calc(100vw - 32px));
+        }
+
+        .admin-command-search {
+          position: absolute;
+          top: calc(100% + 16px);
+          right: clamp(12px, 4vw, 44px);
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          width: min(420px, calc(100vw - 360px));
+          min-height: 44px;
+          padding: 0 14px;
+          border: 1px solid #bfd2db;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.94);
+          box-shadow: 0 12px 26px rgba(16, 32, 38, 0.1);
+        }
+
+        .admin-command-search span {
+          color: #60747c;
+          font-size: 18px;
+        }
+
+        .admin-command-search input {
+          min-width: 0;
+          flex: 1;
+          border: 0;
+          outline: 0;
+          background: transparent;
+          color: #102026;
+          font: inherit;
+          font-size: 14px;
+        }
+
+        .admin-command-search input::placeholder {
+          color: #60747c;
+        }
+
+        .admin-command-search kbd {
+          color: #60747c;
+          font: inherit;
+          font-size: 11px;
+          font-weight: 850;
+          white-space: nowrap;
+        }
+
+        .admin-chrome-main {
+          padding-top: 132px !important;
+        }
+
+        .grid-4 {
+          grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+        }
+
+        .module-stat-grid {
+          margin-bottom: 16px;
+        }
+
+        .module-stat {
+          display: grid;
+          gap: 8px;
+          min-height: 118px;
+          padding: 16px;
+          border: 1px solid #d5e2e7;
+          border-radius: 8px;
+          background: #ffffff;
+        }
+
+        .module-stat > span {
+          width: 10px;
+          height: 10px;
+          border-radius: 999px;
+          background: currentColor;
+        }
+
+        .module-stat p {
+          margin: 0;
+          color: #60747c;
+          font-size: 13px;
+          font-weight: 850;
+        }
+
+        .module-stat strong {
+          color: #102026;
+          font-size: 26px;
+          line-height: 1;
+        }
+
+        .module-stat-green,
+        .module-amount-green {
+          color: #1f7a52;
+        }
+
+        .module-stat-crimson,
+        .module-amount-crimson {
+          color: #c9264e;
+        }
+
+        .module-stat-blue,
+        .module-amount-blue {
+          color: #1976a3;
+        }
+
+        .module-stat-cyan,
+        .module-amount-cyan {
+          color: #1396ad;
+        }
+
+        .module-stat-orange {
+          color: #d78428;
+        }
+
+        .module-stat-pink {
+          color: #c62c86;
+        }
+
+        .module-layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1.25fr) minmax(320px, 0.75fr);
+          gap: 16px;
+          align-items: start;
+        }
+
+        .module-main-panel,
+        .module-side-panel {
+          border-radius: 8px;
+        }
+
+        .module-table {
+          display: grid;
+          gap: 10px;
+        }
+
+        .module-table > div {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto auto;
+          gap: 14px;
+          align-items: center;
+          min-height: 44px;
+          padding: 0 12px;
+          border-radius: 8px;
+          background: #f5f8f7;
+        }
+
+        .finance-module-shell .module-table > div {
+          grid-template-columns: minmax(0, 1fr) auto;
+        }
+
+        .module-table strong,
+        .module-table span {
+          min-width: 0;
+          overflow-wrap: anywhere;
+        }
+
+        @media (max-width: 900px) {
+          .admin-global-topnav {
+            align-items: flex-start;
+            border-radius: 24px;
+          }
+
+          .admin-global-links {
+            overflow-x: auto;
+          }
+
+          .admin-command-search {
+            display: none;
+          }
+
+          .admin-chrome-main {
+            padding-top: 88px !important;
+          }
+
+          .module-layout {
+            grid-template-columns: 1fr;
+          }
+        }
+      `}</style>
       <LocalAiLauncher />
     </>
   );

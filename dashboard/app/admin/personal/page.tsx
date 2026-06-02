@@ -40,7 +40,7 @@ export default async function PersonalOpsPage() {
         sidebarItems={[
           { label: "Domains", value: String(PERSONAL_SYSTEM_DOMAINS.length) },
           { label: "Sensitive", value: String(sensitiveCount) },
-          { label: "Saved records", value: String(records.length) }
+          { label: "Saved notes", value: String(records.length) }
         ]}
         sidebarActions={[
           { label: "Notes", href: "/admin/personal/notes-docs" },
@@ -66,10 +66,10 @@ export default async function PersonalOpsPage() {
       <section className="personal-ops-command">
         <div>
           <p className="personal-domain-eyebrow">Current build posture</p>
-          <h2>Record first, then specialize the modules around real data.</h2>
+          <h2>Notes first, then specialize the modules around real data.</h2>
           <p>
-            Personal Ops now saves native records in Unigentamos. A record can belong to one
-            domain, overlap with others, carry notes or file references, and become the input for
+            Personal Ops now saves native notes in Unigentamos. A note can belong to one
+            domain, overlap with others, carry file references, and become the input for
             future custom views.
           </p>
         </div>
@@ -89,7 +89,7 @@ export default async function PersonalOpsPage() {
           <h3>{sensitiveCount}</h3>
         </article>
         <article className="card personal-ops-stat">
-          <p className="muted" style={{ margin: 0 }}>Saved records</p>
+          <p className="muted" style={{ margin: 0 }}>Saved notes</p>
           <h3>{records.length}</h3>
         </article>
       </section>
@@ -160,7 +160,7 @@ export default async function PersonalOpsPage() {
           <section className="card">
             <h2>Native Database</h2>
             <p className="muted">
-              Personal records are saved through the same authenticated app persistence layer as KPIs,
+              Personal Ops notes are saved through the same authenticated app persistence layer as KPIs,
               reviews, and Current Goals. No Obsidian import/export path is required.
             </p>
           </section>

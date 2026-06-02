@@ -30,7 +30,7 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     shortLabel: "AI",
     summary: "Track AI work sessions, outputs, decisions, and follow-up actions inside Unigentamos.",
     operatingView: "A session ledger that separates durable decisions from transient chat output.",
-    systemStatus: "Native records are ready for session notes, decisions, and follow-ups.",
+    systemStatus: "Native notes are ready for session summaries, decisions, and follow-ups.",
     sensitivity: "private",
     status: "active",
     nextStep: "Start recording durable AI decisions and implementation follow-ups.",
@@ -48,19 +48,19 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
       {
         label: "Related domains",
         status: "ready",
-        detail: "Link an AI record to travel, jobs, notes, or project work when it overlaps."
+        detail: "Link an AI note to travel, jobs, resources, or project work when it overlaps."
       }
     ],
     privacyBoundary: "Do not persist raw chat transcripts or account tokens in the dashboard.",
-    dataBoundary: "Keep records short, outcome-oriented, and safe to resurface later."
+    dataBoundary: "Keep notes short, outcome-oriented, and safe to resurface later."
   },
   {
     slug: "notes-docs",
     label: "Notes and Docs",
     shortLabel: "Notes",
     summary: "Create durable notes, active documents, thoughts, and reference material.",
-    operatingView: "A native note workspace where records can overlap with every other domain.",
-    systemStatus: "Native note records are ready for capture and cross-domain linking.",
+    operatingView: "A native note workspace where notes can overlap with every other domain.",
+    systemStatus: "Native notes are ready for capture and cross-domain linking.",
     sensitivity: "private",
     status: "active",
     nextStep: "Use this as the default capture lane for durable notes and reusable context.",
@@ -73,12 +73,12 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
       {
         label: "Note body",
         status: "ready",
-        detail: "Long-form text is stored on the record and can be linked to other domains."
+        detail: "Long-form text is stored on the note and can be linked to other domains."
       },
       {
         label: "Link or file reference",
         status: "ready",
-        detail: "Store a URL or plain file reference when the record points at a document."
+        detail: "Store a URL or plain file reference when the note points at a document."
       }
     ],
     privacyBoundary: "Private notes stay behind the existing admin session and CSRF protection.",
@@ -90,20 +90,20 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     shortLabel: "Finance",
     summary: "Summarize finances with clean graphs, manual snapshots, and strategic review surfaces.",
     operatingView: "A high-level planning surface for aggregates, not account-level transaction storage.",
-    systemStatus: "Manual aggregate records are allowed; account integrations remain out of scope.",
+    systemStatus: "Manual aggregate notes are allowed; account integrations remain out of scope.",
     sensitivity: "sensitive",
     status: "guarded",
     nextStep: "Capture only manual summaries, goals, and decisions until detailed rules exist.",
     workflows: [
       "Monthly summary snapshot with manually entered totals.",
       "Goal and runway views that avoid exposing raw transactions by default.",
-      "Integration decision record before any bank, spreadsheet, or app connection."
+      "Integration decision note before any bank, spreadsheet, or app connection."
     ],
     fields: [
       {
         label: "Manual monthly summary",
         status: "ready",
-        detail: "Use record text for aggregate summaries, decisions, and review notes."
+        detail: "Use note text for aggregate summaries, decisions, and review notes."
       },
       {
         label: "Account-level detail",
@@ -112,7 +112,7 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
       }
     ],
     privacyBoundary: "No credentials, account identifiers, or raw transaction feeds.",
-    dataBoundary: "Finance records should be manual, summarized, and intentionally sparse."
+    dataBoundary: "Finance notes should be manual, summarized, and intentionally sparse."
   },
   {
     slug: "family",
@@ -120,7 +120,7 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     shortLabel: "Family",
     summary: "Keep relationship context, important dates, and care reminders organized.",
     operatingView: "A private reminder and relationship-context layer with strict data minimization.",
-    systemStatus: "Minimal private records are allowed when they are useful and respectful.",
+    systemStatus: "Minimal private notes are allowed when they are useful and respectful.",
     sensitivity: "sensitive",
     status: "guarded",
     nextStep: "Start with dates, reminders, and lightweight context instead of broad profiles.",
@@ -142,7 +142,7 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
       }
     ],
     privacyBoundary: "Minimize private details and avoid storing information that does not serve a clear purpose.",
-    dataBoundary: "Records should be editable, concise, and easy to archive."
+    dataBoundary: "Notes should be editable, concise, and easy to archive."
   },
   {
     slug: "jobs",
@@ -150,10 +150,10 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     shortLabel: "Jobs",
     summary: "Track job history, applications, opportunities, and supporting materials.",
     operatingView: "A pipeline board for opportunities, stages, materials, and follow-up dates.",
-    systemStatus: "Native records are ready for opportunities, materials, and follow-ups.",
+    systemStatus: "Native notes are ready for opportunities, materials, and follow-ups.",
     sensitivity: "private",
     status: "active",
-    nextStep: "Use records for active opportunities and next follow-up actions.",
+    nextStep: "Use notes for active opportunities and next follow-up actions.",
     workflows: [
       "Active opportunity list with status, owner action, and next follow-up.",
       "Document checklist for resume, portfolio, cover letter, and notes.",
@@ -161,9 +161,9 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     ],
     fields: [
       {
-        label: "Opportunity record",
+        label: "Opportunity note",
         status: "ready",
-        detail: "Track company, role, stage, follow-up, and supporting notes in one record."
+        detail: "Track company, role, stage, follow-up, and supporting context in one note."
       },
       {
         label: "Material reference",
@@ -172,7 +172,7 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
       }
     ],
     privacyBoundary: "Avoid sensitive compensation or employer contact details unless needed.",
-    dataBoundary: "Jobs records live in the website and can be linked to notes/docs."
+    dataBoundary: "Jobs notes live in the website and can be linked to notes/docs."
   },
   {
     slug: "travel",
@@ -180,10 +180,10 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     shortLabel: "Travel",
     summary: "Plan trips with itinerary state, map-ready locations, bookings, and constraints.",
     operatingView: "A trip command board for itineraries, constraints, stops, and booking tasks.",
-    systemStatus: "Native records are ready for trip plans, stops, constraints, and checklists.",
+    systemStatus: "Native notes are ready for trip plans, stops, constraints, and checklists.",
     sensitivity: "private",
     status: "active",
-    nextStep: "Create trip records first; map and globe views can read from those records later.",
+    nextStep: "Create trip notes first; map and globe views can read from those notes later.",
     workflows: [
       "Trip index with dates, route status, lodging status, and constraint flags.",
       "Map-ready stop list after location source and privacy rules are known.",
@@ -191,9 +191,9 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     ],
     fields: [
       {
-        label: "Trip or stop record",
+        label: "Trip or stop note",
         status: "ready",
-        detail: "Store dates, places, constraints, and next actions as native records."
+        detail: "Store dates, places, constraints, and next actions as native notes."
       },
       {
         label: "Booking reference",
@@ -202,7 +202,7 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
       }
     ],
     privacyBoundary: "No live location, confirmation numbers, payment details, or private address data.",
-    dataBoundary: "Travel records are dashboard-native and can later power a map view."
+    dataBoundary: "Travel notes are dashboard-native and can later power a map view."
   },
   {
     slug: "university-notes",
@@ -210,10 +210,10 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     shortLabel: "University",
     summary: "Capture coursework, notes, and reference material as searchable context.",
     operatingView: "A curated archive browser for coursework and reusable reference material.",
-    systemStatus: "Native archive records are ready for course notes and references.",
+    systemStatus: "Native archive notes are ready for course notes and references.",
     sensitivity: "reference",
     status: "designing",
-    nextStep: "Create curated course/reference records before adding search or file upload.",
+    nextStep: "Create curated course/reference notes before adding search or file upload.",
     workflows: [
       "Course index grouped by term, class, and topic.",
       "Reusable reference highlights promoted into the broader notes system.",
@@ -228,7 +228,7 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
       {
         label: "File attachment",
         status: "planned",
-        detail: "File upload can come later after the record model is stable."
+        detail: "File upload can come later after the note model is stable."
       }
     ],
     privacyBoundary: "Avoid ingesting grades, student records, or third-party personal information.",
@@ -240,7 +240,7 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
     shortLabel: "Systems",
     summary: "Reserve space for other personal tools that should connect later.",
     operatingView: "A triage shelf for repeated workflows before they deserve a first-class module.",
-    systemStatus: "Native records are ready for candidate workflows and system ideas.",
+    systemStatus: "Native notes are ready for candidate workflows and system ideas.",
     sensitivity: "private",
     status: "designing",
     nextStep: "Promote only after a real workflow repeats enough to deserve a module.",
@@ -253,7 +253,7 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
       {
         label: "Candidate system",
         status: "ready",
-        detail: "Record repeated workflows and promote them only when they prove useful."
+        detail: "Capture repeated workflows and promote them only when they prove useful."
       },
       {
         label: "External app integration",
@@ -268,9 +268,9 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
 
 export const PERSONAL_SYSTEM_GUARDRAILS = [
   "Founder-only admin surface attached to the existing command center.",
-  "No new auth middleware, public endpoints, or production network calls for Personal Ops records.",
-  "Personal Ops records use the existing app_state persistence layer.",
-  "Sensitive domains use manual, minimized records until a stricter model is needed."
+  "No new auth middleware, public endpoints, or production network calls for Personal Ops notes.",
+  "Personal Ops notes use the existing app_state persistence layer.",
+  "Sensitive domains use manual, minimized notes until a stricter model is needed."
 ];
 
 export function getPersonalSystemDomain(slug: string) {

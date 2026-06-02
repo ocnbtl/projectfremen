@@ -56,7 +56,7 @@ export default async function PersonalDomainPage({
         sidebarItems={[
           { label: "Workflows", value: String(domain.workflows.length) },
           { label: "Fields", value: String(domain.fields.length) },
-          { label: "Records", value: String(domainRecords.length) },
+          { label: "Notes", value: String(domainRecords.length) },
           { label: "Status", value: STATUS_LABELS[domain.status] }
         ]}
         sidebarActions={[
@@ -104,7 +104,7 @@ export default async function PersonalDomainPage({
           <strong>{domain.fields.length}</strong>
         </article>
         <article className="personal-metric">
-          <p>Records</p>
+          <p>Notes</p>
           <strong>{domainRecords.length}</strong>
         </article>
       </section>

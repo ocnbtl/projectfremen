@@ -488,7 +488,7 @@ export default function PersonalRecordsPanel({
       .catch(() => ({ ok: false, error: "Invalid server response" }))) as RecordsResponse;
 
     if (!response.ok || !payload.ok || !payload.items) {
-      setError(payload.error || "Failed to save record");
+      setError(payload.error || "Failed to save note");
       setSaving(false);
       return;
     }
@@ -535,7 +535,7 @@ export default function PersonalRecordsPanel({
       .catch(() => ({ ok: false, error: "Invalid server response" }))) as RecordsResponse;
 
     if (!response.ok || !payload.ok || !payload.items) {
-      setError(payload.error || "Failed to update record");
+      setError(payload.error || "Failed to update note");
       return;
     }
     setRecords(payload.items);
@@ -545,7 +545,7 @@ export default function PersonalRecordsPanel({
     <section className="personal-record-workspace">
       <div className="personal-record-form-wrap">
         <div className="personal-ops-section-heading">
-          <h2>Record Note</h2>
+          <h2>Create Note</h2>
           <span>Saved to Unigentamos</span>
         </div>
         <form className="personal-record-form" onSubmit={submitRecord}>
@@ -599,7 +599,7 @@ export default function PersonalRecordsPanel({
             <textarea
               value={body}
               onChange={(event) => setBody(event.target.value)}
-              placeholder="Record the useful context, decision, next action, citation, or reference."
+              placeholder="Capture the useful context, decision, next action, citation, or reference."
               rows={7}
             />
           </label>
@@ -681,7 +681,7 @@ export default function PersonalRecordsPanel({
           <div className="personal-property-group">
             <div className="personal-property-heading">
               <h3>Time and Review</h3>
-              <InfoTip text="Start and due fields are manual. Review cadence uses ISO duration strings such as P1W or P1M. Last review is auto-created and can be refreshed from each saved record." />
+              <InfoTip text="Start and due fields are manual. Review cadence uses ISO duration strings such as P1W or P1M. Last review is auto-created and can be refreshed from each saved note." />
             </div>
             <div className="personal-record-form-row">
               <label>
@@ -713,9 +713,9 @@ export default function PersonalRecordsPanel({
             </div>
           </div>
 
-          <details className="personal-property-group">
+          <details className="personal-property-group" open>
             <summary>
-              Hidden and Auto Properties
+              Auto Properties
               <InfoTip text="Hidden defaults include UID, privacy, processing stage, kind, created time slices, source links, and generated review metadata. This group exposes every stored property before save." />
             </summary>
             <div className="personal-record-form-row">
@@ -771,10 +771,10 @@ export default function PersonalRecordsPanel({
             />
           </details>
 
-          <details className="personal-property-group">
+          <details className="personal-property-group" open>
             <summary>
               Relationships
-              <InfoTip text="North/South are parent-child. East/West are sequence links. Setting one direction automatically writes the reciprocal direction on the linked record. Stakeholders write stakeholdings back to the selected person or org record." />
+              <InfoTip text="North/South are parent-child. East/West are sequence links. Setting one direction automatically writes the reciprocal direction on the linked note. Stakeholders write stakeholdings back to the selected person or org note." />
             </summary>
             {[
               ["North", north, setNorth],
@@ -816,12 +816,12 @@ export default function PersonalRecordsPanel({
 
       <div className="personal-record-list-wrap">
         <div className="personal-ops-section-heading">
-          <h2>Saved Records</h2>
+          <h2>Saved Notes</h2>
           <span>{visibleRecords.length}</span>
         </div>
         {visibleRecords.length === 0 ? (
           <p className="muted">
-            No records yet. Add the first {domain.shortLabel.toLowerCase()} note and it will be
+            No notes yet. Add the first {domain.shortLabel.toLowerCase()} note and it will be
             saved as part of the Unigentamos database.
           </p>
         ) : (
@@ -867,7 +867,7 @@ export default function PersonalRecordsPanel({
                   </div>
                 )}
 
-                <details className="personal-record-details">
+                <details className="personal-record-details" open>
                   <summary>All Properties</summary>
                   {recordPropertyItems(record, recordById).map((group) => (
                     <section className="personal-record-property-section" key={group.title}>
