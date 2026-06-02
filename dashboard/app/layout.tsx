@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import "./figma-transfer.css";
 
 export const metadata: Metadata = {
   applicationName: "Unigentamos",
