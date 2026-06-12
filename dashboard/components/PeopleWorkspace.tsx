@@ -491,6 +491,13 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
   const selectedProfile = getProfile(selectedPerson);
   const fallbackPerson = selectedPerson || people[0];
   const activeFilterCount = (activeFilter === "all" ? 0 : 1) + (query.trim() ? 1 : 0);
+  const filteringActive = detailMode === "profile" && !aiOpen && activeFilterCount > 0;
+  const shellClassName = [
+    "people-redesign-shell",
+    filteringActive ? "is-filtering" : "",
+    aiOpen ? "is-ai-open" : "",
+    detailMode !== "profile" ? `is-mode-${detailMode}` : ""
+  ].filter(Boolean).join(" ");
   const dueThisMonth = people.filter((record) => {
     const days = daysUntil(record.time.nextReview);
     return days !== null && days >= 0 && days <= 30;
@@ -563,8 +570,10 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     }
 
     const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
+    const createdPerson =
+      nextPeople.find((record) => record.title.toLowerCase() === name.trim().toLowerCase()) || nextPeople[0];
     setPeople(nextPeople);
-    setSelectedId(nextPeople[0]?.id || "");
+    setSelectedId(createdPerson?.id || "");
     setName("");
     setClassName("person");
     setGroup("Collaborator");
@@ -690,7 +699,7 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
   }
 
   return (
-    <section className="people-redesign-shell" aria-label="People workspace">
+    <section className={shellClassName} aria-label="People workspace">
       <span className="module-ref-regression-sentinel">CRM Starting Point</span>
       <div className="people-mobile-topbar">
         <button type="button" aria-label="Open people menu" onClick={() => setMobileMenuOpen(true)}>
@@ -897,8 +906,15 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
           </div>
         ) : (
           <div className="notes-empty-state">
-            <h3>No people match this view</h3>
-            <p>Adjust filters or add a person with a useful follow-up cadence.</p>
+            <h3>{people.length === 0 ? "No people yet" : "No matching people"}</h3>
+            <p>
+              {people.length === 0
+                ? "Add your first person or import contacts to start building relationship context."
+                : "Try removing filters or search a broader term."}
+            </p>
+            <button type="button" onClick={() => setDetailMode("edit")}>
+              Add Person
+            </button>
           </div>
         )}
       </main>

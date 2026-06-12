@@ -55,6 +55,8 @@ export default async function PeoplePage() {
     <main className="shell admin-chrome-main module-ref-shell people-module-shell">
       <AdminChrome
         showCommandSearch={false}
+        showPageSidebar={false}
+        showLocalAi={false}
         sidebarTitle="People"
         sidebarSummary="Contacts, cadence, follow-ups, relationships, and profile context."
         sidebarItems={[

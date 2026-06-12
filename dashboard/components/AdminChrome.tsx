@@ -19,6 +19,8 @@ export type AdminChromeProps = {
   sidebarActions?: SidebarItem[];
   sidebarChildren?: ReactNode;
   showCommandSearch?: boolean;
+  showPageSidebar?: boolean;
+  showLocalAi?: boolean;
 };
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
@@ -325,19 +327,23 @@ export default function AdminChrome({
   sidebarItems,
   sidebarActions,
   sidebarChildren,
-  showCommandSearch
+  showCommandSearch,
+  showPageSidebar = true,
+  showLocalAi = true
 }: AdminChromeProps) {
   return (
     <>
       <AdminTopNav showCommandSearch={showCommandSearch} />
-      <AdminPageSidebar
-        title={sidebarTitle}
-        summary={sidebarSummary}
-        items={sidebarItems}
-        actions={sidebarActions}
-      >
-        {sidebarChildren}
-      </AdminPageSidebar>
+      {showPageSidebar && (
+        <AdminPageSidebar
+          title={sidebarTitle}
+          summary={sidebarSummary}
+          items={sidebarItems}
+          actions={sidebarActions}
+        >
+          {sidebarChildren}
+        </AdminPageSidebar>
+      )}
       <style>{`
         .admin-global-topnav {
           width: min(1220px, calc(100vw - 32px));
@@ -389,6 +395,16 @@ export default function AdminChrome({
 
         .admin-chrome-main {
           padding-top: 132px !important;
+        }
+
+        .people-module-shell.admin-chrome-main {
+          max-width: none;
+          width: 100vw;
+          min-height: 100dvh;
+          margin-left: calc(50% - 50vw);
+          margin-right: calc(50% - 50vw);
+          padding: 56px 0 0 !important;
+          overflow: hidden;
         }
 
         .grid-4 {
@@ -529,12 +545,17 @@ export default function AdminChrome({
             padding-top: 88px !important;
           }
 
+          .people-module-shell.admin-chrome-main {
+            padding-top: 72px !important;
+            overflow: visible;
+          }
+
           .module-layout {
             grid-template-columns: 1fr;
           }
         }
       `}</style>
-      <LocalAiLauncher />
+      {showLocalAi && <LocalAiLauncher />}
     </>
   );
 }

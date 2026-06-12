@@ -1784,14 +1784,60 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 }
 
 /* People redesign slice: screenshot-driven workspace, profile states, and mobile sheets. */
+:root {
+  --surface-app: #f4f7f5;
+  --surface-app-alt: #f6f8f7;
+  --surface-panel: #ffffff;
+  --surface-panel-soft: #fbfcfb;
+  --surface-row-hover: #f6f9f8;
+  --surface-selected: #f7fbff;
+  --text-strong: #102026;
+  --text-body: #23383f;
+  --text-muted: #4a626c;
+  --text-subtle: #60747c;
+  --text-faint: #7c8e95;
+  --border-soft: #d5e2e7;
+  --border-strong: #bfd2db;
+  --accent-green: #1f7a52;
+  --accent-blue: #1976a3;
+  --accent-cyan: #1396ad;
+  --accent-orange: #d78428;
+  --accent-crimson: #c9264e;
+  --accent-pink: #c62c86;
+  --accent-purple: #7657c8;
+  --accent-brown: #9b6a3c;
+  --shadow-panel: 0 1px 2px rgba(16, 32, 38, 0.04);
+  --shadow-floating: 0 12px 32px rgba(16, 32, 38, 0.14);
+}
+
 .people-redesign-shell {
   position: relative;
   display: grid;
-  grid-template-columns: 170px 330px minmax(360px, 1fr) 240px;
-  gap: 12px;
-  width: 100%;
+  grid-template-columns: 236px minmax(420px, 0.9fr) minmax(520px, 1.1fr);
+  gap: 0;
+  width: 100vw;
+  height: calc(100dvh - 56px);
   margin: 0;
-  color: #102026;
+  overflow: hidden;
+  background: var(--surface-app);
+  color: var(--text-strong);
+}
+
+.people-redesign-shell.is-filtering {
+  grid-template-columns: 236px minmax(520px, 1fr) minmax(300px, 340px);
+}
+
+.people-redesign-shell.is-ai-open,
+.people-redesign-shell.is-mode-edit,
+.people-redesign-shell.is-mode-timeline,
+.people-redesign-shell.is-mode-workspace {
+  grid-template-columns: 236px minmax(0, 1fr) minmax(340px, 380px);
+}
+
+.people-redesign-shell.is-mode-edit:not(.is-ai-open),
+.people-redesign-shell.is-mode-timeline:not(.is-ai-open),
+.people-redesign-shell.is-mode-workspace:not(.is-ai-open) {
+  grid-template-columns: 236px minmax(0, 1fr);
 }
 
 .people-redesign-shell button,
@@ -1806,24 +1852,34 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   display: none;
 }
 
+.people-mobile-menu.is-open ~ .people-ai-fab {
+  display: none;
+}
+
 .people-desktop-sidebar,
 .people-directory-panel,
 .people-profile-panel,
 .people-smart-panel,
 .people-filter-sheet {
   min-width: 0;
-  border: 1px solid #d5e2e7;
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 12px 28px rgba(16, 32, 38, 0.07);
+  border: 1px solid var(--border-soft);
+  border-radius: 0;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-panel);
 }
 
 .people-desktop-sidebar {
   display: grid;
   gap: 18px;
   align-content: start;
-  padding: 14px;
-  min-height: calc(100vh - 154px);
+  height: 100%;
+  min-height: 0;
+  padding: 16px;
+  overflow: auto;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  background: color-mix(in srgb, var(--surface-panel) 82%, var(--surface-app-alt));
 }
 
 .people-sidebar-section {
@@ -1847,12 +1903,12 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
   align-items: center;
-  min-height: 30px;
+  min-height: 32px;
   padding: 0 8px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 6px;
   background: transparent;
-  color: #243d47;
+  color: var(--text-body);
   font-size: 12px;
   font-weight: 820;
   text-align: left;
@@ -1862,13 +1918,13 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-sidebar-section button.is-active,
 .people-smart-panel > button:hover,
 .people-filter-sheet button:hover {
-  background: #edf3f5;
+  background: var(--surface-row-hover);
 }
 
 .people-sidebar-section strong,
 .people-smart-panel strong,
 .people-filter-sheet strong {
-  color: #60747c;
+  color: var(--text-subtle);
   font-size: 11px;
   font-weight: 900;
 }
@@ -1877,7 +1933,15 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   display: grid;
   gap: 12px;
   align-content: start;
-  padding: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 20px 16px;
+  overflow: auto;
+  border-top: 0;
+  border-bottom: 0;
+  border-left: 0;
+  border-radius: 0;
+  background: var(--surface-app-alt);
 }
 
 .people-directory-header,
@@ -1896,26 +1960,29 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-profile-header h2,
 .people-smart-panel h2 {
   margin: 0;
-  color: #102026;
+  color: var(--text-strong);
   font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", sans-serif;
   letter-spacing: 0;
 }
 
 .people-directory-header h1 {
-  font-size: 24px;
+  font-size: 18px;
+  font-weight: 750;
 }
 
 .people-directory-header span,
 .people-profile-header p,
 .people-smart-panel span,
 .people-filter-sheet span {
-  color: #60747c;
+  color: var(--text-subtle);
   font-size: 12px;
   font-weight: 780;
 }
 
 .people-header-actions {
   display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
   gap: 6px;
 }
 
@@ -1930,13 +1997,20 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-smart-panel label button {
   min-height: 32px;
   padding: 0 10px;
-  border: 1px solid #bfd2db;
-  border-radius: 8px;
-  background: #ffffff;
-  color: #123445;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
   font-size: 12px;
   font-weight: 900;
+  white-space: nowrap;
   cursor: pointer;
+}
+
+.people-header-actions button,
+.people-profile-actions button {
+  flex: 0 0 auto;
+  width: auto;
 }
 
 .people-header-actions button:last-child,
@@ -1944,20 +2018,20 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-overview-grid button,
 .people-edit-toolbar button[type="submit"],
 .people-smart-panel label button {
-  border-color: #102026;
-  background: #102026;
-  color: #ffffff;
+  border-color: var(--text-strong);
+  background: var(--text-strong);
+  color: var(--surface-panel);
 }
 
 .people-primary-search {
   display: flex;
   align-items: center;
   gap: 9px;
-  min-height: 40px;
+  min-height: 36px;
   padding: 0 10px;
-  border: 1px solid #cbdde5;
-  border-radius: 8px;
-  background: #fbfdfd;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel-soft);
 }
 
 .people-primary-search input {
@@ -1966,12 +2040,12 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   border: 0;
   outline: 0;
   background: transparent;
-  color: #102026;
+  color: var(--text-strong);
 }
 
 .people-primary-search span,
 .people-primary-search button {
-  color: #60747c;
+  color: var(--text-subtle);
 }
 
 .people-primary-search button {
@@ -1979,7 +2053,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   height: 24px;
   border: 0;
   border-radius: 999px;
-  background: #edf3f5;
+  background: var(--surface-row-hover);
   font-weight: 900;
 }
 
@@ -1990,13 +2064,31 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   gap: 7px;
 }
 
+.people-filter-bar > button {
+  flex: 0 0 auto;
+  width: auto;
+  min-width: max-content;
+  justify-content: center;
+}
+
+.people-filter-bar > .module-ref-pill {
+  min-height: 32px;
+  border-radius: 6px;
+}
+
+.people-redesign-shell .notes-empty-state button {
+  justify-self: center;
+  width: auto;
+  min-width: 160px;
+}
+
 .people-filter-bar > button:not(.module-ref-pill) {
-  background: #fbfdfd;
+  background: var(--surface-panel-soft);
 }
 
 .people-filter-bar > span {
   margin-left: auto;
-  color: #60747c;
+  color: var(--text-subtle);
   font-size: 11px;
   font-weight: 900;
 }
@@ -2008,15 +2100,15 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-directory-row {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr) 76px 82px;
-  gap: 10px;
+  grid-template-columns: 48px minmax(0, 1fr) 112px 96px;
+  gap: 12px;
   align-items: center;
   width: 100%;
-  min-height: 72px;
-  padding: 10px;
-  border: 1px solid #e0e8ec;
+  min-height: 76px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
   border-radius: 8px;
-  background: #fbfdfd;
+  background: var(--surface-panel-soft);
   color: inherit;
   text-align: left;
   cursor: pointer;
@@ -2024,8 +2116,8 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-directory-row:hover,
 .people-directory-row.is-selected {
-  border-color: currentColor;
-  background: #ffffff;
+  border-color: var(--border-strong);
+  background: var(--surface-selected);
   box-shadow: inset 3px 0 0 currentColor;
 }
 
@@ -2034,18 +2126,18 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-mobile-brand {
   display: grid;
   place-items: center;
-  border: 1px solid #d8e4e8;
+  border: 1px solid var(--border-soft);
   background:
     linear-gradient(135deg, rgba(230, 92, 136, 0.18), rgba(46, 151, 185, 0.16)),
-    #ffffff;
-  color: #123445;
+    var(--surface-panel);
+  color: var(--text-strong);
   font-weight: 950;
 }
 
 .people-row-avatar {
-  width: 42px;
-  height: 42px;
-  border-radius: 16px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
   font-size: 18px;
 }
 
@@ -2065,14 +2157,14 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 }
 
 .people-row-main strong {
-  color: #102026;
+  color: var(--text-strong);
   font-size: 14px;
 }
 
 .people-row-main small,
 .people-row-date,
 .people-row-next {
-  color: #60747c;
+  color: var(--text-subtle);
   font-size: 11px;
   font-weight: 800;
 }
@@ -2101,7 +2193,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  color: #1f7a52;
+  color: var(--accent-green);
 }
 
 .people-row-date i {
@@ -2115,7 +2207,14 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   display: grid;
   gap: 12px;
   align-content: start;
-  padding: 14px;
+  height: 100%;
+  min-height: 0;
+  padding: 24px;
+  overflow: auto;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
 }
 
 .people-profile-header {
@@ -2131,13 +2230,14 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 }
 
 .people-profile-header h2 {
-  font-size: 28px;
+  font-size: 24px;
+  font-weight: 760;
 }
 
 .people-avatar {
   width: 72px;
   height: 72px;
-  border-radius: 22px;
+  border-radius: 18px;
   font-size: 32px;
 }
 
@@ -2164,7 +2264,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   padding: 0 10px;
   border-radius: 999px;
   background: #e7f4ed;
-  color: #1f7a52;
+  color: var(--accent-green);
   font-size: 11px;
   font-weight: 900;
 }
@@ -2175,23 +2275,29 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 }
 
 .people-profile-tabs {
+  position: sticky;
+  top: -24px;
+  z-index: 4;
   display: flex;
   gap: 6px;
   overflow-x: auto;
-  border-bottom: 1px solid #dfe9ed;
+  min-height: 44px;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-panel);
 }
 
 .people-profile-tabs button {
   border: 0;
   border-radius: 0;
   background: transparent;
-  color: #60747c;
+  color: var(--text-subtle);
+  font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", sans-serif;
   white-space: nowrap;
 }
 
 .people-profile-tabs button.is-active {
-  box-shadow: inset 0 -2px 0 #102026;
-  color: #102026;
+  box-shadow: inset 0 -2px 0 var(--text-strong);
+  color: var(--text-strong);
 }
 
 .people-overview-grid,
@@ -2210,9 +2316,9 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   gap: 10px;
   min-width: 0;
   padding: 12px;
-  border: 1px solid #e0e8ec;
+  border: 1px solid var(--border-soft);
   border-radius: 8px;
-  background: #fbfdfd;
+  background: var(--surface-panel-soft);
 }
 
 .people-overview-grid article:nth-child(4),
@@ -2225,13 +2331,14 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-timeline-panel h3,
 .people-add-card h3 {
   margin: 0;
-  color: #102026;
+  color: var(--text-strong);
+  font-family: "Plus Jakarta Sans", "Inter", "Segoe UI", sans-serif;
   font-size: 14px;
 }
 
 .people-overview-grid p {
   margin: 0;
-  color: #415862;
+  color: var(--text-body);
   line-height: 1.45;
 }
 
@@ -2244,7 +2351,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-info-row strong,
 .people-cadence-pair span,
 .people-cadence-grid span {
-  color: #60747c;
+  color: var(--text-subtle);
   font-size: 11px;
   font-weight: 900;
 }
@@ -2252,7 +2359,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-info-row span,
 .people-cadence-pair strong,
 .people-cadence-grid strong {
-  color: #102026;
+  color: var(--text-strong);
   font-size: 13px;
   font-weight: 850;
 }
@@ -2347,14 +2454,38 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 }
 
 .people-smart-panel {
-  position: sticky;
-  top: 104px;
-  display: grid;
+  display: none;
   gap: 10px;
   align-content: start;
-  padding: 14px;
-  max-height: calc(100vh - 124px);
+  height: 100%;
+  min-height: 0;
+  padding: 18px 14px;
   overflow: auto;
+  border-top: 0;
+  border-right: 0;
+  border-bottom: 0;
+  border-radius: 0;
+  box-shadow: var(--shadow-panel);
+}
+
+.people-redesign-shell:not(.is-filtering):not(.is-ai-open) .people-smart-panel,
+.people-redesign-shell.is-mode-edit:not(.is-ai-open) .people-smart-panel,
+.people-redesign-shell.is-mode-timeline:not(.is-ai-open) .people-smart-panel,
+.people-redesign-shell.is-mode-workspace:not(.is-ai-open) .people-smart-panel {
+  display: none;
+}
+
+.people-redesign-shell.is-filtering .people-profile-panel,
+.people-redesign-shell.is-ai-open .people-directory-panel,
+.people-redesign-shell.is-mode-edit .people-directory-panel,
+.people-redesign-shell.is-mode-timeline .people-directory-panel,
+.people-redesign-shell.is-mode-workspace .people-directory-panel {
+  display: none;
+}
+
+.people-redesign-shell.is-filtering .people-smart-panel,
+.people-redesign-shell.is-ai-open .people-smart-panel {
+  display: grid;
 }
 
 .people-smart-panel h2 {
@@ -2367,28 +2498,28 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   width: 24px;
   height: 24px;
   border-radius: 999px;
-  background: #102026;
-  color: #ffffff;
+  background: var(--text-strong);
+  color: var(--surface-panel);
 }
 
 .people-smart-panel nav {
   display: flex;
   gap: 5px;
-  border-bottom: 1px solid #dfe9ed;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .people-smart-panel nav button {
   min-height: 30px;
   border: 0;
   background: transparent;
-  color: #60747c;
+  color: var(--text-subtle);
   font-size: 11px;
   font-weight: 900;
 }
 
 .people-smart-panel nav button.is-active {
-  color: #102026;
-  box-shadow: inset 0 -2px 0 #102026;
+  color: var(--text-strong);
+  box-shadow: inset 0 -2px 0 var(--text-strong);
 }
 
 .people-smart-panel label {
@@ -2402,19 +2533,21 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   min-width: 0;
   min-height: 36px;
   padding: 0 10px;
-  border: 1px solid #cbdde5;
-  border-radius: 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
 }
 
 .people-filter-sheet {
   position: absolute;
-  top: 94px;
-  left: 210px;
+  top: 72px;
+  left: 252px;
   z-index: 25;
   display: grid;
   gap: 8px;
   width: min(420px, calc(100vw - 40px));
   padding: 14px;
+  border-radius: 8px;
+  box-shadow: var(--shadow-floating);
 }
 
 .people-filter-sheet h2 {
@@ -2444,17 +2577,21 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-ai-fab {
   position: fixed;
-  right: 18px;
-  bottom: 18px;
+  right: 24px;
+  bottom: 24px;
   z-index: 84;
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
-  min-height: 52px;
+  width: 64px;
+  height: 64px;
+  min-height: 64px;
   padding: 0;
   border-radius: 999px;
-  box-shadow: 0 18px 42px rgba(16, 32, 38, 0.22);
+  box-shadow: var(--shadow-floating);
+}
+
+.people-redesign-shell.is-ai-open .people-ai-fab {
+  display: none;
 }
 
 .people-profile-form button,
@@ -2468,13 +2605,17 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   font-weight: 900;
 }
 
-@media (max-width: 1500px) {
+@media (max-width: 1280px) {
   .people-redesign-shell {
-    grid-template-columns: 150px 300px minmax(0, 1fr);
+    grid-template-columns: 220px minmax(380px, 0.95fr) minmax(460px, 1fr);
   }
 
-  .people-smart-panel {
-    display: none;
+  .people-redesign-shell.is-filtering,
+  .people-redesign-shell.is-ai-open,
+  .people-redesign-shell.is-mode-edit,
+  .people-redesign-shell.is-mode-timeline,
+  .people-redesign-shell.is-mode-workspace {
+    grid-template-columns: 220px minmax(0, 1fr);
   }
 
   .people-directory-row {
@@ -2493,6 +2634,9 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 @media (max-width: 1180px) {
   .people-redesign-shell {
     width: auto;
+    height: auto;
+    min-height: calc(100dvh - 72px);
+    overflow: visible;
     margin-right: 0;
     grid-template-columns: minmax(260px, 0.52fr) minmax(0, 1fr);
   }
@@ -2512,7 +2656,12 @@ html[data-admin-preview="mobile"] .people-profile-rail {
     grid-template-columns: 1fr;
     gap: 10px;
     width: min(430px, 100%);
+    height: auto;
+    min-height: 0;
+    overflow: visible;
     margin: 0 auto;
+    padding: 0 10px 88px;
+    background: var(--surface-app);
   }
 
   .people-mobile-topbar {
@@ -2544,8 +2693,8 @@ html[data-admin-preview="mobile"] .people-profile-rail {
     width: 34px;
     height: 34px;
     border-radius: 999px;
-    background: #102026;
-    color: #ffffff;
+    background: var(--text-strong);
+    color: var(--surface-panel);
   }
 
   .people-desktop-sidebar,
@@ -2560,12 +2709,12 @@ html[data-admin-preview="mobile"] .people-profile-rail {
     display: grid;
     align-content: start;
     gap: 8px;
-    width: min(292px, calc(100vw - 24px));
+    width: min(86vw, 360px);
     padding: 16px;
-    border: 1px solid #d5e2e7;
+    border: 1px solid var(--border-soft);
     border-radius: 8px;
-    background: #ffffff;
-    box-shadow: 0 24px 64px rgba(16, 32, 38, 0.24);
+    background: var(--surface-panel);
+    box-shadow: var(--shadow-floating);
   }
 
   .people-mobile-menu > button:first-child {
@@ -2601,6 +2750,15 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
   .people-directory-header {
     align-items: flex-start;
+  }
+
+  .people-directory-panel,
+  .people-profile-panel {
+    height: auto;
+    overflow: visible;
+    padding: 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
   }
 
   .people-header-actions button:nth-child(2) {
@@ -2673,13 +2831,25 @@ html[data-admin-preview="mobile"] .people-profile-rail {
     overflow: auto;
     border-radius: 8px;
   }
+
+  .people-ai-fab {
+    right: 16px;
+    bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+    width: 54px;
+    height: 54px;
+    min-height: 54px;
+  }
 }
 
 html[data-admin-preview="mobile"] .people-redesign-shell {
   grid-template-columns: 1fr;
   gap: 10px;
   width: min(430px, 100%);
+  height: auto;
+  min-height: 0;
+  overflow: visible;
   margin: 0 auto;
+  padding: 0 10px 88px;
 }
 
 html[data-admin-preview="mobile"] .people-mobile-topbar {
@@ -2691,19 +2861,19 @@ html[data-admin-preview="mobile"] .people-mobile-topbar {
   gap: 8px;
   align-items: center;
   padding: 10px;
-  border: 1px solid #d5e2e7;
+  border: 1px solid var(--border-soft);
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 12px 28px rgba(16, 32, 38, 0.08);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-panel);
 }
 
 html[data-admin-preview="mobile"] .people-mobile-topbar button {
   width: 34px;
   height: 34px;
-  border: 1px solid #bfd2db;
+  border: 1px solid var(--border-strong);
   border-radius: 8px;
-  background: #ffffff;
-  color: #102026;
+  background: var(--surface-panel);
+  color: var(--text-strong);
   font-weight: 900;
 }
 
@@ -2711,8 +2881,8 @@ html[data-admin-preview="mobile"] .people-mobile-brand {
   width: 34px;
   height: 34px;
   border-radius: 999px;
-  background: #102026;
-  color: #ffffff;
+  background: var(--text-strong);
+  color: var(--surface-panel);
 }
 
 html[data-admin-preview="mobile"] .people-desktop-sidebar,
@@ -2727,12 +2897,21 @@ html[data-admin-preview="mobile"] .people-mobile-menu.is-open {
   display: grid;
   align-content: start;
   gap: 8px;
-  width: min(292px, calc(100vw - 24px));
+  width: min(86vw, 360px);
   padding: 16px;
-  border: 1px solid #d5e2e7;
+  border: 1px solid var(--border-soft);
   border-radius: 8px;
-  background: #ffffff;
-  box-shadow: 0 24px 64px rgba(16, 32, 38, 0.24);
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-floating);
+}
+
+html[data-admin-preview="mobile"] .people-directory-panel,
+html[data-admin-preview="mobile"] .people-profile-panel {
+  height: auto;
+  overflow: visible;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
 }
 
 html[data-admin-preview="mobile"] .people-directory-row {
@@ -2801,4 +2980,12 @@ html[data-admin-preview="mobile"] .people-filter-sheet {
   max-height: calc(100vh - 140px);
   overflow: auto;
   border-radius: 8px;
+}
+
+html[data-admin-preview="mobile"] .people-ai-fab {
+  right: 16px;
+  bottom: calc(64px + env(safe-area-inset-bottom) + 12px);
+  width: 54px;
+  height: 54px;
+  min-height: 54px;
 }
