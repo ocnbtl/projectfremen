@@ -4,13 +4,20 @@ import { useEffect, useState } from "react";
 
 type PreviewMode = "desktop" | "mobile";
 
-const STORAGE_KEY = "personal-preview-mode";
+const STORAGE_KEY = "admin-preview-mode";
+const LEGACY_STORAGE_KEY = "personal-preview-mode";
+
+function applyMode(mode: PreviewMode) {
+  document.documentElement.dataset.adminPreview = mode;
+  document.documentElement.dataset.personalPreview = mode;
+  window.dispatchEvent(new CustomEvent<PreviewMode>("admin-preview-mode-change", { detail: mode }));
+}
 
 function getDefaultMode(): PreviewMode {
   if (typeof window === "undefined") {
     return "desktop";
   }
-  const stored = window.localStorage.getItem(STORAGE_KEY);
+  const stored = window.localStorage.getItem(STORAGE_KEY) || window.localStorage.getItem(LEGACY_STORAGE_KEY);
   if (stored === "desktop" || stored === "mobile") {
     return stored;
   }
@@ -23,14 +30,15 @@ export default function PersonalViewportToggle() {
   useEffect(() => {
     const next = getDefaultMode();
     setMode(next);
-    document.documentElement.dataset.personalPreview = next;
+    applyMode(next);
   }, []);
 
   function toggleMode() {
     setMode((current) => {
       const next = current === "desktop" ? "mobile" : "desktop";
-      document.documentElement.dataset.personalPreview = next;
+      applyMode(next);
       window.localStorage.setItem(STORAGE_KEY, next);
+      window.localStorage.setItem(LEGACY_STORAGE_KEY, next);
       return next;
     });
   }
@@ -40,7 +48,7 @@ export default function PersonalViewportToggle() {
   return (
     <button
       type="button"
-      className="personal-preview-toggle"
+      className="personal-preview-toggle admin-viewport-toggle"
       onClick={toggleMode}
       aria-label={`Switch to ${isMobile ? "desktop" : "mobile"} preview mode`}
       title={`Viewing ${isMobile ? "mobile" : "desktop"} mode`}

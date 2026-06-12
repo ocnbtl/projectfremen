@@ -661,6 +661,41 @@
   }
 }
 
+html[data-admin-preview="mobile"] .admin-home-shell.admin-chrome-main,
+html[data-admin-preview="mobile"] .personal-ops-shell.admin-chrome-main {
+  padding-top: 92px !important;
+}
+
+html[data-admin-preview="mobile"] .command-center-grid,
+html[data-admin-preview="mobile"] .ops-workspace {
+  width: auto;
+  grid-template-columns: 1fr;
+  margin-right: 0;
+}
+
+html[data-admin-preview="mobile"] .command-hero,
+html[data-admin-preview="mobile"] .ops-header,
+html[data-admin-preview="mobile"] .command-bottom-grid,
+html[data-admin-preview="mobile"] .command-metric-grid,
+html[data-admin-preview="mobile"] .command-lanes,
+html[data-admin-preview="mobile"] .ops-stats {
+  grid-template-columns: 1fr;
+}
+
+html[data-admin-preview="mobile"] .command-hero-actions {
+  align-items: stretch;
+  min-width: 0;
+}
+
+html[data-admin-preview="mobile"] .command-hero h1,
+html[data-admin-preview="mobile"] .ops-header h1 {
+  font-size: clamp(36px, 12vw, 52px);
+}
+
+html[data-admin-preview="mobile"] .ops-header-search {
+  display: none;
+}
+
 /* Figma transfer slice: module workspaces. */
 .module-ref-shell {
   min-height: 100vh;
@@ -1687,4 +1722,63 @@
   .people-profile-rail {
     position: static;
   }
+}
+
+html[data-admin-preview="mobile"] .module-ref-shell.admin-chrome-main {
+  padding-top: 92px !important;
+}
+
+html[data-admin-preview="mobile"] .module-ref-header,
+html[data-admin-preview="mobile"] .module-ref-stat-grid,
+html[data-admin-preview="mobile"] .module-ref-card-strip,
+html[data-admin-preview="mobile"] .notes-operating-strip,
+html[data-admin-preview="mobile"] .notes-lower-grid,
+html[data-admin-preview="mobile"] .notes-capture-grid,
+html[data-admin-preview="mobile"] .people-operating-strip,
+html[data-admin-preview="mobile"] .people-lower-grid,
+html[data-admin-preview="mobile"] .people-capture-grid,
+html[data-admin-preview="mobile"] .people-profile-field-grid,
+html[data-admin-preview="mobile"] .module-ref-lanes,
+html[data-admin-preview="mobile"] .module-ref-tile-grid {
+  grid-template-columns: 1fr;
+}
+
+html[data-admin-preview="mobile"] .module-ref-header,
+html[data-admin-preview="mobile"] .module-ref-content,
+html[data-admin-preview="mobile"] .notes-operating-strip,
+html[data-admin-preview="mobile"] .people-operating-strip {
+  width: auto;
+  margin-right: 0;
+}
+
+html[data-admin-preview="mobile"] .module-ref-content {
+  grid-template-columns: 1fr;
+}
+
+html[data-admin-preview="mobile"] .module-ref-search {
+  display: none;
+}
+
+html[data-admin-preview="mobile"] .module-ref-row,
+html[data-admin-preview="mobile"] .module-ref-table-row,
+html[data-admin-preview="mobile"] .people-contact-row,
+html[data-admin-preview="mobile"] .module-ref-field,
+html[data-admin-preview="mobile"] .module-ref-field-grid,
+html[data-admin-preview="mobile"] .module-ref-list-item {
+  grid-template-columns: 1fr;
+}
+
+html[data-admin-preview="mobile"] .module-ref-row::before,
+html[data-admin-preview="mobile"] .module-ref-table-row::before,
+html[data-admin-preview="mobile"] .people-contact-row::before,
+html[data-admin-preview="mobile"] .module-ref-list-item::before {
+  display: none;
+}
+
+html[data-admin-preview="mobile"] .module-ref-shell h1 {
+  font-size: clamp(36px, 12vw, 52px);
+}
+
+html[data-admin-preview="mobile"] .people-profile-rail {
+  position: static;
 }

@@ -1,6 +1,5 @@
 import Link from "next/link";
 import AdminChrome from "../../../components/AdminChrome";
-import PersonalViewportToggle from "../../../components/PersonalViewportToggle";
 import {
   PERSONAL_SYSTEM_DOMAINS,
   PERSONAL_SYSTEM_GUARDRAILS,
@@ -145,7 +144,6 @@ export default async function PersonalOpsPage() {
           </section>
         }
       />
-      <PersonalViewportToggle />
 
       <header className="ops-header">
         <div>

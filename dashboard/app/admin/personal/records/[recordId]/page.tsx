@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import AdminChrome from "../../../../../components/AdminChrome";
-import PersonalViewportToggle from "../../../../../components/PersonalViewportToggle";
 import { getPersonalSystemDomain } from "../../../../../lib/personal-systems";
 import {
   readPersonalRecords,
@@ -164,7 +163,6 @@ export default async function PersonalRecordPage({
           { label: "All Notes", href: "/admin/notes" }
         ]}
       />
-      <PersonalViewportToggle />
       <header className="topbar personal-domain-topbar">
         <div>
           <p className="muted personal-ops-kicker">Personal note</p>

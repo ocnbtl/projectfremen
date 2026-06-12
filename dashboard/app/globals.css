@@ -1955,23 +1955,22 @@ a {
 }
 
 .personal-preview-toggle {
-  position: fixed;
-  top: 82px;
-  right: 18px;
-  z-index: 60;
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 8px;
   width: auto;
-  min-height: 38px;
+  min-height: 34px;
   padding: 0 12px;
   border: 1px solid #bfd2db;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.96);
   color: #123445;
-  box-shadow: 0 10px 24px rgba(16, 32, 38, 0.12);
+  box-shadow: 0 8px 18px rgba(16, 32, 38, 0.1);
   font-size: 12px;
   font-weight: 900;
+  white-space: nowrap;
+  cursor: pointer;
 }
 
 .personal-preview-toggle-icon {
@@ -1991,10 +1990,56 @@ a {
   height: 22px;
 }
 
+html[data-admin-preview="mobile"] .admin-global-topnav {
+  left: auto;
+  right: 16px;
+  width: min(430px, calc(100vw - 32px));
+  transform: none;
+}
+
+html[data-admin-preview="mobile"] .admin-global-brand strong {
+  display: none;
+}
+
+html[data-admin-preview="mobile"] .admin-global-links {
+  justify-content: flex-start;
+  overflow-x: auto;
+}
+
+html[data-admin-preview="mobile"] .admin-command-search {
+  display: none;
+}
+
+html[data-admin-preview="mobile"] .admin-chrome-main,
 html[data-personal-preview="mobile"] .personal-ops-shell {
+  width: min(430px, calc(100vw - 24px));
   max-width: 430px;
   padding-left: 12px;
   padding-right: 12px;
+}
+
+html[data-admin-preview="mobile"] .shell.admin-chrome-main {
+  margin-left: auto;
+  margin-right: 12px;
+}
+
+html[data-admin-preview="mobile"] .admin-shell.admin-chrome-main {
+  margin-left: auto;
+  margin-right: 12px;
+  padding-left: 12px;
+}
+
+html[data-admin-preview="mobile"] .admin-page-sidebar {
+  position: relative;
+  top: auto;
+  left: auto;
+  width: 100%;
+  max-height: none;
+  margin: 0 0 16px;
+}
+
+html[data-admin-preview="mobile"] .admin-page-sidebar-inner {
+  max-height: none;
 }
 
 html[data-personal-preview="mobile"] .personal-ops-layout,
@@ -2027,9 +2072,12 @@ html[data-personal-preview="mobile"] .personal-command-actions {
   grid-template-columns: 1fr;
 }
 
-html[data-personal-preview="mobile"] .personal-preview-toggle {
-  top: 76px;
-  right: 12px;
+html[data-admin-preview="mobile"] .personal-preview-toggle {
+  padding: 0 10px;
+}
+
+html[data-admin-preview="mobile"] .personal-preview-toggle > span:last-child {
+  display: none;
 }
 
 .card h2,
@@ -2090,6 +2138,13 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 14px;
+}
+
+html[data-admin-preview="mobile"] table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  white-space: nowrap;
 }
 
 th,
@@ -2965,9 +3020,16 @@ select {
   }
 
   .admin-page-sidebar {
-    top: 70px;
-    left: 10px;
-    width: min(250px, calc(100vw - 20px));
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    max-height: none;
+    margin: 0 0 16px;
+  }
+
+  .admin-page-sidebar-inner {
+    max-height: none;
   }
 
   .admin-chrome-main {
@@ -2986,6 +3048,13 @@ select {
 
   .local-ai-settings {
     grid-template-columns: 1fr;
+  }
+
+  table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
   }
 
   .admin-home-grid {

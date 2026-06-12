@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { ADMIN_NAV_ITEMS } from "../lib/admin-navigation";
+import PersonalViewportToggle from "./PersonalViewportToggle";
 
 type SidebarItem = {
   label: string;
@@ -23,6 +24,14 @@ export type AdminChromeProps = {
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
 const AI_ENDPOINT_STORAGE_KEY = "local-ai-endpoint";
 const AI_MODEL_STORAGE_KEY = "local-ai-model";
+
+function isMobilePreviewMode() {
+  return (
+    document.documentElement.dataset.adminPreview === "mobile" ||
+    window.localStorage.getItem("admin-preview-mode") === "mobile" ||
+    window.matchMedia("(max-width: 760px)").matches
+  );
+}
 
 function AdminTopNav({ showCommandSearch = true }: { showCommandSearch?: boolean }) {
   const [projectsOpen, setProjectsOpen] = useState(false);
@@ -66,6 +75,7 @@ function AdminTopNav({ showCommandSearch = true }: { showCommandSearch?: boolean
           )
         )}
       </nav>
+      <PersonalViewportToggle />
       {showCommandSearch && (
         <div className="admin-command-search" role="search" aria-label="Admin command search">
           <span aria-hidden="true">/</span>
@@ -93,7 +103,20 @@ function AdminPageSidebar({
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
-    setCollapsed(window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1");
+    const stored = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+    setCollapsed(isMobilePreviewMode() ? true : stored === "1");
+
+    function handlePreviewChange(event: Event) {
+      const mode = (event as CustomEvent<"desktop" | "mobile">).detail;
+      if (mode === "mobile") {
+        setCollapsed(true);
+      } else {
+        setCollapsed(window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === "1");
+      }
+    }
+
+    window.addEventListener("admin-preview-mode-change", handlePreviewChange);
+    return () => window.removeEventListener("admin-preview-mode-change", handlePreviewChange);
   }, []);
 
   function toggleSidebar() {
@@ -470,6 +493,22 @@ export default function AdminChrome({
         .module-table span {
           min-width: 0;
           overflow-wrap: anywhere;
+        }
+
+        html[data-admin-preview="mobile"] .admin-command-search {
+          display: none;
+        }
+
+        html[data-admin-preview="mobile"] .grid-2,
+        html[data-admin-preview="mobile"] .grid-3,
+        html[data-admin-preview="mobile"] .grid-4,
+        html[data-admin-preview="mobile"] .module-layout,
+        html[data-admin-preview="mobile"] .module-table > div {
+          grid-template-columns: 1fr;
+        }
+
+        html[data-admin-preview="mobile"] .module-table > div {
+          align-items: start;
         }
 
         @media (max-width: 900px) {
