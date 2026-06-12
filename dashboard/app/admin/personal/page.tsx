@@ -121,6 +121,7 @@ export default async function PersonalOpsPage() {
   return (
     <main className="shell personal-ops-shell admin-chrome-main">
       <AdminChrome
+        showCommandSearch={false}
         sidebarTitle="Personal Ops"
         sidebarSummary="Dashboard-native notes, relationships, review metadata, and source context."
         sidebarItems={[

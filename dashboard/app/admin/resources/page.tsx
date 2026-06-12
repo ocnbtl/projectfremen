@@ -18,6 +18,7 @@ export default async function ResourcesPage() {
   return (
     <main className="shell admin-chrome-main module-ref-shell resource-module-shell">
       <AdminChrome
+        showCommandSearch={false}
         sidebarTitle="Resources"
         sidebarSummary="Podcasts, articles, posts, images, references, and saved ideas."
         sidebarItems={[
@@ -61,11 +62,11 @@ export default async function ResourcesPage() {
               </Link>
             </div>
             <div className="module-ref-chip-row">
-              <span>Article</span>
-              <span>Podcast</span>
-              <span>Image</span>
-              <span>Social post</span>
-              <span>Quote</span>
+              <span className="module-ref-tone-blue">Article</span>
+              <span className="module-ref-tone-orange">Podcast</span>
+              <span className="module-ref-tone-cyan">Image</span>
+              <span className="module-ref-tone-pink">Social post</span>
+              <span className="module-ref-tone-purple">Quote</span>
             </div>
             <p>
               Save item, classify source type, add topic tags, connect to notes/projects, and mark

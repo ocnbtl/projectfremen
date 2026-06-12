@@ -23,6 +23,7 @@ export default async function MonthlyReviewPage({
   return (
     <main className="shell admin-chrome-main module-ref-shell reviews-module-shell">
       <AdminChrome
+        showCommandSearch={false}
         sidebarTitle="Monthly Review"
         sidebarSummary="Higher-level review history across finance, resources, media, people, and system state."
         sidebarItems={[

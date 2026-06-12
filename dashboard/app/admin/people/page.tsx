@@ -26,6 +26,7 @@ export default async function PeoplePage() {
   return (
     <main className="shell admin-chrome-main module-ref-shell people-module-shell">
       <AdminChrome
+        showCommandSearch={false}
         sidebarTitle="People"
         sidebarSummary="Contacts, cadence, follow-ups, relationships, and profile context."
         sidebarItems={[
@@ -55,7 +56,7 @@ export default async function PeoplePage() {
         </div>
         <label className="module-ref-search">
           <span aria-hidden="true">/</span>
-          <input aria-label="Search people" placeholder="Search people, dates, notes" />
+          <input aria-label="Search people" placeholder="Search notes, files, people, reviews" />
           <kbd>people</kbd>
         </label>
       </header>
@@ -64,8 +65,8 @@ export default async function PeoplePage() {
         <div className="module-ref-main">
           <article className="module-ref-panel">
             <div className="module-ref-section-title">
-              <h2>Contact cadence board</h2>
-              <span>CRM Starting Point</span>
+              <h2>Contact cadence</h2>
+              <span className="module-ref-regression-sentinel">CRM Starting Point</span>
             </div>
             <div className="module-ref-row-list">
               {cadenceRows.map(([name, last, next, cadence, tone]) => (
@@ -87,18 +88,22 @@ export default async function PeoplePage() {
               </Link>
             </div>
             <div className="module-ref-chip-row">
-              <span>Family</span>
-              <span>Collaborators</span>
-              <span>Friends</span>
-              <span>Vendors</span>
+              <span className="module-ref-tone-pink">Family</span>
+              <span className="module-ref-tone-blue">Collaborators</span>
+              <span className="module-ref-tone-green">Friends</span>
+              <span className="module-ref-tone-orange">Vendors</span>
             </div>
-            <div className="module-ref-row-list">
-              {contactGroups.map(([name, state]) => (
-                <div className="module-ref-row" key={name}>
-                  <strong>{name}</strong>
-                  <span>{state}</span>
+            <div className="module-ref-list">
+              {contactGroups.map(([name, state], index) => (
+                <div
+                  className={`module-ref-list-item module-ref-tone-${["pink", "blue", "green", "orange"][index]}`}
+                  key={name}
+                >
+                  <div>
+                    <strong>{name}</strong>
+                    <span>{state}</span>
+                  </div>
                   <span>Open profile</span>
-                  <span>Relationship notes</span>
                 </div>
               ))}
             </div>
@@ -114,7 +119,7 @@ export default async function PeoplePage() {
             Contact info, cadence, relationship notes, files, connected projects, and follow-up
             history stay in one dashboard-native profile.
           </p>
-          <div className="module-ref-field-list">
+          <div className="module-ref-field-grid">
             {[
               ["Last talked", "Apr 12"],
               ["Next contact", "Jun 12"],
@@ -129,11 +134,14 @@ export default async function PeoplePage() {
               </div>
             ))}
           </div>
-          <div className="module-ref-activity-list">
+          <div className="module-ref-list">
             {["Sent portfolio draft", "Mentioned July travel", "Waiting on feedback"].map((item) => (
-              <div className="module-ref-activity" key={item}>
-                <strong>{item}</strong>
-                <span>Recent note</span>
+              <div className="module-ref-list-item module-ref-tone-blue" key={item}>
+                <div>
+                  <strong>{item}</strong>
+                  <span>Recent note</span>
+                </div>
+                <span>View</span>
               </div>
             ))}
           </div>

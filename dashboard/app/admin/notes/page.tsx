@@ -34,6 +34,7 @@ export default async function NotesPage() {
   return (
     <main className="shell admin-chrome-main module-ref-shell notes-module-shell">
       <AdminChrome
+        showCommandSearch={false}
         sidebarTitle="Notes"
         sidebarSummary="Dashboard-native objects grouped by properties, workflow, and review state."
         sidebarItems={[
@@ -62,7 +63,7 @@ export default async function NotesPage() {
         </div>
         <label className="module-ref-search">
           <span aria-hidden="true">/</span>
-          <input aria-label="Search notes" placeholder="Search notes, properties, sources" />
+          <input aria-label="Search notes" placeholder="Search notes, goals, modules" />
           <kbd>notes</kbd>
         </label>
       </header>
@@ -77,12 +78,12 @@ export default async function NotesPage() {
               </Link>
             </div>
             <div className="module-ref-chip-row">
-              <span>Notes</span>
-              <span>Vault</span>
-              <span>Review</span>
-              <span>Sources</span>
-              <span>Media</span>
-              <span>Filters</span>
+              <span className="module-ref-regression-sentinel">Vault</span>
+              <span className="module-ref-tone-pink">Notes</span>
+              <span className="module-ref-tone-crimson">Review</span>
+              <span className="module-ref-tone-brown">Sources</span>
+              <span className="module-ref-tone-cyan">Media</span>
+              <span className="module-ref-tone-blue">Filters</span>
             </div>
             <div className="module-ref-table">
               {noteRows.map(([title, type, category, owner, status, updated, tone, id]) => {
@@ -94,6 +95,7 @@ export default async function NotesPage() {
                     <span>{owner}</span>
                     <span>{status}</span>
                     <span>{updated}</span>
+                    <span className="module-ref-open-button">Open</span>
                   </div>
                 );
 
@@ -131,14 +133,40 @@ export default async function NotesPage() {
                 ))}
               </div>
             </article>
-            <article className="module-ref-lane">
-              <h3>Color map</h3>
+          </section>
+        </div>
+
+        <aside className="module-ref-rail-stack">
+          <section className="module-ref-detail">
+            <div className="module-ref-detail-title">
+              <span className="module-ref-eyebrow module-ref-tone-pink">Selected note</span>
+              <h2>{noteRows[0]?.[0] || "Garden planning note"}</h2>
+            </div>
+            <p>
+              The detail view stays in the dashboard shell: properties, relationships, source
+              context, review fields, and activity remain visible.
+            </p>
+            <div className="module-ref-field-grid">
+              {[
+                ["Type", noteRows[0]?.[1] || "Note"],
+                ["Category", noteRows[0]?.[2] || "Personal Ops"],
+                ["Owner", noteRows[0]?.[3] || "Missing"],
+                ["Status", noteRows[0]?.[4] || "Review"]
+              ].map(([label, value]) => (
+                <div className="module-ref-field" key={label}>
+                  <strong>{label}</strong>
+                  <span>{value}</span>
+                </div>
+              ))}
+            </div>
+            <div className="module-ref-review-card">
+              <h3>Review fields</h3>
               <div className="module-ref-field-list">
                 {[
-                  ["Pink", "Notes and personal objects"],
-                  ["Crimson", "Blocked review state"],
-                  ["Cyan", "Media and discovery"],
-                  ["Brown", "Sources and archives"]
+                  ["Review", "Visible"],
+                  ["Source context", "Optional Files"],
+                  ["Linked goals", "3"],
+                  ["Last activity", "Today"]
                 ].map(([label, value]) => (
                   <div className="module-ref-field" key={label}>
                     <strong>{label}</strong>
@@ -146,34 +174,27 @@ export default async function NotesPage() {
                   </div>
                 ))}
               </div>
-            </article>
+            </div>
           </section>
-        </div>
-
-        <aside className="module-ref-detail">
-          <div className="module-ref-detail-title">
-            <span className="module-ref-eyebrow module-ref-tone-pink">Selected note</span>
-            <h2>{noteRows[0]?.[0] || "Garden planning note"}</h2>
-          </div>
-          <p>
-            The detail view stays in the dashboard shell: properties, relationships, source
-            context, review fields, and activity remain visible.
-          </p>
-          <div className="module-ref-field-list">
-            {[
-              ["Type", noteRows[0]?.[1] || "Note"],
-              ["Category", noteRows[0]?.[2] || "Personal Ops"],
-              ["Owner", noteRows[0]?.[3] || "Missing"],
-              ["Status", noteRows[0]?.[4] || "Review"],
-              ["Review fields", "Visible"],
-              ["Source context", "Optional Files"]
-            ].map(([label, value]) => (
-              <div className="module-ref-field" key={label}>
-                <strong>{label}</strong>
-                <span>{value}</span>
-              </div>
-            ))}
-          </div>
+          <section className="module-ref-panel">
+            <div className="module-ref-section-title">
+              <h2>Note color logic</h2>
+              <span>Adaptive</span>
+            </div>
+            <div className="module-ref-field-list">
+              {[
+                ["Pink", "Notes and personal objects"],
+                ["Crimson", "Blocked review state"],
+                ["Cyan", "Media and discovery"],
+                ["Brown", "Sources and archives"]
+              ].map(([label, value]) => (
+                <div className="module-ref-field" key={label}>
+                  <strong>{label}</strong>
+                  <span>{value}</span>
+                </div>
+              ))}
+            </div>
+          </section>
         </aside>
       </section>
     </main>

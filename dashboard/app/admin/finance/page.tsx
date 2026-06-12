@@ -38,6 +38,7 @@ export default async function FinancePage() {
   return (
     <main className="shell admin-chrome-main module-ref-shell finance-module-shell">
       <AdminChrome
+        showCommandSearch={false}
         sidebarTitle="Finance"
         sidebarSummary="Cash flow, accounts, budgets, bills, subscriptions, and financial reviews."
         sidebarItems={[

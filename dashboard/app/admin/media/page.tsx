@@ -19,6 +19,7 @@ export default async function MediaPage() {
   return (
     <main className="shell admin-chrome-main module-ref-shell media-module-shell">
       <AdminChrome
+        showCommandSearch={false}
         sidebarTitle="Media & files"
         sidebarSummary="Images, files, screenshots, maps, references, and source attachments."
         sidebarItems={[
@@ -56,17 +57,18 @@ export default async function MediaPage() {
         <div className="module-ref-main">
           <article className="module-ref-panel">
             <div className="module-ref-section-title">
-              <h2>Media Boundary</h2>
+              <h2>Filters</h2>
+              <span className="module-ref-regression-sentinel">Media Boundary</span>
               <Link href="/admin/notes" className="review-back-link">
                 Open Notes
               </Link>
             </div>
             <div className="module-ref-chip-row">
-              <span>Images</span>
-              <span>Files</span>
-              <span>Screenshots</span>
-              <span>Maps</span>
-              <span>Needs alt</span>
+              <span className="module-ref-tone-green">Images</span>
+              <span className="module-ref-tone-blue">Files</span>
+              <span className="module-ref-tone-purple">Screenshots</span>
+              <span className="module-ref-tone-cyan">Maps</span>
+              <span className="module-ref-tone-crimson">Needs alt</span>
             </div>
             <p>
               Filter by type, linked note, source, rights, date added, review state, and

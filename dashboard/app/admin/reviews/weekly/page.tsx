@@ -28,6 +28,7 @@ export default async function WeeklyReviewPage({
   return (
     <main className="shell admin-chrome-main module-ref-shell reviews-module-shell">
       <AdminChrome
+        showCommandSearch={false}
         sidebarTitle="Reviews"
         sidebarSummary="Weekly, monthly, and focused checks across the operating system."
         sidebarItems={[

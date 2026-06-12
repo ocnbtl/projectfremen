@@ -138,6 +138,7 @@ export default async function AdminPage({
   return (
     <main className="admin-shell admin-home-shell admin-chrome-main">
       <AdminChrome
+        showCommandSearch={false}
         sidebarTitle="Command Center"
         sidebarSummary="Home base for projects, reviews, KPIs, and personal systems."
         sidebarItems={[

@@ -17,13 +17,14 @@ export type AdminChromeProps = {
   sidebarItems?: SidebarItem[];
   sidebarActions?: SidebarItem[];
   sidebarChildren?: ReactNode;
+  showCommandSearch?: boolean;
 };
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
 const AI_ENDPOINT_STORAGE_KEY = "local-ai-endpoint";
 const AI_MODEL_STORAGE_KEY = "local-ai-model";
 
-function AdminTopNav() {
+function AdminTopNav({ showCommandSearch = true }: { showCommandSearch?: boolean }) {
   const [projectsOpen, setProjectsOpen] = useState(false);
   const closeProjects = () => setProjectsOpen(false);
 
@@ -65,11 +66,13 @@ function AdminTopNav() {
           )
         )}
       </nav>
-      <div className="admin-command-search" role="search" aria-label="Admin command search">
-        <span aria-hidden="true">/</span>
-        <input aria-label="Search notes, files, people, reviews" placeholder="Search notes, files, people, reviews" />
-        <kbd>cmd k</kbd>
-      </div>
+      {showCommandSearch && (
+        <div className="admin-command-search" role="search" aria-label="Admin command search">
+          <span aria-hidden="true">/</span>
+          <input aria-label="Search notes, files, people, reviews" placeholder="Search notes, files, people, reviews" />
+          <kbd>cmd k</kbd>
+        </div>
+      )}
     </header>
   );
 }
@@ -298,11 +301,12 @@ export default function AdminChrome({
   sidebarSummary,
   sidebarItems,
   sidebarActions,
-  sidebarChildren
+  sidebarChildren,
+  showCommandSearch
 }: AdminChromeProps) {
   return (
     <>
-      <AdminTopNav />
+      <AdminTopNav showCommandSearch={showCommandSearch} />
       <AdminPageSidebar
         title={sidebarTitle}
         summary={sidebarSummary}
