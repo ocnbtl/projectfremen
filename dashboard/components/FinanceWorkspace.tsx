@@ -22,6 +22,7 @@ type ViewId = "overview" | "accounts" | "budgets" | "bills" | "review" | "transa
 type BillStatus = "due" | "soon" | "scheduled" | "paid" | "overdue";
 type Recurring = "monthly" | "annual" | "weekly" | null;
 type ModalKind = "record" | "filter" | "account" | "category" | "bill" | "columns" | "pay" | "transfer" | null;
+type TxnIo = "income" | "expense" | "transfer" | "savings";
 
 type AccountKind = "Checking" | "Savings" | "Credit" | "Brokerage" | "Cash" | "Business";
 
@@ -59,16 +60,35 @@ interface Bill {
   recurring: Recurring;
   autopay: boolean;
   icon: string;
+  brandColors: [string, string, string];
 }
 
 interface Txn {
   id: string;
   date: string;
+  quarter: "Q1" | "Q2" | "Q3" | "Q4";
+  quarterYear: string;
+  week: number;
+  weekYear: string;
+  weekdayName: string;
+  weekdayNum: number;
+  tzOffset: string;
+  entity: string;
   merchant: string;
   account: string;
+  accountType: AccountKind;
   category: string;
+  spendCategory: string;
   hue: Hue;
   amount: number;
+  io: TxnIo;
+  currency: "USD";
+  memo: string;
+  receipt: string;
+  incomeSource: string;
+  reimbursable: boolean;
+  reimbursedOn: string;
+  ufInit: boolean;
   status: "cleared" | "pending";
 }
 
@@ -149,27 +169,40 @@ const budgets: Budget[] = [
 ];
 
 const bills: Bill[] = [
-  { id: "aws", name: "AWS", amount: 188.4, due: "Jun 12", dueIn: 0, status: "overdue", account: "Unigentamos LLC", category: "Software & SaaS", hue: "orange", recurring: "monthly", autopay: false, icon: "Server" },
-  { id: "studio-rent", name: "Studio Rent", amount: 2400, due: "Jun 15", dueIn: 3, status: "due", account: "Operating", category: "Home & Utilities", hue: "crimson", recurring: "monthly", autopay: false, icon: "Building" },
-  { id: "adobe", name: "Adobe Creative Cloud", amount: 59.99, due: "Jun 14", dueIn: 2, status: "soon", account: "Studio Card", category: "Software & SaaS", hue: "cyan", recurring: "monthly", autopay: true, icon: "Cloud" },
-  { id: "phone", name: "Phone & Data", amount: 78, due: "Jun 16", dueIn: 4, status: "soon", account: "Operating", category: "Home & Utilities", hue: "blue", recurring: "monthly", autopay: true, icon: "Phone" },
-  { id: "health", name: "Health Insurance", amount: 412, due: "Jun 18", dueIn: 6, status: "scheduled", account: "Operating", category: "Health", hue: "green", recurring: "monthly", autopay: true, icon: "Heart" },
-  { id: "figma", name: "Figma Org", amount: 45, due: "Jun 20", dueIn: 8, status: "scheduled", account: "Unigentamos LLC", category: "Software & SaaS", hue: "violet", recurring: "monthly", autopay: true, icon: "Pen" },
-  { id: "notion", name: "Notion Team", amount: 32, due: "Jun 22", dueIn: 10, status: "scheduled", account: "Operating", category: "Software & SaaS", hue: "indigo", recurring: "monthly", autopay: true, icon: "Notebook" },
-  { id: "domain", name: "Domain Renewal", amount: 22, due: "Jun 09", dueIn: -3, status: "paid", account: "Studio Card", category: "Software & SaaS", hue: "neutral", recurring: "annual", autopay: true, icon: "Globe" }
+  { id: "aws", name: "AWS", amount: 188.4, due: "Jun 12", dueIn: 0, status: "overdue", account: "Unigentamos LLC", category: "Software & SaaS", hue: "orange", recurring: "monthly", autopay: false, icon: "Server", brandColors: ["#ff9900", "#232f3e", "#ec7211"] },
+  { id: "studio-rent", name: "Studio Rent", amount: 2400, due: "Jun 15", dueIn: 3, status: "due", account: "Operating", category: "Home & Utilities", hue: "crimson", recurring: "monthly", autopay: false, icon: "Building", brandColors: ["#a855f7", "#e11d48", "#f97316"] },
+  { id: "adobe", name: "Adobe Creative Cloud", amount: 59.99, due: "Jun 14", dueIn: 2, status: "soon", account: "Studio Card", category: "Software & SaaS", hue: "cyan", recurring: "monthly", autopay: true, icon: "Cloud", brandColors: ["#ff0000", "#fa0f00", "#470137"] },
+  { id: "phone", name: "Phone & Data", amount: 78, due: "Jun 16", dueIn: 4, status: "soon", account: "Operating", category: "Home & Utilities", hue: "blue", recurring: "monthly", autopay: true, icon: "Phone", brandColors: ["#0ea5e9", "#2563eb", "#22d3ee"] },
+  { id: "health", name: "Health Insurance", amount: 412, due: "Jun 18", dueIn: 6, status: "scheduled", account: "Operating", category: "Health", hue: "green", recurring: "monthly", autopay: true, icon: "Heart", brandColors: ["#16a34a", "#14b8a6", "#86efac"] },
+  { id: "figma", name: "Figma Org", amount: 45, due: "Jun 20", dueIn: 8, status: "scheduled", account: "Unigentamos LLC", category: "Software & SaaS", hue: "violet", recurring: "monthly", autopay: true, icon: "Pen", brandColors: ["#f24e1e", "#a259ff", "#1abcfe"] },
+  { id: "notion", name: "Notion Team", amount: 32, due: "Jun 22", dueIn: 10, status: "scheduled", account: "Operating", category: "Software & SaaS", hue: "indigo", recurring: "monthly", autopay: true, icon: "Notebook", brandColors: ["#18181b", "#71717a", "#f4f4f5"] },
+  { id: "domain", name: "Domain Renewal", amount: 22, due: "Jun 09", dueIn: -3, status: "paid", account: "Studio Card", category: "Software & SaaS", hue: "neutral", recurring: "annual", autopay: true, icon: "Globe", brandColors: ["#71717a", "#d4d4d8", "#a1a1aa"] }
 ];
 
+function makeTxn(input: Omit<Txn, "currency" | "quarter" | "quarterYear" | "week" | "weekYear" | "tzOffset" | "ufInit"> & Partial<Pick<Txn, "quarter" | "quarterYear" | "week" | "weekYear" | "tzOffset" | "ufInit">>): Txn {
+  return {
+    currency: "USD",
+    quarter: "Q2",
+    quarterYear: "2026-Q2",
+    week: 24,
+    weekYear: "2026-W24",
+    tzOffset: "-0400",
+    ufInit: true,
+    ...input
+  };
+}
+
 const transactions: Txn[] = [
-  { id: "TX-7741", date: "Jun 12", merchant: "Apple Store", account: "Studio Card", category: "Studio & Tools", hue: "indigo", amount: -1299, status: "pending" },
-  { id: "TX-7740", date: "Jun 11", merchant: "Stripe Payout", account: "Operating", category: "Income", hue: "green", amount: 6840, status: "cleared" },
-  { id: "TX-7739", date: "Jun 11", merchant: "Blue Bottle", account: "Studio Card", category: "Food & Dining", hue: "orange", amount: -18.5, status: "cleared" },
-  { id: "TX-7738", date: "Jun 10", merchant: "AWS", account: "Unigentamos LLC", category: "Software & SaaS", hue: "cyan", amount: -188.4, status: "cleared" },
-  { id: "TX-7737", date: "Jun 10", merchant: "Whole Foods", account: "Operating", category: "Food & Dining", hue: "orange", amount: -132.18, status: "cleared" },
-  { id: "TX-7736", date: "Jun 09", merchant: "Delta Air Lines", account: "Studio Card", category: "Travel", hue: "teal", amount: -642, status: "cleared" },
-  { id: "TX-7735", date: "Jun 09", merchant: "Consulting - Lumen", account: "Unigentamos LLC", category: "Income", hue: "green", amount: 3200, status: "cleared" },
-  { id: "TX-7734", date: "Jun 08", merchant: "Figma", account: "Unigentamos LLC", category: "Software & SaaS", hue: "violet", amount: -45, status: "cleared" },
-  { id: "TX-7733", date: "Jun 08", merchant: "Uber", account: "Operating", category: "Travel", hue: "teal", amount: -27.4, status: "cleared" },
-  { id: "TX-7732", date: "Jun 07", merchant: "Notion", account: "Operating", category: "Software & SaaS", hue: "indigo", amount: -32, status: "cleared" }
+  makeTxn({ id: "TX-7741", date: "Jun 12", weekdayName: "Friday", weekdayNum: 5, entity: "Apple", merchant: "Apple Store", account: "Studio Card", accountType: "Credit", category: "Studio & Tools", spendCategory: "Hardware", hue: "indigo", amount: -1299, io: "expense", memo: "iPad Pro setup for dashboard review and design work.", receipt: "Apple receipt pending", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "pending" }),
+  makeTxn({ id: "TX-7740", date: "Jun 11", weekdayName: "Thursday", weekdayNum: 4, entity: "Stripe", merchant: "Stripe Payout", account: "Operating", accountType: "Checking", category: "Income", spendCategory: "", hue: "green", amount: 6840, io: "income", memo: "Weekly payout cleared to Operating.", receipt: "Stripe payout report", incomeSource: "Client revenue", reimbursable: false, reimbursedOn: "", status: "cleared" }),
+  makeTxn({ id: "TX-7739", date: "Jun 11", weekdayName: "Thursday", weekdayNum: 4, entity: "Blue Bottle", merchant: "Blue Bottle", account: "Studio Card", accountType: "Credit", category: "Food & Dining", spendCategory: "Meals", hue: "orange", amount: -18.5, io: "expense", memo: "Coffee before studio block.", receipt: "", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" }),
+  makeTxn({ id: "TX-7738", date: "Jun 10", weekdayName: "Wednesday", weekdayNum: 3, entity: "AWS", merchant: "AWS", account: "Unigentamos LLC", accountType: "Business", category: "Software & SaaS", spendCategory: "Infrastructure", hue: "cyan", amount: -188.4, io: "expense", memo: "June infra charge; no autopay on bill record.", receipt: "AWS invoice", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" }),
+  makeTxn({ id: "TX-7737", date: "Jun 10", weekdayName: "Wednesday", weekdayNum: 3, entity: "Whole Foods", merchant: "Whole Foods", account: "Operating", accountType: "Checking", category: "Food & Dining", spendCategory: "Groceries", hue: "orange", amount: -132.18, io: "expense", memo: "Weekly groceries.", receipt: "", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" }),
+  makeTxn({ id: "TX-7736", date: "Jun 09", weekdayName: "Tuesday", weekdayNum: 2, entity: "Delta", merchant: "Delta Air Lines", account: "Studio Card", accountType: "Credit", category: "Travel", spendCategory: "Flights", hue: "teal", amount: -642, io: "expense", memo: "Project travel; review for reimbursement.", receipt: "Delta itinerary", incomeSource: "", reimbursable: true, reimbursedOn: "", status: "cleared" }),
+  makeTxn({ id: "TX-7735", date: "Jun 09", weekdayName: "Tuesday", weekdayNum: 2, entity: "Lumen", merchant: "Consulting - Lumen", account: "Unigentamos LLC", accountType: "Business", category: "Income", spendCategory: "", hue: "green", amount: 3200, io: "income", memo: "Consulting invoice paid.", receipt: "Invoice 2026-06-LUM", incomeSource: "Consulting", reimbursable: false, reimbursedOn: "", status: "cleared" }),
+  makeTxn({ id: "TX-7734", date: "Jun 08", weekdayName: "Monday", weekdayNum: 1, entity: "Figma", merchant: "Figma", account: "Unigentamos LLC", accountType: "Business", category: "Software & SaaS", spendCategory: "Design tools", hue: "violet", amount: -45, io: "expense", memo: "Org seat.", receipt: "Figma invoice", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" }),
+  makeTxn({ id: "TX-7733", date: "Jun 08", weekdayName: "Monday", weekdayNum: 1, entity: "Uber", merchant: "Uber", account: "Operating", accountType: "Checking", category: "Travel", spendCategory: "Ground transport", hue: "teal", amount: -27.4, io: "expense", memo: "Ride from studio.", receipt: "Uber receipt", incomeSource: "", reimbursable: true, reimbursedOn: "", status: "cleared" }),
+  makeTxn({ id: "TX-7732", date: "Jun 07", weekdayName: "Sunday", weekdayNum: 7, entity: "Notion", merchant: "Notion", account: "Operating", accountType: "Checking", category: "Software & SaaS", spendCategory: "Knowledge tools", hue: "indigo", amount: -32, io: "expense", memo: "Team workspace.", receipt: "Notion invoice", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" })
 ];
 
 const initialReviewItems: ReviewItem[] = [
@@ -361,26 +394,26 @@ function Sparkline({ values, hue }: { values: number[]; hue: Hue }) {
 function CashflowChart({ compact = false }: { compact?: boolean }) {
   const income = [9.1, 8.8, 8.7, 10.6, 11.1, 10.4, 10.0, 11.4, 12.7, 12.4, 11.6, 10.0];
   const spend = [9.2, 8.7, 8.6, 10.5, 11.1, 10.5, 10.0, 11.2, 12.7, 12.5, 11.7, 10.1];
+  const savings = [1.6, 0.8, 1.1, 2.4, 3.0, -0.4, 1.2, 2.8, 3.4, 2.7, -0.6, 3.9];
   const width = 920;
   const height = compact ? 185 : 210;
   const padX = 48;
   const padY = 24;
   const plotH = height - padY * 2;
-  const points = polylinePoints(spend, width - padX - 12, plotH, 0)
-    .split(" ")
-    .map((point) => {
-      const [x, y] = point.split(",").map(Number);
-      return `${x + padX},${y + padY}`;
+  const yMin = -4;
+  const yMax = 16;
+  const toPoints = (values: number[]) => values
+    .map((value, index) => {
+      const x = padX + (index / Math.max(values.length - 1, 1)) * (width - padX - 12);
+      const y = padY + ((yMax - value) / (yMax - yMin)) * plotH;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
+  const points = toPoints(spend);
   const area = `${padX},${height - padY} ${points} ${width - 12},${height - padY}`;
-  const incomePoints = polylinePoints(income, width - padX - 12, plotH, 0)
-    .split(" ")
-    .map((point) => {
-      const [x, y] = point.split(",").map(Number);
-      return `${x + padX},${y + padY}`;
-    })
-    .join(" ");
+  const incomePoints = toPoints(income);
+  const savingsPoints = toPoints(savings);
+  const zeroY = padY + ((yMax - 0) / (yMax - yMin)) * plotH;
 
   return (
     <div className={classNames("finance-chart", compact && "is-compact")}>
@@ -395,18 +428,20 @@ function CashflowChart({ compact = false }: { compact?: boolean }) {
             <stop offset="100%" stopColor="#14b8a6" stopOpacity="0" />
           </linearGradient>
         </defs>
-        {[16, 12, 8, 4, 0].map((tick, index) => {
-          const y = padY + (index / 4) * plotH;
+        {[16, 12, 8, 4, 0, -4].map((tick) => {
+          const y = padY + ((yMax - tick) / (yMax - yMin)) * plotH;
           return (
             <g key={tick}>
-              <line x1={padX} x2={width - 12} y1={y} y2={y} />
+              <line className={tick === 0 ? "zero-line" : ""} x1={padX} x2={width - 12} y1={y} y2={y} />
               <text x="12" y={y + 4}>{tick}k</text>
             </g>
           );
         })}
+        <line className="savings-baseline" x1={padX} x2={width - 12} y1={zeroY} y2={zeroY} />
         <polygon points={area} fill="url(#financeSpendGradient)" />
         <polyline className="income-line" points={incomePoints} />
         <polyline className="spend-line" points={points} />
+        <polyline className="savings-line" points={savingsPoints} />
         {["Jan", "Feb", "Mar", "Apr", "May", "Jun"].map((label, index) => (
           <text className="axis-month" key={label} x={padX + (index / 5) * (width - padX - 12)} y={height - 4}>
             {label}
@@ -475,6 +510,114 @@ function SectionBand({ hue, label, count }: { hue: Hue; label: string; count: nu
   );
 }
 
+function transactionProperties(txn: Txn) {
+  return [
+    ["quarter", txn.quarter],
+    ["quarteryear", txn.quarterYear],
+    ["week", String(txn.week)],
+    ["weekyear", txn.weekYear],
+    ["weekday_name", txn.weekdayName],
+    ["weekday_num", String(txn.weekdayNum)],
+    ["tz_offset", txn.tzOffset],
+    ["entity", txn.entity],
+    ["account", txn.account],
+    ["amount", money(txn.amount, { sign: true, cents: true })],
+    ["io", txn.io],
+    ["currency", txn.currency],
+    ["account_type", txn.accountType],
+    ["spend_category", txn.spendCategory || "n/a"],
+    ["memo", txn.memo],
+    ["receipt", txn.receipt || "none"],
+    ["income_source", txn.incomeSource || "none"],
+    ["reimbursable", txn.reimbursable ? "true" : "false"],
+    ["reimbursed_on", txn.reimbursedOn || "none"],
+    ["uf_init", txn.ufInit ? "true" : "false"]
+  ];
+}
+
+function RecentTransactionsRail({ onNotice }: { onNotice: (notice: string) => void }) {
+  return (
+    <section className="finance-context-card finance-recent-card" aria-label="Recent transactions">
+      <div className="finance-context-heading">
+        <span><Swatch hue="blue" />Recent</span>
+        <strong>{transactions.length}</strong>
+      </div>
+      <div className="finance-recent-list">
+        {transactions.slice(0, 7).map((txn) => (
+          <button type="button" key={txn.id} onClick={() => onNotice(`${txn.merchant} opened from recent transactions.`)} style={hueStyle(txn.hue)}>
+            <span><Swatch hue={txn.hue} /><strong>{txn.merchant}</strong></span>
+            <small>{txn.date} · {txn.account}</small>
+            <em className={txn.amount > 0 ? "is-green" : ""}>{money(txn.amount, { sign: true, cents: true })}</em>
+          </button>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function SubscriptionValueRail({ onNotice }: { onNotice: (notice: string) => void }) {
+  const monthlyBills = bills.filter((bill) => bill.recurring);
+  const [expanded, setExpanded] = useState("");
+  const selected = monthlyBills.find((bill) => bill.id === expanded);
+  return (
+    <section className="finance-context-card finance-subscription-card" aria-label="Blind subscription value audit">
+      <div className="finance-context-heading">
+        <span><Swatch hue="violet" />Subscriptions</span>
+        <strong>{monthlyBills.length}</strong>
+      </div>
+      <p className="finance-context-copy">Judge the monthly cost first. Hover or click to reveal the vendor.</p>
+      <div className="finance-subscription-orbits">
+        {monthlyBills.map((bill) => (
+          <button
+            type="button"
+            key={bill.id}
+            className={classNames("finance-subscription-squircle", expanded === bill.id && "is-expanded")}
+            onClick={() => {
+              setExpanded(bill.id);
+              onNotice(`${bill.name} subscription selected for value review.`);
+            }}
+            style={{
+              ...hueStyle(bill.hue),
+              "--subscription-a": bill.brandColors[0],
+              "--subscription-b": bill.brandColors[1],
+              "--subscription-c": bill.brandColors[2]
+            } as React.CSSProperties}
+          >
+            <strong>{money(bill.amount, { cents: bill.amount % 1 !== 0 })}</strong>
+            <span>{bill.name}</span>
+          </button>
+        ))}
+      </div>
+      {selected && (
+        <div className="finance-subscription-detail" style={hueStyle(selected.hue)}>
+          <span>Selected</span>
+          <strong>{selected.name}</strong>
+          <small>{money(selected.amount, { cents: true })}/mo · {selected.account}</small>
+          <button type="button" onClick={() => onNotice(`${selected.name} expanded into subscription detail.`)}>Open detail</button>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function FinanceContextRail({ view, onNotice }: { view: ViewId; onNotice: (notice: string) => void }) {
+  if (view === "bills") {
+    return (
+      <aside className="finance-context-rail" aria-label="Finance context">
+        <SubscriptionValueRail onNotice={onNotice} />
+      </aside>
+    );
+  }
+  if (view === "overview" || view === "transactions") {
+    return (
+      <aside className="finance-context-rail" aria-label="Finance context">
+        <RecentTransactionsRail onNotice={onNotice} />
+      </aside>
+    );
+  }
+  return null;
+}
+
 function FinanceSidebar({
   view,
   setView,
@@ -536,18 +679,6 @@ function FinanceSidebar({
           </button>
         ))}
       </div>
-      <div className="finance-followups">
-        <div>
-          <Icon name="Calendar" />
-          <strong>Follow-ups</strong>
-        </div>
-        {reminders.slice(0, 3).map((item) => (
-          <button type="button" key={item.id} onClick={() => onSmart(item.id)} style={hueStyle(item.hue)}>
-            <Swatch hue={item.hue} />
-            <span>{item.text}</span>
-          </button>
-        ))}
-      </div>
     </aside>
   );
 }
@@ -589,7 +720,7 @@ function OverviewView({
         <Panel hue="teal" className="finance-span-2">
           <div className="finance-panel-heading">
             <h2>Cashflow <span>6 mo · $k</span></h2>
-            <div><Chip hue="teal" dot>in</Chip><Chip hue="orange" dot>out</Chip></div>
+            <div><Chip hue="teal" dot>in</Chip><Chip hue="orange" dot>out</Chip><Chip hue="indigo" dot>savings</Chip></div>
           </div>
           <CashflowChart compact />
           <div className="finance-cash-footer">
@@ -660,7 +791,7 @@ function AccountsView({
         subtitle="Balances, movement, and money in vs out"
         actions={<><HeaderAction icon="Sliders" onClick={() => onModal("filter")}>Group: Type</HeaderAction><HeaderAction icon="Plus" primary onClick={() => onModal("account")}>Link account</HeaderAction></>}
       />
-      <Panel hue="teal"><div className="finance-panel-heading"><h2>Cashflow <span>6 mo · $k</span></h2><div><Chip hue="teal" dot>in</Chip><Chip hue="orange" dot>out</Chip></div></div><CashflowChart /></Panel>
+      <Panel hue="teal"><div className="finance-panel-heading"><h2>Cashflow <span>6 mo · $k</span></h2><div><Chip hue="teal" dot>in</Chip><Chip hue="orange" dot>out</Chip><Chip hue="indigo" dot>savings</Chip></div></div><CashflowChart /></Panel>
       <Panel hue="blue" className="finance-ledger-panel">
         <div className="finance-panel-heading"><h2>All accounts <span>6</span></h2></div>
         {groups.map((group) => (
@@ -820,6 +951,25 @@ function ReviewView({
   );
 }
 
+function TransactionPropertiesPanel({ txn }: { txn: Txn }) {
+  return (
+    <Panel hue={txn.hue} className="finance-transaction-properties">
+      <div className="finance-panel-heading">
+        <h2>{txn.merchant} <span>{txn.id}</span></h2>
+        <Chip hue={txn.io === "income" ? "green" : txn.io === "savings" ? "indigo" : "neutral"}>{txn.io}</Chip>
+      </div>
+      <div className="finance-property-grid">
+        {transactionProperties(txn).map(([label, value]) => (
+          <div key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
 function TransactionsView({
   query,
   setQuery,
@@ -833,11 +983,13 @@ function TransactionsView({
   onModal: (modal: ModalKind) => void;
   onNotice: (notice: string) => void;
 }) {
+  const [selectedTxnId, setSelectedTxnId] = useState(transactions[0]?.id || "");
   const cleanQuery = query.trim().toLowerCase();
   const visible = transactions.filter((txn) => {
     const text = `${txn.date} ${txn.merchant} ${txn.account} ${txn.category} ${txn.amount} ${txn.id}`.toLowerCase();
     return (!pendingOnly || txn.status === "pending") && (!cleanQuery || text.includes(cleanQuery));
   });
+  const selectedTxn = visible.find((txn) => txn.id === selectedTxnId) || visible[0] || transactions[0];
   return (
     <>
       <WorkspaceHeader
@@ -852,7 +1004,15 @@ function TransactionsView({
       <Panel className="finance-transaction-table">
         <div className="finance-table-head"><span>Date</span><span>Merchant</span><span>Account</span><span>Category</span><span>Status</span><span>Amount</span></div>
         {visible.map((txn) => (
-          <button type="button" className="finance-table-row" key={txn.id} onClick={() => onNotice(`${txn.merchant} transaction detail shell opened.`)}>
+          <button
+            type="button"
+            className={classNames("finance-table-row", selectedTxn.id === txn.id && "is-selected")}
+            key={txn.id}
+            onClick={() => {
+              setSelectedTxnId(txn.id);
+              onNotice(`${txn.merchant} properties selected.`);
+            }}
+          >
             <span>{txn.date}</span>
             <strong><Swatch hue={txn.hue} />{txn.merchant} <small>{txn.id}</small></strong>
             <span>{txn.account}</span>
@@ -862,6 +1022,7 @@ function TransactionsView({
           </button>
         ))}
       </Panel>
+      {selectedTxn && <TransactionPropertiesPanel txn={selectedTxn} />}
     </>
   );
 }
@@ -896,52 +1057,6 @@ function RightRail({ account, onClose, onNotice }: { account: Account | null; on
   );
 }
 
-function FinanceAiDock({
-  open,
-  setOpen,
-  onModal,
-  onAudit
-}: {
-  open: boolean;
-  setOpen: (open: boolean) => void;
-  onModal: (modal: ModalKind) => void;
-  onAudit: () => void;
-}) {
-  if (!open) {
-    return (
-      <button type="button" className="finance-ai-pill" onClick={() => setOpen(true)}>
-        <span><Icon name="Sparkles" /></span>
-        Ask Finance AI
-      </button>
-    );
-  }
-  return (
-    <section className="finance-ai-panel" aria-label="Finance AI">
-      <div className="finance-ai-header"><span className="finance-ai-avatar"><Icon name="Sparkles" /></span><strong>Finance AI</strong><Chip hue="indigo">context: June</Chip><button type="button" onClick={() => setOpen(false)} aria-label="Close Finance AI"><Icon name="X" /></button></div>
-      <div className="finance-ai-body">
-        <p className="finance-ai-user">What needs my attention before the close?</p>
-        <div className="finance-ai-answer">
-          <p>Three things stand out for June:</p>
-          <ul>
-            <li><Swatch hue="crimson" /><span><strong>AWS $188.40</strong> is overdue with no autopay. Pay or schedule.</span></li>
-            <li><Swatch hue="orange" /><span><strong>Travel</strong> is 24% over budget after the Delta charge.</span></li>
-            <li><Swatch hue="violet" /><span>You have <strong>$5k surplus</strong>. I can draft a move to Reserve.</span></li>
-          </ul>
-        </div>
-      </div>
-      <div className="finance-ai-suggestions">
-        <button type="button" onClick={() => onModal("pay")}>Pay AWS now -&gt;</button>
-        <button type="button" onClick={() => onModal("transfer")}>Draft surplus transfer -&gt;</button>
-        <button type="button" onClick={onAudit}>Audit subscriptions -&gt;</button>
-      </div>
-      <form className="finance-ai-form" onSubmit={(event) => event.preventDefault()}>
-        <input placeholder="Ask about cashflow, bills, budgets..." />
-        <button type="submit" aria-label="Send Finance AI prompt"><Icon name="Send" /></button>
-      </form>
-    </section>
-  );
-}
-
 function ModalShell({ modal, onClose, onNotice }: { modal: ModalKind; onClose: () => void; onNotice: (notice: string) => void }) {
   if (!modal) return null;
   const content: Record<Exclude<ModalKind, null>, { title: string; body: string; fields: string[]; action: string }> = {
@@ -972,8 +1087,7 @@ function ModalShell({ modal, onClose, onNotice }: { modal: ModalKind; onClose: (
 
 export default function FinanceWorkspace() {
   const [view, setView] = useState<ViewId>("overview");
-  const [selected, setSelected] = useState<Account | null>(accounts[0]);
-  const [aiOpen, setAiOpen] = useState(false);
+  const [selected, setSelected] = useState<Account | null>(null);
   const [modal, setModal] = useState<ModalKind>(null);
   const [notice, setNotice] = useState("");
   const [smartFilter, setSmartFilter] = useState("");
@@ -982,6 +1096,7 @@ export default function FinanceWorkspace() {
   const [reviewItems, setReviewItems] = useState(initialReviewItems);
 
   const showRail = (view === "overview" || view === "accounts") && selected;
+  const showContext = view === "overview" || view === "bills" || view === "transactions";
   const activeSmart = useMemo(() => SMART_VIEWS.find((item) => item.id === smartFilter), [smartFilter]);
 
   function handleSmart(id: string) {
@@ -997,11 +1112,12 @@ export default function FinanceWorkspace() {
   }
 
   return (
-    <div className={classNames("finance-workspace", showRail && "has-rail")}>
+    <div className={classNames("finance-workspace", showContext && "has-context", showRail && "has-rail")}>
       <span className="module-ref-regression-sentinel">Finance command view</span>
       <button type="button" className="finance-mobile-menu" onClick={() => setMobileSidebarOpen(true)} aria-label="Open Finance sidebar">Finance</button>
       {mobileSidebarOpen && <button type="button" className="finance-mobile-scrim" onClick={() => setMobileSidebarOpen(false)} aria-label="Close Finance sidebar" />}
       <FinanceSidebar view={view} setView={(next) => { setView(next); setSmartFilter(""); }} smartFilter={smartFilter} onSmart={handleSmart} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
+      {showContext && <FinanceContextRail view={view} onNotice={setNotice} />}
       <main className="finance-main-workspace">
         {notice && <div className="finance-notice"><Swatch hue={activeSmart?.hue || "indigo"} /><span>{notice}</span><button type="button" onClick={() => setNotice("")}>Clear</button></div>}
         {view === "overview" && <OverviewView selected={selected} onSelect={setSelected} onModal={setModal} onNotice={setNotice} />}
@@ -1012,7 +1128,6 @@ export default function FinanceWorkspace() {
         {view === "transactions" && <TransactionsView query={query} setQuery={setQuery} pendingOnly={smartFilter === "unreviewed"} onModal={setModal} onNotice={setNotice} />}
       </main>
       <RightRail account={showRail ? selected : null} onClose={() => setSelected(null)} onNotice={setNotice} />
-      <FinanceAiDock open={aiOpen} setOpen={setAiOpen} onModal={setModal} onAudit={() => { setSmartFilter("recurring"); setView("bills"); setAiOpen(false); setNotice("Bills filtered to recurring subscriptions for audit."); }} />
       <ModalShell modal={modal} onClose={() => setModal(null)} onNotice={setNotice} />
     </div>
   );

@@ -13,7 +13,6 @@ export default async function FinancePage() {
         sidebarTitle="Finance"
         showCommandSearch={false}
         showPageSidebar={false}
-        showLocalAi={false}
       />
       <FinanceWorkspace />
     </main>
