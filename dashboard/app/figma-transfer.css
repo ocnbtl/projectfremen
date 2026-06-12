@@ -1319,14 +1319,14 @@
 
 .people-operating-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 10px;
   width: min(1510px, calc(100vw - 336px));
   margin: 0 24px 14px 0;
 }
 
 .people-workspace-content {
-  grid-template-columns: minmax(0, 1fr) minmax(330px, 390px);
+  grid-template-columns: minmax(0, 1fr) minmax(350px, 410px);
 }
 
 .people-list-panel {
@@ -1334,6 +1334,8 @@
 }
 
 .people-filter-row button {
+  width: auto;
+  max-width: max-content;
   font: inherit;
   cursor: pointer;
 }
@@ -1345,7 +1347,7 @@
 
 .people-contact-row {
   display: grid;
-  grid-template-columns: 14px minmax(0, 1.1fr) minmax(92px, 0.42fr) minmax(92px, 0.42fr) minmax(92px, 0.42fr) minmax(116px, 0.52fr) 74px;
+  grid-template-columns: 14px minmax(0, 1.2fr) minmax(104px, 0.48fr) minmax(122px, 0.52fr) minmax(150px, 0.68fr) minmax(104px, 0.46fr) minmax(70px, 0.32fr) 74px;
   gap: 5px;
   align-items: center;
   width: 100%;
@@ -1392,21 +1394,32 @@
   color: #60747c;
   font-size: 12px;
   font-weight: 760;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  overflow-wrap: normal;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .people-lower-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1.12fr) minmax(250px, 0.88fr);
+  grid-template-columns: minmax(300px, 0.72fr) minmax(0, 1.28fr);
   gap: 12px;
+  align-items: start;
 }
 
-.people-capture-form {
+.people-capture-panel,
+.people-profile-editor {
+  align-self: start;
+}
+
+.people-capture-form,
+.people-profile-form {
   display: grid;
   gap: 10px;
 }
 
-.people-capture-form label {
+.people-capture-form label,
+.people-profile-form label {
   display: grid;
   gap: 5px;
   color: #2d4650;
@@ -1416,7 +1429,10 @@
 
 .people-capture-form input,
 .people-capture-form select,
-.people-capture-form textarea {
+.people-capture-form textarea,
+.people-profile-form input,
+.people-profile-form select,
+.people-profile-form textarea {
   width: 100%;
   min-height: 38px;
   border: 1px solid #bfd2db;
@@ -1427,11 +1443,14 @@
 }
 
 .people-capture-form input,
-.people-capture-form select {
+.people-capture-form select,
+.people-profile-form input,
+.people-profile-form select {
   padding: 0 10px;
 }
 
-.people-capture-form textarea {
+.people-capture-form textarea,
+.people-profile-form textarea {
   min-height: 108px;
   padding: 10px;
   resize: vertical;
@@ -1444,6 +1463,7 @@
 }
 
 .people-capture-form button,
+.people-profile-form button,
 .people-detail-actions button,
 .people-detail-actions a {
   display: inline-flex;
@@ -1465,6 +1485,71 @@
 .people-capture-form button:disabled {
   opacity: 0.56;
   cursor: default;
+}
+
+.people-profile-form button:disabled {
+  opacity: 0.56;
+  cursor: default;
+}
+
+.people-profile-section {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #dbe7eb;
+  border-left: 4px solid currentColor;
+  border-radius: 8px;
+  background: #fbfdfc;
+}
+
+.people-profile-section h4 {
+  margin: 0;
+  color: #102026;
+  font-size: 13px;
+  font-weight: 940;
+}
+
+.people-profile-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.people-profile-field-grid label.is-wide {
+  grid-column: 1 / -1;
+}
+
+.people-profile-rail {
+  position: sticky;
+  top: 104px;
+}
+
+.people-contact-card {
+  gap: 14px;
+}
+
+.people-avatar {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  border: 1px solid #bfd2db;
+  border-radius: 22px;
+  background:
+    linear-gradient(135deg, rgba(230, 92, 136, 0.2), rgba(46, 151, 185, 0.18)),
+    #ffffff;
+  color: #123445;
+  font-size: 32px;
+  font-weight: 950;
+}
+
+.people-contact-methods {
+  display: grid;
+  gap: 8px;
+}
+
+.people-memory-card {
+  background: #f7fbf3;
 }
 
 .people-detail-actions {
@@ -1523,10 +1608,12 @@
 
 @media (max-width: 1500px) {
   .people-contact-row {
-    grid-template-columns: 14px minmax(150px, 1.4fr) minmax(76px, 0.38fr) minmax(76px, 0.38fr) minmax(84px, 0.4fr) 72px;
+    grid-template-columns: 14px minmax(150px, 1.4fr) minmax(86px, 0.42fr) minmax(96px, 0.48fr) 72px;
   }
 
-  .people-contact-row > span:nth-of-type(1) {
+  .people-contact-row > span:nth-of-type(2),
+  .people-contact-row > span:nth-of-type(3),
+  .people-contact-row > span:nth-of-type(5) {
     display: none;
   }
 
@@ -1554,6 +1641,7 @@
   .people-operating-strip,
   .people-lower-grid,
   .people-capture-grid,
+  .people-profile-field-grid,
   .module-ref-lanes,
   .module-ref-tile-grid {
     grid-template-columns: 1fr;
@@ -1581,5 +1669,22 @@
 
   .module-ref-shell h1 {
     font-size: clamp(36px, 12vw, 52px);
+  }
+
+  .people-module-shell .admin-page-sidebar {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: 100%;
+    max-height: none;
+    margin: 0 0 16px;
+  }
+
+  .people-module-shell .admin-page-sidebar-inner {
+    max-height: none;
+  }
+
+  .people-profile-rail {
+    position: static;
   }
 }

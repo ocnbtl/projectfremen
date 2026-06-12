@@ -85,6 +85,42 @@ export type PersonalRecordTime = {
   processedOn?: string;
 };
 
+export type PersonalContactProfile = {
+  fullName?: string;
+  firstName?: string;
+  middleName?: string;
+  lastName?: string;
+  nickname?: string;
+  context?: string;
+  birthday?: string;
+  phoneNumber?: string;
+  primaryEmail?: string;
+  workEmail?: string;
+  universityEmail?: string;
+  primaryOccupation?: string;
+  primaryEmployer?: string;
+  secondaryOccupation?: string;
+  secondaryEmployer?: string;
+  pastOccupation?: string;
+  pastEmployer?: string;
+  universityAffiliation?: string;
+  livesIn?: string;
+  comesFrom?: string;
+  associatedPeople: string[];
+  lastContact?: string;
+  nextContact?: string;
+  contactCadence?: string;
+  interestingFact?: string;
+  lifeDream?: string;
+  notes?: string;
+  linkedin?: string;
+  website?: string;
+  partner?: string;
+  children: string[];
+  interactions: string[];
+  memories: string[];
+};
+
 export type PersonalRecord = {
   id: string;
   domain: string;
@@ -104,6 +140,7 @@ export type PersonalRecord = {
   externalSources: string[];
   relations: PersonalRecordRelations;
   time: PersonalRecordTime;
+  profile?: PersonalContactProfile;
   createdMeta: PersonalRecordCreatedMeta;
   createdAt: string;
   updatedAt: string;
@@ -128,6 +165,7 @@ export type PersonalRecordInput = {
   externalSources?: string[];
   relations?: Partial<PersonalRecordRelations>;
   time?: PersonalRecordTime;
+  profile?: Partial<PersonalContactProfile>;
 };
 
 const FILE_NAME = "personal-records.json";
@@ -226,6 +264,73 @@ const DEFAULT_RELATIONS: PersonalRecordRelations = {
   internalSources: [],
   related: []
 };
+
+const CONTACT_PROFILE_TEXT_KEYS = [
+  "fullName",
+  "firstName",
+  "middleName",
+  "lastName",
+  "nickname",
+  "context",
+  "birthday",
+  "phoneNumber",
+  "primaryEmail",
+  "workEmail",
+  "universityEmail",
+  "primaryOccupation",
+  "primaryEmployer",
+  "secondaryOccupation",
+  "secondaryEmployer",
+  "pastOccupation",
+  "pastEmployer",
+  "universityAffiliation",
+  "livesIn",
+  "comesFrom",
+  "lastContact",
+  "nextContact",
+  "contactCadence",
+  "interestingFact",
+  "lifeDream",
+  "notes",
+  "linkedin",
+  "website",
+  "partner"
+] as const;
+
+type ContactProfileTextKey = (typeof CONTACT_PROFILE_TEXT_KEYS)[number];
+
+function splitProfileList(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return sanitizeList(value.map(String), 80);
+  }
+  if (typeof value === "string") {
+    return sanitizeList(value.split(",").map((item) => item.trim()), 80);
+  }
+  return [];
+}
+
+function normalizeContactProfile(input: unknown): PersonalContactProfile | undefined {
+  if (!input || typeof input !== "object") {
+    return undefined;
+  }
+
+  const raw = input as Record<string, unknown>;
+  const profile: PersonalContactProfile = {
+    associatedPeople: splitProfileList(raw.associatedPeople),
+    children: splitProfileList(raw.children),
+    interactions: splitProfileList(raw.interactions),
+    memories: splitProfileList(raw.memories)
+  };
+
+  for (const key of CONTACT_PROFILE_TEXT_KEYS) {
+    const value = raw[key];
+    if (typeof value === "string") {
+      profile[key as ContactProfileTextKey] = value.trim();
+    }
+  }
+
+  return profile;
+}
 
 function isAllowedDomain(slug: string) {
   return Boolean(getPersonalSystemDomain(slug));
@@ -500,6 +605,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
   const stage = pickStage(raw.stage as string | undefined);
   const relations = normalizeRelations(raw.relations);
   const body = typeof raw.body === "string" ? raw.body : "";
+  const profile = normalizeContactProfile(raw.profile);
   const record: PersonalRecord = {
     id: typeof raw.id === "string" ? raw.id : `personal-${crypto.randomUUID()}`,
     domain: typeof raw.domain === "string" ? raw.domain : "notes-docs",
@@ -521,6 +627,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     externalSources: sanitizeList(raw.externalSources as string[] | undefined),
     relations,
     time: normalizeTime(raw.time, createdMeta, stage),
+    profile,
     createdMeta,
     createdAt,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : createdAt
@@ -561,6 +668,7 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
   const meta = buildCreatedMeta(now);
   const stage = pickStage(input.stage);
   const relations = normalizeRelations(input.relations);
+  const profile = normalizeContactProfile(input.profile);
   const nextRecord: PersonalRecord = {
     id: `personal-${crypto.randomUUID()}`,
     domain,
@@ -589,6 +697,7 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
       meta,
       stage
     ),
+    profile,
     createdMeta: meta,
     createdAt: meta.createdIso,
     updatedAt: meta.createdIso
@@ -602,7 +711,10 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
 
 export async function updatePersonalRecord(
   id: string,
-  patch: Partial<Pick<PersonalRecord, "status">> & { action?: "review" }
+  patch: Partial<Pick<PersonalRecord, "status" | "body" | "url" | "projects" | "areas" | "subjects" | "externalSources">> & {
+    action?: "review";
+    profile?: Partial<PersonalContactProfile>;
+  }
 ): Promise<PersonalRecord[]> {
   const existing = await readPersonalRecords();
   const idx = existing.findIndex((record) => record.id === id);
@@ -614,6 +726,7 @@ export async function updatePersonalRecord(
   const next = [...existing];
   const current = next[idx];
   const time = { ...current.time };
+  const profilePatch = normalizeContactProfile(patch.profile);
   if (patch.action === "review") {
     time.lastReview = now;
     time.nextReview = calculateNextReview(now, time.reviewCadence) || time.nextReview;
@@ -621,10 +734,24 @@ export async function updatePersonalRecord(
 
   next[idx] = {
     ...current,
+    body: typeof patch.body === "string" ? patch.body.trim() : current.body,
+    url: typeof patch.url === "string" && patch.url.trim() ? patch.url.trim() : current.url,
+    areas: Array.isArray(patch.areas) ? sanitizeList(patch.areas) : current.areas,
+    subjects: Array.isArray(patch.subjects) ? sanitizeList(patch.subjects) : current.subjects,
+    projects: Array.isArray(patch.projects) ? sanitizeList(patch.projects) : current.projects,
+    externalSources: Array.isArray(patch.externalSources)
+      ? sanitizeList(patch.externalSources)
+      : current.externalSources,
     status: PERSONAL_RECORD_STATUSES.includes(patch.status as PersonalRecordStatus)
       ? (patch.status as PersonalRecordStatus)
       : current.status,
     time,
+    profile: profilePatch
+      ? {
+          ...current.profile,
+          ...profilePatch
+        }
+      : current.profile,
     updatedAt: now
   };
 

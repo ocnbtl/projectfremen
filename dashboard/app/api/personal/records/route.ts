@@ -60,7 +60,8 @@ export async function POST(request: Request) {
       intents: Array.isArray(body.intents) ? body.intents.map(String) : [],
       externalSources: Array.isArray(body.externalSources) ? body.externalSources.map(String) : [],
       relations: typeof body.relations === "object" && body.relations ? body.relations : {},
-      time: typeof body.time === "object" && body.time ? body.time : {}
+      time: typeof body.time === "object" && body.time ? body.time : {},
+      profile: typeof body.profile === "object" && body.profile ? body.profile : {}
     });
 
     await appendAuditEvent({
@@ -106,7 +107,14 @@ export async function PATCH(request: Request) {
     }
     const items = await updatePersonalRecord(id, {
       status: typeof body.status === "string" ? body.status : undefined,
-      action: body.action === "review" ? "review" : undefined
+      action: body.action === "review" ? "review" : undefined,
+      body: typeof body.body === "string" ? body.body : undefined,
+      url: typeof body.url === "string" ? body.url : undefined,
+      areas: Array.isArray(body.areas) ? body.areas.map(String) : undefined,
+      subjects: Array.isArray(body.subjects) ? body.subjects.map(String) : undefined,
+      projects: Array.isArray(body.projects) ? body.projects.map(String) : undefined,
+      externalSources: Array.isArray(body.externalSources) ? body.externalSources.map(String) : undefined,
+      profile: typeof body.profile === "object" && body.profile ? body.profile : undefined
     });
     return NextResponse.json({ ok: true, items });
   } catch (error) {
