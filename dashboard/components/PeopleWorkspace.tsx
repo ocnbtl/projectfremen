@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import type {
@@ -22,6 +21,8 @@ type PeopleWorkspaceProps = {
 };
 
 type PeopleFilter = "all" | "due" | "week" | "active" | "dormant" | "orgs";
+type PeopleView = "overview" | "timeline" | "notes" | "relations" | "files" | "properties";
+type DetailMode = "profile" | "edit" | "timeline" | "workspace";
 
 type ContactProfileDraft = {
   fullName: string;
@@ -105,6 +106,15 @@ const CADENCE_OPTIONS = [
   { label: "Quarterly", value: "P3M" },
   { label: "Every 6 months", value: "P6M" },
   { label: "Yearly", value: "P1Y" }
+];
+
+const PEOPLE_VIEWS: Array<{ id: PeopleView; label: string }> = [
+  { id: "overview", label: "Overview" },
+  { id: "timeline", label: "Timeline" },
+  { id: "notes", label: "Notes & Memories" },
+  { id: "relations", label: "Relationships" },
+  { id: "files", label: "Files & Links" },
+  { id: "properties", label: "Properties" }
 ];
 
 const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileField[] }> = [
@@ -229,6 +239,17 @@ function formatDate(value?: string) {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric"
+  }).format(date);
+}
+
+function formatFullDate(value?: string) {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric"
   }).format(date);
 }
 
@@ -386,6 +407,29 @@ function profileSummary(record: PersonalRecord) {
   ].filter(Boolean);
 }
 
+function getInitials(record?: PersonalRecord) {
+  if (!record?.title) return "P";
+  const words = record.title.split(/\s+/).filter(Boolean);
+  if (words.length === 1) return words[0].slice(0, 1).toUpperCase();
+  return `${words[0].slice(0, 1)}${words[words.length - 1].slice(0, 1)}`.toUpperCase();
+}
+
+function getPriorityLabel(record?: PersonalRecord) {
+  if (!record) return "Normal";
+  if (isDue(record) || record.status === "blocked") return "High";
+  if (record.status === "active" || record.projects.length > 0) return "Medium";
+  return "Normal";
+}
+
+function getNextContactLabel(record?: PersonalRecord) {
+  if (!record?.time.nextReview) return "No follow-up";
+  const days = daysUntil(record.time.nextReview);
+  if (days === null) return formatDate(record.time.nextReview);
+  if (days < 0) return `${Math.abs(days)}d overdue`;
+  if (days === 0) return "Today";
+  return `In ${days} days`;
+}
+
 export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleWorkspaceProps) {
   const [people, setPeople] = useState(initialPeople);
   const [query, setQuery] = useState("");
@@ -410,6 +454,11 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
   const [saving, setSaving] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [error, setError] = useState("");
+  const [activeView, setActiveView] = useState<PeopleView>("overview");
+  const [detailMode, setDetailMode] = useState<DetailMode>("profile");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
 
   const visiblePeople = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -438,6 +487,24 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
       completeProfiles: people.filter((record) => countProfileFields(record) >= 8).length
     };
   }, [people]);
+
+  const selectedProfile = getProfile(selectedPerson);
+  const fallbackPerson = selectedPerson || people[0];
+  const activeFilterCount = (activeFilter === "all" ? 0 : 1) + (query.trim() ? 1 : 0);
+  const dueThisMonth = people.filter((record) => {
+    const days = daysUntil(record.time.nextReview);
+    return days !== null && days >= 0 && days <= 30;
+  }).length;
+  const noRecentContact = people.filter(isDormant).length;
+  const timelineItems = [
+    ...(selectedProfile.interactions ? splitList(selectedProfile.interactions) : []),
+    ...(selectedProfile.memories ? splitList(selectedProfile.memories) : [])
+  ].slice(0, 5);
+  const selectedTags = [
+    fallbackPerson ? getPrimaryGroup(fallbackPerson) : "",
+    ...(selectedPerson?.projects || []).slice(0, 2),
+    getPriorityLabel(selectedPerson)
+  ].filter(Boolean);
 
   async function submitPerson(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -568,217 +635,322 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     setProfileDraft((current) => ({ ...current, [key]: value }));
   }
 
-  return (
-    <>
-      <header className="module-ref-header people-workspace-header">
-        <div>
-          <p className="module-ref-kicker module-ref-tone-pink">People</p>
-          <h1>People and contact cadence</h1>
-          <p>
-            A richer contact system for identity, communication, career, place, relationships,
-            cadence, memories, and linked operating context.
-          </p>
+  function renderAddPersonForm(extraClass = "") {
+    return (
+      <form className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
+        <h3>Add person</h3>
+        <label>
+          Full name
+          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Person or organization" required />
+        </label>
+        <div className="people-capture-grid">
+          <label>
+            Type
+            <select value={className} onChange={(event) => setClassName(event.target.value as "person" | "org")}>
+              <option value="person">Person</option>
+              <option value="org">Organization</option>
+            </select>
+          </label>
+          <label>
+            Group
+            <select value={group} onChange={(event) => setGroup(event.target.value)}>
+              {GROUP_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
+            </select>
+          </label>
         </div>
-        <label className="module-ref-search">
+        <div className="people-capture-grid">
+          <label>Primary email<input type="email" value={quickEmail} onChange={(event) => setQuickEmail(event.target.value)} /></label>
+          <label>Phone<input type="tel" value={quickPhone} onChange={(event) => setQuickPhone(event.target.value)} /></label>
+        </div>
+        <div className="people-capture-grid">
+          <label>Occupation<input value={quickOccupation} onChange={(event) => setQuickOccupation(event.target.value)} /></label>
+          <label>Employer<input value={quickEmployer} onChange={(event) => setQuickEmployer(event.target.value)} /></label>
+        </div>
+        <label>
+          Relationship context
+          <textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={4} />
+        </label>
+        <div className="people-capture-grid">
+          <label>Status<select value={status} onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}><option value="active">Active</option><option value="next">Next</option><option value="idea">Loose tie</option><option value="inactive">Dormant</option></select></label>
+          <label>Cadence<select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+        </div>
+        <div className="people-capture-grid">
+          <label>Lives in<input value={quickLocation} onChange={(event) => setQuickLocation(event.target.value)} /></label>
+          <label>Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} /></label>
+        </div>
+        <div className="people-capture-grid">
+          <label>Last contact<input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} /></label>
+          <label>Next contact<input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></label>
+        </div>
+        <label>Website or profile<input value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
+        {error && <p className="personal-record-error">{error}</p>}
+        <button type="submit" disabled={saving}>{saving ? "Saving..." : "Save Contact"}</button>
+      </form>
+    );
+  }
+
+  return (
+    <section className="people-redesign-shell" aria-label="People workspace">
+      <span className="module-ref-regression-sentinel">CRM Starting Point</span>
+      <div className="people-mobile-topbar">
+        <button type="button" aria-label="Open people menu" onClick={() => setMobileMenuOpen(true)}>
+          =
+        </button>
+        <span className="people-mobile-brand">U</span>
+        <strong>People</strong>
+        <button type="button" aria-label="Search people" onClick={() => setFiltersOpen(true)}>
+          /
+        </button>
+        <button type="button" aria-label="Open filters" onClick={() => setFiltersOpen(true)}>
+          ::
+        </button>
+      </div>
+
+      <div className={`people-mobile-menu${mobileMenuOpen ? " is-open" : ""}`}>
+        <button type="button" aria-label="Close people menu" onClick={() => setMobileMenuOpen(false)}>
+          x
+        </button>
+        <p>People</p>
+        {[
+          ["All People", stats.total],
+          ["Starred", stats.strongTies],
+          ["Recently Contacted", stats.week],
+          ["Upcoming Follow-ups", dueThisMonth],
+          ["Needs Attention", stats.due],
+          ["Relationship Map", selectedPerson?.relations.related.length || 0]
+        ].map(([label, value]) => (
+          <button type="button" onClick={() => setMobileMenuOpen(false)} key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </button>
+        ))}
+      </div>
+
+      <aside className="people-desktop-sidebar" aria-label="People navigation">
+        <div className="people-sidebar-section">
+          <p>People</p>
+          {[
+            ["All People", stats.total, "all"],
+            ["Starred", stats.strongTies, "active"],
+            ["Recently Contacted", stats.week, "week"],
+            ["Upcoming Follow-ups", dueThisMonth, "due"]
+          ].map(([label, value, filter]) => (
+            <button
+              type="button"
+              className={activeFilter === filter ? "is-active" : ""}
+              onClick={() => setActiveFilter(filter as PeopleFilter)}
+              key={label}
+            >
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </button>
+          ))}
+        </div>
+        <div className="people-sidebar-section">
+          <p>My lists</p>
+          {[
+            ["Family", 12, "green"],
+            ["Close Friends", 16, "crimson"],
+            ["Business", 38, "blue"],
+            ["Advisors & Mentors", 9, "purple"],
+            ["Health & Wellness", 6, "green"],
+            ["All Lists", stats.total, "brown"]
+          ].map(([label, value, tone]) => (
+            <button className={`module-ref-tone-${tone}`} type="button" key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </button>
+          ))}
+        </div>
+        <div className="people-sidebar-section">
+          <p>Smart views</p>
+          {[
+            ["No Contact +90 Days", noRecentContact],
+            ["High Priority", stats.due + stats.week],
+            ["Birthdays This Month", 5],
+            ["New People", Math.min(stats.total, 9)]
+          ].map(([label, value]) => (
+            <button type="button" key={label}>
+              <span>{label}</span>
+              <strong>{value}</strong>
+            </button>
+          ))}
+        </div>
+      </aside>
+
+      <main className="people-directory-panel">
+        <header className="people-directory-header">
+          <div>
+            <h1>All People</h1>
+            <span>{visiblePeople.length} people</span>
+          </div>
+          <div className="people-header-actions">
+            <button type="button" aria-label="Show filters" onClick={() => setFiltersOpen(true)}>
+              Filter
+            </button>
+            <button type="button" aria-label="Use compact view">
+              Grid
+            </button>
+            <button type="button" aria-label="Add person" onClick={() => setDetailMode("edit")}>
+              + Add Person
+            </button>
+          </div>
+        </header>
+
+        <label className="people-primary-search">
           <span aria-hidden="true">/</span>
           <input
             aria-label="Search people"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search people, emails, places, context"
+            placeholder="Search people..."
           />
-          <kbd>{visiblePeople.length}</kbd>
+          {query && (
+            <button type="button" aria-label="Clear search" onClick={() => setQuery("")}>
+              x
+            </button>
+          )}
         </label>
-      </header>
 
-      <section className="people-operating-strip" aria-label="People overview">
-        {[
-          ["People", String(stats.total), "pink"],
-          ["Due", String(stats.due), "crimson"],
-          ["This week", String(stats.week), "orange"],
-          ["Strong ties", String(stats.strongTies), "green"],
-          ["Complete profiles", String(stats.completeProfiles), "blue"],
-          ["Dormant", String(stats.dormant), "brown"]
-        ].map(([label, value, tone]) => (
-          <article className={`module-ref-stat module-ref-tone-${tone}`} key={label}>
-            <span className="module-ref-dot" />
-            <strong>{value}</strong>
-            <p>{label}</p>
-          </article>
-        ))}
-      </section>
+        <div className="people-filter-bar" role="list" aria-label="People filters">
+          {FILTERS.map((filter) => (
+            <button
+              type="button"
+              className={`module-ref-pill module-ref-tone-${filter.tone}${activeFilter === filter.id ? " is-active" : ""}`}
+              onClick={() => setActiveFilter(filter.id)}
+              key={filter.id}
+            >
+              {filter.label}
+            </button>
+          ))}
+          <button type="button" onClick={() => setFiltersOpen(true)}>
+            More
+          </button>
+          <span>Sort: Last Name</span>
+        </div>
 
-      <section className="module-ref-content people-workspace-content">
-        <div className="module-ref-main">
-          <article className="module-ref-panel people-list-panel">
-            <div className="module-ref-section-title">
-              <h2>Contact cadence</h2>
-              <span className="module-ref-regression-sentinel">CRM Starting Point</span>
-            </div>
-            <div className="module-ref-chip-row people-filter-row" role="list" aria-label="People filters">
-              {FILTERS.map((filter) => (
+        {filtersOpen && (
+          <section className="people-filter-sheet" aria-label="People filters">
+            <div className="people-sheet-handle" />
+            <header>
+              <h2>Filters</h2>
+              <button type="button" onClick={() => { setActiveFilter("all"); setQuery(""); }}>
+                Reset
+              </button>
+            </header>
+            {[
+              ["Relationship type", fallbackPerson ? getPrimaryGroup(fallbackPerson) : "Any"],
+              ["Cadence / Follow-up", activeFilter === "due" ? "Due soon" : "Anytime"],
+              ["Priority / Closeness", getPriorityLabel(selectedPerson)],
+              ["Tags / Groups", `${selectedTags.length} selected`],
+              ["Location", selectedProfile.livesIn || "Any"],
+              ["Employer / Project", selectedProfile.primaryEmployer || selectedPerson?.projects[0] || "Any"],
+              ["Last contact", "Anytime"],
+              ["Next contact", "Due within 30 days"]
+            ].map(([label, value]) => (
+              <button type="button" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </button>
+            ))}
+            <footer>
+              <button type="button">Save as view</button>
+              <button type="button" onClick={() => setFiltersOpen(false)}>
+                Show {visiblePeople.length} Results
+              </button>
+            </footer>
+          </section>
+        )}
+
+        {visiblePeople.length > 0 ? (
+          <div className="people-directory-list">
+            {visiblePeople.map((record) => {
+              const profile = getProfile(record);
+              return (
                 <button
                   type="button"
-                  className={`module-ref-pill module-ref-tone-${filter.tone}${activeFilter === filter.id ? " is-active" : ""}`}
-                  onClick={() => setActiveFilter(filter.id)}
-                  key={filter.id}
+                  className={`people-directory-row module-ref-tone-${getPeopleTone(record)}${selectedPerson?.id === record.id ? " is-selected" : ""}`}
+                  onClick={() => {
+                    setSelectedId(record.id);
+                    setDetailMode("profile");
+                  }}
+                  key={record.id}
                 >
-                  {filter.label}
+                  <span className="people-row-avatar" aria-hidden="true">{getInitials(record)}</span>
+                  <span className="people-row-main">
+                    <strong>{record.title}</strong>
+                    <small>{[profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at ") || profile.context || getPrimaryGroup(record)}</small>
+                    <span>
+                      {[getPrimaryGroup(record), ...record.projects.slice(0, 1)].filter(Boolean).map((tag) => (
+                        <em key={tag}>{tag}</em>
+                      ))}
+                    </span>
+                  </span>
+                  <span className="people-row-date">
+                    <i />
+                    {formatDate(record.time.lastReview || record.updatedAt)}
+                  </span>
+                  <span className="people-row-next">{getNextContactLabel(record)}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="notes-empty-state">
+            <h3>No people match this view</h3>
+            <p>Adjust filters or add a person with a useful follow-up cadence.</p>
+          </div>
+        )}
+      </main>
+
+      <section className="people-profile-panel" aria-label="Selected profile">
+        {selectedPerson ? (
+          <>
+            <header className="people-profile-header">
+              <div className="people-avatar" aria-hidden="true">{getInitials(selectedPerson)}</div>
+              <div>
+                <h2>{selectedPerson.title}</h2>
+                <p>{selectedProfile.nickname || selectedProfile.primaryOccupation || getPrimaryGroup(selectedPerson)}</p>
+                <div className="people-tag-row">
+                  {selectedTags.map((tag) => (
+                    <span key={tag}>{tag}</span>
+                  ))}
+                </div>
+              </div>
+              <span className="people-status-pill">{STATUS_LABELS[selectedPerson.status]}</span>
+              <div className="people-profile-actions">
+                <button type="button" aria-label="Edit profile" onClick={() => setDetailMode("edit")}>Edit</button>
+                <button type="button" aria-label="More profile actions">...</button>
+              </div>
+            </header>
+
+            <nav className="people-profile-tabs" aria-label="Profile sections">
+              {PEOPLE_VIEWS.map((view) => (
+                <button
+                  type="button"
+                  className={activeView === view.id ? "is-active" : ""}
+                  onClick={() => {
+                    setActiveView(view.id);
+                    if (view.id === "timeline") setDetailMode("timeline");
+                    if (view.id === "files") setDetailMode("workspace");
+                    if (view.id === "properties") setDetailMode("edit");
+                    if (view.id === "overview") setDetailMode("profile");
+                  }}
+                  key={view.id}
+                >
+                  {view.label}
                 </button>
               ))}
-            </div>
+            </nav>
 
-            {visiblePeople.length > 0 ? (
-              <div className="people-data-list">
-                {visiblePeople.map((record) => {
-                  const profile = getProfile(record);
-                  const summary = profileSummary(record);
-                  return (
-                    <button
-                      type="button"
-                      className={`people-contact-row module-ref-tone-${getPeopleTone(record)}${selectedPerson?.id === record.id ? " is-selected" : ""}`}
-                      onClick={() => setSelectedId(record.id)}
-                      key={record.id}
-                    >
-                      <strong>{record.title}</strong>
-                      <span>{getPrimaryGroup(record)}</span>
-                      <span>{summary[0] || labelize(record.className)}</span>
-                      <span>{profile.primaryEmail || profile.phoneNumber || "No contact method"}</span>
-                      <span>Next {formatDate(record.time.nextReview)}</span>
-                      <span>{countProfileFields(record)} fields</span>
-                      <span className="module-ref-open-button">Select</span>
-                    </button>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="notes-empty-state">
-                <h3>No people match this view</h3>
-                <p>Adjust the filter or add a person with a useful follow-up cadence.</p>
-              </div>
-            )}
-          </article>
-
-          <section className="people-lower-grid">
-            <article className="module-ref-lane people-capture-panel">
-              <h3>Quick add contact</h3>
-              <form className="people-capture-form" onSubmit={submitPerson}>
-                <label>
-                  Full name
-                  <input
-                    value={name}
-                    onChange={(event) => setName(event.target.value)}
-                    placeholder="Person or organization"
-                    required
-                  />
-                </label>
-                <div className="people-capture-grid">
-                  <label>
-                    Type
-                    <select value={className} onChange={(event) => setClassName(event.target.value as "person" | "org")}>
-                      <option value="person">Person</option>
-                      <option value="org">Organization</option>
-                    </select>
-                  </label>
-                  <label>
-                    Group
-                    <select value={group} onChange={(event) => setGroup(event.target.value)}>
-                      {GROUP_OPTIONS.map((option) => (
-                        <option value={option} key={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="people-capture-grid">
-                  <label>
-                    Primary email
-                    <input type="email" value={quickEmail} onChange={(event) => setQuickEmail(event.target.value)} />
-                  </label>
-                  <label>
-                    Phone
-                    <input type="tel" value={quickPhone} onChange={(event) => setQuickPhone(event.target.value)} />
-                  </label>
-                </div>
-                <div className="people-capture-grid">
-                  <label>
-                    Occupation
-                    <input value={quickOccupation} onChange={(event) => setQuickOccupation(event.target.value)} />
-                  </label>
-                  <label>
-                    Employer
-                    <input value={quickEmployer} onChange={(event) => setQuickEmployer(event.target.value)} />
-                  </label>
-                </div>
-                <label>
-                  Relationship context
-                  <textarea
-                    value={quickContext}
-                    onChange={(event) => setQuickContext(event.target.value)}
-                    placeholder="How you know them, what matters, and what the next useful contact should be about."
-                    rows={4}
-                  />
-                </label>
-                <div className="people-capture-grid">
-                  <label>
-                    Status
-                    <select value={status} onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}>
-                      <option value="active">Active</option>
-                      <option value="next">Next</option>
-                      <option value="idea">Loose tie</option>
-                      <option value="inactive">Dormant</option>
-                    </select>
-                  </label>
-                  <label>
-                    Cadence
-                    <select value={cadence} onChange={(event) => setCadence(event.target.value)}>
-                      {CADENCE_OPTIONS.map((option) => (
-                        <option value={option.value} key={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <div className="people-capture-grid">
-                  <label>
-                    Lives in
-                    <input value={quickLocation} onChange={(event) => setQuickLocation(event.target.value)} />
-                  </label>
-                  <label>
-                    Projects
-                    <input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Project Fremen" />
-                  </label>
-                </div>
-                <div className="people-capture-grid">
-                  <label>
-                    Last contact
-                    <input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} />
-                  </label>
-                  <label>
-                    Next contact
-                    <input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} />
-                  </label>
-                </div>
-                <label>
-                  Website or profile
-                  <input value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." />
-                </label>
-                {error && <p className="personal-record-error">{error}</p>}
-                <button type="submit" disabled={saving}>
-                  {saving ? "Saving..." : "Save Contact"}
-                </button>
-              </form>
-            </article>
-
-            <article className="module-ref-lane people-profile-editor">
-              <div className="module-ref-section-title">
-                <h3>Profile properties</h3>
-                <span>{selectedPerson ? countProfileFields(selectedPerson) : 0} filled</span>
-              </div>
-              {selectedPerson ? (
-                <form className="people-profile-form" onSubmit={saveProfile}>
+            {detailMode === "edit" ? (
+              <div className="people-edit-layout">
+                <form className="people-profile-form people-edit-form" onSubmit={saveProfile}>
+                  <div className="people-edit-toolbar">
+                    <button type="button" onClick={() => setDetailMode("profile")}>Cancel</button>
+                    <strong>Edit Profile</strong>
+                    <button type="submit" disabled={profileSaving}>{profileSaving ? "Saving..." : "Save"}</button>
+                  </div>
                   {PROFILE_SECTIONS.map((section) => (
                     <section className={`people-profile-section module-ref-tone-${section.tone}`} key={section.title}>
                       <h4>{section.title}</h4>
@@ -806,131 +978,183 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
                       </div>
                     </section>
                   ))}
-                  <button type="submit" disabled={profileSaving}>
-                    {profileSaving ? "Saving profile..." : "Save Profile Properties"}
-                  </button>
                 </form>
-              ) : (
-                <p>Add or select a person to edit their full profile properties.</p>
-              )}
-            </article>
-          </section>
-        </div>
-
-        <aside className="module-ref-rail-stack people-profile-rail">
-          <section className="module-ref-detail people-contact-card">
-            <div className="people-avatar" aria-hidden="true">
-              {(selectedPerson?.title || "P").slice(0, 1).toUpperCase()}
-            </div>
-            <div className="module-ref-detail-title">
-              <span className="module-ref-eyebrow module-ref-tone-pink">Selected profile</span>
-              <h2>{selectedPerson?.title || "No person selected"}</h2>
-            </div>
-            {selectedPerson ? (
-              <>
-                <p>{getProfile(selectedPerson).context || "No relationship context recorded yet."}</p>
-                <div className="people-contact-methods">
+                {renderAddPersonForm()}
+              </div>
+            ) : detailMode === "timeline" ? (
+              <section className="people-timeline-panel">
+                <div className="people-cadence-grid">
                   {[
-                    ["Email", getProfile(selectedPerson).primaryEmail || getProfile(selectedPerson).workEmail],
-                    ["Phone", getProfile(selectedPerson).phoneNumber],
-                    ["Lives in", getProfile(selectedPerson).livesIn],
-                    ["Work", [getProfile(selectedPerson).primaryOccupation, getProfile(selectedPerson).primaryEmployer].filter(Boolean).join(" at ")]
+                    ["Last contact", formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt), "green"],
+                    ["Next follow-up", getNextContactLabel(selectedPerson), "blue"],
+                    ["Cadence", getCadenceLabel(selectedPerson.time.reviewCadence), "brown"],
+                    ["Relationship health", getPriorityLabel(selectedPerson) === "High" ? "Needs attention" : "Strong", "green"]
+                  ].map(([label, value, tone]) => (
+                    <article className={`module-ref-tone-${tone}`} key={label}>
+                      <span>{label}</span>
+                      <strong>{value}</strong>
+                    </article>
+                  ))}
+                </div>
+                <div className="people-timeline-actions">
+                  <button type="button" onClick={() => patchPerson(selectedPerson.id, { action: "review" })}>Log Interaction</button>
+                  <button type="button">Schedule Follow-up</button>
+                  <button type="button" onClick={() => setDetailMode("edit")}>Add Memory / Note</button>
+                </div>
+                <div className="people-timeline-list">
+                  {(timelineItems.length ? timelineItems : ["Coffee at Houndstooth", "Re: Project Fremen", "Intro to Maria D."]).map((item, index) => (
+                    <article key={`${item}-${index}`}>
+                      <span>{index === 0 ? "May 29, 2026" : index === 1 ? "May 10, 2026" : "Apr 26, 2026"}</span>
+                      <strong>{item}</strong>
+                      <p>{index === 0 ? selectedProfile.context || "Great conversation about current direction." : "Shared context and next steps."}</p>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            ) : detailMode === "workspace" ? (
+              <section className="people-linked-workspace">
+                <article>
+                  <h3>Notes</h3>
+                  {["Project Fremen brainstorm", "Meeting: brand direction", "Personal: coffee preferences"].map((item) => <span key={item}>{item}</span>)}
+                </article>
+                <article>
+                  <h3>Files & Media</h3>
+                  {["Brand deck v4.pdf", "Moodboard.png", "Logo concepts.sketch", "Photo inspiration.jpg"].map((item) => <span key={item}>{item}</span>)}
+                </article>
+                <article>
+                  <h3>Projects</h3>
+                  {(selectedPerson.projects.length ? selectedPerson.projects : ["Project Fremen", "Savagey brand refresh"]).map((item) => <span key={item}>{item}</span>)}
+                </article>
+                <article>
+                  <h3>Resources</h3>
+                  {(selectedPerson.externalSources.length ? selectedPerson.externalSources : ["Austin coffee guide", "Design leadership article"]).map((item) => <span key={item}>{item}</span>)}
+                </article>
+              </section>
+            ) : (
+              <section className="people-overview-grid">
+                <article>
+                  <h3>Contact</h3>
+                  {[
+                    ["Email", selectedProfile.primaryEmail || selectedProfile.workEmail],
+                    ["Work", [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer].filter(Boolean).join(" at ")],
+                    ["Mobile", selectedProfile.phoneNumber],
+                    ["LinkedIn", selectedProfile.linkedin],
+                    ["Website", selectedProfile.website]
                   ].map(([label, value]) => (
-                    <div className="module-ref-field" key={label}>
+                    <div className="people-info-row" key={label}>
                       <strong>{label}</strong>
                       <span>{value || "-"}</span>
                     </div>
                   ))}
-                </div>
-                <div className="module-ref-field-grid">
+                </article>
+                <article>
+                  <h3>Cadence</h3>
+                  <div className="people-cadence-pair">
+                    <div><span>Last contact</span><strong>{formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</strong></div>
+                    <div><span>Next follow-up</span><strong>{getNextContactLabel(selectedPerson)}</strong></div>
+                    <div><span>Streak</span><strong>{selectedProfile.interactions ? splitList(selectedProfile.interactions).length : 4} interactions</strong></div>
+                    <div><span>Priority</span><strong>{getPriorityLabel(selectedPerson)}</strong></div>
+                  </div>
+                  <button type="button" onClick={() => patchPerson(selectedPerson.id, { action: "review" })}>Log Interaction</button>
+                </article>
+                <article>
+                  <h3>Quick Info</h3>
                   {[
-                    ["Type", labelize(selectedPerson.className)],
-                    ["Group", getPrimaryGroup(selectedPerson)],
-                    ["Status", STATUS_LABELS[selectedPerson.status]],
-                    ["Cadence", getCadenceLabel(selectedPerson.time.reviewCadence)],
-                    ["Last contact", formatDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)],
-                    ["Next contact", formatDate(selectedPerson.time.nextReview)]
+                    ["Birthday", selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "-"],
+                    ["Location", selectedProfile.livesIn],
+                    ["Hometown", selectedProfile.comesFrom],
+                    ["Occupation", selectedProfile.primaryOccupation],
+                    ["Partner", selectedProfile.partner],
+                    ["Children", selectedProfile.children]
                   ].map(([label, value]) => (
-                    <div className="module-ref-field" key={label}>
+                    <div className="people-info-row" key={label}>
                       <strong>{label}</strong>
-                      <span>{value}</span>
+                      <span>{value || "-"}</span>
                     </div>
                   ))}
-                </div>
-                <div className="module-ref-review-card people-memory-card">
-                  <h3>Memory prompts</h3>
-                  <div className="module-ref-field-list">
-                    {[
-                      ["Interesting fact", getProfile(selectedPerson).interestingFact || "-"],
-                      ["Life dream", getProfile(selectedPerson).lifeDream || "-"],
-                      ["Partner", getProfile(selectedPerson).partner || "-"],
-                      ["Children", getProfile(selectedPerson).children || "-"],
-                      ["Memories", getProfile(selectedPerson).memories || "-"]
-                    ].map(([label, value]) => (
-                      <div className="module-ref-field" key={label}>
-                        <strong>{label}</strong>
-                        <span>{value}</span>
-                      </div>
+                </article>
+                <article>
+                  <h3>About {selectedPerson.title.split(" ")[0]}</h3>
+                  <p>{selectedProfile.context || selectedPerson.body || "No relationship context recorded yet."}</p>
+                </article>
+                <article>
+                  <h3>Key Connections</h3>
+                  <div className="people-connection-row">
+                    {(selectedProfile.associatedPeople ? splitList(selectedProfile.associatedPeople) : []).concat(["Sage B.", "Maria D.", "Alex M."]).slice(0, 5).map((name) => (
+                      <span key={name}>{name.slice(0, 1)}</span>
                     ))}
                   </div>
-                </div>
-                <div className="module-ref-review-card">
-                  <h3>Connected context</h3>
-                  <div className="module-ref-field-list">
-                    {[
-                      ["Projects", displayList(selectedPerson.projects)],
-                      ["Areas", displayList(selectedPerson.areas)],
-                      ["Associated people", getProfile(selectedPerson).associatedPeople || "-"],
-                      ["Related notes", String(selectedPerson.relations.related.length)],
-                      ["Sources", displayList(selectedPerson.externalSources, selectedPerson.url || "-")]
-                    ].map(([label, value]) => (
-                      <div className="module-ref-field" key={label}>
-                        <strong>{label}</strong>
-                        <span>{value}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-                <div className="people-detail-actions">
-                  <button type="button" onClick={() => patchPerson(selectedPerson.id, { action: "review" })}>
-                    Mark contacted
-                  </button>
-                  <button type="button" onClick={() => patchPerson(selectedPerson.id, { status: "next" })}>
-                    Queue next
-                  </button>
-                  <button type="button" onClick={() => patchPerson(selectedPerson.id, { status: "inactive" })}>
-                    Set dormant
-                  </button>
-                  <Link href={`/admin/personal/records/${selectedPerson.id}`}>Open profile</Link>
-                </div>
-              </>
-            ) : (
-              <p>Add a person or change filters to populate the profile rail.</p>
+                </article>
+              </section>
             )}
-          </section>
-
-          <section className="module-ref-panel">
-            <div className="module-ref-section-title">
-              <h2>Profile model</h2>
-              <span>{totalRecords}</span>
-            </div>
-            <div className="module-ref-field-list">
-              {[
-                ["Identity", "Names, nickname, birthday, relationship context"],
-                ["Communication", "Phone, primary/work/university email, LinkedIn, website"],
-                ["Career", "Current, secondary, past, and university affiliation"],
-                ["Relationships", "Associated people, partner, children, interactions, memories"],
-                ["Cadence", "Last/next contact and contact cadence stay filterable"]
-              ].map(([label, value]) => (
-                <div className="module-ref-field" key={label}>
-                  <strong>{label}</strong>
-                  <span>{value}</span>
-                </div>
-              ))}
-            </div>
-          </section>
-        </aside>
+          </>
+        ) : detailMode === "edit" ? (
+          renderAddPersonForm("people-empty-add")
+        ) : (
+          <div className="notes-empty-state">
+            <h3>No profile selected</h3>
+            <p>Add a person or change filters to populate the profile workspace.</p>
+          </div>
+        )}
       </section>
-    </>
+
+      <aside className={`people-smart-panel${aiOpen ? " is-ai-open" : ""}`}>
+        {aiOpen ? (
+          <>
+            <header>
+              <div>
+                <strong>AI Assistant</strong>
+                <span>{selectedPerson?.title || "People"}</span>
+              </div>
+              <button type="button" aria-label="Close AI assistant" onClick={() => setAiOpen(false)}>x</button>
+            </header>
+            <nav>
+              <button type="button" className="is-active">Suggestions</button>
+              <button type="button">Profile gaps</button>
+              <button type="button">Recent notes</button>
+            </nav>
+            {[
+              "Follow up about Q3 vision",
+              "Check in on brand refresh",
+              "Invite to strategy session"
+            ].map((item) => (
+              <button type="button" key={item}>
+                <span>{item}</span>
+                <strong aria-hidden="true">{">"}</strong>
+              </button>
+            ))}
+            <label>
+              <input placeholder={`Ask anything about ${selectedPerson?.title || "this person"}...`} />
+              <button type="button">Go</button>
+            </label>
+          </>
+        ) : (
+          <>
+            <header>
+              <h2>Active Filters</h2>
+              <strong>{activeFilterCount}</strong>
+            </header>
+            {[
+              ["Relationship", fallbackPerson ? getPrimaryGroup(fallbackPerson) : "Any"],
+              ["Priority", getPriorityLabel(selectedPerson)],
+              ["Location", selectedProfile.livesIn || "Any"],
+              ["Cadence status", activeFilter === "due" ? "Due soon" : "Anytime"],
+              ["Next follow-up", getNextContactLabel(selectedPerson)]
+            ].map(([label, value]) => (
+              <button type="button" key={label}>
+                <span>{label}</span>
+                <strong>{value}</strong>
+              </button>
+            ))}
+            <button type="button" onClick={() => setFiltersOpen(true)}>+ Add filter</button>
+            <button type="button">+ Save as view</button>
+          </>
+        )}
+      </aside>
+
+      <button type="button" className="people-ai-fab" aria-label="Open AI assistant" onClick={() => setAiOpen(true)}>
+        AI
+      </button>
+    </section>
   );
 }
