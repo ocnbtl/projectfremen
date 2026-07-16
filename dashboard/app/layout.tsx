@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/next";
+import "@fontsource-variable/plus-jakarta-sans/wght.css";
+import "@fontsource-variable/inter/wght.css";
+import "@fontsource-variable/inconsolata/wght.css";
 import "./globals.css";
 import "./figma-transfer.css";
 
@@ -36,7 +39,7 @@ export default function RootLayout({
   children: ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" data-scroll-behavior="smooth">
       <body>
         {children}
         <Analytics />

@@ -106,6 +106,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: false, error: "Record id is required" }, { status: 400 });
     }
     const items = await updatePersonalRecord(id, {
+      title: typeof body.title === "string" ? body.title : undefined,
       status: typeof body.status === "string" ? body.status : undefined,
       action: body.action === "review" ? "review" : undefined,
       body: typeof body.body === "string" ? body.body : undefined,
@@ -114,8 +115,27 @@ export async function PATCH(request: Request) {
       subjects: Array.isArray(body.subjects) ? body.subjects.map(String) : undefined,
       projects: Array.isArray(body.projects) ? body.projects.map(String) : undefined,
       externalSources: Array.isArray(body.externalSources) ? body.externalSources.map(String) : undefined,
-      profile: typeof body.profile === "object" && body.profile ? body.profile : undefined
+      time:
+        typeof body.time === "object" && body.time && !Array.isArray(body.time)
+          ? body.time
+          : undefined,
+      profile:
+        typeof body.profile === "object" && body.profile && !Array.isArray(body.profile)
+          ? body.profile
+          : undefined
     });
+
+    const updated = items.find((item) => item.id === id);
+    await appendAuditEvent({
+      at: new Date().toISOString(),
+      action: "personal.record.update.success",
+      path: new URL(request.url).pathname,
+      method: "PATCH",
+      ip: getRequestIp(request),
+      status: "ok",
+      detail: `${updated?.domain || "unknown"}:${id}`
+    });
+
     return NextResponse.json({ ok: true, items });
   } catch (error) {
     return NextResponse.json(

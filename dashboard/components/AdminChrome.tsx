@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { ADMIN_NAV_ITEMS } from "../lib/admin-navigation";
-import PersonalViewportToggle from "./PersonalViewportToggle";
+import { useEffect, useState } from "react";
+import type { ModuleId } from "../lib/native-objects/types";
+import AppTopNav from "./admin-shell/AppTopNav";
+import SharedAIDock from "./admin-shell/SharedAIDock";
 
 type SidebarItem = {
   label: string;
@@ -24,68 +25,12 @@ export type AdminChromeProps = {
 };
 
 const SIDEBAR_STORAGE_KEY = "admin-sidebar-collapsed";
-const AI_ENDPOINT_STORAGE_KEY = "local-ai-endpoint";
-const AI_MODEL_STORAGE_KEY = "local-ai-model";
 
 function isMobilePreviewMode() {
   return (
     document.documentElement.dataset.adminPreview === "mobile" ||
     window.localStorage.getItem("admin-preview-mode") === "mobile" ||
     window.matchMedia("(max-width: 760px)").matches
-  );
-}
-
-function AdminTopNav({ showCommandSearch = true }: { showCommandSearch?: boolean }) {
-  const [projectsOpen, setProjectsOpen] = useState(false);
-  const closeProjects = () => setProjectsOpen(false);
-
-  return (
-    <header className="admin-global-topnav">
-      <Link href="/admin" className="admin-global-brand" aria-label="Unigentamos home">
-        <span>U</span>
-        <strong>Unigentamos</strong>
-      </Link>
-      <nav className="admin-global-links" aria-label="Primary navigation">
-        {ADMIN_NAV_ITEMS.map((item) =>
-          item.children ? (
-            <div className="admin-global-nav-group" key={item.label}>
-              <button
-                type="button"
-                className="admin-global-nav-button"
-                onClick={() => setProjectsOpen((current) => !current)}
-                aria-expanded={projectsOpen}
-              >
-                {item.label}
-                <span aria-hidden="true">v</span>
-              </button>
-              <div className="admin-project-menu" hidden={!projectsOpen}>
-                <Link href={item.href || "/admin/projects"} className="admin-project-menu-overview" onClick={closeProjects}>
-                  All projects
-                </Link>
-                {item.children.map((project) => (
-                  <Link href={project.href} className="admin-project-menu-item" key={project.slug} onClick={closeProjects}>
-                    <span>{project.shortLabel}</span>
-                    <small>{project.status === "active" ? "Active" : "Planned"}</small>
-                  </Link>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <Link href={item.href || "/admin"} className="admin-global-nav-link" key={item.label}>
-              {item.label}
-            </Link>
-          )
-        )}
-      </nav>
-      <PersonalViewportToggle />
-      {showCommandSearch && (
-        <div className="admin-command-search" role="search" aria-label="Admin command search">
-          <span aria-hidden="true">/</span>
-          <input aria-label="Search notes, files, people, reviews" placeholder="Search notes, files, people, reviews" />
-          <kbd>cmd k</kbd>
-        </div>
-      )}
-    </header>
   );
 }
 
@@ -175,150 +120,17 @@ function AdminPageSidebar({
   );
 }
 
-function getVisiblePageContext() {
-  const main = document.querySelector("main");
-  return (main?.textContent || document.body.textContent || "")
-    .replace(/\s+/g, " ")
-    .trim()
-    .slice(0, 5000);
-}
-
-function isLocalEndpoint(value: string) {
-  try {
-    const url = new URL(value);
-    return ["localhost", "127.0.0.1", "::1", "[::1]"].includes(url.hostname);
-  } catch {
-    return false;
-  }
-}
-
-function LocalAiLauncher() {
-  const [open, setOpen] = useState(false);
-  const [endpoint, setEndpoint] = useState("http://127.0.0.1:11434");
-  const [model, setModel] = useState("gemma");
-  const [prompt, setPrompt] = useState("");
-  const [messages, setMessages] = useState<Array<{ role: "user" | "assistant"; text: string }>>([
-    {
-      role: "assistant",
-      text: "Local AI is designed to talk only to a model running on this computer. Start Ollama or another localhost-compatible server, then ask from here."
-    }
-  ]);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  useEffect(() => {
-    setEndpoint(window.localStorage.getItem(AI_ENDPOINT_STORAGE_KEY) || "http://127.0.0.1:11434");
-    setModel(window.localStorage.getItem(AI_MODEL_STORAGE_KEY) || "gemma");
-  }, []);
-
-  const canSend = useMemo(() => prompt.trim().length > 0 && isLocalEndpoint(endpoint), [endpoint, prompt]);
-
-  function updateEndpoint(value: string) {
-    setEndpoint(value);
-    window.localStorage.setItem(AI_ENDPOINT_STORAGE_KEY, value);
-  }
-
-  function updateModel(value: string) {
-    setModel(value);
-    window.localStorage.setItem(AI_MODEL_STORAGE_KEY, value);
-  }
-
-  async function submitPrompt(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    const cleanPrompt = prompt.trim();
-    if (!cleanPrompt || !isLocalEndpoint(endpoint)) {
-      setError("Local AI endpoint must be localhost, 127.0.0.1, or ::1.");
-      return;
-    }
-
-    setBusy(true);
-    setError("");
-    setPrompt("");
-    setMessages((current) => [...current, { role: "user", text: cleanPrompt }]);
-
-    try {
-      const response = await fetch(`${endpoint.replace(/\/$/, "")}/api/generate`, {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          model,
-          stream: false,
-          prompt: [
-            "You are the user's local Unigentamos assistant. Use the visible page context, stay concise, and do not claim access to private data not shown here.",
-            `Visible page context: ${getVisiblePageContext()}`,
-            `User: ${cleanPrompt}`
-          ].join("\n\n")
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`Local model returned ${response.status}`);
-      }
-      const payload = (await response.json()) as { response?: string };
-      setMessages((current) => [
-        ...current,
-        { role: "assistant", text: payload.response?.trim() || "The local model returned an empty response." }
-      ]);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Local AI request failed.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <div className={`local-ai-widget ${open ? "is-open" : ""}`}>
-      <button
-        type="button"
-        className="local-ai-toggle"
-        onClick={() => setOpen((current) => !current)}
-        aria-label={open ? "Close local AI" : "Open local AI"}
-      >
-        AI
-      </button>
-      {open && (
-        <section className="local-ai-panel" aria-label="Local AI assistant">
-          <div className="local-ai-panel-header">
-            <div>
-              <p>Local AI</p>
-              <h2>Private assistant</h2>
-            </div>
-            <button type="button" onClick={() => setOpen(false)} aria-label="Close local AI">
-              x
-            </button>
-          </div>
-          <div className="local-ai-settings">
-            <label>
-              Endpoint
-              <input value={endpoint} onChange={(event) => updateEndpoint(event.target.value)} />
-            </label>
-            <label>
-              Model
-              <input value={model} onChange={(event) => updateModel(event.target.value)} placeholder="gemma" />
-            </label>
-          </div>
-          <div className="local-ai-messages">
-            {messages.map((message, index) => (
-              <article className={`local-ai-message local-ai-message-${message.role}`} key={`${message.role}-${index}`}>
-                {message.text}
-              </article>
-            ))}
-            {error && <p className="local-ai-error">{error}</p>}
-          </div>
-          <form className="local-ai-form" onSubmit={submitPrompt}>
-            <textarea
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              placeholder="Ask about this page, find a note, or plan a change..."
-              rows={3}
-            />
-            <button type="submit" disabled={!canSend || busy}>
-              {busy ? "Thinking..." : "Send"}
-            </button>
-          </form>
-        </section>
-      )}
-    </div>
-  );
+function moduleFromTitle(title: string): ModuleId {
+  const normalized = title.trim().toLowerCase();
+  if (normalized === "personal ops" || normalized === "personal") return "personal_ops";
+  if (normalized === "people") return "people";
+  if (normalized === "media") return "media";
+  if (normalized === "projects") return "projects";
+  if (normalized === "notes") return "notes";
+  if (normalized === "reviews") return "reviews";
+  if (normalized === "resources") return "resources";
+  if (normalized === "finance") return "finance";
+  return "personal_ops";
 }
 
 export default function AdminChrome({
@@ -331,9 +143,11 @@ export default function AdminChrome({
   showPageSidebar = true,
   showLocalAi = true
 }: AdminChromeProps) {
+  const [aiOpen, setAiOpen] = useState(false);
+
   return (
     <>
-      <AdminTopNav showCommandSearch={showCommandSearch} />
+      <AppTopNav showCommandSearch={showCommandSearch} />
       {showPageSidebar && (
         <AdminPageSidebar
           title={sidebarTitle}
@@ -404,6 +218,16 @@ export default function AdminChrome({
           margin-left: calc(50% - 50vw);
           margin-right: calc(50% - 50vw);
           padding: 56px 0 0 !important;
+          overflow: hidden;
+        }
+
+        .native-module-shell.admin-chrome-main {
+          max-width: none;
+          width: 100vw;
+          min-height: 100dvh;
+          margin-left: calc(50% - 50vw);
+          margin-right: calc(50% - 50vw);
+          padding: 68px 0 0 !important;
           overflow: hidden;
         }
 
@@ -550,12 +374,28 @@ export default function AdminChrome({
             overflow: visible;
           }
 
+          .native-module-shell.admin-chrome-main {
+            padding-top: 68px !important;
+            overflow: hidden;
+          }
+
           .module-layout {
             grid-template-columns: 1fr;
           }
         }
       `}</style>
-      {showLocalAi && <LocalAiLauncher />}
+      {showLocalAi && (
+        <SharedAIDock
+          className="admin-chrome-ai-dock"
+          open={aiOpen}
+          onOpenChange={setAiOpen}
+          context={{
+            module: moduleFromTitle(sidebarTitle),
+            visibleScope: sidebarTitle,
+            allowedActions: ["Draft a proposal", "Summarize visible context"]
+          }}
+        />
+      )}
     </>
   );
 }

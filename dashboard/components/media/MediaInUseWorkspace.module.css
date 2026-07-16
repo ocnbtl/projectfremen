@@ -1,0 +1,482 @@
+.shell {
+  grid-template-columns: clamp(232px, 16vw, 286px) minmax(440px, 34vw) minmax(600px, 1fr);
+}
+
+.directory {
+  display: flex;
+  flex-direction: column;
+}
+
+.directory :global(.directory-pane__selection-bar) {
+  flex: 0 0 auto;
+  padding: 10px 20px 0;
+  background: var(--shell-bg-alt);
+}
+
+.directory :global(.directory-pane__content) {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+.capabilityBoundary,
+.coverageBoundary {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 12px;
+  align-items: start;
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid #2b7ba0;
+  border-radius: 7px;
+  background: #f5fafc;
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.coverageBoundary {
+  border-left-color: #b87920;
+  background: #fffaf0;
+}
+
+.capabilityBoundary strong,
+.coverageBoundary strong {
+  color: var(--text-strong);
+  font: 900 11px var(--font-heading);
+}
+
+.metricStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+  margin: 0 0 12px;
+}
+
+.metricStrip :global(.metric-strip__item) {
+  min-width: 0;
+  padding: 9px 10px;
+}
+
+.metricStrip :global(.metric-strip__item dt),
+.metricStrip :global(.metric-strip__item span) {
+  overflow-wrap: anywhere;
+  line-height: 1.25;
+}
+
+.sortControl {
+  display: inline-flex;
+  gap: 7px;
+  align-items: center;
+  color: var(--text-muted);
+  font: 850 11px var(--font-heading);
+}
+
+.sortControl select {
+  min-height: 34px;
+  padding: 0 30px 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--panel-bg);
+  color: var(--text-strong);
+  font: 800 11px var(--font-heading);
+}
+
+.sortControl select:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: 2px;
+}
+
+.recordGroups,
+.recordGroup,
+.inspectorStack {
+  display: grid;
+  gap: 10px;
+}
+
+.recordGroups {
+  margin-top: 14px;
+}
+
+.scopeFootnote {
+  display: grid;
+  gap: 4px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.inspector {
+  position: relative;
+}
+
+.inspector :global(.inspector-rail__header) {
+  border-bottom: 1px solid var(--border);
+}
+
+.inspector :global(.object-header__heading h2) {
+  overflow-wrap: anywhere;
+  font: 900 clamp(24px, 2.1vw, 34px)/1.05 var(--font-heading);
+  letter-spacing: -0.035em;
+}
+
+.inspector :global(.inspector-rail__content) {
+  padding-right: 16px;
+  padding-bottom: 136px;
+  padding-left: 16px;
+}
+
+.inspector :global(.inspector-rail__footer) {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 12;
+  border-top: 1px solid var(--border-strong);
+  background: color-mix(in srgb, var(--panel-bg) 97%, transparent);
+  box-shadow: 0 -10px 22px rgba(16, 32, 38, 0.07);
+  backdrop-filter: blur(12px);
+}
+
+.tabPanel {
+  padding: 14px 0 0;
+}
+
+.tabPanel:focus {
+  outline: none;
+}
+
+.tabPanel:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: -2px;
+}
+
+.overviewGrid {
+  padding-top: 0;
+}
+
+.usageStrip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+}
+
+.usageStrip > div {
+  display: grid;
+  align-content: start;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px;
+  border-right: 1px solid var(--border);
+}
+
+.usageStrip > div:last-child {
+  border-right: 0;
+}
+
+.usageStrip span,
+.usageStrip small {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.35;
+}
+
+.usageStrip strong {
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font: 900 17px var(--font-mono);
+}
+
+.panelHeading {
+  display: flex;
+  gap: 12px;
+  align-items: start;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.panelHeading h2,
+.panelHeading p {
+  margin: 0;
+}
+
+.panelHeading p {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.panelHeading > strong {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-bg-subtle);
+  font: 800 11px var(--font-mono);
+}
+
+.locationList,
+.legacyList,
+.auditList {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.locationList > li,
+.legacyList > li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-left: 3px solid #2b7ba0;
+  border-radius: 7px;
+  background: var(--panel-bg-subtle);
+}
+
+.locationList > li[data-reference-state="broken"],
+.locationList > li[data-reference-state="missing"] {
+  border-left-color: #c63256;
+}
+
+.locationList > li[data-reference-state="stale"],
+.locationList > li[data-reference-state="pending"] {
+  border-left-color: #b87920;
+}
+
+.locationList > li > div:first-child,
+.legacyList > li > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.locationList span,
+.locationList small,
+.legacyList small {
+  overflow-wrap: anywhere;
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.locationList strong,
+.legacyList strong {
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font: 850 11px var(--font-heading);
+}
+
+.locationActions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.twoColumn {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.auditList > li {
+  display: grid;
+  grid-template-columns: minmax(72px, auto) minmax(0, 1fr);
+  gap: 9px;
+  align-items: start;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.auditList > li:last-child {
+  border-bottom: 0;
+}
+
+.auditList time {
+  color: var(--text-muted);
+  font: 700 9px var(--font-mono);
+}
+
+.auditList span {
+  display: grid;
+  gap: 2px;
+}
+
+.auditList strong {
+  font: 850 10px var(--font-heading);
+}
+
+.auditList small {
+  color: var(--text-muted);
+  font-size: 9px;
+}
+
+.inspectorFooter {
+  display: grid;
+  gap: 7px;
+  padding: 9px 12px max(9px, env(safe-area-inset-bottom));
+}
+
+.inspectorFooter p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.inspectorFooter p strong {
+  color: var(--text-strong);
+}
+
+.inspectorFooter :global(.quick-action-bar__actions) {
+  justify-content: flex-start;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  padding-bottom: 2px;
+}
+
+.inspectorFooter :global(.quick-action-bar__action) {
+  flex: 0 0 auto;
+  font-size: 10px;
+}
+
+.aiDockRaised {
+  bottom: 142px;
+}
+
+@media (max-width: 1500px) {
+  .shell {
+    grid-template-columns: 232px minmax(420px, 38vw) minmax(500px, 1fr);
+  }
+
+  .usageStrip {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .usageStrip > div:nth-child(2) {
+    border-right: 0;
+  }
+
+  .usageStrip > div:nth-child(n + 3) {
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 1240px) {
+  .shell {
+    grid-template-columns: 220px minmax(0, 1fr);
+  }
+
+  .shell.shell > :global(.inspector-rail).inspector {
+    width: min(720px, calc(100vw - 24px));
+    max-width: none;
+  }
+
+  .aiDockRaised {
+    bottom: 22px;
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    display: block;
+  }
+
+  .directory :global(.directory-pane__selection-bar) {
+    padding: 8px 12px 0;
+  }
+
+  .capabilityBoundary,
+  .coverageBoundary {
+    grid-template-columns: 1fr;
+  }
+
+  .metricStrip,
+  .usageStrip,
+  .twoColumn {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .sortControl > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+  }
+
+  .sortControl select {
+    width: min(52vw, 210px);
+    min-height: 44px;
+  }
+
+  .shell.shell > :global(.inspector-rail).inspector {
+    width: 100vw;
+  }
+
+  .inspector :global(.object-header__heading h2) {
+    font-size: 26px;
+    line-height: 1.08;
+  }
+
+  .inspector :global(.inspector-rail__content) {
+    padding-right: 12px;
+    padding-bottom: 154px;
+    padding-left: 12px;
+  }
+
+  .inspector :global(.detail-tabs) {
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .inspector :global(.detail-tabs > button) {
+    flex: 0 0 auto;
+    min-width: 45px;
+    min-height: 45px;
+  }
+
+  .locationList > li,
+  .legacyList > li {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .locationActions {
+    justify-content: space-between;
+  }
+
+  .inspectorFooter :global(.quick-action-bar__action) {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 480px) {
+  .metricStrip,
+  .usageStrip,
+  .twoColumn {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .shell > :global(.module-sidebar),
+  .shell > :global(.inspector-rail) {
+    transition: none;
+  }
+}

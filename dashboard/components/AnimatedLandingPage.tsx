@@ -45,6 +45,10 @@ const DOT_RADIUS = LOGO_SIZE * 0.07;
 const CENTER = LOGO_SIZE / 2;
 const LINE_MAX_PIXELS = 3600;
 
+function roundMotionValue(value: number) {
+  return Number(value.toFixed(5));
+}
+
 function getViewport() {
   if (typeof window === "undefined") {
     return { w: 1366, h: 900 };
@@ -57,8 +61,8 @@ function getFinalPosition(index: number) {
   const angle = (index * 360) / DOT_COUNT - 90;
   const radians = (angle * Math.PI) / 180;
   return {
-    x: CENTER + LOGO_RADIUS * Math.cos(radians),
-    y: CENTER + LOGO_RADIUS * Math.sin(radians)
+    x: roundMotionValue(CENTER + LOGO_RADIUS * Math.cos(radians)),
+    y: roundMotionValue(CENTER + LOGO_RADIUS * Math.sin(radians))
   };
 }
 
@@ -67,8 +71,8 @@ function getSwirlPosition(index: number) {
   const radians = (angle * Math.PI) / 180;
   const swirlRadius = LOGO_RADIUS * 1.5;
   return {
-    x: CENTER + swirlRadius * Math.cos(radians),
-    y: CENTER + swirlRadius * Math.sin(radians)
+    x: roundMotionValue(CENTER + swirlRadius * Math.cos(radians)),
+    y: roundMotionValue(CENTER + swirlRadius * Math.sin(radians))
   };
 }
 
@@ -77,21 +81,21 @@ function getStartPosition(index: number, width: number, height: number) {
 
   if (side === 0) {
     const x = (width / DOT_COUNT) * (index + 0.5);
-    return { x, y: -110 };
+    return { x: roundMotionValue(x), y: -110 };
   }
 
   if (side === 1) {
     const y = (height / DOT_COUNT) * (index + 0.5);
-    return { x: width + 110, y };
+    return { x: width + 110, y: roundMotionValue(y) };
   }
 
   if (side === 2) {
     const x = width - (width / DOT_COUNT) * (index + 0.5);
-    return { x, y: height + 110 };
+    return { x: roundMotionValue(x), y: height + 110 };
   }
 
   const y = height - (height / DOT_COUNT) * (index + 0.5);
-  return { x: -110, y };
+  return { x: -110, y: roundMotionValue(y) };
 }
 
 function isWithinBounds(x: number, y: number, width: number, height: number) {
@@ -160,7 +164,10 @@ export default function AnimatedLandingPage({
   showBackLink = false
 }: LandingProps) {
   const [animationComplete, setAnimationComplete] = useState(false);
-  const [viewport, setViewport] = useState(() => getViewport());
+  // Keep the first client render identical to the server render. The real
+  // viewport is applied immediately after hydration so the animation still
+  // begins from the current window edges without producing mismatched markup.
+  const [viewport, setViewport] = useState({ w: 1366, h: 900 });
   const [orangePixels, setOrangePixels] = useState<Pixel[]>([]);
   const [bluePixels, setBluePixels] = useState<Pixel[]>([]);
   const [greenPixels, setGreenPixels] = useState<Pixel[]>([]);
@@ -176,6 +183,7 @@ export default function AnimatedLandingPage({
       setViewport(getViewport());
     }
 
+    onResize();
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -264,21 +272,25 @@ export default function AnimatedLandingPage({
             const start = startPositions[index];
             const swirl = getSwirlPosition(index);
             const final = getFinalPosition(index);
+            const startX = roundMotionValue(start.x - final.x);
+            const startY = roundMotionValue(start.y - final.y);
+            const swirlX = roundMotionValue(swirl.x - final.x);
+            const swirlY = roundMotionValue(swirl.y - final.y);
 
             return (
               <motion.span
                 key={`${color}-${index}`}
                 className="landing-logo-dot"
                 style={{
-                  width: DOT_RADIUS * 2,
-                  height: DOT_RADIUS * 2,
-                  left: final.x - DOT_RADIUS,
-                  top: final.y - DOT_RADIUS,
+                  width: roundMotionValue(DOT_RADIUS * 2),
+                  height: roundMotionValue(DOT_RADIUS * 2),
+                  left: roundMotionValue(final.x - DOT_RADIUS),
+                  top: roundMotionValue(final.y - DOT_RADIUS),
                   backgroundColor: color
                 }}
                 initial={{
-                  x: start.x - final.x,
-                  y: start.y - final.y,
+                  x: startX,
+                  y: startY,
                   scale: 0,
                   opacity: 0
                 }}
@@ -286,8 +298,8 @@ export default function AnimatedLandingPage({
                   animationComplete
                     ? { x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 }
                     : {
-                        x: [start.x - final.x, swirl.x - final.x, 0],
-                        y: [start.y - final.y, swirl.y - final.y, 0],
+                        x: [startX, swirlX, 0],
+                        y: [startY, swirlY, 0],
                         scale: [0, 1.2, 1],
                         opacity: [0, 1, 1],
                         rotate: [0, 1440, 0]

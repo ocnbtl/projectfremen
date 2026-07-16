@@ -4,3 +4,4 @@ node_modules
 *.tsbuildinfo
 data/audit-log.json
 data/exports/
+output/

@@ -80,7 +80,7 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
   },
   {
     label: "Reviews",
-    href: "/admin/reviews/weekly",
+    href: "/admin/reviews",
     description: "Weekly and monthly cadence"
   },
   {

@@ -168,6 +168,17 @@ export type PersonalRecordInput = {
   profile?: Partial<PersonalContactProfile>;
 };
 
+export type PersonalRecordPatch = Partial<
+  Pick<
+    PersonalRecord,
+    "title" | "status" | "body" | "url" | "projects" | "areas" | "subjects" | "externalSources"
+  >
+> & {
+  action?: "review";
+  time?: Partial<PersonalRecordTime>;
+  profile?: Partial<PersonalContactProfile>;
+};
+
 const FILE_NAME = "personal-records.json";
 
 export const PERSONAL_RECORD_CLASSES: PersonalRecordClass[] = [
@@ -297,6 +308,18 @@ const CONTACT_PROFILE_TEXT_KEYS = [
   "partner"
 ] as const;
 
+const CONTACT_PROFILE_LIST_KEYS = ["associatedPeople", "children", "interactions", "memories"] as const;
+const PERSONAL_RECORD_TIME_KEYS = [
+  "startDate",
+  "startTime",
+  "dueDate",
+  "dueTime",
+  "reviewCadence",
+  "nextReview",
+  "lastReview",
+  "processedOn"
+] as const;
+
 type ContactProfileTextKey = (typeof CONTACT_PROFILE_TEXT_KEYS)[number];
 
 function splitProfileList(value: unknown): string[] {
@@ -330,6 +353,80 @@ function normalizeContactProfile(input: unknown): PersonalContactProfile | undef
   }
 
   return profile;
+}
+
+function normalizeContactProfilePatch(input: unknown): Partial<PersonalContactProfile> | undefined {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return undefined;
+  }
+
+  const raw = input as Record<string, unknown>;
+  const patch: Partial<PersonalContactProfile> = {};
+
+  for (const key of CONTACT_PROFILE_TEXT_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) {
+      continue;
+    }
+    const value = raw[key];
+    if (typeof value === "string") {
+      patch[key] = value.trim() || undefined;
+    }
+  }
+
+  for (const key of CONTACT_PROFILE_LIST_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) {
+      continue;
+    }
+    const value = raw[key];
+    if (typeof value === "string" || Array.isArray(value)) {
+      patch[key] = splitProfileList(value);
+    }
+  }
+
+  return Object.keys(patch).length > 0 ? patch : undefined;
+}
+
+function mergeContactProfile(
+  current: PersonalContactProfile | undefined,
+  patch: Partial<PersonalContactProfile> | undefined
+): PersonalContactProfile | undefined {
+  if (!patch) {
+    return current;
+  }
+  return {
+    ...current,
+    ...patch,
+    associatedPeople: patch.associatedPeople ?? current?.associatedPeople ?? [],
+    children: patch.children ?? current?.children ?? [],
+    interactions: patch.interactions ?? current?.interactions ?? [],
+    memories: patch.memories ?? current?.memories ?? []
+  };
+}
+
+function sanitizeTitle(value: string): string {
+  const title = value
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!title) {
+    throw new Error("Title is required");
+  }
+  if (title.length > 240) {
+    throw new Error("Title must be 240 characters or fewer");
+  }
+  return title;
+}
+
+function normalizeOptionalHttpUrl(value: string): string | undefined {
+  const url = value.trim();
+  if (!url) {
+    return undefined;
+  }
+  if (!/^https?:\/\//i.test(url)) {
+    throw new Error("Link must start with http:// or https://");
+  }
+  return url;
 }
 
 function isAllowedDomain(slug: string) {
@@ -540,6 +637,41 @@ function normalizeTime(input: PersonalRecordTime | undefined, meta: PersonalReco
   };
 }
 
+function mergeTimePatch(
+  current: PersonalRecordTime,
+  input: Partial<PersonalRecordTime> | undefined
+): PersonalRecordTime {
+  if (!input || typeof input !== "object" || Array.isArray(input)) {
+    return { ...current };
+  }
+
+  const raw = input as Record<string, unknown>;
+  const patch: Partial<PersonalRecordTime> = {};
+  for (const key of PERSONAL_RECORD_TIME_KEYS) {
+    if (!Object.prototype.hasOwnProperty.call(raw, key)) {
+      continue;
+    }
+    const value = raw[key];
+    if (typeof value !== "string") {
+      continue;
+    }
+    const normalized = key === "reviewCadence" ? value.trim().toUpperCase() : value.trim();
+    if (normalized.length > 120) {
+      throw new Error(`${key} must be 120 characters or fewer`);
+    }
+    patch[key] = normalized || undefined;
+  }
+
+  const next = { ...current, ...patch };
+  const cadenceChanged = Object.prototype.hasOwnProperty.call(raw, "reviewCadence");
+  const lastReviewChanged = Object.prototype.hasOwnProperty.call(raw, "lastReview");
+  const nextReviewProvided = Object.prototype.hasOwnProperty.call(raw, "nextReview");
+  if ((cadenceChanged || lastReviewChanged) && !nextReviewProvided) {
+    next.nextReview = calculateNextReview(next.lastReview, next.reviewCadence) || next.nextReview;
+  }
+  return next;
+}
+
 function normalizeRelations(input: Partial<PersonalRecordRelations> | undefined): PersonalRecordRelations {
   return {
     north: sanitizeRecordIds(input?.north),
@@ -659,10 +791,7 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
     throw new Error("Title is required");
   }
 
-  const url = input.url?.trim() || "";
-  if (url && !/^https?:\/\//i.test(url)) {
-    throw new Error("Link must start with http:// or https://");
-  }
+  const url = normalizeOptionalHttpUrl(input.url || "");
 
   const now = new Date();
   const meta = buildCreatedMeta(now);
@@ -680,7 +809,7 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
     status: pickStatus(input.status),
     growth: "seed",
     body: input.body?.trim() || "",
-    url: url || undefined,
+    url,
     areas: sanitizeList(input.areas),
     subjects: sanitizeList(input.subjects),
     projects: sanitizeList(input.projects),
@@ -711,10 +840,7 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
 
 export async function updatePersonalRecord(
   id: string,
-  patch: Partial<Pick<PersonalRecord, "status" | "body" | "url" | "projects" | "areas" | "subjects" | "externalSources">> & {
-    action?: "review";
-    profile?: Partial<PersonalContactProfile>;
-  }
+  patch: PersonalRecordPatch
 ): Promise<PersonalRecord[]> {
   const existing = await readPersonalRecords();
   const idx = existing.findIndex((record) => record.id === id);
@@ -725,8 +851,12 @@ export async function updatePersonalRecord(
   const now = new Date().toISOString();
   const next = [...existing];
   const current = next[idx];
-  const time = { ...current.time };
-  const profilePatch = normalizeContactProfile(patch.profile);
+  const time = mergeTimePatch(current.time, patch.time);
+  const profilePatch = normalizeContactProfilePatch(patch.profile);
+  for (const profileUrl of [profilePatch?.website, profilePatch?.linkedin]) {
+    if (profileUrl) normalizeOptionalHttpUrl(profileUrl);
+  }
+  const url = typeof patch.url === "string" ? normalizeOptionalHttpUrl(patch.url) : current.url;
   if (patch.action === "review") {
     time.lastReview = now;
     time.nextReview = calculateNextReview(now, time.reviewCadence) || time.nextReview;
@@ -734,8 +864,9 @@ export async function updatePersonalRecord(
 
   next[idx] = {
     ...current,
+    title: typeof patch.title === "string" ? sanitizeTitle(patch.title) : current.title,
     body: typeof patch.body === "string" ? patch.body.trim() : current.body,
-    url: typeof patch.url === "string" && patch.url.trim() ? patch.url.trim() : current.url,
+    url,
     areas: Array.isArray(patch.areas) ? sanitizeList(patch.areas) : current.areas,
     subjects: Array.isArray(patch.subjects) ? sanitizeList(patch.subjects) : current.subjects,
     projects: Array.isArray(patch.projects) ? sanitizeList(patch.projects) : current.projects,
@@ -746,12 +877,7 @@ export async function updatePersonalRecord(
       ? (patch.status as PersonalRecordStatus)
       : current.status,
     time,
-    profile: profilePatch
-      ? {
-          ...current.profile,
-          ...profilePatch
-        }
-      : current.profile,
+    profile: mergeContactProfile(current.profile, profilePatch),
     updatedAt: now
   };
 

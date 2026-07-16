@@ -1,13 +1,21 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
+import { peopleCreateInputToLegacy, peopleUpdateInputToLegacy } from "../lib/modules/people/legacy-adapter";
+import { getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/routes";
+import { parsePeopleUrlState, serializePeopleUrlState } from "../lib/native-objects/url-state";
 import type {
   PersonalContactProfile,
   PersonalRecord,
   PersonalRecordClass,
   PersonalRecordStatus
 } from "../lib/personal-records-store";
+import SharedAIDock from "./admin-shell/SharedAIDock";
+import ConfirmationSheet from "./operational/ConfirmationSheet";
+import DetailTabs from "./operational/DetailTabs";
+import SystemState from "./operational/SystemState";
 
 type RecordsResponse = {
   ok: boolean;
@@ -18,6 +26,9 @@ type RecordsResponse = {
 type PeopleWorkspaceProps = {
   initialPeople: PersonalRecord[];
   totalRecords: number;
+  initialSelectedId?: string;
+  initialMode?: "directory" | "profile" | "new" | "edit";
+  initialLoadError?: string;
 };
 
 type PeopleFilter = "all" | "due" | "week" | "active" | "dormant" | "orgs";
@@ -49,7 +60,7 @@ type PeopleSidebarView =
   | "customize";
 type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up" | "priority";
 type PeopleListMode = "list" | "compact" | "grid";
-type PeopleAiTab = "glance" | "suggestions" | "gaps" | "notes";
+type InteractionKind = "call" | "message" | "email" | "meeting" | "note" | "milestone";
 
 type MemoryCategory =
   | "personal_context"
@@ -162,6 +173,9 @@ const PEOPLE_VIEWS: Array<{ id: PeopleView; label: string }> = [
   { id: "files", label: "Files & Links" },
   { id: "properties", label: "Properties" }
 ];
+
+const PEOPLE_DIRTY_HISTORY_GUARD = "__unigentamosPeopleDirtyGuard";
+const PEOPLE_HISTORY_BACK_DESTINATION = "__people_history_back__";
 
 const MEMORY_CATEGORIES: Array<{ id: MemoryCategory; label: string; tone: string }> = [
   { id: "personal_context", label: "Personal context", tone: "green" },
@@ -337,9 +351,17 @@ function labelize(value: string) {
     .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
+function parseDisplayDate(value: string) {
+  const dateOnly = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dateOnly) {
+    return new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]));
+  }
+  return new Date(value);
+}
+
 function formatDate(value?: string) {
   if (!value) return "-";
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -349,7 +371,7 @@ function formatDate(value?: string) {
 
 function formatFullDate(value?: string) {
   if (!value) return "-";
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -369,9 +391,21 @@ function joinList(values?: string[]) {
   return values && values.length > 0 ? values.join(", ") : "";
 }
 
+function splitTextEntries(value: string) {
+  const trimmed = value.trim();
+  if (!trimmed) return [];
+  return trimmed.includes("\n")
+    ? trimmed.split(/\n+/).map((item) => item.trim()).filter(Boolean)
+    : splitList(trimmed);
+}
+
+function joinTextEntries(values?: string[]) {
+  return values && values.length > 0 ? values.join("\n") : "";
+}
+
 function daysUntil(value?: string) {
   if (!value) return null;
-  const date = new Date(value);
+  const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return null;
   return Math.ceil((date.getTime() - Date.now()) / 86400000);
 }
@@ -389,7 +423,7 @@ function isThisWeek(record: PersonalRecord) {
 function isDormant(record: PersonalRecord) {
   if (record.status === "inactive") return true;
   if (!record.time.lastReview && !record.time.nextReview) return true;
-  const last = record.time.lastReview ? new Date(record.time.lastReview) : null;
+  const last = record.time.lastReview ? parseDisplayDate(record.time.lastReview) : null;
   if (!last || Number.isNaN(last.getTime())) return false;
   return Date.now() - last.getTime() > 1000 * 60 * 60 * 24 * 75;
 }
@@ -482,8 +516,8 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     website: profile?.website || record.url || "",
     partner: profile?.partner || "",
     children: joinList(profile?.children),
-    interactions: joinList(profile?.interactions),
-    memories: joinList(profile?.memories)
+    interactions: joinTextEntries(profile?.interactions),
+    memories: joinTextEntries(profile?.memories)
   };
 }
 
@@ -492,8 +526,8 @@ function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile
     ...draft,
     associatedPeople: splitList(draft.associatedPeople),
     children: splitList(draft.children),
-    interactions: splitList(draft.interactions),
-    memories: splitList(draft.memories)
+    interactions: splitTextEntries(draft.interactions),
+    memories: splitTextEntries(draft.memories)
   };
 }
 
@@ -535,6 +569,43 @@ function getNextContactLabel(record?: PersonalRecord) {
   return `In ${days} days`;
 }
 
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function followUpDueAt(record: PersonalRecord) {
+  const recordedDueAt = record.time.nextReview || getProfile(record).nextContact;
+  if (recordedDueAt) {
+    const recordedDate = parseDisplayDate(recordedDueAt);
+    if (!Number.isNaN(recordedDate.getTime())) return toDateInputValue(recordedDate);
+  }
+
+  const oneWeekFromToday = new Date();
+  oneWeekFromToday.setDate(oneWeekFromToday.getDate() + 7);
+  return toDateInputValue(oneWeekFromToday);
+}
+
+function followUpCreationRoute(record: PersonalRecord) {
+  const objectType = record.className === "org" ? "organization" : "person";
+  const params = new URLSearchParams({
+    create: "follow-up",
+    sourceModule: "people",
+    sourceObjectType: objectType,
+    sourceObjectId: record.id,
+    sourceLabel: record.title,
+    sourceRoute: getNativeObjectRoute({
+      module: "people",
+      objectType,
+      objectId: record.id
+    }),
+    dueAt: followUpDueAt(record)
+  });
+  return `${getModuleRoute("personal_ops")}/follow-ups?${params.toString()}`;
+}
+
 function getLastName(record: PersonalRecord) {
   const profile = getProfile(record);
   const name = profile.lastName || record.title.split(/\s+/).filter(Boolean).slice(-1)[0] || record.title;
@@ -544,21 +615,21 @@ function getLastName(record: PersonalRecord) {
 function isRecentContact(record: PersonalRecord) {
   const last = record.time.lastReview || record.updatedAt;
   if (!last) return false;
-  const date = new Date(last);
+  const date = parseDisplayDate(last);
   return !Number.isNaN(date.getTime()) && Date.now() - date.getTime() <= 1000 * 60 * 60 * 24 * 30;
 }
 
 function isNoContact90(record: PersonalRecord) {
   const last = record.time.lastReview || getProfile(record).lastContact;
   if (!last) return true;
-  const date = new Date(last);
+  const date = parseDisplayDate(last);
   return Number.isNaN(date.getTime()) || Date.now() - date.getTime() > 1000 * 60 * 60 * 24 * 90;
 }
 
 function isBirthdayThisMonth(record: PersonalRecord) {
   const birthday = getProfile(record).birthday;
   if (!birthday) return false;
-  const date = new Date(birthday);
+  const date = parseDisplayDate(birthday);
   return !Number.isNaN(date.getTime()) && date.getMonth() === new Date().getMonth();
 }
 
@@ -630,15 +701,28 @@ function sortPeople(records: PersonalRecord[], sortMode: PeopleSortMode) {
   });
 }
 
-export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleWorkspaceProps) {
+export default function PeopleWorkspace({
+  initialPeople,
+  totalRecords,
+  initialSelectedId,
+  initialMode = "directory",
+  initialLoadError = ""
+}: PeopleWorkspaceProps) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const initialUrlState = parsePeopleUrlState(searchParams);
   const [people, setPeople] = useState(initialPeople);
-  const [query, setQuery] = useState("");
-  const [activeFilter, setActiveFilter] = useState<PeopleFilter>("all");
-  const [activeSidebarView, setActiveSidebarView] = useState<PeopleSidebarView>("all");
-  const [sortMode, setSortMode] = useState<PeopleSortMode>("last-name");
-  const [listMode, setListMode] = useState<PeopleListMode>("list");
-  const [starredIds, setStarredIds] = useState<Set<string>>(() => new Set(initialPeople.filter((record) => record.status === "next").map((record) => record.id)));
-  const [selectedId, setSelectedId] = useState(initialPeople[0]?.id || "");
+  const [query, setQuery] = useState(initialUrlState.query);
+  const [activeFilter, setActiveFilter] = useState<PeopleFilter>(initialUrlState.filter);
+  const [activeSidebarView, setActiveSidebarView] = useState<PeopleSidebarView>(initialUrlState.sidebar);
+  const [sortMode, setSortMode] = useState<PeopleSortMode>(initialUrlState.sort);
+  const [listMode, setListMode] = useState<PeopleListMode>(initialUrlState.view);
+  // Star storage is an open product decision. Do not overload lifecycle `next`
+  // or pretend this client-only preference is durable.
+  const [starredIds] = useState<Set<string>>(() => new Set());
+  const [selectedId, setSelectedId] = useState(initialSelectedId || initialUrlState.person || initialPeople[0]?.id || "");
+  const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(() => new Set());
   const [name, setName] = useState("");
   const [className, setClassName] = useState<Extract<PersonalRecordClass, "person" | "org">>("person");
   const [group, setGroup] = useState("Collaborator");
@@ -658,13 +742,12 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
   const [saving, setSaving] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [error, setError] = useState("");
-  const [activeView, setActiveView] = useState<PeopleView>("overview");
-  const [detailMode, setDetailMode] = useState<DetailMode>("profile");
-  const [addingPerson, setAddingPerson] = useState(false);
+  const [activeView, setActiveView] = useState<PeopleView>(initialMode === "edit" ? "properties" : initialUrlState.tab);
+  const [detailMode, setDetailMode] = useState<DetailMode>(initialMode === "new" || initialMode === "edit" ? "edit" : "profile");
+  const [addingPerson, setAddingPerson] = useState(initialMode === "new");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
-  const [aiTab, setAiTab] = useState<PeopleAiTab>("suggestions");
+  const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [utilityNotice, setUtilityNotice] = useState("");
   const [memoryCategory, setMemoryCategory] = useState<MemoryCategory>("personal_context");
@@ -675,6 +758,174 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
   const [relationshipType, setRelationshipType] = useState("collaborator");
   const [relationshipSaving, setRelationshipSaving] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
+  const [interactionOpen, setInteractionOpen] = useState(false);
+  const [interactionKind, setInteractionKind] = useState<InteractionKind>("meeting");
+  const [interactionDate, setInteractionDate] = useState("");
+  const [interactionTitle, setInteractionTitle] = useState("");
+  const [interactionSummary, setInteractionSummary] = useState("");
+  const [interactionMeaningful, setInteractionMeaningful] = useState(true);
+  const [interactionSaving, setInteractionSaving] = useState(false);
+  const [cancelConfirmOpen, setCancelConfirmOpen] = useState(false);
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [editorReturnView, setEditorReturnView] = useState<PeopleView>("overview");
+  const interactionDialogRef = useRef<HTMLFormElement>(null);
+  const interactionReturnFocusRef = useRef<HTMLElement | null>(null);
+  const interactionSavingRef = useRef(false);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
+  const filterSheetRef = useRef<HTMLElement>(null);
+  const dirtyHistoryGuardRef = useRef<string | null>(null);
+  const suppressDirtyPopRef = useRef(false);
+
+  const searchParamKey = searchParams.toString();
+
+  useEffect(() => {
+    const next = parsePeopleUrlState(searchParams);
+    setQuery(next.query);
+    setActiveFilter(next.filter);
+    setActiveSidebarView(next.sidebar);
+    setSortMode(next.sort);
+    setListMode(next.view);
+    setAiOpen(next.ai);
+    if (initialSelectedId || next.person) {
+      setSelectedId(initialSelectedId || next.person);
+    }
+    if (initialMode === "edit") {
+      setEditorReturnView(next.tab === "properties" ? "overview" : next.tab);
+      setActiveView("properties");
+      setDetailMode("edit");
+      setAddingPerson(false);
+    } else if (initialMode === "new") {
+      setAddingPerson(true);
+      setDetailMode("edit");
+    } else {
+      setActiveView(next.tab);
+      setDetailMode(
+        next.tab === "timeline"
+          ? "timeline"
+          : next.tab === "files"
+            ? "workspace"
+            : next.tab === "properties"
+              ? "edit"
+              : "profile"
+      );
+      setAddingPerson(false);
+    }
+  }, [initialMode, initialSelectedId, searchParamKey]);
+
+  useEffect(() => {
+    if (!interactionOpen) return;
+    interactionReturnFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = interactionDialogRef.current;
+    dialog?.querySelector<HTMLElement>("input, select, textarea, button")?.focus();
+    const handleDialogKey = (event: KeyboardEvent) => {
+      if (!interactionDialogRef.current) return;
+      if (event.key === "Escape" && !interactionSavingRef.current) {
+        event.preventDefault();
+        setInteractionOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const controls = Array.from(
+        interactionDialogRef.current.querySelectorAll<HTMLElement>(
+          "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
+        )
+      );
+      if (!controls.length) return;
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleDialogKey);
+    return () => {
+      document.removeEventListener("keydown", handleDialogKey);
+      interactionReturnFocusRef.current?.focus();
+    };
+  }, [interactionOpen]);
+
+  useEffect(() => {
+    interactionSavingRef.current = interactionSaving;
+  }, [interactionSaving]);
+
+  useEffect(() => {
+    const container = mobileMenuOpen ? mobileMenuRef.current : filtersOpen ? filterSheetRef.current : null;
+    if (!container) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const controls = () => Array.from(
+      container.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex='-1'])"
+      )
+    );
+    controls()[0]?.focus();
+    const handleOverlayKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        if (mobileMenuOpen) setMobileMenuOpen(false);
+        if (filtersOpen) setFiltersOpen(false);
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = controls();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleOverlayKey);
+    return () => {
+      document.removeEventListener("keydown", handleOverlayKey);
+      previousFocus?.focus();
+    };
+  }, [filtersOpen, mobileMenuOpen]);
+
+  function buildPeopleDestination(
+    partial: Partial<ReturnType<typeof parsePeopleUrlState>>,
+    options: { path?: string } = {}
+  ) {
+    const path = options.path || pathname;
+    const params = serializePeopleUrlState(
+      {
+        query,
+        filter: activeFilter,
+        sort: sortMode,
+        view: listMode,
+        sidebar: activeSidebarView,
+        person: path === getModuleRoute("people") ? selectedId : "",
+        tab: activeView,
+        ai: aiOpen,
+        ...partial
+      },
+      searchParams
+    );
+    return `${path}${params.size ? `?${params.toString()}` : ""}`;
+  }
+
+  function updatePeopleUrl(
+    partial: Partial<ReturnType<typeof parsePeopleUrlState>>,
+    options: { path?: string; history?: "push" | "replace"; native?: boolean } = {}
+  ) {
+    const destination = buildPeopleDestination(partial, options);
+    if (options.native && typeof window !== "undefined") {
+      window.history.replaceState(window.history.state, "", destination);
+      return;
+    }
+    if (options.history === "push") {
+      router.push(destination, { scroll: false });
+    } else {
+      router.replace(destination, { scroll: false });
+    }
+  }
 
   const visiblePeople = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -692,19 +943,12 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
   }, [activeFilter, activeSidebarView, people, query, sortMode, starredIds]);
 
   const selectedPerson = useMemo(() => {
-    return people.find((record) => record.id === selectedId) || visiblePeople[0] || people[0];
+    return people.find((record) => record.id === selectedId) || visiblePeople[0];
   }, [people, selectedId, visiblePeople]);
 
   useEffect(() => {
     setProfileDraft(getProfile(selectedPerson));
   }, [selectedPerson?.id]);
-
-  useEffect(() => {
-    document.body.classList.toggle("people-ai-panel-open", aiOpen);
-    return () => {
-      document.body.classList.remove("people-ai-panel-open");
-    };
-  }, [aiOpen]);
 
   const stats = useMemo(() => {
     const countFor = (view: PeopleSidebarView) => people.filter((record) => matchesSidebarView(record, view, starredIds)).length;
@@ -735,20 +979,28 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
   }, [people, starredIds]);
 
   const selectedProfile = getProfile(selectedPerson);
-  const fallbackPerson = selectedPerson || people[0];
+  const fallbackPerson = selectedPerson || visiblePeople[0];
   const activeFilterCount = (activeFilter === "all" ? 0 : 1) + (query.trim() ? 1 : 0);
-  const filteringActive = detailMode === "profile" && !aiOpen && activeFilterCount > 0;
+  const filteringActive = detailMode === "profile" && activeFilterCount > 0;
+  const mobileSurface = addingPerson || initialMode === "new" || detailMode === "edit" || initialMode === "edit"
+    ? "editor"
+    : pathname === getModuleRoute("people")
+      ? "directory"
+      : "profile";
   const shellClassName = [
     "people-redesign-shell",
     filteringActive ? "is-filtering" : "",
-    aiOpen ? "is-ai-open" : "",
+    `is-mobile-${mobileSurface}`,
     detailMode !== "profile" ? `is-mode-${detailMode}` : ""
   ].filter(Boolean).join(" ");
   const activeSidebarItem = PEOPLE_SIDEBAR_SECTIONS.flatMap((section) => section.items).find((item) => item.id === activeSidebarView);
   const activeViewLabel = activeSidebarItem?.label || "All People";
+  const resolvedUtilityNotice = activeSidebarItem?.surface === "utility"
+    ? utilityNotice || `${activeViewLabel} is a read-only People utility in this checkpoint. Stored-data actions remain disabled until matching backend support exists.`
+    : utilityNotice;
   const profileGaps = selectedPerson ? getProfileGaps(selectedPerson) : [];
-  const selectedMemories = splitList(selectedProfile.memories);
-  const selectedInteractions = splitList(selectedProfile.interactions);
+  const selectedMemories = splitTextEntries(selectedProfile.memories);
+  const selectedInteractions = splitTextEntries(selectedProfile.interactions);
   const selectedChildren = splitList(selectedProfile.children);
   const associatedPeople = splitList(selectedProfile.associatedPeople);
   const relatedRecordLabels = selectedPerson
@@ -761,14 +1013,6 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     ["Next follow-up", selectedPerson ? getNextContactLabel(selectedPerson) : "-"],
     ["Added", selectedPerson ? formatFullDate(selectedPerson.createdAt) : "-"]
   ];
-  const aiSuggestions = [
-    selectedPerson && isDue(selectedPerson) ? `Follow up with ${selectedPerson.title} today.` : "",
-    profileGaps.length > 0 ? `Fill ${profileGaps[0].toLowerCase()} so this profile is easier to use later.` : "",
-    selectedInteractions.length === 0 ? "Log the first real interaction to establish relationship history." : "",
-    selectedProfile.birthday ? `Birthday is ${formatDate(selectedProfile.birthday)}. Consider adding a reminder note.` : "",
-    selectedPerson?.projects.length ? `Review linked project context: ${selectedPerson.projects[0]}.` : ""
-  ].filter(Boolean);
-  const aiRecentNotes = Array.from(new Set([...selectedMemories, ...selectedProfile.notes.split("\n").filter(Boolean)]));
   const timelineItems = [
     ...selectedInteractions,
     ...selectedMemories
@@ -778,6 +1022,101 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     ...(selectedPerson?.projects || []).slice(0, 2),
     getPriorityLabel(selectedPerson)
   ].filter(Boolean);
+  const addFormDirty = [
+    name,
+    quickContext,
+    quickEmail,
+    quickPhone,
+    quickLocation,
+    quickOccupation,
+    quickEmployer,
+    quickProjects,
+    lastContact,
+    nextContact,
+    referenceUrl
+  ].some((value) => value.trim().length > 0)
+    || className !== "person"
+    || group !== "Collaborator"
+    || status !== "active"
+    || cadence !== "P1M";
+  const profileFormDirty = Boolean(
+    selectedPerson && JSON.stringify(profileDraft) !== JSON.stringify(getProfile(selectedPerson))
+  );
+  const editorDirty = addingPerson ? addFormDirty : detailMode === "edit" && profileFormDirty;
+
+  function guardDirtyNavigation(destination: string) {
+    if (!editorDirty) return false;
+    setPendingNavigation(destination);
+    setCancelConfirmOpen(true);
+    return true;
+  }
+
+  useEffect(() => {
+    if (!editorDirty) return;
+    if (!dirtyHistoryGuardRef.current) {
+      const marker = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      dirtyHistoryGuardRef.current = marker;
+      window.history.pushState(
+        { ...(window.history.state || {}), [PEOPLE_DIRTY_HISTORY_GUARD]: marker },
+        "",
+        window.location.href
+      );
+    }
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    const handleLinkNavigation = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target.closest<HTMLAnchorElement>("a[href]") : null;
+      if (!target || target.target === "_blank" || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const destination = new URL(target.href, window.location.href);
+      if (destination.origin !== window.location.origin || destination.href === window.location.href) return;
+      event.preventDefault();
+      setPendingNavigation(`${destination.pathname}${destination.search}${destination.hash}`);
+      setCancelConfirmOpen(true);
+    };
+    const handlePopState = () => {
+      if (suppressDirtyPopRef.current) {
+        suppressDirtyPopRef.current = false;
+        return;
+      }
+      if (!dirtyHistoryGuardRef.current) return;
+      suppressDirtyPopRef.current = true;
+      window.history.forward();
+      setPendingNavigation(PEOPLE_HISTORY_BACK_DESTINATION);
+      setCancelConfirmOpen(true);
+    };
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    window.addEventListener("popstate", handlePopState);
+    document.addEventListener("click", handleLinkNavigation, true);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      window.removeEventListener("popstate", handlePopState);
+      document.removeEventListener("click", handleLinkNavigation, true);
+    };
+  }, [editorDirty]);
+
+  useEffect(() => {
+    if (editorDirty || !dirtyHistoryGuardRef.current) return;
+    void releaseDirtyHistoryGuard();
+  }, [editorDirty]);
+
+  useEffect(() => {
+    if (detailMode !== "edit") return;
+    const handleEditorShortcut = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
+        event.preventDefault();
+        const selector = addingPerson ? ".people-capture-form" : ".people-edit-form";
+        document.querySelector<HTMLFormElement>(selector)?.requestSubmit();
+      }
+      if (event.key === "Escape") {
+        event.preventDefault();
+        requestCancelEditor();
+      }
+    };
+    window.addEventListener("keydown", handleEditorShortcut);
+    return () => window.removeEventListener("keydown", handleEditorShortcut);
+  }, [addingPerson, detailMode, editorDirty, selectedPerson?.id]);
 
   function getSidebarCount(view: PeopleSidebarView) {
     const counts: Partial<Record<PeopleSidebarView, number>> = {
@@ -807,6 +1146,16 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
   }
 
   function selectSidebarView(item: SidebarItemConfig) {
+    const destination = buildPeopleDestination(
+      {
+        sidebar: item.id,
+        filter: "all",
+        person: "",
+        tab: item.surface === "profile" || item.id === "relationship-map" ? "relations" : "overview"
+      },
+      { path: getModuleRoute("people") }
+    );
+    if (guardDirtyNavigation(destination)) return;
     setActiveSidebarView(item.id);
     setActiveFilter("all");
     setFiltersOpen(false);
@@ -817,17 +1166,45 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     if (item.surface === "profile" || item.id === "relationship-map") {
       setActiveView("relations");
       setDetailMode("profile");
+      updatePeopleUrl(
+        { sidebar: item.id, filter: "all", tab: "relations", person: "" },
+        { path: getModuleRoute("people"), history: "push" }
+      );
       return;
     }
     if (item.surface === "utility") {
       setUtilityNotice(`${item.label} is ready as a People workspace surface. Actions that would change stored data stay disabled until the matching backend support exists.`);
       setDetailMode("profile");
+      updatePeopleUrl(
+        { sidebar: item.id, filter: "all", person: "" },
+        { path: getModuleRoute("people"), history: "push" }
+      );
       return;
     }
     setDetailMode("profile");
+    updatePeopleUrl(
+      { sidebar: item.id, filter: "all", person: "" },
+      { path: getModuleRoute("people"), history: "push" }
+    );
   }
 
   function selectProfileView(view: PeopleView) {
+    if (!selectedPerson) return;
+    if (view === "properties") {
+      setEditorReturnView(activeView === "properties" ? "overview" : activeView);
+    }
+    const destination = buildPeopleDestination(
+      { tab: view, person: "" },
+      {
+        path: getNativeObjectRoute({
+          module: "people",
+          objectType: selectedPerson.className === "org" ? "organization" : "person",
+          objectId: selectedPerson.id,
+          mode: view === "properties" ? "edit" : "view"
+        })
+      }
+    );
+    if (guardDirtyNavigation(destination)) return;
     setActiveView(view);
     setAddingPerson(false);
     setActionNotice("");
@@ -840,15 +1217,55 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     } else {
       setDetailMode("profile");
     }
+    router.push(destination, { scroll: false });
+  }
+
+  function selectPerson(record: PersonalRecord) {
+    const destination = buildPeopleDestination(
+      { person: "", tab: "overview" },
+      {
+        path: getNativeObjectRoute({
+          module: "people",
+          objectType: record.className === "org" ? "organization" : "person",
+          objectId: record.id
+        })
+      }
+    );
+    if (guardDirtyNavigation(destination)) return;
+    setSelectedId(record.id);
+    setAddingPerson(false);
+    setDetailMode("profile");
+    setActiveView("overview");
+    router.push(destination, { scroll: false });
+  }
+
+  function toggleBatchSelection(id: string) {
+    setBatchSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   }
 
   async function saveProfileDraft(nextDraft: ContactProfileDraft) {
     if (!selectedPerson) return false;
     const profile = buildProfilePayload(nextDraft);
+    const previousProfileSources = new Set(
+      [selectedProfile.website, selectedProfile.linkedin].filter((value): value is string => Boolean(value))
+    );
+    const preservedSources = selectedPerson.externalSources.filter((source) => !previousProfileSources.has(source));
+    const profileSources = [profile.website, profile.linkedin].filter((value): value is string => Boolean(value));
     return patchPerson(selectedPerson.id, {
+      title: profile.fullName || selectedPerson.title,
       body: profile.context,
       url: profile.website || profile.linkedin,
-      externalSources: [profile.website, profile.linkedin].filter((value): value is string => Boolean(value)),
+      externalSources: Array.from(new Set([...preservedSources, ...profileSources])),
+      time: {
+        lastReview: profile.lastContact || undefined,
+        nextReview: profile.nextContact || undefined,
+        reviewCadence: profile.contactCadence || undefined
+      },
       profile
     });
   }
@@ -857,13 +1274,13 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     if (!selectedPerson || !memoryDraft.trim()) return;
     setMemorySaving(true);
     const categoryLabel = MEMORY_CATEGORIES.find((category) => category.id === memoryCategory)?.label || "Memory";
-    const currentMemories = splitList(selectedProfile.memories);
+    const currentMemories = splitTextEntries(selectedProfile.memories);
     const currentNotes = selectedProfile.notes ? `${selectedProfile.notes}\n` : "";
     const marker = memoryPinned ? "Pinned" : "Saved";
     const entry = `${marker} ${categoryLabel}: ${memoryDraft.trim()}`;
     const saved = await saveProfileDraft({
       ...selectedProfile,
-      memories: [...currentMemories, entry].join(", "),
+      memories: joinTextEntries([...currentMemories, entry]),
       notes: `${currentNotes}${entry}`.trim()
     });
     setMemorySaving(false);
@@ -895,16 +1312,47 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     }
   }
 
-  function toggleStar(record: PersonalRecord) {
-    setStarredIds((current) => {
-      const next = new Set(current);
-      if (next.has(record.id)) {
-        next.delete(record.id);
-      } else {
-        next.add(record.id);
-      }
-      return next;
+  function openInteractionComposer() {
+    if (!selectedPerson) return;
+    const now = new Date();
+    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+    setInteractionDate(localDate);
+    setInteractionKind("meeting");
+    setInteractionTitle("");
+    setInteractionSummary("");
+    setInteractionMeaningful(true);
+    setInteractionOpen(true);
+    setActionNotice("");
+  }
+
+  async function saveInteraction(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedPerson || !interactionDate || !interactionTitle.trim()) return;
+    setInteractionSaving(true);
+    const kindLabel = labelize(interactionKind);
+    const entry = [interactionDate, kindLabel, interactionTitle.trim(), interactionSummary.trim()]
+      .filter(Boolean)
+      .join(" • ");
+    const profile = buildProfilePayload({
+      ...selectedProfile,
+      interactions: joinTextEntries([...selectedInteractions, entry]),
+      lastContact: interactionMeaningful ? interactionDate : selectedProfile.lastContact
     });
+    const saved = await patchPerson(selectedPerson.id, {
+      profile,
+      time: interactionMeaningful
+        ? {
+            lastReview: interactionDate,
+            reviewCadence: selectedPerson.time.reviewCadence || selectedProfile.contactCadence || undefined
+          }
+        : undefined
+    });
+    setInteractionSaving(false);
+    if (!saved) return;
+    setInteractionOpen(false);
+    setInteractionTitle("");
+    setInteractionSummary("");
+    setActionNotice("Interaction saved to this People profile and cadence refreshed.");
   }
 
   async function submitPerson(event: React.FormEvent<HTMLFormElement>) {
@@ -927,66 +1375,72 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
       website: referenceUrl
     });
 
-    const response = await fetch("/api/personal/records", {
-      method: "POST",
-      headers: buildJsonHeadersWithCsrf(),
-      body: JSON.stringify({
-        domain: "notes-docs",
-        title: name,
-        className,
-        status,
-        body: quickContext,
-        privacy: "private",
-        stage: "processed",
-        areas: ["Relationships"],
-        subjects: [group],
-        projects: splitList(quickProjects),
-        intents: ["connect"],
-        url: referenceUrl,
-        externalSources: referenceUrl ? [referenceUrl] : [],
-        time: {
-          reviewCadence: cadence,
-          lastReview: lastContact,
-          nextReview: nextContact
-        },
-        profile
-      })
+    const legacyInput = peopleCreateInputToLegacy({
+      fullName: name.trim(),
+      type: className === "org" ? "organization" : "person",
+      status,
+      context: quickContext,
+      profile,
+      time: {
+        reviewCadence: cadence,
+        lastReview: lastContact,
+        nextReview: nextContact
+      },
+      areas: ["Relationships"],
+      subjects: [group],
+      projects: splitList(quickProjects),
+      externalSources: referenceUrl ? [referenceUrl] : [],
+      sourceUrl: referenceUrl
     });
 
-    const payload = (await response
-      .json()
-      .catch(() => ({ ok: false, error: "Invalid server response" }))) as RecordsResponse;
+    try {
+      const response = await fetch("/api/personal/records", {
+        method: "POST",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify(legacyInput)
+      });
 
-    if (!response.ok || !payload.ok || !payload.items) {
-      setError(payload.error || "Failed to save person");
+      const payload = (await response
+        .json()
+        .catch(() => ({ ok: false, error: "Invalid server response" }))) as RecordsResponse;
+
+      if (!response.ok || !payload.ok || !payload.items) {
+        setError(payload.error || "Failed to save person");
+        return;
+      }
+
+      const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
+      const createdPerson =
+        nextPeople.find((record) => record.title.toLowerCase() === name.trim().toLowerCase()) || nextPeople[0];
+      setPeople(nextPeople);
+      setSelectedId(createdPerson?.id || "");
+      setAddingPerson(false);
+      setDetailMode("profile");
+      setActiveView("overview");
+      setName("");
+      setClassName("person");
+      setGroup("Collaborator");
+      setStatus("active");
+      setQuickContext("");
+      setQuickEmail("");
+      setQuickPhone("");
+      setQuickLocation("");
+      setQuickOccupation("");
+      setQuickEmployer("");
+      setQuickProjects("");
+      setLastContact("");
+      setNextContact("");
+      setCadence("P1M");
+      setReferenceUrl("");
+      if (createdPerson) {
+        await releaseDirtyHistoryGuard();
+        router.replace(`${getNativeObjectRoute({ module: "people", objectType: "person", objectId: createdPerson.id })}?tab=overview`);
+      }
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to reach the People store. Your draft is still here.");
+    } finally {
       setSaving(false);
-      return;
     }
-
-    const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
-    const createdPerson =
-      nextPeople.find((record) => record.title.toLowerCase() === name.trim().toLowerCase()) || nextPeople[0];
-    setPeople(nextPeople);
-    setSelectedId(createdPerson?.id || "");
-    setAddingPerson(false);
-    setDetailMode("profile");
-    setActiveView("overview");
-    setName("");
-    setClassName("person");
-    setGroup("Collaborator");
-    setStatus("active");
-    setQuickContext("");
-    setQuickEmail("");
-    setQuickPhone("");
-    setQuickLocation("");
-    setQuickOccupation("");
-    setQuickEmployer("");
-    setQuickProjects("");
-    setLastContact("");
-    setNextContact("");
-    setCadence("P1M");
-    setReferenceUrl("");
-    setSaving(false);
   }
 
   async function patchPerson(
@@ -994,32 +1448,56 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     patch: {
       status?: PersonalRecordStatus;
       action?: "review";
+      title?: string;
       body?: string;
       url?: string;
       projects?: string[];
       externalSources?: string[];
+      time?: {
+        lastReview?: string;
+        nextReview?: string;
+        reviewCadence?: string;
+      };
       profile?: PersonalContactProfile;
     }
   ) {
     setError("");
-    const response = await fetch("/api/personal/records", {
-      method: "PATCH",
-      headers: buildJsonHeadersWithCsrf(),
-      body: JSON.stringify({ id, ...patch })
+    const legacyPatch = peopleUpdateInputToLegacy({
+      fullName: patch.title,
+      status: patch.status,
+      context: patch.body,
+      sourceUrl: patch.url,
+      projects: patch.projects,
+      externalSources: patch.externalSources,
+      time: patch.time,
+      profile: patch.profile,
+      markReviewed: patch.action === "review"
     });
-    const payload = (await response
-      .json()
-      .catch(() => ({ ok: false, error: "Invalid server response" }))) as RecordsResponse;
+    try {
+      const response = await fetch("/api/personal/records", {
+        method: "PATCH",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({ id, ...legacyPatch })
+      });
+      const payload = (await response
+        .json()
+        .catch(() => ({ ok: false, error: "Invalid server response" }))) as RecordsResponse;
 
-    if (!response.ok || !payload.ok || !payload.items) {
-      setError(payload.error || "Failed to update person");
+      if (!response.ok || !payload.ok || !payload.items) {
+        setError(payload.error || "Failed to update person");
+        return false;
+      }
+
+      const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
+      const updatedPerson = nextPeople.find((record) => record.id === id);
+      setPeople(nextPeople);
+      setSelectedId(id);
+      if (updatedPerson) setProfileDraft(getProfile(updatedPerson));
+      return true;
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to reach the People store. Your draft is still here.");
       return false;
     }
-
-    const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
-    setPeople(nextPeople);
-    setSelectedId(id);
-    return true;
   }
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
@@ -1029,20 +1507,85 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
     const saved = await saveProfileDraft(profileDraft);
     setProfileSaving(false);
     if (!saved) return;
+    setDetailMode("profile");
+    setActiveView(editorReturnView);
+    await releaseDirtyHistoryGuard();
+    router.replace(`${getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id })}?tab=${editorReturnView}`);
   }
 
   function openAddPerson() {
+    const destination = `${getModuleRoute("people")}/new`;
+    if (guardDirtyNavigation(destination)) return;
     setAddingPerson(true);
     setDetailMode("edit");
     setActiveView("overview");
     setProfileMenuOpen(false);
+    router.push(destination);
   }
 
   function openEditProfile() {
+    if (!selectedPerson) return;
+    setEditorReturnView(activeView === "properties" ? "overview" : activeView);
     setAddingPerson(false);
     setDetailMode("edit");
     setActiveView("properties");
     setProfileMenuOpen(false);
+    router.push(`${getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id, mode: "edit" })}?tab=${activeView}`);
+  }
+
+  async function releaseDirtyHistoryGuard() {
+    const marker = dirtyHistoryGuardRef.current;
+    if (!marker) return;
+    dirtyHistoryGuardRef.current = null;
+    if (window.history.state?.[PEOPLE_DIRTY_HISTORY_GUARD] !== marker) return;
+    suppressDirtyPopRef.current = true;
+    await new Promise<void>((resolve) => {
+      let finished = false;
+      const finish = () => {
+        if (finished) return;
+        finished = true;
+        suppressDirtyPopRef.current = false;
+        window.removeEventListener("popstate", finish);
+        window.clearTimeout(timeoutId);
+        resolve();
+      };
+      const timeoutId = window.setTimeout(finish, 350);
+      window.addEventListener("popstate", finish, { once: true });
+      window.history.back();
+    });
+  }
+
+  async function discardEditorChanges() {
+    const destination = pendingNavigation;
+    setPendingNavigation(null);
+    setCancelConfirmOpen(false);
+    if (destination === PEOPLE_HISTORY_BACK_DESTINATION) {
+      const marker = dirtyHistoryGuardRef.current;
+      const onGuardEntry = marker && window.history.state?.[PEOPLE_DIRTY_HISTORY_GUARD] === marker;
+      dirtyHistoryGuardRef.current = null;
+      suppressDirtyPopRef.current = true;
+      window.history.go(onGuardEntry ? -2 : -1);
+      return;
+    }
+    await releaseDirtyHistoryGuard();
+    if (addingPerson || !selectedPerson) {
+      setAddingPerson(false);
+      setDetailMode("profile");
+      router.replace(destination || getModuleRoute("people"));
+      return;
+    }
+    setProfileDraft(getProfile(selectedPerson));
+    setDetailMode("profile");
+    setActiveView(editorReturnView);
+    router.replace(destination || `${getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id })}?tab=${editorReturnView}`);
+  }
+
+  function requestCancelEditor() {
+    if (editorDirty) {
+      setCancelConfirmOpen(true);
+      return;
+    }
+    discardEditorChanges();
   }
 
   function updateProfileDraft(key: keyof ContactProfileDraft, value: string) {
@@ -1052,7 +1595,11 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
   function renderAddPersonForm(extraClass = "") {
     return (
       <form className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
-        <h3>Add person</h3>
+        <div className="people-edit-toolbar">
+          <button type="button" onClick={requestCancelEditor}>Cancel</button>
+          <strong>New Person</strong>
+          <button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
+        </div>
         <label>
           Full name
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Person or organization" required />
@@ -1098,20 +1645,31 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
         </div>
         <label>Website or profile<input value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
         {error && <p className="personal-record-error">{error}</p>}
-        <button type="submit" disabled={saving}>{saving ? "Saving..." : "Save Contact"}</button>
       </form>
     );
   }
 
   return (
     <section className={shellClassName} aria-label="People workspace">
-      <span className="module-ref-regression-sentinel">CRM Starting Point</span>
+      <span id="people-unavailable-actions" className="sr-only">
+        This action is intentionally unavailable until its native owner or persistence path is connected.
+      </span>
       <div className="people-mobile-topbar">
-        <button type="button" aria-label="Open people menu" onClick={() => setMobileMenuOpen(true)}>
-          =
-        </button>
+        {mobileSurface === "directory" ? (
+          <button type="button" aria-label="Open people menu" onClick={() => setMobileMenuOpen(true)}>
+            <span aria-hidden="true">☰</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            aria-label={mobileSurface === "editor" ? "Cancel editing" : "Back to People directory"}
+            onClick={() => mobileSurface === "editor" ? requestCancelEditor() : router.push(getModuleRoute("people"))}
+          >
+            <span aria-hidden="true">←</span>
+          </button>
+        )}
         <span className="people-mobile-brand">U</span>
-        <strong>People</strong>
+        <strong>{mobileSurface === "editor" ? (addingPerson ? "New Person" : "Edit Person") : mobileSurface === "profile" ? selectedPerson?.title || "Profile" : "People"}</strong>
         <button type="button" aria-label="Search people" onClick={() => setFiltersOpen(true)}>
           /
         </button>
@@ -1120,7 +1678,14 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
         </button>
       </div>
 
-      <div className={`people-mobile-menu${mobileMenuOpen ? " is-open" : ""}`}>
+      <div
+        ref={mobileMenuRef}
+        className={`people-mobile-menu${mobileMenuOpen ? " is-open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label="People module navigation"
+        aria-hidden={!mobileMenuOpen}
+      >
         <button type="button" aria-label="Close people menu" onClick={() => setMobileMenuOpen(false)}>
           x
         </button>
@@ -1171,7 +1736,7 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
         <header className="people-directory-header">
           <div>
             <h1>{activeViewLabel}</h1>
-            <span>{visiblePeople.length} people</span>
+            <span>{visiblePeople.length} shown · {people.length} People records · {totalRecords} total Personal Records</span>
           </div>
           <div className="people-header-actions">
             <button type="button" aria-label="Show filters" onClick={() => setFiltersOpen(true)}>
@@ -1180,7 +1745,11 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
             <button
               type="button"
               aria-label="Toggle list density"
-              onClick={() => setListMode((current) => current === "list" ? "compact" : current === "compact" ? "grid" : "list")}
+              onClick={() => {
+                const next = listMode === "list" ? "compact" : listMode === "compact" ? "grid" : "list";
+                setListMode(next);
+                updatePeopleUrl({ view: next });
+              }}
             >
               {listMode === "list" ? "Compact" : listMode === "compact" ? "Grid" : "List"}
             </button>
@@ -1195,11 +1764,14 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
           <input
             aria-label="Search people"
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onChange={(event) => {
+              setQuery(event.target.value);
+              updatePeopleUrl({ query: event.target.value }, { native: true });
+            }}
             placeholder="Search people..."
           />
           {query && (
-            <button type="button" aria-label="Clear search" onClick={() => setQuery("")}>
+            <button type="button" aria-label="Clear search" onClick={() => { setQuery(""); updatePeopleUrl({ query: "" }, { native: true }); }}>
               x
             </button>
           )}
@@ -1210,7 +1782,7 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
             <button
               type="button"
               className={`module-ref-pill module-ref-tone-${filter.tone}${activeFilter === filter.id ? " is-active" : ""}`}
-              onClick={() => setActiveFilter(filter.id)}
+              onClick={() => { setActiveFilter(filter.id); updatePeopleUrl({ filter: filter.id }); }}
               key={filter.id}
             >
               {filter.label}
@@ -1221,7 +1793,11 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
           </button>
           <label className="people-sort-control">
             Sort
-            <select value={sortMode} onChange={(event) => setSortMode(event.target.value as PeopleSortMode)}>
+            <select value={sortMode} onChange={(event) => {
+              const next = event.target.value as PeopleSortMode;
+              setSortMode(next);
+              updatePeopleUrl({ sort: next });
+            }}>
               <option value="last-name">Last Name</option>
               <option value="recent-contact">Recent Contact</option>
               <option value="next-follow-up">Next Follow-up</option>
@@ -1231,11 +1807,11 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
         </div>
 
         {filtersOpen && (
-          <section className="people-filter-sheet" aria-label="People filters">
+          <section ref={filterSheetRef} className="people-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="people-filter-title">
             <div className="people-sheet-handle" />
             <header>
-              <h2>Filters</h2>
-              <button type="button" onClick={() => { setActiveFilter("all"); setQuery(""); }}>
+              <h2 id="people-filter-title">Filters</h2>
+              <button type="button" onClick={() => { setActiveFilter("all"); setQuery(""); updatePeopleUrl({ filter: "all", query: "" }); }}>
                 Reset
               </button>
             </header>
@@ -1249,13 +1825,13 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
               ["Last contact", "Anytime"],
               ["Next contact", "Due within 30 days"]
             ].map(([label, value]) => (
-              <button type="button" onClick={() => setActionNotice(`${label} filter is visible here; advanced filter editing is a shell action for this slice.`)} key={label}>
+              <button type="button" disabled aria-describedby="people-unavailable-actions" title="Advanced filter editing is not connected in this slice" key={label}>
                 <span>{label}</span>
                 <strong>{value}</strong>
               </button>
             ))}
             <footer>
-              <button type="button" onClick={() => setActionNotice("Saved People views are a shell action until custom view persistence is connected.")}>Save as view</button>
+              <button type="button" disabled aria-describedby="people-unavailable-actions" title="Saved views are not connected yet">Save as view unavailable</button>
               <button type="button" onClick={() => setFiltersOpen(false)}>
                 Show {visiblePeople.length} Results
               </button>
@@ -1263,10 +1839,26 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
           </section>
         )}
 
-        {utilityNotice ? (
+        {batchSelectedIds.size > 0 && (
+          <div className="people-batch-bar" role="toolbar" aria-label="People batch actions">
+            <strong>{batchSelectedIds.size} selected</strong>
+            <button type="button" disabled aria-describedby="people-unavailable-actions" title="Durable list membership is not connected yet">Add to list unavailable</button>
+            <button type="button" disabled aria-describedby="people-unavailable-actions" title="People export is not connected yet">Export unavailable</button>
+            <button type="button" onClick={() => setBatchSelectedIds(new Set())}>Clear selection</button>
+          </div>
+        )}
+
+        {initialLoadError ? (
+          <SystemState
+            variant="error"
+            title="People could not be loaded"
+            description={initialLoadError}
+            action={{ label: "Reload", onSelect: () => window.location.reload() }}
+          />
+        ) : resolvedUtilityNotice ? (
           <section className="people-utility-surface">
             <h2>{activeViewLabel}</h2>
-            <p>{utilityNotice}</p>
+            <p>{resolvedUtilityNotice}</p>
             {activeSidebarView === "all-lists" && (
               <div className="people-utility-grid">
                 {PEOPLE_SIDEBAR_SECTIONS[1].items.slice(0, 6).map((item) => (
@@ -1285,15 +1877,15 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
             )}
             {activeSidebarView === "import-export" && (
               <div className="people-utility-grid">
-                <button type="button" disabled>Import preview not connected</button>
-                <button type="button" disabled>Export people data</button>
+                <button type="button" disabled aria-describedby="people-unavailable-actions">Import preview not connected</button>
+                <button type="button" disabled aria-describedby="people-unavailable-actions">Export people data unavailable</button>
               </div>
             )}
             {activeSidebarView === "customize" && (
               <div className="people-utility-grid">
-                <button type="button" disabled>Manage custom fields</button>
-                <button type="button" disabled>Cadence defaults</button>
-                <button type="button" disabled>Visible sections</button>
+                <button type="button" disabled aria-describedby="people-unavailable-actions">Manage custom fields unavailable</button>
+                <button type="button" disabled aria-describedby="people-unavailable-actions">Cadence defaults unavailable</button>
+                <button type="button" disabled aria-describedby="people-unavailable-actions">Visible sections unavailable</button>
               </div>
             )}
           </section>
@@ -1302,33 +1894,40 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
             {visiblePeople.map((record) => {
               const profile = getProfile(record);
               return (
-                <button
-                  type="button"
+                <article
                   className={`people-directory-row module-ref-tone-${getPeopleTone(record)}${selectedPerson?.id === record.id ? " is-selected" : ""}`}
-                  onClick={() => {
-                    setSelectedId(record.id);
-                    setAddingPerson(false);
-                    setDetailMode("profile");
-                    setActiveView("overview");
-                  }}
                   key={record.id}
                 >
-                  <span className="people-row-avatar" aria-hidden="true">{getInitials(record)}</span>
-                  <span className="people-row-main">
-                    <strong>{record.title}</strong>
-                    <small>{[profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at ") || profile.context || getPrimaryGroup(record)}</small>
-                    <span>
-                      {[getPrimaryGroup(record), ...record.projects.slice(0, 1)].filter(Boolean).map((tag) => (
-                        <em key={tag}>{tag}</em>
-                      ))}
+                  <label className="people-row-checkbox" aria-label={`Select ${record.title} for batch actions`}>
+                    <input
+                      type="checkbox"
+                      checked={batchSelectedIds.has(record.id)}
+                      onChange={() => toggleBatchSelection(record.id)}
+                    />
+                  </label>
+                  <button
+                    type="button"
+                    className="people-directory-row-body"
+                    aria-pressed={selectedPerson?.id === record.id}
+                    onClick={() => selectPerson(record)}
+                  >
+                    <span className="people-row-avatar" aria-hidden="true">{getInitials(record)}</span>
+                    <span className="people-row-main">
+                      <strong>{record.title}</strong>
+                      <small>{[profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at ") || profile.context || getPrimaryGroup(record)}</small>
+                      <span>
+                        {[getPrimaryGroup(record), ...record.projects.slice(0, 1)].filter(Boolean).map((tag) => (
+                          <em key={tag}>{tag}</em>
+                        ))}
+                      </span>
                     </span>
-                  </span>
-                  <span className="people-row-date">
-                    <i />
-                    {formatDate(record.time.lastReview || record.updatedAt)}
-                  </span>
-                  <span className="people-row-next">{getNextContactLabel(record)}</span>
-                </button>
+                    <span className="people-row-date">
+                      <i />
+                      {formatDate(record.time.lastReview || record.updatedAt)}
+                    </span>
+                    <span className="people-row-next">{getNextContactLabel(record)}</span>
+                  </button>
+                </article>
               );
             })}
           </div>
@@ -1348,9 +1947,18 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
       </main>
 
       <section className="people-profile-panel" aria-label="Selected profile">
-        {selectedPerson ? (
+        {initialLoadError ? (
+          <SystemState
+            variant="error"
+            title="Person could not be loaded"
+            description={initialLoadError}
+            action={{ label: "Reload", onSelect: () => window.location.reload() }}
+          />
+        ) : selectedPerson ? (
           <>
-            <header className="people-profile-header">
+            {!addingPerson && (
+              <>
+              <header className="people-profile-header">
               <div className="people-avatar" aria-hidden="true">{getInitials(selectedPerson)}</div>
               <div>
                 <h2>{selectedPerson.title}</h2>
@@ -1365,44 +1973,56 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
               <div className="people-profile-actions">
                 <button
                   type="button"
-                  aria-label={starredIds.has(selectedPerson.id) ? "Unstar profile" : "Star profile"}
-                  onClick={() => toggleStar(selectedPerson)}
+                  aria-label="Star profile unavailable"
+                  disabled
+                  title="Star storage is not connected yet"
                 >
-                  {starredIds.has(selectedPerson.id) ? "Starred" : "Star"}
+                  Star
                 </button>
                 <button type="button" aria-label="Edit profile" onClick={openEditProfile}>Edit</button>
-                <button type="button" aria-label="More profile actions" onClick={() => setProfileMenuOpen((current) => !current)}>...</button>
-              </div>
-              {profileMenuOpen && (
-                <div className="people-action-menu">
-                  <button type="button" onClick={openEditProfile}>Open properties</button>
-                  <button type="button" onClick={() => { setActiveSidebarView("all-lists"); setUtilityNotice("Choose a list to review membership. Editing list definitions is not connected yet."); setProfileMenuOpen(false); }}>Add to list</button>
-                  <button type="button" onClick={() => { patchPerson(selectedPerson.id, { status: "inactive" }); setProfileMenuOpen(false); }}>Set dormant</button>
-                <button type="button" disabled>Export contact</button>
-                </div>
-              )}
-            </header>
-
-            <nav className="people-profile-tabs" aria-label="Profile sections">
-              {PEOPLE_VIEWS.map((view) => (
                 <button
                   type="button"
-                  className={activeView === view.id ? "is-active" : ""}
-                  onClick={() => selectProfileView(view.id)}
-                  key={view.id}
-                >
-                  {view.label}
-                </button>
-              ))}
-            </nav>
+                  aria-label="More profile actions"
+                  aria-expanded={profileMenuOpen}
+                  aria-controls="people-profile-action-menu"
+                  onClick={() => setProfileMenuOpen((current) => !current)}
+                >...</button>
+              </div>
+              {profileMenuOpen && (
+                <div id="people-profile-action-menu" className="people-action-menu" role="group" aria-label="Profile actions">
+                  <button type="button" onClick={openEditProfile}>Open properties</button>
+                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="List membership persistence is not connected yet">Add to list unavailable</button>
+                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="Lifecycle changes require a confirmation and undo path">Set dormant unavailable</button>
+                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="People export is not connected yet">Export contact unavailable</button>
+                </div>
+              )}
+              </header>
 
+              <DetailTabs
+                id={`people-${selectedPerson.id}`}
+                tabs={PEOPLE_VIEWS}
+                activeTab={activeView}
+                onTabChange={(tabId) => selectProfileView(tabId as PeopleView)}
+                ariaLabel={`${selectedPerson.title} profile sections`}
+                className="people-profile-tabs"
+              />
+              </>
+            )}
+
+            <div
+              id={!addingPerson ? `people-${selectedPerson.id}-panel-${activeView}` : undefined}
+              role={!addingPerson ? "tabpanel" : undefined}
+              aria-labelledby={!addingPerson ? `people-${selectedPerson.id}-tab-${activeView}` : undefined}
+              tabIndex={!addingPerson ? 0 : undefined}
+              className="people-active-tab-panel"
+            >
             {addingPerson ? (
               renderAddPersonForm("people-empty-add")
             ) : detailMode === "edit" ? (
               <div className="people-edit-layout">
                 <form className="people-profile-form people-edit-form" onSubmit={saveProfile}>
                   <div className="people-edit-toolbar">
-                    <button type="button" onClick={() => setDetailMode("profile")}>Cancel</button>
+                    <button type="button" onClick={requestCancelEditor}>Cancel</button>
                     <strong>Edit Profile</strong>
                     <button type="submit" disabled={profileSaving}>{profileSaving ? "Saving..." : "Save"}</button>
                   </div>
@@ -1434,7 +2054,6 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
                     </section>
                   ))}
                 </form>
-                {renderAddPersonForm()}
               </div>
             ) : detailMode === "timeline" ? (
               <section className="people-timeline-panel">
@@ -1452,41 +2071,52 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
                   ))}
                 </div>
                 <div className="people-timeline-actions">
-                  <button type="button" onClick={() => patchPerson(selectedPerson.id, { action: "review" })}>Log Interaction</button>
-                  <button type="button" onClick={() => { setActiveView("properties"); setDetailMode("edit"); setActionNotice("Edit Next contact to schedule the next follow-up."); }}>Schedule Follow-up</button>
-                  <button type="button" onClick={() => { setActiveView("notes"); setDetailMode("profile"); }}>Add Memory / Note</button>
+                  <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
+                  <button
+                    type="button"
+                    onClick={() => router.push(followUpCreationRoute(selectedPerson))}
+                    aria-label={`Schedule a Personal Ops follow-up for ${selectedPerson.title}`}
+                  >
+                    Schedule Follow-up
+                  </button>
+                  <button type="button" onClick={() => selectProfileView("notes")}>Add Memory / Note</button>
                 </div>
                 <div className="people-timeline-list">
-                  {(timelineItems.length ? timelineItems : ["Coffee at Houndstooth", "Re: Project Fremen", "Intro to Maria D."]).map((item, index) => (
+                  {timelineItems.length > 0 ? timelineItems.map((item, index) => (
                     <article key={`${item}-${index}`}>
-                      <span>{index === 0 ? "May 29, 2026" : index === 1 ? "May 10, 2026" : "Apr 26, 2026"}</span>
+                      <span>{formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</span>
                       <strong>{item}</strong>
-                      <p>{index === 0 ? selectedProfile.context || "Great conversation about current direction." : "Shared context and next steps."}</p>
+                      {selectedProfile.context && <p>{selectedProfile.context}</p>}
                     </article>
-                  ))}
+                  )) : (
+                    <div className="notes-empty-state">
+                      <h3>No interactions yet</h3>
+                      <p>Log a call, email, meeting, message, or meaningful memory to build relationship history.</p>
+                    </div>
+                  )}
                 </div>
               </section>
             ) : detailMode === "workspace" ? (
               <section className="people-linked-workspace">
                 <article>
                   <h3>Notes</h3>
-                  {(selectedProfile.notes ? selectedProfile.notes.split("\n").filter(Boolean) : ["Project Fremen brainstorm", "Meeting: brand direction", "Personal: coffee preferences"]).map((item) => <span key={item}>{item}</span>)}
-                  <button type="button" onClick={() => { setActiveView("notes"); setDetailMode("profile"); }}>Create Note</button>
+                  {selectedProfile.notes ? selectedProfile.notes.split("\n").filter(Boolean).map((item) => <span key={item}>{item}</span>) : <span>No authored Notes linked.</span>}
+                  <button type="button" onClick={() => selectProfileView("notes")}>Open Notes & Memories</button>
                 </article>
                 <article>
                   <h3>Files & Media</h3>
-                  {["Brand deck v4.pdf", "Moodboard.png", "Logo concepts.sketch", "Photo inspiration.jpg"].map((item) => <span key={item}>{item}</span>)}
-                  <button type="button" onClick={() => setActionNotice("File linking is a shell action until the Files picker is connected here.")}>Link Existing</button>
+                  <span>No Media files linked.</span>
+                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="The Media picker is not connected in this slice">Link Existing unavailable</button>
                 </article>
                 <article>
                   <h3>Projects</h3>
-                  {(selectedPerson.projects.length ? selectedPerson.projects : ["Project Fremen", "Savagey brand refresh"]).map((item) => <span key={item}>{item}</span>)}
-                  <button type="button" onClick={() => setActionNotice("Project creation stays in the project workspace; this page can link existing context.")}>Link Project</button>
+                  {selectedPerson.projects.length ? selectedPerson.projects.map((item) => <a href={`${getModuleRoute("projects")}?query=${encodeURIComponent(item)}`} key={item}>{item}</a>) : <span>No Projects linked.</span>}
+                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="The Projects object picker is not connected in this slice">Link Project unavailable</button>
                 </article>
                 <article>
                   <h3>Resources</h3>
-                  {(selectedPerson.externalSources.length ? selectedPerson.externalSources : ["Austin coffee guide", "Design leadership article"]).map((item) => <span key={item}>{item}</span>)}
-                  <button type="button" onClick={() => setActionNotice("Resource linking is a shell action until the resource picker is connected here.")}>Add Resource</button>
+                  {selectedPerson.externalSources.length ? selectedPerson.externalSources.map((item) => <a href={`${getModuleRoute("resources")}?query=${encodeURIComponent(item)}`} key={item}>{item}</a>) : <span>No Resources linked.</span>}
+                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="The Resources object picker is not connected in this slice">Add Resource unavailable</button>
                 </article>
               </section>
             ) : activeView === "notes" ? (
@@ -1496,8 +2126,8 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
                     <h3>Notes & Memories</h3>
                     <span>{selectedMemories.length} memories, {selectedInteractions.length} interactions</span>
                   </div>
-                  <button type="button" onClick={() => setActionNotice("Search is scoped to this rendered profile. Stored note search remains handled by the Notes workspace.")}>
-                    Search this profile
+                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="Profile-local note search is not connected in this slice">
+                    Search unavailable
                   </button>
                 </div>
 
@@ -1541,9 +2171,9 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
                         <span>{item.includes(":") ? item.split(":")[0] : "Memory"}</span>
                         <p>{item.includes(":") ? item.split(":").slice(1).join(":").trim() : item}</p>
                         <div>
-                          <button type="button" onClick={() => setActionNotice("Pin state is preserved in the saved memory text for now.")}>Pin</button>
-                          <button type="button" onClick={() => setActionNotice("Editing a single memory opens the profile properties until per-memory rows exist.")}>Edit</button>
-                          <button type="button" onClick={() => setActionNotice("Delete is intentionally disabled here to avoid destructive memory loss.")}>Archive</button>
+                          <button type="button" disabled aria-describedby="people-unavailable-actions" title="Per-memory pin mutations are not connected">Pin unavailable</button>
+                          <button type="button" disabled aria-describedby="people-unavailable-actions" title="Per-memory editing is not connected">Edit unavailable</button>
+                          <button type="button" disabled aria-describedby="people-unavailable-actions" title="Archive needs an auditable memory record">Archive unavailable</button>
                         </div>
                       </article>
                     ))}
@@ -1556,8 +2186,8 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
                         <span>{index === 0 ? "Latest" : "Note"}</span>
                         <p>{item}</p>
                         <div>
-                          <button type="button" onClick={() => { setActiveView("properties"); setDetailMode("edit"); }}>Open</button>
-                          <button type="button" onClick={() => setActionNotice("Linking notes is non-destructive and will be wired to existing Notes objects in a later slice.")}>Link</button>
+                          <button type="button" onClick={openEditProfile}>Open in profile editor</button>
+                          <button type="button" disabled aria-describedby="people-unavailable-actions" title="The Notes object picker is not connected in this slice">Link unavailable</button>
                         </div>
                       </article>
                     ))}
@@ -1587,7 +2217,7 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
                     <h3>Relationships</h3>
                     <span>{connectionItems.length} linked people and context markers</span>
                   </div>
-                  <button type="button" onClick={() => setActionNotice("Relationship links are saved onto this profile without changing other records.")}>
+                  <button type="button" onClick={() => document.querySelector<HTMLInputElement>(".people-relation-form input")?.focus()}>
                     Add Relationship
                   </button>
                 </div>
@@ -1689,10 +2319,10 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
                   <div className="people-cadence-pair">
                     <div><span>Last contact</span><strong>{formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</strong></div>
                     <div><span>Next follow-up</span><strong>{getNextContactLabel(selectedPerson)}</strong></div>
-                    <div><span>Streak</span><strong>{selectedProfile.interactions ? splitList(selectedProfile.interactions).length : 4} interactions</strong></div>
+                    <div><span>Streak</span><strong>{splitTextEntries(selectedProfile.interactions).length} interactions</strong></div>
                     <div><span>Priority</span><strong>{getPriorityLabel(selectedPerson)}</strong></div>
                   </div>
-                  <button type="button" onClick={() => patchPerson(selectedPerson.id, { action: "review" })}>Log Interaction</button>
+                  <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
                 </article>
                 <article>
                   <h3>Quick Info</h3>
@@ -1717,13 +2347,23 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
                 <article>
                   <h3>Key Connections</h3>
                   <div className="people-connection-row">
-                    {(connectionItems.length ? connectionItems : ["Sage B.", "Maria D.", "Alex M."]).slice(0, 5).map((name) => (
-                      <span key={name}>{name.slice(0, 1)}</span>
-                    ))}
+                    {connectionItems.length > 0
+                      ? connectionItems.slice(0, 5).map((name) => <span key={name}>{name.slice(0, 1)}</span>)
+                      : <small>No linked connections.</small>}
                   </div>
                 </article>
               </section>
             )}
+            </div>
+            {!addingPerson && PEOPLE_VIEWS.filter((view) => view.id !== activeView).map((view) => (
+              <section
+                id={`people-${selectedPerson.id}-panel-${view.id}`}
+                role="tabpanel"
+                aria-labelledby={`people-${selectedPerson.id}-tab-${view.id}`}
+                hidden
+                key={view.id}
+              />
+            ))}
           </>
         ) : detailMode === "edit" ? (
           renderAddPersonForm("people-empty-add")
@@ -1735,114 +2375,139 @@ export default function PeopleWorkspace({ initialPeople, totalRecords }: PeopleW
         )}
       </section>
 
-      <aside className={`people-smart-panel${aiOpen ? " is-ai-open" : ""}`}>
-        {aiOpen ? (
+      {!initialLoadError && <nav className="people-mobile-actionbar" aria-label="People quick actions">
+        {mobileSurface === "directory" ? (
+          <button type="button" onClick={openAddPerson}>Add Person</button>
+        ) : mobileSurface === "editor" ? (
           <>
-            <header>
-              <div>
-                <strong>AI Assistant</strong>
-                <span>{selectedPerson?.title || "People"}</span>
-              </div>
-              <button type="button" aria-label="Close AI assistant" onClick={() => setAiOpen(false)}>x</button>
-            </header>
-            <nav>
-              {[
-                ["glance", "At a glance"],
-                ["suggestions", "Suggestions"],
-                ["gaps", "Profile gaps"],
-                ["notes", "Recent notes"]
-              ].map(([id, label]) => (
-                <button
-                  type="button"
-                  className={aiTab === id ? "is-active" : ""}
-                  onClick={() => setAiTab(id as PeopleAiTab)}
-                  key={id}
-                >
-                  {label}
-                </button>
-              ))}
-            </nav>
-            <section className="people-ai-state">
-              <strong>Assistant shell ready</strong>
-              <p>Assistant responses are not connected yet. This panel is using local profile context and deterministic suggestions.</p>
-            </section>
-            {aiTab === "glance" && (
-              <div className="people-ai-section">
-                {[
-                  ["Relationship", selectedPerson ? getPrimaryGroup(selectedPerson) : "Any"],
-                  ["Priority", getPriorityLabel(selectedPerson)],
-                  ["Last contact", selectedPerson ? formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt) : "-"],
-                  ["Next follow-up", selectedPerson ? getNextContactLabel(selectedPerson) : "-"]
-                ].map(([label, value]) => (
-                  <article key={label}>
-                    <span>{label}</span>
-                    <strong>{value}</strong>
-                  </article>
-                ))}
-              </div>
-            )}
-            {aiTab === "suggestions" && (
-              <div className="people-ai-section">
-                {(aiSuggestions.length ? aiSuggestions : ["No urgent suggestions. Keep the profile updated after the next interaction."]).map((item) => (
-                  <button type="button" className="people-ai-suggestion" key={item} onClick={() => setActionNotice(item)}>
-                    <span>{item}</span>
-                    <strong aria-hidden="true">{">"}</strong>
-                  </button>
-                ))}
-              </div>
-            )}
-            {aiTab === "gaps" && (
-              <div className="people-ai-section">
-                {(profileGaps.length ? profileGaps : ["No major profile gaps detected."]).map((gap) => (
-                  <button type="button" className="people-ai-suggestion" key={gap} onClick={() => { setActiveView("properties"); setDetailMode("edit"); }}>
-                    <span>{gap}</span>
-                    <strong>Fill</strong>
-                  </button>
-                ))}
-              </div>
-            )}
-            {aiTab === "notes" && (
-              <div className="people-ai-section">
-                {(aiRecentNotes.length ? aiRecentNotes.slice(0, 6) : ["No recent notes or memories yet."]).map((item) => (
-                  <article key={item}>
-                    <span>Context</span>
-                    <strong>{item}</strong>
-                  </article>
-                ))}
-              </div>
-            )}
-            <label>
-              <input placeholder={`Ask anything about ${selectedPerson?.title || "this person"}...`} />
-              <button type="button" onClick={() => setActionNotice("Assistant chat is not connected yet; local suggestions above are available now.")}>Go</button>
-            </label>
+            <button type="button" onClick={requestCancelEditor}>Cancel</button>
+            <button
+              type="button"
+              onClick={() => document.querySelector<HTMLFormElement>(addingPerson ? ".people-capture-form" : ".people-edit-form")?.requestSubmit()}
+              disabled={saving || profileSaving}
+            >
+              {saving || profileSaving ? "Saving…" : "Save"}
+            </button>
           </>
         ) : (
           <>
-            <header>
-              <h2>Active Filters</h2>
-              <strong>{activeFilterCount}</strong>
-            </header>
-            {[
-              ["Relationship", fallbackPerson ? getPrimaryGroup(fallbackPerson) : "Any"],
-              ["Priority", getPriorityLabel(selectedPerson)],
-              ["Location", selectedProfile.livesIn || "Any"],
-              ["Cadence status", activeFilter === "due" ? "Due soon" : "Anytime"],
-              ["Next follow-up", getNextContactLabel(selectedPerson)]
-            ].map(([label, value]) => (
-              <button type="button" onClick={() => setFiltersOpen(true)} key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </button>
-            ))}
-            <button type="button" onClick={() => setFiltersOpen(true)}>+ Add filter</button>
-            <button type="button" onClick={() => setActionNotice("Saved People views are a shell action until custom view persistence is connected.")}>+ Save as view</button>
+            <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
+            <button type="button" onClick={openEditProfile}>Edit Profile</button>
           </>
         )}
+      </nav>}
+
+      {interactionOpen && selectedPerson && (
+        <div className="people-dialog-backdrop" role="presentation">
+          <form ref={interactionDialogRef} className="people-interaction-dialog" role="dialog" aria-modal="true" aria-labelledby="log-interaction-title" onSubmit={saveInteraction}>
+            <header>
+              <div>
+                <span>Meaningful interaction</span>
+                <h2 id="log-interaction-title">Log interaction with {selectedPerson.title}</h2>
+              </div>
+              <button type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}>x</button>
+            </header>
+            <div className="people-interaction-fields">
+              <label>
+                Type
+                <select value={interactionKind} onChange={(event) => setInteractionKind(event.target.value as InteractionKind)}>
+                  <option value="call">Call</option>
+                  <option value="message">Message</option>
+                  <option value="email">Email</option>
+                  <option value="meeting">Meeting</option>
+                  <option value="note">Note</option>
+                  <option value="milestone">Milestone</option>
+                </select>
+              </label>
+              <label>
+                Date
+                <input type="date" value={interactionDate} onChange={(event) => setInteractionDate(event.target.value)} required />
+              </label>
+              <label className="is-wide">
+                Title
+                <input value={interactionTitle} onChange={(event) => setInteractionTitle(event.target.value)} placeholder="Coffee, call, introduction, or shared moment" required />
+              </label>
+              <label className="is-wide">
+                Summary
+                <textarea value={interactionSummary} onChange={(event) => setInteractionSummary(event.target.value)} rows={4} placeholder="What mattered, what changed, and any context worth remembering." />
+              </label>
+              <label className="people-check-row is-wide">
+                <input type="checkbox" checked={interactionMeaningful} onChange={(event) => setInteractionMeaningful(event.target.checked)} />
+                Refresh last-contact date and cadence
+              </label>
+            </div>
+            {error && <p className="personal-record-error">{error}</p>}
+            <footer>
+              <button type="button" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}>Cancel</button>
+              <button type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate}>
+                {interactionSaving ? "Saving..." : "Save Interaction"}
+              </button>
+            </footer>
+          </form>
+        </div>
+      )}
+
+      <aside className="people-smart-panel">
+        <header>
+          <h2>Active Filters</h2>
+          <strong>{activeFilterCount}</strong>
+        </header>
+        {[
+          ["Relationship", fallbackPerson ? getPrimaryGroup(fallbackPerson) : "Any"],
+          ["Priority", getPriorityLabel(selectedPerson)],
+          ["Location", selectedProfile.livesIn || "Any"],
+          ["Cadence status", activeFilter === "due" ? "Due soon" : "Anytime"],
+          ["Next follow-up", getNextContactLabel(selectedPerson)]
+        ].map(([label, value]) => (
+          <button type="button" onClick={() => setFiltersOpen(true)} key={label}>
+            <span>{label}</span>
+            <strong>{value}</strong>
+          </button>
+        ))}
+        <button type="button" onClick={() => setFiltersOpen(true)}>+ Add filter</button>
+        <button type="button" disabled aria-describedby="people-unavailable-actions" title="Saved views are not connected yet">+ Save as view unavailable</button>
       </aside>
 
-      <button type="button" className="people-ai-fab" aria-label="Open AI assistant" onClick={() => setAiOpen(true)}>
-        AI
-      </button>
+      <ConfirmationSheet
+        open={cancelConfirmOpen}
+        onOpenChange={(open) => {
+          setCancelConfirmOpen(open);
+          if (!open) setPendingNavigation(null);
+        }}
+        onConfirm={discardEditorChanges}
+        title="Discard unsaved People changes?"
+        description="Your current form values have not been saved to the Personal Records store."
+        consequences={["The stored person will not be changed.", "Only the unsaved draft in this editor will be discarded."]}
+        confirmLabel="Discard changes"
+        tone="danger"
+      />
+
+      <SharedAIDock
+        open={aiOpen}
+        onOpenChange={(open) => {
+          setAiOpen(open);
+          updatePeopleUrl({ ai: open });
+        }}
+        context={{
+          module: "people",
+          object: selectedPerson
+            ? {
+                module: "people",
+                objectType: selectedPerson.className === "org" ? "organization" : "person",
+                objectId: selectedPerson.id,
+                label: selectedPerson.title,
+                route: getNativeObjectRoute({
+                  module: "people",
+                  objectType: selectedPerson.className === "org" ? "organization" : "person",
+                  objectId: selectedPerson.id
+                })
+              }
+            : null,
+          activeTab: activeView,
+          visibleScope: activeViewLabel,
+          allowedActions: ["Draft a follow-up", "Summarize visible profile context"]
+        }}
+      />
     </section>
   );
 }

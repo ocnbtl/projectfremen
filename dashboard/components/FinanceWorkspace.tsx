@@ -1,118 +1,51 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useMemo, useRef, useState } from "react";
+import InspectorRail from "./admin-shell/InspectorRail";
+import ModuleShell from "./admin-shell/ModuleShell";
+import ModuleSidebar from "./admin-shell/ModuleSidebar";
+import SharedAIDock from "./admin-shell/SharedAIDock";
+import FinanceAccountsRouteView from "./finance/FinanceAccountsView";
+import FinanceBillsRouteView from "./finance/FinanceBillsView";
+import FinanceBudgetsRouteView from "./finance/FinanceBudgetsView";
+import FinanceInspector, { isFinanceInspectableView, isFinanceTabAllowed } from "./finance/FinanceInspector";
+import FinanceMonthlyReviewRouteView from "./finance/FinanceMonthlyReviewView";
+import FinanceTransactionsRouteView from "./finance/FinanceTransactionsView";
+import {
+  createNativeObjectRef,
+  getModuleRoute,
+  getModuleViewRoute,
+  getNativeObjectRoute
+} from "../lib/native-objects/routes";
+import { normalizeFinanceUrlStateForView, parseFinanceUrlState, serializeFinanceUrlState } from "../lib/native-objects/url-state";
+import type { FinanceFilter, FinanceSort, FinanceTab, FinanceView } from "../lib/native-objects/url-state";
+import { financeFixtureRepository } from "../lib/modules/finance/fixture-repository";
+import { buildFinanceAccountsViewModel } from "../lib/modules/finance/accounts-view-model";
+import { buildFinanceBillsViewModel } from "../lib/modules/finance/bills-view-model";
+import { buildFinanceBudgetsViewModel } from "../lib/modules/finance/budgets-view-model";
+import { buildFinanceMonthlyReviewViewModel } from "../lib/modules/finance/monthly-review-view-model";
+import { buildFinanceTransactionsViewModel } from "../lib/modules/finance/transactions-view-model";
+import {
+  buildFinanceFixtureViewModel,
+  getFinanceSmartViewCount,
+  getFinanceViewBadge
+} from "../lib/modules/finance/view-model";
+import type {
+  FinanceAccount as Account,
+  FinanceAccountKind as AccountKind,
+  FinanceHue as Hue,
+  FinanceTransaction as Txn
+} from "../lib/modules/finance/types";
 
-type Hue =
-  | "neutral"
-  | "green"
-  | "lime"
-  | "yellow"
-  | "orange"
-  | "brown"
-  | "crimson"
-  | "pink"
-  | "purple"
-  | "violet"
-  | "indigo"
-  | "blue"
-  | "cyan"
-  | "teal";
+const financeDataset = financeFixtureRepository.read();
+const financeViewModel = buildFinanceFixtureViewModel(financeDataset);
+const { accounts, budgets, bills, transactions, reviewItems, reminders, linkedContext, snapshot } = financeDataset;
+const FINANCE_PREVIEW_LABEL = financeFixtureRepository.metadata.previewLabel;
+const FINANCE_PREVIEW_REASON = `${FINANCE_PREVIEW_LABEL}. Persistent Finance mutations are not connected.`;
 
-type ViewId = "overview" | "accounts" | "budgets" | "bills" | "review" | "transactions";
-type BillStatus = "due" | "soon" | "scheduled" | "paid" | "overdue";
-type Recurring = "monthly" | "annual" | "weekly" | null;
-type ModalKind = "record" | "filter" | "account" | "category" | "bill" | "columns" | "pay" | "transfer" | null;
-type TxnIo = "income" | "expense" | "transfer" | "savings";
-
-type AccountKind = "Checking" | "Savings" | "Credit" | "Brokerage" | "Cash" | "Business";
-
-interface Account {
-  id: string;
-  name: string;
-  kind: AccountKind;
-  inst: string;
-  mask: string;
-  balance: number;
-  delta30: number;
-  hue: Hue;
-  spark: number[];
-}
-
-interface Budget {
-  id: string;
-  category: string;
-  hue: Hue;
-  spent: number;
-  limit: number;
-  icon: string;
-}
-
-interface Bill {
-  id: string;
-  name: string;
-  amount: number;
-  due: string;
-  dueIn: number;
-  status: BillStatus;
-  account: string;
-  category: string;
-  hue: Hue;
-  recurring: Recurring;
-  autopay: boolean;
-  icon: string;
-  brandColors: [string, string, string];
-}
-
-interface Txn {
-  id: string;
-  date: string;
-  quarter: "Q1" | "Q2" | "Q3" | "Q4";
-  quarterYear: string;
-  week: number;
-  weekYear: string;
-  weekdayName: string;
-  weekdayNum: number;
-  tzOffset: string;
-  entity: string;
-  merchant: string;
-  account: string;
-  accountType: AccountKind;
-  category: string;
-  spendCategory: string;
-  hue: Hue;
-  amount: number;
-  io: TxnIo;
-  currency: "USD";
-  memo: string;
-  receipt: string;
-  incomeSource: string;
-  reimbursable: boolean;
-  reimbursedOn: string;
-  ufInit: boolean;
-  status: "cleared" | "pending";
-}
-
-interface ReviewItem {
-  id: string;
-  label: string;
-  done: boolean;
-  hue: Hue;
-}
-
-interface Reminder {
-  id: string;
-  text: string;
-  due: string;
-  hue: Hue;
-  kind: "review" | "decision" | "action";
-}
-
-interface LinkItem {
-  id: string;
-  title: string;
-  type: "Note" | "Project" | "Resource" | "Review";
-  hue: Hue;
-}
+type ViewId = FinanceView;
+type ModalKind = "record" | "filter" | "account" | "category" | "bill" | "columns" | "pay" | "transfer" | "group" | "period" | null;
 
 const HUES: Record<Hue, { fg: string; tint: string; border: string; solid: string }> = {
   neutral: { fg: "#71717a", tint: "#f4f4f5", border: "#d4d4d8", solid: "#71717a" },
@@ -131,102 +64,39 @@ const HUES: Record<Hue, { fg: string; tint: string; border: string; solid: strin
   teal: { fg: "#0f766e", tint: "#f0fdfa", border: "#99f6e4", solid: "#14b8a6" }
 };
 
-const VIEWS: Array<{ id: ViewId; label: string; hue: Hue; badge?: string }> = [
+const VIEWS: Array<{ id: ViewId; label: string; hue: Hue }> = [
   { id: "overview", label: "Command", hue: "indigo" },
   { id: "accounts", label: "Accounts & Cashflow", hue: "blue" },
-  { id: "budgets", label: "Budgets", hue: "teal", badge: "1 over" },
-  { id: "bills", label: "Bills & Subscriptions", hue: "orange", badge: "1 due" },
-  { id: "review", label: "Monthly Review", hue: "violet" },
-  { id: "transactions", label: "Transactions", hue: "neutral" }
+  { id: "transactions", label: "Transactions", hue: "neutral" },
+  { id: "budgets", label: "Budgets", hue: "teal" },
+  { id: "bills", label: "Bills & Subscriptions", hue: "orange" },
+  { id: "review", label: "Monthly Review", hue: "violet" }
 ];
 
-const SMART_VIEWS: Array<{ id: string; label: string; hue: Hue; count: number; view: ViewId; notice: string }> = [
-  { id: "attention", label: "Needs attention", hue: "crimson", count: 3, view: "overview", notice: "Filtered to overdue, over-budget, and action items." },
-  { id: "due-week", label: "Due this week", hue: "orange", count: 4, view: "bills", notice: "Bills queue narrowed to due this week." },
-  { id: "unreviewed", label: "Unreviewed", hue: "yellow", count: 6, view: "transactions", notice: "Transactions narrowed to pending and review-needed items." },
-  { id: "recurring", label: "Recurring", hue: "violet", count: 8, view: "bills", notice: "Bills queue narrowed to recurring obligations." },
-  { id: "linked-projects", label: "Linked to projects", hue: "indigo", count: 5, view: "overview", notice: "Showing finance items with linked workspace context." }
+const SMART_VIEWS: Array<{ id: string; label: string; hue: Hue; view: ViewId; notice: string; mode?: "filter" | "jump"; disabledReason?: string }> = [
+  { id: "attention", label: "Needs attention", hue: "crimson", view: "overview", mode: "jump", notice: "Command shows all three fixture attention items. This is a summary jump, not a filtered record set." },
+  { id: "due-week", label: "Due this week", hue: "orange", view: "bills", notice: "Bills are narrowed to obligations due within seven days." },
+  { id: "unreviewed", label: "Unreviewed", hue: "yellow", view: "transactions", notice: "Transactions are narrowed to pending fixture items." },
+  { id: "recurring", label: "Recurring", hue: "violet", view: "bills", notice: "Bills are narrowed to recurring fixture obligations." },
+  { id: "linked-projects", label: "Linked to projects", hue: "indigo", view: "overview", notice: "", disabledReason: "A Finance-to-Projects filter is not connected in this fixture checkpoint." },
+  { id: "savings-movement", label: "Savings movement", hue: "green", view: "accounts", mode: "jump", notice: "Accounts shows the fixture snapshot's actual $3,900 savings evidence. This is a summary jump, not a filtered record set; source, destination, and evidence records are not connected." }
 ];
 
-const accounts: Account[] = [
-  { id: "operating", name: "Operating", kind: "Checking", inst: "Mercury", mask: "4021", balance: 18420.55, delta30: 4.2, hue: "blue", spark: [18, 22, 20, 26, 24, 29, 31, 33] },
-  { id: "reserve", name: "Reserve", kind: "Savings", inst: "Ally", mask: "7782", balance: 42500, delta30: 1.1, hue: "teal", spark: [39, 39, 41, 41, 43, 43, 44, 46] },
-  { id: "petty-cash", name: "Petty / Cash", kind: "Cash", inst: "Vault", mask: "-", balance: 1240, delta30: 0, hue: "yellow", spark: [11, 11, 14, 11, 11, 12, 12, 12] },
-  { id: "studio-card", name: "Studio Card", kind: "Credit", inst: "Amex", mask: "1009", balance: -3284.12, delta30: -12, hue: "crimson", spark: [34, 31, 28, 25, 20, 23, 21, 22] },
-  { id: "long-hold", name: "Long Hold", kind: "Brokerage", inst: "Fidelity", mask: "5530", balance: 96240, delta30: 2.8, hue: "violet", spark: [84, 86, 85, 88, 91, 90, 93, 95] },
-  { id: "unigentamos-llc", name: "Unigentamos LLC", kind: "Business", inst: "Mercury", mask: "3300", balance: 28160, delta30: 3.5, hue: "indigo", spark: [24, 24, 26, 27, 28, 30, 31, 33] }
-];
-
-const budgets: Budget[] = [
-  { id: "studio-tools", category: "Studio & Tools", hue: "indigo", spent: 640, limit: 900, icon: "Wrench" },
-  { id: "saas", category: "Software & SaaS", hue: "cyan", spent: 412, limit: 450, icon: "Cloud" },
-  { id: "food", category: "Food & Dining", hue: "orange", spent: 588, limit: 600, icon: "Fork" },
-  { id: "health", category: "Health", hue: "green", spent: 180, limit: 400, icon: "Heart" },
-  { id: "travel", category: "Travel", hue: "teal", spent: 1240, limit: 1000, icon: "Plane" },
-  { id: "home", category: "Home & Utilities", hue: "brown", spent: 720, limit: 850, icon: "Home" },
-  { id: "learning", category: "Learning", hue: "violet", spent: 95, limit: 250, icon: "Book" },
-  { id: "buffer", category: "Buffer / Misc", hue: "neutral", spent: 210, limit: 500, icon: "Circle" }
-];
-
-const bills: Bill[] = [
-  { id: "aws", name: "AWS", amount: 188.4, due: "Jun 12", dueIn: 0, status: "overdue", account: "Unigentamos LLC", category: "Software & SaaS", hue: "orange", recurring: "monthly", autopay: false, icon: "Server", brandColors: ["#ff9900", "#232f3e", "#ec7211"] },
-  { id: "studio-rent", name: "Studio Rent", amount: 2400, due: "Jun 15", dueIn: 3, status: "due", account: "Operating", category: "Home & Utilities", hue: "crimson", recurring: "monthly", autopay: false, icon: "Building", brandColors: ["#a855f7", "#e11d48", "#f97316"] },
-  { id: "adobe", name: "Adobe Creative Cloud", amount: 59.99, due: "Jun 14", dueIn: 2, status: "soon", account: "Studio Card", category: "Software & SaaS", hue: "cyan", recurring: "monthly", autopay: true, icon: "Cloud", brandColors: ["#ff0000", "#fa0f00", "#470137"] },
-  { id: "phone", name: "Phone & Data", amount: 78, due: "Jun 16", dueIn: 4, status: "soon", account: "Operating", category: "Home & Utilities", hue: "blue", recurring: "monthly", autopay: true, icon: "Phone", brandColors: ["#0ea5e9", "#2563eb", "#22d3ee"] },
-  { id: "health", name: "Health Insurance", amount: 412, due: "Jun 18", dueIn: 6, status: "scheduled", account: "Operating", category: "Health", hue: "green", recurring: "monthly", autopay: true, icon: "Heart", brandColors: ["#16a34a", "#14b8a6", "#86efac"] },
-  { id: "figma", name: "Figma Org", amount: 45, due: "Jun 20", dueIn: 8, status: "scheduled", account: "Unigentamos LLC", category: "Software & SaaS", hue: "violet", recurring: "monthly", autopay: true, icon: "Pen", brandColors: ["#f24e1e", "#a259ff", "#1abcfe"] },
-  { id: "notion", name: "Notion Team", amount: 32, due: "Jun 22", dueIn: 10, status: "scheduled", account: "Operating", category: "Software & SaaS", hue: "indigo", recurring: "monthly", autopay: true, icon: "Notebook", brandColors: ["#18181b", "#71717a", "#f4f4f5"] },
-  { id: "domain", name: "Domain Renewal", amount: 22, due: "Jun 09", dueIn: -3, status: "paid", account: "Studio Card", category: "Software & SaaS", hue: "neutral", recurring: "annual", autopay: true, icon: "Globe", brandColors: ["#71717a", "#d4d4d8", "#a1a1aa"] }
-];
-
-function makeTxn(input: Omit<Txn, "currency" | "quarter" | "quarterYear" | "week" | "weekYear" | "tzOffset" | "ufInit"> & Partial<Pick<Txn, "quarter" | "quarterYear" | "week" | "weekYear" | "tzOffset" | "ufInit">>): Txn {
-  return {
-    currency: "USD",
-    quarter: "Q2",
-    quarterYear: "2026-Q2",
-    week: 24,
-    weekYear: "2026-W24",
-    tzOffset: "-0400",
-    ufInit: true,
-    ...input
-  };
+function smartViewCount(id: string) {
+  return getFinanceSmartViewCount(financeViewModel, id);
 }
 
-const transactions: Txn[] = [
-  makeTxn({ id: "TX-7741", date: "Jun 12", weekdayName: "Friday", weekdayNum: 5, entity: "Apple", merchant: "Apple Store", account: "Studio Card", accountType: "Credit", category: "Studio & Tools", spendCategory: "Hardware", hue: "indigo", amount: -1299, io: "expense", memo: "iPad Pro setup for dashboard review and design work.", receipt: "Apple receipt pending", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "pending" }),
-  makeTxn({ id: "TX-7740", date: "Jun 11", weekdayName: "Thursday", weekdayNum: 4, entity: "Stripe", merchant: "Stripe Payout", account: "Operating", accountType: "Checking", category: "Income", spendCategory: "", hue: "green", amount: 6840, io: "income", memo: "Weekly payout cleared to Operating.", receipt: "Stripe payout report", incomeSource: "Client revenue", reimbursable: false, reimbursedOn: "", status: "cleared" }),
-  makeTxn({ id: "TX-7739", date: "Jun 11", weekdayName: "Thursday", weekdayNum: 4, entity: "Blue Bottle", merchant: "Blue Bottle", account: "Studio Card", accountType: "Credit", category: "Food & Dining", spendCategory: "Meals", hue: "orange", amount: -18.5, io: "expense", memo: "Coffee before studio block.", receipt: "", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" }),
-  makeTxn({ id: "TX-7738", date: "Jun 10", weekdayName: "Wednesday", weekdayNum: 3, entity: "AWS", merchant: "AWS", account: "Unigentamos LLC", accountType: "Business", category: "Software & SaaS", spendCategory: "Infrastructure", hue: "cyan", amount: -188.4, io: "expense", memo: "June infra charge; no autopay on bill record.", receipt: "AWS invoice", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" }),
-  makeTxn({ id: "TX-7737", date: "Jun 10", weekdayName: "Wednesday", weekdayNum: 3, entity: "Whole Foods", merchant: "Whole Foods", account: "Operating", accountType: "Checking", category: "Food & Dining", spendCategory: "Groceries", hue: "orange", amount: -132.18, io: "expense", memo: "Weekly groceries.", receipt: "", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" }),
-  makeTxn({ id: "TX-7736", date: "Jun 09", weekdayName: "Tuesday", weekdayNum: 2, entity: "Delta", merchant: "Delta Air Lines", account: "Studio Card", accountType: "Credit", category: "Travel", spendCategory: "Flights", hue: "teal", amount: -642, io: "expense", memo: "Project travel; review for reimbursement.", receipt: "Delta itinerary", incomeSource: "", reimbursable: true, reimbursedOn: "", status: "cleared" }),
-  makeTxn({ id: "TX-7735", date: "Jun 09", weekdayName: "Tuesday", weekdayNum: 2, entity: "Lumen", merchant: "Consulting - Lumen", account: "Unigentamos LLC", accountType: "Business", category: "Income", spendCategory: "", hue: "green", amount: 3200, io: "income", memo: "Consulting invoice paid.", receipt: "Invoice 2026-06-LUM", incomeSource: "Consulting", reimbursable: false, reimbursedOn: "", status: "cleared" }),
-  makeTxn({ id: "TX-7734", date: "Jun 08", weekdayName: "Monday", weekdayNum: 1, entity: "Figma", merchant: "Figma", account: "Unigentamos LLC", accountType: "Business", category: "Software & SaaS", spendCategory: "Design tools", hue: "violet", amount: -45, io: "expense", memo: "Org seat.", receipt: "Figma invoice", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" }),
-  makeTxn({ id: "TX-7733", date: "Jun 08", weekdayName: "Monday", weekdayNum: 1, entity: "Uber", merchant: "Uber", account: "Operating", accountType: "Checking", category: "Travel", spendCategory: "Ground transport", hue: "teal", amount: -27.4, io: "expense", memo: "Ride from studio.", receipt: "Uber receipt", incomeSource: "", reimbursable: true, reimbursedOn: "", status: "cleared" }),
-  makeTxn({ id: "TX-7732", date: "Jun 07", weekdayName: "Sunday", weekdayNum: 7, entity: "Notion", merchant: "Notion", account: "Operating", accountType: "Checking", category: "Software & SaaS", spendCategory: "Knowledge tools", hue: "indigo", amount: -32, io: "expense", memo: "Team workspace.", receipt: "Notion invoice", incomeSource: "", reimbursable: false, reimbursedOn: "", status: "cleared" })
-];
+function viewBadge(view: ViewId) {
+  return getFinanceViewBadge(financeViewModel, view);
+}
 
-const initialReviewItems: ReviewItem[] = [
-  { id: "reconcile", label: "Reconcile all accounts", done: true, hue: "green" },
-  { id: "categorize", label: "Categorize uncleared transactions", done: true, hue: "green" },
-  { id: "budget-overruns", label: "Review budget overruns (Travel +24%)", done: false, hue: "orange" },
-  { id: "subscriptions", label: "Audit active subscriptions", done: false, hue: "violet" },
-  { id: "caps", label: "Set next month's budget caps", done: false, hue: "indigo" },
-  { id: "decisions", label: "File decisions to Notes & Projects", done: false, hue: "cyan" }
-];
-
-const reminders: Reminder[] = [
-  { id: "rate", text: "Confirm Q3 contractor rate before invoicing", due: "Jun 13", hue: "orange", kind: "decision" },
-  { id: "transfer", text: "Move $5k surplus -> Reserve", due: "Jun 14", hue: "teal", kind: "action" },
-  { id: "vimeo", text: "Cancel unused Vimeo Pro", due: "Jun 16", hue: "crimson", kind: "action" },
-  { id: "close", text: "Monthly close - reconcile Studio Card", due: "Jun 30", hue: "violet", kind: "review" }
-];
-
-const linkedContext: LinkItem[] = [
-  { id: "pricing", title: "2026 Pricing model rev. C", type: "Note", hue: "yellow" },
-  { id: "studio-buildout", title: "Studio buildout", type: "Project", hue: "indigo" },
-  { id: "contracts", title: "Vendor contracts / 2026", type: "Resource", hue: "brown" },
-  { id: "may-close", title: "May monthly close", type: "Review", hue: "violet" }
-];
+function statusHue(status: (typeof bills)[number]["status"]): Hue {
+  if (status === "overdue") return "crimson";
+  if (status === "due") return "orange";
+  if (status === "soon") return "yellow";
+  if (status === "paid") return "green";
+  return "blue";
+}
 
 function hueStyle(hue: Hue) {
   const value = HUES[hue];
@@ -251,13 +121,7 @@ function money(value: number, options: { cents?: boolean; sign?: boolean } = {})
 }
 
 function totals() {
-  const liquid = accounts
-    .filter((account) => account.balance > 0 && account.kind !== "Brokerage")
-    .reduce((sum, account) => sum + account.balance, 0);
-  const debt = accounts.filter((account) => account.balance < 0).reduce((sum, account) => sum + account.balance, 0);
-  const net = accounts.reduce((sum, account) => sum + account.balance, 0);
-  const lastMonthOut = 6084;
-  return { liquid, debt, net, runway: liquid / lastMonthOut };
+  return financeViewModel.accountTotals;
 }
 
 function classNames(...parts: Array<string | false | null | undefined>) {
@@ -335,18 +199,45 @@ function HeaderAction({
   children,
   icon,
   primary = false,
-  onClick
+  onClick,
+  disabled = false,
+  title
 }: {
   children: React.ReactNode;
   icon: string;
   primary?: boolean;
-  onClick: () => void;
+  onClick?: () => void;
+  disabled?: boolean;
+  title?: string;
 }) {
   return (
-    <button type="button" className={classNames("finance-action", primary && "is-primary")} onClick={onClick}>
+    <button
+      type="button"
+      className={classNames("finance-action", primary && "is-primary")}
+      onClick={() => {
+        if (!disabled) onClick?.();
+      }}
+      aria-disabled={disabled || undefined}
+      title={title}
+      aria-describedby={disabled ? "finance-preview-status" : undefined}
+      style={disabled ? { borderColor: "#dedee2", background: "#f4f4f5", color: "#71717a", cursor: "not-allowed" } : undefined}
+    >
       <Icon name={icon} />
       {children}
     </button>
+  );
+}
+
+function FixtureDatasetNotice() {
+  return (
+    <section id="finance-preview-status" className="finance-dataset-notice" aria-label="Finance data source status">
+      <IconTile hue="brown" icon="Wallet" />
+      <div>
+        <strong>{FINANCE_PREVIEW_LABEL}</strong>
+        <span>Navigation, search, filters, sorting, selection, inspectors, and charts work across Finance. Persistent Finance mutations are not connected; saving, importing, reconciling, linking, paying, budgeting, and closing remain unavailable.</span>
+      </div>
+      <Chip hue="brown" dot>NOT CONNECTED</Chip>
+    </section>
   );
 }
 
@@ -370,7 +261,7 @@ function WorkspaceHeader({
   );
 }
 
-function polylinePoints(values: number[], width: number, height: number, pad = 4) {
+function polylinePoints(values: readonly number[], width: number, height: number, pad = 4) {
   const min = Math.min(...values);
   const max = Math.max(...values);
   const range = max - min || 1;
@@ -383,7 +274,7 @@ function polylinePoints(values: number[], width: number, height: number, pad = 4
     .join(" ");
 }
 
-function Sparkline({ values, hue }: { values: number[]; hue: Hue }) {
+function Sparkline({ values, hue }: { values: readonly number[]; hue: Hue }) {
   return (
     <svg className="finance-sparkline" viewBox="0 0 96 34" aria-hidden="true" style={hueStyle(hue)}>
       <polyline points={polylinePoints(values, 96, 34)} />
@@ -392,9 +283,7 @@ function Sparkline({ values, hue }: { values: number[]; hue: Hue }) {
 }
 
 function CashflowChart({ compact = false }: { compact?: boolean }) {
-  const income = [9.1, 8.8, 8.7, 10.6, 11.1, 10.4, 10.0, 11.4, 12.7, 12.4, 11.6, 10.0];
-  const spend = [9.2, 8.7, 8.6, 10.5, 11.1, 10.5, 10.0, 11.2, 12.7, 12.5, 11.7, 10.1];
-  const savings = [1.6, 0.8, 1.1, 2.4, 3.0, -0.4, 1.2, 2.8, 3.4, 2.7, -0.6, 3.9];
+  const { income, spend, savings, months } = snapshot.cashflow;
   const width = 920;
   const height = compact ? 185 : 210;
   const padX = 48;
@@ -402,7 +291,7 @@ function CashflowChart({ compact = false }: { compact?: boolean }) {
   const plotH = height - padY * 2;
   const yMin = -4;
   const yMax = 16;
-  const toPoints = (values: number[]) => values
+  const toPoints = (values: readonly number[]) => values
     .map((value, index) => {
       const x = padX + (index / Math.max(values.length - 1, 1)) * (width - padX - 12);
       const y = padY + ((yMax - value) / (yMax - yMin)) * plotH;
@@ -414,10 +303,17 @@ function CashflowChart({ compact = false }: { compact?: boolean }) {
   const incomePoints = toPoints(income);
   const savingsPoints = toPoints(savings);
   const zeroY = padY + ((yMax - 0) / (yMax - yMin)) * plotH;
+  const descriptionId = compact ? "finance-cashflow-summary-compact" : "finance-cashflow-summary";
 
   return (
     <div className={classNames("finance-chart", compact && "is-compact")}>
-      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-label="Cashflow chart">
+      <svg
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="none"
+        role="img"
+        aria-label="Cashflow over six months"
+        aria-describedby={descriptionId}
+      >
         <defs>
           <linearGradient id="financeSpendGradient" x1="0" x2="0" y1="0" y2="1">
             <stop offset="0%" stopColor="#f97316" stopOpacity="0.2" />
@@ -442,20 +338,13 @@ function CashflowChart({ compact = false }: { compact?: boolean }) {
         <polyline className="income-line" points={incomePoints} />
         <polyline className="spend-line" points={points} />
         <polyline className="savings-line" points={savingsPoints} />
-        {["Jan", "Feb", "Mar", "Apr", "May", "Jun"].map((label, index) => (
-          <text className="axis-month" key={label} x={padX + (index / 5) * (width - padX - 12)} y={height - 4}>
+        {months.map((label, index) => (
+          <text className="axis-month" key={label} x={padX + (index / Math.max(months.length - 1, 1)) * (width - padX - 12)} y={height - 4}>
             {label}
           </text>
         ))}
       </svg>
-    </div>
-  );
-}
-
-function Meter({ value, hue, over = false }: { value: number; hue: Hue; over?: boolean }) {
-  return (
-    <div className="finance-meter" style={hueStyle(over ? "crimson" : hue)}>
-      <span style={{ width: `${Math.min(value, 100)}%` }} />
+      <p id={descriptionId} className="sr-only">{financeViewModel.cashflowSummary}</p>
     </div>
   );
 }
@@ -474,16 +363,19 @@ function accountIcon(kind: AccountKind) {
 
 function AccountRow({
   account,
-  selected,
   onSelect
 }: {
   account: Account;
-  selected?: boolean;
   onSelect: (account: Account) => void;
 }) {
   const moneyHue = account.balance < 0 ? "crimson" : account.hue;
   return (
-    <button type="button" className={classNames("finance-account-row", selected && "is-selected")} onClick={() => onSelect(account)}>
+    <button
+      type="button"
+      className="finance-account-row"
+      onClick={() => onSelect(account)}
+      aria-label={`Open ${account.name} in Accounts & Cashflow`}
+    >
       <IconTile hue={account.hue} icon={accountIcon(account.kind)} />
       <span className="finance-row-identity">
         <strong>
@@ -500,51 +392,16 @@ function AccountRow({
   );
 }
 
-function SectionBand({ hue, label, count }: { hue: Hue; label: string; count: number }) {
-  return (
-    <div className="finance-section-band" style={hueStyle(hue)}>
-      <Swatch hue={hue} />
-      <span>{label}</span>
-      <small>· {count}</small>
-    </div>
-  );
-}
-
-function transactionProperties(txn: Txn) {
-  return [
-    ["quarter", txn.quarter],
-    ["quarteryear", txn.quarterYear],
-    ["week", String(txn.week)],
-    ["weekyear", txn.weekYear],
-    ["weekday_name", txn.weekdayName],
-    ["weekday_num", String(txn.weekdayNum)],
-    ["tz_offset", txn.tzOffset],
-    ["entity", txn.entity],
-    ["account", txn.account],
-    ["amount", money(txn.amount, { sign: true, cents: true })],
-    ["io", txn.io],
-    ["currency", txn.currency],
-    ["account_type", txn.accountType],
-    ["spend_category", txn.spendCategory || "n/a"],
-    ["memo", txn.memo],
-    ["receipt", txn.receipt || "none"],
-    ["income_source", txn.incomeSource || "none"],
-    ["reimbursable", txn.reimbursable ? "true" : "false"],
-    ["reimbursed_on", txn.reimbursedOn || "none"],
-    ["uf_init", txn.ufInit ? "true" : "false"]
-  ];
-}
-
-function RecentTransactionsRail({ onNotice }: { onNotice: (notice: string) => void }) {
+function RecentTransactionsRail({ onOpenTransaction }: { onOpenTransaction: (id: string) => void }) {
   return (
     <section className="finance-context-card finance-recent-card" aria-label="Recent transactions">
       <div className="finance-context-heading">
         <span><Swatch hue="blue" />Recent</span>
-        <strong>{transactions.length}</strong>
+        <strong>{financeViewModel.counts.transactions}</strong>
       </div>
       <div className="finance-recent-list">
         {transactions.slice(0, 7).map((txn) => (
-          <button type="button" key={txn.id} onClick={() => onNotice(`${txn.merchant} opened from recent transactions.`)} style={hueStyle(txn.hue)}>
+          <button type="button" key={txn.id} onClick={() => onOpenTransaction(txn.id)} style={hueStyle(txn.hue)}>
             <span><Swatch hue={txn.hue} /><strong>{txn.merchant}</strong></span>
             <small>{txn.date} · {txn.account}</small>
             <em className={txn.amount > 0 ? "is-green" : ""}>{money(txn.amount, { sign: true, cents: true })}</em>
@@ -555,142 +412,130 @@ function RecentTransactionsRail({ onNotice }: { onNotice: (notice: string) => vo
   );
 }
 
-function SubscriptionValueRail({ onNotice }: { onNotice: (notice: string) => void }) {
-  const monthlyBills = bills.filter((bill) => bill.recurring);
-  const [expanded, setExpanded] = useState("");
-  const selected = monthlyBills.find((bill) => bill.id === expanded);
+function FinanceContextRail({
+  onOpenTransaction,
+  mobileOpen,
+  overlay,
+  overlayOpen,
+  onClose
+}: {
+  onOpenTransaction: (id: string) => void;
+  mobileOpen: boolean;
+  overlay: boolean;
+  overlayOpen: boolean;
+  onClose: () => void;
+}) {
+  const closeAction = <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance context"><Icon name="X" /></button>;
   return (
-    <section className="finance-context-card finance-subscription-card" aria-label="Blind subscription value audit">
-      <div className="finance-context-heading">
-        <span><Swatch hue="violet" />Subscriptions</span>
-        <strong>{monthlyBills.length}</strong>
-      </div>
-      <p className="finance-context-copy">Judge the monthly cost first. Hover or click to reveal the vendor.</p>
-      <div className="finance-subscription-orbits">
-        {monthlyBills.map((bill) => (
-          <button
-            type="button"
-            key={bill.id}
-            className={classNames("finance-subscription-squircle", expanded === bill.id && "is-expanded")}
-            onClick={() => {
-              setExpanded(bill.id);
-              onNotice(`${bill.name} subscription selected for value review.`);
-            }}
-            style={{
-              ...hueStyle(bill.hue),
-              "--subscription-a": bill.brandColors[0],
-              "--subscription-b": bill.brandColors[1],
-              "--subscription-c": bill.brandColors[2]
-            } as React.CSSProperties}
-          >
-            <strong>{money(bill.amount, { cents: bill.amount % 1 !== 0 })}</strong>
-            <span>{bill.name}</span>
-          </button>
-        ))}
-      </div>
-      {selected && (
-        <div className="finance-subscription-detail" style={hueStyle(selected.hue)}>
-          <span>Selected</span>
-          <strong>{selected.name}</strong>
-          <small>{money(selected.amount, { cents: true })}/mo · {selected.account}</small>
-          <button type="button" onClick={() => onNotice(`${selected.name} expanded into subscription detail.`)}>Open detail</button>
-        </div>
-      )}
-    </section>
+    <InspectorRail id="finance-inspector" title="Recent activity" actions={closeAction} className={classNames("finance-context-rail", mobileOpen && "is-mobile-open")} ariaLabel="Finance context" readOnly overlay={overlay} overlayOpen={overlayOpen} onRequestClose={onClose}>
+      <RecentTransactionsRail onOpenTransaction={onOpenTransaction} />
+    </InspectorRail>
   );
-}
-
-function FinanceContextRail({ view, onNotice }: { view: ViewId; onNotice: (notice: string) => void }) {
-  if (view === "bills") {
-    return (
-      <aside className="finance-context-rail" aria-label="Finance context">
-        <SubscriptionValueRail onNotice={onNotice} />
-      </aside>
-    );
-  }
-  if (view === "overview" || view === "transactions") {
-    return (
-      <aside className="finance-context-rail" aria-label="Finance context">
-        <RecentTransactionsRail onNotice={onNotice} />
-      </aside>
-    );
-  }
-  return null;
 }
 
 function FinanceSidebar({
   view,
-  setView,
   smartFilter,
   onSmart,
   mobileOpen,
   onClose
 }: {
   view: ViewId;
-  setView: (view: ViewId) => void;
   smartFilter: string;
   onSmart: (id: string) => void;
   mobileOpen: boolean;
   onClose: () => void;
 }) {
   return (
-    <aside className={classNames("finance-sidebar", mobileOpen && "is-mobile-open")} aria-label="Finance sidebar">
-      <div className="finance-sidebar-header">
-        <div>
-          <h2>Finance</h2>
-          <p>June 2026 · monthly close in 18d</p>
-        </div>
-        <Chip hue="green" dot>LIVE</Chip>
-      </div>
-      <nav className="finance-sidebar-nav" aria-label="Finance views">
-        {VIEWS.map((item) => (
-          <button
-            type="button"
-            key={item.id}
-            className={classNames(view === item.id && "is-active")}
-            onClick={() => {
-              setView(item.id);
-              onClose();
-            }}
-            style={hueStyle(item.hue)}
-          >
-            <Swatch hue={item.hue} />
-            <span>{item.label}</span>
-            {item.badge && <small>{item.badge}</small>}
-          </button>
-        ))}
-      </nav>
-      <div className="finance-sidebar-section">
-        <p>SMART VIEWS</p>
-        {SMART_VIEWS.map((item) => (
-          <button
-            type="button"
-            key={item.id}
-            className={classNames(smartFilter === item.id && "is-active")}
-            onClick={() => {
-              onSmart(item.id);
-              onClose();
-            }}
-            style={hueStyle(item.hue)}
-          >
-            <Swatch hue={item.hue} />
-            <span>{item.label}</span>
-            <small>{item.count}</small>
-          </button>
-        ))}
-      </div>
-    </aside>
+    <ModuleSidebar
+      id="finance-module-sidebar"
+      title="Finance"
+      description={`${financeFixtureRepository.metadata.periodLabel} · fixture dataset`}
+      status={<Chip hue="brown" dot>READ ONLY</Chip>}
+      ariaLabel="Finance sidebar"
+      className="finance-module-sidebar"
+      mobileOpen={mobileOpen}
+      onClose={onClose}
+      sections={[
+        {
+          id: "finance-views",
+          label: "Finance",
+          items: VIEWS.map((item) => ({
+            id: item.id,
+            label: viewBadge(item.id) ? `${item.label} · ${viewBadge(item.id)}` : item.label,
+            icon: <Swatch hue={item.hue} />,
+            active: view === item.id && !smartFilter,
+            href: getModuleViewRoute("finance", item.id)
+          }))
+        },
+        {
+          id: "finance-smart-views",
+          label: "Smart views",
+          items: SMART_VIEWS.map((item) => ({
+            id: item.id,
+            label: item.label,
+            icon: <Swatch hue={item.hue} />,
+            count: smartViewCount(item.id),
+            active: smartFilter === item.id,
+            onSelect: item.disabledReason ? undefined : () => onSmart(item.id),
+            disabled: Boolean(item.disabledReason),
+            disabledReason: item.disabledReason
+          }))
+        },
+        {
+          id: "finance-data",
+          label: "Data",
+          items: [
+            {
+              id: "data-accounts",
+              label: "Accounts data",
+              disabled: true,
+              disabledReason: "Use Accounts & Cashflow for the current read path. A separate account-management surface remains unresolved."
+            },
+            {
+              id: "data-categories",
+              label: "Categories",
+              disabled: true,
+              disabledReason: "No native Finance category repository or management route is connected."
+            },
+            {
+              id: "data-imports",
+              label: "Imports",
+              disabled: true,
+              disabledReason: "No import source, batch, repair, or reconciliation repository is connected."
+            },
+            {
+              id: "data-rules",
+              label: "Rules / Automation",
+              disabled: true,
+              disabledReason: "No rule repository, risk policy, test history, or activation audit is connected."
+            },
+            {
+              id: "data-settings",
+              label: "Settings",
+              disabled: true,
+              disabledReason: "Finance settings and permission taxonomy are not yet defined."
+            }
+          ]
+        }
+      ]}
+      footer={<p className="finance-sidebar-footnote">Fixture values are not live account data.</p>}
+    />
   );
 }
 
 function OverviewView({
-  selected,
   onSelect,
+  onOpenBill,
+  onOpenBudget,
+  onView,
   onModal,
   onNotice
 }: {
-  selected: Account | null;
   onSelect: (account: Account) => void;
+  onOpenBill: (id: string) => void;
+  onOpenBudget: (id: string) => void;
+  onView: (view: ViewId) => void;
   onModal: (modal: ModalKind) => void;
   onNotice: (notice: string) => void;
 }) {
@@ -700,13 +545,13 @@ function OverviewView({
       <WorkspaceHeader
         title="Command"
         subtitle="What matters now · due soon · changed · needs review"
-        actions={<><HeaderAction icon="Filter" onClick={() => onModal("filter")}>Filter</HeaderAction><HeaderAction icon="Plus" primary onClick={() => onModal("record")}>Record</HeaderAction></>}
+        actions={<><HeaderAction icon="Filter" onClick={() => onModal("filter")}>Filter preview</HeaderAction><HeaderAction icon="Plus" primary disabled title={FINANCE_PREVIEW_REASON}>Record unavailable</HeaderAction></>}
       />
       <Panel className="finance-kpi-strip">
         {[
-          ["Net worth", money(summary.net), "+3.4% vs last month", "indigo"],
-          ["Liquid", money(summary.liquid), "+2.1% across 5 accts", "teal"],
-          ["Debt", money(summary.debt), "-12% 1 card", "crimson"],
+          ["Net worth", money(summary.net), snapshot.netWorthDeltaLabel, "indigo"],
+          ["Liquid", money(summary.liquid), snapshot.liquidDeltaLabel, "teal"],
+          ["Debt", money(summary.debt), snapshot.debtDeltaLabel, "crimson"],
           ["Runway", `${summary.runway.toFixed(1)} mo`, "at current spend", "violet"]
         ].map(([label, value, sub, hue]) => (
           <article key={label} style={hueStyle(hue as Hue)}>
@@ -724,32 +569,40 @@ function OverviewView({
           </div>
           <CashflowChart compact />
           <div className="finance-cash-footer">
-            <div><span>Net this month</span><strong className="is-green">+$3,900</strong></div>
-            <div><span>Avg burn</span><strong>$7,766</strong></div>
-            <div><span>Savings rate</span><strong>39%</strong></div>
+            <div><span>Net this month</span><strong className="is-green">{money(snapshot.netThisMonth, { sign: true })}</strong></div>
+            <div><span>Avg burn</span><strong>{money(snapshot.averageBurn)}</strong></div>
+            <div><span>Savings rate</span><strong>{snapshot.savingsRate}%</strong></div>
           </div>
         </Panel>
         <Panel hue="crimson">
-          <div className="finance-panel-heading"><h2>Needs attention <span>3</span></h2></div>
+          <div className="finance-panel-heading"><h2>Needs attention <span>{financeViewModel.counts.attention}</span></h2></div>
           <div className="finance-attention-list">
-            {[
-              ["Alert", "AWS payment overdue", "$188.40 · no autopay", "OVERDUE", "crimson"],
-              ["Trending", "Travel over budget", "+24% · $1,240 / $1,000", "BUDGET", "orange"],
-              ["PiggyBank", "$5k surplus idle", "move to Reserve?", "ACTION", "violet"]
-            ].map(([icon, title, sub, chip, hue]) => (
-              <button type="button" key={title} onClick={() => onNotice(`${title} selected for review.`)}>
-                <IconTile hue={hue as Hue} icon={icon} />
-                <span><strong>{title}</strong><small>{sub}</small></span>
-                <Chip hue={hue as Hue}>{chip}</Chip>
+            {snapshot.attentionItems.map((item) => (
+              <button
+                type="button"
+                key={item.title}
+                onClick={() => {
+                  if (item.title.startsWith("AWS")) onOpenBill("aws");
+                  else if (item.title.startsWith("Travel")) onOpenBudget("travel");
+                  else {
+                    const reserve = accounts.find((account) => account.id === "reserve");
+                    if (reserve) onSelect(reserve);
+                    else onNotice(`${item.title} is unavailable in this fixture.`);
+                  }
+                }}
+              >
+                <IconTile hue={item.hue} icon={item.icon} />
+                <span><strong>{item.title}</strong><small>{item.detail}</small></span>
+                <Chip hue={item.hue}>{item.label}</Chip>
               </button>
             ))}
           </div>
         </Panel>
         <Panel hue="blue" className="finance-span-2">
-          <div className="finance-panel-heading"><h2>Accounts <span>6</span></h2><button type="button" onClick={() => onModal("account")}>All -&gt;</button></div>
+          <div className="finance-panel-heading"><h2>Accounts <span>{financeViewModel.counts.accounts}</span></h2><button type="button" onClick={() => onView("accounts")}>View all -&gt;</button></div>
           <div className="finance-account-list">
             {accounts.slice(0, 4).map((account) => (
-              <AccountRow key={account.id} account={account} selected={selected?.id === account.id} onSelect={onSelect} />
+              <AccountRow key={account.id} account={account} onSelect={onSelect} />
             ))}
           </div>
         </Panel>
@@ -757,7 +610,7 @@ function OverviewView({
           <div className="finance-panel-heading"><h2>Due soon <span>next 10d</span></h2></div>
           <div className="finance-timeline">
             {bills.filter((bill) => bill.dueIn >= 0).slice(0, 5).map((bill) => (
-              <button type="button" key={bill.id} onClick={() => onNotice(`${bill.name} bill opened.`)} style={hueStyle(statusHue(bill.status))}>
+              <button type="button" key={bill.id} onClick={() => onOpenBill(bill.id)} style={hueStyle(statusHue(bill.status))}>
                 <Swatch hue={statusHue(bill.status)} />
                 <span><strong>{bill.name}</strong><small>{bill.due} · {bill.dueIn === 0 ? "today" : `${bill.dueIn}d`}</small></span>
                 <strong>{money(bill.amount, { cents: true })}</strong>
@@ -770,365 +623,654 @@ function OverviewView({
   );
 }
 
-function AccountsView({
-  selected,
-  onSelect,
-  onModal
-}: {
-  selected: Account | null;
-  onSelect: (account: Account) => void;
-  onModal: (modal: ModalKind) => void;
-}) {
-  const groups = [
-    { label: "Cash & deposits", hue: "blue" as Hue, rows: accounts.filter((account) => ["Checking", "Savings", "Cash"].includes(account.kind)) },
-    { label: "Credit & liabilities", hue: "crimson" as Hue, rows: accounts.filter((account) => account.kind === "Credit") },
-    { label: "Investments & business", hue: "violet" as Hue, rows: accounts.filter((account) => ["Brokerage", "Business"].includes(account.kind)) }
-  ];
-  return (
-    <>
-      <WorkspaceHeader
-        title="Accounts & Cashflow"
-        subtitle="Balances, movement, and money in vs out"
-        actions={<><HeaderAction icon="Sliders" onClick={() => onModal("filter")}>Group: Type</HeaderAction><HeaderAction icon="Plus" primary onClick={() => onModal("account")}>Link account</HeaderAction></>}
-      />
-      <Panel hue="teal"><div className="finance-panel-heading"><h2>Cashflow <span>6 mo · $k</span></h2><div><Chip hue="teal" dot>in</Chip><Chip hue="orange" dot>out</Chip><Chip hue="indigo" dot>savings</Chip></div></div><CashflowChart /></Panel>
-      <Panel hue="blue" className="finance-ledger-panel">
-        <div className="finance-panel-heading"><h2>All accounts <span>6</span></h2></div>
-        {groups.map((group) => (
-          <div key={group.label}>
-            <SectionBand hue={group.hue} label={group.label} count={group.rows.length} />
-            <div className="finance-account-list">
-              {group.rows.map((account) => (
-                <AccountRow key={account.id} account={account} selected={selected?.id === account.id} onSelect={onSelect} />
-              ))}
-            </div>
-          </div>
-        ))}
-      </Panel>
-    </>
-  );
-}
-
-function BudgetsView({ onModal, onNotice }: { onModal: (modal: ModalKind) => void; onNotice: (notice: string) => void }) {
-  const totalSpent = budgets.reduce((sum, budget) => sum + budget.spent, 0);
-  const totalLimit = budgets.reduce((sum, budget) => sum + budget.limit, 0);
-  const pct = Math.round((totalSpent / totalLimit) * 100);
-  return (
-    <>
-      <WorkspaceHeader
-        title="Budgets"
-        subtitle={`June · ${money(totalSpent)} of ${money(totalLimit)} spent`}
-        actions={<><HeaderAction icon="Calendar" onClick={() => onModal("filter")}>June</HeaderAction><HeaderAction icon="Plus" primary onClick={() => onModal("category")}>New category</HeaderAction></>}
-      />
-      <Panel hue="teal">
-        <div className="finance-budget-summary">
-          <div><span>Total spent</span><strong>{money(totalSpent)} <em>/ {money(totalLimit)}</em></strong></div>
-          <Chip hue={pct > 100 ? "crimson" : "green"}>{pct}% used</Chip>
-        </div>
-        <div className="finance-stacked-bar">
-          {budgets.map((budget) => (
-            <span key={budget.id} title={budget.category} style={{ width: `${(budget.spent / totalLimit) * 100}%`, background: HUES[budget.hue].solid }} />
-          ))}
-        </div>
-      </Panel>
-      <div className="finance-budget-grid">
-        {budgets.map((budget) => {
-          const used = Math.round((budget.spent / budget.limit) * 100);
-          const over = used > 100;
-          return (
-            <button type="button" key={budget.id} className="finance-budget-card" style={hueStyle(over ? "crimson" : budget.hue)} onClick={() => onNotice(`${budget.category} detail shell opened.`)}>
-              <IconTile hue={budget.hue} icon={budget.icon} />
-              <span><strong>{budget.category} {over && <Chip hue="crimson">OVER</Chip>}</strong><small>{money(budget.spent)} of {money(budget.limit)}</small></span>
-              <strong className={over ? "is-negative" : ""}>{used}%</strong>
-              <Meter value={used} hue={budget.hue} over={over} />
-            </button>
-          );
-        })}
-      </div>
-    </>
-  );
-}
-
-function statusHue(status: BillStatus): Hue {
-  return ({ overdue: "crimson", due: "orange", soon: "yellow", scheduled: "blue", paid: "green" } as Record<BillStatus, Hue>)[status];
-}
-
-function statusLabel(status: BillStatus) {
-  return ({ overdue: "OVERDUE", due: "DUE", soon: "SOON", scheduled: "SCHEDULED", paid: "PAID" } as Record<BillStatus, string>)[status];
-}
-
-function BillsView({
-  onModal,
-  recurringOnly,
-  onNotice
-}: {
-  onModal: (modal: ModalKind) => void;
-  recurringOnly: boolean;
-  onNotice: (notice: string) => void;
-}) {
-  const visibleBills = recurringOnly ? bills.filter((bill) => bill.recurring) : bills;
-  const monthly = bills.reduce((sum, bill) => sum + (bill.recurring === "monthly" ? bill.amount : bill.recurring === "annual" ? bill.amount / 12 : bill.amount * 4), 0);
-  const autopayPct = Math.round((bills.filter((bill) => bill.autopay).length / bills.length) * 100);
-  const groups: BillStatus[] = ["overdue", "due", "soon", "scheduled", "paid"];
-  return (
-    <>
-      <WorkspaceHeader
-        title="Bills & Subscriptions"
-        subtitle={`${bills.length} obligations · ${money(monthly, { cents: true })}/mo recurring`}
-        actions={<><HeaderAction icon="Filter" onClick={() => onModal("filter")}>Status</HeaderAction><HeaderAction icon="Plus" primary onClick={() => onModal("bill")}>Add bill</HeaderAction></>}
-      />
-      <div className="finance-two-col">
-        <Panel hue="orange" className="finance-span-2">
-          <div className="finance-panel-heading"><h2>Payment queue <span>by urgency</span></h2></div>
-          {groups.map((status) => {
-            const rows = visibleBills.filter((bill) => bill.status === status);
-            if (rows.length === 0) return null;
-            return (
-              <div key={status}>
-                <SectionBand hue={statusHue(status)} label={statusLabel(status)} count={rows.length} />
-                {rows.map((bill) => (
-                  <button type="button" className="finance-bill-row" key={bill.id} onClick={() => onNotice(`${bill.name} bill detail shell opened.`)}>
-                    <IconTile hue={bill.hue} icon={bill.icon} />
-                    <span><strong>{bill.name} {bill.autopay && <Chip hue="cyan">auto</Chip>} {bill.recurring && <Chip hue="neutral">{bill.recurring}</Chip>}</strong><small>{bill.account} · {bill.category}</small></span>
-                    <span><strong>{money(bill.amount, { cents: true })}</strong><small>{bill.due}</small></span>
-                    <Chip hue={statusHue(bill.status)} solid={bill.status === "overdue"}>{statusLabel(bill.status)}</Chip>
-                  </button>
-                ))}
-              </div>
-            );
-          })}
-        </Panel>
-        <div className="finance-side-stack">
-          <Panel hue="violet"><div className="finance-panel-heading"><h2>Recurring spend <span>monthly</span></h2></div><strong className="finance-big-number">{money(monthly, { cents: true })}</strong><p className="finance-muted">{bills.filter((bill) => bill.recurring).length} active subscriptions</p><div className="finance-mini-list">{bills.filter((bill) => bill.recurring).slice(0, 5).map((bill) => <div key={bill.id}><Swatch hue={bill.hue} /><span>{bill.name}</span><strong>{money(bill.amount, { cents: true })}</strong></div>)}</div></Panel>
-          <Panel hue="cyan"><div className="finance-panel-heading"><h2>Autopay coverage</h2></div><strong className="finance-big-number">{autopayPct}% <span>on autopay</span></strong><Meter value={autopayPct} hue="cyan" /><p className="finance-muted">2 bills need manual payment this month, including AWS overdue.</p></Panel>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function ReviewView({
-  reviewItems,
-  setReviewItems,
-  onNotice
-}: {
-  reviewItems: ReviewItem[];
-  setReviewItems: (items: ReviewItem[]) => void;
-  onNotice: (notice: string) => void;
-}) {
-  const done = reviewItems.filter((item) => item.done).length;
-  const pct = Math.round((done / reviewItems.length) * 100);
-  function toggle(id: string) {
-    setReviewItems(reviewItems.map((item) => (item.id === id ? { ...item, done: !item.done } : item)));
-  }
-  return (
-    <>
-      <WorkspaceHeader
-        title="Monthly Review"
-        subtitle="June close · prep, reconcile, and file decisions"
-        actions={<><a className="finance-action" href="/admin/reviews/monthly"><Icon name="Link" />Link to Reviews</a><HeaderAction icon="Check" primary onClick={() => onNotice("June close snapshot queued for Reviews and decision Notes.")}>Complete close</HeaderAction></>}
-      />
-      <div className="finance-two-col">
-        <Panel hue="violet" className="finance-span-2">
-          <div className="finance-panel-heading"><h2>Close checklist <span>{done}/{reviewItems.length}</span></h2></div>
-          <Meter value={pct} hue="violet" />
-          <div className="finance-checklist">
-            {reviewItems.map((item) => (
-              <button type="button" key={item.id} onClick={() => toggle(item.id)} className={item.done ? "is-done" : ""} style={hueStyle(item.hue)}>
-                <span className="finance-checkbox">{item.done && <Icon name="Check" />}</span>
-                <strong>{item.label}</strong>
-                <Swatch hue={item.hue} />
-              </button>
-            ))}
-          </div>
-        </Panel>
-        <div className="finance-side-stack">
-          <Panel hue="indigo"><div className="finance-panel-heading"><h2>Month at a glance</h2></div><div className="finance-month-grid"><div><span>Income</span><strong className="is-green">+$10,040</strong></div><div><span>Spend</span><strong className="is-orange">-$6,140</strong></div><div><span>Net saved</span><strong>+$3,900</strong></div></div></Panel>
-          <Panel hue="yellow"><div className="finance-panel-heading"><h2>Decisions to file <span>2</span></h2></div><div className="finance-decision-list">{reminders.filter((item) => item.kind === "decision" || item.kind === "review").map((item) => <button type="button" key={item.id} onClick={() => onNotice(`${item.text} will file to Notes.`)}><IconTile hue={item.hue} icon="Notebook" small /><span><strong>{item.text}</strong><small>due {item.due} -&gt; Notes</small></span></button>)}</div></Panel>
-        </div>
-      </div>
-    </>
-  );
-}
-
-function TransactionPropertiesPanel({ txn }: { txn: Txn }) {
-  return (
-    <Panel hue={txn.hue} className="finance-transaction-properties">
-      <div className="finance-panel-heading">
-        <h2>{txn.merchant} <span>{txn.id}</span></h2>
-        <Chip hue={txn.io === "income" ? "green" : txn.io === "savings" ? "indigo" : "neutral"}>{txn.io}</Chip>
-      </div>
-      <div className="finance-property-grid">
-        {transactionProperties(txn).map(([label, value]) => (
-          <div key={label}>
-            <span>{label}</span>
-            <strong>{value}</strong>
-          </div>
-        ))}
-      </div>
-    </Panel>
-  );
-}
-
-function TransactionsView({
-  query,
-  setQuery,
-  pendingOnly,
-  onModal,
-  onNotice
-}: {
-  query: string;
-  setQuery: (query: string) => void;
-  pendingOnly: boolean;
-  onModal: (modal: ModalKind) => void;
-  onNotice: (notice: string) => void;
-}) {
-  const [selectedTxnId, setSelectedTxnId] = useState(transactions[0]?.id || "");
-  const cleanQuery = query.trim().toLowerCase();
-  const visible = transactions.filter((txn) => {
-    const text = `${txn.date} ${txn.merchant} ${txn.account} ${txn.category} ${txn.amount} ${txn.id}`.toLowerCase();
-    return (!pendingOnly || txn.status === "pending") && (!cleanQuery || text.includes(cleanQuery));
-  });
-  const selectedTxn = visible.find((txn) => txn.id === selectedTxnId) || visible[0] || transactions[0];
-  return (
-    <>
-      <WorkspaceHeader
-        title="Transactions"
-        subtitle={`${visible.length} this period · search, filter, reconcile`}
-        actions={<><HeaderAction icon="Sliders" onClick={() => onModal("columns")}>Columns</HeaderAction><HeaderAction icon="Plus" primary onClick={() => onModal("record")}>Record</HeaderAction></>}
-      />
-      <Panel className="finance-filter-panel">
-        <label><Icon name="Search" /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search merchant, amount, note..." /></label>
-        {["Account: All", "Category: All", "Status: All", "This month"].map((label, index) => <button type="button" key={label} onClick={() => onModal("filter")}><Swatch hue={["blue", "indigo", "green", "violet"][index] as Hue} />{label}<Icon name="Chevron" /></button>)}
-      </Panel>
-      <Panel className="finance-transaction-table">
-        <div className="finance-table-head"><span>Date</span><span>Merchant</span><span>Account</span><span>Category</span><span>Status</span><span>Amount</span></div>
-        {visible.map((txn) => (
-          <button
-            type="button"
-            className={classNames("finance-table-row", selectedTxn.id === txn.id && "is-selected")}
-            key={txn.id}
-            onClick={() => {
-              setSelectedTxnId(txn.id);
-              onNotice(`${txn.merchant} properties selected.`);
-            }}
-          >
-            <span>{txn.date}</span>
-            <strong><Swatch hue={txn.hue} />{txn.merchant} <small>{txn.id}</small></strong>
-            <span>{txn.account}</span>
-            <span><Chip hue={txn.hue}>{txn.category}</Chip></span>
-            <span><Chip hue={txn.status === "pending" ? "yellow" : "neutral"}>{txn.status}</Chip></span>
-            <strong className={txn.amount > 0 ? "is-green" : ""}>{money(txn.amount, { sign: true, cents: true })}</strong>
-          </button>
-        ))}
-      </Panel>
-      {selectedTxn && <TransactionPropertiesPanel txn={selectedTxn} />}
-    </>
-  );
-}
-
-function RightRail({ account, onClose, onNotice }: { account: Account | null; onClose: () => void; onNotice: (notice: string) => void }) {
-  if (!account) return null;
-  return (
-    <aside className="finance-right-rail" aria-label={`${account.name} detail`}>
-      <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close account detail"><Icon name="X" /></button>
-      <IconTile hue={account.hue} icon={accountIcon(account.kind)} />
-      <h2>{account.name} <Chip hue={account.hue}>{account.kind}</Chip></h2>
-      <p>{account.inst} · {account.mask} · AC-01</p>
-      <div className="finance-rail-balance">
-        <span>Current balance</span>
-        <strong className={account.balance < 0 ? "is-negative" : ""}>{money(account.balance, { cents: true })}</strong>
-        <small>{account.delta30 >= 0 ? "+" : ""}{account.delta30}% over 30 days</small>
-        <Sparkline values={account.spark} hue={account.balance < 0 ? "crimson" : account.hue} />
-      </div>
-      <div className="finance-rail-actions">
-        <button type="button" onClick={() => onNotice(`Transfer flow opened for ${account.name}.`)}>Transfer</button>
-        <button type="button" onClick={() => onNotice(`Reconcile flow opened for ${account.name}.`)}>Reconcile</button>
-      </div>
-      <SectionBand hue="blue" label="Recent activity" count={4} />
-      <div className="finance-rail-list">
-        {transactions.slice(1, 5).map((txn) => <button type="button" key={txn.id} onClick={() => onNotice(`${txn.merchant} opened from account rail.`)}><Swatch hue={txn.hue} /><span><strong>{txn.merchant}</strong><small>{txn.date} · {txn.category}</small></span><strong>{money(txn.amount, { sign: true, cents: true })}</strong></button>)}
-      </div>
-      <SectionBand hue="indigo" label="Linked context" count={linkedContext.length} />
-      <div className="finance-rail-list">
-        {linkedContext.map((item) => <a key={item.id} href={`/admin/${item.type === "Note" ? "notes" : item.type.toLowerCase() + "s"}`}><IconTile hue={item.hue} icon={item.type === "Project" ? "Briefcase" : item.type === "Resource" ? "LineChart" : "Notebook"} small /><span><strong>{item.title}</strong><small>{item.type}</small></span></a>)}
-      </div>
-    </aside>
-  );
-}
-
-function ModalShell({ modal, onClose, onNotice }: { modal: ModalKind; onClose: () => void; onNotice: (notice: string) => void }) {
+function ModalShell({ modal, onClose }: { modal: ModalKind; onClose: () => void }) {
+  const modalRef = useRef<HTMLElement>(null);
+  const closeRef = useRef(onClose);
+  useEffect(() => {
+    closeRef.current = onClose;
+  }, [onClose]);
+  useEffect(() => {
+    if (!modal || !modalRef.current) return;
+    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const controls = () => Array.from(
+      modalRef.current?.querySelectorAll<HTMLElement>(
+        "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex='-1'])"
+      ) || []
+    );
+    controls()[0]?.focus();
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        closeRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = controls();
+      if (!focusable.length) return;
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown);
+      previousFocus?.focus();
+    };
+  }, [modal]);
   if (!modal) return null;
-  const content: Record<Exclude<ModalKind, null>, { title: string; body: string; fields: string[]; action: string }> = {
-    record: { title: "Record finance item", body: "Create a manual transaction, reminder, or decision without adding bank credentials.", fields: ["Type", "Amount", "Linked context"], action: "Save record shell" },
-    filter: { title: "Finance filters", body: "Apply deterministic filters to the current finance view.", fields: ["Status", "Account", "Category"], action: "Apply filters" },
-    account: { title: "Link or add account", body: "Slice 1 uses a manual account shell. Future bank linking plugs in here.", fields: ["Account name", "Institution", "Type"], action: "Save manual account" },
-    category: { title: "New budget category", body: "Create a budget cap with a hue, icon, and review cadence.", fields: ["Category", "Monthly cap", "Hue"], action: "Save category" },
-    bill: { title: "Add bill", body: "Capture vendor, due date, amount, cadence, account, and autopay status.", fields: ["Vendor", "Amount", "Due date"], action: "Save bill" },
-    columns: { title: "Transaction columns", body: "Choose the visible ledger columns for repeated review.", fields: ["Date", "Category", "Linked note"], action: "Apply columns" },
-    pay: { title: "Pay AWS now", body: "Open a guarded payment flow for the overdue AWS obligation.", fields: ["Bill", "Amount", "Funding account"], action: "Prepare payment" },
-    transfer: { title: "Draft surplus transfer", body: "Prefill a transfer from Operating to Reserve for monthly close review.", fields: ["From", "To", "Amount"], action: "Draft transfer" }
+  const content: Record<Exclude<ModalKind, null>, { title: string; body: string; fields: string[] }> = {
+    record: { title: "Recording unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Type", "Amount", "Linked context"] },
+    filter: { title: "Finance filters preview", body: "Filter structure is shown for review. Use search and Smart Views for the working fixture interactions in this checkpoint.", fields: ["Status", "Account", "Category"] },
+    account: { title: "Account linking unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Account name", "Institution", "Type"] },
+    category: { title: "Budget category creation unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Category", "Monthly cap", "Hue"] },
+    bill: { title: "Bill creation unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Vendor", "Amount", "Due date"] },
+    columns: { title: "Transaction columns preview", body: "Column customization is not persisted in this fixture checkpoint.", fields: ["Date", "Category", "Linked note"] },
+    pay: { title: "Payments unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Bill", "Amount", "Funding account"] },
+    transfer: { title: "Transfers unavailable", body: FINANCE_PREVIEW_REASON, fields: ["From", "To", "Amount"] },
+    group: { title: "Account grouping preview", body: "The current read path groups accounts by cash and deposits, credit and liabilities, and investments and business. Custom grouping is not persisted.", fields: ["Current grouping", "Custom grouping", "Saved view"] },
+    period: { title: "Budget period preview", body: "The fixture represents June 2026. Changing, comparing, or closing budget periods requires a durable Finance period repository.", fields: ["Current period", "Comparison period", "Rollover policy"] }
   };
   const item = content[modal];
   return (
     <div className="finance-modal-backdrop" role="presentation">
-      <section className="finance-modal" role="dialog" aria-modal="true" aria-label={item.title}>
+      <section ref={modalRef} className="finance-modal" role="dialog" aria-modal="true" aria-label={item.title}>
         <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close modal"><Icon name="X" /></button>
         <h2>{item.title}</h2>
         <p>{item.body}</p>
         <div>
-          {item.fields.map((field) => <label key={field}>{field}<input placeholder={field} /></label>)}
+          {item.fields.map((field) => <label key={field}>{field}<input placeholder={field} disabled aria-describedby="finance-preview-status" /></label>)}
         </div>
-        <button type="button" className="finance-action is-primary" onClick={() => { onNotice(`${item.title} action is ready for backend wiring.`); onClose(); }}>{item.action}</button>
+        <button type="button" className="finance-action" onClick={onClose}>Close preview</button>
       </section>
     </div>
   );
 }
 
-export default function FinanceWorkspace() {
-  const [view, setView] = useState<ViewId>("overview");
-  const [selected, setSelected] = useState<Account | null>(null);
+export default function FinanceWorkspace({
+  initialView
+}: {
+  initialView?: FinanceView;
+} = {}) {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const parsedInitialUrlState = parseFinanceUrlState(searchParams);
+  const routedInitialView = initialView || parsedInitialUrlState.view;
+  const initialUrlState = normalizeFinanceUrlStateForView(routedInitialView, parsedInitialUrlState);
+  const [view, setView] = useState<ViewId>(routedInitialView);
+  const [selectedAccountId, setSelectedAccountId] = useState(
+    routedInitialView === "accounts" || routedInitialView === "overview" ? initialUrlState.selected : ""
+  );
+  const [selectedTxnId, setSelectedTxnId] = useState(routedInitialView === "transactions" ? initialUrlState.selected : "");
+  const [selectedSecondaryId, setSelectedSecondaryId] = useState(
+    routedInitialView === "bills" || routedInitialView === "budgets" || routedInitialView === "review"
+      ? initialUrlState.selected
+      : ""
+  );
+  const [checkedTxnIds, setCheckedTxnIds] = useState<ReadonlySet<string>>(() => new Set());
   const [modal, setModal] = useState<ModalKind>(null);
   const [notice, setNotice] = useState("");
-  const [smartFilter, setSmartFilter] = useState("");
+  const [smartFilter, setSmartFilter] = useState<FinanceFilter>(initialUrlState.filter);
+  const [sort, setSort] = useState<FinanceSort>(initialUrlState.sort);
+  const [tab, setTab] = useState<FinanceTab>(initialUrlState.tab);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [query, setQuery] = useState("");
-  const [reviewItems, setReviewItems] = useState(initialReviewItems);
+  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorDismissed, setInspectorDismissed] = useState(false);
+  const [compactInspector, setCompactInspector] = useState(false);
+  const [query, setQuery] = useState(initialUrlState.query);
+  const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
+  const searchParamKey = searchParams.toString();
+  const accountsModel = buildFinanceAccountsViewModel(financeDataset, {
+    query: view === "accounts" ? query : "",
+    sort,
+    selectedId: selectedAccountId
+  });
+  const transactionsModel = buildFinanceTransactionsViewModel(financeDataset, {
+    query: view === "transactions" ? query : "",
+    filter: smartFilter === "unreviewed" ? "pending" : "all",
+    sort,
+    selectedId: selectedTxnId
+  });
+  const billsModel = buildFinanceBillsViewModel(financeDataset, {
+    query: view === "bills" ? query : "",
+    filter: smartFilter === "due-week" ? "due-this-week" : smartFilter === "recurring" ? "recurring" : "all",
+    sort,
+    selectedId: selectedSecondaryId
+  });
+  const budgetsModel = buildFinanceBudgetsViewModel(financeDataset, {
+    query: view === "budgets" ? query : "",
+    filter: smartFilter === "over-budget" ? "over-budget" : "all",
+    sort,
+    selectedId: selectedSecondaryId
+  });
+  const monthlyReviewModel = buildFinanceMonthlyReviewViewModel(financeDataset, {
+    query: view === "review" ? query : "",
+    filter: smartFilter === "incomplete" ? "open" : "all",
+    sort,
+    selectedId: selectedSecondaryId
+  });
+  const selectedAccount = accounts.find((account) => account.id === accountsModel.selectedId) || null;
 
-  const showRail = (view === "overview" || view === "accounts") && selected;
-  const showContext = view === "overview" || view === "bills" || view === "transactions";
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1100px)");
+    const sync = () => setCompactInspector(media.matches);
+    sync();
+    media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
+
+  useEffect(() => {
+    const parsed = parseFinanceUrlState(searchParams);
+    const nextView = initialView || parsed.view;
+    const next = normalizeFinanceUrlStateForView(nextView, parsed);
+    setView(nextView);
+    setSmartFilter(next.filter);
+    setSort(next.sort);
+    setQuery(next.query);
+    setAiOpen(next.ai);
+    setTab(isFinanceInspectableView(nextView) && isFinanceTabAllowed(nextView, next.tab) ? next.tab : "overview");
+    setInspectorDismissed((current) => current && !next.selected);
+    if (nextView === "overview" || nextView === "accounts") {
+      setSelectedAccountId(next.selected);
+    } else {
+      setSelectedAccountId("");
+    }
+    if (nextView === "transactions") {
+      setSelectedTxnId(next.selected);
+    } else {
+      setSelectedTxnId("");
+    }
+    if (nextView === "bills" || nextView === "budgets" || nextView === "review") {
+      setSelectedSecondaryId(next.selected);
+    } else {
+      setSelectedSecondaryId("");
+    }
+    setCheckedTxnIds(new Set());
+    setInspectorOpen(Boolean(next.selected && ["accounts", "transactions", "bills", "budgets", "review"].includes(nextView)));
+    const canonicalParams = serializeFinanceUrlState(next, searchParams);
+    if (initialView) canonicalParams.delete("view");
+    if (canonicalParams.toString() !== searchParams.toString()) {
+      window.history.replaceState(
+        window.history.state,
+        "",
+        `${pathname}${canonicalParams.size ? `?${canonicalParams.toString()}` : ""}`
+      );
+    }
+  }, [initialView, pathname, searchParamKey, searchParams]);
+
+  useEffect(() => {
+    if (inspectorDismissed || !["accounts", "transactions", "bills", "budgets", "review"].includes(view)) return;
+    const resolvedSelectedId = view === "accounts"
+      ? accountsModel.selectedId || ""
+      : view === "transactions"
+        ? transactionsModel.selectedId || ""
+        : view === "bills"
+          ? billsModel.selectedId || ""
+          : view === "budgets"
+            ? budgetsModel.selectedId || ""
+            : monthlyReviewModel.selectedId || "";
+    const currentSelectedId = view === "accounts"
+      ? selectedAccountId
+      : view === "transactions"
+        ? selectedTxnId
+        : selectedSecondaryId;
+    if (currentSelectedId === resolvedSelectedId) return;
+    const selectionBecameHidden = Boolean(currentSelectedId && !resolvedSelectedId);
+    if (selectionBecameHidden) {
+      setInspectorDismissed(true);
+      setInspectorOpen(false);
+      setTab("overview");
+    }
+    if (view === "accounts") setSelectedAccountId(resolvedSelectedId);
+    else if (view === "transactions") setSelectedTxnId(resolvedSelectedId);
+    else setSelectedSecondaryId(resolvedSelectedId);
+    const params = serializeFinanceUrlState(
+      {
+        view,
+        filter: smartFilter,
+        sort,
+        query,
+        selected: resolvedSelectedId,
+        tab: selectionBecameHidden ? "overview" : tab,
+        ai: aiOpen
+      },
+      searchParams
+    );
+    if (initialView) params.delete("view");
+    window.history.replaceState(window.history.state, "", `${pathname}${params.size ? `?${params.toString()}` : ""}`);
+  }, [
+    accountsModel.selectedId,
+    aiOpen,
+    initialView,
+    inspectorDismissed,
+    pathname,
+    billsModel.selectedId,
+    budgetsModel.selectedId,
+    monthlyReviewModel.selectedId,
+    query,
+    searchParams,
+    selectedAccountId,
+    selectedSecondaryId,
+    selectedTxnId,
+    smartFilter,
+    sort,
+    tab,
+    transactionsModel.selectedId,
+    view
+  ]);
+
+  function buildFinanceDestination(partial: Partial<ReturnType<typeof parseFinanceUrlState>>) {
+    const selectedId = view === "transactions"
+      ? transactionsModel.selectedId || ""
+      : view === "accounts" || view === "overview"
+        ? accountsModel.selectedId || ""
+        : view === "bills"
+          ? billsModel.selectedId || ""
+          : view === "budgets"
+            ? budgetsModel.selectedId || ""
+            : view === "review"
+              ? monthlyReviewModel.selectedId || ""
+              : "";
+    const nextView = partial.view || view;
+    const normalizedState = normalizeFinanceUrlStateForView(
+      nextView,
+      {
+        view: nextView,
+        filter: smartFilter,
+        sort,
+        query,
+        selected: selectedId,
+        tab,
+        ai: aiOpen,
+        ...partial
+      }
+    );
+    const params = serializeFinanceUrlState(
+      normalizedState,
+      searchParams
+    );
+    params.delete("view");
+    const destinationPath = getModuleViewRoute("finance", nextView);
+    return `${destinationPath}${params.size ? `?${params.toString()}` : ""}`;
+  }
+
+  function updateFinanceUrl(
+    partial: Partial<ReturnType<typeof parseFinanceUrlState>>,
+    options: { history?: "push" | "replace"; native?: boolean } = {}
+  ) {
+    const destination = buildFinanceDestination(partial);
+    if (options.native) {
+      window.history.replaceState(window.history.state, "", destination);
+      return;
+    }
+    if (options.history === "push") router.push(destination, { scroll: false });
+    else router.replace(destination, { scroll: false });
+  }
+
+  function navigateView(next: ViewId) {
+    setView(next);
+    setSmartFilter("");
+    setSort("default");
+    setTab("overview");
+    setQuery("");
+    setSelectedAccountId("");
+    setSelectedTxnId("");
+    setSelectedSecondaryId("");
+    setCheckedTxnIds(new Set());
+    setInspectorDismissed(false);
+    setInspectorOpen(false);
+    setNotice("");
+    updateFinanceUrl({ view: next, filter: "", sort: "default", query: "", selected: "", tab: "overview" }, { history: "push" });
+  }
+
+  function navigateToSelected(
+    next: "transactions" | "bills" | "budgets",
+    selectedId: string
+  ) {
+    setView(next);
+    setSmartFilter("");
+    setSort("default");
+    setTab("overview");
+    setQuery("");
+    setSelectedAccountId("");
+    setSelectedTxnId(next === "transactions" ? selectedId : "");
+    setSelectedSecondaryId(next === "transactions" ? "" : selectedId);
+    setCheckedTxnIds(new Set());
+    setInspectorDismissed(false);
+    setInspectorOpen(true);
+    setNotice("");
+    updateFinanceUrl(
+      { view: next, filter: "", sort: "default", query: "", selected: selectedId, tab: "overview" },
+      { history: "push" }
+    );
+  }
+
+  function selectAccount(account: Account) {
+    if (view === "overview") {
+      setView("accounts");
+      setSmartFilter("");
+      setSort("default");
+      setQuery("");
+      setSelectedTxnId("");
+      setSelectedSecondaryId("");
+      setCheckedTxnIds(new Set());
+    }
+    setSelectedAccountId(account.id);
+    setTab("overview");
+    setInspectorDismissed(false);
+    setInspectorOpen(true);
+    updateFinanceUrl(
+      view === "overview"
+        ? { view: "accounts", filter: "", sort: "default", query: "", selected: account.id, tab: "overview" }
+        : { selected: account.id, tab: "overview" },
+      { history: "push" }
+    );
+  }
+
+  function selectTransaction(id: string) {
+    setSelectedTxnId(id);
+    setTab("overview");
+    setInspectorDismissed(false);
+    setInspectorOpen(true);
+    updateFinanceUrl({ selected: id, tab: "overview" }, { history: "push" });
+  }
+
+  function selectSecondary(id: string) {
+    setSelectedSecondaryId(id);
+    setTab("overview");
+    setInspectorDismissed(false);
+    setInspectorOpen(true);
+    updateFinanceUrl({ selected: id, tab: "overview" }, { history: "push" });
+  }
+
+  const showRail = !aiOpen
+    && !inspectorDismissed
+    && (
+      (view === "accounts" && Boolean(accountsModel.selected))
+      || (view === "transactions" && Boolean(transactionsModel.selected))
+      || (view === "bills" && Boolean(billsModel.selected))
+      || (view === "budgets" && Boolean(budgetsModel.selected))
+      || (view === "review" && Boolean(monthlyReviewModel.selected))
+    );
+  const showContext = !aiOpen && !inspectorDismissed && view === "overview";
   const activeSmart = useMemo(() => SMART_VIEWS.find((item) => item.id === smartFilter), [smartFilter]);
+  const activeView = VIEWS.find((item) => item.id === view) || VIEWS[0];
+  const selectedTransaction = view === "transactions" ? transactionsModel.selected || undefined : undefined;
+  const selectedSecondary = view === "bills"
+    ? { objectType: "bill", objectId: billsModel.selectedId || view, label: billsModel.selected?.bill.name || activeView.label }
+    : view === "budgets"
+      ? { objectType: "budget", objectId: budgetsModel.selectedId || view, label: budgetsModel.selected?.budget.category || activeView.label }
+    : view === "review"
+        ? { objectType: "finance_close_check", objectId: monthlyReviewModel.selectedId || view, label: monthlyReviewModel.selected?.item.label || activeView.label }
+        : null;
+  const aiObject = createNativeObjectRef({
+    module: "finance",
+    objectType: selectedAccount && view === "accounts" ? "account" : selectedTransaction ? "transaction" : selectedSecondary?.objectType || "finance_view",
+    objectId: selectedAccount && view === "accounts" ? selectedAccount.id : selectedTransaction?.id || selectedSecondary?.objectId || view,
+    label: selectedAccount && view === "accounts" ? selectedAccount.name : selectedTransaction?.merchant || selectedSecondary?.label || activeView.label
+  });
 
   function handleSmart(id: string) {
     const smart = SMART_VIEWS.find((item) => item.id === id);
-    if (smart) {
-      setSmartFilter(id);
+    if (smart && !smart.disabledReason) {
+      const nextFilter = smart.mode === "jump" ? "" : id as ReturnType<typeof parseFinanceUrlState>["filter"];
+      setSmartFilter(nextFilter);
       setView(smart.view);
+      setSort("default");
+      setTab("overview");
+      setQuery("");
+      setSelectedAccountId("");
+      setSelectedTxnId("");
+      setSelectedSecondaryId("");
+      setCheckedTxnIds(new Set());
+      setInspectorDismissed(false);
+      setInspectorOpen(false);
       setNotice(smart.notice);
+      updateFinanceUrl({ view: smart.view, filter: nextFilter, sort: "default", query: "", selected: "", tab: "overview" }, { history: "push" });
       return;
     }
     const reminder = reminders.find((item) => item.id === id);
     setNotice(reminder ? `${reminder.text} opened as a follow-up shell.` : "");
   }
 
+  function closeInspector() {
+    setInspectorDismissed(true);
+    if (view === "accounts") setSelectedAccountId("");
+    if (view === "transactions") setSelectedTxnId("");
+    if (view === "bills" || view === "budgets" || view === "review") setSelectedSecondaryId("");
+    setTab("overview");
+    updateFinanceUrl({ selected: "", tab: "overview" });
+    setInspectorOpen(false);
+  }
+
   return (
-    <div className={classNames("finance-workspace", showContext && "has-context", showRail && "has-rail")}>
+    <ModuleShell
+      module="finance"
+      mode={showRail ? "detail" : "directory"}
+      ariaLabel="Finance workspace"
+      className={classNames("finance-workspace", "finance-module-shell", showContext && "has-context", showRail && "has-rail")}
+      sidebar={<FinanceSidebar view={view} smartFilter={smartFilter} onSmart={handleSmart} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />}
+      inspector={
+        showRail
+          ? <FinanceInspector
+              view={view as "accounts" | "transactions" | "bills" | "budgets" | "review"}
+              accountModel={accountsModel}
+              transactionModel={transactionsModel}
+              billsModel={billsModel}
+              budgetsModel={budgetsModel}
+              monthlyReviewModel={monthlyReviewModel}
+              linkedContext={linkedContext}
+              activeTab={tab}
+              onTabChange={(nextTab) => {
+                setTab(nextTab);
+                updateFinanceUrl({ tab: nextTab }, { native: true });
+              }}
+              onClose={closeInspector}
+              mobileOpen={inspectorOpen}
+              overlay={compactInspector}
+              overlayOpen={compactInspector && inspectorOpen}
+            />
+          : showContext
+            ? <FinanceContextRail onOpenTransaction={(id) => navigateToSelected("transactions", id)} mobileOpen={inspectorOpen} overlay={compactInspector} overlayOpen={compactInspector && inspectorOpen} onClose={closeInspector} />
+            : undefined
+      }
+      aiDock={
+        <SharedAIDock
+          open={aiOpen}
+          onOpenChange={(open) => {
+            setAiOpen(open);
+            if (open) setInspectorOpen(false);
+            updateFinanceUrl({ ai: open }, { native: true });
+          }}
+          context={{
+            module: "finance",
+            object: aiObject,
+            activeTab: `${activeView.label} · ${tab}`,
+            visibleScope: FINANCE_PREVIEW_LABEL,
+            allowedActions: [
+              "Explain visible fixture values",
+              "Summarize the selected object without saving",
+              "Draft questions for manual review"
+            ]
+          }}
+          footer={<p className="finance-ai-disclaimer">Finance remains read-only while the shared assistant is disconnected.</p>}
+        />
+      }
+    >
       <span className="module-ref-regression-sentinel">Finance command view</span>
-      <button type="button" className="finance-mobile-menu" onClick={() => setMobileSidebarOpen(true)} aria-label="Open Finance sidebar">Finance</button>
+      <button
+        type="button"
+        className="finance-mobile-menu"
+        onClick={() => setMobileSidebarOpen(true)}
+        aria-label="Open Finance sidebar"
+        aria-expanded={mobileSidebarOpen}
+        aria-controls="finance-module-sidebar"
+      >
+        Finance
+      </button>
       {mobileSidebarOpen && <button type="button" className="finance-mobile-scrim" onClick={() => setMobileSidebarOpen(false)} aria-label="Close Finance sidebar" />}
-      <FinanceSidebar view={view} setView={(next) => { setView(next); setSmartFilter(""); }} smartFilter={smartFilter} onSmart={handleSmart} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
-      {showContext && <FinanceContextRail view={view} onNotice={setNotice} />}
-      <main className="finance-main-workspace">
-        {notice && <div className="finance-notice"><Swatch hue={activeSmart?.hue || "indigo"} /><span>{notice}</span><button type="button" onClick={() => setNotice("")}>Clear</button></div>}
-        {view === "overview" && <OverviewView selected={selected} onSelect={setSelected} onModal={setModal} onNotice={setNotice} />}
-        {view === "accounts" && <AccountsView selected={selected} onSelect={setSelected} onModal={setModal} />}
-        {view === "budgets" && <BudgetsView onModal={setModal} onNotice={setNotice} />}
-        {view === "bills" && <BillsView onModal={setModal} recurringOnly={smartFilter === "recurring"} onNotice={setNotice} />}
-        {view === "review" && <ReviewView reviewItems={reviewItems} setReviewItems={setReviewItems} onNotice={setNotice} />}
-        {view === "transactions" && <TransactionsView query={query} setQuery={setQuery} pendingOnly={smartFilter === "unreviewed"} onModal={setModal} onNotice={setNotice} />}
-      </main>
-      <RightRail account={showRail ? selected : null} onClose={() => setSelected(null)} onNotice={setNotice} />
-      <ModalShell modal={modal} onClose={() => setModal(null)} onNotice={setNotice} />
-    </div>
+      {(showContext || showRail || (!aiOpen && view === "overview")) && (
+        <button
+          type="button"
+          className="finance-inspector-toggle"
+          onClick={() => {
+            setInspectorDismissed(false);
+            setInspectorOpen(true);
+          }}
+          aria-expanded={inspectorOpen}
+          aria-controls="finance-inspector"
+        >
+          {showRail
+            ? `Open ${view === "accounts"
+              ? accountsModel.selected?.account.name || "account"
+              : view === "transactions"
+                ? transactionsModel.selected?.merchant || "transaction"
+                : view === "bills"
+                  ? billsModel.selected?.bill.name || "bill"
+                  : view === "budgets"
+                    ? budgetsModel.selected?.budget.category || "budget"
+                    : monthlyReviewModel.selected?.item.label || "close item"} detail`
+            : "Open Finance context"}
+        </button>
+      )}
+      {inspectorOpen && <button type="button" className="finance-inspector-scrim" onClick={closeInspector} aria-label="Close Finance context" />}
+      <div className="finance-main-workspace">
+        <FixtureDatasetNotice />
+        {notice && <div className="finance-notice" role="status" aria-live="polite"><Swatch hue={activeSmart?.hue || "indigo"} /><span>{notice}</span><button type="button" onClick={() => setNotice("")}>Clear</button></div>}
+        {view === "overview" && <OverviewView onSelect={selectAccount} onOpenBill={(id) => navigateToSelected("bills", id)} onOpenBudget={(id) => navigateToSelected("budgets", id)} onView={navigateView} onModal={setModal} onNotice={setNotice} />}
+        {view === "accounts" && (
+          <FinanceAccountsRouteView
+            model={accountsModel}
+            cashflow={snapshot.cashflow}
+            cashflowSummary={financeViewModel.cashflowSummary}
+            actualSavingsMovement={snapshot.monthSaved}
+            onQueryChange={(nextQuery) => {
+              setQuery(nextQuery);
+              setInspectorDismissed(false);
+              updateFinanceUrl({ query: nextQuery }, { native: true });
+            }}
+            onSortChange={(nextSort) => {
+              setSort(nextSort);
+              updateFinanceUrl({ sort: nextSort }, { native: true });
+            }}
+            onSelect={(id) => {
+              const account = accounts.find((candidate) => candidate.id === id);
+              if (account) selectAccount(account);
+            }}
+            onOpenFilterPreview={() => setModal("filter")}
+            onOpenGroupingPreview={() => setModal("group")}
+          />
+        )}
+        {view === "budgets" && (
+          <FinanceBudgetsRouteView
+            model={budgetsModel}
+            filter={smartFilter}
+            onQueryChange={(nextQuery) => {
+              setQuery(nextQuery);
+              updateFinanceUrl({ query: nextQuery }, { native: true });
+            }}
+            onFilterChange={(nextFilter) => {
+              setSmartFilter(nextFilter);
+              updateFinanceUrl({ filter: nextFilter }, { native: true });
+            }}
+            onSortChange={(nextSort) => {
+              setSort(nextSort);
+              updateFinanceUrl({ sort: nextSort }, { native: true });
+            }}
+            onSelect={selectSecondary}
+            onOpenFilterPreview={() => setModal("filter")}
+            onOpenPeriodPreview={() => setModal("period")}
+          />
+        )}
+        {view === "bills" && (
+          <FinanceBillsRouteView
+            model={billsModel}
+            filter={smartFilter}
+            onQueryChange={(nextQuery) => {
+              setQuery(nextQuery);
+              updateFinanceUrl({ query: nextQuery }, { native: true });
+            }}
+            onFilterChange={(nextFilter) => {
+              setSmartFilter(nextFilter);
+              updateFinanceUrl({ filter: nextFilter }, { native: true });
+            }}
+            onSortChange={(nextSort) => {
+              setSort(nextSort);
+              updateFinanceUrl({ sort: nextSort }, { native: true });
+            }}
+            onSelect={selectSecondary}
+            onOpenFilterPreview={() => setModal("filter")}
+            onOpenPaymentPreview={() => setModal("pay")}
+          />
+        )}
+        {view === "review" && (
+          <FinanceMonthlyReviewRouteView
+            model={monthlyReviewModel}
+            filter={smartFilter}
+            onQueryChange={(nextQuery) => {
+              setQuery(nextQuery);
+              updateFinanceUrl({ query: nextQuery }, { native: true });
+            }}
+            onFilterChange={(nextFilter) => {
+              setSmartFilter(nextFilter);
+              updateFinanceUrl({ filter: nextFilter }, { native: true });
+            }}
+            onSortChange={(nextSort) => {
+              setSort(nextSort);
+              updateFinanceUrl({ sort: nextSort }, { native: true });
+            }}
+            onSelect={selectSecondary}
+            onOpenFilterPreview={() => setModal("filter")}
+            onOpenReviews={() => router.push(getModuleRoute("reviews"))}
+            onPreviewReminder={(id) => {
+              const reminder = reminders.find((item) => item.id === id);
+              setNotice(reminder ? `${reminder.text} is a proposal reminder only; no savings movement was created.` : "Proposal reminder unavailable.");
+            }}
+          />
+        )}
+        {view === "transactions" && (
+          <FinanceTransactionsRouteView
+            model={transactionsModel}
+            filter={smartFilter}
+            checkedIds={checkedTxnIds}
+            onQueryChange={(nextQuery) => {
+              setQuery(nextQuery);
+              setCheckedTxnIds(new Set());
+              setInspectorDismissed(false);
+              updateFinanceUrl({ query: nextQuery }, { native: true });
+            }}
+            onFilterChange={(nextFilter) => {
+              setSmartFilter(nextFilter);
+              setCheckedTxnIds(new Set());
+              setInspectorDismissed(false);
+              updateFinanceUrl({ filter: nextFilter }, { native: true });
+            }}
+            onSortChange={(nextSort) => {
+              setSort(nextSort);
+              updateFinanceUrl({ sort: nextSort }, { native: true });
+            }}
+            onSelect={selectTransaction}
+            onCheckedChange={(id, checked) => {
+              setCheckedTxnIds((current) => {
+                const next = new Set(current);
+                if (checked) next.add(id);
+                else next.delete(id);
+                return next;
+              });
+            }}
+            onClearChecked={() => setCheckedTxnIds(new Set())}
+            onOpenFilterPreview={() => setModal("filter")}
+            onOpenColumnsPreview={() => setModal("columns")}
+          />
+        )}
+      </div>
+      <ModalShell modal={modal} onClose={() => setModal(null)} />
+    </ModuleShell>
   );
 }

@@ -1,0 +1,99 @@
+.list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 8px 10px;
+  border: 1px solid var(--border, #d5e2e7);
+  border-radius: 7px;
+  background: var(--panel-bg, #fff);
+}
+
+.marker {
+  display: inline-grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid var(--border-strong, #bfd2db);
+  border-radius: 6px;
+  color: var(--text-muted, #60747c);
+  font: 700 12px/1 "Inconsolata Variable", monospace;
+  background: var(--panel-bg-subtle, #fbfcfb);
+}
+
+.item[data-outcome="supported"] .marker {
+  border-color: #9bcdb8;
+  color: #1f7452;
+  background: #e9f7ef;
+}
+
+.item[data-outcome="attention"] .marker,
+.item[data-outcome="unavailable"] .marker {
+  border-color: #edc58d;
+  color: #a55e14;
+  background: #fff7e8;
+}
+
+.copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.copy strong {
+  color: var(--text-strong, #102026);
+  font: 650 12px/1.35 "Plus Jakarta Sans Variable", sans-serif;
+}
+
+.copy small {
+  color: var(--text-muted, #60747c);
+  font: 400 11px/1.4 "Inter Variable", sans-serif;
+  overflow-wrap: anywhere;
+}
+
+.state {
+  max-width: 132px;
+  padding: 4px 7px;
+  border: 1px solid var(--border, #d5e2e7);
+  border-radius: 999px;
+  color: var(--text-muted, #60747c);
+  font: 650 10px/1.2 "Plus Jakarta Sans Variable", sans-serif;
+  text-align: center;
+  background: var(--panel-bg-subtle, #fbfcfb);
+}
+
+.item[data-outcome="supported"] .state {
+  border-color: #b9dfcf;
+  color: #1f7452;
+  background: #e9f7ef;
+}
+
+.item[data-outcome="attention"] .state,
+.item[data-outcome="unavailable"] .state {
+  border-color: #efd0a4;
+  color: #995410;
+  background: #fff7e8;
+}
+
+@media (max-width: 760px) {
+  .item {
+    grid-template-columns: 24px minmax(0, 1fr);
+    min-height: 52px;
+  }
+
+  .state {
+    grid-column: 2;
+    justify-self: start;
+    max-width: none;
+  }
+}
+
