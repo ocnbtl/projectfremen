@@ -3285,7 +3285,16 @@ select {
 
   .landing-back-link {
     position: static;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 4px;
     margin-bottom: 2px;
+  }
+
+  .landing-input,
+  .landing-submit {
+    min-height: 44px;
   }
 
   .review-editor-meta {
