@@ -15,6 +15,7 @@ import MetricStrip from "./operational/MetricStrip";
 import ObjectHeader from "./operational/ObjectHeader";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
+import ResourcePropertiesView from "./resources/ResourcePropertiesView";
 import {
   contentLinksForObject,
   contentTargetGroupsForObject,
@@ -27,6 +28,7 @@ import type {
   ResourceType
 } from "../lib/modules/resources/types";
 import { buildResourceReviewEvidence } from "../lib/modules/resources/review-evidence";
+import { buildResourceReviewQueue } from "../lib/modules/resources/review-queue";
 import { buildResourceSourceEvidenceReport } from "../lib/modules/resources/source-evidence";
 import {
   parseResourcesUrlState,
@@ -104,7 +106,6 @@ const CONTEXT_ROWS = [
 const VIEW_LIMITATIONS: Readonly<Partial<Record<ResourcesView, string>>> = {
   pinned: "Pinned state is not stored by the legacy Resources adapter.",
   recent: "The recency window is an open product decision, so this view is not inferred from timestamps.",
-  "needs-review": "Native Resource review state is not available in the legacy Personal Records model.",
   cited: "Citation and active-use records are not connected yet.",
   archived: "Legacy statuses cannot be safely inferred as native Resource archive state."
 };
@@ -188,13 +189,20 @@ function matchesQuery(resource: ResourceRecord, query: string) {
     .includes(normalized);
 }
 
-function sortResources(resources: ResourceRecord[], sort: ResourcesSort) {
+function sortResources(
+  resources: ResourceRecord[],
+  sort: ResourcesSort,
+  reviewPriorityById: ReadonlyMap<string, number>
+) {
   return [...resources].sort((left, right) => {
     if (sort === "title") {
       return left.title.localeCompare(right.title, undefined, { sensitivity: "base" });
     }
     if (sort === "updated-asc") return left.updatedAt.localeCompare(right.updatedAt);
     if (sort === "review") {
+      const byEvidencePriority =
+        (reviewPriorityById.get(right.id) || 0) - (reviewPriorityById.get(left.id) || 0);
+      if (byEvidencePriority !== 0) return byEvidencePriority;
       const byReview = (left.review.nextReviewAt || "9999-12-31").localeCompare(
         right.review.nextReviewAt || "9999-12-31"
       );
@@ -258,12 +266,28 @@ export default function ResourcesWorkspace({
       : null,
     [initialResources, selectedResource]
   );
+  const reviewQueue = useMemo(
+    () => buildResourceReviewQueue(initialResources, contentGraph),
+    [contentGraph, initialResources]
+  );
+  const reviewPriorityById = useMemo(
+    () => new Map(reviewQueue.items.map((item) => [item.resourceId, item.priorityScore])),
+    [reviewQueue]
+  );
   const unavailableViewReason = VIEW_LIMITATIONS[view] || "";
   const visibleResources = useMemo(
     () => unavailableViewReason
       ? []
-      : sortResources(initialResources.filter((resource) => matchesQuery(resource, query)), sort),
-    [initialResources, query, sort, unavailableViewReason]
+      : sortResources(
+          initialResources.filter(
+            (resource) =>
+              matchesQuery(resource, query) &&
+              (view !== "needs-review" || reviewQueue.byResourceId.has(resource.id))
+          ),
+          sort,
+          reviewPriorityById
+        ),
+    [initialResources, query, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
   );
 
   useEffect(() => {
@@ -276,6 +300,15 @@ export default function ResourcesWorkspace({
     setAiOpen(next.ai);
     if (!initialSelectedId) setSelectedId(next.selected || initialResources[0]?.id || "");
   }, [initialResources, initialSelectedId, searchParamKey]);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      document
+        .querySelector<HTMLElement>("#resource-inspector .inspector-rail__content")
+        ?.scrollTo({ top: 0, behavior: "instant" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [activeTab, selectedId]);
 
   useEffect(() => {
     if (initialMode !== "index" || unavailableViewReason || !visibleResources.length) return;
@@ -322,18 +355,19 @@ export default function ResourcesWorkspace({
   }
 
   function selectResource(resource: ResourceRecord) {
+    const nextTab: ResourcesTab = view === "needs-review" ? "review" : "overview";
     setSelectedId(resource.id);
-    setActiveTab("overview");
+    setActiveTab(nextTab);
     setSelectedEvidenceId("");
     setInspectorOpen(true);
     if (isMobile || initialMode === "detail") {
       updateUrl(
-        { selected: "", tab: "overview", item: "" },
+        { selected: "", tab: nextTab, item: "" },
         { path: getNativeObjectRoute(resource.nativeRef), history: "push" }
       );
       return;
     }
-    updateUrl({ selected: resource.id, tab: "overview", item: "" }, { history: "push" });
+    updateUrl({ selected: resource.id, tab: nextTab, item: "" }, { history: "push" });
   }
 
   function setBatch(id: string, checked: boolean) {
@@ -361,13 +395,19 @@ export default function ResourcesWorkspace({
   }
 
   function selectLibraryView(nextView: ResourcesView) {
+    const nextTab: ResourcesTab =
+      nextView === "needs-review" ? "review" : initialMode === "detail" ? "overview" : activeTab;
+    const nextSort: ResourcesSort = nextView === "needs-review" ? "review" : sort;
     setView(nextView);
-    if (initialMode === "detail") setSelectedEvidenceId("");
+    setSort(nextSort);
+    setActiveTab(nextTab);
+    if (initialMode === "detail" || nextView === "needs-review") setSelectedEvidenceId("");
     updateUrl(
       {
         view: nextView,
-        tab: initialMode === "detail" ? "overview" : activeTab,
-        item: initialMode === "detail" ? "" : selectedEvidenceId
+        sort: nextSort,
+        tab: nextTab,
+        item: initialMode === "detail" || nextView === "needs-review" ? "" : selectedEvidenceId
       },
       {
         path: initialMode === "detail" ? getModuleRoute("resources") : pathname,
@@ -385,7 +425,13 @@ export default function ResourcesWorkspace({
       items: LIBRARY_VIEWS.map(([id, label]) => ({
         id,
         label,
-        count: id === "all" ? initialResources.length : undefined,
+        count:
+          id === "all"
+            ? initialResources.length
+            : id === "needs-review"
+              ? reviewQueue.summary.queuedResources
+              : undefined,
+        tone: id === "needs-review" && reviewQueue.summary.queuedResources ? "attention" : undefined,
         active: view === id,
         onSelect: () => selectLibraryView(id)
       }))
@@ -433,7 +479,7 @@ export default function ResourcesWorkspace({
       className={styles.sidebar}
       footer={
         <p className={styles.sidebarFootnote}>
-          Legacy Personal Records adapter · read-only · source health, native links, and mutations pending
+          Legacy Personal Records adapter · evidence review is derived and read-only · source health, native links, and mutations pending
         </p>
       }
     />
@@ -918,6 +964,26 @@ export default function ResourcesWorkspace({
       );
     }
 
+    if (activeTab === "properties") {
+      return (
+        <DetailTabPanel tabsId={tabsId} tabId="properties" active>
+          <ResourcePropertiesView
+            resource={selectedResource}
+            selectedRuleId={selectedEvidenceId}
+            onSelectRule={(ruleId) => {
+              setSelectedEvidenceId(ruleId);
+              updateUrl({ tab: "properties", item: ruleId }, { history: "push" });
+            }}
+            onOpenTab={(tab) => {
+              setActiveTab(tab);
+              setSelectedEvidenceId("");
+              updateUrl({ tab, item: "" }, { history: "push" });
+            }}
+          />
+        </DetailTabPanel>
+      );
+    }
+
     if (activeTab !== "overview" && activeTab !== "source") return stagedTab(activeTab);
 
     if (activeTab === "source") {
@@ -1254,8 +1320,11 @@ export default function ResourcesWorkspace({
           onTabChange={(tab) => {
             const nextTab = tab as ResourcesTab;
             setActiveTab(nextTab);
-            if (nextTab !== "source") setSelectedEvidenceId("");
-            updateUrl({ tab: nextTab, item: nextTab === "source" ? selectedEvidenceId : "" });
+            if (nextTab !== "source" && nextTab !== "properties") setSelectedEvidenceId("");
+            updateUrl({
+              tab: nextTab,
+              item: nextTab === "source" || nextTab === "properties" ? selectedEvidenceId : ""
+            });
           }}
           className={styles.tabs}
           ariaLabel="Selected Resource details"
@@ -1312,7 +1381,11 @@ export default function ResourcesWorkspace({
           <header className={styles.directoryHeader}>
             <div>
               <h1>{LIBRARY_VIEWS.find(([id]) => id === view)?.[1] || "Resources"}</h1>
-              <p>{unavailableViewReason ? "View unavailable" : `${visibleResources.length} shown`} · {initialResources.length} total external {initialResources.length === 1 ? "reference" : "references"}</p>
+              <p>
+                {unavailableViewReason ? "View unavailable" : `${visibleResources.length} shown`} ·{" "}
+                {initialResources.length} total external {initialResources.length === 1 ? "reference" : "references"}
+                {view === "needs-review" ? " · evidence-derived queue" : ""}
+              </p>
             </div>
             <div className={styles.headerActions}>
               <button type="button" className={styles.button} disabled title="The complete native filter model is not connected yet.">Filter</button>
@@ -1320,6 +1393,32 @@ export default function ResourcesWorkspace({
               <button type="button" className={styles.button} data-primary="true" disabled title="Native Resource persistence topology is unresolved.">+ Add Resource</button>
             </div>
           </header>
+
+          {view === "needs-review" && !unavailableViewReason && (
+            <section className={styles.reviewQueueSummary} aria-label="Resource review queue summary">
+              <MetricStrip
+                ariaLabel="Resource review queue evidence"
+                items={[
+                  { id: "queued", label: "Queued Resources", value: reviewQueue.summary.queuedResources },
+                  { id: "contracts", label: "Evidence contracts", value: reviewQueue.summary.queuedResources * 9, detail: "nine per Resource" },
+                  { id: "gaps", label: "Unavailable checks", value: reviewQueue.summary.evidenceGaps, tone: reviewQueue.summary.evidenceGaps ? "attention" : "positive" },
+                  { id: "no-source", label: "No safe source", value: reviewQueue.summary.withoutSafeSource, tone: reviewQueue.summary.withoutSafeSource ? "attention" : "positive" },
+                  { id: "withheld", label: "Withheld values", value: reviewQueue.summary.withheldSourceValues, tone: reviewQueue.summary.withheldSourceValues ? "attention" : "positive" },
+                  { id: "duplicates", label: "Exact URL candidates", value: reviewQueue.summary.exactUrlCandidates, tone: reviewQueue.summary.exactUrlCandidates ? "attention" : "positive" },
+                  { id: "unresolved", label: "Unresolved refs", value: reviewQueue.summary.unresolvedReferences, tone: reviewQueue.summary.unresolvedReferences ? "attention" : "positive" },
+                  { id: "snapshots", label: "Snapshot unverified", value: reviewQueue.summary.snapshotsUnverified, tone: reviewQueue.summary.snapshotsUnverified ? "attention" : "positive" }
+                ]}
+              />
+              <div className={styles.reviewQueueBoundary}>
+                <strong>Derived Resource evidence queue · not a ReviewRun</strong>
+                <span>
+                  Priority reflects unavailable evidence, safe source candidates, exact URL candidates, unresolved references,
+                  and snapshot evidence already present in the current read model. It does not mark work complete, assign a
+                  reviewer, fetch a URL, create a Reviews-owned run, or write Resource state.
+                </span>
+              </div>
+            </section>
+          )}
 
           <label className={styles.search}>
             <span aria-hidden="true">/</span>
@@ -1366,7 +1465,7 @@ export default function ResourcesWorkspace({
                 <option value="updated-desc">Recently updated</option>
                 <option value="updated-asc">Oldest update</option>
                 <option value="title">Title</option>
-                <option value="review" disabled>Needs review — unavailable</option>
+                <option value="review">Evidence gaps first</option>
               </select>
             </label>
             <strong>{unavailableViewReason ? "View unavailable" : `${visibleResources.length} shown`}</strong>
@@ -1387,35 +1486,54 @@ export default function ResourcesWorkspace({
             <SystemState variant="read_only" title="This Resources view is staged" description={unavailableViewReason} />
           ) : visibleResources.length ? (
             <div className={styles.list} data-density="compact" role="list" aria-label="Resources">
-              {visibleResources.map((resource) => (
-                <DenseObjectRow
-                  id={resource.id}
-                  title={resource.title}
-                  description={`${resource.source.displayDomain || "Source not identified"} · ${TYPE_LABELS[resource.type]}`}
-                  metadata={`saved ${formatDate(resource.source.savedAt)} · ${resource.id}`}
-                  trailing={
-                    <>
-                      <strong>{displayLabel(resource.review.state)}</strong>
-                      <span>{resource.source.canonicalUrl ? "URL unverified" : "URL missing"}</span>
-                    </>
-                  }
-                  selected={selectedResource?.id === resource.id}
-                  onSelect={() => selectResource(resource)}
-                  checkbox={{
-                    checked: batchSelection.has(resource.id),
-                    onCheckedChange: (checked) => setBatch(resource.id, checked),
-                    label: `Select ${resource.title} for batch actions`
-                  }}
-                  key={resource.id}
-                />
-              ))}
+              {visibleResources.map((resource) => {
+                const queueItem = reviewQueue.byResourceId.get(resource.id);
+                return (
+                  <DenseObjectRow
+                    id={resource.id}
+                    title={resource.title}
+                    description={`${resource.source.displayDomain || "Source not identified"} · ${TYPE_LABELS[resource.type]}`}
+                    metadata={`saved ${formatDate(resource.source.savedAt)} · ${resource.id}`}
+                    trailing={
+                      view === "needs-review" && queueItem ? (
+                        <>
+                          <strong>{queueItem.evidenceGapCount} of 9 unavailable</strong>
+                          <span>{queueItem.primaryReason}</span>
+                        </>
+                      ) : (
+                        <>
+                          <strong>{displayLabel(resource.review.state)}</strong>
+                          <span>{resource.source.canonicalUrl ? "URL unverified" : "URL missing"}</span>
+                        </>
+                      )
+                    }
+                    selected={selectedResource?.id === resource.id}
+                    onSelect={() => selectResource(resource)}
+                    checkbox={{
+                      checked: batchSelection.has(resource.id),
+                      onCheckedChange: (checked) => setBatch(resource.id, checked),
+                      label: `Select ${resource.title} for batch actions`
+                    }}
+                    className={view === "needs-review" ? styles.reviewQueueRow : undefined}
+                    key={resource.id}
+                  />
+                );
+              })}
             </div>
           ) : (
             <SystemState
               variant="empty"
-              title={initialResources.length ? "No Resources match this search" : "No Resources yet"}
+              title={
+                view === "needs-review" && !query
+                  ? "No Resource evidence needs review"
+                  : initialResources.length
+                    ? "No Resources match this search"
+                    : "No Resources yet"
+              }
               description={
-                initialResources.length
+                view === "needs-review" && !query
+                  ? "The current read model exposes no unavailable review evidence or source signals. This is not a completed ReviewRun."
+                  : initialResources.length
                   ? "Adjust the query without losing the selected Resource or active detail tab."
                   : "No legacy Resource records were returned. Native creation remains intentionally unavailable."
               }

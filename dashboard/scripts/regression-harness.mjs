@@ -1049,6 +1049,240 @@ async function checkMediaInUseBrowserState(baseUrl, cookieJar, queryToken) {
   }
 }
 
+async function checkResourcesReviewAndPropertiesBrowserState(
+  baseUrl,
+  cookieJar,
+  resourceId,
+  resourceTitle
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "resources-checkpoint-13");
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const url = new URL(request.url());
+      const failure = request.failure()?.errorText || "";
+      if (!url.pathname.startsWith("/_vercel/") && !failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (response.status() >= 400 && url.pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  function selectedResourceRow(page) {
+    return page.locator(".dense-object-row", {
+      has: page.locator(`#dense-object-row-${resourceId}-title`)
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(!diagnostics.overflowX, `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`);
+  }
+
+  async function openInspectorIfNeeded(page) {
+    const details = page.getByRole("button", { name: "Open Resource details" });
+    const inspector = page.locator("#resource-inspector");
+    if (await inspector.getAttribute("aria-hidden") === "true") {
+      await details.click();
+      await inspector.waitFor({ state: "visible" });
+    }
+  }
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const desktop = await desktopContext.newPage();
+    observe(desktop);
+    await desktop.goto(
+      `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(resourceId)}&tab=review&probe=keep`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { level: 1, name: "Needs Review" }).waitFor();
+    assert(await selectedResourceRow(desktop).count() === 1, "Resources Needs Review did not render the scoped Resource");
+    assert(
+      await desktop.getByText("Derived Resource evidence queue · not a ReviewRun", { exact: true }).count() === 1,
+      "Resources Needs Review did not disclose its derived non-ReviewRun boundary"
+    );
+    const initialUrl = new URL(desktop.url());
+    for (const [key, value] of [
+      ["view", "needs-review"],
+      ["query", resourceTitle],
+      ["sort", "review"],
+      ["selected", resourceId],
+      ["tab", "review"],
+      ["probe", "keep"]
+    ]) {
+      assert(initialUrl.searchParams.get(key) === value, `Resources Needs Review dropped ${key} URL state`);
+    }
+    const selectedBeforeCheckbox = initialUrl.searchParams.get("selected");
+    await selectedResourceRow(desktop).locator('input[type="checkbox"]').check();
+    assert(
+      new URL(desktop.url()).searchParams.get("selected") === selectedBeforeCheckbox,
+      "Resources batch checkbox changed inspector selection"
+    );
+    await desktop.screenshot({ path: path.join(screenshotDir, "resources-needs-review-1440x900.png") });
+
+    await desktop.getByRole("tab", { name: "Properties" }).click();
+    await desktop.getByText("Properties control plane · read-only policy preview", { exact: true }).waitFor();
+    await desktop.screenshot({ path: path.join(screenshotDir, "resource-properties-1440x900.png") });
+    await desktop.locator('[data-resource-property-rule="replace-canonical-with-diff"]').click();
+    await desktop.waitForFunction(() => (
+      new URL(window.location.href).searchParams.get("item") === "replace-canonical-with-diff"
+    ));
+    const propertyUrl = new URL(desktop.url());
+    assert(propertyUrl.searchParams.get("tab") === "properties", "Resource Properties did not persist active tab state");
+    assert(propertyUrl.searchParams.get("probe") === "keep", "Resource Properties dropped an unknown safe query parameter");
+    await desktop.screenshot({ path: path.join(screenshotDir, "resource-properties-selected-rule-1440x900.png") });
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    assert(
+      await desktop.locator('[data-resource-property-rule="replace-canonical-with-diff"][data-selected="true"]').count() === 1,
+      "Resource Properties refresh did not restore the selected lifecycle rule"
+    );
+    await desktop.goBack();
+    await desktop.waitForFunction(() => !new URL(window.location.href).searchParams.has("item"));
+    await desktop.goForward();
+    await desktop.waitForFunction(() => (
+      new URL(window.location.href).searchParams.get("item") === "replace-canonical-with-diff"
+    ));
+    await assertNoDocumentOverflow(desktop, "Resource Properties desktop");
+
+    await desktop.setViewportSize({ width: 1920, height: 1080 });
+    await desktop.goto(
+      `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(resourceId)}&tab=review`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { level: 1, name: "Needs Review" }).waitFor();
+    await desktop.screenshot({ path: path.join(screenshotDir, "resources-needs-review-1920x1080.png") });
+    await desktop.getByRole("tab", { name: "Properties" }).click();
+    await desktop.getByText("Properties control plane · read-only policy preview", { exact: true }).waitFor();
+    await desktop.screenshot({ path: path.join(screenshotDir, "resource-properties-1920x1080.png") });
+    await assertNoDocumentOverflow(desktop, "Resource Properties wide desktop");
+    await desktopContext.close();
+
+    const tabletContext = await authenticatedContext({ width: 1024, height: 768 });
+    const tablet = await tabletContext.newPage();
+    observe(tablet);
+    await tablet.goto(
+      `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(resourceId)}&tab=review`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await tablet.getByRole("heading", { level: 1, name: "Needs Review" }).waitFor();
+    await tablet.screenshot({ path: path.join(screenshotDir, "resources-needs-review-1024x768.png") });
+    await openInspectorIfNeeded(tablet);
+    assert(await tablet.getByRole("button", { name: "Open AI assistant" }).count() === 0, "Resources AI dock remained exposed beneath the tablet inspector");
+    await tablet.getByRole("tab", { name: "Properties" }).click();
+    await tablet.getByText("Properties control plane · read-only policy preview", { exact: true }).waitFor();
+    await tablet.screenshot({ path: path.join(screenshotDir, "resource-properties-1024x768.png") });
+    await assertNoDocumentOverflow(tablet, "Resource Properties tablet");
+    await tabletContext.close();
+
+    const mobileContext = await authenticatedContext({ width: 390, height: 844 });
+    const mobile = await mobileContext.newPage();
+    observe(mobile);
+    await mobile.goto(
+      `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await mobile.getByRole("heading", { level: 1, name: "Needs Review" }).waitFor();
+    await mobile.screenshot({ path: path.join(screenshotDir, "resources-needs-review-390x844.png") });
+    await selectedResourceRow(mobile).locator(".dense-object-row__body").click();
+    await mobile.waitForFunction((id) => (
+      window.location.pathname === `/admin/resources/${id}` &&
+      new URL(window.location.href).searchParams.get("tab") === "review"
+    ), resourceId);
+    await openInspectorIfNeeded(mobile);
+    await mobile.waitForFunction(() => document.querySelector("#resource-inspector")?.contains(document.activeElement));
+    assert(await mobile.getByRole("button", { name: "Open AI assistant" }).count() === 0, "Resources AI dock remained exposed beneath the mobile inspector");
+    await mobile.getByRole("tab", { name: "Properties" }).click();
+    await mobile.getByText("Properties control plane · read-only policy preview", { exact: true }).waitFor();
+    await mobile.screenshot({ path: path.join(screenshotDir, "resource-properties-390x844.png") });
+    await mobile.locator('[data-resource-property-rule="archive-preserves-history"]').click();
+    await mobile.waitForFunction(() => (
+      new URL(window.location.href).searchParams.get("item") === "archive-preserves-history"
+    ));
+    await mobile.screenshot({ path: path.join(screenshotDir, "resource-properties-selected-rule-390x844.png") });
+    await assertNoDocumentOverflow(mobile, "Resource Properties mobile");
+    const mobileTargets = await mobile.locator("#resource-inspector button:visible, #resource-inspector a[href]:visible, #resource-inspector [role=tab]:visible").evaluateAll((elements) => (
+      elements
+        .map((element) => {
+          const rect = element.getBoundingClientRect();
+          return {
+            label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+            width: rect.width,
+            height: rect.height
+          };
+        })
+        .filter((item) => item.width < 44 || item.height < 44)
+    ));
+    assert(mobileTargets.length === 0, `Resource Properties mobile targets below 44px: ${JSON.stringify(mobileTargets)}`);
+    for (const control of await mobile.locator('#resource-inspector button[disabled]:visible').all()) {
+      await control.click({ force: true }).catch(() => {});
+    }
+    await mobile.keyboard.press("Shift+Tab");
+    assert(
+      await mobile.evaluate(() => Boolean(document.querySelector("#resource-inspector")?.contains(document.activeElement))),
+      "Resource Properties mobile focus escaped the modal inspector"
+    );
+    await mobileContext.close();
+
+    assert(mutatingRequests.length === 0, `Resource review or Properties interactions emitted mutations: ${mutatingRequests.join(" | ")}`);
+    assert(browserErrors.length === 0, `Resource review or Properties browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Resource review or Properties browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "project-fremen-regression-"));
   const port = await getFreePort();
@@ -4587,6 +4821,100 @@ async function main() {
         `Resource Review route rendered a mockup value as current evidence: ${forbidden}`
       );
     }
+
+    const resourceNeedsReview = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(createdResource.id)}&tab=review`
+    );
+    assert(
+      resourceNeedsReview.response.ok,
+      `Resource Needs Review view failed: ${describeStatus(resourceNeedsReview.response)}`
+    );
+    assertSelectedTab(
+      resourceNeedsReview.body,
+      `resource-${createdResource.id}-tab-review`,
+      "Resource Needs Review selected evidence tab"
+    );
+    for (const expected of [
+      "<h1>Needs Review</h1>",
+      "Derived Resource evidence queue · not a ReviewRun",
+      "Evidence contracts",
+      "Unavailable checks",
+      "No safe source",
+      "Exact URL candidates",
+      "Snapshot unverified",
+      resourceTitle
+    ]) {
+      assert(resourceNeedsReview.body.includes(expected), `Resource Needs Review omitted derived evidence: ${expected}`);
+    }
+    for (const forbidden of [
+      "Native Resource review state is not available",
+      "9 review checks / 3 complete",
+      "8 active links",
+      "4 linked Notes",
+      "HTTP 200"
+    ]) {
+      assert(
+        !resourceNeedsReview.body.includes(forbidden),
+        `Resource Needs Review rendered staged or mockup evidence as current: ${forbidden}`
+      );
+    }
+
+    const resourceProperties = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/resources/${createdResource.id}?tab=properties&item=replace-canonical-with-diff`
+    );
+    assert(
+      resourceProperties.response.ok,
+      `Resource Properties route failed: ${describeStatus(resourceProperties.response)}`
+    );
+    assertSelectedTab(
+      resourceProperties.body,
+      `resource-${createdResource.id}-tab-properties`,
+      "Resource direct Properties tab URL state"
+    );
+    for (const expected of [
+      "Properties control plane · read-only policy preview",
+      "Resource identity",
+      "Lifecycle state",
+      "Review and cadence",
+      "Citation and extraction defaults",
+      "Link and relationship policies",
+      "Archive, replace, and merge",
+      "Canonical replacement requires a diff",
+      "Access and opening",
+      "Health and cleanup rules",
+      "No native ResourceProperties record"
+    ]) {
+      assert(resourceProperties.body.includes(expected), `Resource Properties omitted approved boundary: ${expected}`);
+    }
+    assert(
+      resourceProperties.body.includes('data-resource-property-rule="replace-canonical-with-diff"') &&
+        resourceProperties.body.includes('data-selected="true"'),
+      "Resource Properties did not restore the selected policy rule"
+    );
+    for (const forbidden of [
+      "Resource Properties is staged",
+      "Nielsen Norman Group",
+      "68% complete",
+      "HTTP 200",
+      "Automatically archive"
+    ]) {
+      assert(
+        !resourceProperties.body.includes(forbidden),
+        `Resource Properties rendered staged, mockup, or executable policy state: ${forbidden}`
+      );
+    }
+
+    await checkResourcesReviewAndPropertiesBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdResource.id,
+      resourceTitle
+    );
+    pass("Resources Needs Review and Properties preserve URL state, responsive access, explicit ownership boundaries, and zero mutations");
 
     const mediaDirectoryAfterCreate = await requestText(server.baseUrl, cookieJar, `/admin/media?selected=${createdMedia.id}`);
     assert(mediaDirectoryAfterCreate.response.ok && mediaDirectoryAfterCreate.body.includes(mediaTitle), "Media record missing from the Media directory");

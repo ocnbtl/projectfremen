@@ -707,6 +707,140 @@
   letter-spacing: 0.04em;
 }
 
+.reviewQueueSummary,
+.propertiesSurface {
+  display: grid;
+  gap: 10px;
+}
+
+.reviewQueueSummary {
+  padding: 12px 14px 0;
+}
+
+.reviewQueueBoundary,
+.propertiesBoundary {
+  display: grid;
+  gap: 3px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, var(--status-attention, #a76c16) 34%, var(--border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--status-attention-bg, #fff8e7) 70%, var(--panel-bg));
+}
+
+.reviewQueueBoundary strong,
+.propertiesBoundary strong {
+  color: var(--text-strong);
+  font: 850 12px/1.3 var(--font-heading);
+}
+
+.reviewQueueBoundary span,
+.propertiesBoundary span {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.reviewQueueRow :global(.dense-object-row__trailing) {
+  min-width: 156px;
+}
+
+.propertiesSurface {
+  padding-top: 14px;
+}
+
+.propertiesGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.propertyRows {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.propertyRows li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-bg-subtle);
+}
+
+.propertyRows li > span:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.propertyRows strong {
+  color: var(--text-strong);
+  font: 800 11px/1.3 var(--font-heading);
+}
+
+.propertyRows small {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.propertyRuleList {
+  display: grid;
+  gap: 6px;
+}
+
+.propertyRuleButton {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  min-height: 58px;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-bg-subtle);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.propertyRuleButton:hover {
+  border-color: var(--border-strong);
+  background: var(--selected-bg);
+}
+
+.propertyRuleButton[data-selected="true"] {
+  border-color: var(--border-strong);
+  background: var(--selected-bg);
+  box-shadow: inset 3px 0 0 var(--action-primary);
+}
+
+.propertyRuleButton:focus-visible {
+  outline: 2px solid var(--focus-ring, #287a94);
+  outline-offset: 2px;
+}
+
+.propertyRuleButton strong {
+  color: var(--text-strong);
+  font: 850 11px/1.3 var(--font-heading);
+}
+
+.propertyRuleButton span {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.propertyRuleInspector {
+  grid-column: 1 / -1;
+}
+
 .fact {
   display: grid;
   gap: 4px;
@@ -1116,11 +1250,18 @@
     right: 0;
     bottom: 0;
     z-index: 98;
+    display: block;
     width: min(500px, calc(100vw - 24px));
     height: auto;
+    overflow-y: auto;
+    overscroll-behavior: contain;
     transform: translateX(104%);
     transition: transform 160ms ease;
     box-shadow: -18px 0 44px rgba(16, 32, 38, 0.18);
+  }
+
+  .shell > :global(.inspector-rail) :global(.inspector-rail__content) {
+    overflow: visible;
   }
 
   .shell > :global(.inspector-rail[data-overlay-open="true"]),
@@ -1324,7 +1465,8 @@
 
   .overviewGrid,
   .editorRailGrid,
-  .factGrid {
+  .factGrid,
+  .propertiesGrid {
     grid-template-columns: 1fr;
   }
 
@@ -1340,6 +1482,19 @@
 
   .metricGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .reviewQueueSummary {
+    padding-inline: 12px;
+  }
+
+  .propertyRows li {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .propertyRows li > span:last-child {
+    justify-self: start;
   }
 
   .queueGroupHeader,
