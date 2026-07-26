@@ -4303,6 +4303,48 @@ async function main() {
     assert(noteDetailAfterUpdate.body.includes(updatedNoteTitle), "Updated Note title missing after editor reload");
     assert(noteDetailAfterUpdate.body.includes("Regression-updated authored knowledge."), "Updated Note body missing after editor reload");
 
+    const noteProperties = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes/${createdNote.id}?tab=properties`
+    );
+    assert(noteProperties.response.ok, `Note Properties route failed: ${describeStatus(noteProperties.response)}`);
+    for (const expected of [
+      "Properties control plane",
+      "Core property readiness",
+      "Review and cadence",
+      "Links and counts",
+      "Source and migration",
+      "Ownership and privacy",
+      "System / debug",
+      "Legacy current revision"
+    ]) {
+      assert(noteProperties.body.includes(expected), `Note Properties route missing expected text: ${expected}`);
+    }
+    assert(
+      noteProperties.body.includes("Save properties") &&
+        noteProperties.body.includes("cannot safely round-trip the full native Note property set"),
+      "Note Properties did not expose the disabled native-write boundary"
+    );
+
+    const missingPropertiesQueue = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes?view=missing-properties&note=${createdNote.id}`
+    );
+    assert(
+      missingPropertiesQueue.response.ok,
+      `Missing Properties queue failed: ${describeStatus(missingPropertiesQueue.response)}`
+    );
+    assert(missingPropertiesQueue.body.includes("Property attention queue"), "Missing Properties queue summary is absent");
+    assert(missingPropertiesQueue.body.includes(updatedNoteTitle), "Mapped Note missing from property attention queue");
+    assert(
+      missingPropertiesQueue.body.includes("Mappings to confirm") &&
+        missingPropertiesQueue.body.includes("No weighted readiness percentage is calculated"),
+      "Missing Properties queue did not disclose its derived calculation boundary"
+    );
+    pass("Notes property readiness, Missing Properties queue, and read-only Properties route work from current adapter evidence");
+
     const protectedStatusNoteTitle = `${testRunId}-blocked-note`;
     const createProtectedStatusNote = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
       method: "POST",

@@ -15,6 +15,7 @@ import MetricStrip from "./operational/MetricStrip";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
 import ConfirmationSheet from "./operational/ConfirmationSheet";
+import NotePropertiesView, { NotePropertiesSummary } from "./notes/NotePropertiesView";
 import {
   contentLinksForObject,
   contentTargetGroupsForObject,
@@ -24,6 +25,10 @@ import {
   type LegacyUnresolvedReference
 } from "../lib/modules/content-graph/types";
 import { createNotesRepository } from "../lib/modules/notes/repository";
+import {
+  buildNotePropertyQueue,
+  buildNotePropertyReadiness
+} from "../lib/modules/notes/property-readiness";
 import {
   buildNoteViewCounts,
   noteRecordToDirectoryItem
@@ -113,6 +118,7 @@ const VIEW_LABELS: Readonly<Record<NotesView, string>> = {
   research: "Research",
   "personal-context": "Personal Context",
   "project-notes": "Project Notes",
+  "missing-properties": "Missing Properties",
   archived: "Archived Notes"
 };
 
@@ -192,6 +198,7 @@ function matchesView(note: NoteRecord, view: NotesView) {
   if (view === "research") return note.type === "research";
   if (view === "personal-context") return note.type === "personal_context";
   if (view === "project-notes") return note.type === "project_note";
+  if (view === "missing-properties") return buildNotePropertyReadiness(note).requiresAttention;
   return false;
 }
 
@@ -311,6 +318,7 @@ export default function NotesWorkspace({
   const [saveError, setSaveError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [captureFocusRequested, setCaptureFocusRequested] = useState(false);
   const captureTitleRef = useRef<HTMLInputElement>(null);
   const dirtyHistoryGuardRef = useRef<string | null>(null);
   const suppressDirtyPopRef = useRef(false);
@@ -323,6 +331,11 @@ export default function NotesWorkspace({
   );
   const writableSelectedLifecycle = selectedNote ? writableLifecycleFor(selectedNote) : null;
   const counts = useMemo(() => buildNoteViewCounts(notes), [notes]);
+  const propertyQueue = useMemo(() => buildNotePropertyQueue(notes), [notes]);
+  const selectedPropertyReadiness = useMemo(
+    () => selectedNote ? buildNotePropertyReadiness(selectedNote) : null,
+    [selectedNote]
+  );
   const unavailableViewReason = viewUnavailable(view);
   const visibleNotes = useMemo(
     () => sortNotes(
@@ -330,6 +343,10 @@ export default function NotesWorkspace({
       sort
     ),
     [filter, notes, query, sort, view]
+  );
+  const visiblePropertyQueue = useMemo(
+    () => buildNotePropertyQueue(visibleNotes),
+    [visibleNotes]
   );
 
   useEffect(() => {
@@ -353,6 +370,12 @@ export default function NotesWorkspace({
     setSaveState("saved");
     setSaveError("");
   }, [selectedNote?.id]);
+
+  useEffect(() => {
+    if (!captureFocusRequested || view !== "all") return;
+    captureTitleRef.current?.focus();
+    setCaptureFocusRequested(false);
+  }, [captureFocusRequested, view]);
 
   useEffect(() => {
     if (initialMode !== "index" || unavailableViewReason || !visibleNotes.length) return;
@@ -412,6 +435,15 @@ export default function NotesWorkspace({
         history: initialMode === "detail" ? "push" : "replace"
       }
     );
+  }
+
+  function openQuickCapture() {
+    if (view === "all") {
+      captureTitleRef.current?.focus();
+      return;
+    }
+    setCaptureFocusRequested(true);
+    selectDirectoryView("all");
   }
 
   function setBatch(id: string, checked: boolean) {
@@ -613,6 +645,7 @@ export default function NotesWorkspace({
     if (item === "research") return notes.filter((note) => note.type === "research").length;
     if (item === "personal-context") return notes.filter((note) => note.type === "personal_context").length;
     if (item === "project-notes") return notes.filter((note) => note.type === "project_note").length;
+    if (item === "missing-properties") return counts.missingProperties;
     return undefined;
   };
 
@@ -672,7 +705,13 @@ export default function NotesWorkspace({
       items: [
         { id: "import", label: "Import / Export", disabled: true, disabledReason: "Import and export are not connected yet." },
         { id: "duplicates", label: "Duplicate Notes", disabled: true, disabledReason: "Duplicate detection is not connected and Notes are never auto-merged." },
-        { id: "properties", label: "Missing Properties", disabled: true, disabledReason: "Native property readiness is not connected yet." },
+        {
+          id: "missing-properties",
+          label: "Missing Properties",
+          count: counts.missingProperties,
+          active: view === "missing-properties",
+          onSelect: () => selectDirectoryView("missing-properties")
+        },
         { id: "archived", label: "Archived", count: counts.archived, active: view === "archived", onSelect: () => selectDirectoryView("archived") },
         { id: "settings", label: "Notes Settings", disabled: true, disabledReason: "Notes settings are not implemented." }
       ]
@@ -707,6 +746,17 @@ export default function NotesWorkspace({
       }}
     />
   );
+
+  function propertyContextFor(note: NoteRecord) {
+    const sourceCandidateCount =
+      Number(Boolean(note.legacySources.sourceUrl)) + note.legacySources.externalSources.length;
+    return {
+      retainedRelationCount: relationCount(note),
+      sourceCandidateCount,
+      resolvedOwnerTargetCount: contentTargetGroupsForObject(contentGraph, note.nativeRef).length,
+      unresolvedReferenceCount: unresolvedReferencesForObject(contentGraph, note.nativeRef).length
+    };
+  }
 
   function renderDetailLinksPanel(note: NoteRecord, tabsId: string) {
     const candidates = contentLinksForObject(contentGraph, note.nativeRef);
@@ -1074,6 +1124,23 @@ export default function NotesWorkspace({
     );
   }
 
+  function renderDetailPropertiesPanel(note: NoteRecord, tabsId: string) {
+    const readiness = buildNotePropertyReadiness(note);
+    return (
+      <DetailTabPanel tabsId={tabsId} tabId="properties" active>
+        <NotePropertiesView
+          note={note}
+          readiness={readiness}
+          context={propertyContextFor(note)}
+          onOpenTab={(tab) => {
+            setActiveTab(tab);
+            updateUrl({ tab });
+          }}
+        />
+      </DetailTabPanel>
+    );
+  }
+
   const inspectorTitle = selectedNote ? (
     <ObjectHeader
       objectType="Internal note"
@@ -1098,6 +1165,9 @@ export default function NotesWorkspace({
     />
   ) : undefined;
 
+  const inspectorDisplayTab =
+    initialMode === "detail" && activeTab === "properties" ? "properties" : inspectorTab;
+
   function renderInspectorPanel() {
     if (!selectedNote) {
       return <div className={styles.emptyInspector}><h2>No Note selected</h2><p>Select a row or capture a Note to inspect it.</p></div>;
@@ -1110,12 +1180,39 @@ export default function NotesWorkspace({
       values.map((value) => ({ direction, value }))
     );
 
-    if (inspectorTab !== "overview" && inspectorTab !== "body") {
+    if (inspectorDisplayTab === "properties" && selectedPropertyReadiness) {
+      const propertiesAreOpen = initialMode === "detail" && activeTab === "properties";
       return (
-        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId={inspectorTab} active>
+        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="properties" active>
+          <NotePropertiesSummary
+            note={selectedNote}
+            readiness={selectedPropertyReadiness}
+            context={propertyContextFor(selectedNote)}
+            primaryActionLabel={propertiesAreOpen ? "Edit safe fields" : "Open Properties"}
+            onOpenProperties={() => {
+              if (propertiesAreOpen) {
+                setActiveTab("body");
+                updateUrl({ tab: "body" });
+                return;
+              }
+              router.push(
+                  destinationFor(
+                    { tab: "properties", note: "" },
+                    { path: selectedNote.nativeRef.route }
+                  )
+                );
+            }}
+          />
+        </DetailTabPanel>
+      );
+    }
+
+    if (inspectorDisplayTab !== "overview" && inspectorDisplayTab !== "body") {
+      return (
+        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId={inspectorDisplayTab} active>
           <SystemState
             variant="read_only"
-            title={`${HOME_TABS.find((tab) => tab.id === inspectorTab)?.label || "This tab"} is staged`}
+            title={`${HOME_TABS.find((tab) => tab.id === inspectorDisplayTab)?.label || "This tab"} is staged`}
             description="The approved surface is represented in the route and tab framework, but its native persistence and ownership-safe mutations are not connected in this checkpoint."
             compact
           />
@@ -1124,7 +1221,7 @@ export default function NotesWorkspace({
     }
 
     return (
-      <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId={inspectorTab} active>
+      <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId={inspectorDisplayTab} active>
         <div className={styles.overviewGrid}>
           <section className={styles.panel} data-wide="true">
             <div className={styles.panelHeader}><h2>Note Body</h2><Link href={selectedNote.nativeRef.route}>Open full editor</Link></div>
@@ -1196,9 +1293,16 @@ export default function NotesWorkspace({
         <DetailTabs
           id={`note-home-${selectedNote.id}`}
           tabs={HOME_TABS}
-          activeTab={inspectorTab}
+          activeTab={inspectorDisplayTab}
           onTabChange={(tab) => {
             const nextTab = tab as NotesTab;
+            if (initialMode === "detail" && activeTab === "properties") {
+              const nextDetailTab = nextTab === "overview" ? "body" : nextTab;
+              setActiveTab(nextDetailTab);
+              setInspectorTab(nextTab);
+              updateUrl({ tab: nextDetailTab });
+              return;
+            }
             setInspectorTab(nextTab);
             if (initialMode === "index") {
               setActiveTab(nextTab);
@@ -1268,7 +1372,7 @@ export default function NotesWorkspace({
                   <div className={styles.fact}><span>Persistence</span><strong>Legacy adapter</strong></div>
                   <div className={styles.fact} data-mono="true"><span>UID</span><strong>{currentNote.uid}</strong></div>
                 </div>
-                <DetailTabs id={detailTabsId} tabs={DETAIL_TABS} activeTab={activeTab === "overview" ? "body" : activeTab} onTabChange={(tab) => { setActiveTab(tab as NotesTab); updateUrl({ tab: tab as NotesTab }); }} ariaLabel="Note detail tabs" />
+                <DetailTabs id={detailTabsId} tabs={DETAIL_TABS} activeTab={activeTab === "overview" ? "body" : activeTab} onTabChange={(tab) => { setActiveTab(tab as NotesTab); updateUrl({ tab: tab as NotesTab }); }} className={styles.tabs} ariaLabel="Note detail tabs" />
               </header>
 
               {activeTab === "body" || activeTab === "overview" ? (
@@ -1326,6 +1430,8 @@ export default function NotesWorkspace({
                 renderDetailLinksPanel(currentNote, detailTabsId)
               ) : activeTab === "review" ? (
                 renderDetailReviewPanel(currentNote, detailTabsId)
+              ) : activeTab === "properties" ? (
+                renderDetailPropertiesPanel(currentNote, detailTabsId)
               ) : (
                 <DetailTabPanel tabsId={detailTabsId} tabId={activeTab} active>
                   <SystemState
@@ -1372,7 +1478,7 @@ export default function NotesWorkspace({
             <div className={styles.headerActions}>
               <button type="button" className={styles.button} onClick={() => document.querySelector<HTMLElement>(`.${styles.chipRow}`)?.focus()}>Filter</button>
               <button type="button" className={styles.button} onClick={() => { const next = density === "compact" ? "comfortable" : "compact"; setDensity(next); updateUrl({ density: next }); }}>{density === "compact" ? "Comfortable" : "Compact"}</button>
-              <button type="button" className={styles.button} data-primary="true" onClick={() => captureTitleRef.current?.focus()}>+ New Note</button>
+              <button type="button" className={styles.button} data-primary="true" onClick={openQuickCapture}>+ New Note</button>
             </div>
           </header>
 
@@ -1405,24 +1511,77 @@ export default function NotesWorkspace({
             ))}
           </div>
 
-          <form className={styles.capture} onSubmit={submitNote}>
-            <div className={styles.captureHeader}>
-              <div><span className={styles.eyebrow}>Quick capture</span><h2>Add internal note</h2></div>
-              <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Advanced native Note creation is not connected yet.")}>Advanced create</button>
-            </div>
-            <div className={styles.captureGrid}>
-              <label className={styles.field}>Title<input ref={captureTitleRef} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Decision, meeting, idea, or context" required /></label>
-              <label className={styles.field}>Type<select value={noteType} onChange={(event) => setNoteType(event.target.value as LegacyWritableNoteType)}><option value="idea">Idea</option><option value="meeting">Meeting</option><option value="decision">Decision candidate</option></select></label>
-              <label className={styles.field}>Lifecycle<select value={lifecycle} onChange={(event) => setLifecycle(event.target.value as NoteWritableLifecycleStatus)}><option value="draft">Draft</option><option value="active">Active</option></select></label>
-            </div>
-            <div className={styles.captureBody}>
-              <label className={styles.field}>Context<textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Capture context, next action, and why it matters." /></label>
-              <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Native NoteLink persistence is unresolved.")}>+ Link object</button>
-              <button type="submit" className={styles.button} data-primary="true" disabled={captureSaving || !title.trim()}>{captureSaving ? "Saving…" : "Save Note"}</button>
-            </div>
-          </form>
+          {view === "all" && (
+            <form className={styles.capture} onSubmit={submitNote}>
+              <div className={styles.captureHeader}>
+                <div><span className={styles.eyebrow}>Quick capture</span><h2>Add internal note</h2></div>
+                <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Advanced native Note creation is not connected yet.")}>Advanced create</button>
+              </div>
+              <div className={styles.captureGrid}>
+                <label className={styles.field}>Title<input ref={captureTitleRef} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Decision, meeting, idea, or context" required /></label>
+                <label className={styles.field}>Type<select value={noteType} onChange={(event) => setNoteType(event.target.value as LegacyWritableNoteType)}><option value="idea">Idea</option><option value="meeting">Meeting</option><option value="decision">Decision candidate</option></select></label>
+                <label className={styles.field}>Lifecycle<select value={lifecycle} onChange={(event) => setLifecycle(event.target.value as NoteWritableLifecycleStatus)}><option value="draft">Draft</option><option value="active">Active</option></select></label>
+              </div>
+              <div className={styles.captureBody}>
+                <label className={styles.field}>Context<textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Capture context, next action, and why it matters." /></label>
+                <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Native NoteLink persistence is unresolved.")}>+ Link object</button>
+                <button type="submit" className={styles.button} data-primary="true" disabled={captureSaving || !title.trim()}>{captureSaving ? "Saving…" : "Save Note"}</button>
+              </div>
+            </form>
+          )}
           {captureError && <p className={styles.errorBanner} role="alert">{captureError}</p>}
           {notice && <p className={styles.successBanner} role="status">{notice}</p>}
+
+          {view === "missing-properties" && (
+            <section className={styles.reviewQueueSummary} aria-labelledby="notes-property-queue-title">
+              <div className={styles.panelHeader}>
+                <div>
+                  <span className={styles.eyebrow}>Data quality</span>
+                  <h2 id="notes-property-queue-title">Property attention queue</h2>
+                  <p>Derived from the same searched and filtered Notes shown below.</p>
+                </div>
+                <strong>{visiblePropertyQueue.summary.queuedNotes} shown</strong>
+              </div>
+              <MetricStrip
+                ariaLabel="Visible Note property queue summary"
+                items={[
+                  { id: "queued", label: "Notes in scope", value: visiblePropertyQueue.summary.queuedNotes },
+                  {
+                    id: "attention",
+                    label: "Attention items",
+                    value: visiblePropertyQueue.summary.attentionItems,
+                    tone: visiblePropertyQueue.summary.attentionItems ? "attention" : "positive"
+                  },
+                  {
+                    id: "missing",
+                    label: "Missing values",
+                    value: visiblePropertyQueue.summary.missingValues,
+                    tone: visiblePropertyQueue.summary.missingValues ? "danger" : "positive"
+                  },
+                  {
+                    id: "invalid",
+                    label: "Invalid values",
+                    value: visiblePropertyQueue.summary.invalidValues,
+                    tone: visiblePropertyQueue.summary.invalidValues ? "danger" : "positive"
+                  },
+                  {
+                    id: "confirm",
+                    label: "Mappings to confirm",
+                    value: visiblePropertyQueue.summary.unconfirmedMappings,
+                    tone: visiblePropertyQueue.summary.unconfirmedMappings ? "attention" : "positive"
+                  }
+                ]}
+              />
+              <div className={styles.reviewQueueBoundary}>
+                <strong>Queue rule · explicit and reversible</strong>
+                <span>
+                  A Note appears when a currently checkable property is missing, invalid, or mapped without direct legacy evidence.
+                  Native-only owner, pinned, version, reviewer, schema, and audit fields remain visible as unavailable, but they do
+                  not put every Note into this queue. No weighted readiness percentage is calculated.
+                </span>
+              </div>
+            </section>
+          )}
 
           <div className={styles.sortRow}>
             <span>Sort</span>
@@ -1455,13 +1614,16 @@ export default function NotesWorkspace({
             <div className={styles.list} data-density={density} role="list" aria-label="Notes">
               {visibleNotes.map((note) => {
                 const item = noteRecordToDirectoryItem(note);
+                const propertyItem = propertyQueue.byNoteId.get(note.id);
                 return (
                   <DenseObjectRow
                     id={note.id}
                     title={note.title}
                     description={`${TYPE_LABELS[note.type]} · ${displayLabel(note.lifecycleStatus)} · ${item.area || "Unassigned"}`}
                     metadata={`${item.bodyExcerpt} · updated ${formatDate(note.updatedAt)}`}
-                    trailing={<><strong>{displayLabel(note.reviewState)}</strong><span>{note.nextReviewAt ? `Review ${formatDate(note.nextReviewAt)}` : "No review date"}</span></>}
+                    trailing={view === "missing-properties" && propertyItem
+                      ? <><strong>{propertyItem.attentionCount} property {propertyItem.attentionCount === 1 ? "item" : "items"}</strong><span>{propertyItem.primaryReason} first</span></>
+                      : <><strong>{displayLabel(note.reviewState)}</strong><span>{note.nextReviewAt ? `Review ${formatDate(note.nextReviewAt)}` : "No review date"}</span></>}
                     selected={selectedNote?.id === note.id}
                     onSelect={() => selectNote(note.id)}
                     checkbox={{ checked: batchSelection.has(note.id), onCheckedChange: (checked) => setBatch(note.id, checked), label: `Select ${note.title} for batch actions` }}

@@ -137,6 +137,7 @@ export type NoteViewCounts = {
   drafts: number;
   archived: number;
   needsReview: number;
+  missingProperties: number;
   withLegacySources: number;
   withLegacyRelationships: number;
 };
@@ -147,4 +148,3 @@ export type NotesViewModel = {
   items: NoteDirectoryItem[];
   selected: NoteRecord | null;
 };
-

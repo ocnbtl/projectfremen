@@ -1,7 +1,7 @@
 "use client";
 
 import type { KeyboardEvent, ReactNode } from "react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 
 export type DetailTab = {
   id: string;
@@ -33,6 +33,29 @@ export default function DetailTabs({
   className
 }: DetailTabsProps) {
   const tabRefs = useRef(new Map<string, HTMLButtonElement>());
+  const tablistRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const tablist = tablistRef.current;
+    const active = tabRefs.current.get(activeTab);
+    if (!tablist || !active || tablist.scrollWidth <= tablist.clientWidth) return;
+
+    const padding = 8;
+    const configuredEndInset = Number.parseFloat(
+      getComputedStyle(tablist).getPropertyValue("--detail-tabs-end-inset")
+    );
+    const endInset = Number.isFinite(configuredEndInset) ? configuredEndInset : padding;
+    const visibleLeft = tablist.scrollLeft;
+    const visibleRight = visibleLeft + tablist.clientWidth - endInset;
+    const activeLeft = active.offsetLeft;
+    const activeRight = activeLeft + active.offsetWidth;
+
+    if (activeLeft < visibleLeft + padding) {
+      tablist.scrollLeft = Math.max(0, activeLeft - padding);
+    } else if (activeRight > visibleRight) {
+      tablist.scrollLeft = activeRight - tablist.clientWidth + endInset;
+    }
+  }, [activeTab]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentId: string) {
     const enabledTabs = tabs.filter((tab) => !tab.disabled);
@@ -62,7 +85,12 @@ export default function DetailTabs({
   }
 
   return (
-    <div className={["detail-tabs", className].filter(Boolean).join(" ")} role="tablist" aria-label={ariaLabel}>
+    <div
+      ref={tablistRef}
+      className={["detail-tabs", className].filter(Boolean).join(" ")}
+      role="tablist"
+      aria-label={ariaLabel}
+    >
       {tabs.map((tab) => {
         const selected = tab.id === activeTab;
         const tabId = `${safeId(id)}-tab-${safeId(tab.id)}`;

@@ -841,6 +841,32 @@
   grid-column: 1 / -1;
 }
 
+.propertyDisclosure {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-bg-subtle);
+}
+
+.propertyDisclosure > summary {
+  min-height: 24px;
+  color: var(--text-strong);
+  font: 850 12px/24px var(--font-heading);
+  cursor: pointer;
+}
+
+.propertyDisclosure > summary:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: 3px;
+}
+
+.propertyDisclosure[open] > summary {
+  margin-bottom: 10px;
+}
+
 .fact {
   display: grid;
   gap: 4px;
@@ -1435,6 +1461,11 @@
     min-width: 44px;
     padding-inline: 4px;
     font-size: 10px;
+  }
+
+  .tabs {
+    --detail-tabs-end-inset: 72px;
+    padding-right: 72px;
   }
 
   .shell > :global(.inspector-rail) {

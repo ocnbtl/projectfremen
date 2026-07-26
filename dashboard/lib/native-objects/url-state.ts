@@ -467,6 +467,7 @@ const NOTES_VIEWS = [
   "research",
   "personal-context",
   "project-notes",
+  "missing-properties",
   "archived"
 ] as const;
 const NOTES_FILTERS = ["all", "active", "pinned", "linked", "no-links", "needs-review"] as const;

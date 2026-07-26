@@ -4,6 +4,7 @@ import type {
   NotesViewModel,
   NoteViewCounts
 } from "./types";
+import { buildNotePropertyReadiness } from "./property-readiness";
 
 export type NoteFilter =
   | "all"
@@ -108,6 +109,7 @@ export function buildNoteViewCounts(notes: readonly NoteRecord[]): NoteViewCount
     drafts: notes.filter((note) => note.lifecycleStatus === "draft").length,
     archived: notes.filter((note) => note.lifecycleStatus === "archived").length,
     needsReview: notes.filter((note) => note.reviewState === "needs_review").length,
+    missingProperties: notes.filter((note) => buildNotePropertyReadiness(note).requiresAttention).length,
     withLegacySources: notes.filter(hasLegacySources).length,
     withLegacyRelationships: notes.filter(hasLegacyRelationships).length
   };
@@ -132,4 +134,3 @@ export function buildNotesViewModel(
     selected: notes.find((note) => note.id === options.selectedId) || null
   };
 }
-
