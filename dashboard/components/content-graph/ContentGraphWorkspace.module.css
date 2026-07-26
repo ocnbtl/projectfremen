@@ -642,6 +642,10 @@
   grid-column: 1 / -1;
 }
 
+.panel[data-ai-safe="true"] {
+  padding-right: 128px;
+}
+
 .overviewGrid > [data-wide="true"],
 .sourceMetricStrip {
   grid-column: 1 / -1;
@@ -1259,6 +1263,12 @@
   }
 }
 
+@media (min-width: 1601px) {
+  .panel[data-ai-safe="true"] {
+    padding-right: 14px;
+  }
+}
+
 @media (max-width: 1240px) {
   .shell,
   .detailShell,
@@ -1323,6 +1333,11 @@
 
   .loadingShell > :first-child {
     display: none;
+  }
+
+  .panel[data-ai-safe="true"] {
+    padding-right: 14px;
+    padding-bottom: 84px;
   }
 
   .shell > :global(.module-sidebar) {

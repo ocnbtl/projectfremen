@@ -2793,6 +2793,29 @@ async function main() {
     );
     assert(legacyDecisionCandidate?.id, "Legacy Decision candidate was not returned for explicit conversion coverage");
 
+    const unconvertedNoteDecisionTab = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes/${legacyDecisionCandidate.id}?tab=decisions`
+    );
+    assert(
+      unconvertedNoteDecisionTab.response.ok,
+      `Unconverted Note Decisions route failed: ${describeStatus(unconvertedNoteDecisionTab.response)}`
+    );
+    for (const expected of [
+      "Decision candidate queue",
+      "Structured decision builder",
+      legacyDecisionCandidateTitle,
+      "Original Note preserved: yes",
+      "File Decision"
+    ]) {
+      assert(
+        unconvertedNoteDecisionTab.body.includes(expected),
+        `Unconverted Note Decisions route missing functional candidate evidence: ${expected}`
+      );
+    }
+    pass("Notes renders an ownership-safe, source-preserving Decision candidate builder before conversion");
+
     const decisionConversionKey = `${testRunId}-decision-conversion`;
     const nativeDecisionInput = {
       title: `${testRunId}-native-decision`,
@@ -2871,6 +2894,38 @@ async function main() {
       `Native Decision update failed: ${JSON.stringify(decideNativeDecision.payload)}`
     );
     pass("Explicit legacy Decision conversion is typed, idempotent, and preserves its source mapping");
+
+    const convertedNoteDecisionTab = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes/${legacyDecisionCandidate.id}?tab=decisions`
+    );
+    assert(
+      convertedNoteDecisionTab.response.ok,
+      `Converted Note Decisions route failed: ${describeStatus(convertedNoteDecisionTab.response)}`
+    );
+    for (const expected of [
+      "Filed in Personal Ops",
+      nativeDecision.title,
+      "Decided",
+      "Outputs created from this Note",
+      "The Note body remains intact"
+    ]) {
+      assert(
+        convertedNoteDecisionTab.body.includes(expected),
+        `Converted Note Decisions route missing durable output evidence: ${expected}`
+      );
+    }
+    const convertedDecisionOwnerRoute = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/personal/decisions?selected=${encodeURIComponent(nativeDecision.id)}`
+    );
+    assert(
+      convertedDecisionOwnerRoute.response.ok && convertedDecisionOwnerRoute.body.includes(nativeDecision.title),
+      "The durable Decision owner route did not render the converted object"
+    );
+    pass("Converted Notes Decisions reopen their durable Personal Ops owner object without duplicating the source");
 
     const nativeObligationTitle = `${testRunId}-native-obligation`;
     const obligationEvidenceLabel = "Regression completion evidence";

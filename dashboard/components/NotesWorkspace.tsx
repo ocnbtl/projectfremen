@@ -15,6 +15,7 @@ import MetricStrip from "./operational/MetricStrip";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
 import ConfirmationSheet from "./operational/ConfirmationSheet";
+import NoteDecisionsView from "./notes/NoteDecisionsView";
 import NotePropertiesView, { NotePropertiesSummary } from "./notes/NotePropertiesView";
 import {
   contentLinksForObject,
@@ -38,6 +39,10 @@ import type {
   NoteRecord,
   NoteWritableLifecycleStatus
 } from "../lib/modules/notes/types";
+import type {
+  PersonalOpsDecision,
+  PersonalOpsLegacyMapping
+} from "../lib/modules/personal-ops/types";
 import {
   parseNotesUrlState,
   serializeNotesUrlState,
@@ -55,6 +60,9 @@ type NotesWorkspaceProps = {
   initialMode?: "index" | "detail";
   initialSelectedId?: string;
   initialLoadError?: string;
+  initialPersonalOpsDecisions?: PersonalOpsDecision[];
+  initialDecisionMappings?: PersonalOpsLegacyMapping[];
+  initialDecisionLoadError?: string;
 };
 
 type NoteReviewEvidenceCheck = {
@@ -151,20 +159,9 @@ function displayLabel(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function decisionCandidateRoute(note: NoteRecord) {
-  const params = new URLSearchParams({
-    create: "decision",
-    sourceModule: "notes",
-    sourceObjectType: "decision_candidate",
-    sourceObjectId: note.id,
-    sourceLabel: note.title,
-    sourceRoute: getNativeObjectRoute({
-      module: "notes",
-      objectType: "note",
-      objectId: note.id
-    })
-  });
-  return `${getModuleRoute("personal_ops")}/decisions?${params.toString()}`;
+function noteDecisionsRoute(note: NoteRecord) {
+  const params = new URLSearchParams({ tab: "decisions" });
+  return `${note.nativeRef.route}?${params.toString()}`;
 }
 
 function resourceSearchRoute(value: string) {
@@ -280,7 +277,10 @@ export default function NotesWorkspace({
   contentGraph,
   initialMode = "index",
   initialSelectedId,
-  initialLoadError = ""
+  initialLoadError = "",
+  initialPersonalOpsDecisions = [],
+  initialDecisionMappings = [],
+  initialDecisionLoadError = ""
 }: NotesWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -288,6 +288,8 @@ export default function NotesWorkspace({
   const repository = useMemo(() => createNotesRepository(), []);
   const [firstUrlState] = useState(() => parseNotesUrlState(searchParams));
   const [notes, setNotes] = useState(initialNotes);
+  const [personalOpsDecisions, setPersonalOpsDecisions] = useState(initialPersonalOpsDecisions);
+  const [decisionMappings, setDecisionMappings] = useState(initialDecisionMappings);
   const [query, setQuery] = useState(firstUrlState.query);
   const [view, setView] = useState<NotesView>(firstUrlState.view);
   const [filter, setFilter] = useState<NotesFilter>(firstUrlState.filter);
@@ -910,6 +912,18 @@ export default function NotesWorkspace({
         .map((target) => [`${target.module}|${target.objectType}|${target.objectId}`, target])
     ).values());
     const reviewMapping = note.mappingNotes.find((mapping) => mapping.field === "review");
+    const durableDecisionMapping = decisionMappings.find(
+      (mapping) =>
+        mapping.family === "decisions" &&
+        mapping.legacyPersonalRecordId === note.provenance.recordId
+    );
+    const durableDecision = personalOpsDecisions.find(
+      (decision) =>
+        decision.id === durableDecisionMapping?.nativeRef.objectId ||
+        decision.sourceRefs.some(
+          (reference) => reference.module === "notes" && reference.objectId === note.id
+        )
+    );
     const hasSourceCandidates = hasLegacySource(note);
     const legacyRelations = relationCount(note);
     const checks: NoteReviewEvidenceCheck[] = [
@@ -995,11 +1009,17 @@ export default function NotesWorkspace({
       checks.push({
         id: "decision-candidate",
         label: "Decision candidate is reconciled",
-        detail: "The durable Decision belongs to Personal Ops. This Notes read model cannot confirm an existing output mapping.",
+        detail: durableDecision
+          ? `Durable Personal Ops Decision “${durableDecision.title}” is linked through current native state.`
+          : durableDecisionMapping
+            ? "The conversion mapping is present, but its Personal Ops Decision target is missing and needs repair."
+            : "No durable Personal Ops Decision has been filed from this candidate.",
         required: true,
-        complete: false,
-        href: decisionCandidateRoute(note),
-        actionLabel: "Open in Personal Ops"
+        complete: Boolean(durableDecision),
+        href: durableDecisionMapping && durableDecision?.id === durableDecisionMapping.nativeRef.objectId
+          ? durableDecisionMapping.nativeRef.route
+          : noteDecisionsRoute(note),
+        actionLabel: durableDecision ? "Open Decision" : "Review candidate"
       });
     }
 
@@ -1024,7 +1044,13 @@ export default function NotesWorkspace({
     const blockers = requiredChecks.filter((check) => !check.complete);
     const completedRequired = requiredChecks.length - blockers.length;
     const decisionAction = note.type === "decision"
-      ? [{ id: "decision", label: "Review Decision in Personal Ops", href: decisionCandidateRoute(note) }]
+      ? [{
+          id: "decision",
+          label: durableDecision ? "Open durable Decision" : "Review Decision candidate",
+          href: durableDecisionMapping && durableDecision?.id === durableDecisionMapping.nativeRef.objectId
+            ? durableDecisionMapping.nativeRef.route
+            : noteDecisionsRoute(note)
+        }]
       : [];
 
     return (
@@ -1141,6 +1167,31 @@ export default function NotesWorkspace({
     );
   }
 
+  function renderDetailDecisionsPanel(note: NoteRecord, tabsId: string) {
+    return (
+      <DetailTabPanel tabsId={tabsId} tabId="decisions" active>
+        <NoteDecisionsView
+          note={note}
+          decisions={personalOpsDecisions}
+          mappings={decisionMappings}
+          loadError={initialDecisionLoadError}
+          onConverted={(decision, mapping) => {
+            setPersonalOpsDecisions((current) => [
+              decision,
+              ...current.filter((item) => item.id !== decision.id)
+            ]);
+            if (mapping) {
+              setDecisionMappings((current) => [
+                mapping,
+                ...current.filter((item) => item.id !== mapping.id)
+              ]);
+            }
+          }}
+        />
+      </DetailTabPanel>
+    );
+  }
+
   const inspectorTitle = selectedNote ? (
     <ObjectHeader
       objectType="Internal note"
@@ -1166,7 +1217,9 @@ export default function NotesWorkspace({
   ) : undefined;
 
   const inspectorDisplayTab =
-    initialMode === "detail" && activeTab === "properties" ? "properties" : inspectorTab;
+    initialMode === "detail" && (activeTab === "properties" || activeTab === "decisions")
+      ? activeTab
+      : inspectorTab;
 
   function renderInspectorPanel() {
     if (!selectedNote) {
@@ -1207,6 +1260,93 @@ export default function NotesWorkspace({
       );
     }
 
+    if (inspectorDisplayTab === "decisions") {
+      const mapping = decisionMappings.find(
+        (item) =>
+          item.family === "decisions" &&
+          item.legacyPersonalRecordId === selectedNote.provenance.recordId
+      );
+      const decision = personalOpsDecisions.find(
+        (item) =>
+          item.id === mapping?.nativeRef.objectId ||
+          item.sourceRefs.some(
+            (reference) => reference.module === "notes" && reference.objectId === selectedNote.id
+          )
+      );
+      const candidateOpen = selectedNote.type === "decision" && !decision;
+      return (
+        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="decisions" active>
+          <div className={styles.overviewGrid}>
+            <section className={styles.panel} data-wide="true">
+              <div className={styles.panelHeader}>
+                <div>
+                  <span className={styles.eyebrow}>Decision candidate inspector</span>
+                  <h2>{decision?.title || selectedNote.title}</h2>
+                </div>
+                <span className={styles.stateChip} data-tone={decision ? "green" : candidateOpen ? "amber" : "blue"}>
+                  {decision ? displayLabel(decision.decisionState) : candidateOpen ? "Candidate" : "No candidate"}
+                </span>
+              </div>
+              <div className={styles.factGrid}>
+                <div className={styles.fact}><span>Type</span><strong>{decision ? "Durable Decision" : TYPE_LABELS[selectedNote.type]}</strong></div>
+                <div className={styles.fact}><span>Status</span><strong>{decision ? displayLabel(decision.decisionState) : candidateOpen ? "Open candidate" : "Not present"}</strong></div>
+                <div className={styles.fact}><span>Destination</span><strong>Personal Ops / Decisions</strong></div>
+                <div className={styles.fact}><span>Source</span><strong>Note body</strong></div>
+                <div className={styles.fact}><span>Owner</span><strong>{decision?.owner || "You"}</strong></div>
+                <div className={styles.fact}><span>Provenance</span><strong>{mapping || selectedNote.provenance.recordId ? "Linked" : "Open"}</strong></div>
+              </div>
+            </section>
+            <section className={styles.panel} data-wide="true">
+              <h2>Why this matters</h2>
+              <p>
+                Filing a structured Decision preserves the question, proposed outcome, and rationale without changing the authored Note that supplied the context.
+              </p>
+            </section>
+            <section className={styles.panel} data-wide="true" data-ai-safe="true">
+              <h2>Conversion actions</h2>
+              <QuickActionBar
+                actions={[
+                  decision
+                    ? {
+                        id: "open",
+                        label: "Open durable Decision",
+                        href: getNativeObjectRoute({
+                          module: "personal_ops",
+                          objectType: "decision",
+                          objectId: decision.id
+                        }),
+                        intent: "primary"
+                      }
+                    : {
+                        id: "file",
+                        label: "Review filing form",
+                        href: noteDecisionsRoute(selectedNote),
+                        intent: "primary"
+                      },
+                  {
+                    id: "follow-up",
+                    label: "Create Follow-up",
+                    disabled: true,
+                    disabledReason: "Follow-up creation needs a separate Personal Ops preview and confirmation."
+                  },
+                  {
+                    id: "review-link",
+                    label: "Attach Review",
+                    disabled: true,
+                    disabledReason: "Native Review context-link persistence is not connected."
+                  }
+                ]}
+              />
+            </section>
+            <section className={styles.panel} data-wide="true">
+              <h2>Object boundary</h2>
+              <div className={styles.sourceBoundary}>Decision is owned by Personal Ops. The Note body remains intact; the source mapping preserves provenance.</div>
+            </section>
+          </div>
+        </DetailTabPanel>
+      );
+    }
+
     if (inspectorDisplayTab !== "overview" && inspectorDisplayTab !== "body") {
       return (
         <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId={inspectorDisplayTab} active>
@@ -1242,7 +1382,7 @@ export default function NotesWorkspace({
               actions={[
                 { id: "edit", label: "Open full editor", href: selectedNote.nativeRef.route, intent: "primary" },
                 { id: "link", label: "Link object", disabled: true, disabledReason: "Native NoteLink persistence is unresolved." },
-                { id: "decision", label: "Convert to decision", href: decisionCandidateRoute(selectedNote) },
+                { id: "decision", label: "Review decision output", href: noteDecisionsRoute(selectedNote) },
                 { id: "review", label: "Mark reviewed", disabled: true, disabledReason: "The legacy review action cannot enforce native review blockers." },
                 { id: "archive", label: "Archive", disabled: true, disabledReason: "Native archive metadata and retention are unresolved.", intent: "destructive" }
               ]}
@@ -1296,7 +1436,10 @@ export default function NotesWorkspace({
           activeTab={inspectorDisplayTab}
           onTabChange={(tab) => {
             const nextTab = tab as NotesTab;
-            if (initialMode === "detail" && activeTab === "properties") {
+            if (
+              initialMode === "detail" &&
+              (activeTab === "properties" || activeTab === "decisions")
+            ) {
               const nextDetailTab = nextTab === "overview" ? "body" : nextTab;
               setActiveTab(nextDetailTab);
               setInspectorTab(nextTab);
@@ -1356,13 +1499,17 @@ export default function NotesWorkspace({
                     <button type="button" className={styles.button} data-primary="true" onClick={() => void saveNote()} disabled={!editorDirty || saveState === "saving"}>{saveState === "saving" ? "Saving…" : "Save"}</button>
                     <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Pinned state is not stored by the legacy Notes adapter.")}>Pin</button>
                     <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Native NoteLink persistence is unresolved.")}>Link object</button>
-                    <Link
+                    <button
+                      type="button"
                       className={styles.button}
-                      href={decisionCandidateRoute(currentNote)}
-                      aria-label={`Convert ${currentNote.title} to a Personal Ops decision candidate`}
+                      onClick={() => {
+                        setActiveTab("decisions");
+                        updateUrl({ tab: "decisions" });
+                      }}
+                      aria-label={`Review Decision candidates and outputs for ${currentNote.title}`}
                     >
-                      Convert to decision
-                    </Link>
+                      Decisions
+                    </button>
                     <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Review blockers are not available in the legacy adapter.")}>Mark reviewed</button>
                   </div>
                 </div>
@@ -1387,13 +1534,17 @@ export default function NotesWorkspace({
                       ["Attach", "Media upload and attachment relationships are not connected"],
                       ["Resource", "Resource creation requires native Resources persistence"]
                     ].map(([label, reason]) => <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice(reason)} key={label}>{label}</button>)}
-                    <Link
+                    <button
+                      type="button"
                       className={styles.button}
-                      href={decisionCandidateRoute(currentNote)}
-                      aria-label={`Create a Personal Ops decision candidate from ${currentNote.title}`}
+                      onClick={() => {
+                        setActiveTab("decisions");
+                        updateUrl({ tab: "decisions" });
+                      }}
+                      aria-label={`Review Decision candidates and outputs for ${currentNote.title}`}
                     >
                       Decision
-                    </Link>
+                    </button>
                     <span className={styles.saveState} data-state={saveState}>{saveState === "failed" ? "Save failed" : displayLabel(saveState)}</span>
                     <span className={styles.technicalRow}>legacy current revision</span>
                   </div>
@@ -1428,6 +1579,8 @@ export default function NotesWorkspace({
                 </DetailTabPanel>
               ) : activeTab === "links" ? (
                 renderDetailLinksPanel(currentNote, detailTabsId)
+              ) : activeTab === "decisions" ? (
+                renderDetailDecisionsPanel(currentNote, detailTabsId)
               ) : activeTab === "review" ? (
                 renderDetailReviewPanel(currentNote, detailTabsId)
               ) : activeTab === "properties" ? (
