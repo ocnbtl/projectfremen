@@ -15,6 +15,7 @@ import MetricStrip from "./operational/MetricStrip";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
 import ConfirmationSheet from "./operational/ConfirmationSheet";
+import NoteAttachmentsView, { NoteAttachmentInspector } from "./notes/NoteAttachmentsView";
 import NoteDecisionsView from "./notes/NoteDecisionsView";
 import NotePropertiesView, { NotePropertiesSummary } from "./notes/NotePropertiesView";
 import {
@@ -26,6 +27,7 @@ import {
   type LegacyUnresolvedReference
 } from "../lib/modules/content-graph/types";
 import { createNotesRepository } from "../lib/modules/notes/repository";
+import { buildNoteAttachmentEvidence } from "../lib/modules/notes/attachment-evidence";
 import {
   buildNotePropertyQueue,
   buildNotePropertyReadiness
@@ -39,10 +41,12 @@ import type {
   NoteRecord,
   NoteWritableLifecycleStatus
 } from "../lib/modules/notes/types";
+import type { MediaAsset } from "../lib/modules/media/types";
 import type {
   PersonalOpsDecision,
   PersonalOpsLegacyMapping
 } from "../lib/modules/personal-ops/types";
+import type { ResourceRecord } from "../lib/modules/resources/types";
 import {
   parseNotesUrlState,
   serializeNotesUrlState,
@@ -57,6 +61,8 @@ import styles from "./content-graph/ContentGraphWorkspace.module.css";
 type NotesWorkspaceProps = {
   initialNotes: NoteRecord[];
   contentGraph: LegacyContentGraph;
+  initialMediaAssets: MediaAsset[];
+  initialResources: ResourceRecord[];
   initialMode?: "index" | "detail";
   initialSelectedId?: string;
   initialLoadError?: string;
@@ -95,6 +101,7 @@ const HOME_TABS: readonly DetailTab[] = [
   { id: "links", label: "Links" },
   { id: "decisions", label: "Decisions" },
   { id: "review", label: "Review" },
+  { id: "attachments", label: "Attachments" },
   { id: "properties", label: "Properties" }
 ];
 
@@ -251,7 +258,7 @@ function sortNotes(notes: NoteRecord[], sort: NotesSort) {
 }
 
 function inspectorTabFor(tab: NotesTab): NotesTab {
-  return tab === "attachments" ? "overview" : tab;
+  return tab;
 }
 
 function writableLifecycleFor(note: NoteRecord): NoteWritableLifecycleStatus | null {
@@ -275,6 +282,8 @@ function useMediaQuery(query: string) {
 export default function NotesWorkspace({
   initialNotes,
   contentGraph,
+  initialMediaAssets,
+  initialResources,
   initialMode = "index",
   initialSelectedId,
   initialLoadError = "",
@@ -296,6 +305,7 @@ export default function NotesWorkspace({
   const [sort, setSort] = useState<NotesSort>(firstUrlState.sort);
   const [density, setDensity] = useState(firstUrlState.density);
   const [selectedId, setSelectedId] = useState(initialSelectedId || firstUrlState.note || initialNotes[0]?.id || "");
+  const [selectedAttachmentItemId, setSelectedAttachmentItemId] = useState(firstUrlState.item);
   const [activeTab, setActiveTab] = useState<NotesTab>(
     initialMode === "detail" && firstUrlState.tab === "overview" ? "body" : firstUrlState.tab
   );
@@ -331,6 +341,22 @@ export default function NotesWorkspace({
     () => notes.find((note) => note.id === selectedId) || null,
     [notes, selectedId]
   );
+  const selectedAttachmentEvidence = useMemo(
+    () => selectedNote
+      ? buildNoteAttachmentEvidence({
+          note: selectedNote,
+          graph: contentGraph,
+          mediaAssets: initialMediaAssets,
+          resources: initialResources
+        })
+      : null,
+    [contentGraph, initialMediaAssets, initialResources, selectedNote]
+  );
+  const selectedAttachmentItem = useMemo(
+    () => selectedAttachmentEvidence?.items.find((item) => item.id === selectedAttachmentItemId) || null,
+    [selectedAttachmentEvidence, selectedAttachmentItemId]
+  );
+  const attachmentEvidenceKey = selectedAttachmentEvidence?.items.map((item) => item.id).join("|") || "";
   const writableSelectedLifecycle = selectedNote ? writableLifecycleFor(selectedNote) : null;
   const counts = useMemo(() => buildNoteViewCounts(notes), [notes]);
   const propertyQueue = useMemo(() => buildNotePropertyQueue(notes), [notes]);
@@ -359,10 +385,21 @@ export default function NotesWorkspace({
     setSort(next.sort);
     setDensity(next.density);
     setAiOpen(next.ai);
+    setSelectedAttachmentItemId(next.item);
     if (!initialSelectedId) setSelectedId(next.note || initialNotes[0]?.id || "");
     setActiveTab(initialMode === "detail" && next.tab === "overview" ? "body" : next.tab);
     if (initialMode === "index") setInspectorTab(inspectorTabFor(next.tab));
   }, [initialMode, initialSelectedId, searchParamKey]);
+
+  useEffect(() => {
+    if (activeTab !== "attachments" || !selectedAttachmentEvidence) return;
+    const nextItemId = selectedAttachmentEvidence.items.some((item) => item.id === selectedAttachmentItemId)
+      ? selectedAttachmentItemId
+      : selectedAttachmentEvidence.items[0]?.id || "";
+    if (nextItemId === selectedAttachmentItemId) return;
+    setSelectedAttachmentItemId(nextItemId);
+    updateUrl({ item: nextItemId }, { history: "replace" });
+  }, [activeTab, attachmentEvidenceKey, selectedAttachmentItemId]);
 
   useEffect(() => {
     if (!selectedNote) return;
@@ -401,6 +438,7 @@ export default function NotesWorkspace({
         query,
         note: path === getModuleRoute("notes") ? selectedId : "",
         tab: activeTab,
+        item: selectedAttachmentItemId,
         ai: aiOpen,
         ...partial
       },
@@ -420,10 +458,11 @@ export default function NotesWorkspace({
 
   function selectNote(id: string) {
     setSelectedId(id);
+    setSelectedAttachmentItemId("");
     setInspectorOpen(true);
     setInspectorTab("overview");
     setActiveTab("overview");
-    updateUrl({ note: id, tab: "overview" }, { history: "push" });
+    updateUrl({ note: id, tab: "overview", item: "" }, { history: "push" });
   }
 
   function selectDirectoryView(nextView: NotesView, reason = "") {
@@ -897,6 +936,30 @@ export default function NotesWorkspace({
     );
   }
 
+  function renderDetailAttachmentsPanel(note: NoteRecord, tabsId: string) {
+    const evidence = selectedAttachmentEvidence || buildNoteAttachmentEvidence({
+      note,
+      graph: contentGraph,
+      mediaAssets: initialMediaAssets,
+      resources: initialResources
+    });
+
+    return (
+      <DetailTabPanel tabsId={tabsId} tabId="attachments" active>
+        <NoteAttachmentsView
+          evidence={evidence}
+          selectedItemId={selectedAttachmentItemId}
+          onSelectItem={(itemId) => {
+            setSelectedAttachmentItemId(itemId);
+            setInspectorTab("attachments");
+            setInspectorOpen(true);
+            updateUrl({ tab: "attachments", item: itemId }, { history: "push" });
+          }}
+        />
+      </DetailTabPanel>
+    );
+  }
+
   function renderDetailReviewPanel(note: NoteRecord, tabsId: string) {
     const candidates = contentLinksForObject(contentGraph, note.nativeRef);
     const outgoingCandidates = candidates.filter((candidate) => sameNativeObject(candidate.source, note.nativeRef));
@@ -1217,7 +1280,11 @@ export default function NotesWorkspace({
   ) : undefined;
 
   const inspectorDisplayTab =
-    initialMode === "detail" && (activeTab === "properties" || activeTab === "decisions")
+    initialMode === "detail" && (
+      activeTab === "properties" ||
+      activeTab === "decisions" ||
+      activeTab === "attachments"
+    )
       ? activeTab
       : inspectorTab;
 
@@ -1347,6 +1414,17 @@ export default function NotesWorkspace({
       );
     }
 
+    if (inspectorDisplayTab === "attachments" && selectedAttachmentEvidence) {
+      return (
+        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="attachments" active>
+          <NoteAttachmentInspector
+            evidence={selectedAttachmentEvidence}
+            selectedItem={selectedAttachmentItem}
+          />
+        </DetailTabPanel>
+      );
+    }
+
     if (inspectorDisplayTab !== "overview" && inspectorDisplayTab !== "body") {
       return (
         <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId={inspectorDisplayTab} active>
@@ -1438,7 +1516,11 @@ export default function NotesWorkspace({
             const nextTab = tab as NotesTab;
             if (
               initialMode === "detail" &&
-              (activeTab === "properties" || activeTab === "decisions")
+              (
+                activeTab === "properties" ||
+                activeTab === "decisions" ||
+                activeTab === "attachments"
+              )
             ) {
               const nextDetailTab = nextTab === "overview" ? "body" : nextTab;
               setActiveTab(nextDetailTab);
@@ -1468,7 +1550,7 @@ export default function NotesWorkspace({
         module="notes"
         sidebar={sidebar}
         inspector={inspector}
-        aiDock={aiDock}
+        aiDock={isInspectorOverlay && inspectorOpen ? undefined : aiDock}
         mode="editor"
         ariaLabel="Note editor"
         className={`${styles.shell} ${styles.detailShell}`}
@@ -1583,6 +1665,8 @@ export default function NotesWorkspace({
                 renderDetailDecisionsPanel(currentNote, detailTabsId)
               ) : activeTab === "review" ? (
                 renderDetailReviewPanel(currentNote, detailTabsId)
+              ) : activeTab === "attachments" ? (
+                renderDetailAttachmentsPanel(currentNote, detailTabsId)
               ) : activeTab === "properties" ? (
                 renderDetailPropertiesPanel(currentNote, detailTabsId)
               ) : (
@@ -1616,7 +1700,7 @@ export default function NotesWorkspace({
       module="notes"
       sidebar={sidebar}
       inspector={inspector}
-      aiDock={aiDock}
+      aiDock={isInspectorOverlay && inspectorOpen ? undefined : aiDock}
       mode="directory"
       ariaLabel="Notes directory"
       className={styles.shell}

@@ -1238,6 +1238,14 @@
 }
 
 @media (min-width: 761px) and (max-width: 1600px) {
+  .shell > :global(.inspector-rail) .tabs > :global(button) {
+    flex: 0 0 auto;
+    width: auto;
+    padding-right: 6px;
+    padding-left: 6px;
+    font-size: 10px;
+  }
+
   .detailShell .editorHeadingRow {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1306,6 +1314,10 @@
   }
 
   .mobileInspectorButton {
+    display: inline-flex;
+  }
+
+  .closeButton {
     display: inline-flex;
   }
 

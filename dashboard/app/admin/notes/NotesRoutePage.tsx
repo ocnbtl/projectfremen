@@ -56,6 +56,8 @@ export default async function NotesRoutePage({
       <NotesWorkspace
         initialNotes={notes}
         contentGraph={contentGraph}
+        initialMediaAssets={media}
+        initialResources={resources}
         initialMode={mode}
         initialSelectedId={noteId}
         initialLoadError={loadError}

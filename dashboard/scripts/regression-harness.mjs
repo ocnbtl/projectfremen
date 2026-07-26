@@ -1283,6 +1283,182 @@ async function checkResourcesReviewAndPropertiesBrowserState(
   }
 }
 
+async function checkNoteAttachmentsBrowserState(
+  baseUrl,
+  cookieJar,
+  noteId,
+  mediaId,
+  mediaTitle,
+  resourceId,
+  resourceTitle
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "notes-attachments-checkpoint");
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const url = new URL(request.url());
+      const failure = request.failure()?.errorText || "";
+      if (!url.pathname.startsWith("/_vercel/") && !failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (response.status() >= 400 && url.pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(!diagnostics.overflowX, `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`);
+  }
+
+  try {
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1440, height: 900, label: "1440x900" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({ width: viewport.width, height: viewport.height });
+      const page = await context.newPage();
+      observe(page);
+      await page.goto(
+        `${baseUrl}/admin/notes/${noteId}?tab=attachments&item=${encodeURIComponent(`media:${mediaId}`)}&probe=keep`,
+        { waitUntil: "domcontentloaded" }
+      );
+      await page.getByRole("heading", { level: 2, name: "Attachment evidence" }).waitFor();
+      assert(
+        new URL(page.url()).searchParams.get("item") === `media:${mediaId}`,
+        `Note Attachments ${viewport.label} did not restore selected item URL state`
+      );
+      assert(
+        await page.locator(`[data-attachment-evidence-id="media:${mediaId}"][data-selected="true"]`).count() === 1,
+        `Note Attachments ${viewport.label} did not render selected Media evidence`
+      );
+      await assertNoDocumentOverflow(page, `Note Attachments ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `note-attachments-${viewport.label}.png`)
+      });
+
+      if (viewport.width === 1440) {
+        await page.getByRole("button", { name: `Inspect ${resourceTitle}` }).click();
+        await page.waitForFunction((id) => (
+          new URL(window.location.href).searchParams.get("item") === `resource:${id}`
+        ), resourceId);
+        assert(
+          await page.locator(`[data-note-attachment-inspector="resource:${resourceId}"]`).count() === 1,
+          "Note Attachments desktop row selection did not update the inspector"
+        );
+        assert(new URL(page.url()).searchParams.get("probe") === "keep", "Note Attachments dropped unknown safe URL state");
+        await page.goBack({ waitUntil: "domcontentloaded" });
+        await page.waitForFunction((id) => (
+          new URL(window.location.href).searchParams.get("item") === `media:${id}`
+        ), mediaId);
+        await page.goForward({ waitUntil: "domcontentloaded" });
+        await page.waitForFunction((id) => (
+          new URL(window.location.href).searchParams.get("item") === `resource:${id}`
+        ), resourceId);
+        await page.reload({ waitUntil: "domcontentloaded" });
+        assert(
+          await page.locator(`[data-attachment-evidence-id="resource:${resourceId}"][data-selected="true"]`).count() === 1,
+          "Note Attachments refresh did not restore Resource selection"
+        );
+      }
+
+      if (viewport.width <= 1024) {
+        await page.getByRole("button", { name: `Inspect ${mediaTitle}` }).click();
+        const inspector = page.locator(".inspector-rail");
+        await page.locator('.inspector-rail[data-overlay-open="true"]').waitFor({ state: "visible" });
+        await page.waitForFunction(() => Boolean(document.querySelector(".inspector-rail")?.contains(document.activeElement)));
+        assert(
+          await page.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+          `Note Attachments ${viewport.label} exposed the AI dock beneath the inspector`
+        );
+        if (viewport.width <= 720) {
+          const undersizedTargets = await page.locator(
+            '.inspector-rail button:visible, .inspector-rail a[href]:visible'
+          ).evaluateAll((elements) => elements
+            .map((element) => {
+              const rect = element.getBoundingClientRect();
+              return {
+                label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+                width: rect.width,
+                height: rect.height
+              };
+            })
+            .filter((item) => item.width < 44 || item.height < 44));
+          assert(
+            undersizedTargets.length === 0,
+            `Note Attachments ${viewport.label} inspector targets below 44px: ${JSON.stringify(undersizedTargets)}`
+          );
+        }
+        await page.keyboard.press("Shift+Tab");
+        assert(
+          await page.evaluate(() => Boolean(document.querySelector(".inspector-rail")?.contains(document.activeElement))),
+          `Note Attachments ${viewport.label} focus escaped the modal inspector`
+        );
+      }
+
+      await context.close();
+    }
+
+    assert(mutatingRequests.length === 0, `Note Attachments interactions emitted mutations: ${mutatingRequests.join(" | ")}`);
+    assert(browserErrors.length === 0, `Note Attachments browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Note Attachments browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "project-fremen-regression-"));
   const port = await getFreePort();
@@ -4500,6 +4676,98 @@ async function main() {
     assert(createMedia.response.ok && createMedia.payload?.ok, `Media create failed: ${JSON.stringify(createMedia.payload)}`);
     const createdMedia = createMedia.payload.items?.find((item) => item.title === mediaTitle && item.className === "file");
     assert(createdMedia?.id, "Created legacy Media record was not returned");
+
+    const attachmentNoteTitle = `${testRunId}-attachment-evidence-note`;
+    const missingAttachmentOwnerId = `${testRunId}-missing-attachment-owner`;
+    const createAttachmentNote = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        domain: "notes-docs",
+        title: attachmentNoteTitle,
+        className: "note",
+        status: "active",
+        body: "Regression-created Note with explicit cross-module attachment evidence.",
+        url: sharedContentSourceUrl,
+        relations: {
+          related: [createdMedia.id, createdResource.id, missingAttachmentOwnerId]
+        },
+        intents: ["retain"]
+      })
+    });
+    assert(
+      createAttachmentNote.response.ok && createAttachmentNote.payload?.ok,
+      `Attachment-evidence Note create failed: ${JSON.stringify(createAttachmentNote.payload)}`
+    );
+    const attachmentNote = createAttachmentNote.payload.items?.find(
+      (item) => item.title === attachmentNoteTitle && item.className === "note"
+    );
+    assert(attachmentNote?.id, "Attachment-evidence Note was not returned");
+
+    const noteAttachments = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes/${attachmentNote.id}?tab=attachments&item=${encodeURIComponent(`media:${createdMedia.id}`)}`
+    );
+    assert(
+      noteAttachments.response.ok,
+      `Note Attachments route failed: ${describeStatus(noteAttachments.response)}`
+    );
+    assertSelectedTab(
+      noteAttachments.body,
+      `note-detail-${attachmentNote.id}-tab-attachments`,
+      "Note Attachments direct tab URL state"
+    );
+    for (const expected of [
+      "Attachment evidence",
+      mediaTitle,
+      resourceTitle,
+      missingAttachmentOwnerId,
+      "No persisted NoteAttachment",
+      "Resource stays Resource",
+      "Media owns files",
+      "Needs Confirmation",
+      "Filename",
+      "Unavailable",
+      "Persisted relationship",
+      "No"
+    ]) {
+      assert(
+        noteAttachments.body.includes(expected),
+        `Note Attachments route missing ownership-safe evidence: ${expected}`
+      );
+    }
+    assert(
+      noteAttachments.body.includes(`data-attachment-evidence-id="media:${createdMedia.id}"`) &&
+        noteAttachments.body.includes('data-selected="true"') &&
+        noteAttachments.body.includes(`data-note-attachment-inspector="media:${createdMedia.id}"`),
+      "Note Attachments did not restore selected evidence and inspector state"
+    );
+    for (const forbidden of [
+      "review_screenshot.png",
+      "1728×972",
+      "1.8 MB",
+      "68% complete"
+    ]) {
+      assert(
+        !noteAttachments.body.includes(forbidden),
+        `Note Attachments rendered a mockup value as live evidence: ${forbidden}`
+      );
+    }
+    pass("Notes Attachments exposes dynamic Media, Resource, and unresolved evidence without inventing persisted links");
+    await checkNoteAttachmentsBrowserState(
+      server.baseUrl,
+      cookieJar,
+      attachmentNote.id,
+      createdMedia.id,
+      mediaTitle,
+      createdResource.id,
+      resourceTitle
+    );
+    pass("Notes Attachments preserves row selection, URL history, responsive access, focus containment, and zero mutations");
 
     const mediaNoSourceTitle = `${mediaRightsQueryToken}-no-source`;
     const createMediaNoSource = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {

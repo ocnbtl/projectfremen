@@ -53,7 +53,16 @@ export default function InspectorRail({
       railRef.current?.querySelectorAll<HTMLElement>(
         "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
       ) || []
-    );
+    ).filter((element) => {
+      const computed = window.getComputedStyle(element);
+      return (
+        element.tabIndex >= 0 &&
+        element.getClientRects().length > 0 &&
+        computed.display !== "none" &&
+        computed.visibility !== "hidden" &&
+        element.getAttribute("aria-disabled") !== "true"
+      );
+    });
     controls()[0]?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
       const activeElement = document.activeElement;

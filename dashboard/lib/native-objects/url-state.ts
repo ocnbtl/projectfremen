@@ -489,6 +489,7 @@ export type NotesUrlState = {
   query: string;
   note: string;
   tab: NotesTab;
+  item: string;
   ai: boolean;
 };
 
@@ -512,6 +513,13 @@ export const NOTES_URL_STATE_SCHEMA: UrlStateSchema<NotesUrlState> = {
     omit: (value) => value.trim() === ""
   },
   tab: enumCodec("tab", NOTES_TABS, "overview"),
+  item: {
+    param: "item",
+    defaultValue: "",
+    parse: (raw) => raw?.trim() || undefined,
+    serialize: (value) => value.trim(),
+    omit: (value) => value.trim() === ""
+  },
   ai: {
     param: "ai",
     defaultValue: false,
