@@ -11,6 +11,8 @@ import FinanceBillsRouteView from "./finance/FinanceBillsView";
 import FinanceBudgetsRouteView from "./finance/FinanceBudgetsView";
 import FinanceInspector, { isFinanceInspectableView, isFinanceTabAllowed } from "./finance/FinanceInspector";
 import FinanceMonthlyReviewRouteView from "./finance/FinanceMonthlyReviewView";
+import FinanceRulesInspector, { isFinanceRuleTab } from "./finance/FinanceRulesInspector";
+import FinanceRulesRouteView from "./finance/FinanceRulesView";
 import FinanceTransactionsRouteView from "./finance/FinanceTransactionsView";
 import {
   createNativeObjectRef,
@@ -25,6 +27,12 @@ import { buildFinanceAccountsViewModel } from "../lib/modules/finance/accounts-v
 import { buildFinanceBillsViewModel } from "../lib/modules/finance/bills-view-model";
 import { buildFinanceBudgetsViewModel } from "../lib/modules/finance/budgets-view-model";
 import { buildFinanceMonthlyReviewViewModel } from "../lib/modules/finance/monthly-review-view-model";
+import { financeRulesFixtureRepository } from "../lib/modules/finance/rules-fixture-repository";
+import {
+  buildFinanceRulesViewModel,
+  runFinanceRuleTests,
+  type FinanceRuleTestRun
+} from "../lib/modules/finance/rules-view-model";
 import { buildFinanceTransactionsViewModel } from "../lib/modules/finance/transactions-view-model";
 import {
   buildFinanceFixtureViewModel,
@@ -39,7 +47,9 @@ import type {
 } from "../lib/modules/finance/types";
 
 const financeDataset = financeFixtureRepository.read();
+const financeRulesDataset = financeRulesFixtureRepository.read();
 const financeViewModel = buildFinanceFixtureViewModel(financeDataset);
+const financeRulesSummary = buildFinanceRulesViewModel(financeRulesDataset);
 const { accounts, budgets, bills, transactions, reviewItems, reminders, linkedContext, snapshot } = financeDataset;
 const FINANCE_PREVIEW_LABEL = financeFixtureRepository.metadata.previewLabel;
 const FINANCE_PREVIEW_REASON = `${FINANCE_PREVIEW_LABEL}. Persistent Finance mutations are not connected.`;
@@ -70,7 +80,8 @@ const VIEWS: Array<{ id: ViewId; label: string; hue: Hue }> = [
   { id: "transactions", label: "Transactions", hue: "neutral" },
   { id: "budgets", label: "Budgets", hue: "teal" },
   { id: "bills", label: "Bills & Subscriptions", hue: "orange" },
-  { id: "review", label: "Monthly Review", hue: "violet" }
+  { id: "review", label: "Monthly Review", hue: "violet" },
+  { id: "rules", label: "Rules / Automation", hue: "purple" }
 ];
 
 const SMART_VIEWS: Array<{ id: string; label: string; hue: Hue; view: ViewId; notice: string; mode?: "filter" | "jump"; disabledReason?: string }> = [
@@ -87,6 +98,7 @@ function smartViewCount(id: string) {
 }
 
 function viewBadge(view: ViewId) {
+  if (view === "rules") return `${financeRulesSummary.counts.active} active`;
   return getFinanceViewBadge(financeViewModel, view);
 }
 
@@ -505,12 +517,6 @@ function FinanceSidebar({
               disabledReason: "No import source, batch, repair, or reconciliation repository is connected."
             },
             {
-              id: "data-rules",
-              label: "Rules / Automation",
-              disabled: true,
-              disabledReason: "No rule repository, risk policy, test history, or activation audit is connected."
-            },
-            {
               id: "data-settings",
               label: "Settings",
               disabled: true,
@@ -709,7 +715,7 @@ export default function FinanceWorkspace({
   );
   const [selectedTxnId, setSelectedTxnId] = useState(routedInitialView === "transactions" ? initialUrlState.selected : "");
   const [selectedSecondaryId, setSelectedSecondaryId] = useState(
-    routedInitialView === "bills" || routedInitialView === "budgets" || routedInitialView === "review"
+    routedInitialView === "bills" || routedInitialView === "budgets" || routedInitialView === "review" || routedInitialView === "rules"
       ? initialUrlState.selected
       : ""
   );
@@ -725,6 +731,7 @@ export default function FinanceWorkspace({
   const [compactInspector, setCompactInspector] = useState(false);
   const [query, setQuery] = useState(initialUrlState.query);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
+  const [ruleTestRuns, setRuleTestRuns] = useState<Readonly<Record<string, FinanceRuleTestRun>>>({});
   const searchParamKey = searchParams.toString();
   const accountsModel = buildFinanceAccountsViewModel(financeDataset, {
     query: view === "accounts" ? query : "",
@@ -755,6 +762,12 @@ export default function FinanceWorkspace({
     sort,
     selectedId: selectedSecondaryId
   });
+  const rulesModel = buildFinanceRulesViewModel(financeRulesDataset, {
+    query: view === "rules" ? query : "",
+    filter: view === "rules" ? smartFilter : "",
+    sort,
+    selectedId: selectedSecondaryId || undefined
+  });
   const selectedAccount = accounts.find((account) => account.id === accountsModel.selectedId) || null;
 
   useEffect(() => {
@@ -774,7 +787,13 @@ export default function FinanceWorkspace({
     setSort(next.sort);
     setQuery(next.query);
     setAiOpen(next.ai);
-    setTab(isFinanceInspectableView(nextView) && isFinanceTabAllowed(nextView, next.tab) ? next.tab : "overview");
+    setTab(
+      nextView === "rules"
+        ? isFinanceRuleTab(next.tab) ? next.tab : "overview"
+        : isFinanceInspectableView(nextView) && isFinanceTabAllowed(nextView, next.tab)
+          ? next.tab
+          : "overview"
+    );
     setInspectorDismissed((current) => current && !next.selected);
     if (nextView === "overview" || nextView === "accounts") {
       setSelectedAccountId(next.selected);
@@ -786,13 +805,13 @@ export default function FinanceWorkspace({
     } else {
       setSelectedTxnId("");
     }
-    if (nextView === "bills" || nextView === "budgets" || nextView === "review") {
+    if (nextView === "bills" || nextView === "budgets" || nextView === "review" || nextView === "rules") {
       setSelectedSecondaryId(next.selected);
     } else {
       setSelectedSecondaryId("");
     }
     setCheckedTxnIds(new Set());
-    setInspectorOpen(Boolean(next.selected && ["accounts", "transactions", "bills", "budgets", "review"].includes(nextView)));
+    setInspectorOpen(Boolean(next.selected && ["accounts", "transactions", "bills", "budgets", "review", "rules"].includes(nextView)));
     const canonicalParams = serializeFinanceUrlState(next, searchParams);
     if (initialView) canonicalParams.delete("view");
     if (canonicalParams.toString() !== searchParams.toString()) {
@@ -805,7 +824,7 @@ export default function FinanceWorkspace({
   }, [initialView, pathname, searchParamKey, searchParams]);
 
   useEffect(() => {
-    if (inspectorDismissed || !["accounts", "transactions", "bills", "budgets", "review"].includes(view)) return;
+    if (inspectorDismissed || !["accounts", "transactions", "bills", "budgets", "review", "rules"].includes(view)) return;
     const resolvedSelectedId = view === "accounts"
       ? accountsModel.selectedId || ""
       : view === "transactions"
@@ -814,7 +833,9 @@ export default function FinanceWorkspace({
           ? billsModel.selectedId || ""
           : view === "budgets"
             ? budgetsModel.selectedId || ""
-            : monthlyReviewModel.selectedId || "";
+            : view === "review"
+              ? monthlyReviewModel.selectedId || ""
+              : rulesModel.selectedId || "";
     const currentSelectedId = view === "accounts"
       ? selectedAccountId
       : view === "transactions"
@@ -853,6 +874,7 @@ export default function FinanceWorkspace({
     billsModel.selectedId,
     budgetsModel.selectedId,
     monthlyReviewModel.selectedId,
+    rulesModel.selectedId,
     query,
     searchParams,
     selectedAccountId,
@@ -876,7 +898,9 @@ export default function FinanceWorkspace({
             ? budgetsModel.selectedId || ""
             : view === "review"
               ? monthlyReviewModel.selectedId || ""
-              : "";
+              : view === "rules"
+                ? rulesModel.selectedId || ""
+                : "";
     const nextView = partial.view || view;
     const normalizedState = normalizeFinanceUrlStateForView(
       nextView,
@@ -997,6 +1021,7 @@ export default function FinanceWorkspace({
       || (view === "bills" && Boolean(billsModel.selected))
       || (view === "budgets" && Boolean(budgetsModel.selected))
       || (view === "review" && Boolean(monthlyReviewModel.selected))
+      || (view === "rules" && Boolean(rulesModel.selected))
     );
   const showContext = !aiOpen && !inspectorDismissed && view === "overview";
   const activeSmart = useMemo(() => SMART_VIEWS.find((item) => item.id === smartFilter), [smartFilter]);
@@ -1008,6 +1033,8 @@ export default function FinanceWorkspace({
       ? { objectType: "budget", objectId: budgetsModel.selectedId || view, label: budgetsModel.selected?.budget.category || activeView.label }
     : view === "review"
         ? { objectType: "finance_close_check", objectId: monthlyReviewModel.selectedId || view, label: monthlyReviewModel.selected?.item.label || activeView.label }
+      : view === "rules"
+        ? { objectType: "finance_rule", objectId: rulesModel.selectedId || view, label: rulesModel.selected?.name || activeView.label }
         : null;
   const aiObject = createNativeObjectRef({
     module: "finance",
@@ -1043,10 +1070,40 @@ export default function FinanceWorkspace({
     setInspectorDismissed(true);
     if (view === "accounts") setSelectedAccountId("");
     if (view === "transactions") setSelectedTxnId("");
-    if (view === "bills" || view === "budgets" || view === "review") setSelectedSecondaryId("");
+    if (view === "bills" || view === "budgets" || view === "review" || view === "rules") setSelectedSecondaryId("");
     setTab("overview");
     updateFinanceUrl({ selected: "", tab: "overview" });
     setInspectorOpen(false);
+  }
+
+  function runSelectedRuleTests() {
+    const rule = rulesModel.selected;
+    if (!rule) {
+      setNotice("Select a visible rule before running its deterministic fixture tests.");
+      return;
+    }
+    const run = runFinanceRuleTests(rule, new Date().toISOString());
+    setRuleTestRuns((current) => ({ ...current, [rule.id]: run }));
+    setNotice(
+      `${rule.name}: ${run.passed} passed, ${run.failed} failed, ${run.review} need review. ` +
+      "The preview made 0 source mutations and was not persisted."
+    );
+  }
+
+  function runVisibleRuleTests() {
+    const executedAt = new Date().toISOString();
+    const runs = Object.fromEntries(
+      rulesModel.rows.map((rule) => [rule.id, runFinanceRuleTests(rule, executedAt)])
+    );
+    const values = Object.values(runs);
+    const passed = values.reduce((sum, run) => sum + run.passed, 0);
+    const failed = values.reduce((sum, run) => sum + run.failed, 0);
+    const review = values.reduce((sum, run) => sum + run.review, 0);
+    setRuleTestRuns((current) => ({ ...current, ...runs }));
+    setNotice(
+      `${rulesModel.visibleCount} visible rules tested: ${passed} passed, ${failed} failed, ${review} need review. ` +
+      "The deterministic preview made 0 source mutations and was not persisted."
+    );
   }
 
   return (
@@ -1058,24 +1115,39 @@ export default function FinanceWorkspace({
       sidebar={<FinanceSidebar view={view} smartFilter={smartFilter} onSmart={handleSmart} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />}
       inspector={
         showRail
-          ? <FinanceInspector
-              view={view as "accounts" | "transactions" | "bills" | "budgets" | "review"}
-              accountModel={accountsModel}
-              transactionModel={transactionsModel}
-              billsModel={billsModel}
-              budgetsModel={budgetsModel}
-              monthlyReviewModel={monthlyReviewModel}
-              linkedContext={linkedContext}
-              activeTab={tab}
-              onTabChange={(nextTab) => {
-                setTab(nextTab);
-                updateFinanceUrl({ tab: nextTab }, { native: true });
-              }}
-              onClose={closeInspector}
-              mobileOpen={inspectorOpen}
-              overlay={compactInspector}
-              overlayOpen={compactInspector && inspectorOpen}
-            />
+          ? view === "rules" && rulesModel.selected
+            ? <FinanceRulesInspector
+                rule={rulesModel.selected}
+                run={ruleTestRuns[rulesModel.selected.id] || null}
+                activeTab={tab}
+                onTabChange={(nextTab) => {
+                  setTab(nextTab);
+                  updateFinanceUrl({ tab: nextTab }, { native: true });
+                }}
+                onRunTests={runSelectedRuleTests}
+                onClose={closeInspector}
+                mobileOpen={inspectorOpen}
+                overlay={compactInspector}
+                overlayOpen={compactInspector && inspectorOpen}
+              />
+            : <FinanceInspector
+                view={view as "accounts" | "transactions" | "bills" | "budgets" | "review"}
+                accountModel={accountsModel}
+                transactionModel={transactionsModel}
+                billsModel={billsModel}
+                budgetsModel={budgetsModel}
+                monthlyReviewModel={monthlyReviewModel}
+                linkedContext={linkedContext}
+                activeTab={tab}
+                onTabChange={(nextTab) => {
+                  setTab(nextTab);
+                  updateFinanceUrl({ tab: nextTab }, { native: true });
+                }}
+                onClose={closeInspector}
+                mobileOpen={inspectorOpen}
+                overlay={compactInspector}
+                overlayOpen={compactInspector && inspectorOpen}
+              />
           : showContext
             ? <FinanceContextRail onOpenTransaction={(id) => navigateToSelected("transactions", id)} mobileOpen={inspectorOpen} overlay={compactInspector} overlayOpen={compactInspector && inspectorOpen} onClose={closeInspector} />
             : undefined
@@ -1133,9 +1205,11 @@ export default function FinanceWorkspace({
                 ? transactionsModel.selected?.merchant || "transaction"
                 : view === "bills"
                   ? billsModel.selected?.bill.name || "bill"
-                  : view === "budgets"
-                    ? budgetsModel.selected?.budget.category || "budget"
-                    : monthlyReviewModel.selected?.item.label || "close item"} detail`
+                : view === "budgets"
+                  ? budgetsModel.selected?.budget.category || "budget"
+                  : view === "review"
+                    ? monthlyReviewModel.selected?.item.label || "close item"
+                    : rulesModel.selected?.name || "rule"} detail`
             : "Open Finance context"}
         </button>
       )}
@@ -1232,6 +1306,29 @@ export default function FinanceWorkspace({
               const reminder = reminders.find((item) => item.id === id);
               setNotice(reminder ? `${reminder.text} is a proposal reminder only; no savings movement was created.` : "Proposal reminder unavailable.");
             }}
+          />
+        )}
+        {view === "rules" && (
+          <FinanceRulesRouteView
+            model={rulesModel}
+            filter={smartFilter}
+            onQueryChange={(nextQuery) => {
+              setQuery(nextQuery);
+              setInspectorDismissed(false);
+              updateFinanceUrl({ query: nextQuery }, { native: true });
+            }}
+            onFilterChange={(nextFilter) => {
+              setSmartFilter(nextFilter);
+              setInspectorDismissed(false);
+              updateFinanceUrl({ filter: nextFilter }, { native: true });
+            }}
+            onSortChange={(nextSort) => {
+              setSort(nextSort);
+              updateFinanceUrl({ sort: nextSort }, { native: true });
+            }}
+            onSelect={selectSecondary}
+            onRunVisibleTests={runVisibleRuleTests}
+            onNotice={setNotice}
           />
         )}
         {view === "transactions" && (

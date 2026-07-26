@@ -122,10 +122,10 @@ export function DetailTabPanel({ tabsId, tabId, active, children, className }: D
       aria-labelledby={`${safeTabsId}-tab-${safeTabId}`}
       tabIndex={0}
       hidden={!active}
+      style={active ? undefined : { display: "none" }}
       className={["detail-tab-panel", className].filter(Boolean).join(" ")}
     >
       {children}
     </section>
   );
 }
-

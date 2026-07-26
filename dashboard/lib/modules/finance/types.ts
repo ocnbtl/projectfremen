@@ -1,3 +1,5 @@
+import type { NativeObjectRef } from "../../native-objects/types";
+
 export type FinanceHue =
   | "neutral"
   | "green"
@@ -160,4 +162,143 @@ export interface FinanceFixtureMetadata {
 export interface FinanceFixtureRepository {
   readonly metadata: FinanceFixtureMetadata;
   read(): FinanceFixtureDataset;
+}
+
+export type FinanceRuleType =
+  | "categorization"
+  | "receipt_evidence"
+  | "recurrence"
+  | "budget_variance"
+  | "savings"
+  | "import_repair"
+  | "close_blocker"
+  | "project_link";
+
+export type FinanceRuleMode =
+  | "auto"
+  | "suggest"
+  | "manual_approval"
+  | "draft"
+  | "disabled";
+
+export type FinanceRuleHealth =
+  | "stable"
+  | "needs_review"
+  | "broken"
+  | "overfiring"
+  | "draft";
+
+export type FinanceRuleCapability =
+  | "categorization"
+  | "receipts"
+  | "recurring"
+  | "budget"
+  | "savings"
+  | "imports"
+  | "close"
+  | "project_linked";
+
+export type FinanceRuleInputField =
+  | "merchant"
+  | "amount"
+  | "category"
+  | "forecastPercent"
+  | "receiptPresent"
+  | "reimbursable"
+  | "reimbursed"
+  | "recurringOccurrences"
+  | "amountVariancePercent"
+  | "confidence"
+  | "statementPresent"
+  | "billReviewed"
+  | "projectLinked"
+  | "fromAccount"
+  | "toAccount"
+  | "closePeriod";
+
+export type FinanceRuleConditionOperator =
+  | "contains"
+  | "equals"
+  | "greater_than"
+  | "greater_than_or_equal"
+  | "less_than"
+  | "is_true"
+  | "is_false"
+  | "present"
+  | "missing";
+
+export type FinanceRuleTestInput = Partial<
+  Record<FinanceRuleInputField, string | number | boolean | null>
+>;
+
+export interface FinanceRuleCondition {
+  readonly id: string;
+  readonly field: FinanceRuleInputField;
+  readonly operator: FinanceRuleConditionOperator;
+  readonly value?: string | number | boolean;
+  readonly label: string;
+  readonly required: boolean;
+}
+
+export interface FinanceRuleAction {
+  readonly id: string;
+  readonly label: string;
+  readonly destination: "finance" | "projects" | "personal_ops" | "reviews" | "media";
+  readonly approvalRequired: boolean;
+  readonly mutationLevel: "flag_only" | "draft_record" | "source_mutation";
+}
+
+export interface FinanceRuleTestCase {
+  readonly id: string;
+  readonly label: string;
+  readonly input: FinanceRuleTestInput;
+  readonly expectedActionIds: readonly string[];
+}
+
+export interface FinanceRuleActivity {
+  readonly id: string;
+  readonly occurredAt: string;
+  readonly action: "fixture_defined" | "test_previewed" | "review_requested" | "disabled";
+  readonly summary: string;
+}
+
+export interface FinanceRule {
+  readonly id: string;
+  readonly name: string;
+  readonly description: string;
+  readonly type: FinanceRuleType;
+  readonly scope: string;
+  readonly trigger: string;
+  readonly mode: FinanceRuleMode;
+  readonly health: FinanceRuleHealth;
+  readonly enabled: boolean;
+  readonly requiresApproval: boolean;
+  readonly capabilities: readonly FinanceRuleCapability[];
+  readonly linkedObjects: readonly NativeObjectRef[];
+  readonly generatedCloseBlockers: number;
+  readonly lastEventAt: string | null;
+  readonly nextAction: string;
+  readonly conditions: readonly FinanceRuleCondition[];
+  readonly actions: readonly FinanceRuleAction[];
+  readonly tests: readonly FinanceRuleTestCase[];
+  readonly guardrails: readonly string[];
+  readonly failureMode: string;
+  readonly activity: readonly FinanceRuleActivity[];
+}
+
+export interface FinanceRulesFixtureDataset {
+  readonly rules: readonly FinanceRule[];
+}
+
+export interface FinanceRulesFixtureMetadata {
+  readonly id: string;
+  readonly previewLabel: string;
+  readonly readOnly: true;
+  readonly persistenceConnected: false;
+  readonly testExecution: "deterministic_browser_preview";
+}
+
+export interface FinanceRulesFixtureRepository {
+  readonly metadata: FinanceRulesFixtureMetadata;
+  read(): FinanceRulesFixtureDataset;
 }

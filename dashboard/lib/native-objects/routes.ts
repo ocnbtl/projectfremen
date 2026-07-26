@@ -40,7 +40,8 @@ export const MODULE_VIEW_ROUTES: Readonly<
     accounts: "/admin/finance/accounts",
     bills: "/admin/finance/bills",
     budgets: "/admin/finance/budgets",
-    review: "/admin/finance/monthly-review"
+    review: "/admin/finance/monthly-review",
+    rules: "/admin/finance/rules"
   }
 };
 
@@ -76,7 +77,9 @@ const FINANCE_VIEWS: Readonly<Record<string, string>> = {
   subscription: "bills",
   budget: "budgets",
   monthly_review: "review",
-  finance_close_check: "review"
+  finance_close_check: "review",
+  rule: "rules",
+  finance_rule: "rules"
 };
 
 const PROJECT_CHILD_TABS: Readonly<Record<string, string>> = {
@@ -209,12 +212,6 @@ export function getNativeObjectRoute({
     const collection = PERSONAL_OPS_COLLECTIONS[objectType];
     const base = collection ? `/admin/personal/${collection}` : MODULE_ROUTES.personal_ops;
     return selectedObjectRoute(base, objectId, mode);
-  }
-
-  // Finance Rules has no native route yet. Keep rule references within Finance,
-  // but do not reinterpret a rule id as a selected Command account.
-  if (objectType === "rule") {
-    return MODULE_ROUTES.finance;
   }
 
   const view = objectType === "finance_view" && MODULE_VIEW_ROUTES.finance?.[objectId]

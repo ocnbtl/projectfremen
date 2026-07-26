@@ -314,6 +314,12 @@ async function checkFinanceBrowserState(baseUrl, cookieJar) {
     ));
   }
 
+  async function ruleIds(page) {
+    return page.locator("[data-finance-rule-id]").evaluateAll((rows) => (
+      rows.map((row) => row.getAttribute("data-finance-rule-id"))
+    ));
+  }
+
   async function metricValue(page, ariaLabel, metricLabel) {
     const metric = page.locator(`dl[aria-label="${ariaLabel}"] > div`).filter({
       has: page.locator("dt", { hasText: metricLabel })
@@ -518,24 +524,108 @@ async function checkFinanceBrowserState(baseUrl, cookieJar) {
     assert(await completeClose.evaluate((button) => document.activeElement === button), "Finance Monthly Review unavailable close control is not focusable");
     await completeClose.click({ force: true });
 
+    await page.goto(
+      `${baseUrl}/admin/finance/rules?view=accounts&query=Forecast&selected=RULE-BUDGET-110&tab=tests&probe=keep`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await page.getByRole("heading", { level: 1, name: "Rules / Automation" }).waitFor();
+    await page.waitForFunction(() => !new URL(window.location.href).searchParams.has("view"));
+    const rulesUrl = new URL(page.url());
+    assert(rulesUrl.pathname === "/admin/finance/rules", "Finance Rules check left the canonical route");
+    assert(rulesUrl.searchParams.get("query") === "Forecast", "Finance Rules check dropped query state");
+    assert(rulesUrl.searchParams.get("selected") === "RULE-BUDGET-110", "Finance Rules check dropped selected rule state");
+    assert(rulesUrl.searchParams.get("tab") === "tests", "Finance Rules check dropped the active inspector tab");
+    assert(rulesUrl.searchParams.get("probe") === "keep", "Finance Rules check dropped an unknown safe query parameter");
+    assert(await metricValue(page, "Rules fixture metrics", "Active") === "9", "Finance Rules did not derive nine active fixture rules");
+    assert(await metricValue(page, "Rules fixture metrics", "Draft") === "3", "Finance Rules did not derive three draft fixture rules");
+    assert(await metricValue(page, "Rules fixture metrics", "Review") === "4", "Finance Rules did not derive four attention rules");
+    assert(await metricValue(page, "Rules fixture metrics", "Close") === "5", "Finance Rules did not derive five historical fixture close blockers");
+    assert(
+      JSON.stringify(await ruleIds(page)) === JSON.stringify(["RULE-BUDGET-110"]),
+      "Finance Rules search did not constrain the ledger to the approved budget-variance fixture"
+    );
+    assert(
+      await page.locator('[data-finance-rule-id="RULE-BUDGET-110"][aria-pressed="true"]').count() === 1,
+      "Finance Rules did not restore the selected budget-variance rule"
+    );
+    const rulesInspector = page.locator("#finance-inspector");
+    assert(
+      await rulesInspector.getByRole("tabpanel").count() === 1
+        && (await rulesInspector.getByRole("tabpanel").innerText()).includes("Deterministic fixture tests"),
+      "Finance Rules rendered inactive inspector panels beside the active Tests panel"
+    );
+    await rulesInspector.getByRole("button", { name: "Run tests", exact: true }).click();
+    await rulesInspector.getByText("4 pass", { exact: true }).waitFor();
+    assert(
+      (await rulesInspector.innerText()).includes("0 source mutations"),
+      "Finance Rules deterministic test run omitted its zero-mutation evidence"
+    );
+    assert(
+      (await page.locator("body").innerText()).includes("was not persisted"),
+      "Finance Rules deterministic test run did not disclose session-only state"
+    );
+
+    const ruleSearch = page.getByRole("searchbox", { name: "Search rules" });
+    await ruleSearch.fill("");
+    await page.waitForFunction(() => document.querySelectorAll("[data-finance-rule-id]").length === 16);
+    await page.getByRole("button", { name: "Needs Review", exact: true }).click();
+    await page.waitForFunction(() => {
+      const params = new URL(window.location.href).searchParams;
+      return params.get("filter") === "needs-review" && document.querySelectorAll("[data-finance-rule-id]").length === 4;
+    });
+    await ruleSearch.fill("AWS");
+    await page.waitForFunction(() => {
+      const params = new URL(window.location.href).searchParams;
+      return params.get("query") === "AWS"
+        && !params.has("selected")
+        && document.querySelectorAll("[data-finance-rule-id]").length === 1;
+    });
+    assert(
+      JSON.stringify(await ruleIds(page)) === JSON.stringify(["RULE-REC-AWS"]),
+      "Finance Rules query and Needs Review filter did not share one data scope"
+    );
+    assert(await page.locator("#finance-inspector").count() === 0, "Finance Rules kept a hidden selection in the inspector");
+
+    await ruleSearch.fill("");
+    await page.locator('[data-finance-rule-id="RULE-BUDGET-110"]').click();
+    await page.waitForFunction(() => new URL(window.location.href).searchParams.get("selected") === "RULE-BUDGET-110");
+    await page.getByRole("tab", { name: "Tests" }).click();
+    await page.waitForFunction(() => new URL(window.location.href).searchParams.get("tab") === "tests");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await page.getByRole("heading", { level: 2, name: "Forecast over 110% of cap" }).waitFor();
+    assert(
+      new URL(page.url()).searchParams.get("filter") === "needs-review"
+        && new URL(page.url()).searchParams.get("selected") === "RULE-BUDGET-110"
+        && new URL(page.url()).searchParams.get("tab") === "tests",
+      "Finance Rules refresh did not restore filter, selection, and inspector tab"
+    );
+    assert(
+      !(await page.locator("#finance-inspector").innerText()).includes("4 pass"),
+      "Finance Rules incorrectly persisted a browser-only test result after reload"
+    );
+
     const disabledControls = page.locator('button[aria-disabled="true"]:visible');
     for (let index = 0; index < await disabledControls.count(); index += 1) {
       await disabledControls.nth(index).click({ force: true }).catch(() => {});
     }
 
-    const visualOutputDir = path.join(dashboardDir, "output", "playwright", "finance-checkpoint-11");
+    const visualOutputDir = path.join(dashboardDir, "output", "playwright", "finance-checkpoint-12");
     await mkdir(visualOutputDir, { recursive: true });
     const visualCases = [
       { name: "1920-transactions-properties", viewport: { width: 1920, height: 1080 }, route: "/admin/finance/transactions?selected=TX-7738&tab=properties" },
       { name: "1440-accounts-activity", viewport: { width: 1440, height: 900 }, route: "/admin/finance/accounts?selected=operating&tab=transactions" },
       { name: "1024-bills-detail", viewport: { width: 1024, height: 768 }, route: "/admin/finance/bills?selected=aws" },
       { name: "1024-budgets-list", viewport: { width: 1024, height: 768 }, route: "/admin/finance/budgets" },
+      { name: "1440-rules-tests", viewport: { width: 1440, height: 900 }, route: "/admin/finance/rules?selected=RULE-BUDGET-110&tab=tests" },
+      { name: "1024-rules-list", viewport: { width: 1024, height: 768 }, route: "/admin/finance/rules?filter=needs-review" },
       { name: "390-transactions-list", viewport: { width: 390, height: 844 }, route: "/admin/finance/transactions" },
       { name: "390-accounts-list", viewport: { width: 390, height: 844 }, route: "/admin/finance/accounts" },
       { name: "390-bills-list", viewport: { width: 390, height: 844 }, route: "/admin/finance/bills" },
       { name: "390-budgets-list", viewport: { width: 390, height: 844 }, route: "/admin/finance/budgets" },
       { name: "390-review-list", viewport: { width: 390, height: 844 }, route: "/admin/finance/monthly-review" },
-      { name: "390-review-detail", viewport: { width: 390, height: 844 }, route: "/admin/finance/monthly-review?selected=budget-overruns" }
+      { name: "390-review-detail", viewport: { width: 390, height: 844 }, route: "/admin/finance/monthly-review?selected=budget-overruns" },
+      { name: "390-rules-list", viewport: { width: 390, height: 844 }, route: "/admin/finance/rules?filter=needs-review" },
+      { name: "390-rules-detail", viewport: { width: 390, height: 844 }, route: "/admin/finance/rules?selected=RULE-BUDGET-110&tab=tests" }
     ];
     const visualDiagnostics = [];
 
@@ -1272,7 +1362,8 @@ async function main() {
       "/admin/finance/accounts",
       "/admin/finance/bills",
       "/admin/finance/budgets",
-      "/admin/finance/monthly-review"
+      "/admin/finance/monthly-review",
+      "/admin/finance/rules"
     ];
     for (const pathname of financeDirectPathnames) {
       const unauthenticatedPage = await requestText(server.baseUrl, cookieJar, pathname);
@@ -1707,6 +1798,12 @@ async function main() {
         canonicalHref: "/admin/finance/monthly-review",
         heading: "Monthly Review",
         marker: "Close checklist"
+      },
+      {
+        pathname: "/admin/finance/rules?view=accounts",
+        canonicalHref: "/admin/finance/rules",
+        heading: "Rules / Automation",
+        marker: 'data-finance-rule-id="RULE-BUDGET-110"'
       }
     ];
     for (const route of financeCanonicalRoutes) {
@@ -1740,7 +1837,8 @@ async function main() {
       "/admin/finance/accounts",
       "/admin/finance/bills",
       "/admin/finance/budgets",
-      "/admin/finance/monthly-review"
+      "/admin/finance/monthly-review",
+      "/admin/finance/rules"
     ]) {
       assert(
         countRenderedToken(financePage.body, `href="${canonicalHref}"`) >= 1,
@@ -1751,11 +1849,7 @@ async function main() {
       countRenderedToken(financePage.body, 'href="/admin/finance?view=') === 0,
       "Finance sidebar still emits legacy view-query navigation"
     );
-    assert(
-      countRenderedToken(financePage.body, 'href="/admin/finance/rules"') === 0,
-      "Finance sidebar exposes an unimplemented Rules route"
-    );
-    pass("Finance sidebar emits canonical direct routes without an invented Rules destination");
+    pass("Finance sidebar emits canonical direct routes including the bounded Rules preview");
 
     const legacyFinanceView = await requestText(
       server.baseUrl,
@@ -1793,10 +1887,24 @@ async function main() {
 
     const financeRulesPage = await requestText(server.baseUrl, cookieJar, "/admin/finance/rules");
     assert(
-      isAppRouterNotFound(financeRulesPage.response, financeRulesPage.body),
-      `Unimplemented Finance Rules route did not remain unavailable: ${describeStatus(financeRulesPage.response)}`
+      financeRulesPage.response.ok,
+      `Finance Rules route failed: ${describeStatus(financeRulesPage.response)}`
     );
-    pass("Finance Rules remains explicitly unimplemented instead of presenting a static replica");
+    for (const expected of [
+      "<h1>Rules / Automation</h1>",
+      "Rules ledger",
+      'data-finance-rule-id="RULE-BUDGET-110"',
+      "Read-only deterministic preview",
+      "Tests run only against literal browser fixtures",
+      "A native FinanceRule repository, actor model, rule-run audit, and source-mutation policy are not connected."
+    ]) {
+      assert(financeRulesPage.body.includes(expected), `Finance Rules route omitted its functional boundary: ${expected}`);
+    }
+    assert(
+      countRenderedToken(financeRulesPage.body, 'data-finance-rule-id=') === 16,
+      "Finance Rules route did not render the complete sixteen-scenario fixture"
+    );
+    pass("Finance Rules loads as a searchable, testable, explicitly non-persistent rules preview");
 
     const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
     assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);

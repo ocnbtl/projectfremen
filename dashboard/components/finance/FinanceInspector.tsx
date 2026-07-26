@@ -309,7 +309,11 @@ export default function FinanceInspector({
             <SystemState variant="read_only" title="Transaction audit is not connected" description="The fixture contains no append-only Finance audit events. No history is synthesized." />
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="rules" active={safeTab === "rules"}>
-            <SystemState variant="read_only" title="Rules are not connected" description="There is no rule repository, risk policy, test record, or activation audit. The Rules route remains unavailable." />
+            <SystemState
+              variant="read_only"
+              title="Rule matching is a read-only preview"
+              description={<span>The Rules route can search and test approved fixture scenarios, but it has no rule repository, activation audit, or source-mutation path. <a href={`${getModuleViewRoute("finance", "rules")}?query=${encodeURIComponent(transaction.merchant)}`}>Search rule previews.</a></span>}
+            />
           </DetailTabPanel>
         </div>
       )}
@@ -418,7 +422,11 @@ export default function FinanceInspector({
             </div>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="rules" active={safeTab === "rules"}>
-            <SystemState variant="read_only" title="Recurring rules are not connected" description="No merchant matcher, cadence test, payment-account rule, activation state, or run history is stored." />
+            <SystemState
+              variant="read_only"
+              title="Recurring rules are preview-only"
+              description={<span>Approved recurring-rule scenarios can be searched and tested without writes. No merchant matcher, activation state, or run history is stored. <a href={`${getModuleViewRoute("finance", "rules")}?query=${encodeURIComponent(billRow.bill.name)}`}>Search rule previews.</a></span>}
+            />
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="properties" active={safeTab === "properties"}>
             <div className={styles.factGrid}>
@@ -455,7 +463,11 @@ export default function FinanceInspector({
             <SystemState variant="read_only" title="Project allocation is not connected" description="The budget fixture has no stable Project reference or approved reclassification. No Project object is copied or inferred." />
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="rules" active={safeTab === "rules"}>
-            <SystemState variant="read_only" title="Budget rules are not connected" description="Forecast triggers remain unavailable because the forecast formula, rule repository, test history, and activation audit are unresolved." />
+            <SystemState
+              variant="read_only"
+              title="Budget rules are preview-only"
+              description={<span>Approved variance scenarios can be inspected and tested without source writes. Forecast persistence, activation, run history, and the production formula remain unresolved. <a href={`${getModuleViewRoute("finance", "rules")}?filter=budget-rules`}>Open budget rule previews.</a></span>}
+            />
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="properties" active={safeTab === "properties"}>
             <div className={styles.factGrid}>

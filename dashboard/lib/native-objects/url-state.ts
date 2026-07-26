@@ -181,7 +181,7 @@ export function serializePeopleUrlState(
   return serializeUrlState(state, PEOPLE_URL_STATE_SCHEMA, base);
 }
 
-const FINANCE_VIEWS = ["overview", "accounts", "budgets", "bills", "review", "transactions"] as const;
+const FINANCE_VIEWS = ["overview", "accounts", "budgets", "bills", "review", "transactions", "rules"] as const;
 const FINANCE_FILTERS = [
   "",
   "attention",
@@ -190,7 +190,19 @@ const FINANCE_FILTERS = [
   "recurring",
   "savings-movement",
   "over-budget",
-  "incomplete"
+  "incomplete",
+  "active",
+  "draft",
+  "needs-review",
+  "categorization",
+  "receipts",
+  "bills-subs",
+  "budget-rules",
+  "savings-rules",
+  "import-rules",
+  "close-rules",
+  "project-linked",
+  "disabled"
 ] as const;
 const FINANCE_SORTS = [
   "default",
@@ -212,7 +224,9 @@ const FINANCE_SORTS = [
   "category-asc",
   "open-first",
   "source-order",
-  "label-asc"
+  "label-asc",
+  "last-desc",
+  "next-asc"
 ] as const;
 const FINANCE_TABS = [
   "overview",
@@ -230,7 +244,10 @@ const FINANCE_TABS = [
   "projects",
   "evidence",
   "decisions",
-  "activity"
+  "activity",
+  "conditions",
+  "actions",
+  "tests"
 ] as const;
 
 export type FinanceView = (typeof FINANCE_VIEWS)[number];
@@ -286,7 +303,8 @@ const FINANCE_FILTERS_BY_VIEW: Readonly<Record<FinanceView, readonly FinanceFilt
   transactions: ["", "unreviewed"],
   bills: ["", "due-week", "recurring"],
   budgets: ["", "over-budget"],
-  review: ["", "incomplete"]
+  review: ["", "incomplete"],
+  rules: ["", "active", "draft", "needs-review", "categorization", "receipts", "bills-subs", "budget-rules", "savings-rules", "import-rules", "close-rules", "project-linked", "disabled"]
 };
 
 const FINANCE_SORTS_BY_VIEW: Readonly<Record<FinanceView, readonly FinanceSort[]>> = {
@@ -295,7 +313,8 @@ const FINANCE_SORTS_BY_VIEW: Readonly<Record<FinanceView, readonly FinanceSort[]
   transactions: ["default", "date-desc", "date-asc", "amount-desc", "amount-asc", "merchant-asc"],
   bills: ["default", "urgency", "due-soon", "amount-desc", "amount-asc", "name-asc"],
   budgets: ["default", "attention", "spent-desc", "limit-desc", "remaining-asc", "category-asc"],
-  review: ["default", "open-first", "source-order", "label-asc"]
+  review: ["default", "open-first", "source-order", "label-asc"],
+  rules: ["default", "attention", "name-asc", "last-desc", "next-asc"]
 };
 
 const FINANCE_TABS_BY_VIEW: Readonly<Record<FinanceView, readonly FinanceTab[]>> = {
@@ -304,7 +323,8 @@ const FINANCE_TABS_BY_VIEW: Readonly<Record<FinanceView, readonly FinanceTab[]>>
   transactions: ["overview", "properties", "links", "audit", "rules"],
   bills: ["overview", "payments", "value", "links", "rules", "properties"],
   budgets: ["overview", "transactions", "subscriptions", "projects", "rules", "properties"],
-  review: ["overview", "evidence", "decisions", "links", "activity", "properties"]
+  review: ["overview", "evidence", "decisions", "links", "activity", "properties"],
+  rules: ["overview", "conditions", "actions", "tests", "links", "activity", "properties"]
 };
 
 /**
