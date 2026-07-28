@@ -320,6 +320,7 @@ export function noteCreateInputToLegacy(input: NoteCreateInput): PersonalRecordI
     stage: "processed",
     areas: input.areas || [],
     subjects: input.subjects || [],
+    externalSources: input.externalSources || [],
     time: {
       reviewCadence: input.reviewCadence,
       nextReview: input.nextReviewAt
@@ -338,6 +339,7 @@ export function noteUpdateInputToLegacy(input: NoteUpdateInput): PersonalRecordP
     areas: input.areas,
     subjects: input.subjects,
     projects: input.projects,
+    externalSources: input.externalSources,
     time: hasTimeUpdate
       ? {
           reviewCadence: input.reviewCadence,

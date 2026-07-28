@@ -16,6 +16,7 @@ import ObjectHeader from "./operational/ObjectHeader";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
 import ResourceEditorSheet from "./resources/ResourceEditorSheet";
+import ResourceNotePromotionSheet from "./resources/ResourceNotePromotionSheet";
 import ResourcePropertiesView from "./resources/ResourcePropertiesView";
 import {
   contentTargetGroupsForObject,
@@ -286,6 +287,7 @@ export default function ResourcesWorkspace({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(firstUrlState.ai);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
+  const [notePromotionMode, setNotePromotionMode] = useState<"create" | "existing" | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<{
     resourceId: string;
     evidenceId: string;
@@ -608,6 +610,15 @@ export default function ResourcesWorkspace({
     setAiOpen(false);
     setMobileSidebarOpen(false);
     setEditorMode(mode);
+    updateUrl({ ai: false });
+  }
+
+  function openNotePromotion(mode: "create" | "existing") {
+    if (!selectedResource?.source.canonicalUrl) return;
+    setAiOpen(false);
+    setMobileSidebarOpen(false);
+    setInspectorOpen(false);
+    setNotePromotionMode(mode);
     updateUrl({ ai: false });
   }
 
@@ -1206,13 +1217,30 @@ export default function ResourcesWorkspace({
             <section className={styles.panel}>
               <h2>Promotion boundary</h2>
               <p>
-                A future promotion flow must preview selected source material, create or update one native Note, preserve this Resource, and add citation provenance.
+                Create a clean authored draft or attach this source URL to one existing Note.
+                The Resource remains canonical for source identity and is never replaced.
               </p>
               <QuickActionBar
                 actions={[
                   { id: "search", label: "Search Notes", href: notesSearchRoute(selectedResource) },
-                  { id: "promote", label: "Promote to Note", disabled: true, disabledReason: "Native extraction, citation, and Note insertion persistence are not connected." },
-                  { id: "existing", label: "Add to existing", disabled: true, disabledReason: "No reviewed insertion-preview workflow exists yet." }
+                  {
+                    id: "promote",
+                    label: "Create Note draft",
+                    onSelect: selectedResource.source.canonicalUrl
+                      ? () => openNotePromotion("create")
+                      : undefined,
+                    disabled: !selectedResource.source.canonicalUrl,
+                    disabledReason: "A safe HTTP(S) Resource URL is required."
+                  },
+                  {
+                    id: "existing",
+                    label: "Attach to existing Note",
+                    onSelect: selectedResource.source.canonicalUrl
+                      ? () => openNotePromotion("existing")
+                      : undefined,
+                    disabled: !selectedResource.source.canonicalUrl,
+                    disabledReason: "A safe HTTP(S) Resource URL is required."
+                  }
                 ]}
               />
             </section>
@@ -1446,7 +1474,16 @@ export default function ResourcesWorkspace({
               <QuickActionBar
                 actions={[
                   { id: "links", label: "Inspect link evidence", onSelect: () => { setActiveTab("links"); setSelectedEvidenceId(""); updateUrl({ tab: "links", item: "" }); } },
-                  { id: "notes", label: "Search Notes", href: notesSearchRoute(selectedResource) }
+                  { id: "notes", label: "Search Notes", href: notesSearchRoute(selectedResource) },
+                  {
+                    id: "note-draft",
+                    label: "Create Note draft",
+                    onSelect: selectedResource.source.canonicalUrl
+                      ? () => openNotePromotion("create")
+                      : undefined,
+                    disabled: !selectedResource.source.canonicalUrl,
+                    disabledReason: "A safe HTTP(S) Resource URL is required before creating source evidence."
+                  }
                 ]}
               />
             </section>
@@ -1524,7 +1561,15 @@ export default function ResourcesWorkspace({
               actions={[
                 { id: "link", label: "Link to object", disabled: true, disabledReason: "Native ObjectLink persistence is not connected." },
                 { id: "review", label: "Mark reviewed", disabled: true, disabledReason: "The Resource review workflow is not connected." },
-                { id: "promote", label: "Promote to Note", disabled: true, disabledReason: "Notes promotion requires a reviewed draft workflow." },
+                {
+                  id: "promote",
+                  label: "Create Note draft",
+                  onSelect: selectedResource.source.canonicalUrl
+                    ? () => openNotePromotion("create")
+                    : undefined,
+                  disabled: !selectedResource.source.canonicalUrl,
+                  disabledReason: "A safe HTTP(S) Resource URL is required."
+                },
                 { id: "archive", label: "Archive", disabled: true, disabledReason: "Archive consequences, retention, and audit are unresolved.", intent: "destructive" }
               ]}
             />
@@ -1603,7 +1648,7 @@ export default function ResourcesWorkspace({
       module="resources"
       sidebar={sidebar}
       inspector={inspector}
-      aiDock={editorMode || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? undefined : aiDock}
+      aiDock={editorMode || notePromotionMode || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? undefined : aiDock}
       mode={initialMode === "detail" ? "detail" : "directory"}
       ariaLabel="Resources directory"
       className={`${styles.shell} ${initialMode === "detail" ? styles.detailShell : ""}`}
@@ -1616,6 +1661,16 @@ export default function ResourcesWorkspace({
           resources={resources}
           onClose={() => setEditorMode(null)}
           onSaved={handleResourceSaved}
+        />
+      )}
+      {notePromotionMode && selectedResource && (
+        <ResourceNotePromotionSheet
+          key={`${notePromotionMode}:${selectedResource.id}`}
+          open
+          resource={selectedResource}
+          initialMode={notePromotionMode}
+          onClose={() => setNotePromotionMode(null)}
+          onSaved={() => router.refresh()}
         />
       )}
       <button

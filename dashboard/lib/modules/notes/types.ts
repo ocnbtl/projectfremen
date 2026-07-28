@@ -99,6 +99,7 @@ export type NoteCreateInput = {
   privacy?: PersonalRecordPrivacy;
   areas?: string[];
   subjects?: string[];
+  externalSources?: string[];
   reviewCadence?: string;
   nextReviewAt?: string;
 };
@@ -110,6 +111,7 @@ export type NoteUpdateInput = {
   areas?: string[];
   subjects?: string[];
   projects?: string[];
+  externalSources?: string[];
   reviewCadence?: string;
   nextReviewAt?: string;
 };

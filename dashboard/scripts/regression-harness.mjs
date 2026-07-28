@@ -1940,6 +1940,430 @@ async function checkResourceCreateEditBrowserState(
   }
 }
 
+async function checkResourceNotePromotionBrowserState(
+  baseUrl,
+  cookieJar,
+  resourceId,
+  resourceTitle,
+  sourceUrl,
+  existingNoteId,
+  existingNoteTitle,
+  testRunId
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  let plannedFailureStatusExpected = false;
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "resource-note-promotion-checkpoint-18"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  const before = await requestJson(
+    baseUrl,
+    cookieJar,
+    "/api/personal/records?domain=notes-docs"
+  );
+  assert(before.response.ok && before.payload?.ok, "Resource → Notes preflight read failed");
+  const recordsBefore = before.payload.items || [];
+  const resourceBefore = recordsBefore.find((item) => item.id === resourceId);
+  const existingNoteBefore = recordsBefore.find((item) => item.id === existingNoteId);
+  assert(resourceBefore && existingNoteBefore, "Resource → Notes preflight records were missing");
+  const noteCountBefore = recordsBefore.filter(
+    (item) =>
+      item.domain === "notes-docs" &&
+      !["person", "org", "resource", "file"].includes(item.className)
+  ).length;
+  const resourceCountBefore = recordsBefore.filter(
+    (item) => item.className === "resource"
+  ).length;
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const failure = request.failure()?.errorText || "";
+      if (!failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (
+        response.status() === 503 &&
+        plannedFailureStatusExpected &&
+        url.pathname === "/api/personal/records"
+      ) {
+        plannedFailureStatusExpected = false;
+        return;
+      }
+      if (response.status() >= 400 && url.pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(
+      !diagnostics.overflowX,
+      `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`
+    );
+  }
+
+  async function openPromotion(page, mode) {
+    await page.goto(
+      `${baseUrl}/admin/resources/${encodeURIComponent(resourceId)}?tab=notes`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await page.getByText(resourceTitle, { exact: true }).first().waitFor();
+    const label = mode === "create" ? "Create Note draft" : "Attach to existing Note";
+    let action = page.getByRole("button", { name: label, exact: true });
+    const actionBox = await action.boundingBox().catch(() => null);
+    const viewport = page.viewportSize();
+    const actionInsideViewport = Boolean(
+      actionBox &&
+      viewport &&
+      actionBox.x < viewport.width &&
+      actionBox.x + actionBox.width > 0 &&
+      actionBox.y < viewport.height &&
+      actionBox.y + actionBox.height > 0
+    );
+    if (!actionInsideViewport) {
+      const detailsButton = page.getByRole("button", { name: "Open Resource details" });
+      if (await detailsButton.isVisible().catch(() => false)) {
+        await detailsButton.click();
+      }
+      action = page.getByRole("button", { name: label, exact: true });
+      await action.waitFor();
+    }
+    await action.click();
+    const dialog = page.getByRole("dialog", { name: "Create authored follow-up" });
+    await dialog.waitFor();
+    assert(
+      await page.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Resources AI dock remained exposed beneath the Notes handoff"
+    );
+    return dialog;
+  }
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const desktop = await desktopContext.newPage();
+    observe(desktop);
+
+    const dialog = await openPromotion(desktop, "create");
+    const createdTitle = `${testRunId}-resource-note-draft`;
+    const createdBody =
+      "Authored interpretation created from the Resource handoff without copying source context.";
+    await dialog.getByLabel("Note title").fill(createdTitle);
+    await dialog.getByLabel("Authored body").fill(createdBody);
+    assert(
+      !(await dialog.getByText(resourceBefore.body, { exact: true }).count()),
+      "Resource-owned body was copied into the authored Note draft"
+    );
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "resource-note-create-1440x900.png")
+    });
+    await assertNoDocumentOverflow(desktop, "Resource → Note create desktop");
+
+    let plannedCreateFailure = true;
+    plannedFailureStatusExpected = true;
+    await desktop.route("**/api/personal/records", async (route) => {
+      if (route.request().method() === "POST" && plannedCreateFailure) {
+        plannedCreateFailure = false;
+        await route.fulfill({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ok: false, error: "Regression Note create failure" })
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await dialog.getByRole("button", { name: "Create Note draft" }).click();
+    await dialog.getByText("Note was not saved", { exact: true }).waitFor();
+    assert(
+      (await dialog.getByLabel("Note title").inputValue()) === createdTitle &&
+        (await dialog.getByLabel("Authored body").inputValue()) === createdBody,
+      "Failed Resource → Note create did not preserve authored input"
+    );
+    await desktop.unroute("**/api/personal/records");
+    await dialog.getByRole("button", { name: "Create Note draft" }).click();
+    await dialog.getByText("Note draft created", { exact: true }).waitFor();
+    const openNoteLink = dialog.getByRole("link", { name: "Open Note" });
+    const createdNoteRoute = await openNoteLink.getAttribute("href");
+    assert(
+      createdNoteRoute?.startsWith("/admin/notes/"),
+      `Resource → Note success did not expose a native Note route: ${createdNoteRoute}`
+    );
+    const createdNoteId = createdNoteRoute.split("/").filter(Boolean).at(-1);
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "resource-note-create-success-1440x900.png")
+    });
+    await dialog.getByRole("button", { name: "Stay on Resource" }).click();
+    await dialog.waitFor({ state: "detached" });
+
+    const existingDialog = await openPromotion(desktop, "existing");
+    await existingDialog.getByLabel("Search Notes").fill(existingNoteTitle);
+    const existingChoice = existingDialog.getByRole("button", {
+      name: new RegExp(existingNoteTitle)
+    });
+    await existingChoice.waitFor();
+    await existingChoice.click();
+    await existingDialog.getByText("Exact mutation preview", { exact: true }).waitFor();
+    assert(
+      await existingDialog.getByText("Title · body · lifecycle · review state", { exact: true }).count() === 1,
+      "Existing Note handoff did not preview preserved fields"
+    );
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "resource-note-existing-preview-1440x900.png")
+    });
+
+    let plannedAttachFailure = true;
+    plannedFailureStatusExpected = true;
+    await desktop.route("**/api/personal/records", async (route) => {
+      if (route.request().method() === "PATCH" && plannedAttachFailure) {
+        plannedAttachFailure = false;
+        await route.fulfill({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ok: false, error: "Regression Note attach failure" })
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await existingDialog.getByRole("button", { name: "Attach source evidence", exact: true }).click();
+    await existingDialog.getByText("Note was not saved", { exact: true }).waitFor();
+    assert(
+      await existingChoice.getAttribute("data-selected") === "true",
+      "Failed source attachment did not preserve the selected Note"
+    );
+    await desktop.unroute("**/api/personal/records");
+    await existingDialog.getByRole("button", { name: "Attach source evidence", exact: true }).click();
+    await existingDialog.getByText("Source evidence attached", { exact: true }).waitFor();
+    await existingDialog.getByRole("button", { name: "Stay on Resource" }).click();
+    await existingDialog.waitFor({ state: "detached" });
+
+    const duplicateDialog = await openPromotion(desktop, "existing");
+    await duplicateDialog.getByLabel("Search Notes").fill(existingNoteTitle);
+    const duplicateChoice = duplicateDialog.getByRole("button", {
+      name: new RegExp(existingNoteTitle)
+    });
+    await duplicateChoice.waitFor();
+    await duplicateChoice.click();
+    await duplicateDialog.getByText("Already attached", { exact: true }).first().waitFor();
+    assert(
+      await duplicateDialog.getByRole("button", { name: "Attach source evidence", exact: true }).isDisabled(),
+      "Existing Note handoff allowed a duplicate normalized source attachment"
+    );
+    await duplicateDialog.getByRole("button", { name: "Cancel" }).click();
+    await desktop
+      .getByRole("dialog", { name: "Discard this Notes handoff?" })
+      .getByRole("button", { name: "Discard handoff" })
+      .click();
+    await duplicateDialog.waitFor({ state: "detached" });
+
+    await desktop.goto(`${baseUrl}${createdNoteRoute}?tab=links`, {
+      waitUntil: "domcontentloaded"
+    });
+    await desktop.getByText(createdTitle, { exact: true }).first().waitFor();
+    assert(
+      await desktop.getByText(resourceTitle, { exact: true }).count() >= 1,
+      "Created Note Links route did not resolve the Resource owner route after reload"
+    );
+    await desktopContext.close();
+
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const page = await context.newPage();
+      observe(page);
+      const responsiveDialog = await openPromotion(page, "create");
+      await responsiveDialog.getByLabel("Authored body").fill(
+        "Responsive authored draft retained only until this explicit discard."
+      );
+      await page.screenshot({
+        path: path.join(
+          screenshotDir,
+          `resource-note-create-${viewport.label}.png`
+        )
+      });
+      await assertNoDocumentOverflow(
+        page,
+        `Resource → Note create ${viewport.label}`
+      );
+      if (viewport.width === 390) {
+        const targets = await responsiveDialog
+          .locator("button:visible, input:visible, textarea:visible, a[href]:visible")
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label:
+                    element.getAttribute("aria-label") ||
+                    element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((item) => item.width < 44 || item.height < 44)
+          );
+        assert(
+          targets.length === 0,
+          `Resource → Note mobile targets below 44px: ${JSON.stringify(targets)}`
+        );
+        await page.keyboard.press("Shift+Tab");
+        assert(
+          await page.evaluate(() =>
+            Boolean(
+              document
+                .querySelector("[data-resource-note-promotion]")
+                ?.contains(document.activeElement)
+            )
+          ),
+          "Resource → Note mobile focus escaped the modal sheet"
+        );
+      }
+      await responsiveDialog.getByRole("button", { name: "Cancel" }).click();
+      const discard = page.getByRole("dialog", {
+        name: "Discard this Notes handoff?"
+      });
+      await discard.getByRole("button", { name: "Keep editing" }).click();
+      assert(
+        (await responsiveDialog.getByLabel("Authored body").inputValue()).includes(
+          "Responsive authored draft"
+        ),
+        `Resource → Note ${viewport.label} keep-editing lost the draft`
+      );
+      await responsiveDialog.getByRole("button", { name: "Cancel" }).click();
+      await discard.getByRole("button", { name: "Discard handoff" }).click();
+      await context.close();
+    }
+
+    const after = await requestJson(
+      baseUrl,
+      cookieJar,
+      "/api/personal/records?domain=notes-docs"
+    );
+    assert(after.response.ok && after.payload?.ok, "Resource → Notes verification read failed");
+    const recordsAfter = after.payload.items || [];
+    const createdNoteAfter = recordsAfter.find((item) => item.id === createdNoteId);
+    const existingNoteAfter = recordsAfter.find((item) => item.id === existingNoteId);
+    const resourceAfter = recordsAfter.find((item) => item.id === resourceId);
+    assert(
+      createdNoteAfter?.title === createdTitle &&
+        createdNoteAfter?.body === createdBody &&
+        createdNoteAfter?.status === "draft" &&
+        JSON.stringify(createdNoteAfter?.externalSources) === JSON.stringify([sourceUrl]),
+      `Created Resource-derived Note did not persist exact authored/source state: ${JSON.stringify(createdNoteAfter)}`
+    );
+    for (const field of ["title", "body", "status", "className", "createdAt"]) {
+      assert(
+        JSON.stringify(existingNoteAfter?.[field]) ===
+          JSON.stringify(existingNoteBefore[field]),
+        `Existing Note source attachment changed protected field ${field}`
+      );
+    }
+    assert(
+      existingNoteAfter.externalSources.filter(
+        (value) => value === sourceUrl
+      ).length === 1,
+      "Existing Note did not retain exactly one Resource source URL"
+    );
+    assert(
+      JSON.stringify(resourceAfter) === JSON.stringify(resourceBefore),
+      "Resource → Notes handoff changed the canonical Resource record"
+    );
+    assert(
+      recordsAfter.filter(
+        (item) =>
+          item.domain === "notes-docs" &&
+          !["person", "org", "resource", "file"].includes(item.className)
+      ).length === noteCountBefore + 1,
+      "Resource → Notes handoff did not create exactly one Note"
+    );
+    assert(
+      recordsAfter.filter((item) => item.className === "resource").length ===
+        resourceCountBefore,
+      "Resource → Notes handoff created or removed a Resource"
+    );
+    assert(
+      mutatingRequests.filter(
+        (request) => request === "POST /api/personal/records"
+      ).length === 2,
+      `Resource → Note create did not emit one failed and one successful POST: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      mutatingRequests.filter(
+        (request) => request === "PATCH /api/personal/records"
+      ).length === 2,
+      `Resource → Note attach did not emit one failed and one successful PATCH: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Resource → Notes browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Resource → Notes browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
 async function checkMediaMetadataEditBrowserState(
   baseUrl,
   cookieJar,
@@ -7901,6 +8325,18 @@ async function main() {
       testRunId
     );
     pass("Resources create/edit persists through the audited legacy adapter with exact-URL prevention, failed-write recovery, dirty-close protection, and responsive sheets");
+
+    await checkResourceNotePromotionBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdResource.id,
+      resourceTitle,
+      sharedContentSourceUrl,
+      protectedStatusNote.id,
+      protectedStatusNoteTitle,
+      testRunId
+    );
+    pass("Resources creates authored Note drafts and attaches exact source evidence to existing Notes with persistence, protected-field isolation, failure recovery, duplicate prevention, and responsive sheets");
 
     logStep("Checking Current Goals persistence and sync");
     const goalMarker = `${testRunId}-goal`;
