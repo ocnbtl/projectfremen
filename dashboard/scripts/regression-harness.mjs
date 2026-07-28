@@ -1054,14 +1054,17 @@ async function checkResourcesReviewAndPropertiesBrowserState(
   baseUrl,
   cookieJar,
   resourceId,
-  resourceTitle
+  resourceTitle,
+  duplicateResourceId,
+  duplicateResourceTitle,
+  collisionQuery
 ) {
   const { chromium } = await import("@playwright/test");
   const browser = await chromium.launch({ headless: true });
   const browserErrors = [];
   const failedResponses = [];
   const mutatingRequests = [];
-  const screenshotDir = path.join(dashboardDir, "output", "playwright", "resources-checkpoint-13");
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "resources-checkpoint-14");
   await mkdir(screenshotDir, { recursive: true });
 
   async function authenticatedContext(viewport) {
@@ -1116,10 +1119,14 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     });
   }
 
-  function selectedResourceRow(page) {
+  function resourceRow(page, id) {
     return page.locator(".dense-object-row", {
-      has: page.locator(`#dense-object-row-${resourceId}-title`)
+      has: page.locator(`#dense-object-row-${id}-title`)
     });
+  }
+
+  function selectedResourceRow(page) {
+    return resourceRow(page, resourceId);
   }
 
   async function assertNoDocumentOverflow(page, label) {
@@ -1138,12 +1145,72 @@ async function checkResourcesReviewAndPropertiesBrowserState(
       await details.click();
       await inspector.waitFor({ state: "visible" });
     }
+    await page.waitForFunction(() => {
+      const rail = document.querySelector("#resource-inspector");
+      if (!(rail instanceof HTMLElement)) return false;
+      const transform = window.getComputedStyle(rail).transform;
+      if (transform === "none") return true;
+      const matrix = new DOMMatrixReadOnly(transform);
+      return Math.abs(matrix.m41) < 1;
+    });
   }
 
   try {
     const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
     const desktop = await desktopContext.newPage();
     observe(desktop);
+    await desktop.goto(
+      `${baseUrl}/admin/resources?view=duplicate-urls&query=${encodeURIComponent(collisionQuery)}&sort=title&selected=${encodeURIComponent(resourceId)}&tab=source&probe=keep`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { level: 1, name: "Duplicate URLs" }).waitFor();
+    assert(await selectedResourceRow(desktop).count() === 1, "Resources Duplicate URLs did not render the selected Resource");
+    assert(await resourceRow(desktop, duplicateResourceId).count() === 1, "Resources Duplicate URLs did not render the exact-match peer");
+    assert(
+      await desktop.getByText("Exact accepted URL evidence · not a duplicate scan", { exact: true }).count() === 1,
+      "Resources Duplicate URLs did not disclose its evidence-only boundary"
+    );
+    const duplicateUrlState = new URL(desktop.url());
+    for (const [key, value] of [
+      ["view", "duplicate-urls"],
+      ["query", collisionQuery],
+      ["sort", "title"],
+      ["selected", resourceId],
+      ["tab", "source"],
+      ["probe", "keep"]
+    ]) {
+      assert(duplicateUrlState.searchParams.get(key) === value, `Resources Duplicate URLs dropped ${key} URL state`);
+    }
+    await resourceRow(desktop, duplicateResourceId).locator('input[type="checkbox"]').check();
+    assert(
+      new URL(desktop.url()).searchParams.get("selected") === resourceId,
+      "Resources Duplicate URLs batch checkbox changed inspector selection"
+    );
+    await desktop.screenshot({ path: path.join(screenshotDir, "resources-duplicate-urls-1440x900.png") });
+    await resourceRow(desktop, duplicateResourceId).locator(".dense-object-row__body").click();
+    await desktop.waitForFunction((id) => (
+      new URL(window.location.href).searchParams.get("selected") === id &&
+      new URL(window.location.href).searchParams.get("tab") === "source"
+    ), duplicateResourceId);
+    assert(
+      await desktop.getByText(duplicateResourceTitle, { exact: true }).count() >= 1,
+      "Resources Duplicate URLs did not update the Source inspector to the selected peer"
+    );
+    await desktop.goBack();
+    await desktop.waitForFunction((id) => (
+      new URL(window.location.href).searchParams.get("selected") === id
+    ), resourceId);
+    await desktop.goForward();
+    await desktop.waitForFunction((id) => (
+      new URL(window.location.href).searchParams.get("selected") === id
+    ), duplicateResourceId);
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    assert(
+      new URL(desktop.url()).searchParams.get("selected") === duplicateResourceId,
+      "Resources Duplicate URLs refresh did not restore selected Resource state"
+    );
+    await assertNoDocumentOverflow(desktop, "Resource Duplicate URLs desktop");
+
     await desktop.goto(
       `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(resourceId)}&tab=review&probe=keep`,
       { waitUntil: "domcontentloaded" }
@@ -1199,6 +1266,14 @@ async function checkResourcesReviewAndPropertiesBrowserState(
 
     await desktop.setViewportSize({ width: 1920, height: 1080 });
     await desktop.goto(
+      `${baseUrl}/admin/resources?view=duplicate-urls&query=${encodeURIComponent(collisionQuery)}&sort=title&selected=${encodeURIComponent(resourceId)}&tab=source`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { level: 1, name: "Duplicate URLs" }).waitFor();
+    await desktop.screenshot({ path: path.join(screenshotDir, "resources-duplicate-urls-1920x1080.png") });
+    await assertNoDocumentOverflow(desktop, "Resource Duplicate URLs wide desktop");
+
+    await desktop.goto(
       `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(resourceId)}&tab=review`,
       { waitUntil: "domcontentloaded" }
     );
@@ -1213,6 +1288,24 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     const tabletContext = await authenticatedContext({ width: 1024, height: 768 });
     const tablet = await tabletContext.newPage();
     observe(tablet);
+    await tablet.goto(
+      `${baseUrl}/admin/resources?view=duplicate-urls&query=${encodeURIComponent(collisionQuery)}&sort=title&selected=${encodeURIComponent(resourceId)}&tab=source`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await tablet.getByRole("heading", { level: 1, name: "Duplicate URLs" }).waitFor();
+    await tablet.screenshot({ path: path.join(screenshotDir, "resources-duplicate-urls-1024x768.png") });
+    await openInspectorIfNeeded(tablet);
+    assert(
+      await tablet.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Resources AI dock remained exposed beneath the tablet Duplicate URLs inspector"
+    );
+    assert(
+      await tablet.getByRole("tab", { name: "Source", selected: true }).count() === 1,
+      "Resources Duplicate URLs tablet inspector did not preserve its Source tab"
+    );
+    await tablet.keyboard.press("Escape");
+    await assertNoDocumentOverflow(tablet, "Resource Duplicate URLs tablet");
+
     await tablet.goto(
       `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(resourceId)}&tab=review`,
       { waitUntil: "domcontentloaded" }
@@ -1230,6 +1323,57 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     const mobileContext = await authenticatedContext({ width: 390, height: 844 });
     const mobile = await mobileContext.newPage();
     observe(mobile);
+    await mobile.goto(
+      `${baseUrl}/admin/resources?view=all`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await mobile.getByRole("button", { name: "Open Resources navigation" }).click();
+    const duplicateViewControl = mobile.getByRole("button", { name: /Duplicate URLs/ });
+    await duplicateViewControl.waitFor({ state: "visible" });
+    const duplicateViewTarget = await duplicateViewControl.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+    assert(
+      duplicateViewTarget.width >= 44 && duplicateViewTarget.height >= 44,
+      `Resources Duplicate URLs mobile navigation target below 44px: ${JSON.stringify(duplicateViewTarget)}`
+    );
+    await duplicateViewControl.click();
+    await mobile.getByRole("heading", { level: 1, name: "Duplicate URLs" }).waitFor();
+    await mobile.waitForFunction(() => (
+      new URL(window.location.href).searchParams.get("view") === "duplicate-urls"
+    ));
+    assert(
+      new URL(mobile.url()).searchParams.get("view") === "duplicate-urls",
+      "Resources mobile sidebar did not deep-link the Duplicate URLs view"
+    );
+    assert(
+      await mobile.locator("#resources-module-sidebar").getAttribute("data-mobile-open") === null,
+      "Resources mobile sidebar did not close after selecting Duplicate URLs"
+    );
+    await mobile.goto(
+      `${baseUrl}/admin/resources?view=duplicate-urls&query=${encodeURIComponent(collisionQuery)}&sort=title`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await mobile.getByRole("heading", { level: 1, name: "Duplicate URLs" }).waitFor();
+    assert(await selectedResourceRow(mobile).count() === 1, "Resources Duplicate URLs mobile directory omitted its exact-match Resource");
+    assert(await resourceRow(mobile, duplicateResourceId).count() === 1, "Resources Duplicate URLs mobile directory omitted its peer");
+    await mobile.screenshot({ path: path.join(screenshotDir, "resources-duplicate-urls-390x844.png") });
+    await selectedResourceRow(mobile).locator(".dense-object-row__body").click();
+    await mobile.waitForFunction((id) => (
+      window.location.pathname === `/admin/resources/${id}` &&
+      new URL(window.location.href).searchParams.get("tab") === "source"
+    ), resourceId);
+    await openInspectorIfNeeded(mobile);
+    await mobile.waitForFunction(() => document.querySelector("#resource-inspector")?.contains(document.activeElement));
+    assert(
+      await mobile.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Resources AI dock remained exposed beneath the mobile Duplicate URLs inspector"
+    );
+    await mobile.screenshot({ path: path.join(screenshotDir, "resource-duplicate-source-390x844.png") });
+    await mobile.keyboard.press("Escape");
+    await assertNoDocumentOverflow(mobile, "Resource Duplicate URLs mobile");
+
     await mobile.goto(
       `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review`,
       { waitUntil: "domcontentloaded" }
@@ -4926,6 +5070,33 @@ async function main() {
     const createdResource = createResource.payload.items?.find((item) => item.title === resourceTitle && item.className === "resource");
     assert(createdResource?.id, "Created legacy Resource record was not returned");
 
+    const duplicateResourceTitle = `${testRunId}-exact-url-peer`;
+    const createDuplicateResource = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        domain: "notes-docs",
+        title: duplicateResourceTitle,
+        className: "resource",
+        status: "active",
+        body: "Regression-created exact URL collision candidate.",
+        url: `${sharedContentSourceUrl}#alternate-resource`,
+        externalSources: [],
+        intents: ["research"]
+      })
+    });
+    assert(
+      createDuplicateResource.response.ok && createDuplicateResource.payload?.ok,
+      `Exact-URL candidate Resource create failed: ${JSON.stringify(createDuplicateResource.payload)}`
+    );
+    const duplicateResource = createDuplicateResource.payload.items?.find(
+      (item) => item.title === duplicateResourceTitle && item.className === "resource"
+    );
+    assert(duplicateResource?.id, "Exact-URL candidate Resource was not returned");
+
     const mediaRightsQueryToken = `${testRunId}-media-rights`;
     const mediaTitle = `${mediaRightsQueryToken}-safe`;
     const createMedia = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
@@ -5513,6 +5684,51 @@ async function main() {
       );
     }
 
+    const resourceDuplicateUrls = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/resources?view=duplicate-urls&query=${encodeURIComponent(sharedContentSourceUrl)}&sort=title&selected=${encodeURIComponent(createdResource.id)}&tab=source`
+    );
+    assert(
+      resourceDuplicateUrls.response.ok,
+      `Resource Duplicate URLs view failed: ${describeStatus(resourceDuplicateUrls.response)}`
+    );
+    assertSelectedTab(
+      resourceDuplicateUrls.body,
+      `resource-${createdResource.id}-tab-source`,
+      "Resource Duplicate URLs selected Source tab"
+    );
+    for (const expected of [
+      "<h1>Duplicate URLs</h1>",
+      "Exact accepted URL evidence · not a duplicate scan",
+      "Affected Resources",
+      "Exact URL groups",
+      "Safe URLs indexed",
+      "Withheld excluded",
+      resourceTitle,
+      duplicateResourceTitle,
+      `/admin/resources/${duplicateResource.id}`
+    ]) {
+      assert(
+        resourceDuplicateUrls.body.includes(expected),
+        `Resource Duplicate URLs omitted exact collision evidence: ${expected}`
+      );
+    }
+    for (const forbidden of [
+      "Duplicate detection has not run",
+      "Confirmed duplicate",
+      "Merge duplicate",
+      "source-user",
+      "source-password",
+      "source-secret"
+    ]) {
+      assert(
+        !resourceDuplicateUrls.body.includes(forbidden),
+        `Resource Duplicate URLs rendered an unsafe or unsupported claim: ${forbidden}`
+      );
+    }
+    pass("Resources Duplicate URLs exposes exact accepted URL collisions without confirming or mutating duplicates");
+
     const resourceProperties = await requestText(
       server.baseUrl,
       cookieJar,
@@ -5564,9 +5780,12 @@ async function main() {
       server.baseUrl,
       cookieJar,
       createdResource.id,
-      resourceTitle
+      resourceTitle,
+      duplicateResource.id,
+      duplicateResourceTitle,
+      sharedContentSourceUrl
     );
-    pass("Resources Needs Review and Properties preserve URL state, responsive access, explicit ownership boundaries, and zero mutations");
+    pass("Resources Duplicate URLs, Needs Review, and Properties preserve URL state, responsive access, explicit ownership boundaries, and zero mutations");
 
     const mediaDirectoryAfterCreate = await requestText(server.baseUrl, cookieJar, `/admin/media?selected=${createdMedia.id}`);
     assert(mediaDirectoryAfterCreate.response.ok && mediaDirectoryAfterCreate.body.includes(mediaTitle), "Media record missing from the Media directory");

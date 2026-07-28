@@ -1516,6 +1516,7 @@
     flex: 0 0 auto;
     width: auto;
     min-width: 44px;
+    min-height: 45px;
     padding-inline: 4px;
     font-size: 10px;
   }

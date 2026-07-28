@@ -540,7 +540,15 @@ export function serializeNotesUrlState(
   return serializeUrlState(state, NOTES_URL_STATE_SCHEMA, base);
 }
 
-const RESOURCE_VIEWS = ["all", "pinned", "recent", "needs-review", "cited", "archived"] as const;
+const RESOURCE_VIEWS = [
+  "all",
+  "pinned",
+  "recent",
+  "needs-review",
+  "cited",
+  "archived",
+  "duplicate-urls"
+] as const;
 const RESOURCE_SORTS = ["updated-desc", "updated-asc", "title", "review"] as const;
 const RESOURCE_TABS = ["overview", "source", "links", "notes", "review", "properties"] as const;
 

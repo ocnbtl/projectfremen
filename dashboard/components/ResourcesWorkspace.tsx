@@ -27,6 +27,7 @@ import type {
   ResourceSourceEvidenceState,
   ResourceType
 } from "../lib/modules/resources/types";
+import { buildResourceDuplicateEvidenceIndex } from "../lib/modules/resources/duplicate-evidence";
 import { buildResourceReviewEvidence } from "../lib/modules/resources/review-evidence";
 import { buildResourceReviewQueue } from "../lib/modules/resources/review-queue";
 import { buildResourceSourceEvidenceReport } from "../lib/modules/resources/source-evidence";
@@ -81,6 +82,16 @@ const LIBRARY_VIEWS: ReadonlyArray<[ResourcesView, string]> = [
   ["cited", "Cited / Used"],
   ["archived", "Archived"]
 ];
+
+const VIEW_LABELS: Readonly<Record<ResourcesView, string>> = {
+  all: "All Resources",
+  pinned: "Pinned",
+  recent: "Recent",
+  "needs-review": "Needs Review",
+  cited: "Cited / Used",
+  archived: "Archived",
+  "duplicate-urls": "Duplicate URLs"
+};
 
 const TYPE_ROWS = [
   "Articles",
@@ -274,6 +285,10 @@ export default function ResourcesWorkspace({
     () => new Map(reviewQueue.items.map((item) => [item.resourceId, item.priorityScore])),
     [reviewQueue]
   );
+  const duplicateEvidence = useMemo(
+    () => buildResourceDuplicateEvidenceIndex(initialResources),
+    [initialResources]
+  );
   const unavailableViewReason = VIEW_LIMITATIONS[view] || "";
   const visibleResources = useMemo(
     () => unavailableViewReason
@@ -282,12 +297,13 @@ export default function ResourcesWorkspace({
           initialResources.filter(
             (resource) =>
               matchesQuery(resource, query) &&
-              (view !== "needs-review" || reviewQueue.byResourceId.has(resource.id))
+              (view !== "needs-review" || reviewQueue.byResourceId.has(resource.id)) &&
+              (view !== "duplicate-urls" || duplicateEvidence.byResourceId.has(resource.id))
           ),
           sort,
           reviewPriorityById
         ),
-    [initialResources, query, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
+    [duplicateEvidence, initialResources, query, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
   );
 
   useEffect(() => {
@@ -355,7 +371,8 @@ export default function ResourcesWorkspace({
   }
 
   function selectResource(resource: ResourceRecord) {
-    const nextTab: ResourcesTab = view === "needs-review" ? "review" : "overview";
+    const nextTab: ResourcesTab =
+      view === "needs-review" ? "review" : view === "duplicate-urls" ? "source" : "overview";
     setSelectedId(resource.id);
     setActiveTab(nextTab);
     setSelectedEvidenceId("");
@@ -396,22 +413,34 @@ export default function ResourcesWorkspace({
 
   function selectLibraryView(nextView: ResourcesView) {
     const nextTab: ResourcesTab =
-      nextView === "needs-review" ? "review" : initialMode === "detail" ? "overview" : activeTab;
-    const nextSort: ResourcesSort = nextView === "needs-review" ? "review" : sort;
+      nextView === "needs-review"
+        ? "review"
+        : nextView === "duplicate-urls"
+          ? "source"
+          : initialMode === "detail"
+            ? "overview"
+            : activeTab;
+    const nextSort: ResourcesSort =
+      nextView === "needs-review" ? "review" : nextView === "duplicate-urls" ? "title" : sort;
     setView(nextView);
     setSort(nextSort);
     setActiveTab(nextTab);
-    if (initialMode === "detail" || nextView === "needs-review") setSelectedEvidenceId("");
+    if (initialMode === "detail" || nextView === "needs-review" || nextView === "duplicate-urls") {
+      setSelectedEvidenceId("");
+    }
     updateUrl(
       {
         view: nextView,
         sort: nextSort,
         tab: nextTab,
-        item: initialMode === "detail" || nextView === "needs-review" ? "" : selectedEvidenceId
+        item:
+          initialMode === "detail" || nextView === "needs-review" || nextView === "duplicate-urls"
+            ? ""
+            : selectedEvidenceId
       },
       {
         path: initialMode === "detail" ? getModuleRoute("resources") : pathname,
-        history: initialMode === "detail" ? "push" : "replace"
+        history: "push"
       }
     );
     setMobileSidebarOpen(false);
@@ -461,7 +490,14 @@ export default function ResourcesWorkspace({
       label: "Data",
       items: [
         { id: "imports", label: "Imports", disabled: true, disabledReason: "Resource import persistence is not connected." },
-        { id: "duplicate-urls", label: "Duplicate URLs", disabled: true, disabledReason: "Duplicate detection has not run; Resources are never auto-merged." },
+        {
+          id: "duplicate-urls",
+          label: "Duplicate URLs",
+          count: duplicateEvidence.summary.affectedResources,
+          tone: duplicateEvidence.summary.affectedResources ? "attention" : undefined,
+          active: view === "duplicate-urls",
+          onSelect: () => selectLibraryView("duplicate-urls")
+        },
         { id: "broken-links", label: "Broken Links", disabled: true, disabledReason: "URL health checks are not connected." },
         { id: "resource-settings", label: "Resource Settings", disabled: true, disabledReason: "Resource settings are not implemented." }
       ]
@@ -1380,11 +1416,12 @@ export default function ResourcesWorkspace({
         <div className={styles.mainScroll}>
           <header className={styles.directoryHeader}>
             <div>
-              <h1>{LIBRARY_VIEWS.find(([id]) => id === view)?.[1] || "Resources"}</h1>
+              <h1>{VIEW_LABELS[view]}</h1>
               <p>
                 {unavailableViewReason ? "View unavailable" : `${visibleResources.length} shown`} ·{" "}
                 {initialResources.length} total external {initialResources.length === 1 ? "reference" : "references"}
                 {view === "needs-review" ? " · evidence-derived queue" : ""}
+                {view === "duplicate-urls" ? " · exact collision evidence only" : ""}
               </p>
             </div>
             <div className={styles.headerActions}>
@@ -1415,6 +1452,29 @@ export default function ResourcesWorkspace({
                   Priority reflects unavailable evidence, safe source candidates, exact URL candidates, unresolved references,
                   and snapshot evidence already present in the current read model. It does not mark work complete, assign a
                   reviewer, fetch a URL, create a Reviews-owned run, or write Resource state.
+                </span>
+              </div>
+            </section>
+          )}
+
+          {view === "duplicate-urls" && !unavailableViewReason && (
+            <section className={styles.reviewQueueSummary} aria-label="Resource duplicate URL evidence summary">
+              <MetricStrip
+                ariaLabel="Resource exact URL collision evidence"
+                items={[
+                  { id: "affected", label: "Affected Resources", value: duplicateEvidence.summary.affectedResources, tone: duplicateEvidence.summary.affectedResources ? "attention" : "positive" },
+                  { id: "groups", label: "Exact URL groups", value: duplicateEvidence.summary.collisionGroups, tone: duplicateEvidence.summary.collisionGroups ? "attention" : "positive" },
+                  { id: "indexed", label: "Safe URLs indexed", value: duplicateEvidence.summary.acceptedCandidatesIndexed, detail: "syntax accepted" },
+                  { id: "excluded", label: "Withheld excluded", value: duplicateEvidence.summary.withheldEvidenceExcluded, detail: "never matched", tone: duplicateEvidence.summary.withheldEvidenceExcluded ? "attention" : "default" }
+                ]}
+              />
+              <div className={styles.reviewQueueBoundary}>
+                <strong>Exact accepted URL evidence · not a duplicate scan</strong>
+                <span>
+                  This queue groups Resources only when their safe, fragment-free normalized URL keys are identical.
+                  It does not fetch a source, detect fuzzy similarity, confirm a duplicate, choose a canonical record,
+                  merge, replace, unlink, or write Resource state. Credential-bearing, malformed, and unsupported
+                  values are excluded.
                 </span>
               </div>
             </section>
@@ -1488,6 +1548,7 @@ export default function ResourcesWorkspace({
             <div className={styles.list} data-density="compact" role="list" aria-label="Resources">
               {visibleResources.map((resource) => {
                 const queueItem = reviewQueue.byResourceId.get(resource.id);
+                const duplicateItem = duplicateEvidence.byResourceId.get(resource.id);
                 return (
                   <DenseObjectRow
                     id={resource.id}
@@ -1499,6 +1560,17 @@ export default function ResourcesWorkspace({
                         <>
                           <strong>{queueItem.evidenceGapCount} of 9 unavailable</strong>
                           <span>{queueItem.primaryReason}</span>
+                        </>
+                      ) : view === "duplicate-urls" && duplicateItem ? (
+                        <>
+                          <strong>
+                            {duplicateItem.matchingResourceCount} matching{" "}
+                            {duplicateItem.matchingResourceCount === 1 ? "Resource" : "Resources"}
+                          </strong>
+                          <span>
+                            {duplicateItem.collisionGroupCount} exact URL{" "}
+                            {duplicateItem.collisionGroupCount === 1 ? "group" : "groups"}
+                          </span>
                         </>
                       ) : (
                         <>
@@ -1514,7 +1586,11 @@ export default function ResourcesWorkspace({
                       onCheckedChange: (checked) => setBatch(resource.id, checked),
                       label: `Select ${resource.title} for batch actions`
                     }}
-                    className={view === "needs-review" ? styles.reviewQueueRow : undefined}
+                    className={
+                      view === "needs-review" || view === "duplicate-urls"
+                        ? styles.reviewQueueRow
+                        : undefined
+                    }
                     key={resource.id}
                   />
                 );
@@ -1526,6 +1602,8 @@ export default function ResourcesWorkspace({
               title={
                 view === "needs-review" && !query
                   ? "No Resource evidence needs review"
+                  : view === "duplicate-urls" && !query
+                    ? "No exact URL collision evidence"
                   : initialResources.length
                     ? "No Resources match this search"
                     : "No Resources yet"
@@ -1533,6 +1611,8 @@ export default function ResourcesWorkspace({
               description={
                 view === "needs-review" && !query
                   ? "The current read model exposes no unavailable review evidence or source signals. This is not a completed ReviewRun."
+                  : view === "duplicate-urls" && !query
+                    ? "No two Resources share an identical accepted, fragment-free URL key in the current read model. This is not proof that no duplicates exist."
                   : initialResources.length
                   ? "Adjust the query without losing the selected Resource or active detail tab."
                   : "No legacy Resource records were returned. Native creation remains intentionally unavailable."
