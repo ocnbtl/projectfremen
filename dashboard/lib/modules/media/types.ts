@@ -421,14 +421,18 @@ export type MediaUsageEvidenceIndex = {
 };
 
 /**
- * The first writable Media adapter covers only the two fields that already
- * persist without ambiguity on a legacy Personal Record with class `file`.
+ * The writable Media adapter covers retained text plus the two queue-timing
+ * fields that already persist without ambiguity on a legacy Personal Record
+ * with class `file`. Timing does not constitute a native AssetReview,
+ * readiness decision, reviewer assignment, or review completion.
  * Binary identity, type, source, ownership, accessibility, rights, review,
  * lifecycle, versions, links, and usage remain native Media contracts.
  */
 export type MediaUpdateInput = {
   title?: string;
   description?: string;
+  reviewCadence?: string;
+  nextReviewAt?: string;
 };
 
 export type MediaRepositoryError = MutationError;

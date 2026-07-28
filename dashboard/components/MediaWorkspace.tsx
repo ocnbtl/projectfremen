@@ -9,6 +9,7 @@ import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import MediaMetadataEditorSheet from "./media/MediaMetadataEditorSheet";
+import MediaReviewScheduleEditorSheet from "./media/MediaReviewScheduleEditorSheet";
 import DenseObjectRow from "./operational/DenseObjectRow";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import EvidenceChecklist from "./operational/EvidenceChecklist";
@@ -29,6 +30,7 @@ import {
   matchesMediaRightsIssue,
   type MediaRightsIssue
 } from "../lib/modules/media/rights-evidence";
+import { formatMediaReviewCadence } from "../lib/modules/media/review-schedule";
 import type { MediaAsset } from "../lib/modules/media/types";
 import {
   parseMediaUrlState,
@@ -154,19 +156,32 @@ const SORT_LABELS: Readonly<Record<MediaSort, string>> = {
   "updated-desc": "Updated — newest",
   title: "Title — A–Z",
   size: "File size",
-  review: "Review state",
+  review: "Next review",
   usage: "Usage"
 };
 
 function formatDate(value?: string, fallback = "Not recorded") {
   if (!value) return fallback;
-  const date = new Date(value);
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T12:00:00`)
+    : new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric"
   }).format(date);
+}
+
+function reviewTimingIsDue(value?: string) {
+  if (!value) return false;
+  const nextReview = /^\d{4}-\d{2}-\d{2}$/.test(value)
+    ? new Date(`${value}T12:00:00`)
+    : new Date(value);
+  if (Number.isNaN(nextReview.getTime())) return false;
+  const today = new Date();
+  today.setHours(23, 59, 59, 999);
+  return nextReview.getTime() <= today.getTime();
 }
 
 function displayLabel(value: string) {
@@ -186,6 +201,8 @@ function matchesQuery(asset: MediaAsset, query: string) {
     asset.body,
     asset.provenance.domain,
     asset.provenance.status,
+    asset.provenance.time.nextReview,
+    asset.provenance.time.reviewCadence,
     ...asset.source.resourceReferences.map((reference) => reference.value),
     ...asset.provenance.areas,
     ...asset.provenance.subjects,
@@ -205,6 +222,11 @@ function sortAssets(assets: MediaAsset[], sort: MediaSort) {
     }
     if (sort === "uploaded-desc") {
       return right.createdAt.localeCompare(left.createdAt);
+    }
+    if (sort === "review") {
+      return (left.provenance.time.nextReview || "9999-12-31").localeCompare(
+        right.provenance.time.nextReview || "9999-12-31"
+      );
     }
     return right.updatedAt.localeCompare(left.updatedAt);
   });
@@ -237,7 +259,6 @@ function viewUnavailable(view: MediaView) {
 
 function sortUnavailable(sort: MediaSort) {
   if (sort === "size") return "Verified binary size is not available.";
-  if (sort === "review") return "AssetReview state is not connected.";
   if (sort === "usage") return "AssetUsage records are not connected.";
   return "";
 }
@@ -408,6 +429,11 @@ export default function MediaWorkspace({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [editorAssetId, setEditorAssetId] = useState<string | null>(null);
+  const [reviewScheduleAssetId, setReviewScheduleAssetId] = useState<string | null>(null);
+  const [reviewScheduleFeedback, setReviewScheduleFeedback] = useState<{
+    assetId: string;
+    message: string;
+  } | null>(null);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useMediaQuery("(max-width: 760px)");
@@ -440,6 +466,10 @@ export default function MediaWorkspace({
   const editorAsset = useMemo(
     () => assets.find((asset) => asset.id === editorAssetId) || null,
     [assets, editorAssetId]
+  );
+  const reviewScheduleAsset = useMemo(
+    () => assets.find((asset) => asset.id === reviewScheduleAssetId) || null,
+    [assets, reviewScheduleAssetId]
   );
   const isLegacyReadinessQueue = queueMode === "needs-review" && view === "needs-review";
   const isLegacyMetadataQueue = queueMode === "missing-metadata" && view === "missing-metadata";
@@ -494,6 +524,8 @@ export default function MediaWorkspace({
   const readinessMetrics = useMemo(
     () => [
       { id: "records", label: "Legacy records", value: readinessScope.length, note: "triage" },
+      { id: "due-timing", label: "Review timing due", value: readinessScope.filter((asset) => reviewTimingIsDue(asset.provenance.time.nextReview)).length, note: "date only" },
+      { id: "scheduled", label: "Review scheduled", value: readinessScope.filter((asset) => Boolean(asset.provenance.time.nextReview)).length, note: "legacy timing" },
       { id: "rights", label: "Rights confirmation", value: readinessScope.filter((asset) => !hasConfirmedRights(asset)).length, note: "required" },
       { id: "type", label: "Type unverified", value: readinessScope.filter((asset) => asset.type === "unknown").length, note: "unknown" },
       { id: "binary", label: "Binary not connected", value: readinessScope.filter((asset) => !hasConnectedBinary(asset)).length, note: "boundary" },
@@ -706,12 +738,35 @@ export default function MediaWorkspace({
     setEditorAssetId(asset.id);
   }
 
+  function openReviewSchedule(asset: MediaAsset) {
+    dismissAiForOverlay();
+    setMobileSidebarOpen(false);
+    setInspectorOpen(false);
+    setReviewScheduleFeedback(null);
+    setReviewScheduleAssetId(asset.id);
+  }
+
   function handleMetadataSaved(savedAsset: MediaAsset) {
     setAssets((current) =>
       current.map((asset) => asset.id === savedAsset.id ? savedAsset : asset)
     );
     setSelectedId(savedAsset.id);
     setEditorAssetId(null);
+    router.refresh();
+  }
+
+  function handleReviewTimingSaved(savedAsset: MediaAsset) {
+    setAssets((current) =>
+      current.map((asset) => asset.id === savedAsset.id ? savedAsset : asset)
+    );
+    setSelectedId(savedAsset.id);
+    setReviewScheduleFeedback({
+      assetId: savedAsset.id,
+      message: savedAsset.provenance.time.nextReview
+        ? "Media review timing saved. Readiness, rights, and review completion are unchanged."
+        : "Media review timing removed. Readiness, rights, and review completion are unchanged."
+    });
+    setReviewScheduleAssetId(null);
     router.refresh();
   }
 
@@ -1004,7 +1059,9 @@ export default function MediaWorkspace({
               <div className={styles.readOnlyNotice}>
                 <strong>Legacy-backed record</strong>
                 <span>
-                  Title and description can be updated through the existing audited Personal Records adapter. Binary, source, rights, review, lifecycle, and version fields remain read-only.
+                  Title, description, and review timing can be updated through the existing
+                  protected Personal Records adapter. Binary, source, rights, review completion,
+                  lifecycle, and version fields remain read-only.
                 </span>
               </div>
               <div className={styles.factGrid}>
@@ -1280,6 +1337,72 @@ export default function MediaWorkspace({
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>
                 <div>
+                  <h2>Review timing</h2>
+                  <p>
+                    Legacy-backed queue planning only; readiness and AssetReview state remain
+                    separate.
+                  </p>
+                </div>
+                <span
+                  className={styles.stateChip}
+                  data-tone={
+                    reviewTimingIsDue(asset.provenance.time.nextReview)
+                      ? "amber"
+                      : asset.provenance.time.nextReview
+                        ? "blue"
+                        : undefined
+                  }
+                >
+                  {reviewTimingIsDue(asset.provenance.time.nextReview)
+                    ? "Due"
+                    : asset.provenance.time.nextReview
+                      ? "Scheduled"
+                      : "Not scheduled"}
+                </span>
+              </div>
+              <div className={styles.factGrid}>
+                <div className={styles.fact}>
+                  <span>Next review</span>
+                  <strong>{formatDate(asset.provenance.time.nextReview, "Not scheduled")}</strong>
+                </div>
+                <div className={styles.fact}>
+                  <span>Cadence</span>
+                  <strong>
+                    {asset.provenance.time.nextReview
+                      ? formatMediaReviewCadence(asset.provenance.time.reviewCadence)
+                      : "Not scheduled"}
+                  </strong>
+                </div>
+                <div className={styles.fact}>
+                  <span>Review state</span>
+                  <strong>Not connected</strong>
+                </div>
+                <div className={styles.fact}>
+                  <span>Reviewer</span>
+                  <strong>Not stored</strong>
+                </div>
+              </div>
+              <p>
+                Timing plans a return to this asset. It does not satisfy checklist evidence,
+                confirm rights, or mark the asset ready.
+              </p>
+              <button
+                type="button"
+                className={styles.button}
+                onClick={() => openReviewSchedule(asset)}
+              >
+                {asset.provenance.time.nextReview ? "Edit review timing" : "Schedule review"}
+              </button>
+              {reviewScheduleFeedback?.assetId === asset.id && (
+                <div className={styles.readOnlyNotice} role="status">
+                  <strong>Timing updated</strong>
+                  <span>{reviewScheduleFeedback.message}</span>
+                </div>
+              )}
+            </section>
+            <section className={styles.panel} data-wide="true">
+              <div className={styles.panelHeader}>
+                <div>
                   <h2>Legacy readiness evidence</h2>
                   <p>This is a read-only inventory, not a native AssetReview or readiness score.</p>
                 </div>
@@ -1317,6 +1440,8 @@ export default function MediaWorkspace({
                   ["Legacy status", displayLabel(asset.provenance.status), false],
                   ["Processing stage", displayLabel(asset.provenance.stage), false],
                   ["Privacy", displayLabel(asset.provenance.privacy), false],
+                  ["Next review", formatDate(asset.provenance.time.nextReview, "Not scheduled"), true],
+                  ["Review cadence", asset.provenance.time.nextReview ? formatMediaReviewCadence(asset.provenance.time.reviewCadence) : "Not scheduled", false],
                   ["Created", formatDate(asset.createdAt), true],
                   ["Updated", formatDate(asset.updatedAt), true]
                 ].map(([label, value, mono]) => (
@@ -1381,6 +1506,60 @@ export default function MediaWorkspace({
               <p>
                 {supported} of {checks.length} evidence checks are supported by the current adapter. This is an evidence inventory, not a readiness score.
               </p>
+            </section>
+
+            <section className={styles.panel} data-wide="true">
+              <div className={styles.panelHeader}>
+                <div>
+                  <h2>Review timing</h2>
+                  <p>Plan when this legacy file record should return to this evidence queue.</p>
+                </div>
+                <span
+                  className={styles.stateChip}
+                  data-tone={
+                    reviewTimingIsDue(asset.provenance.time.nextReview)
+                      ? "amber"
+                      : asset.provenance.time.nextReview
+                        ? "blue"
+                        : undefined
+                  }
+                >
+                  {reviewTimingIsDue(asset.provenance.time.nextReview)
+                    ? "Due"
+                    : asset.provenance.time.nextReview
+                      ? "Scheduled"
+                      : "Not scheduled"}
+                </span>
+              </div>
+              <div className={styles.factGrid}>
+                <div className={styles.fact}>
+                  <span>Next review</span>
+                  <strong>{formatDate(asset.provenance.time.nextReview, "Not scheduled")}</strong>
+                </div>
+                <div className={styles.fact}>
+                  <span>Cadence</span>
+                  <strong>
+                    {asset.provenance.time.nextReview
+                      ? formatMediaReviewCadence(asset.provenance.time.reviewCadence)
+                      : "Not scheduled"}
+                  </strong>
+                </div>
+                <div className={styles.fact}><span>AssetReview</span><strong>Not created</strong></div>
+                <div className={styles.fact}><span>ReviewRun</span><strong>Not created</strong></div>
+              </div>
+              <button
+                type="button"
+                className={styles.button}
+                onClick={() => openReviewSchedule(asset)}
+              >
+                {asset.provenance.time.nextReview ? "Edit review timing" : "Schedule review"}
+              </button>
+              {reviewScheduleFeedback?.assetId === asset.id && (
+                <div className={styles.readOnlyNotice} role="status">
+                  <strong>Timing updated</strong>
+                  <span>{reviewScheduleFeedback.message}</span>
+                </div>
+              )}
             </section>
 
             <section className={styles.panel} data-wide="true">
@@ -1465,6 +1644,16 @@ export default function MediaWorkspace({
             </span>
             <span className={styles.stateChip}>{rightsEvidence.scopeLabel}</span>
             <span className={styles.stateChip}>Legacy-backed metadata</span>
+            <span
+              className={styles.stateChip}
+              data-tone={reviewTimingIsDue(asset.provenance.time.nextReview) ? "amber" : undefined}
+            >
+              {reviewTimingIsDue(asset.provenance.time.nextReview)
+                ? "Review timing due"
+                : asset.provenance.time.nextReview
+                  ? `Review ${formatDate(asset.provenance.time.nextReview)}`
+                  : "Review not scheduled"}
+            </span>
           </>
         }
         actions={
@@ -1507,7 +1696,9 @@ export default function MediaWorkspace({
       className={styles.sidebar}
       footer={
         <p className={styles.sidebarFootnote}>
-          Legacy adapter · title and description writes are audited. Binary, source, rights, review, lifecycle, and versions remain read-only.
+          Legacy adapter · title, description, and review timing writes use the protected record
+          route. Binary, source, rights, review completion, lifecycle, and versions remain
+          read-only.
         </p>
       }
     />
@@ -1583,7 +1774,7 @@ export default function MediaWorkspace({
     </InspectorRail>
   );
 
-  const aiDock = editorAssetId || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? null : (
+  const aiDock = editorAssetId || reviewScheduleAssetId || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? null : (
     <SharedAIDock
       open={aiOpen}
       onOpenChange={(next) => {
@@ -1608,6 +1799,16 @@ export default function MediaWorkspace({
     />
   ) : null;
 
+  const reviewScheduleEditor = reviewScheduleAsset ? (
+    <MediaReviewScheduleEditorSheet
+      key={`media-review-schedule:${reviewScheduleAsset.id}`}
+      open
+      asset={reviewScheduleAsset}
+      onClose={() => setReviewScheduleAssetId(null)}
+      onSaved={handleReviewTimingSaved}
+    />
+  ) : null;
+
   if (initialMode === "detail") {
     return (
       <ModuleShell
@@ -1620,6 +1821,7 @@ export default function MediaWorkspace({
         className={`${styles.shell} ${styles.detailShell}`}
       >
         {metadataEditor}
+        {reviewScheduleEditor}
         <button
           className={`${styles.button} ${styles.mobileMenuButton}`}
           type="button"
@@ -1683,6 +1885,7 @@ export default function MediaWorkspace({
       className={styles.shell}
     >
       {metadataEditor}
+      {reviewScheduleEditor}
       <button
         className={`${styles.button} ${styles.mobileMenuButton}`}
         type="button"
@@ -2109,7 +2312,11 @@ export default function MediaWorkspace({
                             trailing={
                               <>
                                 <strong>{supported}/{checks.length} evidence</strong>
-                                <span>Binary unavailable</span>
+                                <span>
+                                  {asset.provenance.time.nextReview
+                                    ? `Review ${formatDate(asset.provenance.time.nextReview)}`
+                                    : "Review not scheduled"}
+                                </span>
                               </>
                             }
                             selected={asset.id === selectedId}
@@ -2208,7 +2415,11 @@ export default function MediaWorkspace({
                   trailing={
                     <>
                       <span>{formatDate(asset.updatedAt)}</span>
-                      <span>Rights · Needs confirmation</span>
+                      <span>
+                        {asset.provenance.time.nextReview
+                          ? `Review ${formatDate(asset.provenance.time.nextReview)}`
+                          : "Review not scheduled"}
+                      </span>
                     </>
                   }
                   selected={asset.id === selectedId}

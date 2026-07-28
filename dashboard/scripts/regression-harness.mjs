@@ -2805,7 +2805,7 @@ async function checkMediaMetadataEditBrowserState(
     dashboardDir,
     "output",
     "playwright",
-    "media-metadata-checkpoint-17"
+    "media-review-timing-checkpoint"
   );
   await mkdir(screenshotDir, { recursive: true });
 
@@ -2895,8 +2895,55 @@ async function checkMediaMetadataEditBrowserState(
     return dialog;
   }
 
+  async function openScheduleFromDetail(page, title) {
+    await page.goto(`${baseUrl}/admin/media/${mediaId}?tab=review`, {
+      waitUntil: "domcontentloaded"
+    });
+    await page.getByText(title, { exact: true }).first().waitFor();
+    await page.getByRole("heading", { name: "Review timing" }).waitFor();
+    const timingTrigger = page
+      .getByRole("button", {
+        name: /Schedule review|Edit review timing/
+      })
+      .first();
+    await timingTrigger.evaluate((element) => {
+      element.scrollIntoView({ block: "center", inline: "nearest" });
+    });
+    await page.waitForTimeout(150);
+    await timingTrigger.click();
+    const dialog = page
+      .locator("[data-media-review-schedule-editor]")
+      .getByRole("dialog");
+    await dialog.waitFor();
+    assert(
+      await dialog
+        .getByRole("heading", { name: `Schedule review · ${title}` })
+        .count() === 1,
+      "Media review timing sheet did not expose the selected asset identity"
+    );
+    assert(
+      await page.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Media AI dock remained exposed beneath the review timing sheet"
+    );
+    return dialog;
+  }
+
+  async function waitForEnabledTimingSave(page) {
+    await page.waitForFunction(() => {
+      const editor = document.querySelector(
+        "[data-media-review-schedule-editor]"
+      );
+      const save = Array.from(editor?.querySelectorAll("button") || []).find(
+        (button) => button.textContent?.trim() === "Save timing"
+      );
+      return save instanceof HTMLButtonElement && !save.disabled;
+    });
+  }
+
   const updatedTitle = `${mediaTitle}-edited`;
   const updatedDescription = `Audited Media description updated by ${testRunId} after an intentional failed write.`;
+  const finalNextReview = "2099-10-19";
+  const finalCadence = "P3M";
 
   try {
     const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
@@ -2980,6 +3027,167 @@ async function checkMediaMetadataEditBrowserState(
         await desktop.getByText(`${updatedTitle}-discard-me`, { exact: true }).count() === 0,
       "Discarded Media metadata draft changed the persisted record"
     );
+
+    const timingDialog = await openScheduleFromDetail(desktop, updatedTitle);
+    await timingDialog.getByLabel("Next review date").fill(finalNextReview);
+    await timingDialog.getByLabel("Cadence").selectOption("quarterly");
+    await waitForEnabledTimingSave(desktop);
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "media-review-timing-1440x900.png")
+    });
+    await assertNoDocumentOverflow(desktop, "Media review timing editor desktop");
+
+    let plannedTimingFailure = true;
+    plannedFailureStatusExpected = true;
+    await desktop.route("**/api/personal/records", async (route) => {
+      if (route.request().method() === "PATCH" && plannedTimingFailure) {
+        plannedTimingFailure = false;
+        await route.fulfill({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ok: false,
+            error: "Regression Media timing failure"
+          })
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await timingDialog.getByRole("button", { name: "Save timing" }).click();
+    await timingDialog
+      .getByText("Media review timing was not saved", { exact: true })
+      .waitFor();
+    assert(
+      await timingDialog.getByLabel("Next review date").inputValue() ===
+        finalNextReview &&
+        await timingDialog.getByLabel("Cadence").inputValue() === "quarterly",
+      "Failed Media review timing write did not preserve the date and cadence draft"
+    );
+    await desktop.unroute("**/api/personal/records");
+    await desktop.screenshot({
+      path: path.join(
+        screenshotDir,
+        "media-review-timing-failed-write-1440x900.png"
+      )
+    });
+
+    await timingDialog.getByRole("button", { name: "Save timing" }).click();
+    await timingDialog.waitFor({ state: "detached" });
+    await desktop
+      .getByText(
+        "Media review timing saved. Readiness, rights, and review completion are unchanged.",
+        { exact: true }
+      )
+      .waitFor();
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    await desktop.getByText("Quarterly", { exact: true }).first().waitFor();
+
+    await desktop.goto(
+      `${baseUrl}/admin/media/needs-review?query=${encodeURIComponent(updatedTitle)}&sort=review&selected=${encodeURIComponent(mediaId)}&tab=review&probe=keep`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { level: 1, name: "Needs Review" }).waitFor();
+    const needsReviewUrl = new URL(desktop.url());
+    for (const [key, value] of [
+      ["query", updatedTitle],
+      ["sort", "review"],
+      ["selected", mediaId],
+      ["tab", "review"],
+      ["probe", "keep"]
+    ]) {
+      assert(
+        needsReviewUrl.searchParams.get(key) === value,
+        `Media Needs Review timing dropped ${key} URL state`
+      );
+    }
+    const scheduledMediaRow = desktop.locator(".dense-object-row", {
+      has: desktop.locator(`#dense-object-row-${mediaId}-title`)
+    });
+    assert(
+      await scheduledMediaRow
+        .getByText("Review Oct 19, 2099", { exact: true })
+        .count() === 1,
+      "Media Needs Review did not expose the persisted next-review date in its queue row"
+    );
+    await desktop.getByRole("heading", { name: "Review timing" }).waitFor();
+    await desktop.getByText("Quarterly", { exact: true }).first().waitFor();
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "media-needs-review-scheduled-1440x900.png")
+    });
+    await assertNoDocumentOverflow(desktop, "Media Needs Review scheduled desktop");
+
+    await desktop
+      .getByRole("button", { name: "Edit review timing" })
+      .first()
+      .click();
+    const dirtyTimingDialog = desktop
+      .locator("[data-media-review-schedule-editor]")
+      .getByRole("dialog");
+    await dirtyTimingDialog.getByLabel("Next review date").fill("2099-11-01");
+    await dirtyTimingDialog.getByRole("button", { name: "Cancel" }).click();
+    const discardTimingDialog = desktop.getByRole("dialog", {
+      name: "Discard unsaved Media review timing?"
+    });
+    await discardTimingDialog.waitFor();
+    await discardTimingDialog.getByRole("button", { name: "Keep editing" }).click();
+    assert(
+      await dirtyTimingDialog.getByLabel("Next review date").inputValue() ===
+        "2099-11-01",
+      "Keeping Media review timing edits did not preserve the draft"
+    );
+    await dirtyTimingDialog.getByRole("button", { name: "Cancel" }).click();
+    await discardTimingDialog
+      .getByRole("button", { name: "Discard changes" })
+      .click();
+    await dirtyTimingDialog.waitFor({ state: "detached" });
+
+    await desktop
+      .getByRole("button", { name: "Edit review timing" })
+      .first()
+      .click();
+    const clearTimingDialog = desktop
+      .locator("[data-media-review-schedule-editor]")
+      .getByRole("dialog");
+    await clearTimingDialog
+      .getByRole("button", { name: "Remove stored schedule" })
+      .click();
+    const clearTimingConfirmation = desktop.getByRole("dialog", {
+      name: /Remove this Media asset’s review schedule/
+    });
+    await clearTimingConfirmation.waitFor();
+    await clearTimingConfirmation
+      .getByRole("button", { name: "Keep schedule" })
+      .click();
+    assert(
+      await clearTimingDialog.getByLabel("Next review date").inputValue() ===
+        finalNextReview,
+      "Canceling Media schedule removal changed the persisted timing draft"
+    );
+    await clearTimingDialog
+      .getByRole("button", { name: "Remove stored schedule" })
+      .click();
+    await clearTimingConfirmation
+      .getByRole("button", { name: "Remove schedule" })
+      .click();
+    await clearTimingDialog.waitFor({ state: "detached" });
+
+    await desktop
+      .getByRole("button", { name: "Schedule review" })
+      .first()
+      .click();
+    const restoredTimingDialog = desktop
+      .locator("[data-media-review-schedule-editor]")
+      .getByRole("dialog");
+    assert(
+      await restoredTimingDialog.getByLabel("Next review date").inputValue() === "" &&
+        await restoredTimingDialog.getByLabel("Cadence").inputValue() === "manual",
+      "Removing the Media review schedule did not clear both timing fields"
+    );
+    await restoredTimingDialog.getByLabel("Next review date").fill(finalNextReview);
+    await restoredTimingDialog.getByLabel("Cadence").selectOption("quarterly");
+    await restoredTimingDialog.getByRole("button", { name: "Save timing" }).click();
+    await restoredTimingDialog.waitFor({ state: "detached" });
     await desktopContext.close();
 
     for (const viewport of [
@@ -3040,12 +3248,69 @@ async function checkMediaMetadataEditBrowserState(
         .getByRole("dialog", { name: "Discard unsaved Media changes?" })
         .getByRole("button", { name: "Discard changes" })
         .click();
+
+      const timingEditor = await openScheduleFromDetail(page, updatedTitle);
+      await timingEditor.getByLabel("Next review date").fill("2099-11-01");
+      await timingEditor.getByLabel("Cadence").selectOption("weekly");
+      await waitForEnabledTimingSave(page);
+      await page.screenshot({
+        path: path.join(
+          screenshotDir,
+          `media-review-timing-${viewport.label}.png`
+        )
+      });
+      await assertNoDocumentOverflow(
+        page,
+        `Media review timing editor ${viewport.label}`
+      );
+      if (viewport.width === 390) {
+        const undersizedTimingTargets = await timingEditor
+          .locator(
+            "button:visible, input:visible, select:visible, a[href]:visible"
+          )
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label:
+                    element.getAttribute("aria-label") ||
+                    element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((item) => item.width < 43.99 || item.height < 43.99)
+          );
+        assert(
+          undersizedTimingTargets.length === 0,
+          `Media review timing mobile targets below 44px: ${JSON.stringify(undersizedTimingTargets)}`
+        );
+        await page.keyboard.press("Shift+Tab");
+        assert(
+          await page.evaluate(() =>
+            Boolean(
+              document
+                .querySelector("[data-media-review-schedule-editor]")
+                ?.contains(document.activeElement)
+            )
+          ),
+          "Media review timing mobile focus escaped the modal sheet"
+        );
+      }
+      await timingEditor.getByRole("button", { name: "Cancel" }).click();
+      await page
+        .getByRole("dialog", {
+          name: "Discard unsaved Media review timing?"
+        })
+        .getByRole("button", { name: "Discard changes" })
+        .click();
       await context.close();
     }
 
     assert(
-      mutatingRequests.filter((request) => request === "PATCH /api/personal/records").length === 2,
-      `Media metadata edit did not emit one failed and one successful PATCH: ${mutatingRequests.join(" | ")}`
+      mutatingRequests.filter((request) => request === "PATCH /api/personal/records").length === 6,
+      `Media workflows did not emit two failed saves, three successful saves, and one timing clear PATCH: ${mutatingRequests.join(" | ")}`
     );
     assert(
       mutatingRequests.filter((request) => request === "POST /api/personal/records").length === 0,
@@ -3065,7 +3330,9 @@ async function checkMediaMetadataEditBrowserState(
 
   return {
     title: updatedTitle,
-    description: updatedDescription
+    description: updatedDescription,
+    nextReview: finalNextReview,
+    reviewCadence: finalCadence
   };
 }
 
@@ -8720,11 +8987,25 @@ async function main() {
         mediaSourceAfterEdit?.body === editedMedia.description,
       `Media metadata edit did not persist the retained title and description: ${JSON.stringify(mediaSourceAfterEdit)}`
     );
+    assert(
+      mediaSourceAfterEdit?.time?.nextReview === editedMedia.nextReview &&
+        mediaSourceAfterEdit?.time?.reviewCadence === editedMedia.reviewCadence,
+      "Media review timing did not persist the final date and cadence"
+    );
     for (const field of [
       "id",
       "domain",
       "className",
+      "status",
+      "stage",
+      "privacy",
+      "knowledgeShape",
+      "growth",
       "url",
+      "areas",
+      "subjects",
+      "projects",
+      "intents",
       "externalSources",
       "relations",
       "createdAt"
@@ -8739,8 +9020,25 @@ async function main() {
         mediaRecordCountBeforeEdit,
       "Media metadata edit created or removed a Media-owned legacy record"
     );
+    const scheduledMediaReviewRoute = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/media/${createdMedia.id}?tab=review`
+    );
+    for (const expected of [
+      "Scheduled",
+      "Quarterly",
+      "Edit review timing",
+      "Review state",
+      "Not connected"
+    ]) {
+      assert(
+        scheduledMediaReviewRoute.body.includes(expected),
+        `Persisted Media review timing did not refresh the Review surface: ${expected}`
+      );
+    }
     sourceRecordSnapshots.set(createdMedia.id, JSON.stringify(mediaSourceAfterEdit));
-    pass("Media title and description persist through the audited legacy adapter while identity, ownership, URL evidence, links, and record counts remain intact");
+    pass("Media title, description, review date, and cadence persist through the protected legacy adapter while identity, ownership, URL evidence, links, readiness, and record counts remain intact");
 
     await checkResourceCreateEditBrowserState(
       server.baseUrl,

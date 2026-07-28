@@ -172,8 +172,15 @@ export function mediaAssetForClient(asset: MediaAsset): MediaAsset {
 }
 
 export function mediaUpdateInputToLegacy(input: MediaUpdateInput): PersonalRecordPatch {
+  const hasTimeUpdate = input.reviewCadence !== undefined || input.nextReviewAt !== undefined;
   return {
     title: input.title?.trim(),
-    body: input.description?.trim()
+    body: input.description?.trim(),
+    time: hasTimeUpdate
+      ? {
+          reviewCadence: input.reviewCadence,
+          nextReview: input.nextReviewAt
+        }
+      : undefined
   };
 }
