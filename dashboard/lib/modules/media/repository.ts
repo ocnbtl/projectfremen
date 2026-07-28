@@ -1,10 +1,18 @@
+"use client";
+
+import { buildJsonHeadersWithCsrf } from "../../client-csrf";
 import type { MutationErrorCode } from "../../native-objects/mutation-result";
 import type { PersonalRecord } from "../../personal-records-store";
-import { legacyPersonalRecordsToMediaAssets } from "./legacy-adapter";
+import {
+  legacyPersonalRecordsToMediaAssets,
+  mediaAssetForClient,
+  mediaUpdateInputToLegacy
+} from "./legacy-adapter";
 import type {
   MediaAsset,
   MediaRepositoryError,
-  MediaRepositoryResult
+  MediaRepositoryResult,
+  MediaUpdateInput
 } from "./types";
 
 type Fetcher = typeof fetch;
@@ -18,6 +26,7 @@ type PersonalRecordsResponse = {
 export type MediaRepository = {
   list(): Promise<MediaRepositoryResult<MediaAsset[]>>;
   get(id: string): Promise<MediaRepositoryResult<MediaAsset>>;
+  update(id: string, input: MediaUpdateInput): Promise<MediaRepositoryResult<MediaAsset>>;
 };
 
 export type MediaRepositoryOptions = {
@@ -84,11 +93,12 @@ function isPersonalRecord(value: unknown): value is PersonalRecord {
 
 async function requestRecords(
   fetcher: Fetcher,
-  endpoint: string
+  endpoint: string,
+  init?: RequestInit
 ): Promise<MediaRepositoryResult<PersonalRecord[]>> {
   let response: Response;
   try {
-    response = await fetcher(endpoint, { method: "GET", cache: "no-store" });
+    response = await fetcher(endpoint, init);
   } catch (error) {
     return failure(
       "network",
@@ -137,11 +147,13 @@ async function requestRecords(
 export function createMediaRepository(options: MediaRepositoryOptions = {}): MediaRepository {
   const endpoint = options.endpoint || "/api/personal/records";
   const fetcher = options.fetcher || fetch;
+  const toMedia = (records: PersonalRecord[]) =>
+    legacyPersonalRecordsToMediaAssets(records).map(mediaAssetForClient);
 
   async function list(): Promise<MediaRepositoryResult<MediaAsset[]>> {
-    const result = await requestRecords(fetcher, endpoint);
+    const result = await requestRecords(fetcher, endpoint, { cache: "no-store" });
     return result.ok
-      ? { ok: true, data: legacyPersonalRecordsToMediaAssets(result.data) }
+      ? { ok: true, data: toMedia(result.data) }
       : result;
   }
 
@@ -159,6 +171,30 @@ export function createMediaRepository(options: MediaRepositoryOptions = {}): Med
       return asset
         ? { ok: true, data: asset }
         : failure("not_found", "Media asset was not found", { status: 404 });
+    },
+
+    async update(id, input) {
+      const normalizedId = id.trim();
+      if (!normalizedId) {
+        return failure("validation", "Media asset id is required");
+      }
+
+      const result = await requestRecords(fetcher, endpoint, {
+        method: "PATCH",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({
+          id: normalizedId,
+          ...mediaUpdateInputToLegacy(input)
+        })
+      });
+      if (!result.ok) return result;
+
+      const updated = toMedia(result.data).find((asset) => asset.id === normalizedId);
+      return updated
+        ? { ok: true, data: updated }
+        : failure("not_found", "The updated Media asset was missing from the response", {
+            status: 404
+          });
     }
   };
 }

@@ -104,7 +104,8 @@
 .section + .diff,
 .diff + .section,
 .section + .boundary,
-.boundary + .error {
+.boundary + .error,
+.error + .section {
   margin-top: 14px;
 }
 

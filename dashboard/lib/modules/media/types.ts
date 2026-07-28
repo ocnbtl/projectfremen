@@ -420,5 +420,16 @@ export type MediaUsageEvidenceIndex = {
   summary: MediaUsageEvidenceSummary;
 };
 
+/**
+ * The first writable Media adapter covers only the two fields that already
+ * persist without ambiguity on a legacy Personal Record with class `file`.
+ * Binary identity, type, source, ownership, accessibility, rights, review,
+ * lifecycle, versions, links, and usage remain native Media contracts.
+ */
+export type MediaUpdateInput = {
+  title?: string;
+  description?: string;
+};
+
 export type MediaRepositoryError = MutationError;
 export type MediaRepositoryResult<T> = MutationResult<T>;

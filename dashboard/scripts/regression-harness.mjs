@@ -1940,6 +1940,287 @@ async function checkResourceCreateEditBrowserState(
   }
 }
 
+async function checkMediaMetadataEditBrowserState(
+  baseUrl,
+  cookieJar,
+  mediaId,
+  mediaTitle,
+  testRunId
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  let plannedFailureStatusExpected = false;
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "media-metadata-checkpoint-17"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const failure = request.failure()?.errorText || "";
+      if (!failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (
+        response.status() === 503 &&
+        plannedFailureStatusExpected &&
+        url.pathname === "/api/personal/records"
+      ) {
+        plannedFailureStatusExpected = false;
+        return;
+      }
+      if (response.status() >= 400 && url.pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(
+      !diagnostics.overflowX,
+      `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`
+    );
+  }
+
+  async function openEditorFromDetail(page, title) {
+    await page.goto(`${baseUrl}/admin/media/${mediaId}?tab=metadata`, {
+      waitUntil: "domcontentloaded"
+    });
+    await page.getByText(title, { exact: true }).first().waitFor();
+    await page.getByRole("button", { name: "Edit", exact: true }).click();
+    const dialog = page.getByRole("dialog", { name: title });
+    await dialog.waitFor();
+    assert(
+      await page.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Media AI dock remained exposed beneath the metadata editor"
+    );
+    return dialog;
+  }
+
+  const updatedTitle = `${mediaTitle}-edited`;
+  const updatedDescription = `Audited Media description updated by ${testRunId} after an intentional failed write.`;
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const desktop = await desktopContext.newPage();
+    observe(desktop);
+    await desktop.goto(
+      `${baseUrl}/admin/media?selected=${encodeURIComponent(mediaId)}&tab=overview`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { level: 1, name: "All Media" }).waitFor();
+    const inspector = desktop.locator("#media-inspector-rail");
+    await inspector.getByText(mediaTitle, { exact: true }).first().waitFor();
+    await inspector.getByRole("button", { name: "Edit", exact: true }).click();
+    const editDialog = desktop.getByRole("dialog", { name: mediaTitle });
+    await editDialog.waitFor();
+    assert(
+      await desktop.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Media AI dock remained exposed beneath the metadata editor"
+    );
+    await editDialog.getByLabel("Asset title").fill(updatedTitle);
+    await editDialog.getByLabel("Asset description").fill(updatedDescription);
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "media-edit-1440x900.png")
+    });
+    await assertNoDocumentOverflow(desktop, "Media metadata editor desktop");
+
+    let plannedFailure = true;
+    plannedFailureStatusExpected = true;
+    await desktop.route("**/api/personal/records", async (route) => {
+      if (route.request().method() === "PATCH" && plannedFailure) {
+        plannedFailure = false;
+        await route.fulfill({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ok: false, error: "Regression write failure" })
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await editDialog.getByRole("button", { name: "Save metadata" }).click();
+    await editDialog.getByText("Media metadata was not saved", { exact: true }).waitFor();
+    assert(
+      await editDialog.getByLabel("Asset title").inputValue() === updatedTitle &&
+        await editDialog.getByLabel("Asset description").inputValue() === updatedDescription,
+      "Failed Media metadata write did not preserve the dirty title and description"
+    );
+    await desktop.unroute("**/api/personal/records");
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "media-edit-failed-write-1440x900.png")
+    });
+
+    await editDialog.getByRole("button", { name: "Save metadata" }).click();
+    await editDialog.waitFor({ state: "detached" });
+    await desktop.getByText(updatedTitle, { exact: true }).first().waitFor();
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    await desktop.getByText(updatedTitle, { exact: true }).first().waitFor();
+
+    await desktop
+      .locator("#media-inspector-rail")
+      .getByRole("button", { name: "Edit", exact: true })
+      .click();
+    const dirtyDialog = desktop.getByRole("dialog", { name: updatedTitle });
+    await dirtyDialog.getByLabel("Asset title").fill(`${updatedTitle}-discard-me`);
+    await dirtyDialog.getByRole("button", { name: "Cancel" }).click();
+    const discardDialog = desktop.getByRole("dialog", {
+      name: "Discard unsaved Media changes?"
+    });
+    await discardDialog.waitFor();
+    await discardDialog.getByRole("button", { name: "Keep editing" }).click();
+    assert(
+      await dirtyDialog.getByLabel("Asset title").inputValue() === `${updatedTitle}-discard-me`,
+      "Keeping Media edits did not preserve the draft"
+    );
+    await dirtyDialog.getByRole("button", { name: "Cancel" }).click();
+    await discardDialog.getByRole("button", { name: "Discard changes" }).click();
+    await dirtyDialog.waitFor({ state: "detached" });
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    assert(
+      await desktop.getByText(updatedTitle, { exact: true }).count() >= 1 &&
+        await desktop.getByText(`${updatedTitle}-discard-me`, { exact: true }).count() === 0,
+      "Discarded Media metadata draft changed the persisted record"
+    );
+    await desktopContext.close();
+
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const page = await context.newPage();
+      observe(page);
+      const editor = await openEditorFromDetail(page, updatedTitle);
+      await editor.getByLabel("Asset title").fill(`Responsive Media ${viewport.label}`);
+      await editor.getByLabel("Asset description").fill(
+        "Responsive editor verification draft. This draft is intentionally discarded."
+      );
+      await page.screenshot({
+        path: path.join(screenshotDir, `media-edit-${viewport.label}.png`)
+      });
+      await assertNoDocumentOverflow(page, `Media metadata editor ${viewport.label}`);
+      if (viewport.width === 390) {
+        const undersizedTargets = await editor
+          .locator("button:visible, input:visible, textarea:visible, a[href]:visible")
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label:
+                    element.getAttribute("aria-label") ||
+                    element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((item) => item.width < 43.99 || item.height < 43.99)
+          );
+        assert(
+          undersizedTargets.length === 0,
+          `Media metadata editor mobile targets below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+        await page.keyboard.press("Shift+Tab");
+        assert(
+          await page.evaluate(() =>
+            Boolean(
+              document
+                .querySelector("[data-media-metadata-editor]")
+                ?.contains(document.activeElement)
+            )
+          ),
+          "Media metadata editor mobile focus escaped the modal sheet"
+        );
+      }
+      await editor.getByRole("button", { name: "Cancel" }).click();
+      await page
+        .getByRole("dialog", { name: "Discard unsaved Media changes?" })
+        .getByRole("button", { name: "Discard changes" })
+        .click();
+      await context.close();
+    }
+
+    assert(
+      mutatingRequests.filter((request) => request === "PATCH /api/personal/records").length === 2,
+      `Media metadata edit did not emit one failed and one successful PATCH: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      mutatingRequests.filter((request) => request === "POST /api/personal/records").length === 0,
+      `Media metadata edit created a duplicate Personal Record: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Media metadata editor browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Media metadata editor browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+  } finally {
+    await browser.close();
+  }
+
+  return {
+    title: updatedTitle,
+    description: updatedDescription
+  };
+}
+
 async function checkNoteAttachmentsBrowserState(
   baseUrl,
   cookieJar,
@@ -6790,6 +7071,59 @@ async function main() {
     pass("Resource review exposes nine literal evidence contracts without inventing review completion");
     pass("Media metadata triage preserves adapter truth and owner routes without simulating completion");
     pass("Resources, Media, and Notes remain ownership-separated across index and canonical detail routes");
+
+    const mediaSourceBeforeEdit = contentGraphRecordsAfterRouteReads.payload.items.find(
+      (item) => item.id === createdMedia.id
+    );
+    const mediaRecordCountBeforeEdit = contentGraphRecordsAfterRouteReads.payload.items.filter(
+      (item) => item.className === "file"
+    ).length;
+    assert(mediaSourceBeforeEdit, "Media source record was missing before metadata edit verification");
+    const editedMedia = await checkMediaMetadataEditBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdMedia.id,
+      mediaTitle,
+      testRunId
+    );
+    const recordsAfterMediaEdit = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/records"
+    );
+    assert(
+      recordsAfterMediaEdit.response.ok && recordsAfterMediaEdit.payload?.ok,
+      `Unable to reload the Media source record after metadata edit: ${JSON.stringify(recordsAfterMediaEdit.payload)}`
+    );
+    const mediaSourceAfterEdit = recordsAfterMediaEdit.payload.items.find(
+      (item) => item.id === createdMedia.id
+    );
+    assert(
+      mediaSourceAfterEdit?.title === editedMedia.title &&
+        mediaSourceAfterEdit?.body === editedMedia.description,
+      `Media metadata edit did not persist the retained title and description: ${JSON.stringify(mediaSourceAfterEdit)}`
+    );
+    for (const field of [
+      "id",
+      "domain",
+      "className",
+      "url",
+      "externalSources",
+      "relations",
+      "createdAt"
+    ]) {
+      assert(
+        JSON.stringify(mediaSourceAfterEdit?.[field]) === JSON.stringify(mediaSourceBeforeEdit[field]),
+        `Media metadata edit changed protected source field ${field}`
+      );
+    }
+    assert(
+      recordsAfterMediaEdit.payload.items.filter((item) => item.className === "file").length ===
+        mediaRecordCountBeforeEdit,
+      "Media metadata edit created or removed a Media-owned legacy record"
+    );
+    sourceRecordSnapshots.set(createdMedia.id, JSON.stringify(mediaSourceAfterEdit));
+    pass("Media title and description persist through the audited legacy adapter while identity, ownership, URL evidence, links, and record counts remain intact");
 
     await checkResourceCreateEditBrowserState(
       server.baseUrl,

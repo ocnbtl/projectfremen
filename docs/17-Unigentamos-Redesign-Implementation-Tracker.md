@@ -1,0 +1,56 @@
+# Unigentamos redesign implementation tracker
+
+Baseline for this tracker: `origin/main` at `c2bf4787815a53cd0c19aa78b98b75f7a2cd7dd6`.
+
+This is an implementation ledger, not a completeness claim. “Verified” means the route passed the isolated authenticated regression, production build, and its implemented responsive checks at the current checkpoint. “Bounded” means the route is usable for the stated read or preview workflow while its visible unavailable controls remain disabled with an explanation. Mockup values are never treated as live data.
+
+| Target route | Source mockup / handoff | Canonical owner | Read path | Connected mutations | Migration / boundary | Desktop | Mobile | Accessibility / tests | Status |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `/admin/people` | People final visual reference | People | Personal Records person adapter | Create and edit | Stable legacy ID; no duplicate person object | Verified | Verified route stack | Keyboard, focus, reload, URL state | Verified functional adapter |
+| `/admin/people/new` | People Add Person | People | Person adapter defaults | Explicit create | Current protected API | Verified | Verified | Required fields and error retention | Verified functional adapter |
+| `/admin/people/[personId]` | People profile | People | Person adapter | Edit entry point | Compact memories remain People-owned | Verified | Verified | Direct route and refresh | Verified functional adapter |
+| `/admin/people/[personId]/edit` | People edit profile | People | Person adapter | Explicit save | Existing audit and CSRF path | Verified | Verified | Dirty-state protection | Verified functional adapter |
+| `/admin/media` | Media All Media | Media | `file` Personal Records adapter | Title and description | Binary/native fields remain read-only | Verified | Verified detail route | Failure recovery, focus, URL state | Verified functional adapter |
+| `/admin/media/[assetId]` | Media asset detail | Media | Ownership-filtered Media adapter | Title and description | URL remains Resource evidence; no duplicate asset | Verified | Verified | Direct route, modal focus, reload | Verified functional adapter |
+| `/admin/media/needs-review` | Media Needs Review | Media | Literal readiness evidence | Title and description only | Not a native `AssetReview` | Verified | Verified | Evidence labels; no score | Verified bounded workflow |
+| `/admin/media/missing-metadata` | Media Missing Metadata | Media | Adapter evidence groups | Title and description only | Required native metadata unavailable | Verified | Verified | State labels; disabled reasons | Verified bounded workflow |
+| `/admin/media/rights-usage` | Media Rights / Usage | Media | Literal rights/source evidence | None | Canonical rights `needs_confirmation`; provisional internal/review scope | Verified | Verified | Color-independent labels | Verified read-only workflow |
+| `/admin/media/duplicates` | Media Duplicates | Media | Exact safe source evidence | None | Never auto-merges or claims binary match | Verified | Verified | URL state and zero-mutation check | Verified evidence view |
+| `/admin/media/in-use` | Media In Use | Media | Owner-module references | None | References are not `AssetUsage` | Verified | Verified | Focus containment and owner links | Verified evidence view |
+| `/admin/media/upload-queue` | Media Upload Queue | Media | Local file metadata preview | Local draft only | No bytes, upload, browser persistence, or fake `RawFile` | Verified | Verified | Keyboard and explicit boundary | Verified local preview |
+| `/admin/notes` | Notes directory / smart views | Notes | Authored-note adapter | Create and edit | Lifecycle and review remain separate | Verified | Verified | URL history, responsive access | Verified functional adapter |
+| `/admin/notes/[noteId]` | Notes editor and detail tabs | Notes | Note plus reference evidence | Explicit note save | Decisions convert to Personal Ops; attachments remain links | Verified | Verified | Failure retention and owner routes | Verified functional adapter |
+| `/admin/resources` | Resources directory | Resources | Resource adapter and URL evidence | Create and edit | URL identity stays Resource-owned | Verified | Verified | Duplicate prevention, dirty protection | Verified functional adapter |
+| `/admin/resources/[resourceId]` | Resource detail | Resources | Canonical resource adapter | Edit retained fields | Extraction, snapshot, health, and native review bounded | Verified | Verified | Modal/inspector focus and URL state | Verified bounded workflow |
+| `/admin/projects` | Projects hub | Projects | Stable legacy projections plus native state | Explicit promotion | No generic task import | Verified | Verified shell | CSRF, idempotency, route continuity | Verified functional workflow |
+| `/admin/projects/[projectId]` | Project detail tabs | Projects | Native project repository | Project, milestone, blocker, link lifecycle | Completion remains gated | Verified | Verified | Concurrency, soft unlink, audit | Verified functional workflow |
+| `/admin/personal` | Personal Ops Command | Personal Ops | Native schema-v2 view with v1 normalization | Native object writes | Current Goals behavior preserved | Verified | Verified shell | Protected route and explicit boundaries | Verified functional workflow |
+| `/admin/personal/goals` | Personal Ops Goals | Personal Ops | Native Goals | Create and update | No silent formula | Verified | Verified shell | Concurrency and reload | Verified functional workflow |
+| `/admin/personal/decisions` | Personal Ops Decisions | Personal Ops | Native Decisions plus legacy mappings | Explicit conversion/update | Durable Decisions owned here | Verified | Verified shell | Idempotency and provenance | Verified functional workflow |
+| `/admin/personal/obligations` | Personal Ops Obligations | Personal Ops | Native Obligations | Create/update/complete | Completion requires evidence | Verified | Verified shell | Validation and audit | Verified functional workflow |
+| `/admin/personal/follow-ups` | Personal Ops Follow-ups | Personal Ops | Native Follow-ups | Create/update/complete | People retains cadence context | Verified | Verified shell | High-priority outcome gate | Verified functional workflow |
+| `/admin/personal/routines` | Personal Ops Routines | Personal Ops | Native Routines | CRUD, archive/restore, confirmed preview | Auto-create risk remains confirmation-gated | Verified | Verified shell | Idempotency and fail-closed tests | Verified functional workflow |
+| `/admin/personal/inbox` | Personal Ops Capture Inbox | Personal Ops | Native Capture items | CRUD, split preview/confirm | Data-only navigation placement | Verified | Verified shell | Atomicity and provenance tests | Verified functional workflow |
+| `/admin/personal/templates` | Personal Ops Templates | Personal Ops | Native Templates | CRUD, activate/use/archive/restore | Data-only navigation placement | Verified | Verified shell | Pure tests and fingerprint idempotency | Verified functional workflow |
+| `/admin/personal/[slug]` | Personal Ops record detail | Personal Ops | Existing Personal Records | Existing safe writes | Compatibility route retained | Verified | Verified shell | Protected direct route | Verified compatibility route |
+| `/admin/reviews` | Reviews Home | Reviews | Native `ReviewRun` plus legacy compatibility | Create/update/archive/restore | Review coordination owns run state | Verified | Verified shell | Auth, concurrency, audit | Verified functional workflow |
+| `/admin/reviews/[reviewId]` | ReviewRun detail | Reviews | Native ReviewRun | Checklist, evidence, carry-forward, complete | Completion gates cannot be bypassed | Verified | Verified shell | Weekly ten-check gate | Verified functional workflow |
+| `/admin/reviews/weekly` | Weekly Reviews | Reviews | Native/legacy compatible index | Create and update | Compatibility retained | Verified | Verified shell | Route and persistence checks | Verified functional workflow |
+| `/admin/reviews/weekly/[entryId]` | Weekly review detail | Reviews | Review adapter | Existing safe review updates | Native conversion explicit | Verified | Verified shell | Direct route | Verified compatibility workflow |
+| `/admin/reviews/monthly` | Monthly Reviews | Reviews | Native monthly ReviewRun | Checklist/evidence state | Finance close stays Finance-owned | Verified | Verified shell | Thirteen checks plus external gate | Verified bounded workflow |
+| `/admin/reviews/monthly/[entryId]` | Monthly review detail | Reviews | Review adapter | Existing safe review updates | Decisions readiness has nine checks | Verified | Verified shell | Explicit checks, no invented score | Verified bounded workflow |
+| `/admin/finance` | Finance command view | Finance | June 2026 fixture | None | Fixture disclosed; persistence not claimed | Verified | Verified | Read-only labels and no mutation | Verified bounded preview |
+| `/admin/finance/transactions` | Finance Transactions | Finance | Fixture ledger | None | Imports/reconciliation unresolved | Verified | Verified | Canonical route precedence | Verified bounded preview |
+| `/admin/finance/accounts` | Finance Accounts | Finance | Fixture accounts/cashflow | None | Operating `4021`; Studio Card `1009` | Verified | Verified | Accessible chart summary | Verified bounded preview |
+| `/admin/finance/bills` | Finance Bills | Finance | Fixture bills | None | Durable bill state not connected | Verified | Verified | Canonical route and disclosure | Verified bounded preview |
+| `/admin/finance/budgets` | Finance Budgets | Finance | Fixture budgets | None | Formula/persistence not invented | Verified | Verified | Semantic categories | Verified bounded preview |
+| `/admin/finance/monthly-review` | Finance Monthly Review | Finance | Fixture close evidence | None | Finance owns close; Reviews links here | Verified | Verified | Explicit external gate | Verified bounded preview |
+| `/admin/finance/rules` | Finance Rules / Automation | Finance | Sixteen deterministic fixtures | Pure local rule tests | No rule execution or persistent mutation | Verified | Verified | Literal scenarios and zero writes | Verified bounded preview |
+
+## Current checkpoint boundaries
+
+- Authentication, authorization, session, CSRF, Supabase/RLS/service-role behavior, permanent navigation, shared shell, Current Goals, and global AI behavior are unchanged.
+- Media now permits only the two unambiguous legacy-backed fields: title and description. The save updates the existing `file` record through the protected Personal Records route and its existing audit event; it does not create a Media mega-record or a duplicate object.
+- Production Finance remains a clearly labeled fixture preview. No fixture number is presented as live durable state.
+- Native Media persistence topology, binary storage, retention, source confirmation, ownership, accessibility/OCR, rights confirmation, review completion, lifecycle, versions, derivatives, replacement, native links, usage, and AI execution remain intentionally unavailable.
+- External Docs sync and Sentry sync are excluded from the default isolated regression because they require third-party network actions.

@@ -8,6 +8,7 @@ import InspectorRail from "./admin-shell/InspectorRail";
 import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
+import MediaMetadataEditorSheet from "./media/MediaMetadataEditorSheet";
 import DenseObjectRow from "./operational/DenseObjectRow";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import EvidenceChecklist from "./operational/EvidenceChecklist";
@@ -402,9 +403,11 @@ export default function MediaWorkspace({
     )
   );
   const [issue, setIssue] = useState<MediaIssue>(initialUrlState.issue);
+  const [assets, setAssets] = useState(initialAssets);
   const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [editorAssetId, setEditorAssetId] = useState<string | null>(null);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useMediaQuery("(max-width: 760px)");
@@ -431,8 +434,12 @@ export default function MediaWorkspace({
   }, []);
 
   const selectedAsset = useMemo(
-    () => initialAssets.find((asset) => asset.id === selectedId) || null,
-    [initialAssets, selectedId]
+    () => assets.find((asset) => asset.id === selectedId) || null,
+    [assets, selectedId]
+  );
+  const editorAsset = useMemo(
+    () => assets.find((asset) => asset.id === editorAssetId) || null,
+    [assets, editorAssetId]
   );
   const isLegacyReadinessQueue = queueMode === "needs-review" && view === "needs-review";
   const isLegacyMetadataQueue = queueMode === "missing-metadata" && view === "missing-metadata";
@@ -448,23 +455,23 @@ export default function MediaWorkspace({
   const unavailableViewReason = isLegacyEvidenceQueue ? "" : viewUnavailable(view);
   const unavailableSortReason = sortUnavailable(sort);
   const readinessScope = useMemo(
-    () => initialAssets.filter((asset) => matchesQuery(asset, query)),
-    [initialAssets, query]
+    () => assets.filter((asset) => matchesQuery(asset, query)),
+    [assets, query]
   );
   const metadataEvidenceById = useMemo(
-    () => new Map(initialAssets.map((asset) => [asset.id, buildMediaMetadataEvidence(asset)])),
-    [initialAssets]
+    () => new Map(assets.map((asset) => [asset.id, buildMediaMetadataEvidence(asset)])),
+    [assets]
   );
   const rightsEvidenceById = useMemo(
-    () => new Map(initialAssets.map((asset) => [asset.id, buildMediaRightsEvidence(asset)])),
-    [initialAssets]
+    () => new Map(assets.map((asset) => [asset.id, buildMediaRightsEvidence(asset)])),
+    [assets]
   );
   const visibleAssets = useMemo(
     () =>
       unavailableViewReason
         ? []
         : sortAssets(
-            initialAssets.filter(
+            assets.filter(
               (asset) =>
                 matchesQuery(asset, query) &&
                 (!isLegacyReadinessQueue || matchesIssue(asset, effectiveIssue)) &&
@@ -475,7 +482,7 @@ export default function MediaWorkspace({
           ),
     [
       effectiveIssue,
-      initialAssets,
+      assets,
       isLegacyMetadataQueue,
       isLegacyReadinessQueue,
       isLegacyRightsQueue,
@@ -656,7 +663,7 @@ export default function MediaWorkspace({
       const canonicalQuery = canonicalParams.toString();
       router.replace(`${pathname}${canonicalQuery ? `?${canonicalQuery}` : ""}`, { scroll: false });
     }
-  }, [initialAssets, initialMode, initialTab, initialView, queueMode, searchParamKey]);
+  }, [assets, initialMode, initialTab, initialView, queueMode, searchParamKey]);
 
   function updateUrl(
     partial: Partial<MediaUrlState>,
@@ -694,11 +701,25 @@ export default function MediaWorkspace({
     setAiOpen(false);
   }
 
+  function openMetadataEditor(asset: MediaAsset) {
+    dismissAiForOverlay();
+    setEditorAssetId(asset.id);
+  }
+
+  function handleMetadataSaved(savedAsset: MediaAsset) {
+    setAssets((current) =>
+      current.map((asset) => asset.id === savedAsset.id ? savedAsset : asset)
+    );
+    setSelectedId(savedAsset.id);
+    setEditorAssetId(null);
+    router.refresh();
+  }
+
   function assetsVisibleFor(nextQuery: string, nextIssue: MediaIssue, nextSort: MediaSort = sort) {
     if (unavailableViewReason) return [];
 
     return sortAssets(
-      initialAssets.filter(
+      assets.filter(
         (asset) =>
           matchesQuery(asset, nextQuery) &&
           (!isLegacyReadinessQueue || matchesIssue(asset, nextIssue)) &&
@@ -829,7 +850,7 @@ export default function MediaWorkspace({
         (itemView) => ({
           id: itemView,
           label: VIEW_LABELS[itemView],
-          count: itemView === "all" ? initialAssets.length : undefined,
+          count: itemView === "all" ? assets.length : undefined,
           active: view === itemView,
           onSelect: () => selectView(itemView)
         })
@@ -871,7 +892,7 @@ export default function MediaWorkspace({
         {
           id: "data-missing-metadata",
           label: "Missing Metadata",
-          count: initialAssets.length,
+          count: assets.length,
           active: view === "missing-metadata",
           onSelect: () => selectView("missing-metadata")
         },
@@ -883,7 +904,7 @@ export default function MediaWorkspace({
         {
           id: "data-rights-usage",
           label: "Rights / Usage",
-          count: initialAssets.filter((asset) => !hasConfirmedRights(asset)).length,
+          count: assets.filter((asset) => !hasConfirmedRights(asset)).length,
           active: view === "rights-usage",
           onSelect: () => selectView("rights-usage")
         },
@@ -981,9 +1002,9 @@ export default function MediaWorkspace({
           <div className={styles.overviewGrid}>
             <section className={styles.panel} data-wide="true">
               <div className={styles.readOnlyNotice}>
-                <strong>Read-only legacy record</strong>
+                <strong>Legacy-backed record</strong>
                 <span>
-                  The existing Personal Records file is preserved through an adapter. No binary, version, or native Media mutation is connected.
+                  Title and description can be updated through the existing audited Personal Records adapter. Binary, source, rights, review, lifecycle, and version fields remain read-only.
                 </span>
               </div>
               <div className={styles.factGrid}>
@@ -1029,10 +1050,17 @@ export default function MediaWorkspace({
             </section>
 
             <section className={styles.panel} data-wide="true">
-              <h2>Unavailable mutations</h2>
+              <h2>Available and unavailable mutations</h2>
               <div className={styles.inlineActions}>
+                <button
+                  className={styles.button}
+                  data-primary="true"
+                  type="button"
+                  onClick={() => openMetadataEditor(asset)}
+                >
+                  Edit title &amp; description
+                </button>
                 {[
-                  ["Edit metadata", "Native Media writes are not connected."],
                   ["Replace", "Replacement and version synchronization are unresolved."],
                   ["Archive", "Legacy file lifecycle cannot be changed from Media."],
                   ["Download", "No verified binary is connected."],
@@ -1095,13 +1123,13 @@ export default function MediaWorkspace({
             <section className={styles.panel} data-wide="true">
               <h2>Completion boundary</h2>
               <div className={styles.sourceBoundary}>
-                <strong>Evidence can be inspected; metadata cannot be completed here yet.</strong>
-                <span>Required-field rules, suggestions, validation, save, audit, and dependent-queue updates need native Media persistence. Dirty input is never simulated in client-only state.</span>
+                <strong>Retained context is editable; native completion remains unavailable.</strong>
+                <span>Title and description save through the audited legacy adapter. Required-field rules, suggestions, extraction, native validation, and dependent-queue updates still need Media persistence.</span>
               </div>
               <QuickActionBar
-                ariaLabel="Unavailable Media metadata actions"
+                ariaLabel="Media metadata actions"
                 actions={[
-                  { id: "save-metadata", label: "Save metadata", intent: "primary", disabled: true, disabledReason: "Native Media metadata persistence and validation are not connected." },
+                  { id: "edit-retained-metadata", label: "Edit title & description", intent: "primary", onSelect: () => openMetadataEditor(asset) },
                   { id: "auto-fill", label: "Auto-fill suggestions", disabled: true, disabledReason: "No extraction or suggestion service is connected; suggested values never become confirmed silently." },
                   { id: "confirm-source", label: "Confirm source", disabled: true, disabledReason: "Media source and ResourceLink persistence are not connected." },
                   { id: "send-review", label: "Send to review", disabled: true, disabledReason: "AssetReview persistence and metadata completion gates are not connected." }
@@ -1373,11 +1401,11 @@ export default function MediaWorkspace({
             </section>
 
             <section className={styles.panel} data-wide="true">
-              <h2>Unavailable mutations</h2>
+              <h2>Available and unavailable actions</h2>
               <QuickActionBar
-                ariaLabel="Unavailable Media readiness actions"
+                ariaLabel="Media readiness actions"
                 actions={[
-                  { id: "save-metadata", label: "Save metadata", disabled: true, disabledReason: "Native Media metadata persistence is not connected." },
+                  { id: "edit-retained-metadata", label: "Edit title & description", intent: "primary", onSelect: () => openMetadataEditor(asset) },
                   { id: "confirm-rights", label: "Confirm rights", disabled: true, disabledReason: "Rights evidence and confirmation audit are not connected." },
                   { id: "link-source", label: "Link source", disabled: true, disabledReason: "Media source and ResourceLink persistence are not connected." },
                   { id: "mark-reviewed", label: "Mark reviewed", disabled: true, disabledReason: "This queue is legacy readiness triage, not a native AssetReview workflow." }
@@ -1436,7 +1464,7 @@ export default function MediaWorkspace({
               Rights · {rightsEvidence.canonicalStateLabel}
             </span>
             <span className={styles.stateChip}>{rightsEvidence.scopeLabel}</span>
-            <span className={styles.stateChip}>Read-only</span>
+            <span className={styles.stateChip}>Legacy-backed metadata</span>
           </>
         }
         actions={
@@ -1453,14 +1481,9 @@ export default function MediaWorkspace({
             <button
               className={styles.button}
               type="button"
-              aria-disabled="true"
-              aria-describedby={`media-edit-${asset.id}-reason`}
-              title="Native Media writes are not connected."
+              onClick={() => openMetadataEditor(asset)}
             >
               Edit
-              <span id={`media-edit-${asset.id}-reason`} className="sr-only">
-                Native Media writes are not connected.
-              </span>
             </button>
           </>
         }
@@ -1484,7 +1507,7 @@ export default function MediaWorkspace({
       className={styles.sidebar}
       footer={
         <p className={styles.sidebarFootnote}>
-          Legacy file records are read-only. URLs remain unresolved Resource candidates.
+          Legacy adapter · title and description writes are audited. Binary, source, rights, review, lifecycle, and versions remain read-only.
         </p>
       }
     />
@@ -1493,7 +1516,6 @@ export default function MediaWorkspace({
   const inspector = initialMode === "index" ? (
     <InspectorRail
       id="media-inspector-rail"
-      readOnly
       overlay={isInspectorOverlay}
       overlayOpen={!isInspectorOverlay || inspectorOpen}
       onRequestClose={() => setInspectorOpen(false)}
@@ -1561,7 +1583,7 @@ export default function MediaWorkspace({
     </InspectorRail>
   );
 
-  const aiDock = mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? null : (
+  const aiDock = editorAssetId || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? null : (
     <SharedAIDock
       open={aiOpen}
       onOpenChange={(next) => {
@@ -1577,6 +1599,15 @@ export default function MediaWorkspace({
     />
   );
 
+  const metadataEditor = editorAsset ? (
+    <MediaMetadataEditorSheet
+      open
+      asset={editorAsset}
+      onClose={() => setEditorAssetId(null)}
+      onSaved={handleMetadataSaved}
+    />
+  ) : null;
+
   if (initialMode === "detail") {
     return (
       <ModuleShell
@@ -1588,6 +1619,7 @@ export default function MediaWorkspace({
         ariaLabel="Media asset detail"
         className={`${styles.shell} ${styles.detailShell}`}
       >
+        {metadataEditor}
         <button
           className={`${styles.button} ${styles.mobileMenuButton}`}
           type="button"
@@ -1650,6 +1682,7 @@ export default function MediaWorkspace({
       ariaLabel="Media directory"
       className={styles.shell}
     >
+      {metadataEditor}
       <button
         className={`${styles.button} ${styles.mobileMenuButton}`}
         type="button"
@@ -1697,7 +1730,7 @@ export default function MediaWorkspace({
                     ? `${visibleAssets.length} shown · ${readinessScope.length} matching query · legacy metadata evidence`
                     : isLegacyRightsQueue
                       ? `${visibleAssets.length} shown · confirm source, scope, and rights evidence before broader use`
-                  : `${initialAssets.length} retained legacy file record${initialAssets.length === 1 ? "" : "s"}`}
+                  : `${assets.length} retained legacy file record${assets.length === 1 ? "" : "s"}`}
               </p>
             </div>
             {isLegacyEvidenceQueue ? (
@@ -2038,13 +2071,13 @@ export default function MediaWorkspace({
             ) : (
               <SystemState
                 variant="empty"
-                title={initialAssets.length === 0
+                title={assets.length === 0
                   ? "No legacy Media records are available for rights evidence"
                   : "No assets match this rights evidence segment"}
-                description={initialAssets.length === 0
+                description={assets.length === 0
                   ? "No Personal Records items with class file are available. The Rights / Usage workflow remains read-only and creates nothing."
                   : "Change the query or evidence segment. No rights, usage, source, or audit state was changed."}
-                action={initialAssets.length === 0
+                action={assets.length === 0
                   ? undefined
                   : { label: "Show all evidence", onSelect: () => selectIssue("all") }}
               />

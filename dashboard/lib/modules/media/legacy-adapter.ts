@@ -1,10 +1,11 @@
-import type { PersonalRecord } from "../../personal-records-store";
+import type { PersonalRecord, PersonalRecordPatch } from "../../personal-records-store";
 import { createNativeObjectRef } from "../../native-objects/routes";
 import { buildResourceSourceEvidenceItems } from "../resources/source-evidence";
 import type {
   MediaAsset,
   MediaLegacyRelations,
-  MediaResourceReference
+  MediaResourceReference,
+  MediaUpdateInput
 } from "./types";
 
 export type LegacyMediaRecord = PersonalRecord & { className: "file" };
@@ -167,5 +168,12 @@ export function mediaAssetForClient(asset: MediaAsset): MediaAsset {
       url: null,
       externalSources: []
     }
+  };
+}
+
+export function mediaUpdateInputToLegacy(input: MediaUpdateInput): PersonalRecordPatch {
+  return {
+    title: input.title?.trim(),
+    body: input.description?.trim()
   };
 }
