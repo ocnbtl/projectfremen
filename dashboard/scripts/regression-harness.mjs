@@ -1057,14 +1057,16 @@ async function checkResourcesReviewAndPropertiesBrowserState(
   resourceTitle,
   duplicateResourceId,
   duplicateResourceTitle,
-  collisionQuery
+  collisionQuery,
+  noteId,
+  noteTitle
 ) {
   const { chromium } = await import("@playwright/test");
   const browser = await chromium.launch({ headless: true });
   const browserErrors = [];
   const failedResponses = [];
   const mutatingRequests = [];
-  const screenshotDir = path.join(dashboardDir, "output", "playwright", "resources-checkpoint-14");
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "resources-checkpoint-15");
   await mkdir(screenshotDir, { recursive: true });
 
   async function authenticatedContext(viewport) {
@@ -1212,6 +1214,68 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     await assertNoDocumentOverflow(desktop, "Resource Duplicate URLs desktop");
 
     await desktop.goto(
+      `${baseUrl}/admin/resources?view=linked-notes&query=${encodeURIComponent(collisionQuery)}&sort=title&selected=${encodeURIComponent(resourceId)}&tab=links&probe=keep`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { level: 1, name: "Linked to Notes" }).waitFor();
+    assert(await selectedResourceRow(desktop).count() === 1, "Resources Linked to Notes did not render the selected Resource");
+    assert(await resourceRow(desktop, duplicateResourceId).count() === 1, "Resources Linked to Notes did not render the second Resource with the same exact Note source evidence");
+    assert(
+      await desktop.getByText("Exact Notes owner-route evidence · not persisted ObjectLinks", { exact: true }).count() === 1,
+      "Resources Linked to Notes did not disclose its evidence-only ObjectLink boundary"
+    );
+    assert(
+      await desktop.locator(`[data-content-target="notes:${noteId}"]`).count() === 1,
+      "Resources Linked to Notes did not group exact evidence under one Note owner route"
+    );
+    assert(
+      await desktop.locator(`a[href="/admin/notes/${noteId}"]`).count() >= 1 &&
+        await desktop.getByText(noteTitle, { exact: true }).count() >= 1,
+      "Resources Linked to Notes did not expose the native Note owner route"
+    );
+    assert(
+      await desktop.getByRole("tab", { name: "Links", selected: true }).count() === 1,
+      "Resources Linked to Notes did not select the Links inspector tab"
+    );
+    const linkedNotesUrl = new URL(desktop.url());
+    for (const [key, value] of [
+      ["view", "linked-notes"],
+      ["query", collisionQuery],
+      ["sort", "title"],
+      ["selected", resourceId],
+      ["tab", "links"],
+      ["probe", "keep"]
+    ]) {
+      assert(linkedNotesUrl.searchParams.get(key) === value, `Resources Linked to Notes dropped ${key} URL state`);
+    }
+    await resourceRow(desktop, duplicateResourceId).locator('input[type="checkbox"]').check();
+    assert(
+      new URL(desktop.url()).searchParams.get("selected") === resourceId,
+      "Resources Linked to Notes batch checkbox changed inspector selection"
+    );
+    await desktop.screenshot({ path: path.join(screenshotDir, "resources-linked-notes-1440x900.png") });
+    await resourceRow(desktop, duplicateResourceId).locator(".dense-object-row__body").click();
+    await desktop.waitForFunction((id) => (
+      new URL(window.location.href).searchParams.get("selected") === id &&
+      new URL(window.location.href).searchParams.get("tab") === "links"
+    ), duplicateResourceId);
+    await desktop.goBack();
+    await desktop.waitForFunction((id) => (
+      new URL(window.location.href).searchParams.get("selected") === id
+    ), resourceId);
+    await desktop.goForward();
+    await desktop.waitForFunction((id) => (
+      new URL(window.location.href).searchParams.get("selected") === id
+    ), duplicateResourceId);
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    assert(
+      new URL(desktop.url()).searchParams.get("selected") === duplicateResourceId &&
+        new URL(desktop.url()).searchParams.get("tab") === "links",
+      "Resources Linked to Notes refresh did not restore selected Resource and Links state"
+    );
+    await assertNoDocumentOverflow(desktop, "Resource Linked to Notes desktop");
+
+    await desktop.goto(
       `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(resourceId)}&tab=review&probe=keep`,
       { waitUntil: "domcontentloaded" }
     );
@@ -1274,6 +1338,14 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     await assertNoDocumentOverflow(desktop, "Resource Duplicate URLs wide desktop");
 
     await desktop.goto(
+      `${baseUrl}/admin/resources?view=linked-notes&query=${encodeURIComponent(collisionQuery)}&sort=title&selected=${encodeURIComponent(resourceId)}&tab=links`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { level: 1, name: "Linked to Notes" }).waitFor();
+    await desktop.screenshot({ path: path.join(screenshotDir, "resources-linked-notes-1920x1080.png") });
+    await assertNoDocumentOverflow(desktop, "Resource Linked to Notes wide desktop");
+
+    await desktop.goto(
       `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(resourceId)}&tab=review`,
       { waitUntil: "domcontentloaded" }
     );
@@ -1307,6 +1379,24 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     await assertNoDocumentOverflow(tablet, "Resource Duplicate URLs tablet");
 
     await tablet.goto(
+      `${baseUrl}/admin/resources?view=linked-notes&query=${encodeURIComponent(collisionQuery)}&sort=title&selected=${encodeURIComponent(resourceId)}&tab=links`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await tablet.getByRole("heading", { level: 1, name: "Linked to Notes" }).waitFor();
+    await tablet.screenshot({ path: path.join(screenshotDir, "resources-linked-notes-1024x768.png") });
+    await openInspectorIfNeeded(tablet);
+    assert(
+      await tablet.getByRole("tab", { name: "Links", selected: true }).count() === 1,
+      "Resources Linked to Notes tablet inspector did not preserve its Links tab"
+    );
+    assert(
+      await tablet.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Resources AI dock remained exposed beneath the tablet Linked to Notes inspector"
+    );
+    await tablet.keyboard.press("Escape");
+    await assertNoDocumentOverflow(tablet, "Resource Linked to Notes tablet");
+
+    await tablet.goto(
       `${baseUrl}/admin/resources?view=needs-review&query=${encodeURIComponent(resourceTitle)}&sort=review&selected=${encodeURIComponent(resourceId)}&tab=review`,
       { waitUntil: "domcontentloaded" }
     );
@@ -1323,6 +1413,64 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     const mobileContext = await authenticatedContext({ width: 390, height: 844 });
     const mobile = await mobileContext.newPage();
     observe(mobile);
+    await mobile.goto(
+      `${baseUrl}/admin/resources?view=all`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await mobile.getByRole("button", { name: "Open Resources navigation" }).click();
+    const linkedNotesViewControl = mobile.getByRole("button", { name: /Linked to Notes/ });
+    await linkedNotesViewControl.waitFor({ state: "visible" });
+    const linkedNotesViewTarget = await linkedNotesViewControl.evaluate((element) => {
+      const rect = element.getBoundingClientRect();
+      return { width: rect.width, height: rect.height };
+    });
+    assert(
+      linkedNotesViewTarget.width >= 44 && linkedNotesViewTarget.height >= 44,
+      `Resources Linked to Notes mobile navigation target below 44px: ${JSON.stringify(linkedNotesViewTarget)}`
+    );
+    await linkedNotesViewControl.click();
+    await mobile.getByRole("heading", { level: 1, name: "Linked to Notes" }).waitFor();
+    await mobile.waitForFunction(
+      () => new URL(window.location.href).searchParams.get("view") === "linked-notes"
+    );
+    assert(
+      new URL(mobile.url()).searchParams.get("view") === "linked-notes",
+      "Resources mobile sidebar did not deep-link the Linked to Notes view"
+    );
+    assert(
+      await mobile.locator("#resources-module-sidebar").getAttribute("data-mobile-open") === null,
+      "Resources mobile sidebar did not close after selecting Linked to Notes"
+    );
+    await mobile.goto(
+      `${baseUrl}/admin/resources?view=linked-notes&query=${encodeURIComponent(collisionQuery)}&sort=title`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await mobile.getByRole("heading", { level: 1, name: "Linked to Notes" }).waitFor();
+    assert(await selectedResourceRow(mobile).count() === 1, "Resources Linked to Notes mobile directory omitted its exact-evidence Resource");
+    await mobile.screenshot({ path: path.join(screenshotDir, "resources-linked-notes-390x844.png") });
+    await selectedResourceRow(mobile).locator(".dense-object-row__body").click();
+    await mobile.waitForFunction((id) => (
+      window.location.pathname === `/admin/resources/${id}` &&
+      new URL(window.location.href).searchParams.get("tab") === "links"
+    ), resourceId);
+    await openInspectorIfNeeded(mobile);
+    await mobile.waitForFunction(() => document.querySelector("#resource-inspector")?.contains(document.activeElement));
+    assert(
+      await mobile.getByRole("tab", { name: "Links", selected: true }).count() === 1,
+      "Resources Linked to Notes mobile detail did not preserve the Links tab"
+    );
+    assert(
+      await mobile.locator(`a[href="/admin/notes/${noteId}"]`).count() >= 1,
+      "Resources Linked to Notes mobile inspector omitted its owner route"
+    );
+    assert(
+      await mobile.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Resources AI dock remained exposed beneath the mobile Linked to Notes inspector"
+    );
+    await mobile.screenshot({ path: path.join(screenshotDir, "resource-linked-notes-inspector-390x844.png") });
+    await mobile.keyboard.press("Escape");
+    await assertNoDocumentOverflow(mobile, "Resource Linked to Notes mobile");
+
     await mobile.goto(
       `${baseUrl}/admin/resources?view=all`,
       { waitUntil: "domcontentloaded" }
@@ -1420,9 +1568,9 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     );
     await mobileContext.close();
 
-    assert(mutatingRequests.length === 0, `Resource review or Properties interactions emitted mutations: ${mutatingRequests.join(" | ")}`);
-    assert(browserErrors.length === 0, `Resource review or Properties browser checks emitted errors: ${browserErrors.join(" | ")}`);
-    assert(failedResponses.length === 0, `Resource review or Properties browser checks received failed responses: ${failedResponses.join(" | ")}`);
+    assert(mutatingRequests.length === 0, `Resource linked-context, review, or Properties interactions emitted mutations: ${mutatingRequests.join(" | ")}`);
+    assert(browserErrors.length === 0, `Resource linked-context, review, or Properties browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Resource linked-context, review, or Properties browser checks received failed responses: ${failedResponses.join(" | ")}`);
   } finally {
     await browser.close();
   }
@@ -5567,7 +5715,7 @@ async function main() {
       "Resources direct Links tab URL state"
     );
     for (const expected of [
-      "Candidate graph · not persisted links",
+      "Owner-route evidence · not persisted ObjectLinks",
       "Resolved owner routes",
       updatedNoteTitle,
       mediaTitle,
@@ -5729,6 +5877,80 @@ async function main() {
     }
     pass("Resources Duplicate URLs exposes exact accepted URL collisions without confirming or mutating duplicates");
 
+    const resourceLinkedNotes = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/resources?view=linked-notes&query=${encodeURIComponent(sharedContentSourceUrl)}&sort=title&selected=${encodeURIComponent(createdResource.id)}&tab=links`
+    );
+    assert(
+      resourceLinkedNotes.response.ok,
+      `Resource Linked to Notes view failed: ${describeStatus(resourceLinkedNotes.response)}`
+    );
+    assertSelectedTab(
+      resourceLinkedNotes.body,
+      `resource-${createdResource.id}-tab-links`,
+      "Resource Linked to Notes selected Links tab"
+    );
+    for (const expected of [
+      "<h1>Linked to Notes</h1>",
+      "not persisted ObjectLinks",
+      "Affected Resources",
+      "Owner targets",
+      "Evidence signals",
+      "Owner coverage",
+      resourceTitle,
+      duplicateResourceTitle,
+      updatedNoteTitle,
+      `/admin/notes/${createdNote.id}`,
+      'data-resource-linked-context-summary="notes"',
+      `data-content-target="notes:${createdNote.id}"`
+    ]) {
+      assert(
+        resourceLinkedNotes.body.includes(expected),
+        `Resource Linked to Notes omitted exact owner evidence: ${expected}`
+      );
+    }
+    assert(
+      countRenderedToken(
+        resourceLinkedNotes.body,
+        `data-content-target="notes:${createdNote.id}"`
+      ) === 1,
+      "Resource Linked to Notes repeated one owner route for multiple exact signals"
+    );
+    for (const forbidden of [
+      "Creates reference",
+      "Confirmed citation",
+      "Resource usage event"
+    ]) {
+      assert(
+        !resourceLinkedNotes.body.includes(forbidden),
+        `Resource Linked to Notes rendered unsupported current state: ${forbidden}`
+      );
+    }
+
+    const resourceLinkedFinance = await requestText(
+      server.baseUrl,
+      cookieJar,
+      "/admin/resources?view=linked-finance&sort=title&tab=links"
+    );
+    assert(
+      resourceLinkedFinance.response.ok,
+      `Resource Linked to Finance view failed: ${describeStatus(resourceLinkedFinance.response)}`
+    );
+    for (const expected of [
+      "<h1>Linked to Finance</h1>",
+      "not persisted ObjectLinks",
+      "Owner coverage",
+      "Disconnected",
+      "empty result is not proof of no relationship"
+    ]) {
+      assert(
+        resourceLinkedFinance.body.includes(expected),
+        `Resource Linked to Finance omitted disconnected-coverage boundary: ${expected}`
+      );
+    }
+    pass("Resources linked-context views expose exact owner routes and preserve disconnected Finance coverage as unknown");
+
     const resourceProperties = await requestText(
       server.baseUrl,
       cookieJar,
@@ -5783,9 +6005,11 @@ async function main() {
       resourceTitle,
       duplicateResource.id,
       duplicateResourceTitle,
-      sharedContentSourceUrl
+      sharedContentSourceUrl,
+      createdNote.id,
+      updatedNoteTitle
     );
-    pass("Resources Duplicate URLs, Needs Review, and Properties preserve URL state, responsive access, explicit ownership boundaries, and zero mutations");
+    pass("Resources linked context, Duplicate URLs, Needs Review, and Properties preserve URL state, responsive access, explicit ownership boundaries, and zero mutations");
 
     const mediaDirectoryAfterCreate = await requestText(server.baseUrl, cookieJar, `/admin/media?selected=${createdMedia.id}`);
     assert(mediaDirectoryAfterCreate.response.ok && mediaDirectoryAfterCreate.body.includes(mediaTitle), "Media record missing from the Media directory");

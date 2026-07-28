@@ -547,6 +547,12 @@ const RESOURCE_VIEWS = [
   "needs-review",
   "cited",
   "archived",
+  "linked-people",
+  "linked-projects",
+  "linked-notes",
+  "linked-finance",
+  "linked-reviews",
+  "linked-personal-ops",
   "duplicate-urls"
 ] as const;
 const RESOURCE_SORTS = ["updated-desc", "updated-asc", "title", "review"] as const;

@@ -17,7 +17,6 @@ import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
 import ResourcePropertiesView from "./resources/ResourcePropertiesView";
 import {
-  contentLinksForObject,
   contentTargetGroupsForObject,
   unresolvedReferencesForObject,
   type LegacyContentGraph
@@ -28,6 +27,12 @@ import type {
   ResourceType
 } from "../lib/modules/resources/types";
 import { buildResourceDuplicateEvidenceIndex } from "../lib/modules/resources/duplicate-evidence";
+import {
+  RESOURCE_LINKED_CONTEXT_MODULE_BY_VIEW,
+  type ResourceLinkedContextEvidenceIndex,
+  type ResourceLinkedContextModule,
+  type ResourceLinkedContextView
+} from "../lib/modules/resources/linked-context-evidence";
 import { buildResourceReviewEvidence } from "../lib/modules/resources/review-evidence";
 import { buildResourceReviewQueue } from "../lib/modules/resources/review-queue";
 import { buildResourceSourceEvidenceReport } from "../lib/modules/resources/source-evidence";
@@ -42,6 +47,7 @@ import styles from "./content-graph/ContentGraphWorkspace.module.css";
 type ResourcesWorkspaceProps = {
   initialResources: ResourceRecord[];
   contentGraph: LegacyContentGraph;
+  linkedContextEvidence: ResourceLinkedContextEvidenceIndex;
   initialMode?: "index" | "detail";
   initialSelectedId?: string;
   initialLoadError?: string;
@@ -90,6 +96,12 @@ const VIEW_LABELS: Readonly<Record<ResourcesView, string>> = {
   "needs-review": "Needs Review",
   cited: "Cited / Used",
   archived: "Archived",
+  "linked-people": "Linked to People",
+  "linked-projects": "Linked to Projects",
+  "linked-notes": "Linked to Notes",
+  "linked-finance": "Linked to Finance",
+  "linked-reviews": "Linked to Reviews",
+  "linked-personal-ops": "Linked to Personal Ops",
   "duplicate-urls": "Duplicate URLs"
 };
 
@@ -105,13 +117,15 @@ const TYPE_ROWS = [
   "Contracts / Invoices"
 ] as const;
 
-const CONTEXT_ROWS = [
-  "Linked to People",
-  "Linked to Projects",
-  "Linked to Notes",
-  "Linked to Finance",
-  "Linked to Reviews",
-  "Linked to Personal Ops"
+const CONTEXT_ROWS: ReadonlyArray<
+  [ResourceLinkedContextModule, ResourceLinkedContextView, string]
+> = [
+  ["people", "linked-people", "Linked to People"],
+  ["projects", "linked-projects", "Linked to Projects"],
+  ["notes", "linked-notes", "Linked to Notes"],
+  ["finance", "linked-finance", "Linked to Finance"],
+  ["reviews", "linked-reviews", "Linked to Reviews"],
+  ["personal_ops", "linked-personal-ops", "Linked to Personal Ops"]
 ] as const;
 
 const VIEW_LIMITATIONS: Readonly<Partial<Record<ResourcesView, string>>> = {
@@ -135,6 +149,16 @@ const QUICK_FILTERS = [
 
 function displayLabel(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function linkedContextModuleForView(
+  view: ResourcesView
+): ResourceLinkedContextModule | null {
+  return (
+    RESOURCE_LINKED_CONTEXT_MODULE_BY_VIEW[
+      view as ResourceLinkedContextView
+    ] || null
+  );
 }
 
 function sourceEvidenceLabel(state: ResourceSourceEvidenceState) {
@@ -238,6 +262,7 @@ function useMediaQuery(query: string) {
 export default function ResourcesWorkspace({
   initialResources,
   contentGraph,
+  linkedContextEvidence,
   initialMode = "index",
   initialSelectedId,
   initialLoadError = ""
@@ -289,6 +314,23 @@ export default function ResourcesWorkspace({
     () => buildResourceDuplicateEvidenceIndex(initialResources),
     [initialResources]
   );
+  const linkedContextModule = linkedContextModuleForView(view);
+  const linkedContextSummary = linkedContextModule
+    ? linkedContextEvidence.summary[linkedContextModule]
+    : null;
+  const linkedContextCoverage = linkedContextModule
+    ? linkedContextEvidence.coverage[linkedContextModule]
+    : null;
+  const linkedContextByResourceId = useMemo(
+    () =>
+      new Map(
+        linkedContextEvidence.records.map((record) => [
+          record.resourceId,
+          record
+        ])
+      ),
+    [linkedContextEvidence.records]
+  );
   const unavailableViewReason = VIEW_LIMITATIONS[view] || "";
   const visibleResources = useMemo(
     () => unavailableViewReason
@@ -298,12 +340,19 @@ export default function ResourcesWorkspace({
             (resource) =>
               matchesQuery(resource, query) &&
               (view !== "needs-review" || reviewQueue.byResourceId.has(resource.id)) &&
-              (view !== "duplicate-urls" || duplicateEvidence.byResourceId.has(resource.id))
+              (view !== "duplicate-urls" || duplicateEvidence.byResourceId.has(resource.id)) &&
+              (!linkedContextModule ||
+                linkedContextByResourceId
+                  .get(resource.id)
+                  ?.placements.some(
+                    (placement) =>
+                      placement.ownerModule === linkedContextModule
+                  ))
           ),
           sort,
           reviewPriorityById
         ),
-    [duplicateEvidence, initialResources, query, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
+    [duplicateEvidence, initialResources, linkedContextByResourceId, linkedContextModule, query, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
   );
 
   useEffect(() => {
@@ -372,7 +421,13 @@ export default function ResourcesWorkspace({
 
   function selectResource(resource: ResourceRecord) {
     const nextTab: ResourcesTab =
-      view === "needs-review" ? "review" : view === "duplicate-urls" ? "source" : "overview";
+      view === "needs-review"
+        ? "review"
+        : view === "duplicate-urls"
+          ? "source"
+          : linkedContextModule
+            ? "links"
+            : "overview";
     setSelectedId(resource.id);
     setActiveTab(nextTab);
     setSelectedEvidenceId("");
@@ -412,20 +467,32 @@ export default function ResourcesWorkspace({
   }
 
   function selectLibraryView(nextView: ResourcesView) {
+    const nextLinkedContextModule = linkedContextModuleForView(nextView);
     const nextTab: ResourcesTab =
       nextView === "needs-review"
         ? "review"
         : nextView === "duplicate-urls"
           ? "source"
+          : nextLinkedContextModule
+            ? "links"
           : initialMode === "detail"
             ? "overview"
             : activeTab;
     const nextSort: ResourcesSort =
-      nextView === "needs-review" ? "review" : nextView === "duplicate-urls" ? "title" : sort;
+      nextView === "needs-review"
+        ? "review"
+        : nextView === "duplicate-urls" || nextLinkedContextModule
+          ? "title"
+          : sort;
     setView(nextView);
     setSort(nextSort);
     setActiveTab(nextTab);
-    if (initialMode === "detail" || nextView === "needs-review" || nextView === "duplicate-urls") {
+    if (
+      initialMode === "detail" ||
+      nextView === "needs-review" ||
+      nextView === "duplicate-urls" ||
+      nextLinkedContextModule
+    ) {
       setSelectedEvidenceId("");
     }
     updateUrl(
@@ -434,7 +501,10 @@ export default function ResourcesWorkspace({
         sort: nextSort,
         tab: nextTab,
         item:
-          initialMode === "detail" || nextView === "needs-review" || nextView === "duplicate-urls"
+          initialMode === "detail" ||
+          nextView === "needs-review" ||
+          nextView === "duplicate-urls" ||
+          nextLinkedContextModule
             ? ""
             : selectedEvidenceId
       },
@@ -478,11 +548,16 @@ export default function ResourcesWorkspace({
     {
       id: "linked-context",
       label: "Linked Context",
-      items: CONTEXT_ROWS.map((label) => ({
-        id: `context-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`,
+      items: CONTEXT_ROWS.map(([module, contextView, label]) => ({
+        id: `context-${module}`,
         label,
-        disabled: true,
-        disabledReason: "Legacy relation IDs are preserved, but they are not typed native ObjectLinks yet."
+        count: linkedContextEvidence.summary[module].affectedResources,
+        tone:
+          linkedContextEvidence.coverage[module].state === "read_failed"
+            ? "attention"
+            : undefined,
+        active: view === contextView,
+        onSelect: () => selectLibraryView(contextView)
       }))
     },
     {
@@ -515,7 +590,7 @@ export default function ResourcesWorkspace({
       className={styles.sidebar}
       footer={
         <p className={styles.sidebarFootnote}>
-          Legacy Personal Records adapter · evidence review is derived and read-only · source health, native links, and mutations pending
+          Legacy Personal Records adapter · linked-context views are exact owner-reference evidence, not ResourceLinks · source health and Resource mutations pending
         </p>
       }
     />
@@ -609,12 +684,13 @@ export default function ResourcesWorkspace({
     }
 
     const tabsId = `resource-${selectedResource.id}`;
-    const graphLinks = contentLinksForObject(contentGraph, selectedResource.nativeRef);
     const targetGroups = contentTargetGroupsForObject(contentGraph, selectedResource.nativeRef);
     const unresolvedReferences = unresolvedReferencesForObject(
       contentGraph,
       selectedResource.nativeRef
     );
+    const linkedContextRecord =
+      linkedContextByResourceId.get(selectedResource.id) || null;
 
     if (activeTab === "review") {
       const noteSourceTargets = targetGroups.filter(
@@ -800,12 +876,29 @@ export default function ResourcesWorkspace({
     }
 
     if (activeTab === "links") {
-      const noteSourceTargets = targetGroups.filter(
-        (group) => group.candidates.some((candidate) => candidate.relationship === "note_source_candidate")
+      const allOwnerPlacements = linkedContextRecord?.placements || [];
+      const ownerPlacements = linkedContextModule
+        ? allOwnerPlacements.filter(
+            (placement) => placement.ownerModule === linkedContextModule
+          )
+        : allOwnerPlacements;
+      const noteSourceTargets = allOwnerPlacements.filter(
+        (placement) => placement.ownerModule === "notes"
       );
       const mediaSourceTargets = targetGroups.filter(
         (group) => group.candidates.some((candidate) => candidate.relationship === "media_source_reference_candidate")
       );
+      const activeCoverage = linkedContextModule
+        ? linkedContextEvidence.coverage[linkedContextModule]
+        : null;
+      const evidenceSignalCount =
+        ownerPlacements.reduce(
+          (total, placement) => total + placement.evidenceSignalCount,
+          0
+        ) + (linkedContextModule ? 0 : mediaSourceTargets.reduce(
+          (total, group) => total + group.candidates.length,
+          0
+        ));
 
       return (
         <DetailTabPanel tabsId={tabsId} tabId="links" active>
@@ -814,8 +907,8 @@ export default function ResourcesWorkspace({
               <MetricStrip
                 ariaLabel="Resource reuse evidence"
                 items={[
-                  { id: "candidates", label: "Evidence signals", value: graphLinks.length },
-                  { id: "targets", label: "Owner targets", value: targetGroups.length },
+                  { id: "candidates", label: "Evidence signals", value: evidenceSignalCount },
+                  { id: "targets", label: "Owner targets", value: ownerPlacements.length + (linkedContextModule ? 0 : mediaSourceTargets.length) },
                   { id: "notes", label: "Note source matches", value: noteSourceTargets.length },
                   { id: "media", label: "Media URL references", value: mediaSourceTargets.length },
                   { id: "unresolved", label: "Unresolved legacy IDs", value: unresolvedReferences.length, tone: unresolvedReferences.length ? "attention" : "positive" },
@@ -823,37 +916,105 @@ export default function ResourcesWorkspace({
                 ]}
               />
               <div className={styles.readOnlyNotice}>
-                <strong>Candidate graph · not persisted links</strong>
+                <strong>
+                  {linkedContextModule
+                    ? `${displayLabel(linkedContextModule)} owner-route evidence · not persisted ObjectLinks`
+                    : "Owner-route evidence · not persisted ObjectLinks"}
+                </strong>
                 <span>
-                  Exact normalized URL and record-ID evidence can open the owning object. It does not create a ResourceLink, citation, snapshot, usage event, or audit event.
+                  Exact retained references can open the owning object. This view does not attach, unlink, change ownership,
+                  create a ResourceLink, prove active usage, or append an audit event.
                 </span>
               </div>
             </section>
 
+            {activeCoverage && activeCoverage.state !== "indexed" && (
+              <SystemState
+                variant="read_only"
+                compact
+                title={
+                  activeCoverage.state === "read_failed"
+                    ? `${displayLabel(activeCoverage.ownerModule)} reference coverage could not be loaded`
+                    : `${displayLabel(activeCoverage.ownerModule)} Resource references are not indexed`
+                }
+                description={
+                  activeCoverage.error ||
+                  "The current owner module does not expose stable Resource IDs in its connected read model. An empty result is not proof that no relationship exists."
+                }
+                className={styles.panel}
+              />
+            )}
+
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>
-                <h2>Resolved owner routes</h2>
-                <strong>{targetGroups.length}</strong>
+                <div>
+                  <h2>
+                    {linkedContextModule
+                      ? `${displayLabel(linkedContextModule)} owner routes`
+                      : "Resolved owner routes"}
+                  </h2>
+                  <p>Grouped by target object while retaining every exact evidence signal.</p>
+                </div>
+                <strong>{ownerPlacements.length + (linkedContextModule ? 0 : mediaSourceTargets.length)}</strong>
               </div>
-              {targetGroups.length ? (
+              {ownerPlacements.length || (!linkedContextModule && mediaSourceTargets.length) ? (
                 <ul className={styles.objectList} aria-label="Read-only Resource link candidates">
-                  {targetGroups.map((group) => {
-                    const relationships = Array.from(new Set(group.candidates.map((candidate) => displayLabel(candidate.relationship))));
-                    const ambiguous = group.candidates.some((candidate) => candidate.ambiguity === "multiple_targets");
+                  {ownerPlacements.map((placement) => (
+                    <li
+                      key={placement.id}
+                      data-content-target={`${placement.ownerModule}:${placement.ownerRef.objectId}`}
+                      data-resource-linked-context={placement.ownerModule}
+                    >
+                      <span>
+                        <strong>{placement.ownerRef.label}</strong>
+                        <small>
+                          {displayLabel(placement.ownerModule)} ·{" "}
+                          {placement.relationships.map(displayLabel).join(" / ")} ·{" "}
+                          {displayLabel(placement.state)}
+                        </small>
+                      </span>
+                      <span className={styles.inlineActions}>
+                        <span
+                          className={styles.stateChip}
+                          data-tone={
+                            placement.ambiguity === "multiple_targets" ||
+                            ["pending", "stale", "broken", "missing"].includes(placement.state)
+                              ? "amber"
+                              : "blue"
+                          }
+                        >
+                          {placement.evidenceSignalCount} exact{" "}
+                          {placement.evidenceSignalCount === 1 ? "signal" : "signals"}
+                          {placement.ambiguity === "multiple_targets" ? " · ambiguous" : ""}
+                        </span>
+                        <Link className={styles.linkButton} href={placement.ownerRef.route}>
+                          Open owner
+                        </Link>
+                      </span>
+                    </li>
+                  ))}
+                  {!linkedContextModule && mediaSourceTargets.map((group) => {
+                    const ambiguous = group.candidates.some(
+                      (candidate) => candidate.ambiguity === "multiple_targets"
+                    );
                     return (
                       <li
-                        key={`${group.target.module}-${group.target.objectType}-${group.target.objectId}`}
+                        key={`media-${group.target.objectType}-${group.target.objectId}`}
                         data-content-target={`${group.target.module}:${group.target.objectId}`}
                       >
                         <span>
                           <strong>{group.target.label}</strong>
-                          <small>{displayLabel(group.target.module)} · {relationships.join(" / ")}</small>
+                          <small>Media · source URL reference candidate · not a snapshot</small>
                         </span>
                         <span className={styles.inlineActions}>
-                          <span className={styles.stateChip} data-tone={ambiguous ? "amber" : "blue"}>
-                            {group.candidates.length} exact {group.candidates.length === 1 ? "signal" : "signals"}{ambiguous ? " · ambiguous" : ""}
+                          <span className={styles.stateChip} data-tone="amber">
+                            {group.candidates.length} exact{" "}
+                            {group.candidates.length === 1 ? "signal" : "signals"}
+                            {ambiguous ? " · ambiguous" : ""}
                           </span>
-                          <Link className={styles.linkButton} href={group.target.route}>Open owner</Link>
+                          <Link className={styles.linkButton} href={group.target.route}>
+                            Open owner
+                          </Link>
                         </span>
                       </li>
                     );
@@ -863,8 +1024,16 @@ export default function ResourcesWorkspace({
                 <SystemState
                   variant="empty"
                   compact
-                  title="No cross-module candidates resolve yet"
-                  description="No Note URL, Media URL reference, or retained relation ID resolves exactly to another content object."
+                  title={
+                    linkedContextModule
+                      ? `No exact ${displayLabel(linkedContextModule)} owner-route evidence`
+                      : "No cross-module candidates resolve yet"
+                  }
+                  description={
+                    activeCoverage?.state === "indexed"
+                      ? "The connected read model contains no exact reference from this Resource to an object in the selected owner module. This is not proof that no relationship exists."
+                      : "Coverage is incomplete or disconnected, so absence cannot establish that no relationship exists."
+                  }
                 />
               )}
             </section>
@@ -1422,6 +1591,7 @@ export default function ResourcesWorkspace({
                 {initialResources.length} total external {initialResources.length === 1 ? "reference" : "references"}
                 {view === "needs-review" ? " · evidence-derived queue" : ""}
                 {view === "duplicate-urls" ? " · exact collision evidence only" : ""}
+                {linkedContextModule ? " · exact owner-reference evidence" : ""}
               </p>
             </div>
             <div className={styles.headerActions}>
@@ -1475,6 +1645,81 @@ export default function ResourcesWorkspace({
                   It does not fetch a source, detect fuzzy similarity, confirm a duplicate, choose a canonical record,
                   merge, replace, unlink, or write Resource state. Credential-bearing, malformed, and unsupported
                   values are excluded.
+                </span>
+              </div>
+            </section>
+          )}
+
+          {linkedContextModule && linkedContextSummary && linkedContextCoverage && (
+            <section
+              className={styles.reviewQueueSummary}
+              aria-label={`${displayLabel(linkedContextModule)} linked-context evidence summary`}
+              data-resource-linked-context-summary={linkedContextModule}
+            >
+              <MetricStrip
+                ariaLabel={`${displayLabel(linkedContextModule)} Resource reference evidence`}
+                items={[
+                  {
+                    id: "affected",
+                    label: "Affected Resources",
+                    value: linkedContextSummary.affectedResources
+                  },
+                  {
+                    id: "targets",
+                    label: "Owner targets",
+                    value: linkedContextSummary.ownerTargets
+                  },
+                  {
+                    id: "signals",
+                    label: "Evidence signals",
+                    value: linkedContextSummary.evidenceSignals
+                  },
+                  {
+                    id: "attention",
+                    label: "Attention targets",
+                    value: linkedContextSummary.attentionTargets,
+                    tone: linkedContextSummary.attentionTargets
+                      ? "attention"
+                      : "positive"
+                  },
+                  {
+                    id: "ambiguous",
+                    label: "Ambiguous targets",
+                    value: linkedContextSummary.ambiguousTargets,
+                    tone: linkedContextSummary.ambiguousTargets
+                      ? "attention"
+                      : "positive"
+                  },
+                  {
+                    id: "coverage",
+                    label: "Owner coverage",
+                    value:
+                      linkedContextCoverage.state === "indexed"
+                        ? "Indexed"
+                        : linkedContextCoverage.state === "read_failed"
+                          ? "Read failed"
+                          : "Disconnected",
+                    tone:
+                      linkedContextCoverage.state === "indexed"
+                        ? "positive"
+                        : "attention"
+                  }
+                ]}
+              />
+              <div className={styles.reviewQueueBoundary}>
+                <strong>
+                  Exact {displayLabel(linkedContextModule)} owner-route evidence · not persisted ObjectLinks
+                </strong>
+                <span>
+                  Counts come from retained exact legacy candidates and connected owner-module references.
+                  This view does not attach, unlink, change ownership, create a ResourceLink, prove active
+                  usage, or append an audit event. Unresolved IDs are excluded because their owner module
+                  is unknown.
+                  {linkedContextCoverage.error
+                    ? ` ${linkedContextCoverage.error}`
+                    : linkedContextCoverage.state === "disconnected"
+                      ? " This owner module does not currently expose stable Resource IDs, so an empty result is not proof of no relationship."
+                      : ""}
                 </span>
               </div>
             </section>
@@ -1549,6 +1794,14 @@ export default function ResourcesWorkspace({
               {visibleResources.map((resource) => {
                 const queueItem = reviewQueue.byResourceId.get(resource.id);
                 const duplicateItem = duplicateEvidence.byResourceId.get(resource.id);
+                const linkedContextPlacements = linkedContextModule
+                  ? linkedContextByResourceId
+                      .get(resource.id)
+                      ?.placements.filter(
+                        (placement) =>
+                          placement.ownerModule === linkedContextModule
+                      ) || []
+                  : [];
                 return (
                   <DenseObjectRow
                     id={resource.id}
@@ -1572,6 +1825,28 @@ export default function ResourcesWorkspace({
                             {duplicateItem.collisionGroupCount === 1 ? "group" : "groups"}
                           </span>
                         </>
+                      ) : linkedContextModule ? (
+                        <>
+                          <strong>
+                            {linkedContextPlacements.length} owner{" "}
+                            {linkedContextPlacements.length === 1 ? "target" : "targets"}
+                          </strong>
+                          <span>
+                            {linkedContextPlacements.reduce(
+                              (total, placement) =>
+                                total + placement.evidenceSignalCount,
+                              0
+                            )}{" "}
+                            exact{" "}
+                            {linkedContextPlacements.reduce(
+                              (total, placement) =>
+                                total + placement.evidenceSignalCount,
+                              0
+                            ) === 1
+                              ? "signal"
+                              : "signals"}
+                          </span>
+                        </>
                       ) : (
                         <>
                           <strong>{displayLabel(resource.review.state)}</strong>
@@ -1587,7 +1862,9 @@ export default function ResourcesWorkspace({
                       label: `Select ${resource.title} for batch actions`
                     }}
                     className={
-                      view === "needs-review" || view === "duplicate-urls"
+                      view === "needs-review" ||
+                      view === "duplicate-urls" ||
+                      linkedContextModule
                         ? styles.reviewQueueRow
                         : undefined
                     }
@@ -1604,6 +1881,8 @@ export default function ResourcesWorkspace({
                   ? "No Resource evidence needs review"
                   : view === "duplicate-urls" && !query
                     ? "No exact URL collision evidence"
+                  : linkedContextModule && !query
+                    ? `No exact ${displayLabel(linkedContextModule)} owner-route evidence`
                   : initialResources.length
                     ? "No Resources match this search"
                     : "No Resources yet"
@@ -1613,6 +1892,10 @@ export default function ResourcesWorkspace({
                   ? "The current read model exposes no unavailable review evidence or source signals. This is not a completed ReviewRun."
                   : view === "duplicate-urls" && !query
                     ? "No two Resources share an identical accepted, fragment-free URL key in the current read model. This is not proof that no duplicates exist."
+                  : linkedContextModule && !query
+                    ? linkedContextCoverage?.state === "indexed"
+                      ? `The connected ${displayLabel(linkedContextModule)} read model contains no exact Resource references. This is not proof that no relationship exists.`
+                      : `The ${displayLabel(linkedContextModule)} reference source is unavailable or disconnected. Absence cannot establish that no relationship exists.`
                   : initialResources.length
                   ? "Adjust the query without losing the selected Resource or active detail tab."
                   : "No legacy Resource records were returned. Native creation remains intentionally unavailable."
