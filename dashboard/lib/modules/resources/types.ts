@@ -260,5 +260,23 @@ export type ResourcesViewModel = {
   selected: ResourceRecord | null;
 };
 
+/**
+ * The first writable Resource adapter intentionally covers only fields that
+ * already persist without ambiguity in the broad Personal Records model.
+ * Native ownership, lifecycle, extraction, health, review, and ObjectLinks
+ * remain separate contracts until their persistence topology is settled.
+ */
+export type ResourceCreateInput = {
+  title: string;
+  url: string;
+  body?: string;
+};
+
+export type ResourceUpdateInput = {
+  title?: string;
+  url?: string;
+  body?: string;
+};
+
 export type ResourcesRepositoryError = MutationError;
 export type ResourcesRepositoryResult<T> = MutationResult<T>;

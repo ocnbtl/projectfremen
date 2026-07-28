@@ -1143,18 +1143,45 @@ async function checkResourcesReviewAndPropertiesBrowserState(
   async function openInspectorIfNeeded(page) {
     const details = page.getByRole("button", { name: "Open Resource details" });
     const inspector = page.locator("#resource-inspector");
-    if (await inspector.getAttribute("aria-hidden") === "true") {
-      await details.click();
+    if (await inspector.getAttribute("data-overlay-open") !== "true") {
+      let opened = false;
+      for (let attempt = 0; attempt < 2 && !opened; attempt += 1) {
+        await details.click();
+        try {
+          await page.waitForFunction(
+            () =>
+              document
+                .querySelector("#resource-inspector")
+                ?.getAttribute("data-overlay-open") === "true",
+            undefined,
+            { timeout: 5000 }
+          );
+          opened = true;
+        } catch {
+          // A route hydration boundary can consume the first click immediately
+          // after mobile detail navigation. Retry the explicit control once.
+        }
+      }
+      assert(opened, "Resources mobile inspector control did not open the detail rail");
       await inspector.waitFor({ state: "visible" });
     }
-    await page.waitForFunction(() => {
-      const rail = document.querySelector("#resource-inspector");
-      if (!(rail instanceof HTMLElement)) return false;
-      const transform = window.getComputedStyle(rail).transform;
-      if (transform === "none") return true;
-      const matrix = new DOMMatrixReadOnly(transform);
-      return Math.abs(matrix.m41) < 1;
+    await page.waitForTimeout(250);
+    const inspectorDiagnostics = await inspector.evaluate((rail) => {
+      const rect = rail.getBoundingClientRect();
+      return {
+        overlayOpen: rail.getAttribute("data-overlay-open"),
+        transform: window.getComputedStyle(rail).transform,
+        left: rect.left,
+        right: rect.right,
+        innerWidth: window.innerWidth
+      };
     });
+    assert(
+      inspectorDiagnostics.overlayOpen === "true" &&
+        inspectorDiagnostics.left < inspectorDiagnostics.innerWidth &&
+        inspectorDiagnostics.right > 0,
+      `Resources detail rail remained offscreen: ${JSON.stringify(inspectorDiagnostics)}`
+    );
   }
 
   try {
@@ -1571,6 +1598,343 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     assert(mutatingRequests.length === 0, `Resource linked-context, review, or Properties interactions emitted mutations: ${mutatingRequests.join(" | ")}`);
     assert(browserErrors.length === 0, `Resource linked-context, review, or Properties browser checks emitted errors: ${browserErrors.join(" | ")}`);
     assert(failedResponses.length === 0, `Resource linked-context, review, or Properties browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkResourceCreateEditBrowserState(
+  baseUrl,
+  cookieJar,
+  existingResourceId,
+  existingResourceTitle,
+  existingUrl,
+  testRunId
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  let plannedFailureStatusExpected = false;
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "resources-checkpoint-16"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const failure = request.failure()?.errorText || "";
+      if (!failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (
+        response.status() === 503 &&
+        plannedFailureStatusExpected &&
+        url.pathname === "/api/personal/records"
+      ) {
+        plannedFailureStatusExpected = false;
+        return;
+      }
+      if (
+        response.status() >= 400 &&
+        url.pathname !== "/_vercel/insights/script.js"
+      ) {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(
+      !diagnostics.overflowX,
+      `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`
+    );
+  }
+
+  async function openCreateEditor(page) {
+    await page.goto(`${baseUrl}/admin/resources?view=all`, {
+      waitUntil: "domcontentloaded"
+    });
+    await page.getByRole("heading", { level: 1, name: "All Resources" }).waitFor();
+    await page.getByRole("button", { name: "Add Resource", exact: false }).click();
+    const dialog = page.getByRole("dialog", { name: "Add Resource" });
+    await dialog.waitFor();
+    assert(
+      await page.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Resources AI dock remained exposed beneath the editor"
+    );
+    return dialog;
+  }
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const desktop = await desktopContext.newPage();
+    observe(desktop);
+    const dialog = await openCreateEditor(desktop);
+
+    await dialog.getByLabel("Source URL").fill(existingUrl);
+    await dialog.getByLabel("Resource title").fill(`${testRunId}-duplicate-attempt`);
+    await desktop.getByText("Exact URL already saved", { exact: true }).waitFor();
+    assert(
+      await dialog.getByRole("button", { name: "Add Resource", exact: true }).isDisabled(),
+      "Resources duplicate preview did not block exact-URL creation"
+    );
+    assert(
+      await dialog.getByText(existingResourceTitle, { exact: true }).count() >= 1 &&
+        await dialog.locator(`a[href="/admin/resources/${existingResourceId}"]`).count() >= 1,
+      "Resources duplicate preview did not expose the existing native route"
+    );
+
+    const createdTitle = `${testRunId}-editor-created-resource`;
+    const createdUrl = `https://example.com/${testRunId}/resource-editor`;
+    const createdBody = "Regression-created Resource context retained through the audited adapter.";
+    await dialog.getByLabel("Source URL").fill(createdUrl);
+    await dialog.getByLabel("Resource title").fill(createdTitle);
+    await dialog.getByLabel("Source context").fill(createdBody);
+    await desktop.getByText("URL syntax is accepted. Network health, redirects, and canonical identity are not checked.", { exact: true }).waitFor();
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "resource-create-1440x900.png")
+    });
+    await assertNoDocumentOverflow(desktop, "Resource create editor desktop");
+    await dialog.getByRole("button", { name: "Add Resource", exact: true }).click();
+    await dialog.waitFor({ state: "detached" });
+    const createdTitleNode = desktop
+      .locator('[id^="dense-object-row-"][id$="-title"]')
+      .filter({ hasText: createdTitle });
+    await createdTitleNode.waitFor();
+    const createdTitleId = await createdTitleNode.getAttribute("id");
+    const createdResourceId = createdTitleId
+      ?.replace(/^dense-object-row-/, "")
+      .replace(/-title$/, "");
+    assert(createdResourceId, "Resource create did not deep-link the selected Resource");
+    await desktop.waitForFunction(
+      (id) => new URL(window.location.href).searchParams.get("selected") === id,
+      createdResourceId
+    );
+
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    assert(
+      await desktop.locator(`#dense-object-row-${createdResourceId}-title`).getByText(createdTitle, { exact: true }).count() === 1,
+      "Created Resource did not persist after reload"
+    );
+    await desktop.getByRole("button", { name: "Edit", exact: true }).click();
+    const editDialog = desktop.getByRole("dialog", { name: createdTitle });
+    await editDialog.waitFor();
+    const updatedTitle = `${createdTitle}-edited`;
+    const updatedBody = `${createdBody} Edited after an intentional failed write.`;
+    await editDialog.getByLabel("Resource title").fill(updatedTitle);
+    await editDialog.getByLabel("Source context").fill(updatedBody);
+
+    let plannedFailure = true;
+    plannedFailureStatusExpected = true;
+    await desktop.route("**/api/personal/records", async (route) => {
+      if (route.request().method() === "PATCH" && plannedFailure) {
+        plannedFailure = false;
+        await route.fulfill({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ok: false, error: "Regression write failure" })
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await editDialog.getByRole("button", { name: "Save changes" }).click();
+    await editDialog.getByText("Resource was not saved", { exact: true }).waitFor();
+    const preservedTitle = await editDialog.getByLabel("Resource title").inputValue();
+    const preservedBody = await editDialog.getByLabel("Source context").inputValue();
+    assert(
+      preservedTitle === updatedTitle && preservedBody === updatedBody,
+      `Failed Resource write did not preserve dirty input: ${JSON.stringify({
+        expectedTitle: updatedTitle,
+        preservedTitle,
+        expectedBody: updatedBody,
+        preservedBody
+      })}`
+    );
+    await desktop.unroute("**/api/personal/records");
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "resource-edit-failed-write-1440x900.png")
+    });
+    await editDialog.getByRole("button", { name: "Save changes" }).click();
+    await editDialog.waitFor({ state: "detached" });
+    await desktop.getByText(updatedTitle, { exact: true }).first().waitFor();
+
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    await desktop.getByText(updatedTitle, { exact: true }).first().waitFor();
+    await desktop.getByRole("button", { name: "Edit", exact: true }).click();
+    const dirtyDialog = desktop.getByRole("dialog", { name: updatedTitle });
+    await dirtyDialog.getByLabel("Resource title").fill(`${updatedTitle}-discard-me`);
+    await dirtyDialog.getByRole("button", { name: "Cancel" }).click();
+    const discardDialog = desktop.getByRole("dialog", {
+      name: "Discard unsaved Resource changes?"
+    });
+    await discardDialog.waitFor();
+    await discardDialog.getByRole("button", { name: "Keep editing" }).click();
+    const keptDraftTitle = await dirtyDialog.getByLabel("Resource title").inputValue();
+    assert(
+      keptDraftTitle === `${updatedTitle}-discard-me`,
+      `Keeping Resource edits did not preserve the draft: ${JSON.stringify({
+        expected: `${updatedTitle}-discard-me`,
+        actual: keptDraftTitle
+      })}`
+    );
+    await dirtyDialog.getByRole("button", { name: "Cancel" }).click();
+    await discardDialog.getByRole("button", { name: "Discard changes" }).click();
+    await dirtyDialog.waitFor({ state: "detached" });
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    assert(
+      await desktop.getByText(updatedTitle, { exact: true }).count() >= 1 &&
+        await desktop.getByText(`${updatedTitle}-discard-me`, { exact: true }).count() === 0,
+      "Discarded Resource draft changed the persisted record"
+    );
+
+    await desktop.goto(`${baseUrl}/admin/resources/${createdResourceId}?tab=overview`, {
+      waitUntil: "domcontentloaded"
+    });
+    await desktop.getByText(updatedTitle, { exact: true }).first().waitFor();
+    assert(
+      new URL(desktop.url()).pathname === `/admin/resources/${createdResourceId}`,
+      "Created Resource direct detail route did not load"
+    );
+    await desktopContext.close();
+
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const page = await context.newPage();
+      observe(page);
+      const editor = await openCreateEditor(page);
+      await editor.getByLabel("Source URL").fill(
+        `https://example.com/${testRunId}/visual-${viewport.width}`
+      );
+      await editor.getByLabel("Resource title").fill(
+        `Responsive Resource ${viewport.label}`
+      );
+      await editor.getByLabel("Source context").fill(
+        "Responsive editor verification draft. This draft is intentionally discarded."
+      );
+      await page.waitForFunction(() =>
+        Array.from(
+          document.querySelectorAll("[data-resource-editor] button")
+        ).some(
+          (button) =>
+            button.textContent?.trim() === "Add Resource" &&
+            button instanceof HTMLButtonElement &&
+            !button.disabled
+        )
+      );
+      await page.screenshot({
+        path: path.join(screenshotDir, `resource-create-${viewport.label}.png`)
+      });
+      await assertNoDocumentOverflow(page, `Resource create editor ${viewport.label}`);
+      if (viewport.width === 390) {
+        const targets = await editor
+          .locator("button:visible, input:visible, textarea:visible, a[href]:visible")
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label:
+                    element.getAttribute("aria-label") ||
+                    element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((item) => item.width < 44 || item.height < 44)
+          );
+        assert(
+          targets.length === 0,
+          `Resource editor mobile targets below 44px: ${JSON.stringify(targets)}`
+        );
+        await page.keyboard.press("Shift+Tab");
+        assert(
+          await page.evaluate(() =>
+            Boolean(document.querySelector("[data-resource-editor]")?.contains(document.activeElement))
+          ),
+          "Resource editor mobile focus escaped the modal sheet"
+        );
+      }
+      await editor.getByRole("button", { name: "Cancel" }).click();
+      await page
+        .getByRole("dialog", { name: "Discard unsaved Resource changes?" })
+        .getByRole("button", { name: "Discard changes" })
+        .click();
+      await context.close();
+    }
+
+    assert(
+      mutatingRequests.filter((request) => request === "POST /api/personal/records").length === 1,
+      `Resource create emitted an unexpected POST sequence: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      mutatingRequests.filter((request) => request === "PATCH /api/personal/records").length === 2,
+      `Resource edit did not emit one failed and one successful PATCH: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Resource editor browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Resource editor browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
   } finally {
     await browser.close();
   }
@@ -6426,6 +6790,16 @@ async function main() {
     pass("Resource review exposes nine literal evidence contracts without inventing review completion");
     pass("Media metadata triage preserves adapter truth and owner routes without simulating completion");
     pass("Resources, Media, and Notes remain ownership-separated across index and canonical detail routes");
+
+    await checkResourceCreateEditBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdResource.id,
+      resourceTitle,
+      sharedContentSourceUrl,
+      testRunId
+    );
+    pass("Resources create/edit persists through the audited legacy adapter with exact-URL prevention, failed-write recovery, dirty-close protection, and responsive sheets");
 
     logStep("Checking Current Goals persistence and sync");
     const goalMarker = `${testRunId}-goal`;

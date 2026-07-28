@@ -1,11 +1,17 @@
 import { createNativeObjectRef } from "../../native-objects/routes";
-import type { PersonalRecord } from "../../personal-records-store";
 import type {
+  PersonalRecord,
+  PersonalRecordInput,
+  PersonalRecordPatch
+} from "../../personal-records-store";
+import type {
+  ResourceCreateInput,
   ResourceLegacyProvenance,
   ResourceLifecycleState,
   ResourceRecord,
   ResourceRelations,
-  ResourceReviewCadence
+  ResourceReviewCadence,
+  ResourceUpdateInput
 } from "./types";
 import {
   buildResourceSourceEvidenceItems,
@@ -164,5 +170,28 @@ export function resourceForClient(resource: ResourceRecord): ResourceRecord {
       rawUrl: null,
       externalSources: []
     }
+  };
+}
+
+export function resourceCreateInputToLegacy(input: ResourceCreateInput): PersonalRecordInput {
+  return {
+    domain: "notes-docs",
+    title: input.title.trim(),
+    className: "resource",
+    knowledgeShape: "reference",
+    privacy: "private",
+    stage: "processed",
+    status: "active",
+    body: input.body?.trim() || "",
+    url: input.url.trim(),
+    intents: ["retain"]
+  };
+}
+
+export function resourceUpdateInputToLegacy(input: ResourceUpdateInput): PersonalRecordPatch {
+  return {
+    title: input.title?.trim(),
+    body: input.body?.trim(),
+    url: input.url?.trim()
   };
 }

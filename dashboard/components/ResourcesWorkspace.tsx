@@ -15,6 +15,7 @@ import MetricStrip from "./operational/MetricStrip";
 import ObjectHeader from "./operational/ObjectHeader";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
+import ResourceEditorSheet from "./resources/ResourceEditorSheet";
 import ResourcePropertiesView from "./resources/ResourcePropertiesView";
 import {
   contentTargetGroupsForObject,
@@ -270,6 +271,7 @@ export default function ResourcesWorkspace({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [resources, setResources] = useState(initialResources);
   const [firstUrlState] = useState(() => parseResourcesUrlState(searchParams));
   const [query, setQuery] = useState(firstUrlState.query);
   const [view, setView] = useState<ResourcesView>(firstUrlState.view);
@@ -283,6 +285,7 @@ export default function ResourcesWorkspace({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(firstUrlState.ai);
+  const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<{
     resourceId: string;
     evidenceId: string;
@@ -293,26 +296,26 @@ export default function ResourcesWorkspace({
   const searchParamKey = searchParams.toString();
 
   const selectedResource = useMemo(
-    () => initialResources.find((resource) => resource.id === selectedId) || null,
-    [initialResources, selectedId]
+    () => resources.find((resource) => resource.id === selectedId) || null,
+    [resources, selectedId]
   );
   const selectedSourceEvidence = useMemo(
     () => selectedResource
-      ? buildResourceSourceEvidenceReport(selectedResource, initialResources)
+      ? buildResourceSourceEvidenceReport(selectedResource, resources)
       : null,
-    [initialResources, selectedResource]
+    [resources, selectedResource]
   );
   const reviewQueue = useMemo(
-    () => buildResourceReviewQueue(initialResources, contentGraph),
-    [contentGraph, initialResources]
+    () => buildResourceReviewQueue(resources, contentGraph),
+    [contentGraph, resources]
   );
   const reviewPriorityById = useMemo(
     () => new Map(reviewQueue.items.map((item) => [item.resourceId, item.priorityScore])),
     [reviewQueue]
   );
   const duplicateEvidence = useMemo(
-    () => buildResourceDuplicateEvidenceIndex(initialResources),
-    [initialResources]
+    () => buildResourceDuplicateEvidenceIndex(resources),
+    [resources]
   );
   const linkedContextModule = linkedContextModuleForView(view);
   const linkedContextSummary = linkedContextModule
@@ -336,7 +339,7 @@ export default function ResourcesWorkspace({
     () => unavailableViewReason
       ? []
       : sortResources(
-          initialResources.filter(
+          resources.filter(
             (resource) =>
               matchesQuery(resource, query) &&
               (view !== "needs-review" || reviewQueue.byResourceId.has(resource.id)) &&
@@ -352,8 +355,12 @@ export default function ResourcesWorkspace({
           sort,
           reviewPriorityById
         ),
-    [duplicateEvidence, initialResources, linkedContextByResourceId, linkedContextModule, query, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
+    [duplicateEvidence, linkedContextByResourceId, linkedContextModule, query, resources, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
   );
+
+  useEffect(() => {
+    setResources(initialResources);
+  }, [initialResources]);
 
   useEffect(() => {
     const next = parseResourcesUrlState(searchParams);
@@ -363,8 +370,8 @@ export default function ResourcesWorkspace({
     setActiveTab(next.tab);
     setSelectedEvidenceId(next.item);
     setAiOpen(next.ai);
-    if (!initialSelectedId) setSelectedId(next.selected || initialResources[0]?.id || "");
-  }, [initialResources, initialSelectedId, searchParamKey]);
+    if (!initialSelectedId) setSelectedId(next.selected || resources[0]?.id || "");
+  }, [initialSelectedId, resources, searchParamKey]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -526,7 +533,7 @@ export default function ResourcesWorkspace({
         label,
         count:
           id === "all"
-            ? initialResources.length
+            ? resources.length
             : id === "needs-review"
               ? reviewQueue.summary.queuedResources
               : undefined,
@@ -590,11 +597,58 @@ export default function ResourcesWorkspace({
       className={styles.sidebar}
       footer={
         <p className={styles.sidebarFootnote}>
-          Legacy Personal Records adapter · linked-context views are exact owner-reference evidence, not ResourceLinks · source health and Resource mutations pending
+          Legacy Personal Records adapter · title, URL, and context writes are audited · linked-context views are exact owner-reference evidence, not ResourceLinks · source health remains disconnected
         </p>
       }
     />
   );
+
+  function openResourceEditor(mode: "create" | "edit") {
+    if (mode === "edit" && !selectedResource) return;
+    setAiOpen(false);
+    setMobileSidebarOpen(false);
+    setEditorMode(mode);
+    updateUrl({ ai: false });
+  }
+
+  function handleResourceSaved(saved: ResourceRecord, mode: "create" | "edit") {
+    setResources((current) => [
+      saved,
+      ...current.filter((resource) => resource.id !== saved.id)
+    ]);
+    setSelectedId(saved.id);
+    setEditorMode(null);
+
+    if (mode === "create") {
+      setView("all");
+      setSort("updated-desc");
+      setQuery("");
+      setActiveTab("overview");
+      setSelectedEvidenceId("");
+      setInspectorOpen(true);
+      const routeState = {
+        view: "all" as const,
+        sort: "updated-desc" as const,
+        query: "",
+        tab: "overview" as const,
+        item: "",
+        ai: false
+      };
+      if (isMobile || initialMode === "detail") {
+        updateUrl(
+          { ...routeState, selected: "" },
+          { path: getNativeObjectRoute(saved.nativeRef), history: "push" }
+        );
+      } else {
+        updateUrl(
+          { ...routeState, selected: saved.id },
+          { path: getModuleRoute("resources"), history: "push" }
+        );
+      }
+    }
+
+    router.refresh();
+  }
 
   const aiDock = (
     <SharedAIDock
@@ -652,7 +706,13 @@ export default function ResourcesWorkspace({
               Open source ↗
             </button>
           )}
-          <button type="button" className={styles.button} disabled title="Native Resource editing is not connected.">Edit</button>
+          <button
+            type="button"
+            className={styles.button}
+            onClick={() => openResourceEditor("edit")}
+          >
+            Edit
+          </button>
           <button type="button" className={styles.button} disabled title="Pinned state is not stored by the legacy adapter.">Pin</button>
         </>
       }
@@ -1194,7 +1254,7 @@ export default function ResourcesWorkspace({
     if (activeTab === "source") {
       const sourceEvidence = selectedSourceEvidence || buildResourceSourceEvidenceReport(
         selectedResource,
-        initialResources
+        resources
       );
       const selectedSourceEvidenceItem = sourceEvidence.entries.find(
         (item) => item.id === selectedEvidenceId
@@ -1515,7 +1575,6 @@ export default function ResourcesWorkspace({
       onRequestClose={() => setInspectorOpen(false)}
       className={inspectorOpen ? "is-open" : undefined}
       ariaLabel={selectedResource ? `${selectedResource.title} Resource inspector` : "Resource inspector"}
-      readOnly
     >
       {selectedResource && (
         <DetailTabs
@@ -1544,11 +1603,21 @@ export default function ResourcesWorkspace({
       module="resources"
       sidebar={sidebar}
       inspector={inspector}
-      aiDock={mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? undefined : aiDock}
+      aiDock={editorMode || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? undefined : aiDock}
       mode={initialMode === "detail" ? "detail" : "directory"}
       ariaLabel="Resources directory"
       className={`${styles.shell} ${initialMode === "detail" ? styles.detailShell : ""}`}
     >
+      {editorMode && (
+        <ResourceEditorSheet
+          key={`${editorMode}:${editorMode === "edit" ? selectedResource?.id || "missing" : "new"}`}
+          open
+          resource={editorMode === "edit" ? selectedResource : null}
+          resources={resources}
+          onClose={() => setEditorMode(null)}
+          onSaved={handleResourceSaved}
+        />
+      )}
       <button
         type="button"
         className={`${styles.button} ${styles.mobileMenuButton}`}
@@ -1588,7 +1657,7 @@ export default function ResourcesWorkspace({
               <h1>{VIEW_LABELS[view]}</h1>
               <p>
                 {unavailableViewReason ? "View unavailable" : `${visibleResources.length} shown`} ·{" "}
-                {initialResources.length} total external {initialResources.length === 1 ? "reference" : "references"}
+                {resources.length} total external {resources.length === 1 ? "reference" : "references"}
                 {view === "needs-review" ? " · evidence-derived queue" : ""}
                 {view === "duplicate-urls" ? " · exact collision evidence only" : ""}
                 {linkedContextModule ? " · exact owner-reference evidence" : ""}
@@ -1597,7 +1666,14 @@ export default function ResourcesWorkspace({
             <div className={styles.headerActions}>
               <button type="button" className={styles.button} disabled title="The complete native filter model is not connected yet.">Filter</button>
               <button type="button" className={styles.button} disabled title="The directory is already using the only implemented compact density.">Compact</button>
-              <button type="button" className={styles.button} data-primary="true" disabled title="Native Resource persistence topology is unresolved.">+ Add Resource</button>
+              <button
+                type="button"
+                className={styles.button}
+                data-primary="true"
+                onClick={() => openResourceEditor("create")}
+              >
+                + Add Resource
+              </button>
             </div>
           </header>
 
@@ -1883,7 +1959,7 @@ export default function ResourcesWorkspace({
                     ? "No exact URL collision evidence"
                   : linkedContextModule && !query
                     ? `No exact ${displayLabel(linkedContextModule)} owner-route evidence`
-                  : initialResources.length
+                  : resources.length
                     ? "No Resources match this search"
                     : "No Resources yet"
               }
@@ -1896,9 +1972,9 @@ export default function ResourcesWorkspace({
                     ? linkedContextCoverage?.state === "indexed"
                       ? `The connected ${displayLabel(linkedContextModule)} read model contains no exact Resource references. This is not proof that no relationship exists.`
                       : `The ${displayLabel(linkedContextModule)} reference source is unavailable or disconnected. Absence cannot establish that no relationship exists.`
-                  : initialResources.length
+                  : resources.length
                   ? "Adjust the query without losing the selected Resource or active detail tab."
-                  : "No legacy Resource records were returned. Native creation remains intentionally unavailable."
+                  : "No legacy Resource records were returned. Add the first external source through the audited adapter."
               }
             />
           )}

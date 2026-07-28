@@ -1,10 +1,21 @@
+"use client";
+
+import { buildJsonHeadersWithCsrf } from "../../client-csrf";
 import type { MutationErrorCode } from "../../native-objects/mutation-result";
 import type { PersonalRecord } from "../../personal-records-store";
-import { legacyPersonalRecordsToResources } from "./legacy-adapter";
+import {
+  legacyPersonalRecordsToResources,
+  resourceCreateInputToLegacy,
+  resourceForClient,
+  resourceUpdateInputToLegacy
+} from "./legacy-adapter";
+import { normalizeResourceExternalUrl } from "./source-evidence";
 import type {
+  ResourceCreateInput,
   ResourceRecord,
   ResourcesRepositoryError,
-  ResourcesRepositoryResult
+  ResourcesRepositoryResult,
+  ResourceUpdateInput
 } from "./types";
 
 type Fetcher = typeof fetch;
@@ -15,10 +26,11 @@ type PersonalRecordsResponse = {
   error?: unknown;
 };
 
-/** Read-only while the native Resources persistence topology is unresolved. */
 export type ResourcesRepository = {
   list(): Promise<ResourcesRepositoryResult<ResourceRecord[]>>;
   get(id: string): Promise<ResourcesRepositoryResult<ResourceRecord>>;
+  create(input: ResourceCreateInput): Promise<ResourcesRepositoryResult<ResourceRecord>>;
+  update(id: string, input: ResourceUpdateInput): Promise<ResourcesRepositoryResult<ResourceRecord>>;
 };
 
 export type ResourcesRepositoryOptions = {
@@ -70,7 +82,6 @@ function isPersonalRecord(value: unknown): value is PersonalRecord {
   const relations = value.relations;
   const time = value.time;
   const createdMeta = value.createdMeta;
-
   return (
     typeof value.id === "string" &&
     typeof value.domain === "string" &&
@@ -109,11 +120,12 @@ function isPersonalRecord(value: unknown): value is PersonalRecord {
 
 async function requestRecords(
   fetcher: Fetcher,
-  endpoint: string
+  endpoint: string,
+  init?: RequestInit
 ): Promise<ResourcesRepositoryResult<PersonalRecord[]>> {
   let response: Response;
   try {
-    response = await fetcher(endpoint, { method: "GET", cache: "no-store" });
+    response = await fetcher(endpoint, init);
   } catch (error) {
     return failure(
       "network",
@@ -164,28 +176,68 @@ export function createResourcesRepository(
 ): ResourcesRepository {
   const endpoint = options.endpoint || "/api/personal/records";
   const fetcher = options.fetcher || fetch;
-
-  async function list(): Promise<ResourcesRepositoryResult<ResourceRecord[]>> {
-    const result = await requestRecords(fetcher, endpoint);
-    return result.ok
-      ? { ok: true, data: legacyPersonalRecordsToResources(result.data) }
-      : result;
-  }
+  const toResources = (records: PersonalRecord[]) =>
+    legacyPersonalRecordsToResources(records).map(resourceForClient);
 
   return {
-    list,
+    async list() {
+      const result = await requestRecords(fetcher, endpoint, { cache: "no-store" });
+      return result.ok ? { ok: true, data: toResources(result.data) } : result;
+    },
+
     async get(id) {
       const normalizedId = id.trim();
       if (!normalizedId) {
         return failure("validation", "Resource id is required");
       }
-
-      const result = await list();
+      const result = await requestRecords(fetcher, endpoint, { cache: "no-store" });
       if (!result.ok) return result;
-      const resource = result.data.find((item) => item.id === normalizedId);
+      const resource = toResources(result.data).find((item) => item.id === normalizedId);
       return resource
         ? { ok: true, data: resource }
-        : failure("not_found", "Resource was not found", { status: 404 });
+        : failure("not_found", "The requested Resource was not found", { status: 404 });
+    },
+
+    async create(input) {
+      const result = await requestRecords(fetcher, endpoint, {
+        method: "POST",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify(resourceCreateInputToLegacy(input))
+      });
+      if (!result.ok) return result;
+
+      const resources = toResources(result.data);
+      const normalizedTitle = input.title.trim();
+      const normalizedUrl = normalizeResourceExternalUrl(input.url);
+      const created =
+        resources.find(
+          (resource) =>
+            resource.title === normalizedTitle &&
+            resource.source.candidates.some(
+              (candidate) => candidate.matchKey === normalizedUrl
+            )
+        ) || resources[0];
+      return created
+        ? { ok: true, data: created }
+        : failure("unknown", "The created Resource was missing from the response");
+    },
+
+    async update(id, input) {
+      const normalizedId = id.trim();
+      if (!normalizedId) {
+        return failure("validation", "Resource id is required");
+      }
+      const result = await requestRecords(fetcher, endpoint, {
+        method: "PATCH",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({ id: normalizedId, ...resourceUpdateInputToLegacy(input) })
+      });
+      if (!result.ok) return result;
+
+      const updated = toResources(result.data).find((resource) => resource.id === normalizedId);
+      return updated
+        ? { ok: true, data: updated }
+        : failure("not_found", "The updated Resource was missing from the response", { status: 404 });
     }
   };
 }
