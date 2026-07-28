@@ -721,6 +721,14 @@
   padding: 12px 14px 0;
 }
 
+.operatingSummary {
+  gap: 8px;
+}
+
+.operatingMetrics :global(.metric-strip__item) {
+  padding: 9px 10px;
+}
+
 .reviewQueueBoundary,
 .propertiesBoundary {
   display: grid;
@@ -729,6 +737,24 @@
   border: 1px solid color-mix(in srgb, var(--status-attention, #a76c16) 34%, var(--border));
   border-radius: 7px;
   background: color-mix(in srgb, var(--status-attention-bg, #fff8e7) 70%, var(--panel-bg));
+}
+
+@media (max-width: 720px) {
+  .operatingSummary {
+    padding-inline: 12px;
+  }
+
+  .operatingMetrics {
+    display: none;
+  }
+
+  .operatingSummary .reviewQueueBoundary {
+    padding: 8px 10px;
+  }
+
+  .operatingSummary .reviewQueueBoundary span {
+    display: none;
+  }
 }
 
 .reviewQueueBoundary strong,
@@ -1469,6 +1495,10 @@
 
   .sortRow {
     min-height: 44px;
+  }
+
+  .sortRow > strong {
+    display: none;
   }
 
   .shell :global(.dense-object-row__body),

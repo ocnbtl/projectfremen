@@ -1,5 +1,6 @@
 import type { MediaAsset } from "../media/types";
 import type { NoteRecord } from "../notes/types";
+import type { PeopleRecord } from "../people/types";
 import type { ResourceRecord } from "../resources/types";
 import { normalizeResourceExternalUrl } from "../resources/source-evidence";
 import type { NativeObjectRef } from "../../native-objects/types";
@@ -13,6 +14,7 @@ type LegacyContentGraphInput = {
   notes: readonly NoteRecord[];
   resources: readonly ResourceRecord[];
   media: readonly MediaAsset[];
+  people?: readonly PeopleRecord[];
 };
 
 type RelationSource = {
@@ -120,7 +122,8 @@ function addUnresolvedReference(
 export function buildLegacyContentGraph({
   notes,
   resources,
-  media
+  media,
+  people = []
 }: LegacyContentGraphInput): LegacyContentGraph {
   const linkCandidates: LegacyContentLinkCandidate[] = [];
   const unresolvedReferences: LegacyUnresolvedReference[] = [];
@@ -211,7 +214,8 @@ export function buildLegacyContentGraph({
   const relationSources: RelationSource[] = [
     ...notes.map((note) => ({ nativeRef: note.nativeRef, relations: note.relations })),
     ...resources.map((resource) => ({ nativeRef: resource.nativeRef, relations: resource.relations })),
-    ...media.map((asset) => ({ nativeRef: asset.nativeRef, relations: asset.provenance.relations }))
+    ...media.map((asset) => ({ nativeRef: asset.nativeRef, relations: asset.provenance.relations })),
+    ...people.map((person) => ({ nativeRef: person.nativeRef, relations: person.relations }))
   ];
   const refsById = new Map<string, NativeObjectRef[]>();
   for (const source of relationSources) {
@@ -236,7 +240,7 @@ export function buildLegacyContentGraph({
             evidenceField: `relations.${direction}[${index}]`,
             ownerHint: null,
             legacyDirection: direction,
-            caveat: "The retained legacy ID does not resolve to a Notes, Resources, or Media record in this read model."
+            caveat: "The retained legacy ID does not resolve to a Notes, Resources, Media, or People record in this read model."
           });
           return;
         }

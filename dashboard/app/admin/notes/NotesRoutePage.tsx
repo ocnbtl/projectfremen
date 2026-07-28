@@ -4,12 +4,35 @@ import NotesWorkspace from "../../../components/NotesWorkspace";
 import { buildLegacyContentGraph } from "../../../lib/modules/content-graph/legacy-adapter";
 import { legacyPersonalRecordsToMediaAssets } from "../../../lib/modules/media/legacy-adapter";
 import { legacyPersonalRecordsToNotes } from "../../../lib/modules/notes/legacy-adapter";
+import {
+  buildNoteReferenceEvidence,
+  type NoteReferenceEvidenceSource
+} from "../../../lib/modules/notes/reference-evidence";
+import { legacyPersonalRecordsToPeople } from "../../../lib/modules/people/legacy-adapter";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
+import { readProjectsState } from "../../../lib/modules/projects/store";
+import type { ProjectsState } from "../../../lib/modules/projects/types";
 import { legacyPersonalRecordsToResources } from "../../../lib/modules/resources/legacy-adapter";
+import { readReviewsState } from "../../../lib/modules/reviews/store";
+import type { ReviewsState } from "../../../lib/modules/reviews/types";
 import { readPersonalRecords, type PersonalRecord } from "../../../lib/personal-records-store";
 import { requireAdminSession } from "../../../lib/require-admin";
 
 export type NotesRouteMode = "index" | "detail";
+
+function ownerEvidenceSource<State>(
+  result: PromiseSettledResult<State>,
+  label: string
+): NoteReferenceEvidenceSource<State> {
+  if (result.status === "fulfilled") {
+    return { available: true, error: null, state: result.value };
+  }
+  return {
+    available: false,
+    error: `${label} references could not be loaded.`,
+    state: null
+  };
+}
 
 export default async function NotesRoutePage({
   mode,
@@ -19,7 +42,7 @@ export default async function NotesRoutePage({
   noteId?: string;
 }) {
   await requireAdminSession();
-  const [recordsResult, personalOpsResult] = await Promise.all([
+  const [recordsResult, personalOpsResult, ownerStateResults] = await Promise.all([
     readPersonalRecords()
       .then((records) => ({ ok: true as const, records }))
       .catch((error: unknown) => ({
@@ -31,7 +54,8 @@ export default async function NotesRoutePage({
       .catch((error: unknown) => ({
         ok: false as const,
         error: error instanceof Error ? error.message : "Personal Ops Decisions could not be loaded."
-      }))
+      })),
+    Promise.allSettled([readProjectsState(), readReviewsState()] as const)
   ]);
   const records: PersonalRecord[] = recordsResult.ok ? recordsResult.records : [];
   const loadError = recordsResult.ok ? "" : recordsResult.error;
@@ -39,7 +63,15 @@ export default async function NotesRoutePage({
   const notes = legacyPersonalRecordsToNotes(records);
   const resources = legacyPersonalRecordsToResources(records);
   const media = legacyPersonalRecordsToMediaAssets(records);
-  const contentGraph = buildLegacyContentGraph({ notes, resources, media });
+  const people = legacyPersonalRecordsToPeople(records);
+  const contentGraph = buildLegacyContentGraph({ notes, resources, media, people });
+  const [projectsResult, reviewsResult] = ownerStateResults;
+  const referenceEvidence = buildNoteReferenceEvidence({
+    notes,
+    legacyContentGraph: contentGraph,
+    projects: ownerEvidenceSource<ProjectsState>(projectsResult, "Projects"),
+    reviews: ownerEvidenceSource<ReviewsState>(reviewsResult, "Reviews")
+  });
   if (!loadError && noteId && !notes.some((note) => note.id === noteId)) {
     notFound();
   }
@@ -56,6 +88,7 @@ export default async function NotesRoutePage({
       <NotesWorkspace
         initialNotes={notes}
         contentGraph={contentGraph}
+        referenceEvidence={referenceEvidence}
         initialMediaAssets={media}
         initialResources={resources}
         initialMode={mode}

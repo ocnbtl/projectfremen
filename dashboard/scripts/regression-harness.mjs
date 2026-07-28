@@ -995,6 +995,7 @@ async function checkMediaInUseBrowserState(baseUrl, cookieJar, queryToken) {
     const mobileDialog = mobile.getByRole("dialog", { name: /media usage evidence inspector/i });
     await mobileDialog.waitFor();
     await mobile.waitForFunction(() => document.querySelector("#media-in-use-inspector")?.contains(document.activeElement));
+    await mobile.waitForFunction(() => new URL(window.location.href).searchParams.has("selected"));
     assert(new URL(mobile.url()).searchParams.has("selected"), "Media In Use mobile selection did not push route state");
     await mobile.reload({ waitUntil: "domcontentloaded" });
     await mobileDialog.waitFor();
@@ -1435,7 +1436,9 @@ async function checkNoteAttachmentsBrowserState(
                 height: rect.height
               };
             })
-            .filter((item) => item.width < 44 || item.height < 44));
+            // Chromium can report a CSS 44px target a few ten-thousandths
+            // below 44 after device-pixel conversion.
+            .filter((item) => item.width < 43.99 || item.height < 43.99));
           assert(
             undersizedTargets.length === 0,
             `Note Attachments ${viewport.label} inspector targets below 44px: ${JSON.stringify(undersizedTargets)}`
@@ -1454,6 +1457,158 @@ async function checkNoteAttachmentsBrowserState(
     assert(mutatingRequests.length === 0, `Note Attachments interactions emitted mutations: ${mutatingRequests.join(" | ")}`);
     assert(browserErrors.length === 0, `Note Attachments browser checks emitted errors: ${browserErrors.join(" | ")}`);
     assert(failedResponses.length === 0, `Note Attachments browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkNotesSmartViewsBrowserState(
+  baseUrl,
+  cookieJar,
+  noteId,
+  noteTitle,
+  personTitle,
+  projectTitle,
+  reviewTitle
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "notes-smart-views-checkpoint");
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const url = new URL(request.url());
+      const failure = request.failure()?.errorText || "";
+      if (!url.pathname.startsWith("/_vercel/") && !failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (response.status() >= 400 && url.pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  try {
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1440, height: 900, label: "1440x900" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({ width: viewport.width, height: viewport.height });
+      const page = await context.newPage();
+      observe(page);
+      await page.goto(
+        `${baseUrl}/admin/notes?view=recent&note=${encodeURIComponent(noteId)}&probe=keep`,
+        { waitUntil: "domcontentloaded" }
+      );
+      await page.getByRole("heading", { level: 2, name: "Recent operating window" }).waitFor();
+      assert(await page.getByText(noteTitle, { exact: true }).count() >= 1, `Recent Notes ${viewport.label} omitted the current Note`);
+      const overflow = await page.evaluate(() => ({
+        overflowX: document.documentElement.scrollWidth > window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth
+      }));
+      assert(!overflow.overflowX, `Notes smart view ${viewport.label} has document overflow: ${JSON.stringify(overflow)}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `notes-recent-${viewport.label}.png`)
+      });
+
+      if (viewport.width === 1440) {
+        await page.getByRole("button", { name: /Linked to People/ }).click();
+        await page.waitForFunction(() => new URL(window.location.href).searchParams.get("view") === "linked-people");
+        await page.getByRole("heading", { level: 2, name: "People reference evidence" }).waitFor();
+        assert(await page.getByText(personTitle, { exact: true }).count() >= 1, "Linked-to-People view omitted the exact owner");
+        assert(new URL(page.url()).searchParams.get("probe") === "keep", "Notes smart view dropped unknown safe URL state");
+
+        await page.getByRole("button", { name: /Linked to Projects/ }).click();
+        await page.waitForFunction(() => new URL(window.location.href).searchParams.get("view") === "linked-projects");
+        assert(await page.getByText(projectTitle, { exact: true }).count() >= 1, "Linked-to-Projects view omitted the Project owner");
+        await page.goBack({ waitUntil: "domcontentloaded" });
+        await page.waitForFunction(() => new URL(window.location.href).searchParams.get("view") === "linked-people");
+        await page.goForward({ waitUntil: "domcontentloaded" });
+        await page.waitForFunction(() => new URL(window.location.href).searchParams.get("view") === "linked-projects");
+        await page.reload({ waitUntil: "domcontentloaded" });
+        assert(await page.getByText(projectTitle, { exact: true }).count() >= 1, "Notes smart view refresh lost Project scope");
+      }
+
+      if (viewport.width <= 720) {
+        await page.getByRole("button", { name: "Open Notes navigation" }).click();
+        const sidebar = page.getByRole("dialog", { name: "Notes navigation" });
+        await sidebar.waitFor();
+        await sidebar.getByRole("button", { name: /Linked to Reviews/ }).click();
+        await page.waitForFunction(() => new URL(window.location.href).searchParams.get("view") === "linked-reviews");
+        await page.getByRole("heading", { level: 2, name: "Reviews reference evidence" }).waitFor();
+        assert(await page.getByText(reviewTitle, { exact: true }).count() >= 1, `Linked-to-Reviews ${viewport.label} omitted the Review owner`);
+        assert(await page.getByRole("dialog", { name: "Notes navigation" }).count() === 0, `Notes ${viewport.label} drawer did not close after navigation`);
+
+        const undersizedTargets = await page.locator(
+          'button[aria-label="Open Notes navigation"]:visible, button:has-text("Preview"):visible'
+        ).evaluateAll((elements) => elements
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+              width: rect.width,
+              height: rect.height
+            };
+          })
+          .filter((item) => item.width < 44 || item.height < 44));
+        assert(
+          undersizedTargets.length === 0,
+          `Notes smart view ${viewport.label} targets below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+      }
+
+      await context.close();
+    }
+
+    assert(mutatingRequests.length === 0, `Notes smart view interactions emitted mutations: ${mutatingRequests.join(" | ")}`);
+    assert(browserErrors.length === 0, `Notes smart view browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Notes smart view browser checks received failed responses: ${failedResponses.join(" | ")}`);
   } finally {
     await browser.close();
   }
@@ -4493,6 +4648,9 @@ async function main() {
         externalSources: [`${sharedContentSourceUrl}#supporting-evidence`],
         areas: ["AI"],
         subjects: ["PKM"],
+        relations: {
+          related: [createdPerson.id]
+        },
         intents: ["retain"]
       })
     });
@@ -4533,6 +4691,108 @@ async function main() {
     const noteDetailAfterUpdate = await requestText(server.baseUrl, cookieJar, `/admin/notes/${createdNote.id}?tab=body`);
     assert(noteDetailAfterUpdate.body.includes(updatedNoteTitle), "Updated Note title missing after editor reload");
     assert(noteDetailAfterUpdate.body.includes("Regression-updated authored knowledge."), "Updated Note body missing after editor reload");
+
+    const createNoteProjectReference = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        operation: "create",
+        family: "links",
+        input: {
+          projectId: promotedProject.id,
+          source: {
+            module: "notes",
+            objectType: "note",
+            objectId: createdNote.id,
+            label: updatedNoteTitle
+          },
+          relationship: "supporting_context",
+          relationshipStrength: "normal",
+          projectSpecificNote: "Regression verifies the read-only Notes owner-reference index."
+        }
+      })
+    });
+    assert(
+      createNoteProjectReference.response.ok &&
+        createNoteProjectReference.payload?.item?.source?.objectId === createdNote.id &&
+        createNoteProjectReference.payload.item.linkState === "active",
+      `Note Project reference create failed: ${JSON.stringify(createNoteProjectReference.payload)}`
+    );
+
+    const recentNotesView = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes?view=recent&note=${createdNote.id}&probe=keep`
+    );
+    assert(recentNotesView.response.ok, `Recent Notes view failed: ${describeStatus(recentNotesView.response)}`);
+    for (const expected of [
+      "Recent operating window",
+      "30 days",
+      "INFERRED · 30-day rolling view · no writes",
+      updatedNoteTitle,
+      'data-note-operating-view="recent"'
+    ]) {
+      assert(recentNotesView.body.includes(expected), `Recent Notes view missing expected evidence: ${expected}`);
+    }
+
+    const linkedPeopleNotesView = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes?view=linked-people&note=${createdNote.id}`
+    );
+    assert(
+      linkedPeopleNotesView.response.ok,
+      `Linked-to-People Notes view failed: ${describeStatus(linkedPeopleNotesView.response)}`
+    );
+    for (const expected of [
+      "People reference evidence",
+      "Read-only evidence",
+      updatedNoteTitle,
+      updatedPersonTitle,
+      'data-reference-owner="people"'
+    ]) {
+      assert(
+        linkedPeopleNotesView.body.includes(expected),
+        `Linked-to-People Notes view missing exact retained reference evidence: ${expected}`
+      );
+    }
+
+    const linkedProjectsNotesView = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes?view=linked-projects&note=${createdNote.id}`
+    );
+    assert(
+      linkedProjectsNotesView.response.ok,
+      `Linked-to-Projects Notes view failed: ${describeStatus(linkedProjectsNotesView.response)}`
+    );
+    for (const expected of [
+      "Projects reference evidence",
+      updatedNoteTitle,
+      promotedProject.name,
+      'data-reference-owner="projects"'
+    ]) {
+      assert(
+        linkedProjectsNotesView.body.includes(expected),
+        `Linked-to-Projects Notes view missing Project-owned reference evidence: ${expected}`
+      );
+    }
+
+    const linkedFinanceNotesView = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes?view=linked-finance&note=${createdNote.id}`
+    );
+    assert(
+      linkedFinanceNotesView.response.ok &&
+        linkedFinanceNotesView.body.includes("This Notes view is staged") &&
+        linkedFinanceNotesView.body.includes("Finance fixtures do not expose stable native Note references"),
+      "Linked-to-Finance Notes view did not fail closed at its stable-identifier boundary"
+    );
+    pass("Notes Recent, People, and Projects operating views work while Finance remains explicitly disconnected");
 
     const noteProperties = await requestText(
       server.baseUrl,
@@ -4614,6 +4874,18 @@ async function main() {
       (item) => item.id === protectedStatusNote.id
     );
     assert(protectedStatusAfterUpdate?.status === "blocked", "Body-only Note update rewrote the broad legacy status");
+    const noLinkEvidenceView = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes?view=no-links&note=${protectedStatusNote.id}`
+    );
+    assert(
+      noLinkEvidenceView.response.ok &&
+        noLinkEvidenceView.body.includes("No connected link evidence") &&
+        noLinkEvidenceView.body.includes(protectedStatusNoteTitle) &&
+        noLinkEvidenceView.body.includes("bounded index result, never proof that a Note is unused"),
+      "No Link Evidence view did not preserve its partial-coverage boundary"
+    );
     pass("Notes create/update/reload/direct-editor flow works through the typed legacy adapter");
 
     logStep("Checking Resources and Media ownership-safe read adapters");
@@ -4768,6 +5040,21 @@ async function main() {
       resourceTitle
     );
     pass("Notes Attachments preserves row selection, URL history, responsive access, focus containment, and zero mutations");
+
+    const linkedResourcesNotesView = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes?view=linked-resources&note=${attachmentNote.id}&filter=linked`
+    );
+    assert(
+      linkedResourcesNotesView.response.ok &&
+        linkedResourcesNotesView.body.includes("Resources reference evidence") &&
+        linkedResourcesNotesView.body.includes(attachmentNoteTitle) &&
+        linkedResourcesNotesView.body.includes(resourceTitle) &&
+        linkedResourcesNotesView.body.includes("Exact retained candidates"),
+      "Linked-to-Resources Notes view did not expose current exact Resource evidence"
+    );
+    pass("Notes Resource smart view and Linked evidence filter share the same dynamic reference scope");
 
     const mediaNoSourceTitle = `${mediaRightsQueryToken}-no-source`;
     const createMediaNoSource = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
@@ -5974,6 +6261,51 @@ async function main() {
     weeklyReviewRun = linkReviewContext.payload.item;
     weeklyReviewView = linkReviewContext.payload.view;
 
+    const linkReviewNoteContext = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "link_context",
+          sourceRef: {
+            module: "notes",
+            objectType: "note",
+            objectId: createdNote.id,
+            label: updatedNoteTitle
+          },
+          relationship: "context"
+        }
+      })
+    });
+    assert(
+      linkReviewNoteContext.response.ok &&
+        linkReviewNoteContext.payload?.item?.contextLinks?.some(
+          (link) => link.sourceRef?.module === "notes" && link.sourceRef?.objectId === createdNote.id && link.state === "linked"
+        ),
+      `Review Note reference failed: ${JSON.stringify(linkReviewNoteContext.payload)}`
+    );
+    weeklyReviewRun = linkReviewNoteContext.payload.item;
+    weeklyReviewView = linkReviewNoteContext.payload.view;
+
+    const linkedReviewsNotesView = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes?view=linked-reviews&note=${createdNote.id}&probe=keep`
+    );
+    assert(
+      linkedReviewsNotesView.response.ok &&
+        linkedReviewsNotesView.body.includes("Reviews reference evidence") &&
+        linkedReviewsNotesView.body.includes(updatedNoteTitle) &&
+        linkedReviewsNotesView.body.includes(weeklyReviewRun.title) &&
+        linkedReviewsNotesView.body.includes('data-reference-owner="reviews"'),
+      "Linked-to-Reviews Notes view did not expose ReviewRun-owned context evidence"
+    );
+
     const linkReviewMediaContext = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
       method: "PATCH",
       headers: {
@@ -6046,6 +6378,16 @@ async function main() {
       `Nested Project source lost its parent or canonical owner route after Review reload: ${JSON.stringify(reloadedNestedProjectRef)}`
     );
     pass("Review context unlink is soft and retains the nested Projects owner, parent, and canonical route");
+    await checkNotesSmartViewsBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdNote.id,
+      updatedNoteTitle,
+      updatedPersonTitle,
+      promotedProject.name,
+      weeklyReviewRun.title
+    );
+    pass("Notes smart views preserve URL history, responsive access, owner evidence, and zero mutations");
 
     const mediaInUseWithReview = await requestText(
       server.baseUrl,

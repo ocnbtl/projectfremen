@@ -32,6 +32,11 @@ import {
   buildNotePropertyQueue,
   buildNotePropertyReadiness
 } from "../lib/modules/notes/property-readiness";
+import type {
+  NoteReferenceEvidenceIndex,
+  NoteReferenceEvidenceRecord,
+  NoteReferenceKnownOwnerModule
+} from "../lib/modules/notes/reference-evidence";
 import {
   buildNoteViewCounts,
   noteRecordToDirectoryItem
@@ -61,6 +66,7 @@ import styles from "./content-graph/ContentGraphWorkspace.module.css";
 type NotesWorkspaceProps = {
   initialNotes: NoteRecord[];
   contentGraph: LegacyContentGraph;
+  referenceEvidence: NoteReferenceEvidenceIndex;
   initialMediaAssets: MediaAsset[];
   initialResources: ResourceRecord[];
   initialMode?: "index" | "detail";
@@ -85,6 +91,8 @@ type SaveState = "saved" | "unsaved" | "saving" | "failed";
 
 const NOTES_DIRTY_HISTORY_GUARD = "__unigentamos_notes_dirty_guard";
 const NOTES_HISTORY_BACK_DESTINATION = "__notes_history_back__";
+const NOTES_RECENT_WINDOW_DAYS = 30;
+const NOTES_RECENT_WINDOW_MS = NOTES_RECENT_WINDOW_DAYS * 24 * 60 * 60 * 1000;
 
 const TYPE_LABELS: Readonly<Record<NoteRecord["type"], string>> = {
   decision: "Decision Candidate",
@@ -126,7 +134,7 @@ const VIEW_LABELS: Readonly<Record<NotesView, string>> = {
   "linked-finance": "Linked to Finance",
   "linked-resources": "Linked to Resources",
   "linked-reviews": "Linked to Reviews",
-  "no-links": "No Links",
+  "no-links": "No Link Evidence",
   decisions: "Decision Candidates",
   meetings: "Meetings",
   ideas: "Ideas",
@@ -146,8 +154,8 @@ const FILTERS: ReadonlyArray<{
   { id: "all", label: "All", tone: "pink" },
   { id: "active", label: "Active", tone: "green" },
   { id: "pinned", label: "Pinned", tone: "amber", disabledReason: "Pinned state is not stored by the legacy Notes adapter." },
-  { id: "linked", label: "Linked", tone: "blue", disabledReason: "Legacy relation IDs are not promoted to native NoteLink records." },
-  { id: "no-links", label: "No links", tone: "amber", disabledReason: "Native NoteLink completeness is not available yet." },
+  { id: "linked", label: "Link evidence", tone: "blue" },
+  { id: "no-links", label: "No link evidence", tone: "amber" },
   { id: "needs-review", label: "Needs review", tone: "purple" }
 ];
 
@@ -190,8 +198,39 @@ function hasLegacySource(note: NoteRecord) {
   return Boolean(note.legacySources.sourceUrl || note.legacySources.externalSources.length);
 }
 
-function matchesView(note: NoteRecord, view: NotesView) {
+function isRecentNote(note: NoteRecord, now = Date.now()) {
+  if (note.lifecycleStatus === "archived") return false;
+  const updatedAt = new Date(note.updatedAt).getTime();
+  return Number.isFinite(updatedAt) && updatedAt >= now - NOTES_RECENT_WINDOW_MS;
+}
+
+function ownerModuleForView(view: NotesView): NoteReferenceKnownOwnerModule | null {
+  if (view === "linked-people") return "people";
+  if (view === "linked-projects") return "projects";
+  if (view === "linked-finance") return "finance";
+  if (view === "linked-resources") return "resources";
+  if (view === "linked-reviews") return "reviews";
+  return null;
+}
+
+function emptyReferenceEvidence(noteId: string): NoteReferenceEvidenceRecord {
+  return {
+    noteId,
+    placements: [],
+    ownerModules: [],
+    unresolvedReferenceCount: 0,
+    hasConnectedEvidence: false
+  };
+}
+
+function matchesView(
+  note: NoteRecord,
+  view: NotesView,
+  reference: NoteReferenceEvidenceRecord | null,
+  now = Date.now()
+) {
   if (view === "all") return note.lifecycleStatus !== "archived";
+  if (view === "recent") return isRecentNote(note, now);
   if (view === "active") return note.lifecycleStatus === "active";
   if (view === "needs-review") return note.reviewState === "needs_review";
   if (view === "drafts") return note.lifecycleStatus === "draft";
@@ -203,22 +242,55 @@ function matchesView(note: NoteRecord, view: NotesView) {
   if (view === "personal-context") return note.type === "personal_context";
   if (view === "project-notes") return note.type === "project_note";
   if (view === "missing-properties") return buildNotePropertyReadiness(note).requiresAttention;
+  const ownerModule = ownerModuleForView(view);
+  if (ownerModule) {
+    return (
+      note.lifecycleStatus !== "archived" &&
+      Boolean(reference?.placements.some((placement) => placement.ownerModule === ownerModule))
+    );
+  }
+  if (view === "no-links") {
+    return Boolean(
+      note.lifecycleStatus !== "archived" &&
+      reference &&
+      reference.placements.length === 0 &&
+      reference.unresolvedReferenceCount === 0
+    );
+  }
   return false;
 }
 
-function viewUnavailable(view: NotesView) {
-  if (view === "recent") return "The recency window is an open product decision.";
+function viewUnavailable(view: NotesView, referenceEvidence: NoteReferenceEvidenceIndex) {
   if (view === "pinned") return "Pinned state is not stored by the legacy Notes adapter.";
-  if (view.startsWith("linked-") || view === "no-links") {
-    return "Native NoteLink records and module-specific relationship semantics are not connected yet.";
+  const ownerModule = ownerModuleForView(view);
+  if (ownerModule) {
+    const coverage = referenceEvidence.coverage.find((entry) => entry.ownerModule === ownerModule);
+    if (coverage?.state === "read_failed") {
+      return coverage.error || `${displayLabel(ownerModule)} references could not be loaded.`;
+    }
+    if (coverage?.state === "disconnected") {
+      return coverage.error || `${displayLabel(ownerModule)} reference indexing is not connected.`;
+    }
   }
   return "";
 }
 
-function matchesFilter(note: NoteRecord, filter: NotesFilter) {
+function matchesFilter(
+  note: NoteRecord,
+  filter: NotesFilter,
+  reference: NoteReferenceEvidenceRecord | null
+) {
   if (filter === "all") return true;
   if (filter === "active") return note.lifecycleStatus === "active";
   if (filter === "needs-review") return note.reviewState === "needs_review";
+  if (filter === "linked") return Boolean(reference?.hasConnectedEvidence);
+  if (filter === "no-links") {
+    return Boolean(
+      reference &&
+      reference.placements.length === 0 &&
+      reference.unresolvedReferenceCount === 0
+    );
+  }
   return false;
 }
 
@@ -282,6 +354,7 @@ function useMediaQuery(query: string) {
 export default function NotesWorkspace({
   initialNotes,
   contentGraph,
+  referenceEvidence,
   initialMediaAssets,
   initialResources,
   initialMode = "index",
@@ -296,6 +369,7 @@ export default function NotesWorkspace({
   const searchParams = useSearchParams();
   const repository = useMemo(() => createNotesRepository(), []);
   const [firstUrlState] = useState(() => parseNotesUrlState(searchParams));
+  const [recentReferenceTime] = useState(() => Date.now());
   const [notes, setNotes] = useState(initialNotes);
   const [personalOpsDecisions, setPersonalOpsDecisions] = useState(initialPersonalOpsDecisions);
   const [decisionMappings, setDecisionMappings] = useState(initialDecisionMappings);
@@ -359,23 +433,56 @@ export default function NotesWorkspace({
   const attachmentEvidenceKey = selectedAttachmentEvidence?.items.map((item) => item.id).join("|") || "";
   const writableSelectedLifecycle = selectedNote ? writableLifecycleFor(selectedNote) : null;
   const counts = useMemo(() => buildNoteViewCounts(notes), [notes]);
+  const referenceEvidenceByNoteId = useMemo(
+    () => new Map(referenceEvidence.records.map((record) => [record.noteId, record] as const)),
+    [referenceEvidence.records]
+  );
   const propertyQueue = useMemo(() => buildNotePropertyQueue(notes), [notes]);
   const selectedPropertyReadiness = useMemo(
     () => selectedNote ? buildNotePropertyReadiness(selectedNote) : null,
     [selectedNote]
   );
-  const unavailableViewReason = viewUnavailable(view);
+  const unavailableViewReason = viewUnavailable(view, referenceEvidence);
   const visibleNotes = useMemo(
     () => sortNotes(
-      notes.filter((note) => matchesView(note, view) && matchesFilter(note, filter) && matchesQuery(note, query)),
+      notes.filter((note) => {
+        const reference =
+          referenceEvidenceByNoteId.get(note.id) || emptyReferenceEvidence(note.id);
+        return (
+          matchesView(note, view, reference, recentReferenceTime) &&
+          matchesFilter(note, filter, reference) &&
+          matchesQuery(note, query)
+        );
+      }),
       sort
     ),
-    [filter, notes, query, sort, view]
+    [filter, notes, query, recentReferenceTime, referenceEvidenceByNoteId, sort, view]
   );
   const visiblePropertyQueue = useMemo(
     () => buildNotePropertyQueue(visibleNotes),
     [visibleNotes]
   );
+  const referenceViewOwnerModule = ownerModuleForView(view);
+  const isReferenceEvidenceView = Boolean(referenceViewOwnerModule) || view === "no-links";
+  const visibleReferenceRecords = visibleNotes.map(
+    (note) => referenceEvidenceByNoteId.get(note.id) || emptyReferenceEvidence(note.id)
+  );
+  const visibleReferenceCount = visibleReferenceRecords.reduce(
+    (total, record) =>
+      total +
+      record.placements.filter(
+        (placement) =>
+          !referenceViewOwnerModule || placement.ownerModule === referenceViewOwnerModule
+      ).length,
+    0
+  );
+  const visibleUnresolvedReferenceCount = visibleReferenceRecords.reduce(
+    (total, record) => total + record.unresolvedReferenceCount,
+    0
+  );
+  const coverageGapCount = referenceEvidence.coverage.filter(
+    (entry) => entry.state !== "indexed"
+  ).length;
 
   useEffect(() => {
     const next = parseNotesUrlState(searchParams);
@@ -473,7 +580,7 @@ export default function NotesWorkspace({
       { view: nextView, filter: "all", tab: "overview" },
       {
         path: getModuleRoute("notes"),
-        history: initialMode === "detail" ? "push" : "replace"
+        history: "push"
       }
     );
   }
@@ -687,6 +794,21 @@ export default function NotesWorkspace({
     if (item === "personal-context") return notes.filter((note) => note.type === "personal_context").length;
     if (item === "project-notes") return notes.filter((note) => note.type === "project_note").length;
     if (item === "missing-properties") return counts.missingProperties;
+    if (
+      item === "recent" ||
+      item === "no-links" ||
+      ownerModuleForView(item)
+    ) {
+      if (viewUnavailable(item, referenceEvidence)) return undefined;
+      return notes.filter((note) =>
+        matchesView(
+          note,
+          item,
+          referenceEvidenceByNoteId.get(note.id) || emptyReferenceEvidence(note.id),
+          recentReferenceTime
+        )
+      ).length;
+    }
     return undefined;
   };
 
@@ -697,16 +819,18 @@ export default function NotesWorkspace({
       items: [
         ["all", "All Notes"], ["recent", "Recent"], ["pinned", "Pinned"], ["active", "Active"],
         ["needs-review", "Needs Review"], ["drafts", "Drafts"]
-      ].map(([id, label]) => ({
-        id,
-        label,
-        count: getViewCount(id as NotesView),
-        active: view === id,
-        onSelect: () => {
-          const reason = viewUnavailable(id as NotesView);
-          selectDirectoryView(id as NotesView, reason);
-        }
-      }))
+      ].map(([id, label]) => {
+        const reason = viewUnavailable(id as NotesView, referenceEvidence);
+        return {
+          id,
+          label,
+          count: getViewCount(id as NotesView),
+          active: view === id,
+          disabled: Boolean(reason),
+          disabledReason: reason || undefined,
+          onSelect: reason ? undefined : () => selectDirectoryView(id as NotesView)
+        };
+      })
     },
     {
       id: "smart",
@@ -715,14 +839,18 @@ export default function NotesWorkspace({
         ["linked-people", "Linked to People"], ["linked-projects", "Linked to Projects"],
         ["linked-finance", "Linked to Finance"], ["linked-resources", "Linked to Resources"],
         ["linked-reviews", "Linked to Reviews"], ["no-links", "No Links"]
-      ].map(([id, label]) => ({
-        id,
-        label,
-        active: view === id,
-        onSelect: () => {
-          selectDirectoryView(id as NotesView, viewUnavailable(id as NotesView));
-        }
-      }))
+      ].map(([id, label]) => {
+        const reason = viewUnavailable(id as NotesView, referenceEvidence);
+        return {
+          id,
+          label: id === "no-links" ? "No Link Evidence" : label,
+          count: getViewCount(id as NotesView),
+          active: view === id,
+          disabled: Boolean(reason),
+          disabledReason: reason || undefined,
+          onSelect: reason ? undefined : () => selectDirectoryView(id as NotesView)
+        };
+      })
     },
     {
       id: "types",
@@ -767,7 +895,7 @@ export default function NotesWorkspace({
       mobileOpen={mobileSidebarOpen}
       onClose={() => setMobileSidebarOpen(false)}
       className={styles.sidebar}
-      footer={<p className={styles.sidebarFootnote}>Legacy Personal Records adapter · authored Notes only · native links and versions pending</p>}
+      footer={<p className={styles.sidebarFootnote}>Legacy Notes adapter · 30-day Recent view · owner references indexed read-only · native NoteLinks and versions pending</p>}
     />
   );
 
@@ -1769,6 +1897,99 @@ export default function NotesWorkspace({
           {captureError && <p className={styles.errorBanner} role="alert">{captureError}</p>}
           {notice && <p className={styles.successBanner} role="status">{notice}</p>}
 
+          {view === "recent" && !unavailableViewReason && (
+            <section
+              className={`${styles.reviewQueueSummary} ${styles.operatingSummary}`}
+              aria-labelledby="notes-recent-window-title"
+              data-note-operating-view="recent"
+            >
+              <div className={styles.panelHeader}>
+                <div>
+                  <span className={styles.eyebrow}>Operating view</span>
+                  <h2 id="notes-recent-window-title">Recent operating window</h2>
+                  <p>Non-archived Notes updated in the last {NOTES_RECENT_WINDOW_DAYS} rolling days.</p>
+                </div>
+                <strong>{visibleNotes.length} shown</strong>
+              </div>
+              <MetricStrip
+                ariaLabel="Recent Notes scope"
+                className={styles.operatingMetrics}
+                items={[
+                  { id: "window", label: "Window", value: `${NOTES_RECENT_WINDOW_DAYS} days` },
+                  { id: "recent", label: "Recent Notes in scope", value: visibleNotes.length },
+                  { id: "all", label: "Non-archived Notes", value: counts.total - counts.archived }
+                ]}
+              />
+              <div className={styles.reviewQueueBoundary}>
+                <strong>INFERRED · 30-day rolling view · no writes</strong>
+                <span>
+                  The approved handoff leaves the window open. This reversible default keeps the daily workspace useful without
+                  inventing saved-view persistence; search, filters, sort, selection, and view stay URL-restorable.
+                </span>
+              </div>
+            </section>
+          )}
+
+          {isReferenceEvidenceView && !unavailableViewReason && (
+            <section
+              className={`${styles.reviewQueueSummary} ${styles.operatingSummary}`}
+              aria-labelledby="notes-reference-view-title"
+              data-note-operating-view="reference-evidence"
+              data-reference-owner={referenceViewOwnerModule || "none"}
+            >
+              <div className={styles.panelHeader}>
+                <div>
+                  <span className={styles.eyebrow}>Cross-module index</span>
+                  <h2 id="notes-reference-view-title">
+                    {referenceViewOwnerModule
+                      ? `${displayLabel(referenceViewOwnerModule)} reference evidence`
+                      : "No connected link evidence"}
+                  </h2>
+                  <p>
+                    {referenceViewOwnerModule
+                      ? "Exact retained candidates and owner-module references, grouped by source Note."
+                      : "Notes with no candidate, owner-module, or unresolved reference evidence in the connected indexes."}
+                  </p>
+                </div>
+                <strong>{visibleNotes.length} shown</strong>
+              </div>
+              <MetricStrip
+                ariaLabel="Visible Note reference evidence"
+                className={styles.operatingMetrics}
+                items={[
+                  { id: "notes", label: "Notes in scope", value: visibleNotes.length },
+                  { id: "references", label: "Reference rows", value: visibleReferenceCount },
+                  {
+                    id: "coverage",
+                    label: "Unresolved / coverage gaps",
+                    value: `${visibleUnresolvedReferenceCount} / ${coverageGapCount}`,
+                    tone: coverageGapCount ? "attention" : "positive"
+                  }
+                ]}
+              />
+              <div className={styles.inlineActions} aria-label="Reference index coverage">
+                {referenceEvidence.coverage.map((entry) => (
+                  <span
+                    className={styles.stateChip}
+                    data-tone={entry.state === "indexed" ? "green" : "amber"}
+                    title={entry.error || undefined}
+                    key={entry.ownerModule}
+                  >
+                    {displayLabel(entry.ownerModule)} · {displayLabel(entry.state)}
+                  </span>
+                ))}
+              </div>
+              <div className={styles.reviewQueueBoundary}>
+                <strong>Read-only evidence · not persisted NoteLinks</strong>
+                <span>
+                  Projects and Reviews keep their native reference state. People and Resources use exact retained-ID or normalized-URL
+                  candidates. Finance remains disconnected because the fixture has no stable Note identifiers. “No connected link
+                  evidence” is therefore a bounded index result, never proof that a Note is unused.
+                </span>
+              </div>
+            </section>
+          )}
+
           {view === "missing-properties" && (
             <section className={styles.reviewQueueSummary} aria-labelledby="notes-property-queue-title">
               <div className={styles.panelHeader}>
@@ -1852,15 +2073,32 @@ export default function NotesWorkspace({
               {visibleNotes.map((note) => {
                 const item = noteRecordToDirectoryItem(note);
                 const propertyItem = propertyQueue.byNoteId.get(note.id);
+                const referenceRecord =
+                  referenceEvidenceByNoteId.get(note.id) || emptyReferenceEvidence(note.id);
+                const viewPlacements = referenceViewOwnerModule
+                  ? referenceRecord.placements.filter(
+                      (placement) => placement.ownerModule === referenceViewOwnerModule
+                    )
+                  : referenceRecord.placements;
+                const referenceTrailing = isReferenceEvidenceView
+                  ? view === "no-links"
+                    ? <><strong>No connected evidence</strong><span>Bounded by indexed owners</span></>
+                    : (
+                      <>
+                        <strong>{viewPlacements.length} reference {viewPlacements.length === 1 ? "row" : "rows"}</strong>
+                        <span>{Array.from(new Set(viewPlacements.map((placement) => placement.ownerRef.label))).join(" · ")}</span>
+                      </>
+                    )
+                  : null;
                 return (
                   <DenseObjectRow
                     id={note.id}
                     title={note.title}
                     description={`${TYPE_LABELS[note.type]} · ${displayLabel(note.lifecycleStatus)} · ${item.area || "Unassigned"}`}
                     metadata={`${item.bodyExcerpt} · updated ${formatDate(note.updatedAt)}`}
-                    trailing={view === "missing-properties" && propertyItem
+                    trailing={referenceTrailing || (view === "missing-properties" && propertyItem
                       ? <><strong>{propertyItem.attentionCount} property {propertyItem.attentionCount === 1 ? "item" : "items"}</strong><span>{propertyItem.primaryReason} first</span></>
-                      : <><strong>{displayLabel(note.reviewState)}</strong><span>{note.nextReviewAt ? `Review ${formatDate(note.nextReviewAt)}` : "No review date"}</span></>}
+                      : <><strong>{displayLabel(note.reviewState)}</strong><span>{note.nextReviewAt ? `Review ${formatDate(note.nextReviewAt)}` : "No review date"}</span></>)}
                     selected={selectedNote?.id === note.id}
                     onSelect={() => selectNote(note.id)}
                     checkbox={{ checked: batchSelection.has(note.id), onCheckedChange: (checked) => setBatch(note.id, checked), label: `Select ${note.title} for batch actions` }}
