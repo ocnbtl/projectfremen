@@ -2509,6 +2509,336 @@ async function checkNotePropertiesEditBrowserState(
   };
 }
 
+async function checkNoteReviewScheduleBrowserState(
+  baseUrl,
+  cookieJar,
+  noteId,
+  noteTitle
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  let plannedFailureStatusExpected = false;
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "notes-review-schedule-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function waitForEnabledSave(page) {
+    await page.waitForFunction(() => {
+      const editor = document.querySelector("[data-note-review-schedule-editor]");
+      const save = Array.from(editor?.querySelectorAll("button") || []).find(
+        (button) => button.textContent?.trim() === "Save schedule"
+      );
+      return save instanceof HTMLButtonElement && !save.disabled;
+    });
+  }
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        !message.text().startsWith("Failed to load resource:")
+      ) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const failure = request.failure()?.errorText || "";
+      if (!failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (
+        response.status() === 503 &&
+        plannedFailureStatusExpected &&
+        url.pathname === "/api/personal/records"
+      ) {
+        plannedFailureStatusExpected = false;
+        return;
+      }
+      if (response.status() >= 400 && url.pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(
+      !diagnostics.overflowX,
+      `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`
+    );
+  }
+
+  async function openEditorFromDetail(page) {
+    await page.goto(`${baseUrl}/admin/notes/${noteId}?tab=review`, {
+      waitUntil: "domcontentloaded"
+    });
+    await page.getByRole("heading", { name: "Why this Note appears here" }).waitFor();
+    await page
+      .getByRole("button", { name: /Schedule review|Edit review schedule/ })
+      .first()
+      .click();
+    const dialog = page
+      .locator("[data-note-review-schedule-editor]")
+      .getByRole("dialog");
+    await dialog.waitFor();
+    assert(
+      (await dialog.getByRole("heading", { name: `Schedule review · ${noteTitle}` }).count()) === 1,
+      "Notes review schedule sheet did not expose the selected Note identity"
+    );
+    assert(
+      await page.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Notes AI dock remained exposed beneath the review schedule editor"
+    );
+    return dialog;
+  }
+
+  const finalNextReview = "2099-09-17";
+  const finalCadence = "P1M";
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const desktop = await desktopContext.newPage();
+    observe(desktop);
+    const editDialog = await openEditorFromDetail(desktop);
+    await editDialog.getByLabel("Next review date").fill(finalNextReview);
+    await editDialog.getByLabel("Cadence").selectOption("monthly");
+    await waitForEnabledSave(desktop);
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "note-review-schedule-1440x900.png")
+    });
+    await assertNoDocumentOverflow(desktop, "Note review schedule editor desktop");
+
+    let plannedFailure = true;
+    plannedFailureStatusExpected = true;
+    await desktop.route("**/api/personal/records", async (route) => {
+      if (route.request().method() === "PATCH" && plannedFailure) {
+        plannedFailure = false;
+        await route.fulfill({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ok: false, error: "Regression schedule failure" })
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await editDialog.getByRole("button", { name: "Save schedule" }).click();
+    await editDialog.getByText("Review schedule was not saved", { exact: true }).waitFor();
+    assert(
+      await editDialog.getByLabel("Next review date").inputValue() === finalNextReview &&
+        await editDialog.getByLabel("Cadence").inputValue() === "monthly",
+      "Failed Note review schedule write did not preserve the date and cadence draft"
+    );
+    await desktop.unroute("**/api/personal/records");
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "note-review-schedule-failed-write-1440x900.png")
+    });
+
+    await editDialog.getByRole("button", { name: "Save schedule" }).click();
+    await editDialog.waitFor({ state: "detached" });
+    await desktop.getByText("Scheduled", { exact: true }).first().waitFor();
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    await desktop.getByText("Scheduled", { exact: true }).first().waitFor();
+    await desktop.waitForLoadState("networkidle");
+
+    await desktop.goto(
+      `${baseUrl}/admin/notes?view=all&note=${encodeURIComponent(noteId)}&tab=review`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { name: "Review timing" }).waitFor();
+    await desktop.getByRole("button", { name: "Edit schedule" }).click();
+    const inspectorDialog = desktop
+      .locator("[data-note-review-schedule-editor]")
+      .getByRole("dialog");
+    await inspectorDialog.waitFor();
+    assert(
+      await inspectorDialog.getByLabel("Next review date").inputValue() === finalNextReview &&
+        await inspectorDialog.getByLabel("Cadence").inputValue() === "monthly",
+      "Notes directory Review inspector did not open the persisted schedule"
+    );
+    await inspectorDialog.getByLabel("Next review date").fill("2099-10-01");
+    await inspectorDialog.getByRole("button", { name: "Cancel" }).click();
+    const discardDialog = desktop.getByRole("dialog", {
+      name: "Discard unsaved review schedule?"
+    });
+    await discardDialog.waitFor();
+    await discardDialog.getByRole("button", { name: "Keep editing" }).click();
+    assert(
+      await inspectorDialog.getByLabel("Next review date").inputValue() === "2099-10-01",
+      "Keeping Note review schedule edits did not preserve the draft"
+    );
+    await inspectorDialog.getByRole("button", { name: "Cancel" }).click();
+    await discardDialog.getByRole("button", { name: "Discard changes" }).click();
+    await inspectorDialog.waitFor({ state: "detached" });
+
+    await desktop.getByRole("button", { name: "Edit schedule" }).click();
+    const clearDialog = desktop
+      .locator("[data-note-review-schedule-editor]")
+      .getByRole("dialog");
+    await clearDialog.getByRole("button", { name: "Remove stored schedule" }).click();
+    const clearConfirmation = desktop.getByRole("dialog", {
+      name: /Remove this Note’s review schedule/
+    });
+    await clearConfirmation.waitFor();
+    await clearConfirmation.getByRole("button", { name: "Keep schedule" }).click();
+    assert(
+      await clearDialog.getByLabel("Next review date").inputValue() === finalNextReview,
+      "Canceling schedule removal changed the persisted schedule draft"
+    );
+    await clearDialog.getByRole("button", { name: "Remove stored schedule" }).click();
+    await clearConfirmation.getByRole("button", { name: "Remove schedule" }).click();
+    await clearDialog.waitFor({ state: "detached" });
+    await desktop.getByRole("button", { name: "Schedule review" }).click();
+    const restoredDialog = desktop
+      .locator("[data-note-review-schedule-editor]")
+      .getByRole("dialog");
+    assert(
+      await restoredDialog.getByLabel("Next review date").inputValue() === "" &&
+        await restoredDialog.getByLabel("Cadence").inputValue() === "once",
+      "Removing the Note review schedule did not clear both timing fields"
+    );
+    await restoredDialog.getByLabel("Next review date").fill(finalNextReview);
+    await restoredDialog.getByLabel("Cadence").selectOption("monthly");
+    await restoredDialog.getByRole("button", { name: "Save schedule" }).click();
+    await restoredDialog.waitFor({ state: "detached" });
+    await desktopContext.close();
+
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const page = await context.newPage();
+      observe(page);
+      const editor = await openEditorFromDetail(page);
+      await editor.getByLabel("Next review date").fill("2099-10-01");
+      await editor.getByLabel("Cadence").selectOption("weekly");
+      await waitForEnabledSave(page);
+      await page.screenshot({
+        path: path.join(
+          screenshotDir,
+          `note-review-schedule-${viewport.label}.png`
+        )
+      });
+      await assertNoDocumentOverflow(page, `Note review schedule editor ${viewport.label}`);
+      if (viewport.width === 390) {
+        const undersizedTargets = await editor
+          .locator("button:visible, input:visible, select:visible, a[href]:visible")
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label:
+                    element.getAttribute("aria-label") ||
+                    element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((item) => item.width < 43.99 || item.height < 43.99)
+          );
+        assert(
+          undersizedTargets.length === 0,
+          `Note review schedule editor mobile targets below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+        await page.keyboard.press("Shift+Tab");
+        assert(
+          await page.evaluate(() =>
+            Boolean(
+              document
+                .querySelector("[data-note-review-schedule-editor]")
+                ?.contains(document.activeElement)
+            )
+          ),
+          "Note review schedule editor mobile focus escaped the modal sheet"
+        );
+      }
+      await editor.getByRole("button", { name: "Cancel" }).click();
+      await page
+        .getByRole("dialog", { name: "Discard unsaved review schedule?" })
+        .getByRole("button", { name: "Discard changes" })
+        .click();
+      await context.close();
+    }
+
+    assert(
+      mutatingRequests.filter((request) => request === "PATCH /api/personal/records")
+        .length === 4,
+      `Note review scheduling did not emit one failed save, two successful saves, and one clear PATCH: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      mutatingRequests.filter((request) => request === "POST /api/personal/records")
+        .length === 0,
+      `Note review scheduling created a duplicate Personal Record: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Note review schedule browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Note review schedule browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+  } finally {
+    await browser.close();
+  }
+
+  return {
+    nextReview: finalNextReview,
+    reviewCadence: finalCadence
+  };
+}
+
 async function checkNoteAttachmentsBrowserState(
   baseUrl,
   cookieJar,
@@ -6039,10 +6369,32 @@ async function main() {
     }
     assert(
       noteProperties.body.includes("Edit routing fields") &&
+        noteProperties.body.includes("Schedule review") &&
         noteProperties.body.includes("audited routing fields plus read-only evidence") &&
         noteProperties.body.includes("native ownership, review, links, versions"),
-      "Note Properties did not expose its narrow audited-write and protected-native boundaries"
+      "Note Properties did not expose its narrow audited routing/review writes and protected-native boundaries"
     );
+
+    const noteReviewRoute = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes/${createdNote.id}?tab=review`
+    );
+    assert(
+      noteReviewRoute.response.ok,
+      `Note Review route failed: ${describeStatus(noteReviewRoute.response)}`
+    );
+    for (const expected of [
+      "Why this Note appears here",
+      "Schedule review",
+      "Lifecycle and review are separate",
+      "Completion intentionally unavailable"
+    ]) {
+      assert(
+        noteReviewRoute.body.includes(expected),
+        `Note Review route missing scheduling or ownership boundary text: ${expected}`
+      );
+    }
 
     const missingPropertiesQueue = await requestText(
       server.baseUrl,
@@ -6120,6 +6472,73 @@ async function main() {
       "Note property edit created or removed a Note-owned legacy record"
     );
     pass("Notes Areas, Subjects, and legacy project labels persist through the audited adapter with failed-write recovery, dirty-close protection, responsive sheets, and protected-field isolation");
+
+    const scheduledReview = await checkNoteReviewScheduleBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdNote.id,
+      updatedNoteTitle
+    );
+    const recordsAfterNoteReviewSchedule = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/records"
+    );
+    assert(
+      recordsAfterNoteReviewSchedule.response.ok &&
+        recordsAfterNoteReviewSchedule.payload?.ok,
+      `Unable to reload Note source record after review scheduling: ${JSON.stringify(recordsAfterNoteReviewSchedule.payload)}`
+    );
+    const noteSourceAfterReviewSchedule =
+      recordsAfterNoteReviewSchedule.payload.items.find(
+        (item) => item.id === createdNote.id
+      );
+    assert(
+      noteSourceAfterReviewSchedule?.time?.nextReview === scheduledReview.nextReview &&
+        noteSourceAfterReviewSchedule?.time?.reviewCadence ===
+          scheduledReview.reviewCadence,
+      "Note review schedule did not persist the final date and cadence"
+    );
+    for (const field of [
+      "id",
+      "domain",
+      "className",
+      "status",
+      "title",
+      "body",
+      "url",
+      "areas",
+      "subjects",
+      "projects",
+      "externalSources",
+      "relations",
+      "privacy",
+      "createdAt"
+    ]) {
+      assert(
+        JSON.stringify(noteSourceAfterReviewSchedule?.[field]) ===
+          JSON.stringify(noteSourceAfterPropertyEdit[field]),
+        `Note review scheduling changed protected source field ${field}`
+      );
+    }
+    assert(
+      recordsAfterNoteReviewSchedule.payload.items.filter(
+        (item) => item.className === "note"
+      ).length === noteRecordCountBeforePropertyEdit,
+      "Note review scheduling created or removed a Note-owned legacy record"
+    );
+    const scheduledReviewRoute = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/notes/${createdNote.id}?tab=review`
+    );
+    assert(
+      scheduledReviewRoute.body.includes("Scheduled") &&
+        scheduledReviewRoute.body.includes("Monthly") &&
+        scheduledReviewRoute.body.includes("Edit review schedule"),
+      "Persisted Note review timing did not refresh the derived Review surface"
+    );
+    pass("Notes review date and cadence persist through the audited adapter with derived queue state, removal confirmation, failed-write recovery, responsive sheets, and protected-field isolation");
 
     const protectedStatusNoteTitle = `${testRunId}-blocked-note`;
     const createProtectedStatusNote = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {

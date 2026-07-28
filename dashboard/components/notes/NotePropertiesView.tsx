@@ -1,6 +1,7 @@
 "use client";
 
 import type { NotePropertyReadiness } from "../../lib/modules/notes/property-readiness";
+import { formatNoteReviewCadence } from "../../lib/modules/notes/review-schedule";
 import type { NoteRecord } from "../../lib/modules/notes/types";
 import EvidenceChecklist from "../operational/EvidenceChecklist";
 import MetricStrip from "../operational/MetricStrip";
@@ -133,13 +134,15 @@ export default function NotePropertiesView({
   readiness,
   context,
   onOpenTab,
-  onEditProperties
+  onEditProperties,
+  onScheduleReview
 }: {
   note: NoteRecord;
   readiness: NotePropertyReadiness;
   context: NotePropertyContext;
   onOpenTab: (tab: "body" | "links" | "review") => void;
   onEditProperties: () => void;
+  onScheduleReview: () => void;
 }) {
   const requiredChecks = readiness.checks.filter((check) => check.requirement === "required");
   const recommendedChecks = readiness.checks.filter((check) => check.requirement === "recommended");
@@ -274,20 +277,20 @@ export default function NotePropertiesView({
             <div className={styles.fact}><span>Review reason</span><strong>{reviewMapping(note)}</strong></div>
             <div className={styles.fact}><span>Last legacy review</span><strong>{formatTimestamp(note.legacyLastReviewAt)}</strong></div>
             <div className={styles.fact}><span>Next review</span><strong>{formatTimestamp(note.nextReviewAt)}</strong></div>
-            <div className={styles.fact}><span>Cadence</span><strong>{note.reviewCadence || "Not recorded"}</strong></div>
+            <div className={styles.fact}><span>Cadence</span><strong>{note.nextReviewAt ? formatNoteReviewCadence(note.reviewCadence) : "Not scheduled"}</strong></div>
             <div className={styles.fact}><span>Review owner</span><strong>Not stored</strong></div>
             <div className={styles.fact}><span>Linked Review ID</span><strong>Not connected</strong></div>
           </div>
           <p>Review state is derived separately and never written into Note lifecycle.</p>
           <QuickActionBar
             actions={[
-              { id: "open-review", label: "Open Review", onSelect: () => onOpenTab("review"), intent: "primary" },
               {
                 id: "set-cadence",
-                label: "Set cadence",
-                disabled: true,
-                disabledReason: "Cadence editing needs a native NoteReviewState, review owner, date rules, explicit save, and audit."
-              }
+                label: note.nextReviewAt ? "Edit schedule" : "Schedule review",
+                onSelect: onScheduleReview,
+                intent: "primary"
+              },
+              { id: "open-review", label: "Open Review evidence", onSelect: () => onOpenTab("review") }
             ]}
           />
         </section>

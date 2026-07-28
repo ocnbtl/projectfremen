@@ -19,6 +19,7 @@ import NoteAttachmentsView, { NoteAttachmentInspector } from "./notes/NoteAttach
 import NoteDecisionsView from "./notes/NoteDecisionsView";
 import NotePropertiesEditorSheet from "./notes/NotePropertiesEditorSheet";
 import NotePropertiesView, { NotePropertiesSummary } from "./notes/NotePropertiesView";
+import NoteReviewScheduleEditorSheet from "./notes/NoteReviewScheduleEditorSheet";
 import {
   contentLinksForObject,
   contentTargetGroupsForObject,
@@ -33,6 +34,7 @@ import {
   buildNotePropertyQueue,
   buildNotePropertyReadiness
 } from "../lib/modules/notes/property-readiness";
+import { formatNoteReviewCadence } from "../lib/modules/notes/review-schedule";
 import type {
   NoteReferenceEvidenceIndex,
   NoteReferenceEvidenceRecord,
@@ -406,6 +408,7 @@ export default function NotesWorkspace({
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [propertyEditorNoteId, setPropertyEditorNoteId] = useState<string | null>(null);
+  const [reviewScheduleEditorNoteId, setReviewScheduleEditorNoteId] = useState<string | null>(null);
   const [captureFocusRequested, setCaptureFocusRequested] = useState(false);
   const captureTitleRef = useRef<HTMLInputElement>(null);
   const dirtyHistoryGuardRef = useRef<string | null>(null);
@@ -420,6 +423,10 @@ export default function NotesWorkspace({
   const propertyEditorNote = useMemo(
     () => notes.find((note) => note.id === propertyEditorNoteId) || null,
     [notes, propertyEditorNoteId]
+  );
+  const reviewScheduleEditorNote = useMemo(
+    () => notes.find((note) => note.id === reviewScheduleEditorNoteId) || null,
+    [notes, reviewScheduleEditorNoteId]
   );
   const selectedAttachmentEvidence = useMemo(
     () => selectedNote
@@ -622,6 +629,25 @@ export default function NotesWorkspace({
     );
     setPropertyEditorNoteId(null);
     setNotice("Note routing properties saved through the audited Personal Records adapter.");
+  }
+
+  function openReviewScheduleEditor(note: NoteRecord | null) {
+    if (!note) return;
+    setAiOpen(false);
+    setReviewScheduleEditorNoteId(note.id);
+    if (aiOpen) updateUrl({ ai: false });
+  }
+
+  function handleReviewScheduleSaved(savedNote: NoteRecord) {
+    setNotes((current) =>
+      current.map((note) => note.id === savedNote.id ? savedNote : note)
+    );
+    setReviewScheduleEditorNoteId(null);
+    setNotice(
+      savedNote.nextReviewAt
+        ? "Note review schedule saved through the audited Personal Records adapter."
+        : "Note review schedule removed through the audited Personal Records adapter."
+    );
   }
 
   async function submitNote(event: React.FormEvent<HTMLFormElement>) {
@@ -920,7 +946,7 @@ export default function NotesWorkspace({
     />
   );
 
-  const aiDock = propertyEditorNoteId ? null : (
+  const aiDock = propertyEditorNoteId || reviewScheduleEditorNoteId ? null : (
     <SharedAIDock
       open={aiOpen}
       onOpenChange={(open) => {
@@ -1246,7 +1272,7 @@ export default function NotesWorkspace({
       {
         id: "cadence",
         label: "Review cadence is recorded",
-        detail: note.reviewCadence ? `Legacy cadence ${note.reviewCadence}.` : "No cadence is stored.",
+        detail: note.reviewCadence ? `${formatNoteReviewCadence(note.reviewCadence)} cadence is stored as ${note.reviewCadence}.` : "No recurring cadence is stored.",
         required: false,
         complete: Boolean(note.reviewCadence)
       }
@@ -1296,7 +1322,7 @@ export default function NotesWorkspace({
             <div className={styles.factGrid}>
               <div className={styles.fact}><span>Last legacy review</span><strong>{formatDate(note.legacyLastReviewAt)}</strong></div>
               <div className={styles.fact}><span>Next legacy review</span><strong>{formatDate(note.nextReviewAt)}</strong></div>
-              <div className={styles.fact}><span>Review cadence</span><strong>{note.reviewCadence || "Not recorded"}</strong></div>
+              <div className={styles.fact}><span>Review cadence</span><strong>{note.nextReviewAt ? formatNoteReviewCadence(note.reviewCadence) : "Not scheduled"}</strong></div>
               <div className={styles.fact}><span>Required blockers</span><strong>{blockers.length}</strong></div>
             </div>
           </section>
@@ -1347,6 +1373,12 @@ export default function NotesWorkspace({
             <QuickActionBar
               actions={[
                 ...decisionAction,
+                {
+                  id: "schedule-review",
+                  label: note.nextReviewAt ? "Edit review schedule" : "Schedule review",
+                  onSelect: () => openReviewScheduleEditor(note),
+                  intent: "primary"
+                },
                 { id: "mark-reviewed", label: "Mark reviewed", disabled: true, disabledReason: "The legacy timestamp write cannot validate required checks, store waivers, identify the reviewer, or create an auditable native review completion." },
                 { id: "waive", label: "Waive blocker", disabled: true, disabledReason: "Native check IDs, reviewer identity, reason, and waiver audit are not stored by the legacy adapter." },
                 { id: "carry-forward", label: "Carry forward", disabled: true, disabledReason: "Carry-forward requires a native Note review aggregate and destination review state." }
@@ -1375,6 +1407,7 @@ export default function NotesWorkspace({
             updateUrl({ tab });
           }}
           onEditProperties={() => openPropertyEditor(note)}
+          onScheduleReview={() => openReviewScheduleEditor(note)}
         />
       </DetailTabPanel>
     );
@@ -1561,6 +1594,70 @@ export default function NotesWorkspace({
       );
     }
 
+    if (inspectorDisplayTab === "review") {
+      const reviewRoute = destinationFor(
+        { tab: "review", note: "" },
+        { path: selectedNote.nativeRef.route }
+      );
+      const reviewMapping = selectedNote.mappingNotes.find(
+        (mapping) => mapping.field === "review"
+      );
+      return (
+        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="review" active>
+          <div className={styles.overviewGrid}>
+            <section className={styles.panel} data-wide="true">
+              <div className={styles.panelHeader}>
+                <div>
+                  <span className={styles.eyebrow}>Review timing</span>
+                  <h2>Review timing</h2>
+                </div>
+                <span
+                  className={styles.stateChip}
+                  data-tone={selectedNote.reviewState === "needs_review" ? "pink" : "blue"}
+                >
+                  {displayLabel(selectedNote.reviewState)}
+                </span>
+              </div>
+              <div className={styles.factGrid}>
+                <div className={styles.fact}><span>Lifecycle</span><strong>{displayLabel(selectedNote.lifecycleStatus)}</strong></div>
+                <div className={styles.fact}><span>Next review</span><strong>{formatDate(selectedNote.nextReviewAt)}</strong></div>
+                <div className={styles.fact}><span>Cadence</span><strong>{selectedNote.nextReviewAt ? formatNoteReviewCadence(selectedNote.reviewCadence) : "Not scheduled"}</strong></div>
+                <div className={styles.fact}><span>Last legacy review</span><strong>{formatDate(selectedNote.legacyLastReviewAt)}</strong></div>
+              </div>
+              <p>{reviewMapping?.message || "No independent Note review state is stored."}</p>
+            </section>
+            <section className={styles.panel} data-wide="true" data-ai-safe="true">
+              <h2>Review actions</h2>
+              <QuickActionBar
+                actions={[
+                  {
+                    id: "schedule-review",
+                    label: selectedNote.nextReviewAt ? "Edit schedule" : "Schedule review",
+                    onSelect: () => openReviewScheduleEditor(selectedNote),
+                    intent: "primary"
+                  },
+                  { id: "open-review", label: "Open review evidence", href: reviewRoute },
+                  {
+                    id: "mark-reviewed",
+                    label: "Mark reviewed",
+                    disabled: true,
+                    disabledReason: "Native blockers, reviewer identity, waivers, and completion audit are not connected."
+                  }
+                ]}
+              />
+            </section>
+            <section className={styles.panel} data-wide="true">
+              <h2>Explicit review boundary</h2>
+              <div className={styles.sourceBoundary}>
+                Scheduling updates only the legacy timing fields. Lifecycle stays separate, and
+                Notes does not create or complete a Reviews-owned ReviewRun.
+              </div>
+            </section>
+          </div>
+        </DetailTabPanel>
+      );
+    }
+
     if (inspectorDisplayTab === "attachments" && selectedAttachmentEvidence) {
       return (
         <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="attachments" active>
@@ -1608,6 +1705,7 @@ export default function NotesWorkspace({
                 { id: "edit", label: "Open full editor", href: selectedNote.nativeRef.route, intent: "primary" },
                 { id: "link", label: "Link object", disabled: true, disabledReason: "Native NoteLink persistence is unresolved." },
                 { id: "decision", label: "Review decision output", href: noteDecisionsRoute(selectedNote) },
+                { id: "schedule", label: selectedNote.nextReviewAt ? "Edit review schedule" : "Schedule review", onSelect: () => openReviewScheduleEditor(selectedNote) },
                 { id: "review", label: "Mark reviewed", disabled: true, disabledReason: "The legacy review action cannot enforce native review blockers." },
                 { id: "archive", label: "Archive", disabled: true, disabledReason: "Native archive metadata and retention are unresolved.", intent: "destructive" }
               ]}
@@ -1699,6 +1797,16 @@ export default function NotesWorkspace({
     />
   ) : null;
 
+  const reviewScheduleEditor = reviewScheduleEditorNote ? (
+    <NoteReviewScheduleEditorSheet
+      key={reviewScheduleEditorNote.id}
+      open
+      note={reviewScheduleEditorNote}
+      onClose={() => setReviewScheduleEditorNoteId(null)}
+      onSaved={handleReviewScheduleSaved}
+    />
+  ) : null;
+
   if (initialMode === "detail") {
     const currentNote = selectedNote;
     const detailTabsId = currentNote ? `note-detail-${currentNote.id}` : "note-detail";
@@ -1713,6 +1821,7 @@ export default function NotesWorkspace({
         className={`${styles.shell} ${styles.detailShell}`}
       >
         {propertyEditor}
+        {reviewScheduleEditor}
         <button type="button" className={`${styles.button} ${styles.mobileMenuButton}`} onClick={() => { setInspectorOpen(false); setMobileSidebarOpen(true); }} aria-label="Open Notes navigation">Menu</button>
         <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(true); }} disabled={!currentNote}>Context</button>
         {(mobileSidebarOpen || (isInspectorOverlay && inspectorOpen)) && <button type="button" className={styles.scrim} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(false); }} aria-label="Close overlay" />}
@@ -1739,6 +1848,7 @@ export default function NotesWorkspace({
                     <button type="button" className={styles.button} data-primary="true" onClick={() => void saveNote()} disabled={!editorDirty || saveState === "saving"}>{saveState === "saving" ? "Saving…" : "Save"}</button>
                     <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Pinned state is not stored by the legacy Notes adapter.")}>Pin</button>
                     <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Native NoteLink persistence is unresolved.")}>Link object</button>
+                    <button type="button" className={styles.button} onClick={() => openReviewScheduleEditor(currentNote)}>{currentNote.nextReviewAt ? "Edit review schedule" : "Schedule review"}</button>
                     <button
                       type="button"
                       className={styles.button}
@@ -1864,6 +1974,7 @@ export default function NotesWorkspace({
       className={styles.shell}
     >
       {propertyEditor}
+      {reviewScheduleEditor}
       <button type="button" className={`${styles.button} ${styles.mobileMenuButton}`} onClick={() => { setInspectorOpen(false); setMobileSidebarOpen(true); }} aria-label="Open Notes navigation">Menu</button>
       <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(true); }} disabled={!selectedNote}>Preview</button>
       {(mobileSidebarOpen || (isInspectorOverlay && inspectorOpen)) && <button type="button" className={styles.scrim} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(false); }} aria-label="Close overlay" />}

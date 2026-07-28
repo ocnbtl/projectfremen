@@ -153,6 +153,7 @@
 }
 
 .field input,
+.field select,
 .field textarea {
   width: 100%;
   min-width: 0;
@@ -166,6 +167,11 @@
 .field input {
   min-height: 40px;
   padding: 0 11px;
+}
+
+.field select {
+  min-height: 40px;
+  padding: 0 34px 0 11px;
 }
 
 .field textarea {
@@ -344,6 +350,30 @@
   line-height: 1.45;
 }
 
+.dateShortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin: 8px 0 15px;
+}
+
+.dateShortcuts button,
+.dangerButton {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--panel-bg);
+  color: var(--text-strong);
+  font: 800 11px var(--font-heading);
+}
+
+.dangerButton {
+  margin-top: 12px;
+  border-color: #d8a0aa;
+  color: #8b273b;
+}
+
 .actions {
   display: flex;
   align-items: center;
@@ -393,7 +423,10 @@
 
 .iconButton:focus-visible,
 .field input:focus-visible,
+.field select:focus-visible,
 .field textarea:focus-visible,
+.dateShortcuts button:focus-visible,
+.dangerButton:focus-visible,
 .duplicate a:focus-visible,
 .actions button:focus-visible {
   outline: 3px solid rgba(35, 103, 143, 0.3);
@@ -426,6 +459,9 @@
 
   .iconButton,
   .field input,
+  .field select,
+  .dateShortcuts button,
+  .dangerButton,
   .actions button {
     min-height: 44px;
   }
