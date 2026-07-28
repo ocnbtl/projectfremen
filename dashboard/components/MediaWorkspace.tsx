@@ -16,6 +16,7 @@ import EvidenceChecklist from "./operational/EvidenceChecklist";
 import ObjectHeader from "./operational/ObjectHeader";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
+import ResourceEditorSheet from "./resources/ResourceEditorSheet";
 import {
   contentLinksForObject,
   type LegacyContentGraph
@@ -31,7 +32,8 @@ import {
   type MediaRightsIssue
 } from "../lib/modules/media/rights-evidence";
 import { formatMediaReviewCadence } from "../lib/modules/media/review-schedule";
-import type { MediaAsset } from "../lib/modules/media/types";
+import type { MediaAsset, MediaResourceReference } from "../lib/modules/media/types";
+import type { ResourceRecord } from "../lib/modules/resources/types";
 import {
   parseMediaUrlState,
   serializeMediaUrlState,
@@ -44,6 +46,7 @@ import styles from "./content-graph/ContentGraphWorkspace.module.css";
 
 type MediaWorkspaceProps = {
   initialAssets: MediaAsset[];
+  initialResources: ResourceRecord[];
   contentGraph: LegacyContentGraph;
   initialMode?: "index" | "detail";
   initialSelectedId?: string;
@@ -390,6 +393,7 @@ function useMediaQuery(query: string) {
 
 export default function MediaWorkspace({
   initialAssets,
+  initialResources,
   contentGraph,
   initialMode = "index",
   initialSelectedId,
@@ -425,6 +429,7 @@ export default function MediaWorkspace({
   );
   const [issue, setIssue] = useState<MediaIssue>(initialUrlState.issue);
   const [assets, setAssets] = useState(initialAssets);
+  const [resources, setResources] = useState(initialResources);
   const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
@@ -433,6 +438,15 @@ export default function MediaWorkspace({
   const [reviewScheduleFeedback, setReviewScheduleFeedback] = useState<{
     assetId: string;
     message: string;
+  } | null>(null);
+  const [resourceHandoffTarget, setResourceHandoffTarget] = useState<{
+    assetId: string;
+    reference: MediaResourceReference;
+  } | null>(null);
+  const [resourceHandoffFeedback, setResourceHandoffFeedback] = useState<{
+    assetId: string;
+    referenceValue: string;
+    resource: ResourceRecord;
   } | null>(null);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -459,6 +473,10 @@ export default function MediaWorkspace({
     return () => document.removeEventListener("keydown", focusSearch);
   }, []);
 
+  useEffect(() => {
+    setResources(initialResources);
+  }, [initialResources]);
+
   const selectedAsset = useMemo(
     () => assets.find((asset) => asset.id === selectedId) || null,
     [assets, selectedId]
@@ -470,6 +488,13 @@ export default function MediaWorkspace({
   const reviewScheduleAsset = useMemo(
     () => assets.find((asset) => asset.id === reviewScheduleAssetId) || null,
     [assets, reviewScheduleAssetId]
+  );
+  const resourceHandoffAsset = useMemo(
+    () =>
+      resourceHandoffTarget
+        ? assets.find((asset) => asset.id === resourceHandoffTarget.assetId) || null
+        : null,
+    [assets, resourceHandoffTarget]
   );
   const isLegacyReadinessQueue = queueMode === "needs-review" && view === "needs-review";
   const isLegacyMetadataQueue = queueMode === "missing-metadata" && view === "missing-metadata";
@@ -746,6 +771,17 @@ export default function MediaWorkspace({
     setReviewScheduleAssetId(asset.id);
   }
 
+  function openResourceHandoff(
+    asset: MediaAsset,
+    reference: MediaResourceReference
+  ) {
+    dismissAiForOverlay();
+    setMobileSidebarOpen(false);
+    setInspectorOpen(false);
+    setResourceHandoffFeedback(null);
+    setResourceHandoffTarget({ assetId: asset.id, reference });
+  }
+
   function handleMetadataSaved(savedAsset: MediaAsset) {
     setAssets((current) =>
       current.map((asset) => asset.id === savedAsset.id ? savedAsset : asset)
@@ -767,6 +803,21 @@ export default function MediaWorkspace({
         : "Media review timing removed. Readiness, rights, and review completion are unchanged."
     });
     setReviewScheduleAssetId(null);
+    router.refresh();
+  }
+
+  function handleResourceHandoffSaved(savedResource: ResourceRecord) {
+    if (!resourceHandoffTarget) return;
+    setResources((current) => [
+      savedResource,
+      ...current.filter((resource) => resource.id !== savedResource.id)
+    ]);
+    setResourceHandoffFeedback({
+      assetId: resourceHandoffTarget.assetId,
+      referenceValue: resourceHandoffTarget.reference.value,
+      resource: savedResource
+    });
+    setResourceHandoffTarget(null);
     router.refresh();
   }
 
@@ -999,6 +1050,17 @@ export default function MediaWorkspace({
           const matches = ownerMatches.filter(
             (candidate) => candidate.evidenceValue === reference.value
           );
+          const justCreated =
+            resourceHandoffFeedback?.assetId === asset.id &&
+            resourceHandoffFeedback.referenceValue === reference.value
+              ? resourceHandoffFeedback.resource
+              : null;
+          const ownerTargets = new Map(
+            matches.map((candidate) => [candidate.target.objectId, candidate.target])
+          );
+          if (justCreated) {
+            ownerTargets.set(justCreated.id, justCreated.nativeRef);
+          }
           return (
             <li key={`${reference.provenance}-${reference.value}`}>
               <span>
@@ -1006,17 +1068,32 @@ export default function MediaWorkspace({
                 <br />
                 {reference.value}
                 <small>
-                  {matches.length
-                    ? ` · ${matches.length} exact owner record ${matches.length === 1 ? "match" : "matches"}; relationship not persisted`
+                  {ownerTargets.size
+                    ? ` · ${ownerTargets.size} exact owner record ${ownerTargets.size === 1 ? "match" : "matches"}; relationship not persisted`
                     : " · no exact owner record match"}
                 </small>
+                {justCreated && (
+                  <small role="status">
+                    Resource created. Media source confirmation, rights, readiness, and native
+                    linking remain unchanged.
+                  </small>
+                )}
               </span>
               <span className={styles.inlineActions}>
-                {matches.map((candidate) => (
-                  <Link className={styles.linkButton} href={candidate.target.route} key={candidate.id}>
+                {Array.from(ownerTargets.values()).map((target) => (
+                  <Link className={styles.linkButton} href={target.route} key={target.objectId}>
                     Open Resource
                   </Link>
                 ))}
+                {ownerTargets.size === 0 && (
+                  <button
+                    type="button"
+                    className={styles.button}
+                    onClick={() => openResourceHandoff(asset, reference)}
+                  >
+                    Create Resource
+                  </button>
+                )}
                 <Link className={styles.linkButton} href={resourceOwnerRoute(reference.value)}>
                   Search Resources
                 </Link>
@@ -1596,8 +1673,21 @@ export default function MediaWorkspace({
               <h2>Ownership boundary</h2>
               <div className={styles.sourceBoundary}>
                 <strong>Media still owns the future binary and asset identity.</strong>
-                <span>URLs remain unresolved Resource candidates. Retained relation IDs remain untyped provenance. No source, link, review, or binary object is created by this queue.</span>
+                <span>An accepted URL can be explicitly handed to Resources as a new Resource. Retained relation IDs remain untyped provenance; no native link, review completion, rights decision, or binary object is created by this queue.</span>
               </div>
+            </section>
+
+            <section className={styles.panel} data-wide="true">
+              <div className={styles.panelHeader}>
+                <div>
+                  <h2>Resource source candidates</h2>
+                  <p>
+                    Hand an accepted URL to Resources without changing this Media asset or
+                    completing its review.
+                  </p>
+                </div>
+              </div>
+              {renderSourceReferences(asset)}
             </section>
           </div>
         </DetailTabPanel>
@@ -1774,7 +1864,7 @@ export default function MediaWorkspace({
     </InspectorRail>
   );
 
-  const aiDock = editorAssetId || reviewScheduleAssetId || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? null : (
+  const aiDock = editorAssetId || reviewScheduleAssetId || resourceHandoffTarget || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? null : (
     <SharedAIDock
       open={aiOpen}
       onOpenChange={(next) => {
@@ -1809,6 +1899,28 @@ export default function MediaWorkspace({
     />
   ) : null;
 
+  const resourceHandoffEditor =
+    resourceHandoffTarget && resourceHandoffAsset ? (
+      <ResourceEditorSheet
+        key={`media-resource-handoff:${resourceHandoffAsset.id}:${resourceHandoffTarget.reference.value}`}
+        open
+        resource={null}
+        resources={resources}
+        initialDraft={{
+          title: resourceHandoffAsset.title,
+          url: resourceHandoffTarget.reference.value,
+          body: ""
+        }}
+        handoff={{
+          sourceModule: "Media",
+          sourceId: resourceHandoffAsset.id,
+          sourceLabel: resourceHandoffAsset.title
+        }}
+        onClose={() => setResourceHandoffTarget(null)}
+        onSaved={handleResourceHandoffSaved}
+      />
+    ) : null;
+
   if (initialMode === "detail") {
     return (
       <ModuleShell
@@ -1822,6 +1934,7 @@ export default function MediaWorkspace({
       >
         {metadataEditor}
         {reviewScheduleEditor}
+        {resourceHandoffEditor}
         <button
           className={`${styles.button} ${styles.mobileMenuButton}`}
           type="button"
@@ -1886,6 +1999,7 @@ export default function MediaWorkspace({
     >
       {metadataEditor}
       {reviewScheduleEditor}
+      {resourceHandoffEditor}
       <button
         className={`${styles.button} ${styles.mobileMenuButton}`}
         type="button"

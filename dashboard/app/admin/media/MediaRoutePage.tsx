@@ -17,7 +17,10 @@ import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
 import type { PersonalOpsState } from "../../../lib/modules/personal-ops/types";
 import { readProjectsState } from "../../../lib/modules/projects/store";
 import type { ProjectsState } from "../../../lib/modules/projects/types";
-import { legacyPersonalRecordsToResources } from "../../../lib/modules/resources/legacy-adapter";
+import {
+  legacyPersonalRecordsToResources,
+  resourceForClient
+} from "../../../lib/modules/resources/legacy-adapter";
 import { readReviewsState } from "../../../lib/modules/reviews/store";
 import type { ReviewsState } from "../../../lib/modules/reviews/types";
 import type { MediaTab, MediaView } from "../../../lib/native-objects/url-state";
@@ -71,6 +74,7 @@ export default async function MediaRoutePage({
   const assets = serverAssets.map(mediaAssetForClient);
   const notes = legacyPersonalRecordsToNotes(records);
   const resources = legacyPersonalRecordsToResources(records);
+  const clientResources = resources.map(resourceForClient);
   const contentGraph = buildLegacyContentGraph({ notes, resources, media: assets });
   if (!loadError && assetId && !assets.some((asset) => asset.id === assetId)) {
     notFound();
@@ -110,6 +114,7 @@ export default async function MediaRoutePage({
       ) : (
         <MediaWorkspace
           initialAssets={assets}
+          initialResources={clientResources}
           contentGraph={contentGraph}
           initialMode={mode}
           initialSelectedId={assetId}

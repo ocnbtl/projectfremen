@@ -3336,6 +3336,420 @@ async function checkMediaMetadataEditBrowserState(
   };
 }
 
+async function checkMediaResourcePromotionBrowserState(
+  baseUrl,
+  cookieJar,
+  mediaId,
+  mediaTitle,
+  mediaUrl,
+  testRunId
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  let plannedFailureStatusExpected = false;
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "media-resource-handoff-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        !message.text().startsWith("Failed to load resource:")
+      ) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const failure = request.failure()?.errorText || "";
+      if (!failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (
+        response.status() === 503 &&
+        plannedFailureStatusExpected &&
+        url.pathname === "/api/personal/records"
+      ) {
+        plannedFailureStatusExpected = false;
+        return;
+      }
+      if (
+        response.status() >= 400 &&
+        url.pathname !== "/_vercel/insights/script.js"
+      ) {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(
+      !diagnostics.overflowX,
+      `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`
+    );
+  }
+
+  async function openHandoff(page, suffix = "") {
+    await page.goto(
+      `${baseUrl}/admin/media/${mediaId}?tab=links&probe=keep${suffix}`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await page.getByText(mediaTitle, { exact: true }).first().waitFor();
+    await page
+      .getByRole("button", { name: "Create Resource", exact: true })
+      .first()
+      .click();
+    const dialog = page.getByRole("dialog", {
+      name: "Create Resource from Media"
+    });
+    await dialog.waitFor();
+    assert(
+      (await dialog.getByLabel("Source URL").inputValue()) === mediaUrl &&
+        (await dialog.getByLabel("Source URL").isDisabled()),
+      "Media handoff did not preserve and lock the exact accepted source URL"
+    );
+    assert(
+      (await dialog.getByLabel("Resource title").inputValue()) === mediaTitle,
+      "Media handoff did not prefill the user-recognizable asset title"
+    );
+    assert(
+      (await dialog.getByText(mediaId, { exact: true }).count()) === 1 &&
+        (await dialog
+          .getByText("Exact URL candidate · native link pending", {
+            exact: true
+          })
+          .count()) === 1,
+      "Media handoff did not expose origin identity and pending-link ownership"
+    );
+    assert(
+      (await page
+        .getByRole("button", { name: "Open AI assistant" })
+        .count()) === 0,
+      "Media AI dock remained exposed beneath the Resource handoff sheet"
+    );
+    return dialog;
+  }
+
+  const resourceTitle = `${mediaTitle}-resource`;
+  const resourceBody = `Created through Media source handoff ${testRunId}.`;
+
+  try {
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const page = await context.newPage();
+      observe(page);
+      const dialog = await openHandoff(page);
+      await dialog
+        .getByLabel("Resource title")
+        .fill(`${resourceTitle}-${viewport.label}`);
+      await dialog
+        .getByLabel("Source context")
+        .fill("Responsive handoff verification draft. This draft is intentionally discarded.");
+      await page.screenshot({
+        path: path.join(
+          screenshotDir,
+          `media-resource-handoff-${viewport.label}.png`
+        )
+      });
+      await assertNoDocumentOverflow(
+        page,
+        `Media → Resources handoff ${viewport.label}`
+      );
+      if (viewport.width === 390) {
+        const undersizedTargets = await dialog
+          .locator(
+            "button:visible, input:visible, textarea:visible, a[href]:visible"
+          )
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label:
+                    element.getAttribute("aria-label") ||
+                    element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((item) => item.width < 43.99 || item.height < 43.99)
+          );
+        assert(
+          undersizedTargets.length === 0,
+          `Media → Resources handoff mobile targets below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+        await page.keyboard.press("Shift+Tab");
+        assert(
+          await page.evaluate(() =>
+            Boolean(
+              document
+                .querySelector("[data-resource-editor='create']")
+                ?.contains(document.activeElement)
+            )
+          ),
+          "Media → Resources handoff mobile focus escaped the modal sheet"
+        );
+      }
+      await dialog.getByRole("button", { name: "Cancel" }).click();
+      const discardDialog = page.getByRole("dialog", {
+        name: "Discard unsaved Resource changes?"
+      });
+      await discardDialog.waitFor();
+      await discardDialog.getByRole("button", { name: "Keep editing" }).click();
+      assert(
+        (await dialog.getByLabel("Resource title").inputValue()) ===
+          `${resourceTitle}-${viewport.label}`,
+        "Keeping the Media handoff draft did not preserve edited input"
+      );
+      await dialog.getByRole("button", { name: "Cancel" }).click();
+      await discardDialog
+        .getByRole("button", { name: "Discard changes" })
+        .click();
+      await dialog.waitFor({ state: "detached" });
+      await context.close();
+    }
+
+    const desktopContext = await authenticatedContext({
+      width: 1440,
+      height: 900
+    });
+    const desktop = await desktopContext.newPage();
+    observe(desktop);
+    const dialog = await openHandoff(desktop);
+    await dialog.getByLabel("Resource title").fill(resourceTitle);
+    await dialog.getByLabel("Source context").fill(resourceBody);
+    await desktop.screenshot({
+      path: path.join(
+        screenshotDir,
+        "media-resource-handoff-1440x900.png"
+      )
+    });
+    await assertNoDocumentOverflow(
+      desktop,
+      "Media → Resources handoff 1440x900"
+    );
+
+    let plannedFailure = true;
+    plannedFailureStatusExpected = true;
+    await desktop.route("**/api/personal/records", async (route) => {
+      if (route.request().method() === "POST" && plannedFailure) {
+        plannedFailure = false;
+        await route.fulfill({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ok: false,
+            error: "Regression Media handoff failure"
+          })
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await dialog
+      .getByRole("button", { name: "Add Resource", exact: true })
+      .click();
+    const failedWriteMessage = dialog.getByText("Resource was not saved", {
+      exact: true
+    });
+    await failedWriteMessage.waitFor();
+    assert(
+      (await dialog.getByLabel("Resource title").inputValue()) ===
+        resourceTitle &&
+        (await dialog.getByLabel("Source URL").inputValue()) === mediaUrl &&
+        (await dialog.getByLabel("Source context").inputValue()) ===
+          resourceBody,
+      "Failed Media → Resources write did not preserve title, exact URL, and context"
+    );
+    await desktop.unroute("**/api/personal/records");
+    await failedWriteMessage.scrollIntoViewIfNeeded();
+    await desktop.screenshot({
+      path: path.join(
+        screenshotDir,
+        "media-resource-handoff-failed-write-1440x900.png"
+      )
+    });
+
+    await dialog
+      .getByRole("button", { name: "Add Resource", exact: true })
+      .click();
+    await dialog.waitFor({ state: "detached" });
+    const activeLinksPanel = desktop.getByLabel("Links");
+    await activeLinksPanel
+      .getByText(
+        "Resource created. Media source confirmation, rights, readiness, and native linking remain unchanged.",
+        { exact: true }
+      )
+      .waitFor();
+    const ownerLink = activeLinksPanel
+      .getByRole("link", { name: "Open Resource", exact: true })
+      .first();
+    const ownerHref = await ownerLink.getAttribute("href");
+    const resourceId = ownerHref?.match(/^\/admin\/resources\/([^/?#]+)$/)?.[1];
+    assert(
+      resourceId,
+      `Media handoff did not return a canonical Resource route: ${ownerHref}`
+    );
+    const detailUrl = new URL(desktop.url());
+    assert(
+      detailUrl.pathname === `/admin/media/${mediaId}` &&
+        detailUrl.searchParams.get("tab") === "links" &&
+        detailUrl.searchParams.get("probe") === "keep",
+      `Media handoff changed direct-route URL state: ${detailUrl.toString()}`
+    );
+
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    const reloadedLinksPanel = desktop.getByLabel("Links");
+    await reloadedLinksPanel
+      .getByRole("link", { name: "Open Resource", exact: true })
+      .first()
+      .waitFor();
+    assert(
+      (await reloadedLinksPanel
+        .getByRole("button", { name: "Create Resource", exact: true })
+        .count()) === 0,
+      "Media handoff continued offering duplicate Resource creation after reload"
+    );
+    await reloadedLinksPanel
+      .getByText("· 1 exact owner record match; relationship not persisted", {
+        exact: true
+      })
+      .waitFor();
+
+    await desktop.goto(
+      `${baseUrl}/admin/media/needs-review?query=${encodeURIComponent(mediaTitle)}&sort=review&selected=${encodeURIComponent(mediaId)}&tab=review&probe=keep`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop
+      .getByRole("heading", { level: 1, name: "Needs Review" })
+      .waitFor();
+    const queueUrl = new URL(desktop.url());
+    for (const [key, value] of [
+      ["query", mediaTitle],
+      ["sort", "review"],
+      ["selected", mediaId],
+      ["tab", "review"],
+      ["probe", "keep"]
+    ]) {
+      assert(
+        queueUrl.searchParams.get(key) === value,
+        `Media Needs Review handoff dropped ${key} URL state`
+      );
+    }
+    const queueReviewPanel = desktop.getByLabel("Review");
+    const queueOwnerLink = queueReviewPanel
+      .getByRole("link", { name: "Open Resource", exact: true })
+      .first();
+    await queueOwnerLink.waitFor();
+    assert(
+      (await queueReviewPanel
+        .getByRole("button", { name: "Create Resource", exact: true })
+        .count()) === 0,
+      "Media Needs Review offered duplicate Resource creation after persistence"
+    );
+    await queueOwnerLink.scrollIntoViewIfNeeded();
+    await desktop.screenshot({
+      path: path.join(
+        screenshotDir,
+        "media-resource-handoff-persisted-1440x900.png"
+      )
+    });
+    await assertNoDocumentOverflow(
+      desktop,
+      "Media → Resources persisted owner evidence"
+    );
+    await desktopContext.close();
+
+    assert(
+      mutatingRequests.filter(
+        (request) => request === "POST /api/personal/records"
+      ).length === 2,
+      `Media → Resources handoff did not emit one failed and one successful POST: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      mutatingRequests.filter(
+        (request) => request === "PATCH /api/personal/records"
+      ).length === 0,
+      `Media → Resources handoff mutated a legacy Media record: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      plannedFailureStatusExpected === false,
+      "Media → Resources handoff did not observe the planned failed write"
+    );
+    assert(
+      browserErrors.length === 0,
+      `Media → Resources browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Media → Resources browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+
+    return {
+      resourceId,
+      resourceTitle,
+      resourceBody,
+      resourceUrl: mediaUrl,
+      resourceRoute: ownerHref
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
 async function checkNotePropertiesEditBrowserState(
   baseUrl,
   cookieJar,
@@ -7795,6 +8209,55 @@ async function main() {
     const createdMedia = createMedia.payload.items?.find((item) => item.title === mediaTitle && item.className === "file");
     assert(createdMedia?.id, "Created legacy Media record was not returned");
 
+    const mediaResourceHandoffTitle = `${testRunId}-media-resource-handoff`;
+    const mediaResourceHandoffUrl =
+      `https://example.com/media/source-handoff/${encodeURIComponent(testRunId)}`;
+    const createMediaResourceHandoff = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/records",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          domain: "notes-docs",
+          title: mediaResourceHandoffTitle,
+          className: "file",
+          status: "active",
+          body: "Regression-created Media source candidate for an explicit Resources-owned handoff.",
+          url: mediaResourceHandoffUrl,
+          externalSources: [],
+          intents: ["retain"]
+        })
+      }
+    );
+    assert(
+      createMediaResourceHandoff.response.ok &&
+        createMediaResourceHandoff.payload?.ok,
+      `Media Resource-handoff fixture failed: ${JSON.stringify(createMediaResourceHandoff.payload)}`
+    );
+    const createdMediaResourceHandoff =
+      createMediaResourceHandoff.payload.items?.find(
+        (item) =>
+          item.title === mediaResourceHandoffTitle &&
+          item.className === "file"
+      );
+    assert(
+      createdMediaResourceHandoff?.id,
+      "Media Resource-handoff fixture was not returned"
+    );
+    assert(
+      createMediaResourceHandoff.payload.items.filter(
+        (item) =>
+          item.className === "resource" &&
+          (item.url || "") === mediaResourceHandoffUrl
+      ).length === 0,
+      "Media Resource-handoff fixture unexpectedly started with a matching Resource"
+    );
+
     const attachmentNoteTitle = `${testRunId}-attachment-evidence-note`;
     const missingAttachmentOwnerId = `${testRunId}-missing-attachment-owner`;
     const createAttachmentNote = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
@@ -8094,6 +8557,12 @@ async function main() {
       { id: createdNote.id, className: "note", label: "Note", expectedUrl: sharedContentSourceUrl },
       { id: createdResource.id, className: "resource", label: "Resource", expectedUrl: sharedContentSourceUrl },
       { id: createdMedia.id, className: "file", label: "Media", expectedUrl: sharedContentSourceUrl },
+      {
+        id: createdMediaResourceHandoff.id,
+        className: "file",
+        label: "Media Resource-handoff candidate",
+        expectedUrl: mediaResourceHandoffUrl
+      },
       { id: createdMediaNoSource.id, className: "file", label: "Media without source evidence", expectedUrl: "" },
       { id: createdMediaWithheld.id, className: "file", label: "Media with withheld source evidence", expectedUrl: credentialBearingSourceUrl },
       ...createdDuplicateMedia.map((fixture) => ({
@@ -9039,6 +9508,166 @@ async function main() {
     }
     sourceRecordSnapshots.set(createdMedia.id, JSON.stringify(mediaSourceAfterEdit));
     pass("Media title, description, review date, and cadence persist through the protected legacy adapter while identity, ownership, URL evidence, links, readiness, and record counts remain intact");
+
+    const recordsBeforeMediaResourceHandoff = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/records"
+    );
+    assert(
+      recordsBeforeMediaResourceHandoff.response.ok &&
+        recordsBeforeMediaResourceHandoff.payload?.ok,
+      `Unable to capture source records before the Media → Resources handoff: ${JSON.stringify(recordsBeforeMediaResourceHandoff.payload)}`
+    );
+    const handoffMediaBefore =
+      recordsBeforeMediaResourceHandoff.payload.items.find(
+        (item) => item.id === createdMediaResourceHandoff.id
+      );
+    const handoffMediaCountBefore =
+      recordsBeforeMediaResourceHandoff.payload.items.filter(
+        (item) => item.className === "file"
+      ).length;
+    const handoffResourceCountBefore =
+      recordsBeforeMediaResourceHandoff.payload.items.filter(
+        (item) => item.className === "resource"
+      ).length;
+    assert(
+      handoffMediaBefore,
+      "Media Resource-handoff fixture was missing before promotion"
+    );
+    assert(
+      recordsBeforeMediaResourceHandoff.payload.items.filter(
+        (item) =>
+          item.className === "resource" &&
+          (item.url || "") === mediaResourceHandoffUrl
+      ).length === 0,
+      "Media Resource-handoff URL already had a Resource owner before creation"
+    );
+    for (const [pathname, label] of [
+      [
+        `/admin/media/missing-metadata?query=${encodeURIComponent(mediaResourceHandoffTitle)}&selected=${encodeURIComponent(createdMediaResourceHandoff.id)}&tab=source&issue=source`,
+        "Media Missing Metadata"
+      ],
+      [
+        `/admin/media/rights-usage?query=${encodeURIComponent(mediaResourceHandoffTitle)}&selected=${encodeURIComponent(createdMediaResourceHandoff.id)}&tab=source&issue=resource-candidate`,
+        "Media Rights / Usage"
+      ]
+    ]) {
+      const handoffSurface = await requestText(
+        server.baseUrl,
+        cookieJar,
+        pathname
+      );
+      assert(
+        handoffSurface.response.ok &&
+          handoffSurface.body.includes(mediaResourceHandoffUrl) &&
+          handoffSurface.body.includes("Create Resource") &&
+          handoffSurface.body.includes(
+            "no exact owner record match"
+          ),
+        `${label} did not expose the explicit Resource handoff without claiming a native link`
+      );
+    }
+
+    const promotedMediaResource =
+      await checkMediaResourcePromotionBrowserState(
+        server.baseUrl,
+        cookieJar,
+        createdMediaResourceHandoff.id,
+        mediaResourceHandoffTitle,
+        mediaResourceHandoffUrl,
+        testRunId
+      );
+    const recordsAfterMediaResourceHandoff = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/records"
+    );
+    assert(
+      recordsAfterMediaResourceHandoff.response.ok &&
+        recordsAfterMediaResourceHandoff.payload?.ok,
+      `Unable to reload source records after the Media → Resources handoff: ${JSON.stringify(recordsAfterMediaResourceHandoff.payload)}`
+    );
+    const handoffMediaAfter =
+      recordsAfterMediaResourceHandoff.payload.items.find(
+        (item) => item.id === createdMediaResourceHandoff.id
+      );
+    const promotedResourceMatches =
+      recordsAfterMediaResourceHandoff.payload.items.filter(
+        (item) =>
+          item.id === promotedMediaResource.resourceId &&
+          item.className === "resource"
+      );
+    assert(
+      promotedResourceMatches.length === 1,
+      "Media → Resources handoff did not create exactly one canonical Resource record"
+    );
+    const promotedResourceRecord = promotedResourceMatches[0];
+    assert(
+      promotedResourceRecord.title === promotedMediaResource.resourceTitle &&
+        promotedResourceRecord.body === promotedMediaResource.resourceBody &&
+        promotedResourceRecord.url === promotedMediaResource.resourceUrl &&
+        promotedResourceRecord.domain === "notes-docs" &&
+        promotedResourceRecord.className === "resource" &&
+        promotedResourceRecord.status === "active" &&
+        promotedResourceRecord.stage === "processed" &&
+        promotedResourceRecord.privacy === "private" &&
+        promotedResourceRecord.knowledgeShape === "reference",
+      `Media → Resources handoff did not persist the expected owner-native adapter shape: ${JSON.stringify(promotedResourceRecord)}`
+    );
+    assert(
+      JSON.stringify(handoffMediaAfter) === JSON.stringify(handoffMediaBefore),
+      "Media → Resources handoff changed the Media-owned source record"
+    );
+    assert(
+      recordsAfterMediaResourceHandoff.payload.items.filter(
+        (item) => item.className === "file"
+      ).length === handoffMediaCountBefore,
+      "Media → Resources handoff created or removed a Media record"
+    );
+    assert(
+      recordsAfterMediaResourceHandoff.payload.items.filter(
+        (item) => item.className === "resource"
+      ).length === handoffResourceCountBefore + 1,
+      "Media → Resources handoff did not add exactly one Resource"
+    );
+    assert(
+      recordsAfterMediaResourceHandoff.payload.items.filter(
+        (item) =>
+          item.className === "resource" &&
+          (item.url || "") === mediaResourceHandoffUrl
+      ).length === 1,
+      "Media → Resources handoff produced duplicate exact-URL Resource identity"
+    );
+
+    const promotedMediaLinks = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/media/${createdMediaResourceHandoff.id}?tab=links`
+    );
+    assert(
+      promotedMediaLinks.response.ok &&
+        promotedMediaLinks.body.includes(promotedMediaResource.resourceRoute) &&
+        promotedMediaLinks.body.includes(
+          "relationship not persisted"
+        ) &&
+        !promotedMediaLinks.body.includes(">Create Resource<"),
+      "Media Links did not expose the persisted Resource owner while retaining the pending-link boundary"
+    );
+    const promotedResourceDetail = await requestText(
+      server.baseUrl,
+      cookieJar,
+      promotedMediaResource.resourceRoute
+    );
+    assert(
+      promotedResourceDetail.response.ok &&
+        promotedResourceDetail.body.includes(
+          promotedMediaResource.resourceTitle
+        ) &&
+        promotedResourceDetail.body.includes(mediaResourceHandoffUrl),
+      "Media-created Resource did not render through its canonical owner route"
+    );
+    pass("Media source candidates create exactly one Resources-owned record with failed-write recovery, responsive sheets, durable reload, and no Media or native-link mutation");
 
     await checkResourceCreateEditBrowserState(
       server.baseUrl,

@@ -14,6 +14,12 @@ type ResourceEditorSheetProps = {
   open: boolean;
   resource: ResourceRecord | null;
   resources: readonly ResourceRecord[];
+  initialDraft?: Partial<ResourceEditorForm>;
+  handoff?: {
+    sourceModule: "Media";
+    sourceId: string;
+    sourceLabel: string;
+  };
   onClose: () => void;
   onSaved: (resource: ResourceRecord, mode: "create" | "edit") => void;
 };
@@ -39,8 +45,16 @@ const FOCUSABLE_SELECTOR = [
   "[tabindex]:not([tabindex='-1'])"
 ].join(",");
 
-function formForResource(resource: ResourceRecord | null): ResourceEditorForm {
-  if (!resource) return EMPTY_FORM;
+function formForResource(
+  resource: ResourceRecord | null,
+  initialDraft?: Partial<ResourceEditorForm>
+): ResourceEditorForm {
+  if (!resource) {
+    return {
+      ...EMPTY_FORM,
+      ...initialDraft
+    };
+  }
   return {
     title: resource.title,
     url: resource.provenance.rawUrl || resource.source.canonicalUrl || "",
@@ -73,6 +87,8 @@ export default function ResourceEditorSheet({
   open,
   resource,
   resources,
+  initialDraft,
+  handoff,
   onClose,
   onSaved
 }: ResourceEditorSheetProps) {
@@ -84,14 +100,18 @@ export default function ResourceEditorSheet({
   const dirtyRef = useRef(false);
   const discardOpenRef = useRef(false);
   const onCloseRef = useRef(onClose);
-  const [form, setForm] = useState<ResourceEditorForm>(() => formForResource(resource));
-  const [baseline, setBaseline] = useState<ResourceEditorForm>(() => formForResource(resource));
+  const [form, setForm] = useState<ResourceEditorForm>(() =>
+    formForResource(resource, initialDraft)
+  );
+  const [baseline, setBaseline] = useState<ResourceEditorForm>(() =>
+    resource ? formForResource(resource) : EMPTY_FORM
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [discardOpen, setDiscardOpen] = useState(false);
   const mode = resource ? "edit" : "create";
   const dirty = !formsEqual(form, baseline);
-  const urlEditable = !resource || Boolean(resource.source.canonicalUrl);
+  const urlEditable = !handoff && (!resource || Boolean(resource.source.canonicalUrl));
   busyRef.current = busy;
   dirtyRef.current = dirty;
   discardOpenRef.current = discardOpen;
@@ -172,8 +192,9 @@ export default function ResourceEditorSheet({
 
   const titleValid = Boolean(form.title.trim());
   const urlValid =
-    !urlEditable ||
-    (Boolean(form.url.trim()) && sourceEvidence.state === "syntax_accepted");
+    resource && !urlEditable
+      ? true
+      : Boolean(form.url.trim()) && sourceEvidence.state === "syntax_accepted";
   const canSave = dirty && titleValid && urlValid && exactMatches.length === 0 && !busy;
 
   function updateField(field: keyof ResourceEditorForm, value: string) {
@@ -247,13 +268,23 @@ export default function ResourceEditorSheet({
             <header className={styles.header}>
               <div>
                 <span className={styles.eyebrow}>
-                  {mode === "create" ? "New external source" : "Edit Resource"}
+                  {handoff
+                    ? "Media → Resources handoff"
+                    : mode === "create"
+                      ? "New external source"
+                      : "Edit Resource"}
                 </span>
                 <h2 id={titleId}>
-                  {mode === "create" ? "Add Resource" : resource?.title}
+                  {handoff
+                    ? "Create Resource from Media"
+                    : mode === "create"
+                      ? "Add Resource"
+                      : resource?.title}
                 </h2>
                 <p id={descriptionId}>
-                  Save a source identity and compact context through the current audited adapter.
+                  {handoff
+                    ? "Create one Resources-owned external source while the Media asset and its pending relationship remain unchanged."
+                    : "Save a source identity and compact context through the current audited adapter."}
                 </p>
               </div>
               <button
@@ -289,7 +320,7 @@ export default function ResourceEditorSheet({
                   <input
                     data-autofocus="true"
                     autoFocus
-                    type={urlEditable ? "url" : "text"}
+                    type={urlEditable || handoff ? "url" : "text"}
                     inputMode="url"
                     autoComplete="url"
                     value={form.url}
@@ -315,7 +346,9 @@ export default function ResourceEditorSheet({
                     }
                   >
                     {!urlEditable
-                      ? "The adapter cannot safely expose this stored value. Title and context can still be edited without replacing or deleting it."
+                      ? handoff
+                        ? "This accepted Media candidate is fixed for the handoff so the new Resource keeps the exact source identity."
+                        : "The adapter cannot safely expose this stored value. Title and context can still be edited without replacing or deleting it."
                       : form.url.trim()
                       ? sourceStateMessage(sourceEvidence.state)
                       : "A complete HTTP or HTTPS URL is required."}
@@ -375,6 +408,38 @@ export default function ResourceEditorSheet({
                 </label>
               </section>
 
+              {handoff && (
+                <section className={styles.section} aria-label="Media handoff boundary">
+                  <div className={styles.sectionHeading}>
+                    <div>
+                      <h3>Origin and ownership</h3>
+                      <p>
+                        The external source becomes a Resource; the file record remains Media-owned.
+                      </p>
+                    </div>
+                    <span className={styles.required}>Explicit handoff</span>
+                  </div>
+                  <div className={styles.boundaryRows}>
+                    <div>
+                      <span>Source module</span>
+                      <strong>{handoff.sourceModule}</strong>
+                    </div>
+                    <div>
+                      <span>Media asset</span>
+                      <strong>{handoff.sourceLabel}</strong>
+                    </div>
+                    <div>
+                      <span>Media ID</span>
+                      <strong>{handoff.sourceId}</strong>
+                    </div>
+                    <div>
+                      <span>Relationship after create</span>
+                      <strong>Exact URL candidate · native link pending</strong>
+                    </div>
+                  </div>
+                </section>
+              )}
+
               {resource && urlEditable && form.url.trim() !== baseline.url.trim() && (
                 <section className={styles.diff} aria-label="Source identity change preview">
                   <span>Identity-sensitive change</span>
@@ -422,8 +487,9 @@ export default function ResourceEditorSheet({
                 </p>
                 <strong>Still intentionally unavailable</strong>
                 <p>
-                  Metadata fetch, fetched source title, owner selection, native ResourceLinks,
-                  URL health, snapshots, citations, extraction, lifecycle changes, and review state.
+                  {handoff
+                    ? "The Media record is not modified. Source confirmation, native Media↔Resource linking, binary identity, rights, readiness, review completion, and background fetching remain unavailable."
+                    : "Metadata fetch, fetched source title, owner selection, native ResourceLinks, URL health, snapshots, citations, extraction, lifecycle changes, and review state."}
                 </p>
               </section>
 
