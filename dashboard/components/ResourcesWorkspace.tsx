@@ -18,6 +18,7 @@ import SystemState from "./operational/SystemState";
 import ResourceEditorSheet from "./resources/ResourceEditorSheet";
 import ResourceNotePromotionSheet from "./resources/ResourceNotePromotionSheet";
 import ResourcePropertiesView from "./resources/ResourcePropertiesView";
+import ResourceReviewScheduleEditorSheet from "./resources/ResourceReviewScheduleEditorSheet";
 import {
   contentTargetGroupsForObject,
   unresolvedReferencesForObject,
@@ -37,6 +38,7 @@ import {
 } from "../lib/modules/resources/linked-context-evidence";
 import { buildResourceReviewEvidence } from "../lib/modules/resources/review-evidence";
 import { buildResourceReviewQueue } from "../lib/modules/resources/review-queue";
+import { formatResourceReviewCadence } from "../lib/modules/resources/review-schedule";
 import { buildResourceSourceEvidenceReport } from "../lib/modules/resources/source-evidence";
 import {
   parseResourcesUrlState,
@@ -288,6 +290,11 @@ export default function ResourcesWorkspace({
   const [aiOpen, setAiOpen] = useState(firstUrlState.ai);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [notePromotionMode, setNotePromotionMode] = useState<"create" | "existing" | null>(null);
+  const [reviewScheduleOpen, setReviewScheduleOpen] = useState(false);
+  const [reviewScheduleFeedback, setReviewScheduleFeedback] = useState<{
+    resourceId: string;
+    message: string;
+  } | null>(null);
   const [copyFeedback, setCopyFeedback] = useState<{
     resourceId: string;
     evidenceId: string;
@@ -599,7 +606,7 @@ export default function ResourcesWorkspace({
       className={styles.sidebar}
       footer={
         <p className={styles.sidebarFootnote}>
-          Legacy Personal Records adapter · title, URL, and context writes are audited · linked-context views are exact owner-reference evidence, not ResourceLinks · source health remains disconnected
+          Legacy Personal Records adapter · title, URL, context, and review-timing writes use the protected audit path · linked-context views are exact owner-reference evidence, not ResourceLinks · source health remains disconnected
         </p>
       }
     />
@@ -619,6 +626,15 @@ export default function ResourcesWorkspace({
     setMobileSidebarOpen(false);
     setInspectorOpen(false);
     setNotePromotionMode(mode);
+    updateUrl({ ai: false });
+  }
+
+  function openReviewSchedule() {
+    if (!selectedResource) return;
+    setAiOpen(false);
+    setMobileSidebarOpen(false);
+    setReviewScheduleFeedback(null);
+    setReviewScheduleOpen(true);
     updateUrl({ ai: false });
   }
 
@@ -658,6 +674,21 @@ export default function ResourcesWorkspace({
       }
     }
 
+    router.refresh();
+  }
+
+  function handleReviewTimingSaved(saved: ResourceRecord) {
+    setResources((current) =>
+      current.map((resource) => (resource.id === saved.id ? saved : resource))
+    );
+    setSelectedId(saved.id);
+    setReviewScheduleOpen(false);
+    setReviewScheduleFeedback({
+      resourceId: saved.id,
+      message: saved.review.nextReviewAt
+        ? "Resource review timing saved. Review completion and evidence state are unchanged."
+        : "Resource review timing removed. Review completion and evidence state are unchanged."
+    });
     router.refresh();
   }
 
@@ -786,6 +817,8 @@ export default function ResourcesWorkspace({
                 items={[
                   { id: "contracts", label: "Review contracts", value: reviewEvidence.checks.length },
                   { id: "supported", label: "Evidence available", value: reviewEvidence.supportedCount, tone: reviewEvidence.supportedCount ? "positive" : "attention" },
+                  { id: "next-review", label: "Next review", value: formatDate(selectedResource.review.nextReviewAt, "Not scheduled"), tone: selectedResource.review.nextReviewAt ? "default" : "attention" },
+                  { id: "cadence", label: "Cadence", value: selectedResource.review.nextReviewAt ? formatResourceReviewCadence(selectedResource.provenance.time.reviewCadence) : "Not scheduled" },
                   { id: "url", label: "URL candidates", value: selectedResource.source.candidates.length },
                   { id: "targets", label: "Owner targets", value: reviewEvidence.ownerTargetCount },
                   { id: "notes", label: "Exact Note matches", value: reviewEvidence.noteSourceMatches },
@@ -795,9 +828,9 @@ export default function ResourcesWorkspace({
                 ]}
               />
               <div className={styles.readOnlyNotice}>
-                <strong>Resource-local evidence review · not a Reviews run</strong>
+                <strong>Resource-local evidence review · legacy timing only · not a Reviews run</strong>
                 <span>
-                  This cockpit exposes what the legacy adapter can and cannot prove. It does not create a Resource review record, a Reviews-owned ReviewRun, a health result, citation, extraction, snapshot, or audit event.
+                  This cockpit exposes what the legacy adapter can and cannot prove. Review timing can be saved through the existing protected record path; it does not create a Resource review record, a Reviews-owned ReviewRun, a health result, citation, extraction, snapshot, or review event.
                 </span>
               </div>
             </section>
@@ -862,6 +895,31 @@ export default function ResourcesWorkspace({
 
             <section className={styles.panel}>
               <div className={styles.panelHeader}>
+                <h2>Review timing</h2>
+                <span className={styles.stateChip} data-tone={selectedResource.review.nextReviewAt ? "blue" : "amber"}>
+                  {selectedResource.review.nextReviewAt ? "Scheduled" : "Not scheduled"}
+                </span>
+              </div>
+              <div className={styles.factGrid}>
+                <div className={styles.fact}><span>Next review</span><strong>{formatDate(selectedResource.review.nextReviewAt, "Not scheduled")}</strong></div>
+                <div className={styles.fact}><span>Cadence</span><strong>{selectedResource.review.nextReviewAt ? formatResourceReviewCadence(selectedResource.provenance.time.reviewCadence) : "Not scheduled"}</strong></div>
+                <div className={styles.fact}><span>Review state</span><strong>Not connected</strong></div>
+                <div className={styles.fact}><span>Reviewer</span><strong>Not stored</strong></div>
+              </div>
+              <p>Timing plans a return to this source. It does not satisfy or waive any review contract.</p>
+              <button type="button" className={styles.button} onClick={openReviewSchedule}>
+                {selectedResource.review.nextReviewAt ? "Edit review timing" : "Schedule review"}
+              </button>
+              {reviewScheduleFeedback?.resourceId === selectedResource.id && (
+                <div className={styles.readOnlyNotice} role="status">
+                  <strong>Timing updated</strong>
+                  <span>{reviewScheduleFeedback.message}</span>
+                </div>
+              )}
+            </section>
+
+            <section className={styles.panel}>
+              <div className={styles.panelHeader}>
                 <h2>Freshness and trust evidence</h2>
                 <span className={styles.stateChip} data-tone="amber">Unverified</span>
               </div>
@@ -897,13 +955,13 @@ export default function ResourcesWorkspace({
                 ]}
               />
               <QuickActionBar
-                ariaLabel="Unavailable Resource review mutations"
+                ariaLabel="Resource review actions"
                 actions={[
                   { id: "mark-reviewed", label: "Mark reviewed", intent: "primary", disabled: true, disabledReason: "Native Resource review checks, reviewer identity, timestamps, acknowledgement, outcome, and audit persistence are not connected." },
                   { id: "check-url", label: "Check URL", disabled: true, disabledReason: "No URL-health job or result persistence is connected." },
                   { id: "update-citations", label: "Update citations", disabled: true, disabledReason: "Persisted citations and per-Note diff confirmation are not connected." },
                   { id: "attach-snapshot", label: "Attach snapshot", disabled: true, disabledReason: "No approved Media snapshot write path or native link persistence exists." },
-                  { id: "set-cadence", label: "Set cadence", disabled: true, disabledReason: "Resource review policy persistence and reviewer assignment are not connected." },
+                  { id: "set-cadence", label: selectedResource.review.nextReviewAt ? "Edit timing" : "Set cadence", onSelect: openReviewSchedule },
                   { id: "archive", label: "Archive", intent: "destructive", disabled: true, disabledReason: "Archive consequences, retention, restore, and audit semantics remain unresolved." }
                 ]}
               />
@@ -1561,6 +1619,7 @@ export default function ResourcesWorkspace({
               actions={[
                 { id: "link", label: "Link to object", disabled: true, disabledReason: "Native ObjectLink persistence is not connected." },
                 { id: "review", label: "Mark reviewed", disabled: true, disabledReason: "The Resource review workflow is not connected." },
+                { id: "schedule", label: selectedResource.review.nextReviewAt ? "Edit review timing" : "Schedule review", onSelect: openReviewSchedule },
                 {
                   id: "promote",
                   label: "Create Note draft",
@@ -1578,8 +1637,9 @@ export default function ResourcesWorkspace({
           <section className={styles.panel}>
             <h2>Review state</h2>
             <div className={styles.factGrid}>
-              <div className={styles.fact}><span>State</span><strong>{displayLabel(selectedResource.review.state)}</strong></div>
-              <div className={styles.fact}><span>Cadence</span><strong>{displayLabel(selectedResource.review.cadence)}</strong></div>
+              <div className={styles.fact}><span>State</span><strong>{selectedResource.review.state === "unknown" ? "Not connected" : displayLabel(selectedResource.review.state)}</strong></div>
+              <div className={styles.fact}><span>Next review</span><strong>{formatDate(selectedResource.review.nextReviewAt, "Not scheduled")}</strong></div>
+              <div className={styles.fact}><span>Cadence</span><strong>{selectedResource.review.nextReviewAt ? formatResourceReviewCadence(selectedResource.provenance.time.reviewCadence) : "Not scheduled"}</strong></div>
               <div className={styles.fact}><span>Usefulness</span><strong>{displayLabel(selectedResource.review.usefulness)}</strong></div>
               <div className={styles.fact}><span>Last reviewed</span><strong>{formatDate(selectedResource.review.lastReviewedAt)}</strong></div>
               <div className={styles.fact}><span>Pinned</span><strong>Not stored</strong></div>
@@ -1648,7 +1708,7 @@ export default function ResourcesWorkspace({
       module="resources"
       sidebar={sidebar}
       inspector={inspector}
-      aiDock={editorMode || notePromotionMode || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? undefined : aiDock}
+      aiDock={editorMode || notePromotionMode || reviewScheduleOpen || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? undefined : aiDock}
       mode={initialMode === "detail" ? "detail" : "directory"}
       ariaLabel="Resources directory"
       className={`${styles.shell} ${initialMode === "detail" ? styles.detailShell : ""}`}
@@ -1671,6 +1731,15 @@ export default function ResourcesWorkspace({
           initialMode={notePromotionMode}
           onClose={() => setNotePromotionMode(null)}
           onSaved={() => router.refresh()}
+        />
+      )}
+      {reviewScheduleOpen && selectedResource && (
+        <ResourceReviewScheduleEditorSheet
+          key={`review-schedule:${selectedResource.id}`}
+          open
+          resource={selectedResource}
+          onClose={() => setReviewScheduleOpen(false)}
+          onSaved={handleReviewTimingSaved}
         />
       )}
       <button
@@ -1980,8 +2049,18 @@ export default function ResourcesWorkspace({
                         </>
                       ) : (
                         <>
-                          <strong>{displayLabel(resource.review.state)}</strong>
-                          <span>{resource.source.canonicalUrl ? "URL unverified" : "URL missing"}</span>
+                          <strong>
+                            {resource.review.nextReviewAt
+                              ? `Review ${formatDate(resource.review.nextReviewAt)}`
+                              : displayLabel(resource.review.state)}
+                          </strong>
+                          <span>
+                            {resource.review.nextReviewAt
+                              ? formatResourceReviewCadence(resource.provenance.time.reviewCadence)
+                              : resource.source.canonicalUrl
+                                ? "URL unverified"
+                                : "URL missing"}
+                          </span>
                         </>
                       )
                     }

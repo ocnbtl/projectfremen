@@ -1603,6 +1603,430 @@ async function checkResourcesReviewAndPropertiesBrowserState(
   }
 }
 
+async function checkResourceReviewScheduleBrowserState(
+  baseUrl,
+  cookieJar,
+  resourceId,
+  resourceTitle
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  let plannedFailureStatusExpected = false;
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "resources-review-timing-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (
+        message.type() === "error" &&
+        !message.text().startsWith("Failed to load resource:")
+      ) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const failure = request.failure()?.errorText || "";
+      if (!failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (
+        response.status() === 503 &&
+        plannedFailureStatusExpected &&
+        url.pathname === "/api/personal/records"
+      ) {
+        plannedFailureStatusExpected = false;
+        return;
+      }
+      if (
+        response.status() >= 400 &&
+        url.pathname !== "/_vercel/insights/script.js"
+      ) {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(
+      !diagnostics.overflowX,
+      `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`
+    );
+  }
+
+  async function openResourceInspectorIfNeeded(page) {
+    const details = page.getByRole("button", { name: "Open Resource details" });
+    if ((await details.count()) && (await details.isVisible())) {
+      const inspector = page.locator("#resource-inspector");
+      if ((await inspector.getAttribute("data-overlay-open")) !== "true") {
+        let opened = false;
+        for (let attempt = 0; attempt < 2 && !opened; attempt += 1) {
+          await details.click();
+          try {
+            await page.waitForFunction(
+              () =>
+                document
+                  .querySelector("#resource-inspector")
+                  ?.getAttribute("data-overlay-open") === "true",
+              undefined,
+              { timeout: 5000 }
+            );
+            opened = true;
+          } catch {
+            // Retry once if a just-finished route hydration consumes the click.
+          }
+        }
+        assert(opened, "Resource review timing could not open the responsive inspector");
+      }
+      await inspector.waitFor({ state: "visible" });
+    }
+  }
+
+  async function openEditorFromDetail(page) {
+    await page.goto(`${baseUrl}/admin/resources/${resourceId}?tab=review`, {
+      waitUntil: "domcontentloaded"
+    });
+    await page.waitForLoadState("networkidle");
+    await openResourceInspectorIfNeeded(page);
+    await page.getByRole("heading", { name: "Review timing" }).waitFor();
+    const timingTrigger = page
+      .getByRole("button", {
+        name: /Schedule review|Edit review timing|Set cadence/
+      })
+      .first();
+    await timingTrigger.evaluate((element) => {
+      element.scrollIntoView({ block: "center", inline: "nearest" });
+    });
+    await page.waitForTimeout(150);
+    await timingTrigger.click();
+    const dialog = page
+      .locator("[data-resource-review-schedule-editor]")
+      .getByRole("dialog");
+    await dialog.waitFor();
+    assert(
+      await dialog
+        .getByRole("heading", { name: `Schedule review · ${resourceTitle}` })
+        .count() === 1,
+      "Resource review timing sheet did not expose the selected Resource identity"
+    );
+    assert(
+      await page.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Resources AI dock remained exposed beneath the review timing sheet"
+    );
+    return dialog;
+  }
+
+  async function waitForEnabledSave(page) {
+    await page.waitForFunction(() => {
+      const editor = document.querySelector(
+        "[data-resource-review-schedule-editor]"
+      );
+      const save = Array.from(editor?.querySelectorAll("button") || []).find(
+        (button) => button.textContent?.trim() === "Save timing"
+      );
+      return save instanceof HTMLButtonElement && !save.disabled;
+    });
+  }
+
+  const finalNextReview = "2099-11-17";
+  const finalCadence = "P3M";
+
+  try {
+    const desktopContext = await authenticatedContext({
+      width: 1440,
+      height: 900
+    });
+    const desktop = await desktopContext.newPage();
+    observe(desktop);
+    const editDialog = await openEditorFromDetail(desktop);
+    await editDialog.getByLabel("Next review date").fill(finalNextReview);
+    await editDialog.getByLabel("Cadence").selectOption("quarterly");
+    await waitForEnabledSave(desktop);
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "resource-review-timing-1440x900.png")
+    });
+    await assertNoDocumentOverflow(
+      desktop,
+      "Resource review timing editor desktop"
+    );
+
+    let plannedFailure = true;
+    plannedFailureStatusExpected = true;
+    await desktop.route("**/api/personal/records", async (route) => {
+      if (route.request().method() === "PATCH" && plannedFailure) {
+        plannedFailure = false;
+        await route.fulfill({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ok: false,
+            error: "Regression Resource timing failure"
+          })
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await editDialog.getByRole("button", { name: "Save timing" }).click();
+    await editDialog
+      .getByText("Resource review timing was not saved", { exact: true })
+      .waitFor();
+    assert(
+      await editDialog.getByLabel("Next review date").inputValue() ===
+        finalNextReview &&
+        await editDialog.getByLabel("Cadence").inputValue() === "quarterly",
+      "Failed Resource review timing write did not preserve the date and cadence draft"
+    );
+    await desktop.unroute("**/api/personal/records");
+    await desktop.screenshot({
+      path: path.join(
+        screenshotDir,
+        "resource-review-timing-failed-write-1440x900.png"
+      )
+    });
+
+    await editDialog.getByRole("button", { name: "Save timing" }).click();
+    await editDialog.waitFor({ state: "detached" });
+    await desktop
+      .getByText(
+        "Resource review timing saved. Review completion and evidence state are unchanged.",
+        { exact: true }
+      )
+      .waitFor();
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    await desktop.getByText("Quarterly", { exact: true }).first().waitFor();
+
+    await desktop.goto(
+      `${baseUrl}/admin/resources?view=all&selected=${encodeURIComponent(resourceId)}&tab=review`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { name: "Review timing" }).waitFor();
+    await desktop
+      .getByRole("button", { name: "Edit review timing" })
+      .first()
+      .click();
+    const inspectorDialog = desktop
+      .locator("[data-resource-review-schedule-editor]")
+      .getByRole("dialog");
+    await inspectorDialog.waitFor();
+    assert(
+      await inspectorDialog.getByLabel("Next review date").inputValue() ===
+        finalNextReview &&
+        await inspectorDialog.getByLabel("Cadence").inputValue() ===
+          "quarterly",
+      "Resources directory Review inspector did not open the persisted timing"
+    );
+    await inspectorDialog.getByLabel("Next review date").fill("2099-12-01");
+    await inspectorDialog.getByRole("button", { name: "Cancel" }).click();
+    const discardDialog = desktop.getByRole("dialog", {
+      name: "Discard unsaved Resource review timing?"
+    });
+    await discardDialog.waitFor();
+    await discardDialog.getByRole("button", { name: "Keep editing" }).click();
+    assert(
+      await inspectorDialog.getByLabel("Next review date").inputValue() ===
+        "2099-12-01",
+      "Keeping Resource review timing edits did not preserve the draft"
+    );
+    await inspectorDialog.getByRole("button", { name: "Cancel" }).click();
+    await discardDialog
+      .getByRole("button", { name: "Discard changes" })
+      .click();
+    await inspectorDialog.waitFor({ state: "detached" });
+
+    await desktop
+      .getByRole("button", { name: "Edit review timing" })
+      .first()
+      .click();
+    const clearDialog = desktop
+      .locator("[data-resource-review-schedule-editor]")
+      .getByRole("dialog");
+    await clearDialog
+      .getByRole("button", { name: "Remove stored schedule" })
+      .click();
+    const clearConfirmation = desktop.getByRole("dialog", {
+      name: /Remove this Resource’s review schedule/
+    });
+    await clearConfirmation.waitFor();
+    await clearConfirmation
+      .getByRole("button", { name: "Keep schedule" })
+      .click();
+    assert(
+      await clearDialog.getByLabel("Next review date").inputValue() ===
+        finalNextReview,
+      "Canceling Resource schedule removal changed the persisted timing draft"
+    );
+    await clearDialog
+      .getByRole("button", { name: "Remove stored schedule" })
+      .click();
+    await clearConfirmation
+      .getByRole("button", { name: "Remove schedule" })
+      .click();
+    await clearDialog.waitFor({ state: "detached" });
+    await desktop
+      .getByRole("button", { name: "Schedule review" })
+      .first()
+      .click();
+    const restoredDialog = desktop
+      .locator("[data-resource-review-schedule-editor]")
+      .getByRole("dialog");
+    assert(
+      await restoredDialog.getByLabel("Next review date").inputValue() === "" &&
+        await restoredDialog.getByLabel("Cadence").inputValue() === "manual",
+      "Removing the Resource review schedule did not clear both timing fields"
+    );
+    await restoredDialog.getByLabel("Next review date").fill(finalNextReview);
+    await restoredDialog.getByLabel("Cadence").selectOption("quarterly");
+    await restoredDialog.getByRole("button", { name: "Save timing" }).click();
+    await restoredDialog.waitFor({ state: "detached" });
+    await desktopContext.close();
+
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const page = await context.newPage();
+      observe(page);
+      const editor = await openEditorFromDetail(page);
+      await editor.getByLabel("Next review date").fill("2099-12-01");
+      await editor.getByLabel("Cadence").selectOption("weekly");
+      await waitForEnabledSave(page);
+      await page.screenshot({
+        path: path.join(
+          screenshotDir,
+          `resource-review-timing-${viewport.label}.png`
+        )
+      });
+      await assertNoDocumentOverflow(
+        page,
+        `Resource review timing editor ${viewport.label}`
+      );
+      if (viewport.width === 390) {
+        const undersizedTargets = await editor
+          .locator(
+            "button:visible, input:visible, select:visible, a[href]:visible"
+          )
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label:
+                    element.getAttribute("aria-label") ||
+                    element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((item) => item.width < 43.99 || item.height < 43.99)
+          );
+        assert(
+          undersizedTargets.length === 0,
+          `Resource review timing mobile targets below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+        await page.keyboard.press("Shift+Tab");
+        assert(
+          await page.evaluate(() =>
+            Boolean(
+              document
+                .querySelector("[data-resource-review-schedule-editor]")
+                ?.contains(document.activeElement)
+            )
+          ),
+          "Resource review timing mobile focus escaped the modal sheet"
+        );
+      }
+      await editor.getByRole("button", { name: "Cancel" }).click();
+      await page
+        .getByRole("dialog", {
+          name: "Discard unsaved Resource review timing?"
+        })
+        .getByRole("button", { name: "Discard changes" })
+        .click();
+      await context.close();
+    }
+
+    assert(
+      mutatingRequests.filter(
+        (request) => request === "PATCH /api/personal/records"
+      ).length === 4,
+      `Resource review timing did not emit one failed save, two successful saves, and one clear PATCH: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      mutatingRequests.filter(
+        (request) => request === "POST /api/personal/records"
+      ).length === 0,
+      `Resource review timing created a duplicate Personal Record: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Resource review timing browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Resource review timing browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+  } finally {
+    await browser.close();
+  }
+
+  return {
+    nextReview: finalNextReview,
+    reviewCadence: finalCadence
+  };
+}
+
 async function checkResourceCreateEditBrowserState(
   baseUrl,
   cookieJar,
@@ -7602,7 +8026,9 @@ async function main() {
     );
     for (const expected of [
       "Nine review contracts",
-      "Resource-local evidence review · not a Reviews run",
+      "Resource-local evidence review · legacy timing only · not a Reviews run",
+      "Review timing",
+      "Schedule review",
       "URL reachable",
       "Source identity confirmed",
       "Citation metadata complete",
@@ -8337,6 +8763,102 @@ async function main() {
       testRunId
     );
     pass("Resources creates authored Note drafts and attaches exact source evidence to existing Notes with persistence, protected-field isolation, failure recovery, duplicate prevention, and responsive sheets");
+
+    const recordsBeforeResourceReviewSchedule = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/records"
+    );
+    assert(
+      recordsBeforeResourceReviewSchedule.response.ok &&
+        recordsBeforeResourceReviewSchedule.payload?.ok,
+      `Unable to capture Resource source record before review scheduling: ${JSON.stringify(recordsBeforeResourceReviewSchedule.payload)}`
+    );
+    const resourceSourceBeforeReviewSchedule =
+      recordsBeforeResourceReviewSchedule.payload.items.find(
+        (item) => item.id === createdResource.id
+      );
+    const resourceRecordCountBeforeReviewSchedule =
+      recordsBeforeResourceReviewSchedule.payload.items.filter(
+        (item) => item.className === "resource"
+      ).length;
+    assert(
+      resourceSourceBeforeReviewSchedule,
+      "Resource source record was missing before review scheduling"
+    );
+    const scheduledResourceReview = await checkResourceReviewScheduleBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdResource.id,
+      resourceSourceBeforeReviewSchedule.title
+    );
+    const recordsAfterResourceReviewSchedule = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/records"
+    );
+    assert(
+      recordsAfterResourceReviewSchedule.response.ok &&
+        recordsAfterResourceReviewSchedule.payload?.ok,
+      `Unable to reload Resource source record after review scheduling: ${JSON.stringify(recordsAfterResourceReviewSchedule.payload)}`
+    );
+    const resourceSourceAfterReviewSchedule =
+      recordsAfterResourceReviewSchedule.payload.items.find(
+        (item) => item.id === createdResource.id
+      );
+    assert(
+      resourceSourceAfterReviewSchedule?.time?.nextReview ===
+        scheduledResourceReview.nextReview &&
+        resourceSourceAfterReviewSchedule?.time?.reviewCadence ===
+          scheduledResourceReview.reviewCadence,
+      "Resource review timing did not persist the final date and cadence"
+    );
+    for (const field of [
+      "id",
+      "domain",
+      "className",
+      "status",
+      "title",
+      "body",
+      "url",
+      "areas",
+      "subjects",
+      "projects",
+      "externalSources",
+      "relations",
+      "privacy",
+      "createdAt"
+    ]) {
+      assert(
+        JSON.stringify(resourceSourceAfterReviewSchedule?.[field]) ===
+          JSON.stringify(resourceSourceBeforeReviewSchedule[field]),
+        `Resource review scheduling changed protected source field ${field}`
+      );
+    }
+    assert(
+      recordsAfterResourceReviewSchedule.payload.items.filter(
+        (item) => item.className === "resource"
+      ).length === resourceRecordCountBeforeReviewSchedule,
+      "Resource review scheduling created or removed a Resource-owned legacy record"
+    );
+    const scheduledResourceReviewRoute = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/resources/${createdResource.id}?tab=review`
+    );
+    for (const expected of [
+      "Scheduled",
+      "Quarterly",
+      "Edit review timing",
+      "Review state",
+      "Not connected"
+    ]) {
+      assert(
+        scheduledResourceReviewRoute.body.includes(expected),
+        `Persisted Resource review timing did not refresh the Review surface: ${expected}`
+      );
+    }
+    pass("Resources review date and cadence persist through the protected adapter with removal confirmation, failed-write recovery, responsive sheets, and protected-field isolation");
 
     logStep("Checking Current Goals persistence and sync");
     const goalMarker = `${testRunId}-goal`;

@@ -119,9 +119,11 @@ export function legacyPersonalRecordToResource(record: LegacyResourceRecord): Re
       freshness: "unknown",
       confidence: "unknown",
       // The legacy normalizer may synthesize review dates from createdAt, so
-      // they remain provenance-only until an explicit review record exists.
+      // last review remains provenance-only until an explicit review record
+      // exists. nextReview is exposed strictly as legacy-backed queue timing;
+      // it never establishes review completion.
       lastReviewedAt: null,
-      nextReviewAt: null
+      nextReviewAt: record.time.nextReview || null
     },
     citationCount: null,
     linkedObjectCount: null,
@@ -189,9 +191,16 @@ export function resourceCreateInputToLegacy(input: ResourceCreateInput): Persona
 }
 
 export function resourceUpdateInputToLegacy(input: ResourceUpdateInput): PersonalRecordPatch {
+  const hasTimeUpdate = input.reviewCadence !== undefined || input.nextReviewAt !== undefined;
   return {
     title: input.title?.trim(),
     body: input.body?.trim(),
-    url: input.url?.trim()
+    url: input.url?.trim(),
+    time: hasTimeUpdate
+      ? {
+          reviewCadence: input.reviewCadence,
+          nextReview: input.nextReviewAt
+        }
+      : undefined
   };
 }
