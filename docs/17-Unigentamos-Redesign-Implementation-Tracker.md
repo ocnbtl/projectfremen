@@ -1,12 +1,12 @@
 # Unigentamos redesign implementation tracker
 
-Current checkpoint baseline: fetched GitHub `main` at `1bd9dbf4d8d3e0d29a7ec6c5be6c1109dc69e972`.
+Current checkpoint baseline: fetched GitHub `main` at `c54517371d6c898687e3e81d1ec4133889464bad`.
 
 This is an implementation ledger, not a completeness claim. “Verified” means the route passed the isolated authenticated regression, production build, and its implemented responsive checks at the current checkpoint. “Bounded” means the route is usable for the stated read or preview workflow while its visible unavailable controls remain disabled with an explanation. Mockup values are never treated as live data.
 
 | Target route | Source mockup / handoff | Canonical owner | Read path | Connected mutations | Migration / boundary | Desktop | Mobile | Accessibility / tests | Status |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `/admin/people` | People final visual reference | People | Personal Records person adapter | Create and edit | Stable legacy ID; no duplicate person object | Verified | Verified route stack | Keyboard, focus, reload, URL state | Verified functional adapter |
+| `/admin/people` | People final visual reference | People | Personal Records person adapter | Create/edit; explicit Personal Ops follow-up handoff | People keeps cadence; source-aware guard prevents accidental parallel active follow-ups | Verified | Verified route stack | Keyboard, focus, reload, URL state, duplicate handoff | Verified functional adapter |
 | `/admin/people/new` | People Add Person | People | Person adapter defaults | Explicit create | Current protected API | Verified | Verified | Required fields and error retention | Verified functional adapter |
 | `/admin/people/[personId]` | People profile | People | Person adapter | Edit entry point | Compact memories remain People-owned | Verified | Verified | Direct route and refresh | Verified functional adapter |
 | `/admin/people/[personId]/edit` | People edit profile | People | Person adapter | Explicit save | Existing audit and CSRF path | Verified | Verified | Dirty-state protection | Verified functional adapter |
@@ -28,7 +28,7 @@ This is an implementation ledger, not a completeness claim. “Verified” means
 | `/admin/personal/goals` | Personal Ops Goals | Personal Ops | Native Goals | Create and update | No silent formula | Verified | Verified shell | Concurrency and reload | Verified functional workflow |
 | `/admin/personal/decisions` | Personal Ops Decisions | Personal Ops | Native Decisions plus legacy mappings | Explicit conversion/update | Durable Decisions owned here | Verified | Verified shell | Idempotency and provenance | Verified functional workflow |
 | `/admin/personal/obligations` | Personal Ops Obligations | Personal Ops | Native Obligations | Create/update/complete | Completion requires evidence | Verified | Verified shell | Validation and audit | Verified functional workflow |
-| `/admin/personal/follow-ups` | Personal Ops Follow-ups | Personal Ops | Native Follow-ups | Create/update/complete | People retains cadence context | Verified | Verified shell | High-priority outcome gate | Verified functional workflow |
+| `/admin/personal/follow-ups` | Personal Ops Follow-ups | Personal Ops | Native Follow-ups | Create/update/complete; confirmed separate-source override | People retains cadence context; exact active source duplicates fail closed | Verified | Verified shell | Outcome gate, server conflict, audited override, 44 px targets | Verified functional workflow |
 | `/admin/personal/routines` | Personal Ops Routines | Personal Ops | Native Routines | CRUD, archive/restore, confirmed preview | Auto-create risk remains confirmation-gated | Verified | Verified shell | Idempotency and fail-closed tests | Verified functional workflow |
 | `/admin/personal/inbox` | Personal Ops Capture Inbox | Personal Ops | Native Capture items | CRUD, split preview/confirm | Data-only navigation placement | Verified | Verified shell | Atomicity and provenance tests | Verified functional workflow |
 | `/admin/personal/templates` | Personal Ops Templates | Personal Ops | Native Templates | CRUD, activate/use/archive/restore | Data-only navigation placement | Verified | Verified shell | Pure tests and fingerprint idempotency | Verified functional workflow |
@@ -50,6 +50,9 @@ This is an implementation ledger, not a completeness claim. “Verified” means
 ## Current checkpoint boundaries
 
 - Authentication, authorization, session, CSRF, Supabase/RLS/service-role behavior, permanent navigation, shared shell, Current Goals, and global AI behavior are unchanged.
+- People, Projects, Notes, and Reviews source handoffs now reuse one source-aware Personal Ops Follow-up guard. An existing active Follow-up is shown before creation, save stays disabled until a separate outcome is explicitly confirmed, and the protected store independently rejects unconfirmed duplicates under its mutation lock.
+- Intentional parallel Follow-ups keep independent IDs and state but share the exact native source reference. The transient confirmation is not stored as domain data; the resulting creation audit uses `follow_up.created_with_duplicate_source_confirmation`. Completed or archived work does not block the next cadence instance.
+- Date-only handoff values remain the exact selected calendar day instead of passing through UTC parsing. The browser gate asserts the retained date at desktop, tablet, and mobile sizes.
 - Notes review timing now supports an explicit next-review date plus one-time, weekly, monthly, quarterly, annual, or adapter-compatible custom cadence. The same sheet opens from the directory Review inspector, full Review tab, full Properties tab, and editor header; failed writes preserve the draft and schedule removal requires consequence confirmation.
 - Scheduling updates only `time.nextReview` and `time.reviewCadence` on the existing legacy Personal Record. The derived `scheduled` / `needs_review` state and queue count refresh from the saved date; no background scheduler, reviewer, blocker resolution, waiver, review completion, or Reviews-owned `ReviewRun` is created.
 - Notes now permits explicit editing of the three legacy routing arrays the protected adapter already round-trips: Areas, Subjects, and legacy project labels. The same audited PATCH is available from the full Properties tab and Missing Properties inspector; title, body, lifecycle, review, privacy, sources, relations, and cross-module objects remain untouched.

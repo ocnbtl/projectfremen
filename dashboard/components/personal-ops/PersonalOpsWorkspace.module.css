@@ -1383,6 +1383,121 @@ button.metric {
   color: color-mix(in srgb, var(--ops-danger) 82%, var(--text));
 }
 
+.duplicateWarning {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid color-mix(in srgb, var(--ops-attention) 38%, var(--border));
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--ops-attention) 7%, var(--panel-bg));
+}
+
+.duplicateWarning > div {
+  display: grid;
+  gap: 3px;
+}
+
+.duplicateWarning > div > strong {
+  color: var(--text-strong);
+  font: 800 12px/1.35 var(--font-heading);
+}
+
+.duplicateWarning p,
+.duplicateWarning ul {
+  margin: 0;
+}
+
+.duplicateWarning p {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.duplicateWarning ul {
+  display: grid;
+  gap: 6px;
+  padding: 0;
+  list-style: none;
+}
+
+.duplicateWarning li {
+  display: flex;
+  min-width: 0;
+  gap: 10px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 9px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+}
+
+.duplicateWarning li > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.duplicateWarning li strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.duplicateWarning li small {
+  color: var(--text-muted);
+  font: 500 9px/1.35 var(--font-mono);
+}
+
+.duplicateWarning li > a {
+  flex: 0 0 auto;
+  color: var(--action-primary);
+  font-size: 10px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.duplicateWarning li > a:hover {
+  text-decoration: underline;
+}
+
+.duplicateConfirmation {
+  display: flex;
+  min-height: 44px;
+  gap: 9px;
+  align-items: center;
+  padding: 8px 9px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--ops-attention) 9%, var(--panel-bg));
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.duplicateConfirmation input {
+  width: 18px;
+  min-height: 18px;
+  flex: 0 0 auto;
+}
+
+.duplicateConfirmation span {
+  display: grid;
+  gap: 2px;
+}
+
+.duplicateConfirmation strong {
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.duplicateConfirmation small {
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 500;
+  line-height: 1.35;
+}
+
 .formActions {
   justify-content: flex-end;
   border-top: 1px solid var(--border);
@@ -1611,6 +1726,11 @@ button.metric {
   .field textarea,
   .sidebar :global(.module-sidebar__item) {
     min-height: 44px;
+  }
+
+  .closeButton {
+    width: 44px;
+    min-width: 44px;
   }
 
   .metricRail {

@@ -36,7 +36,7 @@ import {
   type PersonalOpsSort,
   type PersonalOpsTab
 } from "../../lib/native-objects/url-state";
-import type { NativeObjectRef } from "../../lib/native-objects/types";
+import type { ModuleId, NativeObjectRef } from "../../lib/native-objects/types";
 import InspectorRail from "../admin-shell/InspectorRail";
 import SharedAIDock from "../admin-shell/SharedAIDock";
 import ConfirmationSheet from "../operational/ConfirmationSheet";
@@ -130,6 +130,7 @@ type FormDraft = {
   followUpOutcome: string;
   deferredUntil: string;
   createLinkedFollowUp: boolean;
+  allowSourceDuplicate: boolean;
 };
 
 type OpenForm = {
@@ -188,6 +189,17 @@ const PRIORITY_WEIGHT: Record<string, number> = {
   low: 3
 };
 
+const SOURCE_MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
+  people: "People",
+  media: "Media",
+  projects: "Projects",
+  notes: "Notes",
+  personal_ops: "Personal Ops",
+  reviews: "Reviews",
+  resources: "Resources",
+  finance: "Finance"
+};
+
 const INSPECTOR_TABS: readonly DetailTab[] = [
   { id: "overview", label: "Overview" },
   { id: "details", label: "Details" },
@@ -205,6 +217,7 @@ function lines(value: string) {
 
 function toLocalDate(value?: string) {
   if (!value) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value.slice(0, 10);
   const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
@@ -360,7 +373,8 @@ function defaultDraft(family: PersonalOpsFamily, item?: PersonalOpsObject, sourc
     context: item?.objectType === "follow_up" ? item.context : sourceLabel ? `Continue from ${sourceLabel}.` : "",
     followUpOutcome: item?.objectType === "follow_up" ? item.outcome || "" : "",
     deferredUntil: item?.objectType === "follow_up" ? toLocalDate(item.deferredUntil) : "",
-    createLinkedFollowUp: family === "decisions" && Boolean(sourceLabel)
+    createLinkedFollowUp: family === "decisions" && Boolean(sourceLabel),
+    allowSourceDuplicate: false
   };
 }
 
@@ -444,6 +458,7 @@ function createInput(form: OpenForm, draft: FormDraft): PersonalOpsCreateInputBy
   const input: FollowUpCreateInput = {
     ...common,
     followUpType: draft.followUpType,
+    allowSourceDuplicate: draft.allowSourceDuplicate,
     followUpState: draft.followUpState,
     context: draft.context,
     outcome: draft.followUpOutcome || undefined,
@@ -605,6 +620,38 @@ function sourceRefFromParams(params: URLSearchParams): NativeObjectRef | undefin
   });
 }
 
+function sameNativeObjectIdentity(left: NativeObjectRef, right: NativeObjectRef): boolean {
+  return (
+    left.module === right.module &&
+    left.objectType === right.objectType &&
+    left.objectId === right.objectId &&
+    (left.containerObjectId || "") === (right.containerObjectId || "")
+  );
+}
+
+function activeFollowUpsForSource(
+  followUps: PersonalOpsFollowUp[],
+  sourceRef?: NativeObjectRef
+): PersonalOpsFollowUp[] {
+  if (!sourceRef) return [];
+  return followUps.filter(
+    (followUp) =>
+      followUp.lifecycle !== "archived" &&
+      followUp.lifecycle !== "complete" &&
+      followUp.followUpState !== "complete" &&
+      followUp.sourceRefs.some((ref) => sameNativeObjectIdentity(ref, sourceRef))
+  );
+}
+
+function followUpRoute(item: PersonalOpsFollowUp): string {
+  return createNativeObjectRef({
+    module: "personal_ops",
+    objectType: "follow_up",
+    objectId: item.id,
+    label: item.title
+  }).route;
+}
+
 function Field({
   label,
   children,
@@ -633,7 +680,8 @@ function ObjectForm({
   onClose,
   busy,
   error,
-  notice
+  notice,
+  sourceDuplicates
 }: {
   form: OpenForm;
   draft: FormDraft;
@@ -643,9 +691,19 @@ function ObjectForm({
   busy: boolean;
   error: string;
   notice: string;
+  sourceDuplicates: PersonalOpsFollowUp[];
 }) {
   const familyLabel = FAMILY_LABELS[form.family];
   const editing = Boolean(form.item);
+  const sourceOwner = form.sourceRef
+    ? SOURCE_MODULE_LABELS[form.sourceRef.module]
+    : "its owner module";
+  const duplicateConfirmationRequired =
+    !editing &&
+    form.family === "followUps" &&
+    sourceDuplicates.length > 0 &&
+    !draft.allowSourceDuplicate;
+  const titleId = `personal-ops-${form.family}-form-title`;
   function update<Key extends keyof FormDraft>(key: Key, value: FormDraft[Key]) {
     setDraft({ ...draft, [key]: value });
   }
@@ -653,10 +711,16 @@ function ObjectForm({
   return (
     <>
       <button className={styles.scrim} data-open="true" onClick={onClose} aria-label="Close form" />
-      <form className={styles.formSheet} onSubmit={onSubmit} aria-label={`${editing ? "Edit" : "Create"} ${familyLabel}`}>
+      <form
+        className={styles.formSheet}
+        onSubmit={onSubmit}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
         <header className={styles.sheetHeader}>
           <div>
-            <h2>{editing ? `Edit ${familyLabel}` : `New ${familyLabel}`}</h2>
+            <h2 id={titleId}>{editing ? `Edit ${familyLabel}` : `New ${familyLabel}`}</h2>
             <p>{form.sourceLabel ? `Source: ${form.sourceLabel}` : "Saved to the native Personal Ops ledger."}</p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close form">
@@ -667,8 +731,45 @@ function ObjectForm({
           <div className={styles.formGrid}>
             {form.sourceLabel && (
               <div className={[styles.notice, styles.fullWidth].join(" ")}>
-                This creates a linked operating object. The source stays in {form.sourceRef?.module === "notes" ? "Notes" : "People"}.
+                This creates a linked operating object. The source stays in {sourceOwner}.
               </div>
+            )}
+            {sourceDuplicates.length > 0 && !editing && form.family === "followUps" && (
+              <section
+                className={[styles.duplicateWarning, styles.fullWidth].join(" ")}
+                aria-labelledby="personal-ops-source-duplicate-title"
+              >
+                <div>
+                  <strong id="personal-ops-source-duplicate-title">
+                    {sourceDuplicates.length} active {sourceDuplicates.length === 1 ? "follow-up already uses" : "follow-ups already use"} this {sourceOwner} source
+                  </strong>
+                  <p>Open existing work first, or confirm that this follow-up has a separate outcome.</p>
+                </div>
+                <ul>
+                  {sourceDuplicates.map((item) => (
+                    <li key={item.id}>
+                      <span>
+                        <strong>{item.title}</strong>
+                        <small>{cleanLabel(item.followUpState)} · {formatDate(item.dueAt)}</small>
+                      </span>
+                      <Link href={followUpRoute(item)} target="_blank" rel="noreferrer">
+                        Open existing
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <label className={styles.duplicateConfirmation}>
+                  <input
+                    type="checkbox"
+                    checked={draft.allowSourceDuplicate}
+                    onChange={(event) => update("allowSourceDuplicate", event.target.checked)}
+                  />
+                  <span>
+                    <strong>I need a separate follow-up for this source</strong>
+                    <small>The confirmation is recorded in Personal Ops audit history.</small>
+                  </span>
+                </label>
+              </section>
             )}
             <Field label="Title" full>
               <input value={draft.title} onChange={(event) => update("title", event.target.value)} required maxLength={240} />
@@ -876,7 +977,14 @@ function ObjectForm({
         </div>
         <footer className={styles.formActions}>
           <button type="button" className={styles.button} onClick={onClose} disabled={busy}>Cancel</button>
-          <button type="submit" className={styles.primaryButton} disabled={busy}>{busy ? "Saving…" : editing ? "Save changes" : `Create ${familyLabel}`}</button>
+          <button
+            type="submit"
+            className={styles.primaryButton}
+            disabled={busy || duplicateConfirmationRequired}
+            aria-describedby={duplicateConfirmationRequired ? "personal-ops-source-duplicate-title" : undefined}
+          >
+            {busy ? "Saving…" : editing ? "Save changes" : `Create ${familyLabel}`}
+          </button>
         </footer>
       </form>
     </>
@@ -956,6 +1064,13 @@ export default function PersonalOpsWorkspace({
     () => legacyGoals.find((goal) => goal.id === urlState.selected) || null,
     [legacyGoals, urlState.selected]
   );
+  const sourceDuplicates = useMemo(
+    () =>
+      openForm?.family === "followUps" && !openForm.item
+        ? activeFollowUpsForSource(state.followUps, openForm.sourceRef)
+        : [],
+    [openForm, state.followUps]
+  );
 
   const baseItems = useMemo<PersonalOpsListItem[]>(() => {
     if (initialView === "goals") {
@@ -1032,6 +1147,7 @@ export default function PersonalOpsWorkspace({
     if (sourceRef?.module === "people") {
       nextDraft.followUpType = "person_check_in";
       nextDraft.domain = "Relationships";
+      nextDraft.title = sourceLabel ? `Check in with ${sourceLabel}` : "Relationship check-in";
       nextDraft.context = `Reconnect with ${sourceLabel || "this person"} and record the outcome.`;
     }
     setOpenForm(form);
@@ -1616,7 +1732,17 @@ export default function PersonalOpsWorkspace({
       )}
 
       {openForm && draft && (
-        <ObjectForm form={openForm} draft={draft} setDraft={setDraft} onSubmit={(event) => void submitForm(event)} onClose={requestCloseForm} busy={busy} error={error} notice={notice} />
+        <ObjectForm
+          form={openForm}
+          draft={draft}
+          setDraft={setDraft}
+          onSubmit={(event) => void submitForm(event)}
+          onClose={requestCloseForm}
+          busy={busy}
+          error={error}
+          notice={notice}
+          sourceDuplicates={sourceDuplicates}
+        />
       )}
 
       <ConfirmationSheet

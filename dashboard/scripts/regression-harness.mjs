@@ -4698,6 +4698,194 @@ async function checkNotesSmartViewsBrowserState(
   }
 }
 
+async function checkPersonalOpsSourceDuplicateBrowserState(
+  baseUrl,
+  cookieJar,
+  sourceObjectId,
+  sourceLabel,
+  expectedFollowUpTitles
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "personal-ops-source-duplicate-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const url = new URL(request.url());
+      const failure = request.failure()?.errorText || "";
+      if (!url.pathname.startsWith("/_vercel/") && !failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (response.status() >= 400 && url.pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  try {
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1440, height: 900, label: "1440x900" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const page = await context.newPage();
+      observe(page);
+      const params = new URLSearchParams({
+        create: "follow-up",
+        sourceModule: "people",
+        sourceObjectType: "person",
+        sourceObjectId,
+        sourceLabel,
+        dueAt: "2026-08-12"
+      });
+      await page.goto(`${baseUrl}/admin/personal/follow-ups?${params.toString()}`, {
+        waitUntil: "domcontentloaded"
+      });
+      const dialog = page.getByRole("dialog", { name: "New Follow-up" });
+      await dialog.waitFor();
+      await dialog.getByText(/active follow-ups already use this People source/).waitFor();
+      assert(
+        await dialog.getByText("This creates a linked operating object. The source stays in People.").count() === 1,
+        `Personal Ops ${viewport.label} did not explain People source ownership`
+      );
+      for (const title of expectedFollowUpTitles) {
+        assert(
+          await dialog.getByText(title, { exact: true }).count() === 1,
+          `Personal Ops ${viewport.label} duplicate warning omitted ${title}`
+        );
+      }
+      assert(
+        await dialog.getByLabel("Due date").inputValue() === "2026-08-12",
+        `Personal Ops ${viewport.label} shifted the date-only People handoff`
+      );
+
+      const createButton = dialog.getByRole("button", { name: "Create Follow-up" });
+      assert(
+        await createButton.isDisabled(),
+        `Personal Ops ${viewport.label} allowed an unconfirmed duplicate source write`
+      );
+      const duplicateConfirmation = dialog.getByRole("checkbox", {
+        name: /I need a separate follow-up for this source/
+      });
+      await duplicateConfirmation.check();
+      assert(
+        await createButton.isEnabled(),
+        `Personal Ops ${viewport.label} did not enable the explicit duplicate confirmation path`
+      );
+
+      const layout = await page.evaluate(() => {
+        const dialogElement = document.querySelector('[role="dialog"][aria-labelledby^="personal-ops-followUps-form-title"]');
+        const footer = dialogElement?.querySelector("footer");
+        const dialogRect = dialogElement?.getBoundingClientRect();
+        const footerRect = footer?.getBoundingClientRect();
+        return {
+          overflowX: document.documentElement.scrollWidth > window.innerWidth,
+          dialogWithinViewport:
+            Boolean(dialogRect) &&
+            dialogRect.left >= 0 &&
+            dialogRect.right <= window.innerWidth &&
+            dialogRect.top >= 0 &&
+            dialogRect.bottom <= window.innerHeight,
+          footerVisible:
+            Boolean(footerRect) &&
+            footerRect.top >= 0 &&
+            footerRect.bottom <= window.innerHeight
+        };
+      });
+      assert(!layout.overflowX, `Personal Ops ${viewport.label} duplicate sheet overflowed horizontally`);
+      assert(layout.dialogWithinViewport, `Personal Ops ${viewport.label} duplicate sheet escaped the viewport`);
+      assert(layout.footerVisible, `Personal Ops ${viewport.label} duplicate actions were not visible`);
+
+      if (viewport.width <= 760) {
+        const undersizedTargets = await dialog.locator(
+          'button:visible, a:visible, label:has(input[type="checkbox"]):visible'
+        ).evaluateAll((elements) =>
+          elements
+            .map((element) => {
+              const rect = element.getBoundingClientRect();
+              return {
+                label:
+                  element.getAttribute("aria-label") ||
+                  element.textContent?.trim().slice(0, 60) ||
+                  element.getAttribute("name"),
+                width: rect.width,
+                height: rect.height
+              };
+            })
+            .filter((item) => item.width < 44 || item.height < 44)
+        );
+        assert(
+          undersizedTargets.length === 0,
+          `Personal Ops mobile duplicate controls are below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+      }
+
+      await page.screenshot({
+        path: path.join(screenshotDir, `source-duplicate-${viewport.label}.png`)
+      });
+      await context.close();
+    }
+    assert(mutatingRequests.length === 0, `Personal Ops duplicate browser checks emitted mutations: ${mutatingRequests.join(" | ")}`);
+    assert(browserErrors.length === 0, `Personal Ops duplicate browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Personal Ops duplicate browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "project-fremen-regression-"));
   const port = await getFreePort();
@@ -6425,6 +6613,8 @@ async function main() {
     pass("Obligation completion is blocked until evidence and criteria are satisfied");
 
     const nativeFollowUpTitle = `${testRunId}-people-follow-up`;
+    const nativeFollowUpSourceId = `${testRunId}-person-source`;
+    const nativeFollowUpSourceLabel = "Regression person source";
     const createNativeFollowUp = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
       method: "POST",
       headers: {
@@ -6444,8 +6634,8 @@ async function main() {
             {
               module: "people",
               objectType: "person",
-              objectId: `${testRunId}-person-source`,
-              label: "Regression person source"
+              objectId: nativeFollowUpSourceId,
+              label: nativeFollowUpSourceLabel
             }
           ]
         }
@@ -6456,6 +6646,111 @@ async function main() {
       `Native Follow-up create failed: ${JSON.stringify(createNativeFollowUp.payload)}`
     );
     const nativeFollowUp = createNativeFollowUp.payload.item;
+
+    const duplicateFollowUpTitle = `${testRunId}-separate-people-follow-up`;
+    const duplicateFollowUpInput = {
+      title: duplicateFollowUpTitle,
+      followUpType: "person_check_in",
+      context: "A distinct relationship outcome that still shares the same exact People source.",
+      lifecycle: "active",
+      followUpState: "scheduled",
+      priority: "medium",
+      dueAt: "2026-08-12T12:00:00.000Z",
+      sourceRefs: [
+        {
+          module: "people",
+          objectType: "person",
+          objectId: nativeFollowUpSourceId,
+          label: nativeFollowUpSourceLabel
+        }
+      ]
+    };
+    const rejectDuplicateSourceFollowUp = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/ops",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          family: "followUps",
+          input: duplicateFollowUpInput
+        })
+      }
+    );
+    assert(
+      rejectDuplicateSourceFollowUp.response.status === 409 &&
+        rejectDuplicateSourceFollowUp.payload?.code === "conflict" &&
+        rejectDuplicateSourceFollowUp.payload?.fieldErrors?.sourceRefs,
+      `Personal Ops accepted an unconfirmed duplicate source: ${JSON.stringify(rejectDuplicateSourceFollowUp.payload)}`
+    );
+
+    const createConfirmedDuplicateSourceFollowUp = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/ops",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          family: "followUps",
+          input: {
+            ...duplicateFollowUpInput,
+            allowSourceDuplicate: true
+          }
+        })
+      }
+    );
+    assert(
+      createConfirmedDuplicateSourceFollowUp.response.ok &&
+        createConfirmedDuplicateSourceFollowUp.payload?.created,
+      `Personal Ops rejected an explicitly confirmed separate follow-up: ${JSON.stringify(createConfirmedDuplicateSourceFollowUp.payload)}`
+    );
+    const duplicateSourceState = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/ops?family=followUps"
+    );
+    assert(
+      duplicateSourceState.response.ok &&
+        duplicateSourceState.payload?.items?.filter((item) =>
+          item.sourceRefs?.some(
+            (ref) =>
+              ref.module === "people" &&
+              ref.objectType === "person" &&
+              ref.objectId === nativeFollowUpSourceId
+          )
+        ).length === 2,
+      `Personal Ops did not preserve the two explicitly distinct follow-ups: ${JSON.stringify(duplicateSourceState.payload)}`
+    );
+    const duplicateSourceAudit = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/ops"
+    );
+    assert(
+      duplicateSourceAudit.response.ok &&
+        duplicateSourceAudit.payload?.state?.auditEvents?.some(
+          (event) =>
+            event.action === "follow_up.created_with_duplicate_source_confirmation" &&
+            event.object?.objectId === createConfirmedDuplicateSourceFollowUp.payload.item.id
+        ),
+      "Personal Ops did not audit the explicit duplicate-source confirmation"
+    );
+    await checkPersonalOpsSourceDuplicateBrowserState(
+      server.baseUrl,
+      cookieJar,
+      nativeFollowUpSourceId,
+      nativeFollowUpSourceLabel,
+      [nativeFollowUpTitle, duplicateFollowUpTitle]
+    );
+    pass("Source-aware Follow-up creation blocks duplicate spam and audits explicit separate work");
 
     const rejectOutcomeLessFollowUp = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
       method: "PATCH",

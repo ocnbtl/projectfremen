@@ -874,6 +874,33 @@ function validateFollowUp(item: PersonalOpsFollowUp): void {
   }
 }
 
+function sameNativeObjectIdentity(left: NativeObjectRef, right: NativeObjectRef): boolean {
+  return (
+    left.module === right.module &&
+    left.objectType === right.objectType &&
+    left.objectId === right.objectId &&
+    (left.containerObjectId || "") === (right.containerObjectId || "")
+  );
+}
+
+function activeSourceDuplicate(
+  state: PersonalOpsState,
+  candidate: PersonalOpsFollowUp
+): PersonalOpsFollowUp | undefined {
+  if (candidate.sourceRefs.length === 0) return undefined;
+  return state.followUps.find(
+    (followUp) =>
+      followUp.lifecycle !== "archived" &&
+      followUp.lifecycle !== "complete" &&
+      followUp.followUpState !== "complete" &&
+      candidate.sourceRefs.some((candidateRef) =>
+        followUp.sourceRefs.some((existingRef) =>
+          sameNativeObjectIdentity(candidateRef, existingRef)
+        )
+      )
+  );
+}
+
 function buildByFamily<Family extends PersonalOpsFamily>(
   family: Family,
   input: PersonalOpsCreateInputByFamily[Family],
@@ -1015,8 +1042,34 @@ export async function createPersonalOpsObject<Family extends PersonalOpsFamily>(
 
     const built = buildByFamily(family, input, now, actorId);
     const item = withLegacySourceRef(built, legacy);
+    const allowSourceDuplicate =
+      item.objectType === "follow_up"
+        ? booleanValue(rawInput.allowSourceDuplicate, false, "allowSourceDuplicate")
+        : false;
+    const duplicate =
+      item.objectType === "follow_up"
+        ? activeSourceDuplicate(state, item)
+        : undefined;
+    if (duplicate && !allowSourceDuplicate) {
+      throw new PersonalOpsStoreError(
+        "conflict",
+        `An active follow-up already exists for this source: ${duplicate.title}`,
+        {
+          status: 409,
+          fieldErrors: {
+            sourceRefs: [
+              "Open the existing follow-up or explicitly confirm that this is separate work."
+            ]
+          }
+        }
+      );
+    }
     const mapping = legacy ? createMapping(family, item, legacy, now, actorId) : undefined;
-    const action = mapping ? `${item.objectType}.converted_from_legacy` : `${item.objectType}.created`;
+    const action = mapping
+      ? `${item.objectType}.converted_from_legacy`
+      : duplicate && allowSourceDuplicate
+        ? `${item.objectType}.created_with_duplicate_source_confirmation`
+        : `${item.objectType}.created`;
     const auditEvent = moduleAuditEvent({ item, action, actorId, occurredAt: now, before: null });
     const nextState: PersonalOpsState = {
       ...state,

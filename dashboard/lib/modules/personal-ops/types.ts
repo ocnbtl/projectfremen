@@ -532,6 +532,12 @@ export type ObligationCreateInput = {
 export type FollowUpCreateInput = {
   title: string;
   followUpType: FollowUpType;
+  /**
+   * Confirmation-only mutation input. It is never persisted on the Follow-up.
+   * The store rejects a second active Follow-up for the same exact source unless
+   * the user has explicitly confirmed that the work is intentionally separate.
+   */
+  allowSourceDuplicate?: boolean;
   context?: string;
   domain?: string;
   description?: string;
