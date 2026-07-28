@@ -17,6 +17,7 @@ import SystemState from "./operational/SystemState";
 import ConfirmationSheet from "./operational/ConfirmationSheet";
 import NoteAttachmentsView, { NoteAttachmentInspector } from "./notes/NoteAttachmentsView";
 import NoteDecisionsView from "./notes/NoteDecisionsView";
+import NotePropertiesEditorSheet from "./notes/NotePropertiesEditorSheet";
 import NotePropertiesView, { NotePropertiesSummary } from "./notes/NotePropertiesView";
 import {
   contentLinksForObject,
@@ -404,6 +405,7 @@ export default function NotesWorkspace({
   const [saveError, setSaveError] = useState("");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
+  const [propertyEditorNoteId, setPropertyEditorNoteId] = useState<string | null>(null);
   const [captureFocusRequested, setCaptureFocusRequested] = useState(false);
   const captureTitleRef = useRef<HTMLInputElement>(null);
   const dirtyHistoryGuardRef = useRef<string | null>(null);
@@ -414,6 +416,10 @@ export default function NotesWorkspace({
   const selectedNote = useMemo(
     () => notes.find((note) => note.id === selectedId) || null,
     [notes, selectedId]
+  );
+  const propertyEditorNote = useMemo(
+    () => notes.find((note) => note.id === propertyEditorNoteId) || null,
+    [notes, propertyEditorNoteId]
   );
   const selectedAttachmentEvidence = useMemo(
     () => selectedNote
@@ -601,6 +607,21 @@ export default function NotesWorkspace({
       else next.delete(id);
       return next;
     });
+  }
+
+  function openPropertyEditor(note: NoteRecord | null) {
+    if (!note) return;
+    setAiOpen(false);
+    setPropertyEditorNoteId(note.id);
+    if (aiOpen) updateUrl({ ai: false });
+  }
+
+  function handlePropertiesSaved(savedNote: NoteRecord) {
+    setNotes((current) =>
+      current.map((note) => note.id === savedNote.id ? savedNote : note)
+    );
+    setPropertyEditorNoteId(null);
+    setNotice("Note routing properties saved through the audited Personal Records adapter.");
   }
 
   async function submitNote(event: React.FormEvent<HTMLFormElement>) {
@@ -899,7 +920,7 @@ export default function NotesWorkspace({
     />
   );
 
-  const aiDock = (
+  const aiDock = propertyEditorNoteId ? null : (
     <SharedAIDock
       open={aiOpen}
       onOpenChange={(open) => {
@@ -1353,6 +1374,7 @@ export default function NotesWorkspace({
             setActiveTab(tab);
             updateUrl({ tab });
           }}
+          onEditProperties={() => openPropertyEditor(note)}
         />
       </DetailTabPanel>
     );
@@ -1436,20 +1458,17 @@ export default function NotesWorkspace({
             note={selectedNote}
             readiness={selectedPropertyReadiness}
             context={propertyContextFor(selectedNote)}
-            primaryActionLabel={propertiesAreOpen ? "Edit safe fields" : "Open Properties"}
-            onOpenProperties={() => {
-              if (propertiesAreOpen) {
-                setActiveTab("body");
-                updateUrl({ tab: "body" });
-                return;
-              }
-              router.push(
-                  destinationFor(
-                    { tab: "properties", note: "" },
-                    { path: selectedNote.nativeRef.route }
-                  )
-                );
-            }}
+            onEditProperties={() => openPropertyEditor(selectedNote)}
+            onOpenProperties={propertiesAreOpen
+              ? undefined
+              : () => {
+                  router.push(
+                    destinationFor(
+                      { tab: "properties", note: "" },
+                      { path: selectedNote.nativeRef.route }
+                    )
+                  );
+                }}
           />
         </DetailTabPanel>
       );
@@ -1670,6 +1689,16 @@ export default function NotesWorkspace({
     </InspectorRail>
   );
 
+  const propertyEditor = propertyEditorNote ? (
+    <NotePropertiesEditorSheet
+      key={propertyEditorNote.id}
+      open
+      note={propertyEditorNote}
+      onClose={() => setPropertyEditorNoteId(null)}
+      onSaved={handlePropertiesSaved}
+    />
+  ) : null;
+
   if (initialMode === "detail") {
     const currentNote = selectedNote;
     const detailTabsId = currentNote ? `note-detail-${currentNote.id}` : "note-detail";
@@ -1683,6 +1712,7 @@ export default function NotesWorkspace({
         ariaLabel="Note editor"
         className={`${styles.shell} ${styles.detailShell}`}
       >
+        {propertyEditor}
         <button type="button" className={`${styles.button} ${styles.mobileMenuButton}`} onClick={() => { setInspectorOpen(false); setMobileSidebarOpen(true); }} aria-label="Open Notes navigation">Menu</button>
         <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(true); }} disabled={!currentNote}>Context</button>
         {(mobileSidebarOpen || (isInspectorOverlay && inspectorOpen)) && <button type="button" className={styles.scrim} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(false); }} aria-label="Close overlay" />}
@@ -1833,6 +1863,7 @@ export default function NotesWorkspace({
       ariaLabel="Notes directory"
       className={styles.shell}
     >
+      {propertyEditor}
       <button type="button" className={`${styles.button} ${styles.mobileMenuButton}`} onClick={() => { setInspectorOpen(false); setMobileSidebarOpen(true); }} aria-label="Open Notes navigation">Menu</button>
       <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(true); }} disabled={!selectedNote}>Preview</button>
       {(mobileSidebarOpen || (isInspectorOverlay && inspectorOpen)) && <button type="button" className={styles.scrim} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(false); }} aria-label="Close overlay" />}

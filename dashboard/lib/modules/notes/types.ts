@@ -109,6 +109,7 @@ export type NoteUpdateInput = {
   lifecycleStatus?: NoteWritableLifecycleStatus;
   areas?: string[];
   subjects?: string[];
+  projects?: string[];
   reviewCadence?: string;
   nextReviewAt?: string;
 };

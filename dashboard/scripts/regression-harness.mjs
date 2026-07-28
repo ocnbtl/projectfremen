@@ -2221,6 +2221,294 @@ async function checkMediaMetadataEditBrowserState(
   };
 }
 
+async function checkNotePropertiesEditBrowserState(
+  baseUrl,
+  cookieJar,
+  noteId,
+  noteTitle,
+  testRunId
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  let plannedFailureStatusExpected = false;
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "notes-properties-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const failure = request.failure()?.errorText || "";
+      if (!failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (
+        response.status() === 503 &&
+        plannedFailureStatusExpected &&
+        url.pathname === "/api/personal/records"
+      ) {
+        plannedFailureStatusExpected = false;
+        return;
+      }
+      if (response.status() >= 400 && url.pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${response.url()}`);
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(
+      !diagnostics.overflowX,
+      `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`
+    );
+  }
+
+  async function openEditorFromDetail(page) {
+    await page.goto(`${baseUrl}/admin/notes/${noteId}?tab=properties`, {
+      waitUntil: "domcontentloaded"
+    });
+    await page.getByRole("heading", { name: "Core property readiness" }).waitFor();
+    await page.getByRole("button", { name: "Edit routing fields" }).first().click();
+    const dialog = page.getByRole("dialog", { name: noteTitle });
+    await dialog.waitFor();
+    assert(
+      await page.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Notes AI dock remained exposed beneath the properties editor"
+    );
+    return dialog;
+  }
+
+  const updatedAreas = ["Research", "Relationships"];
+  const updatedSubjects = ["Knowledge systems", testRunId];
+  const updatedProjects = ["Project Fremen", "Notes redesign"];
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const desktop = await desktopContext.newPage();
+    observe(desktop);
+    const editDialog = await openEditorFromDetail(desktop);
+    await editDialog.getByLabel("Areas").fill(" Research, Relationships, research ");
+    await editDialog.getByLabel("Subjects").fill(`Knowledge systems, ${testRunId}`);
+    await editDialog
+      .getByLabel("Legacy project labels")
+      .fill("Project Fremen, Notes redesign");
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "note-properties-edit-1440x900.png")
+    });
+    await assertNoDocumentOverflow(desktop, "Note properties editor desktop");
+
+    let plannedFailure = true;
+    plannedFailureStatusExpected = true;
+    await desktop.route("**/api/personal/records", async (route) => {
+      if (route.request().method() === "PATCH" && plannedFailure) {
+        plannedFailure = false;
+        await route.fulfill({
+          status: 503,
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ ok: false, error: "Regression write failure" })
+        });
+        return;
+      }
+      await route.continue();
+    });
+    await editDialog.getByRole("button", { name: "Save properties" }).click();
+    await editDialog.getByText("Note properties were not saved", { exact: true }).waitFor();
+    assert(
+      await editDialog.getByLabel("Areas").inputValue() === " Research, Relationships, research " &&
+        await editDialog.getByLabel("Subjects").inputValue() === `Knowledge systems, ${testRunId}` &&
+        await editDialog.getByLabel("Legacy project labels").inputValue() ===
+          "Project Fremen, Notes redesign",
+      "Failed Note property write did not preserve the complete routing draft"
+    );
+    await desktop.unroute("**/api/personal/records");
+    await desktop.screenshot({
+      path: path.join(screenshotDir, "note-properties-failed-write-1440x900.png")
+    });
+
+    await editDialog.getByRole("button", { name: "Save properties" }).click();
+    await editDialog.waitFor({ state: "detached" });
+    await desktop.getByText("Research, Relationships", { exact: false }).first().waitFor();
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    await desktop.getByText("Research, Relationships", { exact: false }).first().waitFor();
+    await desktop.waitForLoadState("networkidle");
+
+    await desktop.goto(
+      `${baseUrl}/admin/notes?view=missing-properties&note=${encodeURIComponent(noteId)}&tab=properties`,
+      { waitUntil: "domcontentloaded" }
+    );
+    await desktop.getByRole("heading", { name: "Property attention queue" }).waitFor();
+    await desktop.getByRole("button", { name: "Edit routing fields" }).click();
+    const queueDialog = desktop.getByRole("dialog", { name: noteTitle });
+    await queueDialog.waitFor();
+    assert(
+      await queueDialog.getByLabel("Areas").inputValue() === "Research, Relationships",
+      "Missing Properties queue did not open the persisted routing values"
+    );
+    await queueDialog.getByLabel("Areas").fill("Discard this area");
+    await queueDialog.getByRole("button", { name: "Cancel" }).click();
+    const discardDialog = desktop.getByRole("dialog", {
+      name: "Discard unsaved Note properties?"
+    });
+    await discardDialog.waitFor();
+    await discardDialog.getByRole("button", { name: "Keep editing" }).click();
+    assert(
+      await queueDialog.getByLabel("Areas").inputValue() === "Discard this area",
+      "Keeping Note property edits did not preserve the draft"
+    );
+    await queueDialog.getByRole("button", { name: "Cancel" }).click();
+    await discardDialog.getByRole("button", { name: "Discard changes" }).click();
+    await queueDialog.waitFor({ state: "detached" });
+    await desktop.reload({ waitUntil: "domcontentloaded" });
+    await desktop.getByRole("button", { name: "Edit routing fields" }).click();
+    const reopenedQueueDialog = desktop.getByRole("dialog", { name: noteTitle });
+    assert(
+      await reopenedQueueDialog.getByLabel("Areas").inputValue() ===
+        "Research, Relationships",
+      "Discarded Note property draft changed the persisted record"
+    );
+    await reopenedQueueDialog.getByRole("button", { name: "Cancel" }).click();
+    await desktopContext.close();
+
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const page = await context.newPage();
+      observe(page);
+      const editor = await openEditorFromDetail(page);
+      await editor.getByLabel("Areas").fill(`Responsive area ${viewport.label}`);
+      await editor.getByLabel("Subjects").fill("Responsive verification draft");
+      await editor.getByLabel("Legacy project labels").fill("Project Fremen");
+      await page.screenshot({
+        path: path.join(
+          screenshotDir,
+          `note-properties-edit-${viewport.label}.png`
+        )
+      });
+      await assertNoDocumentOverflow(page, `Note properties editor ${viewport.label}`);
+      if (viewport.width === 390) {
+        const undersizedTargets = await editor
+          .locator("button:visible, input:visible, textarea:visible, a[href]:visible")
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label:
+                    element.getAttribute("aria-label") ||
+                    element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((item) => item.width < 43.99 || item.height < 43.99)
+          );
+        assert(
+          undersizedTargets.length === 0,
+          `Note properties editor mobile targets below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+        await page.keyboard.press("Shift+Tab");
+        assert(
+          await page.evaluate(() =>
+            Boolean(
+              document
+                .querySelector("[data-note-properties-editor]")
+                ?.contains(document.activeElement)
+            )
+          ),
+          "Note properties editor mobile focus escaped the modal sheet"
+        );
+      }
+      await editor.getByRole("button", { name: "Cancel" }).click();
+      await page
+        .getByRole("dialog", { name: "Discard unsaved Note properties?" })
+        .getByRole("button", { name: "Discard changes" })
+        .click();
+      await context.close();
+    }
+
+    assert(
+      mutatingRequests.filter((request) => request === "PATCH /api/personal/records").length === 2,
+      `Note properties edit did not emit one failed and one successful PATCH: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      mutatingRequests.filter((request) => request === "POST /api/personal/records").length === 0,
+      `Note properties edit created a duplicate Personal Record: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Note properties editor browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Note properties editor browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+  } finally {
+    await browser.close();
+  }
+
+  return {
+    areas: updatedAreas,
+    subjects: updatedSubjects,
+    projects: updatedProjects
+  };
+}
+
 async function checkNoteAttachmentsBrowserState(
   baseUrl,
   cookieJar,
@@ -5750,9 +6038,10 @@ async function main() {
       assert(noteProperties.body.includes(expected), `Note Properties route missing expected text: ${expected}`);
     }
     assert(
-      noteProperties.body.includes("Save properties") &&
-        noteProperties.body.includes("cannot safely round-trip the full native Note property set"),
-      "Note Properties did not expose the disabled native-write boundary"
+      noteProperties.body.includes("Edit routing fields") &&
+        noteProperties.body.includes("audited routing fields plus read-only evidence") &&
+        noteProperties.body.includes("native ownership, review, links, versions"),
+      "Note Properties did not expose its narrow audited-write and protected-native boundaries"
     );
 
     const missingPropertiesQueue = await requestText(
@@ -5771,7 +6060,66 @@ async function main() {
         missingPropertiesQueue.body.includes("No weighted readiness percentage is calculated"),
       "Missing Properties queue did not disclose its derived calculation boundary"
     );
-    pass("Notes property readiness, Missing Properties queue, and read-only Properties route work from current adapter evidence");
+    pass("Notes property readiness and Missing Properties queue derive from the current adapter evidence");
+
+    const noteSourceBeforePropertyEdit = updateNote.payload.items.find(
+      (item) => item.id === createdNote.id
+    );
+    const noteRecordCountBeforePropertyEdit = updateNote.payload.items.filter(
+      (item) => item.className === "note"
+    ).length;
+    assert(noteSourceBeforePropertyEdit, "Note source record was missing before property edit verification");
+    const editedNoteProperties = await checkNotePropertiesEditBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdNote.id,
+      updatedNoteTitle,
+      testRunId
+    );
+    const recordsAfterNotePropertyEdit = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/records"
+    );
+    assert(
+      recordsAfterNotePropertyEdit.response.ok && recordsAfterNotePropertyEdit.payload?.ok,
+      `Unable to reload Note source record after property edit: ${JSON.stringify(recordsAfterNotePropertyEdit.payload)}`
+    );
+    const noteSourceAfterPropertyEdit = recordsAfterNotePropertyEdit.payload.items.find(
+      (item) => item.id === createdNote.id
+    );
+    for (const field of ["areas", "subjects", "projects"]) {
+      assert(
+        JSON.stringify(noteSourceAfterPropertyEdit?.[field]) ===
+          JSON.stringify(editedNoteProperties[field]),
+        `Note property editor did not persist normalized ${field}`
+      );
+    }
+    for (const field of [
+      "id",
+      "domain",
+      "className",
+      "status",
+      "body",
+      "url",
+      "externalSources",
+      "relations",
+      "privacy",
+      "createdAt"
+    ]) {
+      assert(
+        JSON.stringify(noteSourceAfterPropertyEdit?.[field]) ===
+          JSON.stringify(noteSourceBeforePropertyEdit[field]),
+        `Note property edit changed protected source field ${field}`
+      );
+    }
+    assert(
+      recordsAfterNotePropertyEdit.payload.items.filter(
+        (item) => item.className === "note"
+      ).length === noteRecordCountBeforePropertyEdit,
+      "Note property edit created or removed a Note-owned legacy record"
+    );
+    pass("Notes Areas, Subjects, and legacy project labels persist through the audited adapter with failed-write recovery, dirty-close protection, responsive sheets, and protected-field isolation");
 
     const protectedStatusNoteTitle = `${testRunId}-blocked-note`;
     const createProtectedStatusNote = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {

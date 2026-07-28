@@ -337,6 +337,7 @@ export function noteUpdateInputToLegacy(input: NoteUpdateInput): PersonalRecordP
       : undefined,
     areas: input.areas,
     subjects: input.subjects,
+    projects: input.projects,
     time: hasTimeUpdate
       ? {
           reviewCadence: input.reviewCadence,

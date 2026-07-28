@@ -51,14 +51,14 @@ export function NotePropertiesSummary({
   note,
   readiness,
   context,
+  onEditProperties,
   onOpenProperties,
-  primaryActionLabel = "Open Properties"
 }: {
   note: NoteRecord;
   readiness: NotePropertyReadiness;
   context: NotePropertyContext;
-  onOpenProperties: () => void;
-  primaryActionLabel?: string;
+  onEditProperties: () => void;
+  onOpenProperties?: () => void;
 }) {
   const visibleChecks = readiness.checks.filter(
     (check) => check.outcome !== "supported" || check.requirement === "required"
@@ -107,12 +107,20 @@ export function NotePropertiesSummary({
       <QuickActionBar
         ariaLabel="Selected Note property actions"
         actions={[
-          { id: "open-properties", label: primaryActionLabel, onSelect: onOpenProperties, intent: "primary" },
+          {
+            id: "edit-routing",
+            label: "Edit routing fields",
+            onSelect: onEditProperties,
+            intent: "primary"
+          },
+          ...(onOpenProperties
+            ? [{ id: "open-properties", label: "Open full Properties", onSelect: onOpenProperties }]
+            : []),
           {
             id: "fill-missing",
             label: "Fill missing",
             disabled: true,
-            disabledReason: "A native Note property writer, allowed-field contract, actor, version, and audit event are not connected."
+            disabledReason: "Automatic fill remains unavailable because native ownership, type, review, version, and audit fields cannot be inferred safely."
           }
         ]}
       />
@@ -124,12 +132,14 @@ export default function NotePropertiesView({
   note,
   readiness,
   context,
-  onOpenTab
+  onOpenTab,
+  onEditProperties
 }: {
   note: NoteRecord;
   readiness: NotePropertyReadiness;
   context: NotePropertyContext;
   onOpenTab: (tab: "body" | "links" | "review") => void;
+  onEditProperties: () => void;
 }) {
   const requiredChecks = readiness.checks.filter((check) => check.requirement === "required");
   const recommendedChecks = readiness.checks.filter((check) => check.requirement === "recommended");
@@ -191,11 +201,11 @@ export default function NotePropertiesView({
       />
 
       <div className={styles.propertiesBoundary}>
-        <strong>Properties control plane · read-only current evidence</strong>
+        <strong>Properties control plane · audited routing fields plus read-only evidence</strong>
         <span>
           This view groups canonical, derived, and unavailable fields without recreating the old raw property dump.
-          Title, body, and directly writable lifecycle values remain editable on Body; all other mutations stay disabled
-          until a native Note writer can validate fields, preserve versions, and append audit history.
+          Areas, Subjects, and legacy project labels use an explicit audited editor. Title, body, and directly writable
+          lifecycle values remain on Body; native ownership, review, links, versions, and lifecycle transitions stay disabled.
         </span>
       </div>
 
@@ -227,18 +237,22 @@ export default function NotePropertiesView({
           <QuickActionBar
             ariaLabel="Core Note property actions"
             actions={[
-              { id: "edit-safe", label: "Edit safe fields", onSelect: () => onOpenTab("body"), intent: "primary" },
               {
-                id: "save-properties",
-                label: "Save properties",
-                disabled: true,
-                disabledReason: "The legacy PATCH contract cannot safely round-trip the full native Note property set."
+                id: "edit-routing",
+                label: "Edit routing fields",
+                onSelect: onEditProperties,
+                intent: "primary"
+              },
+              {
+                id: "open-body",
+                label: "Open authored body",
+                onSelect: () => onOpenTab("body")
               },
               {
                 id: "clean-properties",
                 label: "Clean properties",
                 disabled: true,
-                disabledReason: "Property cleanup requires a field-by-field preview, expected version, actor, validation, and audit."
+                disabledReason: "Automatic cleanup requires a field-by-field preview and cannot infer native ownership, type, review, or link state."
               }
             ]}
           />

@@ -1,6 +1,6 @@
 # Unigentamos redesign implementation tracker
 
-Baseline for this tracker: `origin/main` at `c2bf4787815a53cd0c19aa78b98b75f7a2cd7dd6`.
+Current checkpoint baseline: `origin/main` at `5f8d2b8d8ce9ac9845b3442ca0e78ad2af646d64`.
 
 This is an implementation ledger, not a completeness claim. “Verified” means the route passed the isolated authenticated regression, production build, and its implemented responsive checks at the current checkpoint. “Bounded” means the route is usable for the stated read or preview workflow while its visible unavailable controls remain disabled with an explanation. Mockup values are never treated as live data.
 
@@ -18,8 +18,8 @@ This is an implementation ledger, not a completeness claim. “Verified” means
 | `/admin/media/duplicates` | Media Duplicates | Media | Exact safe source evidence | None | Never auto-merges or claims binary match | Verified | Verified | URL state and zero-mutation check | Verified evidence view |
 | `/admin/media/in-use` | Media In Use | Media | Owner-module references | None | References are not `AssetUsage` | Verified | Verified | Focus containment and owner links | Verified evidence view |
 | `/admin/media/upload-queue` | Media Upload Queue | Media | Local file metadata preview | Local draft only | No bytes, upload, browser persistence, or fake `RawFile` | Verified | Verified | Keyboard and explicit boundary | Verified local preview |
-| `/admin/notes` | Notes directory / smart views | Notes | Authored-note adapter | Create and edit | Lifecycle and review remain separate | Verified | Verified | URL history, responsive access | Verified functional adapter |
-| `/admin/notes/[noteId]` | Notes editor and detail tabs | Notes | Note plus reference evidence | Explicit note save | Decisions convert to Personal Ops; attachments remain links | Verified | Verified | Failure retention and owner routes | Verified functional adapter |
+| `/admin/notes` | Notes directory / smart views | Notes | Authored-note adapter | Create/edit; Areas, Subjects, legacy project labels | Lifecycle and review remain separate; project labels are not links | Verified | Verified | URL history, failed-write retention, modal focus | Verified functional adapter |
+| `/admin/notes/[noteId]` | Notes editor and detail tabs | Notes | Note plus reference evidence | Explicit body and routing-property saves | Decisions convert to Personal Ops; attachments remain relationships | Verified | Verified | Reload, dirty discard, protected-field isolation | Verified functional adapter |
 | `/admin/resources` | Resources directory | Resources | Resource adapter and URL evidence | Create and edit | URL identity stays Resource-owned | Verified | Verified | Duplicate prevention, dirty protection | Verified functional adapter |
 | `/admin/resources/[resourceId]` | Resource detail | Resources | Canonical resource adapter | Edit retained fields | Extraction, snapshot, health, and native review bounded | Verified | Verified | Modal/inspector focus and URL state | Verified bounded workflow |
 | `/admin/projects` | Projects hub | Projects | Stable legacy projections plus native state | Explicit promotion | No generic task import | Verified | Verified shell | CSRF, idempotency, route continuity | Verified functional workflow |
@@ -50,6 +50,8 @@ This is an implementation ledger, not a completeness claim. “Verified” means
 ## Current checkpoint boundaries
 
 - Authentication, authorization, session, CSRF, Supabase/RLS/service-role behavior, permanent navigation, shared shell, Current Goals, and global AI behavior are unchanged.
+- Notes now permits explicit editing of the three legacy routing arrays the protected adapter already round-trips: Areas, Subjects, and legacy project labels. The same audited PATCH is available from the full Properties tab and Missing Properties inspector; title, body, lifecycle, review, privacy, sources, relations, and cross-module objects remain untouched.
+- Notes project labels are retrieval metadata only. They never create or imply a Projects-owned native link. Native owner, type remapping, pinned state, review mutation, versions, schema, archive, native links, and native Note audit history remain intentionally unavailable.
 - Media now permits only the two unambiguous legacy-backed fields: title and description. The save updates the existing `file` record through the protected Personal Records route and its existing audit event; it does not create a Media mega-record or a duplicate object.
 - Production Finance remains a clearly labeled fixture preview. No fixture number is presented as live durable state.
 - Native Media persistence topology, binary storage, retention, source confirmation, ownership, accessibility/OCR, rights confirmation, review completion, lifecycle, versions, derivatives, replacement, native links, usage, and AI execution remain intentionally unavailable.
