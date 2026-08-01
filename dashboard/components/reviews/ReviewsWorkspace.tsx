@@ -26,6 +26,7 @@ import {
 } from "../../lib/modules/personal-ops/decision-links";
 import {
   getLinkedFollowUps,
+  isAvailableFollowUp,
   type FollowUpSourceRef
 } from "../../lib/modules/personal-ops/follow-up-links";
 import type {
@@ -281,8 +282,61 @@ function completionBlockers(run: ReviewRun): ReviewCompletionBlocker[] {
   return blockers;
 }
 
-function runCounts(run: ReviewRun) {
-  const blockers = completionBlockers(run);
+function followUpOwnerBlockers(
+  run: ReviewRun,
+  owners: readonly PersonalOpsFollowUp[],
+  ownerLoadError = ""
+): ReviewCompletionBlocker[] {
+  if (run.lifecycle === "completed" || run.lifecycle === "archived") return [];
+  if (ownerLoadError && run.followUps.some((item) => item.createdObjectRef)) {
+    return [{
+      id: `follow-up-owner-state-${run.id}`,
+      type: "external_gate",
+      sourceItemId: run.id,
+      label: "Personal Ops Follow-up owner state could not be verified",
+      routeTab: "follow-ups",
+      severity: "blocking"
+    }];
+  }
+  return run.followUps.flatMap((item) => {
+    if (
+      !item.createdObjectRef ||
+      (item.state !== "created" && item.state !== "completed")
+    ) return [];
+    const owner = owners.find((candidate) => candidate.id === item.createdObjectRef?.objectId);
+    if (!owner) {
+      return [{
+        id: `follow-up-owner-missing-${item.id}`,
+        type: "follow_up" as const,
+        sourceItemId: item.id,
+        label: `${item.title} has an unavailable Personal Ops owner`,
+        routeTab: "follow-ups" as const,
+        severity: "blocking" as const
+      }];
+    }
+    if (!isAvailableFollowUp(owner)) {
+      return [{
+        id: `follow-up-owner-archived-${item.id}`,
+        type: "follow_up" as const,
+        sourceItemId: item.id,
+        label: `${item.title} has an archived Personal Ops owner`,
+        routeTab: "follow-ups" as const,
+        severity: "blocking" as const
+      }];
+    }
+    return [];
+  });
+}
+
+function runCounts(
+  run: ReviewRun,
+  owners?: readonly PersonalOpsFollowUp[],
+  ownerLoadError = ""
+) {
+  const blockers = [
+    ...completionBlockers(run),
+    ...(owners ? followUpOwnerBlockers(run, owners, ownerLoadError) : [])
+  ];
   return {
     required: run.checklist.filter((item) => item.required).length,
     resolved: run.checklist.filter((item) => item.required && RESOLVED_CHECKLIST_STATES.has(item.state)).length,
@@ -784,6 +838,10 @@ export default function ReviewsWorkspace({
     candidate: ReviewFollowUpLink,
     ownerFollowUp: PersonalOpsFollowUp
   ) {
+    if (!isAvailableFollowUp(ownerFollowUp)) {
+      setError("This Personal Ops Follow-up is archived. Restore it or choose a current owner before linking it to the Review.");
+      return false;
+    }
     const { createdAt: _createdAt, updatedAt: _updatedAt, ...followUp } = candidate;
     const ownerIsComplete =
       ownerFollowUp.lifecycle === "complete" ||
@@ -1338,10 +1396,14 @@ export default function ReviewsWorkspace({
             {run.followUps.map((item) => {
               const source = reviewFollowUpSource(run, item);
               const linked = getLinkedFollowUps(followUps, source);
-              const exactOwner = linked.length === 1 ? linked[0] : undefined;
+              const availableLinked = linked.filter(isAvailableFollowUp);
+              const exactOwner = availableLinked.length === 1 ? availableLinked[0] : undefined;
               const linkedOwner = item.createdObjectRef
-                ? linked.find((followUp) => followUp.id === item.createdObjectRef?.objectId)
+                ? followUps.find((followUp) => followUp.id === item.createdObjectRef?.objectId)
                 : undefined;
+              const ownerUnavailable = Boolean(
+                item.createdObjectRef && (!linkedOwner || !isAvailableFollowUp(linkedOwner))
+              );
               const ownerIsComplete = Boolean(
                 linkedOwner &&
                 (linkedOwner.lifecycle === "complete" || linkedOwner.followUpState === "complete")
@@ -1353,9 +1415,27 @@ export default function ReviewsWorkspace({
                     <span className={styles.stateChip} data-tone={RESOLVED_FOLLOW_UP_STATES.has(item.state) ? "positive" : "attention"}>{displayLabel(item.state)}</span>
                   </div>
                   <div className={styles.sourceLine}><span>Source</span><Link href={item.sourceRef.route}>{item.sourceRef.label}</Link></div>
+                  {ownerUnavailable && (
+                    <SystemState
+                      variant="stale"
+                      title={linkedOwner ? "Linked Follow-up is archived" : "Linked Follow-up is unavailable"}
+                      description={linkedOwner
+                        ? "Restore the Personal Ops owner or link a current Follow-up before this Review can complete."
+                        : "The owner reference is preserved. Refresh Personal Ops, repair the reference, or link a current Follow-up before completion."}
+                      compact
+                    />
+                  )}
                   <div className={styles.inlineActions}>
                     {item.createdObjectRef ? (
-                      <Link className={styles.textLink} href={item.createdObjectRef.route}>Open linked Follow-up</Link>
+                      <>
+                        <Link className={styles.textLink} href={item.createdObjectRef.route}>{linkedOwner?.lifecycle === "archived" ? "Open archived Follow-up" : "Open linked Follow-up"}</Link>
+                        {ownerUnavailable && (
+                          <>
+                            <Link className={styles.textLink} href={personalOpsCreateRoute("follow-up", run, source, item.title, item.dueDate)}>Create current replacement…</Link>
+                            <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Link current Follow-up…</button>
+                          </>
+                        )}
+                      </>
                     ) : exactOwner ? (
                       <button
                         type="button"
@@ -1365,7 +1445,7 @@ export default function ReviewsWorkspace({
                       >
                         Link exact Follow-up
                       </button>
-                    ) : linked.length > 1 ? (
+                    ) : availableLinked.length > 1 ? (
                       <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Choose linked Follow-up…</button>
                     ) : (
                       <>
@@ -1546,7 +1626,7 @@ export default function ReviewsWorkspace({
   );
 
   function ReviewSurface({ run, headingLevel = "h1" }: { run: ReviewRun; headingLevel?: "h1" | "h2" }) {
-    const counts = runCounts(run);
+    const counts = runCounts(run, followUps, followUpsError);
     const tabs = REVIEW_TABS
       .filter((tab) => run.cadence === "monthly" || tab.id !== "finance")
       .map((tab) => tab.id === "checklist" ? { ...tab, count: run.checklist.length } : tab.id === "evidence" ? { ...tab, count: run.evidence.length } : tab.id === "decisions" ? { ...tab, count: run.decisions.length } : tab.id === "follow-ups" ? { ...tab, count: run.followUps.length + run.carryForward.length } : tab);
@@ -1620,7 +1700,7 @@ export default function ReviewsWorkspace({
       onRequestClose={() => setMobileInspectorOpen(false)}
     >
       {selectedRun ? (() => {
-        const counts = runCounts(selectedRun);
+        const counts = runCounts(selectedRun, followUps, followUpsError);
         return (
           <>
             <div className={styles.completionHead}>

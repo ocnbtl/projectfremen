@@ -205,7 +205,7 @@ const SOURCE_MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
   finance: "Finance"
 };
 
-const FOLLOW_UP_SOURCE_OBJECT_TYPES: Readonly<
+const CREATION_SOURCE_OBJECT_TYPES: Readonly<
   Partial<Record<ModuleId, readonly string[]>>
 > = {
   media: ["media_asset"],
@@ -224,6 +224,7 @@ const FOLLOW_UP_SOURCE_OBJECT_TYPES: Readonly<
     "project_link"
   ],
   resources: ["resource"],
+  finance: ["budget", "finance_close_check"],
   reviews: [
     "review_run",
     "weekly_review",
@@ -602,7 +603,7 @@ function sourceRefFromParams(params: URLSearchParams): NativeObjectRef | undefin
   if (!objectId || !label) return undefined;
   if (!module || !isModuleId(module)) return undefined;
 
-  const allowedObjectTypes = FOLLOW_UP_SOURCE_OBJECT_TYPES[module];
+  const allowedObjectTypes = CREATION_SOURCE_OBJECT_TYPES[module];
   if (!allowedObjectTypes) return undefined;
 
   const fallbackObjectType =

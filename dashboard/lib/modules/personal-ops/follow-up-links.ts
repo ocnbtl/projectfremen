@@ -34,6 +34,10 @@ export function isActiveFollowUp(followUp: PersonalOpsFollowUp): boolean {
   );
 }
 
+export function isAvailableFollowUp(followUp: PersonalOpsFollowUp): boolean {
+  return followUp.lifecycle !== "archived";
+}
+
 function compareFollowUps(left: PersonalOpsFollowUp, right: PersonalOpsFollowUp): number {
   const leftActive = isActiveFollowUp(left);
   const rightActive = isActiveFollowUp(right);

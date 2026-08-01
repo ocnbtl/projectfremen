@@ -1131,6 +1131,12 @@
     min-height: 44px;
   }
 
+  .sourceLine a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+
   .definitionList,
   .legacyField {
     grid-template-columns: 1fr;

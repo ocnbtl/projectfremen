@@ -11,13 +11,76 @@ import {
   toReviewRunView,
   updateReviewRun
 } from "../../../../lib/modules/reviews/store";
-import type { ReviewRunCreateInput } from "../../../../lib/modules/reviews/types";
+import type {
+  ReviewFollowUpLink,
+  ReviewRun,
+  ReviewRunCreateInput
+} from "../../../../lib/modules/reviews/types";
+import { isAvailableFollowUp } from "../../../../lib/modules/personal-ops/follow-up-links";
+import { readPersonalOpsObject } from "../../../../lib/modules/personal-ops/store";
+import type { NativeObjectRef } from "../../../../lib/native-objects/types";
 import { readReviewEntry } from "../../../../lib/reviews-store";
 
 export const runtime = "nodejs";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function personalOpsFollowUpRef(value: unknown): NativeObjectRef | null {
+  if (!isRecord(value)) return null;
+  if (
+    value.module !== "personal_ops" ||
+    value.objectType !== "follow_up" ||
+    typeof value.objectId !== "string" ||
+    !value.objectId.trim()
+  ) {
+    return null;
+  }
+  return value as NativeObjectRef;
+}
+
+async function requireAvailableFollowUpOwner(
+  reference: NativeObjectRef,
+  label: string
+) {
+  const owner = await readPersonalOpsObject("followUps", reference.objectId);
+  if (!owner) {
+    throw new ReviewsStoreError(
+      "conflict",
+      `The linked Personal Ops Follow-up for “${label}” is unavailable. Refresh Personal Ops or link a current owner before continuing.`,
+      { status: 409 }
+    );
+  }
+  if (!isAvailableFollowUp(owner)) {
+    throw new ReviewsStoreError(
+      "conflict",
+      `The linked Personal Ops Follow-up for “${label}” is archived. Restore it in Personal Ops or link a current owner before continuing.`,
+      { status: 409 }
+    );
+  }
+}
+
+async function validateFollowUpOwners(run: ReviewRun | null, patch: Record<string, unknown>) {
+  if (patch.action === "upsert_follow_up" && isRecord(patch.followUp)) {
+    const state = patch.followUp.state;
+    const reference = personalOpsFollowUpRef(patch.followUp.createdObjectRef);
+    if ((state === "created" || state === "completed") && reference) {
+      const label = typeof patch.followUp.title === "string" && patch.followUp.title.trim()
+        ? patch.followUp.title.trim()
+        : reference.label;
+      await requireAvailableFollowUpOwner(reference, label);
+    }
+  }
+
+  if (patch.action !== "complete" || !run) return;
+  const ownedItems = run.followUps.filter(
+    (item): item is ReviewFollowUpLink & { createdObjectRef: NativeObjectRef } =>
+      (item.state === "created" || item.state === "completed") && Boolean(item.createdObjectRef)
+  );
+  for (const item of ownedItems) {
+    await requireAvailableFollowUpOwner(item.createdObjectRef, item.title);
+  }
 }
 
 function errorResponse(error: unknown) {
@@ -177,6 +240,15 @@ export async function PATCH(request: Request) {
     if (!isRecord(body.patch)) {
       return NextResponse.json({ ok: false, error: "patch must be an object" }, { status: 400 });
     }
+    const currentRun = await readReviewRun(id);
+    if (currentRun && currentRun.updatedAt !== expectedUpdatedAt) {
+      throw new ReviewsStoreError(
+        "stale",
+        "This ReviewRun changed after it was loaded. Refresh before retrying.",
+        { status: 409 }
+      );
+    }
+    await validateFollowUpOwners(currentRun, body.patch);
     const result = await updateReviewRun(id, body.patch, { expectedUpdatedAt, actorId: "admin" });
     await auditRequest(request, "review_runs.update.success", "ok", `${id}:${body.patch.action || "unknown"}`);
     return NextResponse.json({
@@ -195,4 +267,3 @@ export async function PATCH(request: Request) {
     return errorResponse(error);
   }
 }
-

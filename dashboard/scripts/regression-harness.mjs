@@ -5772,7 +5772,8 @@ async function checkCrossModuleFollowUpConnections(
     );
     return {
       run: completedReview.payload.item,
-      view: completedReview.payload.view
+      view: completedReview.payload.view,
+      reviewOwner: createdByKey.get("review")
     };
   } finally {
     await browser.close();
@@ -6064,6 +6065,54 @@ async function checkCrossModuleDecisionConnections(
       "Finance budget did not preserve its read-only boundary and owner-aware Decision action"
     );
 
+    await financeBudgetPage.goto(
+      `${baseUrl}/admin/finance/budgets?selected=saas&tab=overview`,
+      { waitUntil: "networkidle" }
+    );
+    await financeBudgetPage.getByText("File decision", { exact: true }).click();
+    await financeBudgetPage.waitForURL((url) =>
+      url.pathname === "/admin/personal/decisions" &&
+      url.searchParams.get("create") === "decision" &&
+      url.searchParams.get("sourceModule") === "finance" &&
+      url.searchParams.get("sourceObjectType") === "budget" &&
+      url.searchParams.get("sourceObjectId") === "saas"
+    );
+    const financeDecisionDialog = financeBudgetPage.getByRole("dialog", { name: "New Decision" });
+    await financeDecisionDialog.waitFor();
+    await financeDecisionDialog
+      .getByText("This creates a linked operating object. The source stays in Finance.", { exact: true })
+      .waitFor();
+    const handoffDecisionTitle = "Software & SaaS budget · source-preserving decision";
+    await financeDecisionDialog.getByLabel("Title").fill(handoffDecisionTitle);
+    await financeDecisionDialog.getByLabel("Question").fill("What choice should retain this exact Finance budget as its source?");
+    await financeDecisionDialog.getByRole("checkbox", { name: /Create one linked follow-up/ }).uncheck();
+    await Promise.all([
+      financeBudgetPage.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/personal/ops" &&
+          response.request().method() === "POST" &&
+          response.ok()
+      ),
+      financeDecisionDialog.getByRole("button", { name: "Create Decision" }).click()
+    ]);
+    const financeHandoffState = await requestJson(
+      baseUrl,
+      cookieJar,
+      "/api/personal/ops?family=decisions"
+    );
+    const financeHandoffDecision = financeHandoffState.payload?.items?.find(
+      (item) => item.title === handoffDecisionTitle
+    );
+    assert(
+      financeHandoffState.response.ok &&
+        financeHandoffDecision?.sourceRefs?.length === 1 &&
+        financeHandoffDecision.sourceRefs[0].module === "finance" &&
+        financeHandoffDecision.sourceRefs[0].objectType === "budget" &&
+        financeHandoffDecision.sourceRefs[0].objectId === "saas" &&
+        financeHandoffDecision.sourceRefs[0].route === "/admin/finance/budgets?selected=saas",
+      `Finance Decision handoff did not persist its exact native source: ${JSON.stringify(financeHandoffDecision)}`
+    );
+
     const financeClosePage = await desktopContext.newPage();
     observe(financeClosePage);
     await financeClosePage.goto(`${baseUrl}${sources[3].source.route}`, { waitUntil: "networkidle" });
@@ -6072,6 +6121,26 @@ async function checkCrossModuleDecisionConnections(
       await financeClosePage.getByText("Finance close remains read-only", { exact: true }).count() === 1 &&
         await financeClosePage.getByText("Open Decision", { exact: true }).count() >= 1,
       "Finance close item did not preserve its explicit boundary and owner-aware Decision action"
+    );
+    const closeHandoffParams = new URLSearchParams({
+      create: "decision",
+      sourceModule: "finance",
+      sourceObjectType: "finance_close_check",
+      sourceObjectId: "budget-overruns",
+      sourceLabel: "Review budget overruns (Travel +24%)"
+    });
+    await financeClosePage.goto(
+      `${baseUrl}/admin/personal/decisions?${closeHandoffParams.toString()}`,
+      { waitUntil: "networkidle" }
+    );
+    const closeDecisionDialog = financeClosePage.getByRole("dialog", { name: "New Decision" });
+    await closeDecisionDialog.waitFor();
+    await closeDecisionDialog
+      .getByText("This creates a linked operating object. The source stays in Finance.", { exact: true })
+      .waitFor();
+    assert(
+      new URL(financeClosePage.url()).searchParams.get("sourceObjectType") === "finance_close_check",
+      "Finance close Decision handoff did not preserve its source object type"
     );
     await desktopContext.close();
 
@@ -6167,8 +6236,9 @@ async function checkCrossModuleDecisionConnections(
       "Review did not audit its exact Personal Ops Decision link"
     );
     assert(
-      browserMutations.length === 1 &&
-        browserMutations[0] === "PATCH /api/reviews/runs",
+      browserMutations.length === 2 &&
+        browserMutations.includes("PATCH /api/reviews/runs") &&
+        browserMutations.includes("POST /api/personal/ops"),
       `Cross-module Decision browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
     );
     assert(
@@ -6183,6 +6253,119 @@ async function checkCrossModuleDecisionConnections(
       run: linkedReview.payload.item,
       view: linkedReview.payload.view
     };
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkArchivedReviewFollowUpOwnerBrowserState(
+  baseUrl,
+  cookieJar,
+  reviewRun,
+  reviewFollowUp
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "cross-module-follow-up-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  try {
+    for (const viewport of [
+      { label: "1920x1080", width: 1920, height: 1080 },
+      { label: "1440x900", width: 1440, height: 900 },
+      { label: "1024x768", width: 1024, height: 768 },
+      { label: "390x844", width: 390, height: 844 }
+    ]) {
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height }
+      });
+      await context.addCookies([
+        {
+          name: "admin_session",
+          value: cookieJar.get("admin_session"),
+          url: baseUrl,
+          httpOnly: true,
+          sameSite: "Lax"
+        },
+        {
+          name: "admin_csrf",
+          value: cookieJar.get("admin_csrf"),
+          url: baseUrl,
+          sameSite: "Lax"
+        }
+      ]);
+      const page = await context.newPage();
+      page.on("console", (message) => {
+        if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+          browserErrors.push(`${viewport.label} console: ${message.text()}`);
+        }
+      });
+      page.on("pageerror", (error) => browserErrors.push(`${viewport.label} page: ${error.message}`));
+      page.on("response", (response) => {
+        const pathname = new URL(response.url()).pathname;
+        if (response.status() >= 400 && pathname !== "/_vercel/insights/script.js") {
+          failedResponses.push(`${viewport.label} ${response.status()} ${pathname}`);
+        }
+      });
+      await page.goto(
+        `${baseUrl}/admin/reviews/${encodeURIComponent(reviewRun.id)}?tab=follow-ups&item=${encodeURIComponent(reviewFollowUp.id)}`,
+        { waitUntil: "networkidle" }
+      );
+      const item = page.locator(`#review-item-${reviewFollowUp.id}`);
+      await item.getByText("Linked Follow-up is archived", { exact: true }).waitFor();
+      await item.getByRole("link", { name: "Open archived Follow-up" }).waitFor();
+      await item.getByRole("link", { name: /Create current replacement/ }).waitFor();
+      await item.getByRole("button", { name: /Link current Follow-up/ }).waitFor();
+      const layout = await page.evaluate(() => ({
+        overflowX: document.documentElement.scrollWidth > window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth
+      }));
+      assert(
+        !layout.overflowX,
+        `Archived Review owner state overflowed at ${viewport.label}: ${JSON.stringify(layout)}`
+      );
+      if (viewport.width <= 760) {
+        const undersizedTargets = await item
+          .locator("button:visible, a:visible")
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((target) => target.width < 44 || target.height < 44)
+          );
+        assert(
+          undersizedTargets.length === 0,
+          `Archived Review owner mobile targets are below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+      }
+      await page.screenshot({
+        path: path.join(screenshotDir, `review-archived-owner-${viewport.label}.png`),
+        fullPage: true
+      });
+      await context.close();
+    }
+    assert(
+      browserErrors.length === 0,
+      `Archived Review owner browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Archived Review owner browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
   } finally {
     await browser.close();
   }
@@ -14246,6 +14429,7 @@ async function main() {
     );
     weeklyReviewRun = crossModuleFollowUpResult.run;
     weeklyReviewView = crossModuleFollowUpResult.view;
+    let reviewFollowUpOwner = crossModuleFollowUpResult.reviewOwner;
     pass("Projects, Blockers, Notes, and Reviews share exact Personal Ops Follow-up owner state without duplicate native objects");
     pass("Resources and Media share current Personal Ops Follow-up owner state with duplicate-safe handoffs and recoverable refresh failures");
 
@@ -14353,6 +14537,141 @@ async function main() {
       weeklyReviewRun = resolveWeeklyChecklist.payload.item;
       weeklyReviewView = resolveWeeklyChecklist.payload.view;
     }
+
+    const archiveReviewFollowUpOwner = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/ops",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          family: "followUps",
+          id: reviewFollowUpOwner.id,
+          expectedUpdatedAt: reviewFollowUpOwner.updatedAt,
+          patch: {
+            lifecycle: "archived",
+            archiveReason: "Regression verifies Reviews rejects an archived Personal Ops owner."
+          }
+        })
+      }
+    );
+    assert(
+      archiveReviewFollowUpOwner.response.ok &&
+        archiveReviewFollowUpOwner.payload?.item?.lifecycle === "archived",
+      `Review owner archive fixture failed: ${JSON.stringify(archiveReviewFollowUpOwner.payload)}`
+    );
+    reviewFollowUpOwner = archiveReviewFollowUpOwner.payload.item;
+
+    const archivedOwnerReviewPage = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/reviews/${encodeURIComponent(weeklyReviewRun.id)}?tab=follow-ups&item=${encodeURIComponent(reviewStatusCandidate.id)}`
+    );
+    assert(
+      archivedOwnerReviewPage.response.ok &&
+        archivedOwnerReviewPage.body.includes("Linked Follow-up is archived") &&
+        archivedOwnerReviewPage.body.includes("has an archived Personal Ops owner") &&
+        archivedOwnerReviewPage.body.includes("Create current replacement"),
+      `Reviews did not expose the archived owner and its recoverable actions: ${describeStatus(archivedOwnerReviewPage.response)}`
+    );
+    await checkArchivedReviewFollowUpOwnerBrowserState(
+      server.baseUrl,
+      cookieJar,
+      weeklyReviewRun,
+      reviewStatusCandidate
+    );
+
+    const rejectArchivedOwnerRelink = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/reviews/runs",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          id: weeklyReviewRun.id,
+          expectedUpdatedAt: weeklyReviewRun.updatedAt,
+          patch: {
+            action: "upsert_follow_up",
+            followUp: {
+              ...reviewStatusCandidate,
+              state: "completed",
+              createdObjectRef: {
+                module: "personal_ops",
+                objectType: "follow_up",
+                objectId: reviewFollowUpOwner.id,
+                label: reviewFollowUpOwner.title
+              }
+            }
+          }
+        })
+      }
+    );
+    assert(
+      rejectArchivedOwnerRelink.response.status === 409 &&
+        rejectArchivedOwnerRelink.payload?.code === "conflict" &&
+        rejectArchivedOwnerRelink.payload?.error?.includes("is archived"),
+      `Reviews accepted an archived Follow-up as a current owner: ${describeStatus(rejectArchivedOwnerRelink.response)} ${JSON.stringify(rejectArchivedOwnerRelink.payload)}`
+    );
+
+    const rejectArchivedOwnerCompletion = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/reviews/runs",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          id: weeklyReviewRun.id,
+          expectedUpdatedAt: weeklyReviewRun.updatedAt,
+          patch: { action: "complete" }
+        })
+      }
+    );
+    assert(
+      rejectArchivedOwnerCompletion.response.status === 409 &&
+        rejectArchivedOwnerCompletion.payload?.code === "conflict" &&
+        rejectArchivedOwnerCompletion.payload?.error?.includes("is archived"),
+      `Review completion accepted an archived Follow-up owner: ${describeStatus(rejectArchivedOwnerCompletion.response)} ${JSON.stringify(rejectArchivedOwnerCompletion.payload)}`
+    );
+
+    const restoreReviewFollowUpOwner = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/ops",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          family: "followUps",
+          id: reviewFollowUpOwner.id,
+          expectedUpdatedAt: reviewFollowUpOwner.updatedAt,
+          patch: { lifecycle: "complete" }
+        })
+      }
+    );
+    assert(
+      restoreReviewFollowUpOwner.response.ok &&
+        restoreReviewFollowUpOwner.payload?.item?.lifecycle === "complete" &&
+        !restoreReviewFollowUpOwner.payload?.item?.archivedAt,
+      `Review Follow-up owner restore failed: ${JSON.stringify(restoreReviewFollowUpOwner.payload)}`
+    );
+    reviewFollowUpOwner = restoreReviewFollowUpOwner.payload.item;
+    pass("Reviews blocks archived or unavailable Personal Ops Follow-up owners and preserves an explicit restore or relink path");
+
     assert(
       weeklyReviewView?.canComplete === true && weeklyReviewView.blockers?.length === 0,
       `Weekly ReviewRun remained blocked after its explicit requirements were resolved: ${JSON.stringify(weeklyReviewView)}`
