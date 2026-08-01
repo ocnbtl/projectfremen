@@ -50,6 +50,8 @@ This is an implementation ledger, not a completeness claim. “Verified” means
 ## Current checkpoint boundaries
 
 - Authentication, authorization, session, CSRF, Supabase/RLS/service-role behavior, permanent navigation, shared shell, Current Goals, and global AI behavior are unchanged.
+- Every route now emits the shared `nosniff`, `DENY` frame, strict-origin referrer, and camera/microphone/geolocation permissions-policy baseline; the regression verifies these headers on the login boundary without changing session or authorization behavior.
+- Vercel Analytics now renders only in the Vercel runtime (`VERCEL=1`), preserving production telemetry while preventing isolated local verification servers from requesting a Vercel-only script with an invalid MIME type.
 - The release dependency graph is hardened on Next.js 16.2.12 with explicit PostCSS 8.5.25 and Sharp 0.35.3 overrides. A clean `npm ci`, full audit, production build, and isolated regression all pass on the resolved tree.
 - Notes, Resources, and Media now expose the lifecycle of their exact Projects-owned `ProjectLink` records. Each source can create, soft-unlink with a required reason, retry without losing that reason, and restore the same association; the source object and destination Project are never duplicated or deleted.
 - Projects Files & Links keeps long native-source identifiers readable on mobile by stacking source content above its action group. Shared detail tabs keep the active tab fully visible and separate count badges from their labels instead of compressing operational text.

@@ -42,7 +42,7 @@ export default function RootLayout({
     <html lang="en" data-scroll-behavior="smooth">
       <body>
         {children}
-        <Analytics />
+        {process.env.VERCEL === "1" ? <Analytics /> : null}
       </body>
     </html>
   );

@@ -7788,6 +7788,15 @@ async function main() {
     assert(loginPage.response.ok, `Login page failed: ${describeStatus(loginPage.response)}`);
     assert(loginPage.body.includes('name="password"'), "Login form password field missing");
     pass("Admin login page loads");
+    assert(
+      loginPage.response.headers.get("x-content-type-options") === "nosniff" &&
+        loginPage.response.headers.get("x-frame-options") === "DENY" &&
+        loginPage.response.headers.get("referrer-policy") === "strict-origin-when-cross-origin" &&
+        loginPage.response.headers.get("permissions-policy") ===
+          "camera=(), microphone=(), geolocation=()",
+      "Login page response did not include the locked security-header baseline"
+    );
+    pass("Public and protected entry responses include the security-header baseline");
 
     logStep("Checking unauthenticated API protection");
     const unauthKpis = await requestJson(server.baseUrl, cookieJar, "/api/kpis");
