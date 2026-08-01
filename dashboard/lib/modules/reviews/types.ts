@@ -46,6 +46,13 @@ export type ReviewContextRelationship =
 
 export type ReviewContextLinkState = "linked" | "stale" | "broken" | "removed";
 
+export type ReviewContextRepair = {
+  previousSourceRef: NativeObjectRef;
+  reason: string;
+  repairedAt: string;
+  repairedBy: string;
+};
+
 export type ReviewEvidenceState =
   | "missing"
   | "linked"
@@ -121,6 +128,10 @@ export type ReviewContextLink = {
   removedAt?: string;
   lastKnownLabel: string;
   sourceVersion?: string;
+  healthNote?: string;
+  healthChangedAt?: string;
+  healthChangedBy?: string;
+  lastRepair?: ReviewContextRepair;
 };
 
 export type ReviewEvidenceWaiver = {
@@ -404,6 +415,18 @@ export type ReviewRunPatch =
   | { action: "update_checklist"; checklist: ReviewChecklistMutation }
   | { action: "link_context"; sourceRef: NativeObjectRef; relationship?: ReviewContextRelationship }
   | { action: "unlink_context"; contextLinkId: string }
+  | {
+      action: "update_context_health";
+      contextLinkId: string;
+      state: "stale" | "broken";
+      reason: string;
+    }
+  | {
+      action: "repair_context";
+      contextLinkId: string;
+      sourceRef: NativeObjectRef;
+      reason: string;
+    }
   | { action: "update_evidence"; evidence: ReviewEvidenceMutation }
   | { action: "upsert_decision"; decision: ReviewDecisionMutation }
   | { action: "upsert_follow_up"; followUp: ReviewFollowUpMutation }

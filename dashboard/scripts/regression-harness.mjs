@@ -7749,8 +7749,8 @@ async function checkProjectReviewContextBrowserState(
         `Projects ${viewport.label} omitted the linked native ReviewRun`
       );
       assert(
-        await page.getByRole("link", { name: "Open ReviewRun" }).count() >= 1,
-        `Projects ${viewport.label} omitted the Review owner route`
+        await page.getByRole("link", { name: "Repair in Reviews" }).count() >= 1,
+        `Projects ${viewport.label} omitted the Review-owned repair route`
       );
       assert(new URL(page.url()).searchParams.get("probe") === "keep", `Projects ${viewport.label} dropped safe URL state`);
       await assertNoHorizontalOverflow(page, `Projects Review coverage at ${viewport.label}`);
@@ -7775,8 +7775,55 @@ async function checkProjectReviewContextBrowserState(
         await page.unroute("**/api/reviews/runs?includeArchived=1");
         await page.getByRole("button", { name: "Retry" }).first().click();
         await page.getByText("Review context refreshed from the Reviews owner module.").waitFor();
-        await page.getByRole("link", { name: "Open ReviewRun" }).first().click();
+        await page.getByRole("link", { name: "Repair in Reviews" }).first().click();
         await page.waitForURL(new RegExp(`/admin/reviews/${reviewRun.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+        const staleLink = reviewRun.contextLinks.find(
+          (link) => link.sourceRef?.objectId === blocker.id && link.state === "stale"
+        );
+        assert(staleLink, "Browser Review repair fixture lost its stale Project context link");
+        assert(
+          new URL(page.url()).searchParams.get("item") === staleLink.id,
+          "Projects did not deep-link to the exact Review context repair target"
+        );
+        await page.getByRole("heading", { name: "Linked source context" }).waitFor();
+        await page.getByText(/Stale reason: Project source changed/).waitFor();
+        await page.screenshot({
+          path: path.join(screenshotDir, "review-context-stale-1440x900.png")
+        });
+        await page.getByRole("button", { name: "Repair link…" }).first().click();
+        await page.getByRole("heading", { name: "Repair source reference" }).waitFor();
+        await page.locator(".confirmation-sheet").evaluate(async (element) => {
+          await Promise.all(element.getAnimations({ subtree: true }).map((animation) => animation.finished.catch(() => undefined)));
+        });
+        const confirmRepair = page.getByRole("button", { name: "Repair reference" });
+        const repairSheetGeometry = await page.locator(".confirmation-sheet__panel").evaluate((panel) => {
+          const header = panel.querySelector(".confirmation-sheet__header")?.getBoundingClientRect();
+          const actions = panel.querySelector(".confirmation-sheet__actions")?.getBoundingClientRect();
+          const bounds = panel.getBoundingClientRect();
+          const close = panel.querySelector("[aria-label='Close confirmation']");
+          return {
+            scrollTop: panel.scrollTop,
+            headerTop: header?.top,
+            actionsBottom: actions?.bottom,
+            panelTop: bounds.top,
+            panelBottom: bounds.bottom,
+            closeFocused: close === document.activeElement
+          };
+        });
+        assert(
+          repairSheetGeometry.scrollTop === 0 &&
+            repairSheetGeometry.closeFocused &&
+            repairSheetGeometry.headerTop >= repairSheetGeometry.panelTop - 1 &&
+            repairSheetGeometry.actionsBottom <= repairSheetGeometry.panelBottom + 1,
+          `Long confirmation sheet did not open with visible focus, header, and actions: ${JSON.stringify(repairSheetGeometry)}`
+        );
+        assert(await confirmRepair.isDisabled(), "Review repair allowed an unreasoned reference update");
+        await page.screenshot({
+          path: path.join(screenshotDir, "review-context-repair-sheet-1440x900.png")
+        });
+        await page.getByLabel("Repair reason").fill("Verified during browser regression without submitting.");
+        assert(!(await confirmRepair.isDisabled()), "Review repair stayed disabled after completing the required reason");
+        await page.getByRole("button", { name: "Cancel" }).click();
         await page.goBack({ waitUntil: "domcontentloaded" });
         await page.getByText(reviewRun.title, { exact: true }).first().waitFor();
         assert(new URL(page.url()).searchParams.get("item") === blocker.id, "Browser history lost the selected Project blocker");
@@ -7803,8 +7850,12 @@ async function checkProjectReviewContextBrowserState(
         });
       }
       assert(
-        await page.getByText(`This Blocker is already linked to ${reviewRun.title}.`, { exact: true }).count() === 1,
-        `Reviews ${viewport.label} did not detect the idempotent existing source link`
+        await page.getByText(`This Blocker reference is stale. Review or repair it before relying on this context.`, { exact: true }).count() === 1,
+        `Reviews ${viewport.label} did not expose the stale existing source link`
+      );
+      assert(
+        await page.getByRole("button", { name: "Repair link…" }).count() >= 1,
+        `Reviews ${viewport.label} omitted the handoff repair action`
       );
       const ownerHref = await page.getByRole("link", { name: "Open Project source" }).getAttribute("href");
       assert(
@@ -7815,7 +7866,7 @@ async function checkProjectReviewContextBrowserState(
       await page.screenshot({
         path: path.join(screenshotDir, `reviews-project-handoff-${viewport.label}.png`)
       });
-      await page.getByRole("button", { name: "Done" }).click();
+      await page.getByRole("button", { name: "Dismiss" }).click();
       await page.waitForFunction(() => !new URL(window.location.href).searchParams.has("handoff"));
       assert(new URL(page.url()).searchParams.get("probe") === "keep", `Reviews ${viewport.label} dropped unrelated URL state`);
 
@@ -13557,6 +13608,93 @@ async function main() {
     weeklyReviewRun = relinkReviewContextAgain.payload.item;
     weeklyReviewView = relinkReviewContextAgain.payload.view;
 
+    const staleReviewContext = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "update_context_health",
+          contextLinkId: linkedReviewContext.id,
+          state: "stale",
+          reason: "Project source changed after this review context was captured."
+        }
+      })
+    });
+    const staleProjectLink = staleReviewContext.payload?.item?.contextLinks?.find(
+      (link) => link.id === linkedReviewContext.id
+    );
+    assert(
+      staleReviewContext.response.ok &&
+        staleReviewContext.payload?.auditEventId &&
+        staleProjectLink?.state === "stale" &&
+        staleProjectLink.healthNote === "Project source changed after this review context was captured." &&
+        staleProjectLink.healthChangedAt &&
+        staleProjectLink.healthChangedBy === "admin",
+      `Review context health did not retain the stale reason and actor: ${JSON.stringify(staleReviewContext.payload)}`
+    );
+    weeklyReviewRun = staleReviewContext.payload.item;
+    weeklyReviewView = staleReviewContext.payload.view;
+
+    const repeatedLinkWhileStale = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "link_context",
+          sourceRef: { ...reviewContextSource, label: "Silently refreshed label" },
+          relationship: "blocker_source"
+        }
+      })
+    });
+    const stillStaleProjectLink = repeatedLinkWhileStale.payload?.item?.contextLinks?.find(
+      (link) => link.id === linkedReviewContext.id
+    );
+    assert(
+      repeatedLinkWhileStale.response.ok &&
+        stillStaleProjectLink?.state === "stale" &&
+        stillStaleProjectLink.lastKnownLabel === reviewContextSource.label &&
+        stillStaleProjectLink.healthNote === staleProjectLink.healthNote,
+      `Repeated linking silently refreshed a stale Review reference: ${JSON.stringify(repeatedLinkWhileStale.payload)}`
+    );
+    weeklyReviewRun = repeatedLinkWhileStale.payload.item;
+    weeklyReviewView = repeatedLinkWhileStale.payload.view;
+
+    const duplicateRepairSource = weeklyReviewRun.contextLinks.find(
+      (link) => link.sourceRef?.module === "notes" && link.sourceRef?.objectId === createdNote.id && link.state === "linked"
+    )?.sourceRef;
+    assert(duplicateRepairSource, "Review duplicate-repair fixture lost its linked Notes source");
+    const duplicateRepair = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "repair_context",
+          contextLinkId: linkedReviewContext.id,
+          sourceRef: duplicateRepairSource,
+          reason: "Attempt to replace with an already-linked source."
+        }
+      })
+    });
+    assert(
+      duplicateRepair.response.status === 409 && duplicateRepair.payload?.code === "conflict",
+      `Review context repair allowed duplicate active ownership: ${describeStatus(duplicateRepair.response)} ${JSON.stringify(duplicateRepair.payload)}`
+    );
+
     const projectsAfterReviewContext = await requestJson(server.baseUrl, cookieJar, "/api/projects");
     assert(
       projectsAfterReviewContext.response.ok &&
@@ -13574,9 +13712,10 @@ async function main() {
       projectReviewCoveragePage.response.ok &&
         projectReviewCoveragePage.body.includes("Review coverage") &&
         projectReviewCoveragePage.body.includes(weeklyReviewRun.title) &&
-        projectReviewCoveragePage.body.includes(`/admin/reviews/${weeklyReviewRun.id}`) &&
-        projectReviewCoveragePage.body.includes("Open ReviewRun"),
-      `Projects did not render explicit ReviewRun coverage after reload: ${describeStatus(projectReviewCoveragePage.response)}`
+        projectReviewCoveragePage.body.includes(`/admin/reviews/${weeklyReviewRun.id}?tab=overview&amp;item=${linkedReviewContext.id}`) &&
+        projectReviewCoveragePage.body.includes("Repair in Reviews") &&
+        projectReviewCoveragePage.body.includes("Stale"),
+      `Projects did not render stale ReviewRun coverage and its owner repair route after reload: ${describeStatus(projectReviewCoveragePage.response)}`
     );
 
     const reviewHandoffParams = new URLSearchParams({
@@ -13598,9 +13737,10 @@ async function main() {
       reviewProjectHandoffPage.response.ok &&
         reviewProjectHandoffPage.body.includes("Project context handoff") &&
         reviewProjectHandoffPage.body.includes(projectBlocker.title) &&
-        reviewProjectHandoffPage.body.includes(`already linked to ${weeklyReviewRun.title}`) &&
+        reviewProjectHandoffPage.body.includes("reference is stale") &&
+        reviewProjectHandoffPage.body.includes("Repair link") &&
         reviewProjectHandoffPage.body.includes(`/admin/projects/${promotedProject.id}?tab=timeline&amp;item=${encodeURIComponent(projectBlocker.id)}`),
-      `Reviews did not reconstruct the canonical Project context handoff: ${describeStatus(reviewProjectHandoffPage.response)}`
+      `Reviews did not reconstruct the stale Project context handoff and repair action: ${describeStatus(reviewProjectHandoffPage.response)}`
     );
 
     await checkProjectReviewContextBrowserState(
@@ -13610,7 +13750,96 @@ async function main() {
       projectBlocker,
       weeklyReviewRun
     );
-    pass("Projects and Reviews share one explicit, refreshable, duplicate-safe context relationship with canonical owner routing");
+
+    const repairReason = "Verified the canonical Project blocker and refreshed its Review reference.";
+    const repairReviewContext = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "repair_context",
+          contextLinkId: linkedReviewContext.id,
+          sourceRef: reviewContextSource,
+          reason: repairReason
+        }
+      })
+    });
+    const repairedProjectLink = repairReviewContext.payload?.item?.contextLinks?.find(
+      (link) => link.id === linkedReviewContext.id
+    );
+    assert(
+      repairReviewContext.response.ok &&
+        repairReviewContext.payload?.auditEventId &&
+        repairedProjectLink?.state === "linked" &&
+        !repairedProjectLink.healthNote &&
+        repairedProjectLink.lastRepair?.previousSourceRef?.objectId === projectBlocker.id &&
+        repairedProjectLink.lastRepair?.reason === repairReason &&
+        repairedProjectLink.lastRepair?.repairedBy === "admin",
+      `Review context repair did not preserve prior identity and repair evidence: ${JSON.stringify(repairReviewContext.payload)}`
+    );
+    weeklyReviewRun = repairReviewContext.payload.item;
+    weeklyReviewView = repairReviewContext.payload.view;
+
+    const repairLinkedContext = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "repair_context",
+          contextLinkId: linkedReviewContext.id,
+          sourceRef: reviewContextSource,
+          reason: "No repair should be accepted for a healthy link."
+        }
+      })
+    });
+    assert(
+      repairLinkedContext.response.status === 409 && repairLinkedContext.payload?.code === "conflict",
+      `Review context repair accepted an already-healthy link: ${describeStatus(repairLinkedContext.response)} ${JSON.stringify(repairLinkedContext.payload)}`
+    );
+
+    const reloadedRepairedContext = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      `/api/reviews/runs?id=${encodeURIComponent(weeklyReviewRun.id)}`
+    );
+    const persistedRepair = reloadedRepairedContext.payload?.item?.contextLinks?.find(
+      (link) => link.id === linkedReviewContext.id
+    );
+    assert(
+      reloadedRepairedContext.response.ok &&
+        persistedRepair?.state === "linked" &&
+        persistedRepair.lastRepair?.reason === repairReason &&
+        persistedRepair.sourceRef?.route === `/admin/projects/${promotedProject.id}?tab=timeline&item=${encodeURIComponent(projectBlocker.id)}`,
+      `Review context repair did not survive isolated persistence reload: ${JSON.stringify(reloadedRepairedContext.payload)}`
+    );
+
+    const reviewAuditState = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/reviews/runs?includeArchived=1"
+    );
+    assert(
+      reviewAuditState.response.ok &&
+        reviewAuditState.payload?.state?.auditEvents?.some(
+          (event) => event.id === repairReviewContext.payload.auditEventId && event.action === "review_run.repair_context"
+        ) &&
+        reviewAuditState.payload.state.auditEvents.some(
+          (event) => event.id === staleReviewContext.payload.auditEventId && event.action === "review_run.update_context_health"
+        ),
+      "Review link health and repair mutations were not retained in the Review-owned audit stream"
+    );
+
+    pass("Projects and Reviews share one explicit, repairable, duplicate-safe context relationship with canonical owner routing and audit history");
     await checkNotesSmartViewsBrowserState(
       server.baseUrl,
       cookieJar,

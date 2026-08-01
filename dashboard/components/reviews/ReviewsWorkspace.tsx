@@ -91,6 +91,18 @@ type SourceDraft = {
 type EditorState =
   | ({ kind: "create"; cadence: ReviewCadence } & ReviewRunCreateInput)
   | ({ kind: "context"; relationship: ReviewContextRelationship } & SourceDraft)
+  | ({
+      kind: "repair-context";
+      contextLinkId: string;
+      previousState: "stale" | "broken";
+      reason: string;
+    } & SourceDraft)
+  | {
+      kind: "context-health";
+      contextLinkId: string;
+      state: "stale" | "broken";
+      reason: string;
+    }
   | ({ kind: "evidence"; evidenceId: string } & SourceDraft)
   | { kind: "waive-evidence"; evidenceId: string; reason: string; riskNote: string }
   | {
@@ -345,6 +357,16 @@ function defaultSourceDraft(module: ModuleId = "projects"): SourceDraft {
   return { module, objectType: module === "projects" ? "project" : "record", objectId: "", containerObjectId: "", label: "" };
 }
 
+function sourceDraftFromRef(sourceRef: NativeObjectRef): SourceDraft {
+  return {
+    module: sourceRef.module,
+    objectType: sourceRef.objectType,
+    objectId: sourceRef.objectId,
+    containerObjectId: sourceRef.containerObjectId || "",
+    label: sourceRef.label
+  };
+}
+
 function sourceNeedsContainer(draft: SourceDraft) {
   return draft.module === "projects" && !["project", "legacy_project"].includes(draft.objectType.trim());
 }
@@ -479,6 +501,26 @@ export default function ReviewsWorkspace({
     const next = params.toString() ? `${pathname}?${params.toString()}` : pathname;
     router.replace(next, { scroll: false });
   }, [pathname, router, searchParams]);
+
+  const openContextRepair = useCallback((link: ReviewContextLink) => {
+    if (link.state !== "stale" && link.state !== "broken") return;
+    setEditor({
+      kind: "repair-context",
+      contextLinkId: link.id,
+      previousState: link.state,
+      reason: "",
+      ...sourceDraftFromRef(link.sourceRef)
+    });
+  }, []);
+
+  const openContextHealth = useCallback((link: ReviewContextLink, state: "stale" | "broken" = "stale") => {
+    setEditor({
+      kind: "context-health",
+      contextLinkId: link.id,
+      state,
+      reason: ""
+    });
+  }, []);
 
   const proceedWithNavigation = useCallback((action: () => void) => {
     if (!summaryDirty) {
@@ -806,6 +848,28 @@ export default function ReviewsWorkspace({
     }
     if (!selectedRun) return;
 
+    if (editor.kind === "context-health") {
+      const ok = await patchRun(selectedRun, {
+        action: "update_context_health",
+        contextLinkId: editor.contextLinkId,
+        state: editor.state,
+        reason: editor.reason.trim()
+      }, editor.state === "broken"
+        ? "Source marked unavailable. Its last-known identity remains visible for repair or removal."
+        : "Source marked stale. The existing reference remains visible until it is reviewed or replaced.");
+      if (ok) setEditor(null);
+      return;
+    }
+    if (editor.kind === "repair-context") {
+      const ok = await patchRun(selectedRun, {
+        action: "repair_context",
+        contextLinkId: editor.contextLinkId,
+        sourceRef: nativeRefFromDraft(editor),
+        reason: editor.reason.trim()
+      }, "Source reference repaired. Reviews retained the prior identity and repair reason in its audit history.");
+      if (ok) setEditor(null);
+      return;
+    }
     if (editor.kind === "context") {
       const linksProjectHandoff = Boolean(
         projectHandoff &&
@@ -1367,7 +1431,18 @@ export default function ReviewsWorkspace({
             <button type="button" className={styles.button} onClick={() => setEditor({ kind: "context", relationship: "context", ...defaultSourceDraft() })} disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed"}>Link source…</button>
           </div>
           {activeLinks.length === 0 ? <SystemState variant="empty" title="No source context linked" description="Link only records you have reviewed. Automatic source selection remains disabled." compact /> : (
-            <ul className={styles.list}>{activeLinks.map((link) => <ContextLinkRow link={link} run={run} busy={busy} onUnlink={() => setConfirmation({ kind: "unlink", reviewId: run.id, contextLinkId: link.id })} key={link.id} />)}</ul>
+            <ul className={styles.list}>{activeLinks.map((link) => (
+              <ContextLinkRow
+                link={link}
+                run={run}
+                busy={busy}
+                selected={urlState.item === link.id}
+                onRepair={() => openContextRepair(link)}
+                onReport={(state) => openContextHealth(link, state)}
+                onUnlink={() => setConfirmation({ kind: "unlink", reviewId: run.id, contextLinkId: link.id })}
+                key={link.id}
+              />
+            ))}</ul>
           )}
         </section>
       </div>
@@ -1376,13 +1451,15 @@ export default function ReviewsWorkspace({
 
   const renderProjectHandoff = (run?: ReviewRun | null) => {
     if (!projectHandoff) return null;
-    const alreadyLinked = Boolean(run?.contextLinks.some((link) => (
+    const existingLink = run?.contextLinks.find((link) => (
       link.state !== "removed" &&
       link.sourceRef.module === projectHandoff.sourceRef.module &&
       link.sourceRef.objectType === projectHandoff.sourceRef.objectType &&
       link.sourceRef.objectId === projectHandoff.sourceRef.objectId &&
       (link.sourceRef.containerObjectId || "") === (projectHandoff.sourceRef.containerObjectId || "")
-    )));
+    ));
+    const alreadyLinked = existingLink?.state === "linked";
+    const needsRepair = existingLink?.state === "stale" || existingLink?.state === "broken";
     const readOnly = Boolean(run && reviewIsReadOnly(run));
     return (
       <section className={styles.projectHandoff} aria-label="Project context handoff">
@@ -1393,13 +1470,15 @@ export default function ReviewsWorkspace({
             {run
               ? alreadyLinked
                 ? `This ${displayLabel(projectHandoff.source.objectType)} is already linked to ${run.title}.`
+                : needsRepair
+                  ? `This ${displayLabel(projectHandoff.source.objectType)} reference is ${existingLink.state}. Review or repair it before relying on this context.`
                 : `Confirm the exact ${displayLabel(projectHandoff.source.objectType)} link in ${run.title}. Reviews stores only the reference.`
               : "Select a native ReviewRun to link this exact source. Nothing is written until you confirm."}
           </p>
         </div>
         <div className={styles.inlineActions}>
           <Link className={styles.textLink} href={projectHandoff.sourceRef.route}>Open Project source</Link>
-          {run && !alreadyLinked && (
+          {run && !existingLink && (
             <button
               type="button"
               className={styles.button}
@@ -1417,6 +1496,16 @@ export default function ReviewsWorkspace({
               })}
             >Review and link…</button>
           )}
+          {run && needsRepair && existingLink && (
+            <button
+              type="button"
+              className={styles.button}
+              data-primary="true"
+              disabled={busy || readOnly}
+              title={readOnly ? "Completed, archived, and canceled ReviewRuns are read-only." : undefined}
+              onClick={() => openContextRepair(existingLink)}
+            >Repair link…</button>
+          )}
           <button type="button" className={styles.button} onClick={clearProjectHandoff}>
             {alreadyLinked ? "Done" : "Dismiss"}
           </button>
@@ -1432,7 +1521,7 @@ export default function ReviewsWorkspace({
         <p className={styles.ownershipBanner}>Reviews can hold a link to Finance evidence and coordinate completion. It cannot close the ledger, reconcile accounts, or present fixture values as live facts.</p>
         <div className={styles.inlineActions}><Link className={styles.textLink} href={financeBridge.href}>{financeBridge.label}</Link><button type="button" className={styles.button} disabled title="Finance close mutations belong to Finance and are not connected from Reviews.">Close Finance month</button></div>
       </section>
-      <section className={styles.panel} data-span="full"><div className={styles.panelHeader}><div><h2>Linked Finance sources</h2><p>Only explicit Finance-owned references appear here.</p></div></div>{run.contextLinks.filter((link) => link.sourceRef.module === "finance" && link.state !== "removed").length === 0 ? <SystemState variant="empty" title="No Finance source linked" description="Use Overview or Evidence to link a Finance-owned record after reviewing it." compact /> : <ul className={styles.list}>{run.contextLinks.filter((link) => link.sourceRef.module === "finance" && link.state !== "removed").map((link) => <ContextLinkRow link={link} run={run} busy={busy} onUnlink={() => setConfirmation({ kind: "unlink", reviewId: run.id, contextLinkId: link.id })} key={link.id} />)}</ul>}</section>
+      <section className={styles.panel} data-span="full"><div className={styles.panelHeader}><div><h2>Linked Finance sources</h2><p>Only explicit Finance-owned references appear here.</p></div></div>{run.contextLinks.filter((link) => link.sourceRef.module === "finance" && link.state !== "removed").length === 0 ? <SystemState variant="empty" title="No Finance source linked" description="Use Overview or Evidence to link a Finance-owned record after reviewing it." compact /> : <ul className={styles.list}>{run.contextLinks.filter((link) => link.sourceRef.module === "finance" && link.state !== "removed").map((link) => <ContextLinkRow link={link} run={run} busy={busy} selected={urlState.item === link.id} onRepair={() => openContextRepair(link)} onReport={(state) => openContextHealth(link, state)} onUnlink={() => setConfirmation({ kind: "unlink", reviewId: run.id, contextLinkId: link.id })} key={link.id} />)}</ul>}</section>
     </div>
   );
 
@@ -1696,15 +1785,64 @@ export default function ReviewsWorkspace({
   );
 }
 
-function ContextLinkRow({ link, run, busy, onUnlink }: { link: ReviewContextLink; run: ReviewRun; busy: boolean; onUnlink: () => void }) {
+function ContextLinkRow({
+  link,
+  run,
+  busy,
+  selected,
+  onRepair,
+  onReport,
+  onUnlink
+}: {
+  link: ReviewContextLink;
+  run: ReviewRun;
+  busy: boolean;
+  selected: boolean;
+  onRepair: () => void;
+  onReport: (state: "stale" | "broken") => void;
+  onUnlink: () => void;
+}) {
+  const readOnly = reviewIsReadOnly(run);
+  const unavailable = link.state === "broken";
+  const needsRepair = link.state === "stale" || unavailable;
+  const readOnlyReason = readOnly ? "Completed, archived, and canceled ReviewRuns are read-only." : undefined;
   return (
-    <li className={styles.sourceRow}>
+    <li id={`review-item-${link.id}`} className={styles.sourceRow} data-selected={selected || undefined} tabIndex={-1}>
       <div className={styles.sourceTop}>
-        <div><strong>{link.lastKnownLabel}</strong><p>{displayLabel(link.relationship)} · {displayLabel(link.sourceRef.module)} owns source</p></div>
+        <div>
+          <strong>{link.lastKnownLabel}</strong>
+          <p>
+            {unavailable
+              ? "Source unavailable. Last-known identity is preserved for repair or removal."
+              : link.state === "stale"
+                ? "Source may have changed. Review it before confirming or replacing this reference."
+                : `${displayLabel(link.relationship)} · ${displayLabel(link.sourceRef.module)} owns source`}
+          </p>
+        </div>
         <span className={styles.stateChip} data-tone={link.state === "linked" ? "positive" : link.state === "broken" ? "danger" : "attention"}>{displayLabel(link.state)}</span>
       </div>
       <div className={styles.sourceLine}><span>{link.sourceRef.objectType}</span><span>{link.sourceRef.objectId}</span></div>
-      <div className={styles.inlineActions}><Link className={styles.textLink} href={link.sourceRef.route}>Open source</Link><button type="button" className={styles.button} onClick={onUnlink} disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed"}>Remove link…</button></div>
+      {link.healthNote && (
+        <p className={styles.linkHealthNote}>
+          <strong>{link.state === "broken" ? "Unavailable reason" : "Stale reason"}:</strong> {link.healthNote}
+          {link.healthChangedAt ? ` · recorded ${formatDate(link.healthChangedAt)}` : ""}
+        </p>
+      )}
+      {link.lastRepair && (
+        <p className={styles.linkAuditNote}>Last repaired {formatDate(link.lastRepair.repairedAt)} · {link.lastRepair.reason}</p>
+      )}
+      <div className={styles.inlineActions}>
+        {!unavailable && <Link className={styles.textLink} href={link.sourceRef.route}>Open source</Link>}
+        {needsRepair ? (
+          <>
+            <button type="button" className={styles.button} data-primary="true" onClick={onRepair} disabled={busy || readOnly} title={readOnlyReason}>Repair link…</button>
+            {link.state === "stale" && <button type="button" className={styles.button} onClick={() => onReport("broken")} disabled={busy || readOnly} title={readOnlyReason}>Mark unavailable…</button>}
+          </>
+        ) : (
+          <button type="button" className={styles.button} onClick={() => onReport("stale")} disabled={busy || readOnly} title={readOnlyReason}>Report issue…</button>
+        )}
+        <button type="button" className={styles.button} onClick={onUnlink} disabled={busy || readOnly} title={readOnlyReason}>{unavailable ? "Remove reference…" : "Remove link…"}</button>
+      </div>
     </li>
   );
 }
@@ -1727,25 +1865,29 @@ function EditorSheet({ editor, setEditor, busy, errorMessage, onConfirm }: { edi
     if (editor && errorMessage) errorRef.current?.focus();
   }, [editor, errorMessage]);
   if (!editor) return null;
-  const sourceEditor = ["context", "evidence", "decision", "follow-up", "reconcile-decision", "reconcile-follow-up"].includes(editor.kind) ? editor as EditorState & SourceDraft : null;
-  const title = editor.kind === "create" ? `Start ${editor.cadence} review` : editor.kind === "context" ? "Link source context" : editor.kind === "evidence" ? "Link evidence source" : editor.kind === "waive-evidence" ? "Waive evidence requirement" : editor.kind === "carry-forward" ? "Assign carry-forward" : editor.kind === "decision" ? "Add decision candidate" : editor.kind === "follow-up" ? "Add follow-up candidate" : editor.kind === "reconcile-decision" ? "Link filed Personal Ops Decision" : "Link created Personal Ops Follow-up";
-  const confirmLabel = editor.kind === "create" ? "Start review" : editor.kind === "waive-evidence" ? "Record waiver" : editor.kind === "carry-forward" ? "Assign carry-forward" : editor.kind === "decision" || editor.kind === "follow-up" ? "Add candidate" : editor.kind === "reconcile-decision" ? "Link Decision" : editor.kind === "reconcile-follow-up" ? "Link Follow-up" : "Link source";
+  const sourceEditor = ["context", "repair-context", "evidence", "decision", "follow-up", "reconcile-decision", "reconcile-follow-up"].includes(editor.kind) ? editor as EditorState & SourceDraft : null;
+  const title = editor.kind === "create" ? `Start ${editor.cadence} review` : editor.kind === "context" ? "Link source context" : editor.kind === "repair-context" ? "Repair source reference" : editor.kind === "context-health" ? "Report source issue" : editor.kind === "evidence" ? "Link evidence source" : editor.kind === "waive-evidence" ? "Waive evidence requirement" : editor.kind === "carry-forward" ? "Assign carry-forward" : editor.kind === "decision" ? "Add decision candidate" : editor.kind === "follow-up" ? "Add follow-up candidate" : editor.kind === "reconcile-decision" ? "Link filed Personal Ops Decision" : "Link created Personal Ops Follow-up";
+  const confirmLabel = editor.kind === "create" ? "Start review" : editor.kind === "repair-context" ? "Repair reference" : editor.kind === "context-health" ? "Update link state" : editor.kind === "waive-evidence" ? "Record waiver" : editor.kind === "carry-forward" ? "Assign carry-forward" : editor.kind === "decision" || editor.kind === "follow-up" ? "Add candidate" : editor.kind === "reconcile-decision" ? "Link Decision" : editor.kind === "reconcile-follow-up" ? "Link Follow-up" : "Link source";
   let invalid = false;
   if (editor.kind === "create") invalid = !editor.title?.trim() || !editor.periodStart || !editor.periodEnd;
+  else if (editor.kind === "context-health") invalid = !editor.reason.trim();
   else if (editor.kind === "waive-evidence") invalid = !editor.reason.trim() || !editor.riskNote.trim();
   else if (editor.kind === "carry-forward") invalid = !editor.ownerId.trim() || !editor.reason.trim() || !editor.nextAction.trim();
   else if (sourceEditor) {
     invalid = !sourceEditor.objectType.trim() || !sourceEditor.objectId.trim() || !sourceEditor.label.trim() || (sourceNeedsContainer(sourceEditor) && !sourceEditor.containerObjectId.trim());
     if (editor.kind === "decision") invalid ||= !editor.title.trim() || !editor.question.trim();
     if (editor.kind === "follow-up") invalid ||= !editor.title.trim();
+    if (editor.kind === "repair-context") invalid ||= !editor.reason.trim();
     if (editor.kind === "reconcile-decision") invalid ||= !editor.rationale.trim() || editor.module !== "personal_ops" || editor.objectType.trim() !== "decision";
     if (editor.kind === "reconcile-follow-up") invalid ||= editor.module !== "personal_ops" || editor.objectType.trim() !== "follow_up";
   }
   return (
-    <ConfirmationSheet open onOpenChange={(open) => { if (!open) setEditor(null); }} onConfirm={onConfirm} title={title} description={editor.kind === "create" ? "Creates a native ReviewRun. It does not migrate or mutate legacy Review entries." : editor.kind === "waive-evidence" ? "Waivers are explicit audit events and require both a reason and a risk note." : "The source remains owned by its native module; Reviews stores a route-aware reference."} confirmLabel={confirmLabel} busy={busy} confirmDisabled={invalid} confirmDisabledReason={invalid ? "Complete every required field." : undefined}>
+    <ConfirmationSheet open onOpenChange={(open) => { if (!open) setEditor(null); }} onConfirm={onConfirm} title={title} description={editor.kind === "create" ? "Creates a native ReviewRun. It does not migrate or mutate legacy Review entries." : editor.kind === "repair-context" ? "Updates this Review-owned reference only. The source object and original audit history remain unchanged." : editor.kind === "context-health" ? "Records the observed link condition and reason. The source object remains unchanged." : editor.kind === "waive-evidence" ? "Waivers are explicit audit events and require both a reason and a risk note." : "The source remains owned by its native module; Reviews stores a route-aware reference."} confirmLabel={confirmLabel} busy={busy} confirmDisabled={invalid} confirmDisabledReason={invalid ? "Complete every required field." : undefined}>
       {errorMessage && <p ref={errorRef} className={styles.error} role="alert" tabIndex={-1}>{errorMessage}</p>}
       {editor.kind === "create" && <div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Title</span><input value={editor.title || ""} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /></label><label className={styles.field}><span>Period start</span><input type="date" value={editor.periodStart} onChange={(event) => setEditor({ ...editor, periodStart: event.target.value })} /></label><label className={styles.field}><span>Period end</span><input type="date" value={editor.periodEnd} onChange={(event) => setEditor({ ...editor, periodEnd: event.target.value })} /></label><label className={styles.field}><span>Due date</span><input type="date" value={editor.dueAt || ""} onChange={(event) => setEditor({ ...editor, dueAt: event.target.value })} /></label><label className={styles.field}><span>Owner</span><input value={editor.ownerId || ""} onChange={(event) => setEditor({ ...editor, ownerId: event.target.value })} /></label><label className={styles.field} data-span="full"><span><input type="checkbox" checked={editor.current ?? false} onChange={(event) => setEditor({ ...editor, current: event.target.checked })} /> Make this the current {editor.cadence} review</span><small>Only one open current run is allowed per cadence. Scheduled runs remain fully usable.</small></label></div>}
       {editor.kind === "context" && <><SourceFields draft={editor} onChange={(patch) => setEditor({ ...editor, ...patch })} /><label className={styles.field}><span>Relationship</span><select value={editor.relationship} onChange={(event) => setEditor({ ...editor, relationship: event.target.value as ReviewContextRelationship })}><option value="context">Context</option><option value="blocker_source">Blocker source</option><option value="decision_source">Decision source</option><option value="follow_up_source">Follow-up source</option><option value="summary_source">Summary source</option></select></label></>}
+      {editor.kind === "repair-context" && <div className={styles.formGrid}><p className={styles.ownershipBanner}>Confirm the current source identity. Keeping the same identity records a reviewed refresh; choosing another identity records a replacement without deleting the prior audit trail.</p><SourceFields draft={editor} onChange={(patch) => setEditor({ ...editor, ...patch })} /><label className={styles.field} data-span="full"><span>Repair reason</span><textarea value={editor.reason} onChange={(event) => setEditor({ ...editor, reason: event.target.value })} placeholder={editor.previousState === "broken" ? "How was the source recovered or replaced?" : "What did you verify or replace?"} /></label></div>}
+      {editor.kind === "context-health" && <div className={styles.formGrid}><label className={styles.field}><span>Observed state</span><select value={editor.state} onChange={(event) => setEditor({ ...editor, state: event.target.value as "stale" | "broken" })}><option value="stale">Stale · needs review</option><option value="broken">Broken · source unavailable</option></select><small>Stale sources can still be opened. Broken sources retain only their last-known identity.</small></label><label className={styles.field} data-span="full"><span>Observed issue</span><textarea value={editor.reason} onChange={(event) => setEditor({ ...editor, reason: event.target.value })} placeholder="Describe what changed or why the source is unavailable." /></label></div>}
       {editor.kind === "evidence" && <SourceFields draft={editor} onChange={(patch) => setEditor({ ...editor, ...patch })} />}
       {editor.kind === "waive-evidence" && <div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Reason</span><textarea value={editor.reason} onChange={(event) => setEditor({ ...editor, reason: event.target.value })} /></label><label className={styles.field} data-span="full"><span>Risk note</span><textarea value={editor.riskNote} onChange={(event) => setEditor({ ...editor, riskNote: event.target.value })} /></label></div>}
       {editor.kind === "carry-forward" && <div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Item</span><input value={editor.title} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /></label><label className={styles.field}><span>Owner</span><input value={editor.ownerId} onChange={(event) => setEditor({ ...editor, ownerId: event.target.value })} /></label><label className={styles.field}><span>Destination</span><select value={editor.destinationModule} onChange={(event) => setEditor({ ...editor, destinationModule: event.target.value as ModuleId })}>{NATIVE_MODULES.map((module) => <option value={module} key={module}>{displayLabel(module)}</option>)}</select></label><label className={styles.field} data-span="full"><span>Reason</span><textarea value={editor.reason} onChange={(event) => setEditor({ ...editor, reason: event.target.value })} /></label><label className={styles.field} data-span="full"><span>Next action</span><textarea value={editor.nextAction} onChange={(event) => setEditor({ ...editor, nextAction: event.target.value })} /></label><label className={styles.field}><span>Due date</span><input type="date" value={editor.dueDate} onChange={(event) => setEditor({ ...editor, dueDate: event.target.value })} /></label></div>}

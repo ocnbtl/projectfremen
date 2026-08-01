@@ -755,6 +755,31 @@
   overflow-wrap: anywhere;
 }
 
+.linkHealthNote,
+.linkAuditNote {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.linkHealthNote {
+  padding: 8px 10px;
+  border: 1px solid #efd7b7;
+  border-radius: 6px;
+  background: #fff9f0;
+  color: #694019;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.linkHealthNote strong {
+  font-family: var(--font-heading);
+}
+
+.linkAuditNote {
+  color: var(--text-muted);
+  font: 650 10px/1.45 var(--font-mono);
+}
+
 .definitionList {
   display: grid;
   grid-template-columns: minmax(100px, 0.35fr) minmax(0, 1fr);

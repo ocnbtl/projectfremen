@@ -6107,12 +6107,30 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
 
 .confirmation-sheet__header,
 .confirmation-sheet__actions {
+  position: sticky;
+  z-index: 2;
   display: flex;
   justify-content: space-between;
   gap: 10px;
+  background: var(--panel-bg);
+}
+
+.confirmation-sheet__header {
+  top: 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.confirmation-sheet__header > button {
+  flex: 0 0 36px;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
 }
 
 .confirmation-sheet__actions {
+  bottom: 0;
   justify-content: flex-end;
   border-top: 1px solid var(--border);
 }
@@ -6123,7 +6141,20 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
   border: 1px solid var(--border-strong);
   border-radius: 7px;
   background: var(--panel-bg);
+  color: var(--text-strong);
   font-weight: 850;
+}
+
+.confirmation-sheet__actions .is-primary {
+  border-color: var(--action-primary);
+  background: var(--action-primary);
+  color: #fff;
+}
+
+.confirmation-sheet__actions .is-primary:disabled {
+  border-color: var(--border-strong);
+  background: var(--panel-bg-subtle);
+  color: var(--text-muted);
 }
 
 .confirmation-sheet__actions .is-danger {

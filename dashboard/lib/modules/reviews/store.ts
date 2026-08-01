@@ -711,14 +711,24 @@ function addContext(run: ReviewRun, sourceRef: NativeObjectRef, relationship: Re
   const key = nativeRefKey(sourceRef);
   const existing = run.contextLinks.find((link) => nativeRefKey(link.sourceRef) === key);
   if (existing) {
+    if (existing.state === "stale" || existing.state === "broken") {
+      existing.relationship = relationship === "context" ? existing.relationship : relationship;
+      return;
+    }
+    const wasRemoved = existing.state === "removed";
     existing.sourceRef = sourceRef;
     existing.lastKnownLabel = sourceRef.label;
     existing.sourceVersion = sourceRef.versionId;
     existing.relationship = relationship === "context" ? existing.relationship : relationship;
-    existing.state = "linked";
-    existing.removedAt = undefined;
-    existing.linkedAt = now;
-    existing.linkedBy = actorId;
+    if (wasRemoved) {
+      existing.state = "linked";
+      existing.removedAt = undefined;
+      existing.linkedAt = now;
+      existing.linkedBy = actorId;
+      existing.healthNote = undefined;
+      existing.healthChangedAt = now;
+      existing.healthChangedBy = actorId;
+    }
     return;
   }
   run.contextLinks.push({
@@ -1022,6 +1032,8 @@ function normalizePatch(value: unknown): ReviewRunPatch {
     "update_checklist",
     "link_context",
     "unlink_context",
+    "update_context_health",
+    "repair_context",
     "update_evidence",
     "upsert_decision",
     "upsert_follow_up",
@@ -1075,6 +1087,52 @@ function applyPatch(run: ReviewRun, rawPatch: unknown, now: string, actorId: str
     if (!link) throw new ReviewsStoreError("not_found", "Review context link not found", { status: 404 });
     link.state = "removed";
     link.removedAt = now;
+  } else if (patch.action === "update_context_health") {
+    const contextLinkId = requiredText(patch.contextLinkId, "contextLinkId", 240);
+    const link = next.contextLinks.find((candidate) => candidate.id === contextLinkId);
+    if (!link) throw new ReviewsStoreError("not_found", "Review context link not found", { status: 404 });
+    if (link.state === "removed") {
+      throw new ReviewsStoreError("conflict", "Removed context links must be restored through the explicit link flow.", { status: 409 });
+    }
+    link.state = enumValue(patch.state, ["stale", "broken"] as const, "stale", "contextLink.state");
+    link.healthNote = requiredText(patch.reason, "contextLink.reason", 4000);
+    link.healthChangedAt = now;
+    link.healthChangedBy = actorId;
+  } else if (patch.action === "repair_context") {
+    const contextLinkId = requiredText(patch.contextLinkId, "contextLinkId", 240);
+    const link = next.contextLinks.find((candidate) => candidate.id === contextLinkId);
+    if (!link) throw new ReviewsStoreError("not_found", "Review context link not found", { status: 404 });
+    if (link.state === "removed") {
+      throw new ReviewsStoreError("conflict", "Removed context links must be restored through the explicit link flow.", { status: 409 });
+    }
+    if (link.state === "linked") {
+      throw new ReviewsStoreError("conflict", "Only stale or broken context links require repair.", { status: 409 });
+    }
+    const sourceRef = normalizeNativeRef(patch.sourceRef, "sourceRef");
+    const duplicate = next.contextLinks.find((candidate) => (
+      candidate.id !== link.id &&
+      candidate.state !== "removed" &&
+      nativeRefKey(candidate.sourceRef) === nativeRefKey(sourceRef)
+    ));
+    if (duplicate) {
+      throw new ReviewsStoreError("conflict", "This ReviewRun already has an active link to that exact source.", { status: 409 });
+    }
+    const reason = requiredText(patch.reason, "contextLink.reason", 4000);
+    const previousSourceRef = link.sourceRef;
+    link.sourceRef = sourceRef;
+    link.lastKnownLabel = sourceRef.label;
+    link.sourceVersion = sourceRef.versionId;
+    link.state = "linked";
+    link.removedAt = undefined;
+    link.healthNote = undefined;
+    link.healthChangedAt = now;
+    link.healthChangedBy = actorId;
+    link.lastRepair = {
+      previousSourceRef,
+      reason,
+      repairedAt: now,
+      repairedBy: actorId
+    };
   } else if (patch.action === "update_evidence") {
     if (!isRecord(patch.evidence)) validation("evidence must be an object", "evidence");
     mutateEvidence(next, patch.evidence, now, actorId);

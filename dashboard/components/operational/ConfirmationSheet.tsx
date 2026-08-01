@@ -50,7 +50,6 @@ export default function ConfirmationSheet({
   const titleId = useId();
   const descriptionId = useId();
   const panelRef = useRef<HTMLDivElement>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null);
   const previousFocusRef = useRef<HTMLElement | null>(null);
   const busyRef = useRef(busy);
   const dismissibleRef = useRef(dismissible);
@@ -65,7 +64,10 @@ export default function ConfirmationSheet({
       return;
     }
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    cancelRef.current?.focus();
+    if (panelRef.current) {
+      panelRef.current.scrollTop = 0;
+      panelRef.current.querySelector<HTMLElement>(FOCUSABLE_SELECTOR)?.focus({ preventScroll: true });
+    }
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape" && dismissibleRef.current && !busyRef.current) {
@@ -157,7 +159,7 @@ export default function ConfirmationSheet({
         {children && <div className="confirmation-sheet__content">{children}</div>}
 
         <footer className="confirmation-sheet__actions">
-          <button ref={cancelRef} type="button" onClick={() => onOpenChange(false)} disabled={busy}>
+          <button type="button" onClick={() => onOpenChange(false)} disabled={busy}>
             {cancelLabel}
           </button>
           <button

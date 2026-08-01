@@ -1591,23 +1591,28 @@ export default function ProjectsWorkspace({
         )}
         {contexts.length ? (
           <ul className={styles.reviewCoverageList}>
-            {contexts.map((context) => (
-              <li key={context.reviewRef.objectId}>
-                <span className={styles.itemBody}>
-                  <strong>{context.title}</strong>
-                  <small>
-                    {displayLabel(context.cadence)} · {displayLabel(context.lifecycle)} · {context.blockerCount} completion blocker{context.blockerCount === 1 ? "" : "s"}
-                  </small>
-                </span>
-                <span className={styles.inlineActions}>
-                  <span className={styles.rowState} data-tone={context.linkState === "linked" ? "green" : context.linkState === "broken" ? "red" : "amber"}>
-                    {displayLabel(context.linkState)}
+            {contexts.map((context) => {
+              const repairLink = context.links.find((link) => link.state === "stale" || link.state === "broken");
+              return (
+                <li key={context.reviewRef.objectId}>
+                  <span className={styles.itemBody}>
+                    <strong>{context.title}</strong>
+                    <small>
+                      {displayLabel(context.cadence)} · {displayLabel(context.lifecycle)} · {context.blockerCount} completion blocker{context.blockerCount === 1 ? "" : "s"}
+                    </small>
                   </span>
-                  {context.current && <span className={styles.relationshipChip} data-tone="blue">Current</span>}
-                  <Link className={styles.textLink} href={context.reviewRef.route}>Open ReviewRun</Link>
-                </span>
-              </li>
-            ))}
+                  <span className={styles.inlineActions}>
+                    <span className={styles.rowState} data-tone={context.linkState === "linked" ? "green" : context.linkState === "broken" ? "red" : "amber"}>
+                      {displayLabel(context.linkState)}
+                    </span>
+                    {context.current && <span className={styles.relationshipChip} data-tone="blue">Current</span>}
+                    {repairLink
+                      ? <Link className={styles.textLink} href={`${context.reviewRef.route}?tab=overview&item=${encodeURIComponent(repairLink.id)}`}>Repair in Reviews</Link>
+                      : <Link className={styles.textLink} href={context.reviewRef.route}>Open ReviewRun</Link>}
+                  </span>
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <SystemState
