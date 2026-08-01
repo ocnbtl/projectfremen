@@ -5164,6 +5164,7 @@ async function checkCrossModuleFollowUpConnections(
   cookieJar,
   csrfToken,
   project,
+  milestone,
   blocker,
   note,
   reviewRun,
@@ -5184,6 +5185,18 @@ async function checkCrossModuleFollowUpConnections(
         route: `/admin/projects/${encodeURIComponent(project.id)}`
       },
       title: `${project.name} · operating follow-through`
+    },
+    {
+      key: "milestone",
+      source: {
+        module: "projects",
+        objectType: "milestone",
+        objectId: milestone.id,
+        containerObjectId: project.id,
+        label: milestone.title,
+        route: `/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(milestone.id)}`
+      },
+      title: `${milestone.title} · owner follow-through`
     },
     {
       key: "blocker",
@@ -5269,11 +5282,11 @@ async function checkCrossModuleFollowUpConnections(
         family: "followUps",
         input: {
           title: fixture.title,
-          followUpType: fixture.key === "blocker" ? "project_follow_up" : "other",
+          followUpType: ["milestone", "blocker"].includes(fixture.key) ? "project_follow_up" : "other",
           context: `Regression verifies ${fixture.source.module} reads status from the Personal Ops-owned object.`,
           lifecycle: "active",
           followUpState: "scheduled",
-          priority: fixture.key === "blocker" ? "high" : "medium",
+          priority: ["milestone", "blocker"].includes(fixture.key) ? "high" : "medium",
           domain: "Operations",
           dueAt: "2026-08-21T12:00:00.000Z",
           sourceRefs: [fixture.source]
@@ -5403,7 +5416,7 @@ async function checkCrossModuleFollowUpConnections(
       `${baseUrl}/admin/notes/${encodeURIComponent(note.id)}?tab=decisions`,
       { waitUntil: "networkidle" }
     );
-    const notePanel = await assertPanel(desktopPage, sources[2], "Notes follow-through");
+    const notePanel = await assertPanel(desktopPage, sources[3], "Notes follow-through");
     await notePanel.row.click();
     await desktopPage.waitForURL((url) =>
       url.pathname === "/admin/personal/follow-ups" &&
@@ -5426,7 +5439,13 @@ async function checkCrossModuleFollowUpConnections(
       `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}`,
       { waitUntil: "networkidle" }
     );
-    await assertPanel(desktopPage, sources[1], "Project Blocker follow-through");
+    await assertPanel(desktopPage, sources[2], "Project Blocker follow-through");
+
+    await desktopPage.goto(
+      `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(milestone.id)}`,
+      { waitUntil: "networkidle" }
+    );
+    await assertPanel(desktopPage, sources[1], "Project Milestone follow-through");
 
     await desktopPage.goto(
       `${baseUrl}/admin/resources/${encodeURIComponent(resource.id)}?tab=overview`,
@@ -5434,7 +5453,7 @@ async function checkCrossModuleFollowUpConnections(
     );
     const resourcePanel = await assertPanel(
       desktopPage,
-      sources[4],
+      sources[5],
       "Resource follow-through"
     );
     await resourcePanel.row.click();
@@ -5458,7 +5477,7 @@ async function checkCrossModuleFollowUpConnections(
     );
     const mediaPanel = await assertPanel(
       desktopPage,
-      sources[5],
+      sources[6],
       "Media follow-through"
     );
     const mediaOwner = createdByKey.get("media");
@@ -5531,7 +5550,7 @@ async function checkCrossModuleFollowUpConnections(
     );
     await desktopPage.unroute("**/api/personal/ops?family=followUps");
 
-    for (const fixture of [sources[4], sources[5]]) {
+    for (const fixture of [sources[5], sources[6]]) {
       await desktopPage.goto(
         `${baseUrl}${followUpCreationPath(fixture.source)}`,
         { waitUntil: "networkidle" }
@@ -5562,7 +5581,7 @@ async function checkCrossModuleFollowUpConnections(
       `${baseUrl}/admin/reviews/${encodeURIComponent(reviewRun.id)}?tab=follow-ups&item=${encodeURIComponent(reviewFollowUp.id)}`,
       { waitUntil: "networkidle" }
     );
-    await assertPanel(desktopPage, sources[3], "Review follow-through");
+    await assertPanel(desktopPage, sources[4], "Review follow-through");
     const reviewItem = desktopPage.locator(`#review-item-${reviewFollowUp.id}`);
     await Promise.all([
       desktopPage.waitForResponse(
@@ -5641,6 +5660,10 @@ async function checkCrossModuleFollowUpConnections(
       {
         key: "blocker",
         path: `/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}`
+      },
+      {
+        key: "milestone",
+        path: `/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(milestone.id)}`
       },
       {
         key: "note",
@@ -5785,6 +5808,8 @@ async function checkCrossModuleDecisionConnections(
   cookieJar,
   csrfToken,
   project,
+  milestone,
+  blocker,
   reviewRun,
   reviewDecision
 ) {
@@ -5837,6 +5862,32 @@ async function checkCrossModuleDecisionConnections(
         route: "/admin/finance/monthly-review?selected=budget-overruns&tab=decisions"
       },
       title: "Travel overage · monthly close decision",
+      state: "open"
+    },
+    {
+      key: "milestone",
+      source: {
+        module: "projects",
+        objectType: "milestone",
+        objectId: milestone.id,
+        containerObjectId: project.id,
+        label: milestone.title,
+        route: `/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(milestone.id)}`
+      },
+      title: `${milestone.title} · durable operating decision`,
+      state: "open"
+    },
+    {
+      key: "blocker",
+      source: {
+        module: "projects",
+        objectType: "blocker",
+        objectId: blocker.id,
+        containerObjectId: project.id,
+        label: blocker.title,
+        route: `/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}`
+      },
+      title: `${blocker.title} · durable operating decision`,
       state: "open"
     }
   ];
@@ -6020,6 +6071,40 @@ async function checkCrossModuleDecisionConnections(
     await projectPage
       .locator(`[data-decision-id="${projectOwner.id}"][data-decision-state="decided"]`)
       .waitFor();
+
+    await projectPage.goto(`${baseUrl}${sources[4].source.route}`, { waitUntil: "networkidle" });
+    const milestonePanel = await assertPanel(projectPage, sources[4], "Project milestone decisions");
+    assert(
+      await projectPage.locator('section[aria-labelledby^="project-selected-child-"]').getByRole("link", { name: "File decision" }).count() === 0,
+      "Project milestone inspector offered a duplicate Decision creation action"
+    );
+    assert(
+      (await projectPage.getByLabel(/active Follow-ups, 1 unresolved Decisions, \d+ Reviews/).count()) >= 1,
+      "Project milestone row did not summarize current Personal Ops and Reviews owner state"
+    );
+    await milestonePanel.row.click();
+    await projectPage.waitForURL((url) =>
+      url.pathname === "/admin/personal/decisions" &&
+      url.searchParams.get("selected") === createdByKey.get("milestone").id
+    );
+    await projectPage.goBack({ waitUntil: "networkidle" });
+    assert(
+      new URL(projectPage.url()).pathname === `/admin/projects/${project.id}` &&
+        new URL(projectPage.url()).searchParams.get("tab") === "timeline" &&
+        new URL(projectPage.url()).searchParams.get("item") === milestone.id,
+      "Browser Back did not restore the selected Project milestone and Timeline tab"
+    );
+
+    await projectPage.goto(`${baseUrl}${sources[5].source.route}`, { waitUntil: "networkidle" });
+    await assertPanel(projectPage, sources[5], "Project blocker decisions");
+    assert(
+      await projectPage.locator('section[aria-labelledby^="project-selected-child-"]').getByRole("link", { name: "File decision" }).count() === 0,
+      "Project blocker inspector offered a duplicate Decision creation action"
+    );
+    assert(
+      (await projectPage.getByLabel(/active Follow-ups, 1 unresolved Decisions, \d+ Reviews/).count()) >= 1,
+      "Project blocker row did not summarize current Personal Ops and Reviews owner state"
+    );
 
     const reviewPage = await desktopContext.newPage();
     observe(reviewPage);
@@ -14419,6 +14504,7 @@ async function main() {
       cookieJar,
       csrfToken,
       promotedProject,
+      projectMilestone,
       projectBlocker,
       { ...createdNote, title: updatedNoteTitle },
       weeklyReviewRun,
@@ -14430,7 +14516,7 @@ async function main() {
     weeklyReviewRun = crossModuleFollowUpResult.run;
     weeklyReviewView = crossModuleFollowUpResult.view;
     let reviewFollowUpOwner = crossModuleFollowUpResult.reviewOwner;
-    pass("Projects, Blockers, Notes, and Reviews share exact Personal Ops Follow-up owner state without duplicate native objects");
+    pass("Projects, Milestones, Blockers, Notes, and Reviews share exact Personal Ops Follow-up owner state without duplicate native objects");
     pass("Resources and Media share current Personal Ops Follow-up owner state with duplicate-safe handoffs and recoverable refresh failures");
 
     const addReviewDecisionCandidate = await requestJson(
@@ -14497,12 +14583,15 @@ async function main() {
       cookieJar,
       csrfToken,
       promotedProject,
+      projectMilestone,
+      projectBlocker,
       weeklyReviewRun,
       reviewDecisionCandidate
     );
     weeklyReviewRun = crossModuleDecisionResult.run;
     weeklyReviewView = crossModuleDecisionResult.view;
-    pass("Projects, Reviews, and Finance share exact Personal Ops Decision state while preserving module ownership");
+    pass("Projects, Milestones, Blockers, Reviews, and Finance share exact Personal Ops Decision state while preserving module ownership");
+    pass("Project timeline rows and child inspectors reconcile Personal Ops owner state with Review coverage without duplicate native objects");
 
     await checkPeopleProjectConnections(
       server.baseUrl,

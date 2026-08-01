@@ -22,10 +22,13 @@ import { usePersonalOpsDecisions } from "../operational/usePersonalOpsDecisions"
 import { usePersonalOpsFollowUps } from "../operational/usePersonalOpsFollowUps";
 import {
   buildDecisionCreationRoute,
+  getLinkedDecisions,
+  isUnresolvedDecision,
   type DecisionSourceRef
 } from "../../lib/modules/personal-ops/decision-links";
 import {
   buildFollowUpCreationRoute,
+  getActiveFollowUpsForSource,
   type FollowUpSourceRef
 } from "../../lib/modules/personal-ops/follow-up-links";
 import type {
@@ -411,16 +414,21 @@ function projectFollowUpSource(
   };
 }
 
-function projectDecisionSource(project: ProjectDisplayRecord): DecisionSourceRef {
+function projectDecisionSource(
+  project: ProjectDisplayRecord,
+  source?: { objectType: string; objectId: string; label: string }
+): DecisionSourceRef {
   return {
     module: "projects",
-    objectType: "project",
-    objectId: project.id,
-    label: project.name,
+    objectType: source?.objectType || "project",
+    objectId: source?.objectId || project.id,
+    ...(source ? { containerObjectId: project.id } : {}),
+    label: source?.label || project.name,
     route: getNativeObjectRoute({
       module: "projects",
-      objectType: "project",
-      objectId: project.id
+      objectType: source?.objectType || "project",
+      objectId: source?.objectId || project.id,
+      ...(source ? { containerObjectId: project.id } : {})
     })
   };
 }
@@ -440,23 +448,13 @@ function projectReviewSource(
 function personalOpsCreateHref(
   collection: "decisions" | "follow-ups",
   project: ProjectDisplayRecord,
-  source?: { objectType: string; objectId: string; label: string }
+  source?: { objectType: string; objectId: string; label: string },
+  options: { dueAt?: string } = {}
 ) {
   if (collection === "follow-ups") {
-    return buildFollowUpCreationRoute(projectFollowUpSource(project, source));
+    return buildFollowUpCreationRoute(projectFollowUpSource(project, source), options);
   }
-  if (!source) {
-    return buildDecisionCreationRoute(projectDecisionSource(project));
-  }
-  const params = new URLSearchParams({
-    create: "decision",
-    sourceModule: "projects",
-    sourceObjectType: source?.objectType || "project",
-    sourceObjectId: source?.objectId || project.id,
-    sourceLabel: source?.label || project.name
-  });
-  if (source) params.set("sourceContainerObjectId", project.id);
-  return `/admin/personal/${collection}?${params.toString()}`;
+  return buildDecisionCreationRoute(projectDecisionSource(project, source), options);
 }
 
 function nativeCreateHref(module: "notes" | "people" | "media" | "resources", project: ProjectDisplayRecord) {
@@ -1795,23 +1793,42 @@ export default function ProjectsWorkspace({
           </div>
           {item.milestones.length ? (
             <ul className={styles.objectList}>
-              {item.milestones.map((milestone) => (
-                <li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}>
-                  <span className={styles.itemBody}>
-                    <strong>{milestone.title}</strong>
-                    <small>{formatDate(milestone.dueAt)} · {displayLabel(milestone.state)} · {milestone.owner || "No owner"}</small>
-                  </span>
-                  <span className={styles.inlineActions}>
-                    <button type="button" className={styles.button} onClick={() => selectChild(milestone.id, "timeline")}>Inspect</button>
-                    {!['complete', 'archived'].includes(milestone.state) && (
-                      <button type="button" className={styles.button} disabled={!milestone.completionCriteria.length || ["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? item.project.lifecycle === "complete" ? "Completed projects are read-only; reopen behavior is intentionally unavailable." : "Restore the project before completing milestones." : !milestone.completionCriteria.length ? "Add completion criteria before completing this milestone." : undefined} onClick={() => {
-                        setConfirmationReason("");
-                        setConfirmation({ kind: "milestone-complete", projectId: item.project.id, objectId: milestone.id });
-                      }}>Complete</button>
-                    )}
-                  </span>
-                </li>
-              ))}
+              {item.milestones.map((milestone) => {
+                const source = projectFollowUpSource(item.project, {
+                  objectType: "milestone",
+                  objectId: milestone.id,
+                  label: milestone.title
+                });
+                const activeFollowUpCount = getActiveFollowUpsForSource(followUps, source).length;
+                const unresolvedDecisionCount = getLinkedDecisions(decisions, source).filter(isUnresolvedDecision).length;
+                const reviewCount = getProjectSourceReviewContexts(reviewViews, projectReviewSource(item.project, {
+                  objectType: "milestone",
+                  objectId: milestone.id,
+                  label: milestone.title
+                })).length;
+                return (
+                  <li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}>
+                    <span className={styles.itemBody}>
+                      <strong>{milestone.title}</strong>
+                      <small>{formatDate(milestone.dueAt)} · {displayLabel(milestone.state)} · {milestone.owner || "No owner"}</small>
+                      <span className={styles.ownerSummary} aria-label={`${activeFollowUpCount} active Follow-ups, ${unresolvedDecisionCount} unresolved Decisions, ${reviewCount} Reviews`}>
+                        <span className={styles.relationshipChip} data-tone={activeFollowUpCount ? "blue" : undefined}>Follow-ups {activeFollowUpCount}</span>
+                        <span className={styles.relationshipChip} data-tone={unresolvedDecisionCount ? "purple" : undefined}>Decisions {unresolvedDecisionCount}</span>
+                        <span className={styles.relationshipChip} data-tone={reviewCount ? "blue" : undefined}>Reviews {reviewCount}</span>
+                      </span>
+                    </span>
+                    <span className={styles.inlineActions}>
+                      <button type="button" className={styles.button} onClick={() => selectChild(milestone.id, "timeline")}>Inspect</button>
+                      {!['complete', 'archived'].includes(milestone.state) && (
+                        <button type="button" className={styles.button} disabled={!milestone.completionCriteria.length || ["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? item.project.lifecycle === "complete" ? "Completed projects are read-only; reopen behavior is intentionally unavailable." : "Restore the project before completing milestones." : !milestone.completionCriteria.length ? "Add completion criteria before completing this milestone." : undefined} onClick={() => {
+                          setConfirmationReason("");
+                          setConfirmation({ kind: "milestone-complete", projectId: item.project.id, objectId: milestone.id });
+                        }}>Complete</button>
+                      )}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           ) : <SystemState variant="empty" compact title="No native milestones" description={item.project.editable ? "Add the next concrete gate; no legacy task counts are converted into milestones." : "Start tracking to add native milestones."} />}
         </section>
@@ -1822,19 +1839,38 @@ export default function ProjectsWorkspace({
           </div>
           {item.blockers.length ? (
             <ul className={styles.objectList}>
-              {item.blockers.map((blocker) => (
-                <li key={blocker.id} aria-current={selectedChildId === blocker.id || undefined}>
-                  <span className={styles.itemBody}>
-                    <strong>{blocker.title}</strong>
-                    <small>{displayLabel(blocker.state)} · {displayLabel(blocker.severity)} · {blocker.owner || "No owner"}</small>
-                  </span>
-                  <span className={styles.inlineActions}>
-                    <button type="button" className={styles.button} onClick={() => selectChild(blocker.id, "timeline")}>Inspect</button>
-                    {blocker.state === "open" && <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve</button>}
-                    <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title })}>Follow-up</Link>
-                  </span>
-                </li>
-              ))}
+              {item.blockers.map((blocker) => {
+                const source = projectFollowUpSource(item.project, {
+                  objectType: "blocker",
+                  objectId: blocker.id,
+                  label: blocker.title
+                });
+                const activeFollowUpCount = getActiveFollowUpsForSource(followUps, source).length;
+                const unresolvedDecisionCount = getLinkedDecisions(decisions, source).filter(isUnresolvedDecision).length;
+                const reviewCount = getProjectSourceReviewContexts(reviewViews, projectReviewSource(item.project, {
+                  objectType: "blocker",
+                  objectId: blocker.id,
+                  label: blocker.title
+                })).length;
+                return (
+                  <li key={blocker.id} aria-current={selectedChildId === blocker.id || undefined}>
+                    <span className={styles.itemBody}>
+                      <strong>{blocker.title}</strong>
+                      <small>{displayLabel(blocker.state)} · {displayLabel(blocker.severity)} · {blocker.owner || "No owner"}</small>
+                      <span className={styles.ownerSummary} aria-label={`${activeFollowUpCount} active Follow-ups, ${unresolvedDecisionCount} unresolved Decisions, ${reviewCount} Reviews`}>
+                        <span className={styles.relationshipChip} data-tone={activeFollowUpCount ? "blue" : undefined}>Follow-ups {activeFollowUpCount}</span>
+                        <span className={styles.relationshipChip} data-tone={unresolvedDecisionCount ? "purple" : undefined}>Decisions {unresolvedDecisionCount}</span>
+                        <span className={styles.relationshipChip} data-tone={reviewCount ? "blue" : undefined}>Reviews {reviewCount}</span>
+                      </span>
+                    </span>
+                    <span className={styles.inlineActions}>
+                      <button type="button" className={styles.button} onClick={() => selectChild(blocker.id, "timeline")}>Inspect</button>
+                      {blocker.state === "open" && <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve</button>}
+                      <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}>Follow-up</Link>
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           ) : <SystemState variant="empty" compact title="No native blockers" description="Legacy action items are deliberately not inferred as Project blockers." />}
         </section>
@@ -1864,6 +1900,8 @@ export default function ProjectsWorkspace({
   function renderNotesDecisions(item: ProjectDirectoryItem) {
     const noteContext = item.linkedContext.filter((context) => context.ref.module === "notes");
     const decisionContext = item.linkedContext.filter((context) => context.ref.module === "personal_ops" && context.ref.objectType === "decision");
+    const projectDecisionOwner = projectDecisionSource(item.project);
+    const hasProjectDecisionOwner = getLinkedDecisions(decisions, projectDecisionOwner).length > 0;
     return (
       <div className={styles.overviewGrid}>
         <section className={styles.panel} data-wide="true">
@@ -1871,7 +1909,7 @@ export default function ProjectsWorkspace({
             <div><h2>Notes and decision context</h2><p>Authored knowledge remains in Notes; durable decisions remain in Personal Ops.</p></div>
             <span className={styles.inlineActions}>
               <Link className={styles.textLink} href={nativeCreateHref("notes", item.project)}>Open Notes</Link>
-              <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link>
+              {!hasProjectDecisionOwner && <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link>}
               <button type="button" className={styles.button} onClick={() => openEditor("link-create", item)} disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined}>Link existing</button>
             </span>
           </div>
@@ -2082,6 +2120,26 @@ export default function ProjectsWorkspace({
     const blocker = item.blockers.find((candidate) => candidate.id === selectedChildId);
     const link = item.links.find((candidate) => candidate.id === selectedChildId);
     const timelineEvent = item.timelineEvents.find((candidate) => candidate.id === selectedChildId);
+    const milestoneDecisionSource = milestone
+      ? projectDecisionSource(item.project, {
+          objectType: "milestone",
+          objectId: milestone.id,
+          label: milestone.title
+        })
+      : undefined;
+    const blockerDecisionSource = blocker
+      ? projectDecisionSource(item.project, {
+          objectType: "blocker",
+          objectId: blocker.id,
+          label: blocker.title
+        })
+      : undefined;
+    const hasMilestoneDecisionOwner = milestoneDecisionSource
+      ? getLinkedDecisions(decisions, milestoneDecisionSource).length > 0
+      : false;
+    const hasBlockerDecisionOwner = blockerDecisionSource
+      ? getLinkedDecisions(decisions, blockerDecisionSource).length > 0
+      : false;
     const headingId = `project-selected-child-${selectedChildId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
     const parentReadOnly = ["complete", "archived"].includes(item.project.lifecycle);
     const parentReadOnlyReason = item.project.lifecycle === "complete"
@@ -2124,7 +2182,43 @@ export default function ProjectsWorkspace({
               <strong>Completion criteria</strong>
               {milestone.completionCriteria.length ? <ul className={styles.criteriaList}>{milestone.completionCriteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul> : <p className={styles.notice}>No completion criteria are stored. Completion stays disabled until criteria are added.</p>}
             </div>
-            {milestone.linkedRefs.length > 0 && <div className={styles.inlineActions}>{milestone.linkedRefs.map((ref) => <Link className={styles.textLink} href={ref.route} key={`${ref.module}-${ref.objectId}`}>{ref.label}</Link>)}</div>}
+            <div className={styles.inlineActions} aria-label="Milestone owner actions">
+              <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, { dueAt: milestone.dueAt })}>Create follow-up</Link>
+              {!hasMilestoneDecisionOwner && <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, { dueAt: milestone.dueAt })}>File decision</Link>}
+              {milestone.linkedRefs.map((ref) => <Link className={styles.textLink} href={ref.route} key={`${ref.module}-${ref.objectId}`}>Open {ref.label}</Link>)}
+            </div>
+            <LinkedFollowUpsPanel
+              source={projectFollowUpSource(item.project, {
+                objectType: "milestone",
+                objectId: milestone.id,
+                label: milestone.title
+              })}
+              followUps={followUps}
+              loading={followUpsLoading}
+              error={followUpsError}
+              onRefresh={() => void refreshFollowUps()}
+              createHref={personalOpsCreateHref("follow-ups", item.project, {
+                objectType: "milestone",
+                objectId: milestone.id,
+                label: milestone.title
+              }, { dueAt: milestone.dueAt })}
+              compact
+              title="Milestone follow-through"
+            />
+            <LinkedDecisionsPanel
+              source={milestoneDecisionSource!}
+              decisions={decisions}
+              loading={decisionsLoading}
+              error={decisionsError}
+              onRefresh={() => void refreshDecisions()}
+              createHref={personalOpsCreateHref("decisions", item.project, {
+                objectType: "milestone",
+                objectId: milestone.id,
+                label: milestone.title
+              }, { dueAt: milestone.dueAt })}
+              compact
+              title="Milestone decisions"
+            />
             {renderReviewCoverage(item, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, true)}
           </div>
         )}
@@ -2141,7 +2235,8 @@ export default function ProjectsWorkspace({
             {blocker.resolution && <p><strong>Resolution:</strong> {blocker.resolution}</p>}
             <div className={styles.inlineActions}>
               {blocker.state === "open" && <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve blocker</button>}
-              <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title })}>Create follow-up</Link>
+              <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}>Create follow-up</Link>
+              {!hasBlockerDecisionOwner && <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}>File decision</Link>}
               {blocker.sourceRefs.map((ref) => <Link className={styles.textLink} href={ref.route} key={`${ref.module}-${ref.objectId}`}>Open {ref.label}</Link>)}
             </div>
             <LinkedFollowUpsPanel
@@ -2158,9 +2253,23 @@ export default function ProjectsWorkspace({
                 objectType: "blocker",
                 objectId: blocker.id,
                 label: blocker.title
-              })}
+              }, { dueAt: blocker.dueAt })}
               compact
               title="Blocker follow-through"
+            />
+            <LinkedDecisionsPanel
+              source={blockerDecisionSource!}
+              decisions={decisions}
+              loading={decisionsLoading}
+              error={decisionsError}
+              onRefresh={() => void refreshDecisions()}
+              createHref={personalOpsCreateHref("decisions", item.project, {
+                objectType: "blocker",
+                objectId: blocker.id,
+                label: blocker.title
+              }, { dueAt: blocker.dueAt })}
+              compact
+              title="Blocker decisions"
             />
             {renderReviewCoverage(item, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, true)}
           </div>
@@ -2262,6 +2371,26 @@ export default function ProjectsWorkspace({
     const incompleteMilestones = activeMilestones(item);
     const blockers = openBlockers(item);
     const reviewContexts = getProjectReviewContexts(reviewViews, item.project.id);
+    const ownerSources = [
+      projectFollowUpSource(item.project),
+      ...item.milestones.map((milestone) => projectFollowUpSource(item.project, {
+        objectType: "milestone",
+        objectId: milestone.id,
+        label: milestone.title
+      })),
+      ...item.blockers.map((blocker) => projectFollowUpSource(item.project, {
+        objectType: "blocker",
+        objectId: blocker.id,
+        label: blocker.title
+      }))
+    ];
+    const activeOwnerFollowUps = new Set(
+      ownerSources.flatMap((source) => getActiveFollowUpsForSource(followUps, source).map((followUp) => followUp.id))
+    ).size;
+    const unresolvedOwnerDecisions = new Set(
+      ownerSources.flatMap((source) => getLinkedDecisions(decisions, source).filter(isUnresolvedDecision).map((decision) => decision.id))
+    ).size;
+    const hasProjectDecisionOwner = getLinkedDecisions(decisions, projectDecisionSource(item.project)).length > 0;
     return (
       <>
         <section className={styles.panel}>
@@ -2272,7 +2401,10 @@ export default function ProjectsWorkspace({
             <li><span>Blockers resolved or waived</span><span className={styles.rowState} data-tone={blockers.length ? "red" : "green"}>{blockers.length ? `${blockers.length} open` : "Ready"}</span></li>
             <li><span>Project owner assigned</span><span className={styles.rowState} data-tone={item.project.owner ? "green" : "amber"}>{item.project.owner ? "Ready" : "Missing"}</span></li>
             <li><span>Review evidence linked</span><span className={styles.rowState} data-tone={reviewContexts.length ? "green" : "amber"}>{reviewContexts.length ? `${reviewContexts.length} ReviewRun${reviewContexts.length === 1 ? "" : "s"}` : "Not linked"}</span></li>
+            <li><span>Personal Ops follow-through</span><span className={styles.rowState} data-tone={activeOwnerFollowUps ? "amber" : "green"}>{activeOwnerFollowUps ? `${activeOwnerFollowUps} active` : "No active"}</span></li>
+            <li><span>Durable decisions unresolved</span><span className={styles.rowState} data-tone={unresolvedOwnerDecisions ? "amber" : "green"}>{unresolvedOwnerDecisions ? `${unresolvedOwnerDecisions} open` : "No open"}</span></li>
           </ul>
+          <p className={styles.ownershipNote}>Personal Ops items remain owner-controlled context; project completion never closes or rewrites them.</p>
         </section>
         <section className={styles.panel}>
           <h2>Attention rail</h2>
@@ -2281,7 +2413,7 @@ export default function ProjectsWorkspace({
         <section className={styles.panel}>
           <h2>Owner-module actions</h2>
           <div className={styles.inlineActions}>
-            <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link>
+            {!hasProjectDecisionOwner && <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link>}
             <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project)}>Create follow-up</Link>
             <Link className={styles.textLink} href={getModuleRoute("reviews")}>Open Reviews</Link>
             <Link className={styles.textLink} href={buildProjectReviewHandoffRoute(projectReviewSource(item.project))}>Link project context</Link>
@@ -2494,7 +2626,7 @@ export default function ProjectsWorkspace({
       : confirmation?.kind === "project-restore"
         ? "The project will return to active views. Existing history and references remain unchanged."
         : confirmation?.kind === "milestone-complete"
-          ? "The milestone completion will be recorded on the native project timeline."
+          ? "The milestone completion will be recorded on the native project timeline. Linked Personal Ops and Reviews records remain unchanged and keep their own lifecycle."
           : confirmation?.kind === "link-remove"
             ? "Only the Project reference will be removed. The source object remains unchanged in its owner module."
             : "The existing typed reference will return to its state from before removal.";
