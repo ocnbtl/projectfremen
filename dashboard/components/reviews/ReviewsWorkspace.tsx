@@ -16,6 +16,22 @@ import MetricStrip from "../operational/MetricStrip";
 import ObjectHeader from "../operational/ObjectHeader";
 import QuickActionBar, { type QuickAction } from "../operational/QuickActionBar";
 import SystemState from "../operational/SystemState";
+import LinkedDecisionsPanel from "../operational/LinkedDecisionsPanel";
+import LinkedFollowUpsPanel from "../operational/LinkedFollowUpsPanel";
+import { usePersonalOpsDecisions } from "../operational/usePersonalOpsDecisions";
+import { usePersonalOpsFollowUps } from "../operational/usePersonalOpsFollowUps";
+import {
+  getLinkedDecisions,
+  type DecisionSourceRef
+} from "../../lib/modules/personal-ops/decision-links";
+import {
+  getLinkedFollowUps,
+  type FollowUpSourceRef
+} from "../../lib/modules/personal-ops/follow-up-links";
+import type {
+  PersonalOpsDecision,
+  PersonalOpsFollowUp
+} from "../../lib/modules/personal-ops/types";
 import { createReviewsRepository } from "../../lib/modules/reviews/repository";
 import { REVIEW_DECISION_READINESS_CHECKS } from "../../lib/modules/reviews/templates";
 import type {
@@ -26,7 +42,9 @@ import type {
   ReviewCompletionBlocker,
   ReviewContextLink,
   ReviewContextRelationship,
+  ReviewDecisionItem,
   ReviewEvidenceItem,
+  ReviewFollowUpLink,
   ReviewRun,
   ReviewRunCreateInput,
   ReviewRunPatch,
@@ -52,6 +70,10 @@ type ReviewsWorkspaceProps = {
   initialSelectedReviewId?: string;
   initialLoadError?: string;
   financeBridge: FinanceReviewBridge;
+  initialPersonalOpsDecisions: PersonalOpsDecision[];
+  initialDecisionsError?: string;
+  initialPersonalOpsFollowUps: PersonalOpsFollowUp[];
+  initialFollowUpsError?: string;
 };
 
 type SourceDraft = {
@@ -337,6 +359,26 @@ function personalOpsCreateRoute(kind: "decision" | "follow-up", run: ReviewRun, 
   return `/admin/personal/${kind === "decision" ? "decisions" : "follow-ups"}?${params.toString()}`;
 }
 
+function reviewFollowUpSource(run: ReviewRun, item: ReviewFollowUpLink): FollowUpSourceRef {
+  return createNativeObjectRef({
+    module: "reviews",
+    objectType: "review_follow_up",
+    objectId: item.id,
+    containerObjectId: run.id,
+    label: item.title
+  }) as FollowUpSourceRef;
+}
+
+function reviewDecisionSource(run: ReviewRun, item: ReviewDecisionItem): DecisionSourceRef {
+  return createNativeObjectRef({
+    module: "reviews",
+    objectType: "review_decision_item",
+    objectId: item.id,
+    containerObjectId: run.id,
+    label: item.title
+  }) as DecisionSourceRef;
+}
+
 function SourceFields({ draft, onChange }: { draft: SourceDraft; onChange: (patch: Partial<SourceDraft>) => void }) {
   return (
     <div className={styles.formGrid}>
@@ -373,12 +415,28 @@ export default function ReviewsWorkspace({
   initialMode = "index",
   initialSelectedReviewId = "",
   initialLoadError = "",
-  financeBridge
+  financeBridge,
+  initialPersonalOpsDecisions,
+  initialDecisionsError = "",
+  initialPersonalOpsFollowUps,
+  initialFollowUpsError = ""
 }: ReviewsWorkspaceProps) {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const repository = useMemo(() => createReviewsRepository(), []);
+  const {
+    decisions,
+    error: decisionsError,
+    loading: decisionsLoading,
+    refresh: refreshDecisions
+  } = usePersonalOpsDecisions(initialPersonalOpsDecisions, initialDecisionsError);
+  const {
+    followUps,
+    error: followUpsError,
+    loading: followUpsLoading,
+    refresh: refreshFollowUps
+  } = usePersonalOpsFollowUps(initialPersonalOpsFollowUps, initialFollowUpsError);
   const urlState = useMemo(() => parseReviewsUrlState(searchParams), [searchParams]);
   const [state, setState] = useState(initialState);
   const [busy, setBusy] = useState(false);
@@ -628,6 +686,75 @@ export default function ReviewsWorkspace({
     setNotice(refreshed ? successMessage : `${successMessage} The confirmed response is shown, but the collection refresh failed.`);
     setBusy(false);
     return true;
+  }
+
+  async function linkExactDecision(
+    run: ReviewRun,
+    candidate: ReviewDecisionItem,
+    ownerDecision: PersonalOpsDecision
+  ) {
+    const {
+      createdAt: _createdAt,
+      updatedAt: _updatedAt,
+      filedAt: _filedAt,
+      filedBy: _filedBy,
+      ...decision
+    } = candidate;
+    return patchRun(
+      run,
+      {
+        action: "upsert_decision",
+        decision: {
+          ...decision,
+          state: "filed",
+          destinationModule: "personal_ops",
+          destinationObjectType: "decision",
+          destinationRef: createNativeObjectRef({
+            module: "personal_ops",
+            objectType: "decision",
+            objectId: ownerDecision.id,
+            label: ownerDecision.title
+          }),
+          rationale:
+            candidate.rationale.trim() ||
+            ownerDecision.rationale?.trim() ||
+            ownerDecision.finalDecision?.trim() ||
+            "This Review explicitly links the exact source-backed Personal Ops Decision."
+        }
+      },
+      "Exact Personal Ops Decision linked. Personal Ops remains the decision-state owner."
+    );
+  }
+
+  async function linkExactFollowUp(
+    run: ReviewRun,
+    candidate: ReviewFollowUpLink,
+    ownerFollowUp: PersonalOpsFollowUp
+  ) {
+    const { createdAt: _createdAt, updatedAt: _updatedAt, ...followUp } = candidate;
+    const ownerIsComplete =
+      ownerFollowUp.lifecycle === "complete" ||
+      ownerFollowUp.followUpState === "complete";
+    return patchRun(
+      run,
+      {
+        action: "upsert_follow_up",
+        followUp: {
+          ...followUp,
+          state: ownerIsComplete ? "completed" : "created",
+          destinationModule: "personal_ops",
+          createdObjectRef: createNativeObjectRef({
+            module: "personal_ops",
+            objectType: "follow_up",
+            objectId: ownerFollowUp.id,
+            label: ownerFollowUp.title
+          })
+        }
+      },
+      ownerIsComplete
+        ? "Exact Personal Ops Follow-up linked and its completed owner state recorded."
+        : "Exact Personal Ops Follow-up linked. Personal Ops remains the lifecycle owner."
+    );
   }
 
   async function handleEditorConfirm() {
@@ -1035,20 +1162,56 @@ export default function ReviewsWorkspace({
         </div>
         {run.decisions.length === 0 ? <SystemState variant="empty" title="No decision candidates" description="Add a source-backed candidate when this review surfaces a durable choice." compact /> : (
           <ul className={styles.list}>
-            {run.decisions.map((item) => (
-              <li id={`review-item-${item.id}`} className={styles.sourceRow} data-selected={urlState.item === item.id || undefined} tabIndex={-1} key={item.id}>
-                <div className={styles.sourceTop}>
-                  <div><strong>{item.title}</strong><p>{item.question}</p></div>
-                  <span className={styles.stateChip} data-tone={RESOLVED_DECISION_STATES.has(item.state) ? "positive" : "attention"}>{displayLabel(item.state)}</span>
-                </div>
-                <div className={styles.sourceLine}><span>Source</span><Link href={item.sourceRef.route}>{item.sourceRef.label}</Link></div>
-                <div className={styles.inlineActions}>
-                  {item.destinationRef ? <Link className={styles.textLink} href={item.destinationRef.route}>Open filed Decision</Link> : <><Link className={styles.textLink} href={personalOpsCreateRoute("decision", run, createNativeObjectRef({ module: "reviews", objectType: "review_decision_item", objectId: item.id, containerObjectId: run.id, label: item.title }), item.title, item.dueDate)}>Create once in Personal Ops…</Link><button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-decision", decisionId: item.id, rationale: item.rationale, module: "personal_ops", objectType: "decision", objectId: "", containerObjectId: "", label: item.title })}>Link filed Decision…</button></>}
-                </div>
-              </li>
-            ))}
+            {run.decisions.map((item) => {
+              const source = reviewDecisionSource(run, item);
+              const linked = getLinkedDecisions(decisions, source);
+              const exactOwner = linked.length === 1 ? linked[0] : undefined;
+              return (
+                <li id={`review-item-${item.id}`} className={styles.sourceRow} data-selected={urlState.item === item.id || undefined} tabIndex={-1} key={item.id}>
+                  <div className={styles.sourceTop}>
+                    <div><strong>{item.title}</strong><p>{item.question}</p></div>
+                    <span className={styles.stateChip} data-tone={RESOLVED_DECISION_STATES.has(item.state) ? "positive" : "attention"}>{displayLabel(item.state)}</span>
+                  </div>
+                  <div className={styles.sourceLine}><span>Source</span><Link href={item.sourceRef.route}>{item.sourceRef.label}</Link></div>
+                  <div className={styles.inlineActions}>
+                    {item.destinationRef ? (
+                      <Link className={styles.textLink} href={item.destinationRef.route}>Open filed Decision</Link>
+                    ) : exactOwner ? (
+                      <button
+                        type="button"
+                        className={styles.button}
+                        onClick={() => void linkExactDecision(run, item, exactOwner)}
+                        disabled={busy}
+                      >
+                        Link exact Decision
+                      </button>
+                    ) : linked.length > 1 ? (
+                      <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-decision", decisionId: item.id, rationale: item.rationale, module: "personal_ops", objectType: "decision", objectId: "", containerObjectId: "", label: item.title })}>Choose linked Decision…</button>
+                    ) : (
+                      <>
+                        <Link className={styles.textLink} href={personalOpsCreateRoute("decision", run, source, item.title, item.dueDate)}>Create once in Personal Ops…</Link>
+                        <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-decision", decisionId: item.id, rationale: item.rationale, module: "personal_ops", objectType: "decision", objectId: "", containerObjectId: "", label: item.title })}>Link filed Decision…</button>
+                      </>
+                    )}
+                  </div>
+                  <LinkedDecisionsPanel
+                    source={source}
+                    decisions={decisions}
+                    loading={decisionsLoading}
+                    error=""
+                    onRefresh={() => void refreshDecisions()}
+                    limit={2}
+                    compact
+                    showHeader={false}
+                    showBoundary={false}
+                    hideWhenEmpty
+                  />
+                </li>
+              );
+            })}
           </ul>
         )}
+        {decisionsError && <p className={styles.errorBanner} role="alert">{decisionsError}</p>}
       </section>
       <section className={styles.panel} data-span="full">
         <div className={styles.panelHeader}>
@@ -1071,22 +1234,86 @@ export default function ReviewsWorkspace({
       <section className={styles.panel} data-span="full">
         <div className={styles.panelHeader}>
           <div><h2>Actionable follow-ups</h2><p>Reviews proposes and tracks resolution; Personal Ops owns the actionable object.</p></div>
-          <button type="button" className={styles.button} onClick={() => setEditor({ kind: "follow-up", title: "", ownerId: "admin", dueDate: "", ...defaultSourceDraft("projects") })} disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed"}>Add follow-up…</button>
+          <div className={styles.inlineActions}>
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => void refreshFollowUps()}
+              disabled={followUpsLoading}
+              aria-label={`Refresh Personal Ops Follow-up status for ${run.title}`}
+            >
+              {followUpsLoading ? "Refreshing…" : "Refresh owner status"}
+            </button>
+            <button type="button" className={styles.button} onClick={() => setEditor({ kind: "follow-up", title: "", ownerId: "admin", dueDate: "", ...defaultSourceDraft("projects") })} disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed"}>Add follow-up…</button>
+          </div>
         </div>
+        {followUpsError && <p className={styles.errorBanner} role="alert">{followUpsError}</p>}
         {run.followUps.length === 0 ? <SystemState variant="empty" title="No follow-up candidates" description="Add a source-backed candidate when the review identifies actionable work." compact /> : (
           <ul className={styles.list}>
-            {run.followUps.map((item) => (
-              <li id={`review-item-${item.id}`} className={styles.sourceRow} data-selected={urlState.item === item.id || undefined} tabIndex={-1} key={item.id}>
-                <div className={styles.sourceTop}>
-                  <div><strong>{item.title}</strong><p>{item.ownerId || "Unassigned"}{item.dueDate ? ` · due ${formatDate(item.dueDate)}` : " · no due date"}</p></div>
-                  <span className={styles.stateChip} data-tone={RESOLVED_FOLLOW_UP_STATES.has(item.state) ? "positive" : "attention"}>{displayLabel(item.state)}</span>
-                </div>
-                <div className={styles.sourceLine}><span>Source</span><Link href={item.sourceRef.route}>{item.sourceRef.label}</Link></div>
-                <div className={styles.inlineActions}>
-                  {item.createdObjectRef ? <Link className={styles.textLink} href={item.createdObjectRef.route}>Open Follow-up</Link> : <><Link className={styles.textLink} href={personalOpsCreateRoute("follow-up", run, createNativeObjectRef({ module: "reviews", objectType: "review_follow_up", objectId: item.id, containerObjectId: run.id, label: item.title }), item.title, item.dueDate)}>Create once in Personal Ops…</Link><button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Link created Follow-up…</button></>}
-                </div>
-              </li>
-            ))}
+            {run.followUps.map((item) => {
+              const source = reviewFollowUpSource(run, item);
+              const linked = getLinkedFollowUps(followUps, source);
+              const exactOwner = linked.length === 1 ? linked[0] : undefined;
+              const linkedOwner = item.createdObjectRef
+                ? linked.find((followUp) => followUp.id === item.createdObjectRef?.objectId)
+                : undefined;
+              const ownerIsComplete = Boolean(
+                linkedOwner &&
+                (linkedOwner.lifecycle === "complete" || linkedOwner.followUpState === "complete")
+              );
+              return (
+                <li id={`review-item-${item.id}`} className={styles.sourceRow} data-selected={urlState.item === item.id || undefined} tabIndex={-1} key={item.id}>
+                  <div className={styles.sourceTop}>
+                    <div><strong>{item.title}</strong><p>{item.ownerId || "Unassigned"}{item.dueDate ? ` · due ${formatDate(item.dueDate)}` : " · no due date"}</p></div>
+                    <span className={styles.stateChip} data-tone={RESOLVED_FOLLOW_UP_STATES.has(item.state) ? "positive" : "attention"}>{displayLabel(item.state)}</span>
+                  </div>
+                  <div className={styles.sourceLine}><span>Source</span><Link href={item.sourceRef.route}>{item.sourceRef.label}</Link></div>
+                  <div className={styles.inlineActions}>
+                    {item.createdObjectRef ? (
+                      <Link className={styles.textLink} href={item.createdObjectRef.route}>Open linked Follow-up</Link>
+                    ) : exactOwner ? (
+                      <button
+                        type="button"
+                        className={styles.button}
+                        onClick={() => void linkExactFollowUp(run, item, exactOwner)}
+                        disabled={busy}
+                      >
+                        Link exact Follow-up
+                      </button>
+                    ) : linked.length > 1 ? (
+                      <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Choose linked Follow-up…</button>
+                    ) : (
+                      <>
+                        <Link className={styles.textLink} href={personalOpsCreateRoute("follow-up", run, source, item.title, item.dueDate)}>Create once in Personal Ops…</Link>
+                        <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Link existing Follow-up…</button>
+                      </>
+                    )}
+                    {item.createdObjectRef && linkedOwner && ownerIsComplete && item.state !== "completed" && (
+                      <button
+                        type="button"
+                        className={styles.button}
+                        onClick={() => void linkExactFollowUp(run, item, linkedOwner)}
+                        disabled={busy}
+                      >
+                        Record owner completion
+                      </button>
+                    )}
+                  </div>
+                  <LinkedFollowUpsPanel
+                    source={source}
+                    followUps={followUps}
+                    loading={followUpsLoading}
+                    error=""
+                    onRefresh={() => void refreshFollowUps()}
+                    limit={2}
+                    compact
+                    showHeader={false}
+                    showBoundary={false}
+                    hideWhenEmpty
+                  />
+                </li>
+              );
+            })}
           </ul>
         )}
       </section>

@@ -2489,6 +2489,14 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   gap: 12px;
 }
 
+.people-cadence-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .people-connection-row {
   display: flex;
   gap: 8px;
@@ -5833,6 +5841,11 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
 }
 
 .detail-tabs > button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 4px;
+  align-items: center;
+  width: auto;
   min-height: 44px;
   border: 0;
   border-radius: 0;

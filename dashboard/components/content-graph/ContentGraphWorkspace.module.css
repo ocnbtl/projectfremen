@@ -358,6 +358,63 @@
   font: 500 13px var(--font-body);
 }
 
+.projectAssociationForm {
+  display: grid;
+  gap: 12px;
+}
+
+.projectAssociationGrid {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.4fr) repeat(2, minmax(150px, 0.8fr));
+  gap: 10px;
+  align-items: end;
+}
+
+.projectAssociationForm textarea {
+  min-height: 92px;
+  resize: vertical;
+}
+
+.projectAssociationCheckbox {
+  display: flex;
+  min-height: 44px;
+  gap: 9px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: #f8faf9;
+  color: var(--text-muted);
+}
+
+.projectAssociationCheckbox input {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+
+.projectAssociationCheckbox span {
+  display: grid;
+  gap: 2px;
+}
+
+.projectAssociationCheckbox strong {
+  color: var(--text-strong);
+  font: 850 11px var(--font-heading);
+}
+
+.projectAssociationCheckbox small {
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.projectAssociationActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .field input:focus-visible,
 .field select:focus-visible,
 .field textarea:focus-visible,
@@ -628,6 +685,11 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   padding-top: 14px;
+}
+
+.followUpStack {
+  display: grid;
+  gap: 12px;
 }
 
 .panel {
@@ -1555,8 +1617,20 @@
   .overviewGrid,
   .editorRailGrid,
   .factGrid,
-  .propertiesGrid {
+  .propertiesGrid,
+  .projectAssociationGrid {
     grid-template-columns: 1fr;
+  }
+
+  .projectAssociationActions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .projectAssociationActions .button,
+  .projectAssociationActions .linkButton {
+    width: 100%;
+    min-height: 44px;
   }
 
   .sourceEvidenceList li {

@@ -1,6 +1,11 @@
 import { notFound } from "next/navigation";
 import AdminChrome from "../../../components/AdminChrome";
 import PeopleWorkspace from "../../../components/PeopleWorkspace";
+import { listPersonalOpsObjects } from "../../../lib/modules/personal-ops/store";
+import {
+  createEmptyProjectsState,
+  readProjectsState
+} from "../../../lib/modules/projects/store";
 import { readPersonalRecords, type PersonalRecord } from "../../../lib/personal-records-store";
 import { requireAdminSession } from "../../../lib/require-admin";
 
@@ -14,13 +19,29 @@ export default async function PeopleRoutePage({
   personId?: string;
 }) {
   await requireAdminSession();
-  let records: PersonalRecord[] = [];
-  let loadError = "";
-  try {
-    records = await readPersonalRecords();
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : "People records could not be loaded.";
-  }
+  const [recordsResult, followUpsResult, projectsResult] = await Promise.all([
+    readPersonalRecords()
+      .then((records) => ({ ok: true as const, records }))
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error: error instanceof Error ? error.message : "People records could not be loaded."
+      })),
+    listPersonalOpsObjects("followUps")
+      .then((followUps) => ({ ok: true as const, followUps }))
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Personal Ops Follow-ups could not be loaded."
+      })),
+    readProjectsState()
+      .then((state) => ({ ok: true as const, state }))
+      .catch((error: unknown) => ({
+        ok: false as const,
+        state: createEmptyProjectsState(),
+        error: error instanceof Error ? error.message : "Projects involvement could not be loaded."
+      }))
+  ]);
+  const records: PersonalRecord[] = recordsResult.ok ? recordsResult.records : [];
+  const loadError = recordsResult.ok ? "" : recordsResult.error;
   const people = records.filter(
     (record): record is PersonalRecord => record.className === "person" || record.className === "org"
   );
@@ -44,6 +65,10 @@ export default async function PeopleRoutePage({
         initialSelectedId={personId}
         initialMode={mode}
         initialLoadError={loadError}
+        initialFollowUps={followUpsResult.ok ? followUpsResult.followUps : []}
+        initialFollowUpsError={followUpsResult.ok ? "" : followUpsResult.error}
+        initialProjectsState={projectsResult.state}
+        initialProjectsError={projectsResult.ok ? "" : projectsResult.error}
       />
     </div>
   );

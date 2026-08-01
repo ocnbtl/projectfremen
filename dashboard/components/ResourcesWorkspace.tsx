@@ -11,10 +11,15 @@ import SharedAIDock from "./admin-shell/SharedAIDock";
 import DenseObjectRow from "./operational/DenseObjectRow";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import EvidenceChecklist from "./operational/EvidenceChecklist";
+import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import MetricStrip from "./operational/MetricStrip";
 import ObjectHeader from "./operational/ObjectHeader";
+import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
+import ProjectAssociationSheet from "./operational/ProjectAssociationSheet";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
+import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
+import { useProjectsState } from "./operational/useProjectsState";
 import ResourceEditorSheet from "./resources/ResourceEditorSheet";
 import ResourceNotePromotionSheet from "./resources/ResourceNotePromotionSheet";
 import ResourcePropertiesView from "./resources/ResourcePropertiesView";
@@ -41,6 +46,12 @@ import { buildResourceReviewQueue } from "../lib/modules/resources/review-queue"
 import { formatResourceReviewCadence } from "../lib/modules/resources/review-schedule";
 import { buildResourceSourceEvidenceReport } from "../lib/modules/resources/source-evidence";
 import {
+  buildFollowUpCreationRoute,
+  type FollowUpSourceRef
+} from "../lib/modules/personal-ops/follow-up-links";
+import type { PersonalOpsFollowUp } from "../lib/modules/personal-ops/types";
+import type { ProjectsState } from "../lib/modules/projects/types";
+import {
   parseResourcesUrlState,
   serializeResourcesUrlState,
   type ResourcesUrlState
@@ -52,6 +63,10 @@ type ResourcesWorkspaceProps = {
   initialResources: ResourceRecord[];
   contentGraph: LegacyContentGraph;
   linkedContextEvidence: ResourceLinkedContextEvidenceIndex;
+  initialProjectsState: ProjectsState;
+  initialProjectsError?: string;
+  initialPersonalOpsFollowUps: PersonalOpsFollowUp[];
+  initialPersonalOpsFollowUpsError?: string;
   initialMode?: "index" | "detail";
   initialSelectedId?: string;
   initialLoadError?: string;
@@ -196,6 +211,20 @@ function relationCount(resource: ResourceRecord) {
   return Object.values(resource.relations).reduce((total, values) => total + values.length, 0);
 }
 
+function resourceFollowUpSource(resource: ResourceRecord): FollowUpSourceRef {
+  return {
+    ...resource.nativeRef,
+    module: "resources",
+    objectType: "resource"
+  };
+}
+
+function resourceFollowUpCreationRoute(resource: ResourceRecord) {
+  return buildFollowUpCreationRoute(resourceFollowUpSource(resource), {
+    dueAt: resource.review.nextReviewAt || undefined
+  });
+}
+
 function notesSearchRoute(resource: ResourceRecord) {
   const query = resource.source.canonicalUrl || resource.title;
   const params = new URLSearchParams({ query });
@@ -267,6 +296,10 @@ export default function ResourcesWorkspace({
   initialResources,
   contentGraph,
   linkedContextEvidence,
+  initialProjectsState,
+  initialProjectsError = "",
+  initialPersonalOpsFollowUps,
+  initialPersonalOpsFollowUpsError = "",
   initialMode = "index",
   initialSelectedId,
   initialLoadError = ""
@@ -291,6 +324,7 @@ export default function ResourcesWorkspace({
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [notePromotionMode, setNotePromotionMode] = useState<"create" | "existing" | null>(null);
   const [reviewScheduleOpen, setReviewScheduleOpen] = useState(false);
+  const [projectAssociationOpen, setProjectAssociationOpen] = useState(false);
   const [reviewScheduleFeedback, setReviewScheduleFeedback] = useState<{
     resourceId: string;
     message: string;
@@ -303,6 +337,21 @@ export default function ResourcesWorkspace({
   const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
   const isMobile = useMediaQuery("(max-width: 760px)");
   const searchParamKey = searchParams.toString();
+  const {
+    state: projectsState,
+    error: projectsError,
+    loading: projectsLoading,
+    refresh: refreshProjects
+  } = useProjectsState(initialProjectsState, initialProjectsError);
+  const {
+    followUps: personalOpsFollowUps,
+    error: personalOpsFollowUpsError,
+    loading: personalOpsFollowUpsLoading,
+    refresh: refreshPersonalOpsFollowUps
+  } = usePersonalOpsFollowUps(
+    initialPersonalOpsFollowUps,
+    initialPersonalOpsFollowUpsError
+  );
 
   const selectedResource = useMemo(
     () => resources.find((resource) => resource.id === selectedId) || null,
@@ -918,6 +967,17 @@ export default function ResourcesWorkspace({
               )}
             </section>
 
+            <LinkedFollowUpsPanel
+              source={resourceFollowUpSource(selectedResource)}
+              followUps={personalOpsFollowUps}
+              loading={personalOpsFollowUpsLoading}
+              error={personalOpsFollowUpsError}
+              onRefresh={() => void refreshPersonalOpsFollowUps()}
+              createHref={resourceFollowUpCreationRoute(selectedResource)}
+              title="Resource follow-through"
+              wide
+            />
+
             <section className={styles.panel}>
               <div className={styles.panelHeader}>
                 <h2>Freshness and trust evidence</h2>
@@ -957,6 +1017,7 @@ export default function ResourcesWorkspace({
               <QuickActionBar
                 ariaLabel="Resource review actions"
                 actions={[
+                  { id: "follow-up", label: "Track next action", href: resourceFollowUpCreationRoute(selectedResource) },
                   { id: "mark-reviewed", label: "Mark reviewed", intent: "primary", disabled: true, disabledReason: "Native Resource review checks, reviewer identity, timestamps, acknowledgement, outcome, and audit persistence are not connected." },
                   { id: "check-url", label: "Check URL", disabled: true, disabledReason: "No URL-health job or result persistence is connected." },
                   { id: "update-citations", label: "Update citations", disabled: true, disabledReason: "Persisted citations and per-Note diff confirmation are not connected." },
@@ -1055,6 +1116,39 @@ export default function ResourcesWorkspace({
                   create a ResourceLink, prove active usage, or append an audit event.
                 </span>
               </div>
+            </section>
+
+            <section className={styles.panel} data-wide="true">
+              <div className={styles.panelHeader}>
+                <div>
+                  <h2>Project associations</h2>
+                  <p>Typed ProjectLink records that point back to this Resources-owned source.</p>
+                </div>
+                <button
+                  type="button"
+                  className={styles.button}
+                  data-primary="true"
+                  onClick={() => setProjectAssociationOpen(true)}
+                >
+                  Associate Project
+                </button>
+              </div>
+              <LinkedProjectsPanel
+                source={selectedResource.nativeRef}
+                sourceLabel={selectedResource.title}
+                state={projectsState}
+                loading={projectsLoading}
+                error={projectsError}
+                onRefresh={refreshProjects}
+                manageLifecycle
+                legacyProjectLabels={selectedResource.provenance.projects}
+                legacyLabel="Legacy Resource routing labels, not stable links:"
+                title="Projects using this Resource"
+                ownerTab="files-links"
+                emptyDescription="No active Projects-owned association points to this Resource yet."
+                boundary="Resources owns external-source identity and source context. Projects owns relationship semantics, evidence flags, and association lifecycle."
+                limit={8}
+              />
             </section>
 
             {activeCoverage && activeCoverage.state !== "indexed" && (
@@ -1617,7 +1711,9 @@ export default function ResourcesWorkspace({
             )}
             <QuickActionBar
               actions={[
-                { id: "link", label: "Link to object", disabled: true, disabledReason: "Native ObjectLink persistence is not connected." },
+                { id: "project", label: "Associate Project", onSelect: () => setProjectAssociationOpen(true) },
+                { id: "follow-up", label: "Track next action", href: resourceFollowUpCreationRoute(selectedResource) },
+                { id: "link", label: "Link other object", disabled: true, disabledReason: "General ResourceLink persistence is not connected." },
                 { id: "review", label: "Mark reviewed", disabled: true, disabledReason: "The Resource review workflow is not connected." },
                 { id: "schedule", label: selectedResource.review.nextReviewAt ? "Edit review timing" : "Schedule review", onSelect: openReviewSchedule },
                 {
@@ -1634,6 +1730,16 @@ export default function ResourcesWorkspace({
             />
             <p>Opening the legacy URL does not yet create a Resource activity event.</p>
           </section>
+          <LinkedFollowUpsPanel
+            source={resourceFollowUpSource(selectedResource)}
+            followUps={personalOpsFollowUps}
+            loading={personalOpsFollowUpsLoading}
+            error={personalOpsFollowUpsError}
+            onRefresh={() => void refreshPersonalOpsFollowUps()}
+            createHref={resourceFollowUpCreationRoute(selectedResource)}
+            title="Resource follow-through"
+            wide
+          />
           <section className={styles.panel}>
             <h2>Review state</h2>
             <div className={styles.factGrid}>
@@ -1708,7 +1814,7 @@ export default function ResourcesWorkspace({
       module="resources"
       sidebar={sidebar}
       inspector={inspector}
-      aiDock={editorMode || notePromotionMode || reviewScheduleOpen || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? undefined : aiDock}
+      aiDock={editorMode || notePromotionMode || reviewScheduleOpen || projectAssociationOpen || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? undefined : aiDock}
       mode={initialMode === "detail" ? "detail" : "directory"}
       ariaLabel="Resources directory"
       className={`${styles.shell} ${initialMode === "detail" ? styles.detailShell : ""}`}
@@ -1740,6 +1846,21 @@ export default function ResourcesWorkspace({
           resource={selectedResource}
           onClose={() => setReviewScheduleOpen(false)}
           onSaved={handleReviewTimingSaved}
+        />
+      )}
+      {projectAssociationOpen && selectedResource && (
+        <ProjectAssociationSheet
+          key={`resource-project-association:${selectedResource.id}`}
+          open
+          source={selectedResource.nativeRef}
+          sourceKind="Resource"
+          state={projectsState}
+          loading={projectsLoading}
+          error={projectsError}
+          defaultRelationship="source_material"
+          onRefresh={refreshProjects}
+          onClose={() => setProjectAssociationOpen(false)}
+          onLinked={() => router.refresh()}
         />
       )}
       <button

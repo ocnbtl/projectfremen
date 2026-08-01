@@ -10,6 +10,8 @@ import FinanceAccountsRouteView from "./finance/FinanceAccountsView";
 import FinanceBillsRouteView from "./finance/FinanceBillsView";
 import FinanceBudgetsRouteView from "./finance/FinanceBudgetsView";
 import FinanceInspector, { isFinanceInspectableView, isFinanceTabAllowed } from "./finance/FinanceInspector";
+import { usePersonalOpsDecisions } from "./operational/usePersonalOpsDecisions";
+import type { PersonalOpsDecision } from "../lib/modules/personal-ops/types";
 import FinanceMonthlyReviewRouteView from "./finance/FinanceMonthlyReviewView";
 import FinanceRulesInspector, { isFinanceRuleTab } from "./finance/FinanceRulesInspector";
 import FinanceRulesRouteView from "./finance/FinanceRulesView";
@@ -699,13 +701,23 @@ function ModalShell({ modal, onClose }: { modal: ModalKind; onClose: () => void 
 }
 
 export default function FinanceWorkspace({
-  initialView
+  initialView,
+  initialPersonalOpsDecisions = [],
+  initialDecisionsError = ""
 }: {
   initialView?: FinanceView;
+  initialPersonalOpsDecisions?: PersonalOpsDecision[];
+  initialDecisionsError?: string;
 } = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const {
+    decisions,
+    error: decisionsError,
+    loading: decisionsLoading,
+    refresh: refreshDecisions
+  } = usePersonalOpsDecisions(initialPersonalOpsDecisions, initialDecisionsError);
   const parsedInitialUrlState = parseFinanceUrlState(searchParams);
   const routedInitialView = initialView || parsedInitialUrlState.view;
   const initialUrlState = normalizeFinanceUrlStateForView(routedInitialView, parsedInitialUrlState);
@@ -1138,6 +1150,10 @@ export default function FinanceWorkspace({
                 budgetsModel={budgetsModel}
                 monthlyReviewModel={monthlyReviewModel}
                 linkedContext={linkedContext}
+                decisions={decisions}
+                decisionsError={decisionsError}
+                decisionsLoading={decisionsLoading}
+                onRefreshDecisions={() => void refreshDecisions()}
                 activeTab={tab}
                 onTabChange={(nextTab) => {
                   setTab(nextTab);
@@ -1286,6 +1302,7 @@ export default function FinanceWorkspace({
         {view === "review" && (
           <FinanceMonthlyReviewRouteView
             model={monthlyReviewModel}
+            decisions={decisions}
             filter={smartFilter}
             onQueryChange={(nextQuery) => {
               setQuery(nextQuery);

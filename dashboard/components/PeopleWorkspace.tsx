@@ -3,7 +3,13 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
+import {
+  buildFollowUpCreationRoute,
+  type FollowUpSourceRef
+} from "../lib/modules/personal-ops/follow-up-links";
 import { peopleCreateInputToLegacy, peopleUpdateInputToLegacy } from "../lib/modules/people/legacy-adapter";
+import type { PersonalOpsFollowUp } from "../lib/modules/personal-ops/types";
+import type { ProjectsState } from "../lib/modules/projects/types";
 import { getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/routes";
 import { parsePeopleUrlState, serializePeopleUrlState } from "../lib/native-objects/url-state";
 import type {
@@ -15,7 +21,11 @@ import type {
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import ConfirmationSheet from "./operational/ConfirmationSheet";
 import DetailTabs from "./operational/DetailTabs";
+import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
+import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import SystemState from "./operational/SystemState";
+import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
+import { useProjectsState } from "./operational/useProjectsState";
 
 type RecordsResponse = {
   ok: boolean;
@@ -29,6 +39,10 @@ type PeopleWorkspaceProps = {
   initialSelectedId?: string;
   initialMode?: "directory" | "profile" | "new" | "edit";
   initialLoadError?: string;
+  initialFollowUps: PersonalOpsFollowUp[];
+  initialFollowUpsError?: string;
+  initialProjectsState: ProjectsState;
+  initialProjectsError?: string;
 };
 
 type PeopleFilter = "all" | "due" | "week" | "active" | "dormant" | "orgs";
@@ -589,21 +603,24 @@ function followUpDueAt(record: PersonalRecord) {
 }
 
 function followUpCreationRoute(record: PersonalRecord) {
+  return buildFollowUpCreationRoute(peopleFollowUpSource(record), {
+    dueAt: followUpDueAt(record)
+  });
+}
+
+function peopleFollowUpSource(record: PersonalRecord): FollowUpSourceRef {
   const objectType = record.className === "org" ? "organization" : "person";
-  const params = new URLSearchParams({
-    create: "follow-up",
-    sourceModule: "people",
-    sourceObjectType: objectType,
-    sourceObjectId: record.id,
-    sourceLabel: record.title,
-    sourceRoute: getNativeObjectRoute({
+  return {
+    module: "people",
+    objectType,
+    objectId: record.id,
+    label: record.title,
+    route: getNativeObjectRoute({
       module: "people",
       objectType,
       objectId: record.id
-    }),
-    dueAt: followUpDueAt(record)
-  });
-  return `${getModuleRoute("personal_ops")}/follow-ups?${params.toString()}`;
+    })
+  };
 }
 
 function getLastName(record: PersonalRecord) {
@@ -706,13 +723,29 @@ export default function PeopleWorkspace({
   totalRecords,
   initialSelectedId,
   initialMode = "directory",
-  initialLoadError = ""
+  initialLoadError = "",
+  initialFollowUps,
+  initialFollowUpsError = "",
+  initialProjectsState,
+  initialProjectsError = ""
 }: PeopleWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const initialUrlState = parsePeopleUrlState(searchParams);
   const [people, setPeople] = useState(initialPeople);
+  const {
+    followUps,
+    error: followUpsError,
+    loading: followUpsLoading,
+    refresh: refreshLinkedFollowUps
+  } = usePersonalOpsFollowUps(initialFollowUps, initialFollowUpsError);
+  const {
+    state: projectsState,
+    error: projectsError,
+    loading: projectsLoading,
+    refresh: refreshProjects
+  } = useProjectsState(initialProjectsState, initialProjectsError);
   const [query, setQuery] = useState(initialUrlState.query);
   const [activeFilter, setActiveFilter] = useState<PeopleFilter>(initialUrlState.filter);
   const [activeSidebarView, setActiveSidebarView] = useState<PeopleSidebarView>(initialUrlState.sidebar);
@@ -945,7 +978,6 @@ export default function PeopleWorkspace({
   const selectedPerson = useMemo(() => {
     return people.find((record) => record.id === selectedId) || visiblePeople[0];
   }, [people, selectedId, visiblePeople]);
-
   useEffect(() => {
     setProfileDraft(getProfile(selectedPerson));
   }, [selectedPerson?.id]);
@@ -2070,6 +2102,16 @@ export default function PeopleWorkspace({
                     </article>
                   ))}
                 </div>
+                <LinkedFollowUpsPanel
+                  source={peopleFollowUpSource(selectedPerson)}
+                  followUps={followUps}
+                  loading={followUpsLoading}
+                  error={followUpsError}
+                  onRefresh={() => void refreshLinkedFollowUps()}
+                  createHref={followUpCreationRoute(selectedPerson)}
+                  limit={3}
+                  title="Relationship follow-through"
+                />
                 <div className="people-timeline-actions">
                   <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
                   <button
@@ -2110,8 +2152,19 @@ export default function PeopleWorkspace({
                 </article>
                 <article>
                   <h3>Projects</h3>
-                  {selectedPerson.projects.length ? selectedPerson.projects.map((item) => <a href={`${getModuleRoute("projects")}?query=${encodeURIComponent(item)}`} key={item}>{item}</a>) : <span>No Projects linked.</span>}
-                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="The Projects object picker is not connected in this slice">Link Project unavailable</button>
+                  <LinkedProjectsPanel
+                    personId={selectedPerson.id}
+                    personLabel={selectedPerson.title}
+                    objectType={selectedPerson.className === "org" ? "organization" : "person"}
+                    state={projectsState}
+                    loading={projectsLoading}
+                    error={projectsError}
+                    onRefresh={() => void refreshProjects()}
+                    legacyProjectLabels={selectedPerson.projects}
+                    limit={3}
+                    compact
+                    title="Projects-owned involvement"
+                  />
                 </article>
                 <article>
                   <h3>Resources</h3>
@@ -2225,6 +2278,17 @@ export default function PeopleWorkspace({
                 {actionNotice && <p className="people-notice">{actionNotice}</p>}
 
                 <div className="people-relationships-grid">
+                  <LinkedProjectsPanel
+                    personId={selectedPerson.id}
+                    personLabel={selectedPerson.title}
+                    objectType={selectedPerson.className === "org" ? "organization" : "person"}
+                    state={projectsState}
+                    loading={projectsLoading}
+                    error={projectsError}
+                    onRefresh={() => void refreshProjects()}
+                    legacyProjectLabels={selectedPerson.projects}
+                    title="Shared project context"
+                  />
                   <section className="people-relation-map">
                     <h4>Relationship map</h4>
                     <div className="people-relation-node is-center">
@@ -2322,7 +2386,26 @@ export default function PeopleWorkspace({
                     <div><span>Streak</span><strong>{splitTextEntries(selectedProfile.interactions).length} interactions</strong></div>
                     <div><span>Priority</span><strong>{getPriorityLabel(selectedPerson)}</strong></div>
                   </div>
-                  <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
+                  <LinkedFollowUpsPanel
+                    source={peopleFollowUpSource(selectedPerson)}
+                    followUps={followUps}
+                    loading={followUpsLoading}
+                    error={followUpsError}
+                    onRefresh={() => void refreshLinkedFollowUps()}
+                    createHref={followUpCreationRoute(selectedPerson)}
+                    limit={1}
+                    compact
+                    title="Relationship follow-through"
+                  />
+                  <div className="people-cadence-actions">
+                    <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
+                    <button
+                      type="button"
+                      onClick={() => router.push(followUpCreationRoute(selectedPerson))}
+                    >
+                      Schedule Follow-up
+                    </button>
+                  </div>
                 </article>
                 <article>
                   <h3>Quick Info</h3>
@@ -2343,6 +2426,21 @@ export default function PeopleWorkspace({
                 <article>
                   <h3>About {selectedPerson.title.split(" ")[0]}</h3>
                   <p>{selectedProfile.context || selectedPerson.body || "No relationship context recorded yet."}</p>
+                </article>
+                <article>
+                  <LinkedProjectsPanel
+                    personId={selectedPerson.id}
+                    personLabel={selectedPerson.title}
+                    objectType={selectedPerson.className === "org" ? "organization" : "person"}
+                    state={projectsState}
+                    loading={projectsLoading}
+                    error={projectsError}
+                    onRefresh={() => void refreshProjects()}
+                    legacyProjectLabels={selectedPerson.projects}
+                    limit={2}
+                    compact
+                    showBoundary={false}
+                  />
                 </article>
                 <article>
                   <h3>Key Connections</h3>

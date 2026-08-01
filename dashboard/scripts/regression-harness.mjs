@@ -5,11 +5,32 @@ import os from "node:os";
 import path from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 
-const npmCommand = process.platform === "win32" ? "npm.cmd" : "npm";
+const npmExecPath = process.env.npm_execpath;
+const npmCommand = npmExecPath
+  ? process.env.npm_node_execpath || process.execPath
+  : process.platform === "win32"
+    ? "npm.cmd"
+    : "npm";
+const npmPrefixArgs = npmExecPath ? [npmExecPath] : [];
 const dashboardDir = process.cwd();
+const nextCliPath = path.join(dashboardDir, "node_modules", "next", "dist", "bin", "next");
+const tscCliPath = path.join(dashboardDir, "node_modules", "typescript", "bin", "tsc");
 const steps = [];
 const skips = [];
 const testRunId = `regression-${Date.now()}`;
+
+function spawnNpm(args, options) {
+  if (!npmExecPath && args[0] === "run" && args[1] === "typecheck") {
+    return spawn(process.execPath, [tscCliPath, "--noEmit"], options);
+  }
+  if (!npmExecPath && args[0] === "run" && args[1] === "build") {
+    return spawn(process.execPath, [nextCliPath, "build"], options);
+  }
+  return spawn(npmCommand, [...npmPrefixArgs, ...args], {
+    ...options,
+    shell: !npmExecPath && process.platform === "win32"
+  });
+}
 
 function logStep(message) {
   console.log(`\n[regress] ${message}`);
@@ -87,7 +108,7 @@ async function runCommand(args, options = {}) {
   const env = options.env ? { ...process.env, ...options.env } : process.env;
 
   await new Promise((resolve, reject) => {
-    const child = spawn(npmCommand, args, {
+    const child = spawnNpm(args, {
       cwd: dashboardDir,
       env,
       stdio: "inherit"
@@ -166,8 +187,8 @@ class CookieJar {
 
 async function startServer({ port, env }) {
   const child = spawn(
-    npmCommand,
-    ["run", "start", "--", "--hostname", "127.0.0.1", "--port", String(port)],
+    process.execPath,
+    [nextCliPath, "start", "--hostname", "127.0.0.1", "--port", String(port)],
     {
       cwd: dashboardDir,
       env: { ...process.env, ...env },
@@ -4886,6 +4907,2741 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
   }
 }
 
+async function checkPeopleFollowUpBridgeBrowserState(
+  baseUrl,
+  cookieJar,
+  csrfToken,
+  person,
+  followUp
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const mutatingRequests = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "people-follow-up-bridge-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(`console: ${message.text()}`);
+      }
+    });
+    page.on("pageerror", (error) => browserErrors.push(`page: ${error.message}`));
+    page.on("request", (request) => {
+      if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) {
+        mutatingRequests.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      }
+    });
+  }
+
+  async function assertNoDocumentOverflow(page, label) {
+    const diagnostics = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(
+      !diagnostics.overflowX,
+      `${label} has document-level horizontal overflow: ${JSON.stringify(diagnostics)}`
+    );
+  }
+
+  try {
+    const peopleBefore = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+    const followUpsBefore = await requestJson(
+      baseUrl,
+      cookieJar,
+      "/api/personal/ops?family=followUps"
+    );
+    const peopleCountBefore = peopleBefore.payload?.items?.length;
+    const exactSourceCountBefore = followUpsBefore.payload?.items?.filter((item) =>
+      item.sourceRefs?.some(
+        (reference) =>
+          reference.module === "people" &&
+          reference.objectType === "person" &&
+          reference.objectId === person.id
+      )
+    ).length;
+    assert(
+      peopleBefore.response.ok &&
+        followUpsBefore.response.ok &&
+        typeof peopleCountBefore === "number" &&
+        exactSourceCountBefore === 1,
+      "People Follow-up bridge fixture did not begin with one exact Personal Ops-owned source"
+    );
+
+    const context = await authenticatedContext({ width: 1440, height: 900 });
+    const page = await context.newPage();
+    observe(page);
+    await page.goto(
+      `${baseUrl}/admin/people/${encodeURIComponent(person.id)}?tab=timeline`,
+      { waitUntil: "networkidle" }
+    );
+    const bridge = page.locator(`[data-people-follow-up-bridge="${person.id}"]`);
+    const row = bridge.locator(`[data-people-follow-up-id="${followUp.id}"]`);
+    await bridge.waitFor();
+    assert(await row.count() === 1, "People did not render the exact Personal Ops-owned Follow-up");
+    assert(
+      (await row.innerText()).includes(followUp.title) &&
+        (await row.innerText()).includes("Scheduled") &&
+        (await bridge.innerText()).includes("Personal Ops owner"),
+      "People did not render the linked Follow-up title, current state, and native owner"
+    );
+
+    const updatedFollowUp = await requestJson(baseUrl, cookieJar, "/api/personal/ops", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "followUps",
+        id: followUp.id,
+        expectedUpdatedAt: followUp.updatedAt,
+        patch: { followUpState: "waiting" }
+      })
+    });
+    assert(
+      updatedFollowUp.response.ok && updatedFollowUp.payload?.item?.followUpState === "waiting",
+      `Personal Ops status update for the People bridge failed: ${JSON.stringify(updatedFollowUp.payload)}`
+    );
+    await bridge.getByRole("button", { name: `Refresh linked Follow-ups for ${person.title}` }).click();
+    await page
+      .locator(`[data-people-follow-up-id="${followUp.id}"][data-follow-up-state="waiting"]`)
+      .waitFor();
+    assert(
+      await row.getAttribute("data-follow-up-state") === "waiting" &&
+        (await row.innerText()).includes("Waiting"),
+      "People refresh did not load the current Personal Ops Follow-up state"
+    );
+
+    await page.reload({ waitUntil: "networkidle" });
+    const reloadedRow = page.locator(`[data-people-follow-up-id="${followUp.id}"]`);
+    await reloadedRow.waitFor();
+    assert(
+      await reloadedRow.getAttribute("data-follow-up-state") === "waiting",
+      "People reload did not preserve the current Personal Ops Follow-up state"
+    );
+
+    await reloadedRow.click();
+    await page.waitForURL((url) =>
+      url.pathname === "/admin/personal/follow-ups" &&
+      url.searchParams.get("selected") === followUp.id
+    );
+    await page.getByText(followUp.title, { exact: true }).first().waitFor();
+    assert(
+      await page.getByText(followUp.title, { exact: true }).count() >= 1,
+      "People Follow-up owner link did not open the canonical Personal Ops object"
+    );
+    await page.goBack({ waitUntil: "networkidle" });
+    const backUrl = new URL(page.url());
+    assert(
+      backUrl.pathname === `/admin/people/${person.id}` &&
+        backUrl.searchParams.get("tab") === "timeline" &&
+        await page.locator(`[data-people-follow-up-id="${followUp.id}"]`).count() === 1,
+      "Browser Back did not restore the People profile, Timeline tab, and linked Follow-up"
+    );
+    await page.goForward({ waitUntil: "networkidle" });
+    const forwardUrl = new URL(page.url());
+    assert(
+      forwardUrl.pathname === "/admin/personal/follow-ups" &&
+        forwardUrl.searchParams.get("selected") === followUp.id,
+      "Browser Forward did not restore the canonical Personal Ops Follow-up owner route"
+    );
+    await context.close();
+
+    for (const viewport of [
+      { label: "1920x1080", width: 1920, height: 1080 },
+      { label: "1440x900", width: 1440, height: 900 },
+      { label: "1024x768", width: 1024, height: 768 },
+      { label: "390x844", width: 390, height: 844 }
+    ]) {
+      const responsiveContext = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const responsivePage = await responsiveContext.newPage();
+      observe(responsivePage);
+      await responsivePage.goto(
+        `${baseUrl}/admin/people/${encodeURIComponent(person.id)}?tab=timeline`,
+        { waitUntil: "networkidle" }
+      );
+      const responsiveBridge = responsivePage.locator(
+        `[data-people-follow-up-bridge="${person.id}"]`
+      );
+      await responsiveBridge.waitFor();
+      assert(
+        await responsiveBridge.locator(`[data-people-follow-up-id="${followUp.id}"]`).count() === 1,
+        `People Follow-up bridge was unavailable at ${viewport.label}`
+      );
+      await assertNoDocumentOverflow(responsivePage, `People Follow-up bridge ${viewport.label}`);
+      if (viewport.width <= 760) {
+        const undersizedTargets = await responsiveBridge
+          .locator("button:visible, a:visible")
+          .evaluateAll((elements) =>
+            elements
+              .map((element) => {
+                const rect = element.getBoundingClientRect();
+                return {
+                  label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+                  width: rect.width,
+                  height: rect.height
+                };
+              })
+              .filter((item) => item.width < 44 || item.height < 44)
+          );
+        assert(
+          undersizedTargets.length === 0,
+          `People Follow-up mobile targets are below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+      }
+      await responsivePage.screenshot({
+        path: path.join(screenshotDir, `people-follow-up-bridge-${viewport.label}.png`),
+        fullPage: true
+      });
+      await responsiveContext.close();
+    }
+
+    const peopleAfter = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+    const followUpsAfter = await requestJson(
+      baseUrl,
+      cookieJar,
+      "/api/personal/ops?family=followUps"
+    );
+    const exactSourceCountAfter = followUpsAfter.payload?.items?.filter((item) =>
+      item.sourceRefs?.some(
+        (reference) =>
+          reference.module === "people" &&
+          reference.objectType === "person" &&
+          reference.objectId === person.id
+      )
+    ).length;
+    assert(
+      peopleAfter.payload?.items?.length === peopleCountBefore && exactSourceCountAfter === 1,
+      "People Follow-up visibility duplicated either the People source or Personal Ops-owned Follow-up"
+    );
+    assert(
+      mutatingRequests.length === 0,
+      `People Follow-up UI emitted mutations: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `People Follow-up browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkCrossModuleFollowUpConnections(
+  baseUrl,
+  cookieJar,
+  csrfToken,
+  project,
+  blocker,
+  note,
+  reviewRun,
+  reviewFollowUp,
+  resource,
+  mediaAsset,
+  existingMediaFollowUp
+) {
+  const { chromium } = await import("@playwright/test");
+  const sources = [
+    {
+      key: "project",
+      source: {
+        module: "projects",
+        objectType: "project",
+        objectId: project.id,
+        label: project.name,
+        route: `/admin/projects/${encodeURIComponent(project.id)}`
+      },
+      title: `${project.name} · operating follow-through`
+    },
+    {
+      key: "blocker",
+      source: {
+        module: "projects",
+        objectType: "blocker",
+        objectId: blocker.id,
+        containerObjectId: project.id,
+        label: blocker.title,
+        route: `/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}`
+      },
+      title: `${blocker.title} · owner follow-through`
+    },
+    {
+      key: "note",
+      source: {
+        module: "notes",
+        objectType: "note",
+        objectId: note.id,
+        label: note.title,
+        route: `/admin/notes/${encodeURIComponent(note.id)}`
+      },
+      title: `${note.title} · next action`
+    },
+    {
+      key: "review",
+      source: {
+        module: "reviews",
+        objectType: "review_follow_up",
+        objectId: reviewFollowUp.id,
+        containerObjectId: reviewRun.id,
+        label: reviewFollowUp.title,
+        route: `/admin/reviews/${encodeURIComponent(reviewRun.id)}?tab=follow-ups&item=${encodeURIComponent(reviewFollowUp.id)}`
+      },
+      title: `${reviewFollowUp.title} · Personal Ops owner`
+    },
+    {
+      key: "resource",
+      source: {
+        module: "resources",
+        objectType: "resource",
+        objectId: resource.id,
+        label: resource.title,
+        route: `/admin/resources/${encodeURIComponent(resource.id)}`
+      },
+      title: `${resource.title} · source follow-through`
+    },
+    {
+      key: "media",
+      source: {
+        module: "media",
+        objectType: "media_asset",
+        objectId: mediaAsset.id,
+        label: mediaAsset.title,
+        route: `/admin/media/${encodeURIComponent(mediaAsset.id)}`
+      },
+      title: `${mediaAsset.title} · asset follow-through`
+    }
+  ];
+  const createdByKey = new Map();
+
+  for (const fixture of sources) {
+    if (fixture.key === "media") {
+      assert(
+        existingMediaFollowUp?.sourceRefs?.some(
+          (reference) =>
+            reference.module === fixture.source.module &&
+            reference.objectType === fixture.source.objectType &&
+            reference.objectId === fixture.source.objectId
+        ),
+        "Media Follow-up connection did not receive its existing canonical Personal Ops owner"
+      );
+      createdByKey.set(fixture.key, existingMediaFollowUp);
+      continue;
+    }
+    const createFollowUp = await requestJson(baseUrl, cookieJar, "/api/personal/ops", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "followUps",
+        input: {
+          title: fixture.title,
+          followUpType: fixture.key === "blocker" ? "project_follow_up" : "other",
+          context: `Regression verifies ${fixture.source.module} reads status from the Personal Ops-owned object.`,
+          lifecycle: "active",
+          followUpState: "scheduled",
+          priority: fixture.key === "blocker" ? "high" : "medium",
+          domain: "Operations",
+          dueAt: "2026-08-21T12:00:00.000Z",
+          sourceRefs: [fixture.source]
+        }
+      })
+    });
+    assert(
+      createFollowUp.response.ok && createFollowUp.payload?.created,
+      `${fixture.key} Follow-up connection fixture failed: ${JSON.stringify(createFollowUp.payload)}`
+    );
+    createdByKey.set(fixture.key, createFollowUp.payload.item);
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const browserMutations = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "cross-module-follow-up-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(`console: ${message.text()}`);
+      }
+    });
+    page.on("pageerror", (error) => browserErrors.push(`page: ${error.message}`));
+    page.on("request", (request) => {
+      if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) {
+        browserMutations.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      }
+    });
+    page.on("response", (response) => {
+      const pathname = new URL(response.url()).pathname;
+      if (response.status() >= 400 && pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${pathname}`);
+      }
+    });
+  }
+
+  function sourceKey(source) {
+    return [
+      source.module,
+      source.objectType,
+      source.containerObjectId || "root",
+      source.objectId
+    ].join(":");
+  }
+
+  function followUpCreationPath(source) {
+    const params = new URLSearchParams({
+      create: "follow-up",
+      sourceModule: source.module,
+      sourceObjectType: source.objectType,
+      sourceObjectId: source.objectId,
+      sourceLabel: source.label,
+      sourceRoute: source.route
+    });
+    if (source.containerObjectId) {
+      params.set("sourceContainerObjectId", source.containerObjectId);
+    }
+    return `/admin/personal/follow-ups?${params.toString()}`;
+  }
+
+  async function assertPanel(page, fixture, label) {
+    const followUp = createdByKey.get(fixture.key);
+    const panels = page.locator(`[data-linked-follow-ups="${sourceKey(fixture.source)}"]`);
+    const panel = panels.first();
+    await panel.waitFor();
+    assert(await panels.count() >= 1, `${label} did not expose a linked Follow-up panel`);
+    const row = panel.locator(`[data-follow-up-id="${followUp.id}"]`);
+    const expectedState = followUp.followUpState
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase());
+    const expectedActiveCount = followUp.followUpState === "complete" ? 0 : 1;
+    assert(await row.count() === 1, `${label} did not render its exact Personal Ops-owned Follow-up`);
+    assert(
+      (await row.innerText()).includes(followUp.title) &&
+        (await row.innerText()).includes(expectedState) &&
+        (await panel.innerText()).includes(`${expectedActiveCount} active · 1 total`),
+      `${label} did not render the current owner title, state, and exact-source count`
+    );
+    assert(
+      await panel.getByRole("link", { name: "Create in Personal Ops" }).count() === 0,
+      `${label} offered a duplicate creation path despite an exact linked owner`
+    );
+    const layout = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(!layout.overflowX, `${label} overflowed horizontally: ${JSON.stringify(layout)}`);
+    return { panel, row };
+  }
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const desktopPage = await desktopContext.newPage();
+    observe(desktopPage);
+
+    await desktopPage.goto(
+      `${baseUrl}/admin/notes/${encodeURIComponent(note.id)}?tab=decisions`,
+      { waitUntil: "networkidle" }
+    );
+    const notePanel = await assertPanel(desktopPage, sources[2], "Notes follow-through");
+    await notePanel.row.click();
+    await desktopPage.waitForURL((url) =>
+      url.pathname === "/admin/personal/follow-ups" &&
+      url.searchParams.get("selected") === createdByKey.get("note").id
+    );
+    await desktopPage.goBack({ waitUntil: "networkidle" });
+    assert(
+      new URL(desktopPage.url()).pathname === `/admin/notes/${note.id}` &&
+        new URL(desktopPage.url()).searchParams.get("tab") === "decisions",
+      "Browser Back did not restore the source Note and Decisions tab"
+    );
+
+    await desktopPage.goto(
+      `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=overview`,
+      { waitUntil: "networkidle" }
+    );
+    await assertPanel(desktopPage, sources[0], "Project follow-through");
+
+    await desktopPage.goto(
+      `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}`,
+      { waitUntil: "networkidle" }
+    );
+    await assertPanel(desktopPage, sources[1], "Project Blocker follow-through");
+
+    await desktopPage.goto(
+      `${baseUrl}/admin/resources/${encodeURIComponent(resource.id)}?tab=overview`,
+      { waitUntil: "networkidle" }
+    );
+    const resourcePanel = await assertPanel(
+      desktopPage,
+      sources[4],
+      "Resource follow-through"
+    );
+    await resourcePanel.row.click();
+    await desktopPage.waitForURL((url) =>
+      url.pathname === "/admin/personal/follow-ups" &&
+      url.searchParams.get("selected") === createdByKey.get("resource").id
+    );
+    await desktopPage.goBack({ waitUntil: "networkidle" });
+    assert(
+      new URL(desktopPage.url()).pathname === `/admin/resources/${resource.id}` &&
+        new URL(desktopPage.url()).searchParams.get("tab") === "overview" &&
+        await desktopPage
+          .locator(`[data-follow-up-id="${createdByKey.get("resource").id}"]`)
+          .count() === 1,
+      "Browser Back did not restore the Resource overview and linked Follow-up"
+    );
+
+    await desktopPage.goto(
+      `${baseUrl}/admin/media/${encodeURIComponent(mediaAsset.id)}?tab=overview`,
+      { waitUntil: "networkidle" }
+    );
+    const mediaPanel = await assertPanel(
+      desktopPage,
+      sources[5],
+      "Media follow-through"
+    );
+    const mediaOwner = createdByKey.get("media");
+    const updateMediaOwner = await requestJson(
+      baseUrl,
+      cookieJar,
+      "/api/personal/ops",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          family: "followUps",
+          id: mediaOwner.id,
+          expectedUpdatedAt: mediaOwner.updatedAt,
+          patch: { followUpState: "waiting" }
+        })
+      }
+    );
+    assert(
+      updateMediaOwner.response.ok &&
+        updateMediaOwner.payload?.item?.followUpState === "waiting",
+      `Media-linked Personal Ops owner update failed: ${JSON.stringify(updateMediaOwner.payload)}`
+    );
+    createdByKey.set("media", updateMediaOwner.payload.item);
+    await mediaPanel.panel
+      .getByRole("button", {
+        name: `Refresh linked Follow-ups for ${mediaAsset.title}`
+      })
+      .click();
+    await mediaPanel.panel
+      .locator(
+        `[data-follow-up-id="${mediaOwner.id}"][data-follow-up-state="waiting"]`
+      )
+      .waitFor();
+
+    await desktopPage.route(
+      "**/api/personal/ops?family=followUps",
+      async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            ok: false,
+            error: "Personal Ops status is temporarily unavailable."
+          })
+        });
+      }
+    );
+    await mediaPanel.panel
+      .getByRole("button", {
+        name: `Refresh linked Follow-ups for ${mediaAsset.title}`
+      })
+      .click();
+    await mediaPanel.panel
+      .getByRole("alert")
+      .getByText(
+        "Personal Ops status is temporarily unavailable. The last loaded Personal Ops status was preserved."
+      )
+      .waitFor();
+    assert(
+      await mediaPanel.panel
+        .locator(
+          `[data-follow-up-id="${mediaOwner.id}"][data-follow-up-state="waiting"]`
+        )
+        .count() === 1,
+      "Media Follow-up refresh failure discarded the last loaded owner state"
+    );
+    await desktopPage.unroute("**/api/personal/ops?family=followUps");
+
+    for (const fixture of [sources[4], sources[5]]) {
+      await desktopPage.goto(
+        `${baseUrl}${followUpCreationPath(fixture.source)}`,
+        { waitUntil: "networkidle" }
+      );
+      const dialog = desktopPage.getByRole("dialog", { name: "New Follow-up" });
+      await dialog.waitFor();
+      assert(
+        await dialog.getByLabel("Title").inputValue() === fixture.source.label,
+        `${fixture.key} source handoff did not preserve its source label`
+      );
+      await dialog
+        .getByText(
+          `1 active follow-up already uses this ${
+            fixture.key === "resource" ? "Resources" : "Media"
+          } source`,
+          { exact: true }
+        )
+        .waitFor();
+      assert(
+        await dialog
+          .getByRole("button", { name: "Create Follow-up" })
+          .isDisabled(),
+        `${fixture.key} source handoff bypassed the exact-source duplicate confirmation`
+      );
+    }
+
+    await desktopPage.goto(
+      `${baseUrl}/admin/reviews/${encodeURIComponent(reviewRun.id)}?tab=follow-ups&item=${encodeURIComponent(reviewFollowUp.id)}`,
+      { waitUntil: "networkidle" }
+    );
+    await assertPanel(desktopPage, sources[3], "Review follow-through");
+    const reviewItem = desktopPage.locator(`#review-item-${reviewFollowUp.id}`);
+    await Promise.all([
+      desktopPage.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/reviews/runs" &&
+          response.request().method() === "PATCH" &&
+          response.ok()
+      ),
+      reviewItem.getByRole("button", { name: "Link exact Follow-up" }).click()
+    ]);
+    await reviewItem.getByRole("link", { name: "Open linked Follow-up" }).waitFor();
+
+    const linkedReview = await requestJson(
+      baseUrl,
+      cookieJar,
+      `/api/reviews/runs?id=${encodeURIComponent(reviewRun.id)}`
+    );
+    const linkedReviewFollowUp = linkedReview.payload?.item?.followUps?.find(
+      (item) => item.id === reviewFollowUp.id
+    );
+    assert(
+      linkedReview.response.ok &&
+        linkedReviewFollowUp?.state === "created" &&
+        linkedReviewFollowUp.createdObjectRef?.objectId === createdByKey.get("review").id &&
+        linkedReviewFollowUp.createdObjectRef?.module === "personal_ops",
+      `Review did not persist the exact Personal Ops owner reference: ${JSON.stringify(linkedReview.payload)}`
+    );
+
+    const reviewOwner = createdByKey.get("review");
+    const completeReviewOwner = await requestJson(baseUrl, cookieJar, "/api/personal/ops", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "followUps",
+        id: reviewOwner.id,
+        expectedUpdatedAt: reviewOwner.updatedAt,
+        patch: {
+          followUpState: "complete",
+          outcome: "The cross-module owner status was completed with an explicit outcome."
+        }
+      })
+    });
+    assert(
+      completeReviewOwner.response.ok &&
+        completeReviewOwner.payload?.item?.followUpState === "complete",
+      `Review-linked Personal Ops owner completion failed: ${JSON.stringify(completeReviewOwner.payload)}`
+    );
+    createdByKey.set("review", completeReviewOwner.payload.item);
+
+    await desktopPage
+      .getByRole("button", { name: `Refresh Personal Ops Follow-up status for ${reviewRun.title}` })
+      .click();
+    await reviewItem
+      .locator(`[data-follow-up-id="${reviewOwner.id}"][data-follow-up-state="complete"]`)
+      .waitFor();
+    await Promise.all([
+      desktopPage.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/reviews/runs" &&
+          response.request().method() === "PATCH" &&
+          response.ok()
+      ),
+      reviewItem.getByRole("button", { name: "Record owner completion" }).click()
+    ]);
+    await reviewItem.getByText("Completed", { exact: true }).waitFor();
+    await desktopContext.close();
+
+    const responsiveRoutes = [
+      {
+        key: "project",
+        path: `/admin/projects/${encodeURIComponent(project.id)}?tab=overview`
+      },
+      {
+        key: "blocker",
+        path: `/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}`
+      },
+      {
+        key: "note",
+        path: `/admin/notes/${encodeURIComponent(note.id)}?tab=decisions`
+      },
+      {
+        key: "review",
+        path: `/admin/reviews/${encodeURIComponent(reviewRun.id)}?tab=follow-ups&item=${encodeURIComponent(reviewFollowUp.id)}`
+      },
+      {
+        key: "resource",
+        path: `/admin/resources/${encodeURIComponent(resource.id)}?tab=overview`
+      },
+      {
+        key: "media",
+        path: `/admin/media/${encodeURIComponent(mediaAsset.id)}?tab=overview`
+      }
+    ];
+    for (const viewport of [
+      { label: "1920x1080", width: 1920, height: 1080 },
+      { label: "1440x900", width: 1440, height: 900 },
+      { label: "1024x768", width: 1024, height: 768 },
+      { label: "390x844", width: 390, height: 844 }
+    ]) {
+      for (const route of responsiveRoutes) {
+        const context = await authenticatedContext({
+          width: viewport.width,
+          height: viewport.height
+        });
+        const page = await context.newPage();
+        observe(page);
+        await page.goto(`${baseUrl}${route.path}`, { waitUntil: "networkidle" });
+        const fixture = sources.find((item) => item.key === route.key);
+        const { panel } = await assertPanel(
+          page,
+          fixture,
+          `${route.key} follow-through at ${viewport.label}`
+        );
+        if (viewport.width <= 760) {
+          const undersizedTargets = await panel
+            .locator("button:visible, a:visible")
+            .evaluateAll((elements) =>
+              elements
+                .map((element) => {
+                  const rect = element.getBoundingClientRect();
+                  return {
+                    label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+                    width: rect.width,
+                    height: rect.height
+                  };
+                })
+                .filter((item) => item.width < 44 || item.height < 44)
+            );
+          assert(
+            undersizedTargets.length === 0,
+            `${route.key} mobile Follow-up targets are below 44px: ${JSON.stringify(undersizedTargets)}`
+          );
+        }
+        await page.screenshot({
+          path: path.join(
+            screenshotDir,
+            `${route.key}-follow-up-${viewport.label}.png`
+          ),
+          fullPage: true
+        });
+        await context.close();
+      }
+    }
+
+    const finalFollowUps = await requestJson(
+      baseUrl,
+      cookieJar,
+      "/api/personal/ops?family=followUps"
+    );
+    assert(finalFollowUps.response.ok, "Cross-module Follow-up state did not reload");
+    for (const fixture of sources) {
+      const exactOwners = finalFollowUps.payload.items.filter((item) =>
+        item.sourceRefs?.some(
+          (reference) =>
+            reference.module === fixture.source.module &&
+            reference.objectType === fixture.source.objectType &&
+            reference.objectId === fixture.source.objectId &&
+            (reference.containerObjectId || "") ===
+              (fixture.source.containerObjectId || "")
+        )
+      );
+      assert(
+        exactOwners.length === 1,
+        `${fixture.key} source ended with ${exactOwners.length} Personal Ops owners instead of one`
+      );
+    }
+
+    const completedReview = await requestJson(
+      baseUrl,
+      cookieJar,
+      `/api/reviews/runs?id=${encodeURIComponent(reviewRun.id)}`
+    );
+    const completedCandidate = completedReview.payload?.item?.followUps?.find(
+      (item) => item.id === reviewFollowUp.id
+    );
+    const completedReviewState = await requestJson(
+      baseUrl,
+      cookieJar,
+      "/api/reviews/runs?includeArchived=1"
+    );
+    assert(
+      completedReview.response.ok &&
+        completedCandidate?.state === "completed" &&
+        completedCandidate.createdObjectRef?.objectId === createdByKey.get("review").id &&
+        completedReviewState.payload?.state?.auditEvents?.filter(
+          (event) =>
+            event.action === "review_run.upsert_follow_up" &&
+            event.object?.objectId === reviewRun.id
+        ).length >= 2,
+      "Review did not explicitly persist and audit its Personal Ops owner completion"
+    );
+    assert(
+      browserMutations.length === 2 &&
+        browserMutations.every((request) => request === "PATCH /api/reviews/runs"),
+      `Cross-module browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Cross-module Follow-up browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Cross-module Follow-up browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+    return {
+      run: completedReview.payload.item,
+      view: completedReview.payload.view
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkCrossModuleDecisionConnections(
+  baseUrl,
+  cookieJar,
+  csrfToken,
+  project,
+  reviewRun,
+  reviewDecision
+) {
+  const { chromium } = await import("@playwright/test");
+  const sources = [
+    {
+      key: "project",
+      source: {
+        module: "projects",
+        objectType: "project",
+        objectId: project.id,
+        label: project.name,
+        route: `/admin/projects/${encodeURIComponent(project.id)}?tab=notes-decisions`
+      },
+      title: `${project.name} · operating decision`,
+      state: "open"
+    },
+    {
+      key: "review",
+      source: {
+        module: "reviews",
+        objectType: "review_decision_item",
+        objectId: reviewDecision.id,
+        containerObjectId: reviewRun.id,
+        label: reviewDecision.title,
+        route: `/admin/reviews/${encodeURIComponent(reviewRun.id)}?tab=decisions&item=${encodeURIComponent(reviewDecision.id)}`
+      },
+      title: `${reviewDecision.title} · Personal Ops owner`,
+      state: "decided"
+    },
+    {
+      key: "finance-budget",
+      source: {
+        module: "finance",
+        objectType: "budget",
+        objectId: "travel",
+        label: "Travel",
+        route: "/admin/finance/budgets?selected=travel&tab=overview"
+      },
+      title: "Travel budget · variance decision",
+      state: "open"
+    },
+    {
+      key: "finance-close",
+      source: {
+        module: "finance",
+        objectType: "finance_close_check",
+        objectId: "budget-overruns",
+        label: "Review budget overruns (Travel +24%)",
+        route: "/admin/finance/monthly-review?selected=budget-overruns&tab=decisions"
+      },
+      title: "Travel overage · monthly close decision",
+      state: "open"
+    }
+  ];
+  const createdByKey = new Map();
+
+  for (const fixture of sources) {
+    const decided = fixture.state === "decided";
+    const createDecision = await requestJson(baseUrl, cookieJar, "/api/personal/ops", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "decisions",
+        input: {
+          title: fixture.title,
+          question: `What explicit choice should ${fixture.source.label} retain?`,
+          description: `Regression verifies ${fixture.source.module} reads status from the Personal Ops-owned Decision.`,
+          domain: "Operations",
+          lifecycle: "active",
+          decisionState: fixture.state,
+          finalDecision: decided
+            ? "File the source-backed decision once and retain Personal Ops as its owner."
+            : undefined,
+          rationale: decided
+            ? "One exact source reference keeps the Review candidate and durable owner reconcilable."
+            : undefined,
+          reversibility: "reversible",
+          risk: fixture.key.startsWith("finance") ? "medium" : "low",
+          priority: fixture.key === "project" ? "high" : "medium",
+          sourceRefs: [fixture.source]
+        }
+      })
+    });
+    assert(
+      createDecision.response.ok && createDecision.payload?.created,
+      `${fixture.key} Decision connection fixture failed: ${JSON.stringify(createDecision.payload)}`
+    );
+    createdByKey.set(fixture.key, createDecision.payload.item);
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const browserMutations = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "cross-module-decision-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(`console: ${message.text()}`);
+      }
+    });
+    page.on("pageerror", (error) => browserErrors.push(`page: ${error.message}`));
+    page.on("request", (request) => {
+      if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) {
+        browserMutations.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      }
+    });
+    page.on("response", (response) => {
+      const pathname = new URL(response.url()).pathname;
+      if (response.status() >= 400 && pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${pathname}`);
+      }
+    });
+  }
+
+  function sourceKey(source) {
+    return [
+      source.module,
+      source.objectType,
+      source.containerObjectId || "root",
+      source.objectId
+    ].join(":");
+  }
+
+  async function assertPanel(page, fixture, label) {
+    const decision = createdByKey.get(fixture.key);
+    const panels = page.locator(`[data-linked-decisions="${sourceKey(fixture.source)}"]`);
+    const panel = panels.first();
+    await panel.waitFor();
+    const row = panel.locator(`[data-decision-id="${decision.id}"]`);
+    const expectedState = decision.decisionState
+      .replace(/_/g, " ")
+      .replace(/\b\w/g, (character) => character.toUpperCase());
+    const expectedUnresolved = decision.decisionState === "open" || decision.decisionState === "deferred"
+      ? 1
+      : 0;
+    assert(await row.count() === 1, `${label} did not render its exact Personal Ops-owned Decision`);
+    assert(
+      (await row.innerText()).includes(decision.title) &&
+        (await row.innerText()).includes(expectedState) &&
+        (await panel.innerText()).includes(`${expectedUnresolved} unresolved · 1 total`),
+      `${label} did not render the current owner title, state, and exact-source count`
+    );
+    assert(
+      await panel.getByRole("link", { name: "File in Personal Ops" }).count() === 0,
+      `${label} offered a duplicate creation path despite an exact linked owner`
+    );
+    const layout = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(!layout.overflowX, `${label} overflowed horizontally: ${JSON.stringify(layout)}`);
+    return { panel, row };
+  }
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const projectPage = await desktopContext.newPage();
+    observe(projectPage);
+    await projectPage.goto(`${baseUrl}${sources[0].source.route}`, { waitUntil: "networkidle" });
+    const projectPanel = await assertPanel(projectPage, sources[0], "Project decisions");
+    await projectPanel.row.click();
+    await projectPage.waitForURL((url) =>
+      url.pathname === "/admin/personal/decisions" &&
+      url.searchParams.get("selected") === createdByKey.get("project").id
+    );
+    await projectPage.goBack({ waitUntil: "networkidle" });
+    assert(
+      new URL(projectPage.url()).pathname === `/admin/projects/${project.id}` &&
+        new URL(projectPage.url()).searchParams.get("tab") === "notes-decisions",
+      "Browser Back did not restore the source Project and Notes & Decisions tab"
+    );
+
+    const projectOwner = createdByKey.get("project");
+    const decideProjectOwner = await requestJson(baseUrl, cookieJar, "/api/personal/ops", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "decisions",
+        id: projectOwner.id,
+        expectedUpdatedAt: projectOwner.updatedAt,
+        patch: {
+          decisionState: "decided",
+          finalDecision: "Keep this operating choice in the canonical Personal Ops decision record.",
+          rationale: "Projects displays the owner state without copying or mutating the Decision."
+        }
+      })
+    });
+    assert(
+      decideProjectOwner.response.ok &&
+        decideProjectOwner.payload?.item?.decisionState === "decided",
+      `Project-linked Decision state update failed: ${JSON.stringify(decideProjectOwner.payload)}`
+    );
+    createdByKey.set("project", decideProjectOwner.payload.item);
+    await projectPage
+      .getByRole("button", { name: `Refresh linked Decisions for ${project.name}` })
+      .click();
+    await projectPage
+      .locator(`[data-decision-id="${projectOwner.id}"][data-decision-state="decided"]`)
+      .waitFor();
+
+    const reviewPage = await desktopContext.newPage();
+    observe(reviewPage);
+    await reviewPage.goto(`${baseUrl}${sources[1].source.route}`, { waitUntil: "networkidle" });
+    await assertPanel(reviewPage, sources[1], "Review decisions");
+    const reviewItem = reviewPage.locator(`#review-item-${reviewDecision.id}`);
+    await Promise.all([
+      reviewPage.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/reviews/runs" &&
+          response.request().method() === "PATCH" &&
+          response.ok()
+      ),
+      reviewItem.getByRole("button", { name: "Link exact Decision" }).click()
+    ]);
+    await reviewItem.getByRole("link", { name: "Open filed Decision" }).waitFor();
+
+    const linkedReview = await requestJson(
+      baseUrl,
+      cookieJar,
+      `/api/reviews/runs?id=${encodeURIComponent(reviewRun.id)}`
+    );
+    const linkedReviewDecision = linkedReview.payload?.item?.decisions?.find(
+      (item) => item.id === reviewDecision.id
+    );
+    assert(
+      linkedReview.response.ok &&
+        linkedReviewDecision?.state === "filed" &&
+        linkedReviewDecision.destinationRef?.module === "personal_ops" &&
+        linkedReviewDecision.destinationRef?.objectType === "decision" &&
+        linkedReviewDecision.destinationRef?.objectId === createdByKey.get("review").id &&
+        linkedReviewDecision.rationale,
+      `Review did not persist the exact Personal Ops Decision reference: ${JSON.stringify(linkedReview.payload)}`
+    );
+
+    const financeBudgetPage = await desktopContext.newPage();
+    observe(financeBudgetPage);
+    await financeBudgetPage.goto(`${baseUrl}${sources[2].source.route}`, { waitUntil: "networkidle" });
+    await assertPanel(financeBudgetPage, sources[2], "Finance budget decisions");
+    assert(
+      await financeBudgetPage.getByText("Read-only fixture", { exact: true }).count() >= 1 &&
+        await financeBudgetPage.getByText("Open Decision", { exact: true }).count() >= 1,
+      "Finance budget did not preserve its read-only boundary and owner-aware Decision action"
+    );
+
+    const financeClosePage = await desktopContext.newPage();
+    observe(financeClosePage);
+    await financeClosePage.goto(`${baseUrl}${sources[3].source.route}`, { waitUntil: "networkidle" });
+    await assertPanel(financeClosePage, sources[3], "Finance close-item decisions");
+    assert(
+      await financeClosePage.getByText("Finance close remains read-only", { exact: true }).count() === 1 &&
+        await financeClosePage.getByText("Open Decision", { exact: true }).count() >= 1,
+      "Finance close item did not preserve its explicit boundary and owner-aware Decision action"
+    );
+    await desktopContext.close();
+
+    const responsiveRoutes = sources.map((fixture) => ({
+      fixture,
+      path: fixture.source.route
+    }));
+    for (const viewport of [
+      { label: "1920x1080", width: 1920, height: 1080 },
+      { label: "1440x900", width: 1440, height: 900 },
+      { label: "1024x768", width: 1024, height: 768 },
+      { label: "390x844", width: 390, height: 844 }
+    ]) {
+      for (const route of responsiveRoutes) {
+        const context = await authenticatedContext({
+          width: viewport.width,
+          height: viewport.height
+        });
+        const page = await context.newPage();
+        observe(page);
+        await page.goto(`${baseUrl}${route.path}`, { waitUntil: "networkidle" });
+        const { panel } = await assertPanel(
+          page,
+          route.fixture,
+          `${route.fixture.key} decisions at ${viewport.label}`
+        );
+        await panel.scrollIntoViewIfNeeded();
+        if (viewport.width <= 760) {
+          const undersizedTargets = await panel
+            .locator("button:visible, a:visible")
+            .evaluateAll((elements) =>
+              elements
+                .map((element) => {
+                  const rect = element.getBoundingClientRect();
+                  return {
+                    label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+                    width: rect.width,
+                    height: rect.height
+                  };
+                })
+                .filter((item) => item.width < 44 || item.height < 44)
+            );
+          assert(
+            undersizedTargets.length === 0,
+            `${route.fixture.key} mobile Decision targets are below 44px: ${JSON.stringify(undersizedTargets)}`
+          );
+        }
+        await page.screenshot({
+          path: path.join(
+            screenshotDir,
+            `${route.fixture.key}-decision-${viewport.label}.png`
+          ),
+          fullPage: true
+        });
+        await context.close();
+      }
+    }
+
+    const finalDecisions = await requestJson(
+      baseUrl,
+      cookieJar,
+      "/api/personal/ops?family=decisions"
+    );
+    assert(finalDecisions.response.ok, "Cross-module Decision state did not reload");
+    for (const fixture of sources) {
+      const exactOwners = finalDecisions.payload.items.filter((item) =>
+        item.sourceRefs?.some(
+          (reference) =>
+            reference.module === fixture.source.module &&
+            reference.objectType === fixture.source.objectType &&
+            reference.objectId === fixture.source.objectId &&
+            (reference.containerObjectId || "") ===
+              (fixture.source.containerObjectId || "")
+        )
+      );
+      assert(
+        exactOwners.length === 1,
+        `${fixture.key} source ended with ${exactOwners.length} Personal Ops Decisions instead of one`
+      );
+    }
+
+    const finalReviewState = await requestJson(
+      baseUrl,
+      cookieJar,
+      "/api/reviews/runs?includeArchived=1"
+    );
+    assert(
+      finalReviewState.payload?.state?.auditEvents?.some(
+        (event) =>
+          event.action === "review_run.upsert_decision" &&
+          event.object?.objectId === reviewRun.id
+      ),
+      "Review did not audit its exact Personal Ops Decision link"
+    );
+    assert(
+      browserMutations.length === 1 &&
+        browserMutations[0] === "PATCH /api/reviews/runs",
+      `Cross-module Decision browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Cross-module Decision browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Cross-module Decision browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+    return {
+      run: linkedReview.payload.item,
+      view: linkedReview.payload.view
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkPeopleProjectConnections(
+  baseUrl,
+  cookieJar,
+  csrfToken,
+  projectId,
+  person
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const browserMutations = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "people-projects-checkpoint"
+  );
+  const relationshipNote = `Design advisor for ${testRunId} project integration.`;
+  const refreshedRelationshipNote = `${relationshipNote} Current status refreshed from Projects.`;
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(`console: ${message.text()}`);
+      }
+    });
+    page.on("pageerror", (error) => browserErrors.push(`page: ${error.message}`));
+    page.on("request", (request) => {
+      if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) {
+        browserMutations.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      }
+    });
+    page.on("response", (response) => {
+      const pathname = new URL(response.url()).pathname;
+      if (response.status() >= 400 && pathname !== "/_vercel/insights/script.js") {
+        failedResponses.push(`${response.status()} ${pathname}`);
+      }
+    });
+  }
+
+  async function assertNoHorizontalOverflow(page, label) {
+    const layout = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(!layout.overflowX, `${label} overflowed horizontally: ${JSON.stringify(layout)}`);
+  }
+
+  async function assertMobileTargets(panel, label) {
+    const undersizedTargets = await panel
+      .locator("button:visible, a:visible")
+      .evaluateAll((elements) =>
+        elements
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              label:
+                element.getAttribute("aria-label") ||
+                element.textContent?.trim().slice(0, 60),
+              width: rect.width,
+              height: rect.height
+            };
+          })
+          .filter((item) => item.width < 44 || item.height < 44)
+      );
+    assert(
+      undersizedTargets.length === 0,
+      `${label} mobile targets are below 44px: ${JSON.stringify(undersizedTargets)}`
+    );
+  }
+
+  const initialProjects = await requestJson(baseUrl, cookieJar, "/api/projects");
+  const initialPeople = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+  assert(
+    initialProjects.response.ok && initialProjects.payload?.state,
+    "People-Projects regression could not read initial Projects state"
+  );
+  assert(
+    initialPeople.response.ok && initialPeople.payload?.ok,
+    "People-Projects regression could not read initial People state"
+  );
+  const initialProjectCount = initialProjects.payload.state.projects.length;
+  const initialPersonCount = initialPeople.payload.items.length;
+  const project = initialProjects.payload.state.projects.find((item) => item.id === projectId);
+  assert(project, `People-Projects regression could not find Project ${projectId}`);
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const projectPage = await desktopContext.newPage();
+    observe(projectPage);
+    await projectPage.goto(
+      `${baseUrl}/admin/projects/${encodeURIComponent(projectId)}?tab=people`,
+      { waitUntil: "networkidle" }
+    );
+
+    await projectPage.getByRole("button", { name: "Edit", exact: true }).click();
+    const editDialog = projectPage.getByRole("dialog", { name: "Edit project" });
+    await editDialog.getByLabel("Project owner identity").selectOption(person.id);
+    const editFormState = await editDialog.evaluate((form) => ({
+      valid: form instanceof HTMLFormElement ? form.checkValidity() : false,
+      invalid: Array.from(form.querySelectorAll(":invalid")).map((element) => ({
+        label: element.getAttribute("aria-label") || element.getAttribute("name"),
+        value: "value" in element ? element.value : ""
+      }))
+    }));
+    assert(
+      editFormState.valid,
+      `Project editor remained invalid after selecting a People owner: ${JSON.stringify(editFormState)}`
+    );
+    const projectSaveButton = editDialog.getByRole("button", { name: "Save", exact: true });
+    assert(
+      !(await projectSaveButton.isDisabled()),
+      "Project editor Save action remained disabled after selecting a People owner"
+    );
+    const projectUpdateResponsePromise = projectPage.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/projects" &&
+        response.request().method() === "PATCH"
+    );
+    await projectSaveButton.focus();
+    await projectSaveButton.press("Enter");
+    const projectUpdateResponse = await projectUpdateResponsePromise;
+    assert(
+      projectUpdateResponse.ok(),
+      `Project People owner update failed with ${projectUpdateResponse.status()}: ${await projectUpdateResponse.text()}`
+    );
+    await editDialog.waitFor({ state: "detached" });
+
+    const projectPeoplePanel = projectPage.locator(`[data-project-people="${projectId}"]`);
+    await projectPeoplePanel.getByRole("button", { name: "Link person" }).click();
+    const linkDialog = projectPage.getByRole("dialog", { name: "Link native object" });
+    await linkDialog.getByLabel("People identity").selectOption(person.id);
+    await linkDialog
+      .getByLabel("Relationship", { exact: true })
+      .selectOption("advisor_context");
+    await linkDialog
+      .getByLabel("Relationship strength", { exact: true })
+      .selectOption("strong");
+    await linkDialog.getByLabel("Project role or contribution").fill(relationshipNote);
+    const projectLinkResponsePromise = projectPage.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/projects" &&
+          response.request().method() === "POST"
+      );
+    const projectLinkSaveButton = linkDialog.getByRole("button", {
+      name: "Save",
+      exact: true
+    });
+    await projectLinkSaveButton.focus();
+    await projectLinkSaveButton.press("Enter");
+    const projectLinkResponse = await projectLinkResponsePromise;
+    assert(
+      projectLinkResponse.ok(),
+      `Project People link failed with ${projectLinkResponse.status()}: ${await projectLinkResponse.text()}`
+    );
+    await linkDialog.waitFor({ state: "detached" });
+
+    const personLinkRow = projectPeoplePanel.locator("li").filter({ hasText: person.title });
+    await personLinkRow.waitFor();
+    const projectPeopleText = await projectPeoplePanel.innerText();
+    assert(
+      projectPeopleText.includes(person.title) &&
+        projectPeopleText.includes("Advisor Context"),
+      "Project People tab did not render the linked identity and role"
+    );
+
+    const linkedProjects = await requestJson(baseUrl, cookieJar, "/api/projects");
+    const linkedProject = linkedProjects.payload?.state?.projects?.find(
+      (item) => item.id === projectId
+    );
+    const linkedPeopleRefs = linkedProjects.payload?.state?.links?.filter(
+      (item) =>
+        item.projectId === projectId &&
+        item.linkState !== "removed" &&
+        item.source?.module === "people" &&
+        item.source?.objectId === person.id
+    );
+    assert(
+      linkedProjects.response.ok &&
+        linkedProject?.ownerRef?.module === "people" &&
+        linkedProject.ownerRef.objectId === person.id &&
+        linkedProject.ownerRef.route === `/admin/people/${encodeURIComponent(person.id)}` &&
+        linkedPeopleRefs?.length === 1 &&
+        linkedPeopleRefs[0].relationship === "advisor_context" &&
+        linkedPeopleRefs[0].relationshipStrength === "strong",
+      `Projects did not persist one exact People owner and link: ${JSON.stringify(linkedProjects.payload)}`
+    );
+
+    await personLinkRow.getByRole("link", { name: "Open source" }).click();
+    await projectPage.waitForURL(
+      (url) => url.pathname === `/admin/people/${encodeURIComponent(person.id)}`
+    );
+    await projectPage.getByRole("tab", { name: "Relationships" }).click();
+    await projectPage.waitForURL(
+      (url) =>
+        url.pathname === `/admin/people/${encodeURIComponent(person.id)}` &&
+        url.searchParams.get("tab") === "relations"
+    );
+    const peopleUrl = new URL(projectPage.url());
+    assert(
+      peopleUrl.pathname === `/admin/people/${person.id}` &&
+        peopleUrl.searchParams.get("tab") === "relations",
+      "People Relationships tab did not persist its canonical URL state"
+    );
+
+    const peopleProjectsPanel = projectPage.locator(
+      `[data-linked-projects="people:person:root:${person.id}"]`
+    );
+    await peopleProjectsPanel.waitFor();
+    const peopleProjectRow = peopleProjectsPanel.locator(
+      `[data-project-id="${projectId}"]`
+    );
+    assert(
+      await peopleProjectRow.count() === 1,
+      "People rendered duplicate Project identities for owner and advisor roles"
+    );
+    const peopleProjectText = await peopleProjectRow.innerText();
+    const peoplePanelText = await peopleProjectsPanel.innerText();
+    assert(
+      peopleProjectText.includes(project.name) &&
+        peopleProjectText.includes("Project owner") &&
+        peopleProjectText.includes("Advisor Context") &&
+        peoplePanelText.includes("1 active") &&
+        peoplePanelText.includes("1 exact project identity"),
+      "People did not derive the current Project lifecycle, roles, context, and deduplicated count"
+    );
+
+    await peopleProjectRow.click();
+    await projectPage.waitForURL(
+      (url) =>
+        url.pathname === `/admin/projects/${encodeURIComponent(projectId)}` &&
+        url.searchParams.get("tab") === "people"
+    );
+    await projectPage.goBack({ waitUntil: "networkidle" });
+    assert(
+      new URL(projectPage.url()).pathname === `/admin/people/${person.id}` &&
+        new URL(projectPage.url()).searchParams.get("tab") === "relations",
+      "Browser Back did not restore the People identity and Relationships tab"
+    );
+
+    const link = linkedPeopleRefs[0];
+    const updateLink = await requestJson(baseUrl, cookieJar, "/api/projects", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "links",
+        id: link.id,
+        expectedUpdatedAt: link.updatedAt,
+        patch: { projectSpecificNote: refreshedRelationshipNote }
+      })
+    });
+    assert(
+      updateLink.response.ok &&
+        updateLink.payload?.item?.projectSpecificNote === refreshedRelationshipNote,
+      `Project relationship status update failed: ${JSON.stringify(updateLink.payload)}`
+    );
+    await projectPage
+      .getByRole("button", {
+        name: `Refresh Projects involvement for ${person.title}`
+      })
+      .click();
+    await projectPage.getByText(refreshedRelationshipNote, { exact: false }).waitFor();
+    await assertNoHorizontalOverflow(projectPage, "People-Projects desktop workflow");
+    await desktopContext.close();
+
+    for (const viewport of [
+      { label: "1920x1080", width: 1920, height: 1080 },
+      { label: "1440x900", width: 1440, height: 900 },
+      { label: "1024x768", width: 1024, height: 768 },
+      { label: "390x844", width: 390, height: 844 }
+    ]) {
+      for (const route of [
+        {
+          key: "people",
+          path: `/admin/people/${encodeURIComponent(person.id)}?tab=relations`,
+          selector: `[data-linked-projects="people:person:root:${person.id}"]`
+        },
+        {
+          key: "project",
+          path: `/admin/projects/${encodeURIComponent(projectId)}?tab=people`,
+          selector: `[data-project-people="${projectId}"]`
+        }
+      ]) {
+        const context = await authenticatedContext({
+          width: viewport.width,
+          height: viewport.height
+        });
+        const page = await context.newPage();
+        observe(page);
+        await page.goto(`${baseUrl}${route.path}`, { waitUntil: "networkidle" });
+        const panel = page.locator(route.selector);
+        await panel.waitFor();
+        await panel.scrollIntoViewIfNeeded();
+        const text = await panel.innerText();
+        assert(
+          (route.key === "people"
+            ? text.includes(project.name)
+            : text.includes(person.title)) &&
+            text.includes(relationshipNote),
+          `${route.key} did not render the exact cross-module relationship at ${viewport.label}`
+        );
+        await assertNoHorizontalOverflow(
+          page,
+          `${route.key} People-Projects view at ${viewport.label}`
+        );
+        if (viewport.width <= 760) {
+          await assertMobileTargets(
+            panel,
+            `${route.key} People-Projects view at ${viewport.label}`
+          );
+        }
+        await page.screenshot({
+          path: path.join(
+            screenshotDir,
+            `${route.key}-connection-${viewport.label}.png`
+          ),
+          fullPage: true
+        });
+        await context.close();
+      }
+    }
+
+    const finalProjects = await requestJson(baseUrl, cookieJar, "/api/projects");
+    const finalPeople = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+    const finalProject = finalProjects.payload?.state?.projects?.find(
+      (item) => item.id === projectId
+    );
+    const finalPeopleRefs = finalProjects.payload?.state?.links?.filter(
+      (item) =>
+        item.projectId === projectId &&
+        item.linkState !== "removed" &&
+        item.source?.module === "people" &&
+        item.source?.objectId === person.id
+    );
+    assert(
+      finalProjects.response.ok &&
+        finalProjects.payload.state.projects.length === initialProjectCount &&
+        finalPeople.response.ok &&
+        finalPeople.payload.items.length === initialPersonCount &&
+        finalPeopleRefs?.length === 1 &&
+        finalProject?.ownerRef?.objectId === person.id,
+      "People-Projects workflow duplicated a People or Project identity"
+    );
+    assert(
+      finalProjects.payload.state.auditEvents.some(
+        (event) =>
+          event.action === "project.updated" &&
+          event.object?.objectId === projectId
+      ) &&
+        finalProjects.payload.state.auditEvents.some(
+          (event) =>
+            event.action === "project_link.created" &&
+            event.object?.objectId === finalPeopleRefs[0].id
+        ) &&
+        finalProjects.payload.state.auditEvents.some(
+          (event) =>
+            event.action === "project_link.updated" &&
+            event.object?.objectId === finalPeopleRefs[0].id
+        ),
+      "People-Projects owner, link, or refresh mutation was not represented in Projects audit history"
+    );
+    assert(
+      browserMutations.length === 2 &&
+        browserMutations[0] === "PATCH /api/projects" &&
+        browserMutations[1] === "POST /api/projects",
+      `People-Projects browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `People-Projects browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `People-Projects browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkNoteProjectAssociations(
+  baseUrl,
+  cookieJar,
+  project,
+  note
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const expectedFailedResponses = [];
+  const browserMutations = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "notes-projects-checkpoint"
+  );
+  const relationship = "source_material";
+  const projectContext = `${testRunId} verifies a Notes-owned source used by a Projects-owned association.`;
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(`console: ${message.text()}`);
+      }
+    });
+    page.on("pageerror", (error) => browserErrors.push(`page: ${error.message}`));
+    page.on("request", (request) => {
+      if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) {
+        browserMutations.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      }
+    });
+    page.on("response", (response) => {
+      const pathname = new URL(response.url()).pathname;
+      if (response.status() < 400 || pathname === "/_vercel/insights/script.js") return;
+      if (pathname === "/api/projects" && response.status() === 503) {
+        expectedFailedResponses.push(`${response.status()} ${pathname}`);
+        return;
+      }
+      failedResponses.push(`${response.status()} ${pathname}`);
+    });
+  }
+
+  async function assertNoHorizontalOverflow(page, label) {
+    const layout = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(!layout.overflowX, `${label} overflowed horizontally: ${JSON.stringify(layout)}`);
+  }
+
+  async function assertMobileTargets(container, label) {
+    const undersizedTargets = await container
+      .locator("button:visible, a:visible")
+      .evaluateAll((elements) =>
+        elements
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              label:
+                element.getAttribute("aria-label") ||
+                element.textContent?.trim().slice(0, 60),
+              width: rect.width,
+              height: rect.height
+            };
+          })
+          .filter((item) => item.width < 44 || item.height < 44)
+      );
+    assert(
+      undersizedTargets.length === 0,
+      `${label} mobile targets are below 44px: ${JSON.stringify(undersizedTargets)}`
+    );
+  }
+
+  const initialProjects = await requestJson(baseUrl, cookieJar, "/api/projects");
+  const initialNotes = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+  assert(
+    initialProjects.response.ok && initialProjects.payload?.state,
+    "Notes-Projects regression could not read initial Projects state"
+  );
+  assert(
+    initialNotes.response.ok && initialNotes.payload?.ok,
+    "Notes-Projects regression could not read initial Notes state"
+  );
+  const initialProjectCount = initialProjects.payload.state.projects.length;
+  const initialNoteCount = initialNotes.payload.items.filter(
+    (item) => item.className === "note"
+  ).length;
+  const preexistingLinks = initialProjects.payload.state.links.filter(
+    (item) =>
+      item.projectId === project.id &&
+      item.linkState !== "removed" &&
+      item.source?.module === "notes" &&
+      item.source?.objectType === "note" &&
+      item.source?.objectId === note.id &&
+      item.relationship === relationship
+  );
+  assert(
+    preexistingLinks.length === 0,
+    "Notes-Projects browser workflow did not begin without its target association"
+  );
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const page = await desktopContext.newPage();
+    observe(page);
+    const noteRoute = `/admin/notes/${encodeURIComponent(note.id)}?tab=links`;
+    await page.goto(`${baseUrl}${noteRoute}`, { waitUntil: "networkidle" });
+    const projectPanel = page.locator(
+      `[data-linked-projects="notes:note:root:${note.id}"]`
+    );
+    const form = page.locator(`[data-project-link-editor="${note.id}"]`);
+    await projectPanel.waitFor();
+    await form.waitFor();
+    assert(
+      await projectPanel.locator(`[data-project-id="${project.id}"]`).count() === 0,
+      "Notes rendered a Project association before the protected write"
+    );
+
+    await form.getByLabel("Destination Project").selectOption(project.id);
+    await form.getByLabel("Project relationship").selectOption(relationship);
+    await form.getByLabel("Relationship strength").selectOption("strong");
+    await form.getByLabel("Project-specific context").fill(projectContext);
+    await form.getByText("Required evidence", { exact: true }).click();
+
+    await page.route("**/api/projects", async (route) => {
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
+      await route.fulfill({
+        status: 503,
+        contentType: "application/json",
+        body: JSON.stringify({
+          ok: false,
+          error: "Simulated Projects repository outage"
+        })
+      });
+    });
+    await form.getByRole("button", { name: "Create Project association" }).click();
+    await form.getByText("Your Project-association draft was preserved.", { exact: false }).waitFor();
+    assert(
+      (await form.getByLabel("Destination Project").inputValue()) === project.id &&
+        (await form.getByLabel("Project relationship").inputValue()) === relationship &&
+        (await form.getByLabel("Relationship strength").inputValue()) === "strong" &&
+        (await form.getByLabel("Project-specific context").inputValue()) === projectContext &&
+        await form.locator('input[type="checkbox"]').isChecked(),
+      "Failed Notes-Projects write did not preserve the association draft"
+    );
+    await page.unroute("**/api/projects");
+
+    const createResponsePromise = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/projects" &&
+        response.request().method() === "POST"
+    );
+    await form.getByRole("button", { name: "Create Project association" }).click();
+    const createResponse = await createResponsePromise;
+    assert(
+      createResponse.ok(),
+      `Notes Project association failed with ${createResponse.status()}: ${await createResponse.text()}`
+    );
+    await form.getByText(`Linked this Note to ${project.name}.`, { exact: false }).waitFor();
+    const projectRow = projectPanel.locator(`[data-project-id="${project.id}"]`);
+    await projectRow.waitFor();
+    const projectRowText = await projectRow.innerText();
+    assert(
+      projectRowText.includes(project.name) &&
+        projectRowText.includes("Source Material") &&
+        projectRowText.includes(projectContext),
+      "Notes did not render the current Projects-owned relationship, lifecycle, and context"
+    );
+
+    await form.getByLabel("Destination Project").selectOption(project.id);
+    await form.getByLabel("Project relationship").selectOption(relationship);
+    await form.getByLabel("Relationship strength").selectOption("strong");
+    await form.getByLabel("Project-specific context").fill(projectContext);
+    await form.getByText("Exact association already present", { exact: true }).waitFor();
+    const duplicateResponsePromise = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/projects" &&
+        response.request().method() === "POST"
+    );
+    await form.getByRole("button", { name: "Verify existing association" }).click();
+    const duplicateResponse = await duplicateResponsePromise;
+    assert(
+      duplicateResponse.ok(),
+      `Existing Notes Project association verification failed with ${duplicateResponse.status()}`
+    );
+    await form.getByText("no duplicate was created", { exact: false }).waitFor();
+    assert(
+      await projectPanel.locator(`[data-project-id="${project.id}"]`).count() === 1,
+      "Notes rendered duplicate Project destinations for one exact association"
+    );
+
+    await projectRow.click();
+    await page.waitForURL(
+      (url) =>
+        url.pathname === `/admin/projects/${encodeURIComponent(project.id)}` &&
+        url.searchParams.get("tab") === "notes-decisions"
+    );
+    const projectNotesPanel = page
+      .getByRole("heading", { name: "Notes and decision context" })
+      .locator("xpath=ancestor::section[1]");
+    await projectNotesPanel.getByText(note.title, { exact: true }).waitFor();
+    assert(
+      (await projectNotesPanel.innerText()).includes(`${testRunId} verifies`),
+      "Projects Notes & Decisions did not expose the Project-specific Note context"
+    );
+    await page.goBack({ waitUntil: "networkidle" });
+    const restoredUrl = new URL(page.url());
+    assert(
+      restoredUrl.pathname === `/admin/notes/${note.id}` &&
+        restoredUrl.searchParams.get("tab") === "links",
+      "Browser Back did not restore the Notes identity and Links tab"
+    );
+    await page.reload({ waitUntil: "networkidle" });
+    await page.locator(`[data-project-id="${project.id}"]`).waitFor();
+    assert(
+      await page.locator(`[data-project-id="${project.id}"]`).count() === 1,
+      "Notes Project association did not survive a direct route reload"
+    );
+    const noteLifecycleRow = page.locator(
+      `[data-project-lifecycle-project-id="${project.id}"][data-project-link-relationship="${relationship}"]`
+    );
+    await noteLifecycleRow.waitFor();
+    assert(
+      (await noteLifecycleRow.getAttribute("data-project-link-state")) === "active" &&
+        await noteLifecycleRow
+          .getByRole("button", {
+            name: `Remove Source Material association from ${project.name}`
+          })
+          .isVisible(),
+      "Notes did not expose the shared Projects-owned association lifecycle"
+    );
+    await assertNoHorizontalOverflow(page, "Notes-Projects desktop workflow");
+    await desktopContext.close();
+
+    for (const viewport of [
+      { label: "1920x1080", width: 1920, height: 1080 },
+      { label: "1440x900", width: 1440, height: 900 },
+      { label: "1024x768", width: 1024, height: 768 },
+      { label: "390x844", width: 390, height: 844 }
+    ]) {
+      for (const route of [
+        {
+          key: "notes",
+          path: noteRoute,
+          selector: `[data-project-link-editor="${note.id}"]`
+        },
+        {
+          key: "project",
+          path: `/admin/projects/${encodeURIComponent(project.id)}?tab=notes-decisions`,
+          text: note.title
+        }
+      ]) {
+        const context = await authenticatedContext({
+          width: viewport.width,
+          height: viewport.height
+        });
+        const responsivePage = await context.newPage();
+        observe(responsivePage);
+        await responsivePage.goto(`${baseUrl}${route.path}`, { waitUntil: "networkidle" });
+        const surface = route.selector
+          ? responsivePage.locator(route.selector)
+          : responsivePage
+              .getByRole("heading", { name: "Notes and decision context" })
+              .locator("xpath=ancestor::section[1]");
+        await surface.waitFor();
+        const text = await surface.innerText();
+        assert(
+          route.key === "notes"
+            ? text.includes(project.name) && text.includes("Projects-owned write")
+            : text.includes(route.text) && text.includes(`${testRunId} verifies`),
+          `${route.key} did not render the exact Notes-Projects association at ${viewport.label}`
+        );
+        if (route.key === "notes") {
+          const lifecyclePanel = responsivePage.locator(
+            `[data-linked-projects="notes:note:root:${note.id}"]`
+          );
+          const lifecycleRow = lifecyclePanel.locator(
+            `[data-project-lifecycle-project-id="${project.id}"][data-project-link-relationship="${relationship}"]`
+          );
+          await lifecycleRow.waitFor();
+          assert(
+            (await lifecycleRow.getAttribute("data-project-link-state")) === "active",
+            `Notes association lifecycle was not active at ${viewport.label}`
+          );
+          if (viewport.width <= 760) {
+            await assertMobileTargets(
+              lifecyclePanel,
+              `Notes association lifecycle at ${viewport.label}`
+            );
+          }
+        }
+        await assertNoHorizontalOverflow(
+          responsivePage,
+          `${route.key} Notes-Projects view at ${viewport.label}`
+        );
+        if (viewport.width <= 760) {
+          await assertMobileTargets(
+            surface,
+            `${route.key} Notes-Projects view at ${viewport.label}`
+          );
+        }
+        await responsivePage.screenshot({
+          path: path.join(
+            screenshotDir,
+            `${route.key}-association-${viewport.label}.png`
+          ),
+          fullPage: true
+        });
+        await context.close();
+      }
+    }
+
+    const finalProjects = await requestJson(baseUrl, cookieJar, "/api/projects");
+    const finalNotes = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+    const finalLinks = finalProjects.payload?.state?.links?.filter(
+      (item) =>
+        item.projectId === project.id &&
+        item.linkState !== "removed" &&
+        item.source?.module === "notes" &&
+        item.source?.objectType === "note" &&
+        item.source?.objectId === note.id &&
+        item.relationship === relationship
+    );
+    assert(
+      finalProjects.response.ok &&
+        finalProjects.payload.state.projects.length === initialProjectCount &&
+        finalNotes.response.ok &&
+        finalNotes.payload.items.filter((item) => item.className === "note").length === initialNoteCount &&
+        finalLinks?.length === 1 &&
+        finalLinks[0].relationshipStrength === "strong" &&
+        finalLinks[0].isRequiredEvidence === true &&
+        finalLinks[0].projectSpecificNote === projectContext,
+      "Notes-Projects workflow duplicated an owner object or lost typed association state"
+    );
+    const linkCreatedAudits = finalProjects.payload.state.auditEvents.filter(
+      (event) =>
+        event.action === "project_link.created" &&
+        event.object?.objectId === finalLinks[0].id
+    );
+    assert(
+      linkCreatedAudits.length === 1,
+      "Notes-Projects association was not represented by exactly one Projects audit event"
+    );
+    assert(
+      browserMutations.length === 3 &&
+        browserMutations.every((mutation) => mutation === "POST /api/projects"),
+      `Notes-Projects browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
+    );
+    assert(
+      expectedFailedResponses.length === 1 &&
+        expectedFailedResponses[0] === "503 /api/projects",
+      `Notes-Projects failed-write recovery did not observe the expected isolated failure: ${expectedFailedResponses.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Notes-Projects browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Notes-Projects browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkResourceMediaProjectAssociations(
+  baseUrl,
+  cookieJar,
+  project,
+  resource,
+  media
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const expectedFailedResponses = [];
+  const browserMutations = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "resource-media-projects-checkpoint"
+  );
+  const fixtures = [
+    {
+      key: "resource",
+      label: "Resource",
+      sourceModule: "resources",
+      sourceObjectType: "resource",
+      sourceId: resource.id,
+      sourceTitle: resource.title,
+      path: `/admin/resources/${encodeURIComponent(resource.id)}?tab=links`,
+      relationship: "source_material",
+      strength: "strong",
+      required: true,
+      context: `${testRunId} verifies a Resources-owned source used by a Projects-owned association.`
+    },
+    {
+      key: "media",
+      label: "Media asset",
+      sourceModule: "media",
+      sourceObjectType: "media_asset",
+      sourceId: media.id,
+      sourceTitle: media.title,
+      path: `/admin/media/${encodeURIComponent(media.id)}?tab=links`,
+      relationship: "evidence",
+      strength: "normal",
+      required: false,
+      context: `${testRunId} verifies Media evidence without inventing AssetUsage, rights, or binary state.`
+    }
+  ];
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(`console: ${message.text()}`);
+      }
+    });
+    page.on("pageerror", (error) => browserErrors.push(`page: ${error.message}`));
+    page.on("request", (request) => {
+      if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) {
+        browserMutations.push(`${request.method()} ${new URL(request.url()).pathname}`);
+      }
+    });
+    page.on("response", (response) => {
+      const pathname = new URL(response.url()).pathname;
+      if (response.status() < 400 || pathname === "/_vercel/insights/script.js") return;
+      if (pathname === "/api/projects" && response.status() === 503) {
+        expectedFailedResponses.push(`${response.status()} ${pathname}`);
+        return;
+      }
+      failedResponses.push(`${response.status()} ${pathname}`);
+    });
+  }
+
+  async function assertNoHorizontalOverflow(page, label) {
+    const layout = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(!layout.overflowX, `${label} overflowed horizontally: ${JSON.stringify(layout)}`);
+  }
+
+  async function assertMobileTargets(container, label) {
+    const undersizedTargets = await container
+      .locator("button:visible, a:visible, select:visible")
+      .evaluateAll((elements) =>
+        elements
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              label:
+                element.getAttribute("aria-label") ||
+                element.textContent?.trim().slice(0, 60),
+              width: rect.width,
+              height: rect.height
+            };
+          })
+          .filter((item) => item.width < 44 || item.height < 44)
+      );
+    assert(
+      undersizedTargets.length === 0,
+      `${label} mobile targets are below 44px: ${JSON.stringify(undersizedTargets)}`
+    );
+  }
+
+  const initialProjects = await requestJson(baseUrl, cookieJar, "/api/projects");
+  const initialRecords = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+  assert(
+    initialProjects.response.ok && initialProjects.payload?.state,
+    "Resource/Media-Projects regression could not read initial Projects state"
+  );
+  assert(
+    initialRecords.response.ok && initialRecords.payload?.ok,
+    "Resource/Media-Projects regression could not read initial source records"
+  );
+  const initialProjectCount = initialProjects.payload.state.projects.length;
+  const initialResourceCount = initialRecords.payload.items.filter(
+    (item) => item.className === "resource"
+  ).length;
+  const initialMediaCount = initialRecords.payload.items.filter(
+    (item) => item.className === "file"
+  ).length;
+  for (const fixture of fixtures) {
+    const existing = initialProjects.payload.state.links.filter(
+      (item) =>
+        item.projectId === project.id &&
+        item.linkState !== "removed" &&
+        item.source?.module === fixture.sourceModule &&
+        item.source?.objectType === fixture.sourceObjectType &&
+        item.source?.objectId === fixture.sourceId &&
+        item.relationship === fixture.relationship
+    );
+    assert(
+      existing.length === 0,
+      `${fixture.label}-Projects workflow did not begin without its target association`
+    );
+  }
+
+  try {
+    const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
+    const page = await desktopContext.newPage();
+    observe(page);
+
+    for (const [index, fixture] of fixtures.entries()) {
+      await page.goto(`${baseUrl}${fixture.path}`, { waitUntil: "networkidle" });
+      const projectPanel = page.locator(
+        `[data-linked-projects="${fixture.sourceModule}:${fixture.sourceObjectType}:root:${fixture.sourceId}"]`
+      );
+      await projectPanel.waitFor();
+      assert(
+        await projectPanel.locator(`[data-project-id="${project.id}"]`).count() ===
+          (fixture.key === "media" ? 1 : 0),
+        `${fixture.label} rendered an unexpected Project destination before the new relationship`
+      );
+
+      await page.getByRole("button", { name: "Associate Project", exact: true }).click();
+      const sheet = page.locator(
+        `[data-project-association="${fixture.sourceModule}:${fixture.sourceObjectType}:${fixture.sourceId}"]`
+      );
+      await sheet.waitFor();
+      await sheet.getByLabel("Destination Project").selectOption(project.id);
+      await sheet.getByLabel("Project relationship").selectOption(fixture.relationship);
+      await sheet.getByLabel("Relationship strength").selectOption(fixture.strength);
+      await sheet.getByLabel("Project-specific context").fill(fixture.context);
+      if (fixture.required) {
+        await sheet.getByText("Required evidence", { exact: true }).click();
+      }
+
+      if (index === 0) {
+        await page.route("**/api/projects", async (route) => {
+          if (route.request().method() !== "POST") {
+            await route.continue();
+            return;
+          }
+          await route.fulfill({
+            status: 503,
+            contentType: "application/json",
+            body: JSON.stringify({
+              ok: false,
+              error: "Simulated Projects repository outage"
+            })
+          });
+        });
+        await sheet.getByRole("button", { name: "Create association" }).click();
+        await sheet.getByText("Your Project-association draft was preserved.", { exact: false }).waitFor();
+        assert(
+          (await sheet.getByLabel("Destination Project").inputValue()) === project.id &&
+            (await sheet.getByLabel("Project relationship").inputValue()) === fixture.relationship &&
+            (await sheet.getByLabel("Relationship strength").inputValue()) === fixture.strength &&
+            (await sheet.getByLabel("Project-specific context").inputValue()) === fixture.context &&
+            await sheet.locator('input[type="checkbox"]').isChecked(),
+          "Failed Resource-Projects write did not preserve the association draft"
+        );
+        await page.unroute("**/api/projects");
+      }
+
+      const createResponsePromise = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/projects" &&
+          response.request().method() === "POST"
+      );
+      await sheet.getByRole("button", { name: "Create association" }).click();
+      const createResponse = await createResponsePromise;
+      assert(
+        createResponse.ok(),
+        `${fixture.label} Project association failed with ${createResponse.status()}: ${await createResponse.text()}`
+      );
+      await sheet
+        .getByText(`Linked this ${fixture.key === "resource" ? "resource" : "media asset"} to ${project.name}.`, {
+          exact: false
+        })
+        .waitFor();
+      await sheet.getByRole("button", { name: "Close", exact: true }).click();
+      const projectRow = projectPanel.locator(`[data-project-id="${project.id}"]`);
+      await projectRow.waitFor();
+      const rowText = await projectRow.innerText();
+      assert(
+        rowText.includes(project.name) &&
+          rowText.includes(
+            fixture.relationship.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase())
+          ) &&
+          rowText.includes(fixture.context),
+        `${fixture.label} did not render the current Projects-owned relationship and context`
+      );
+
+      await page.getByRole("button", { name: "Associate Project", exact: true }).click();
+      const duplicateSheet = page.locator(
+        `[data-project-association="${fixture.sourceModule}:${fixture.sourceObjectType}:${fixture.sourceId}"]`
+      );
+      await duplicateSheet.getByLabel("Destination Project").selectOption(project.id);
+      await duplicateSheet.getByLabel("Project relationship").selectOption(fixture.relationship);
+      await duplicateSheet.getByText("Exact association already present", { exact: true }).waitFor();
+      const duplicateResponsePromise = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/projects" &&
+          response.request().method() === "POST"
+      );
+      await duplicateSheet.getByRole("button", { name: "Verify association" }).click();
+      const duplicateResponse = await duplicateResponsePromise;
+      assert(
+        duplicateResponse.ok(),
+        `${fixture.label} existing Project association verification failed with ${duplicateResponse.status()}`
+      );
+      await duplicateSheet.getByText("no duplicate was created", { exact: false }).waitFor();
+      await duplicateSheet.getByRole("button", { name: "Close", exact: true }).click();
+      assert(
+        await projectPanel.locator(`[data-project-id="${project.id}"]`).count() === 1,
+        `${fixture.label} rendered duplicate Project destinations`
+      );
+      await page.reload({ waitUntil: "networkidle" });
+      await page.locator(`[data-project-id="${project.id}"]`).waitFor();
+      assert(
+        await page.locator(`[data-project-id="${project.id}"]`).count() === 1,
+        `${fixture.label} Project association did not survive a direct route reload`
+      );
+
+      const relationshipLabel = fixture.relationship
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (character) => character.toUpperCase());
+      const lifecycleRow = projectPanel.locator(
+        `[data-project-lifecycle-project-id="${project.id}"][data-project-link-relationship="${fixture.relationship}"]`
+      );
+      await lifecycleRow.waitFor();
+      assert(
+        (await lifecycleRow.getAttribute("data-project-link-state")) === "active" &&
+          (await lifecycleRow.innerText()).includes(relationshipLabel) &&
+          (await lifecycleRow.innerText()).includes(fixture.context),
+        `${fixture.label} did not expose the active Projects-owned association lifecycle`
+      );
+
+      await lifecycleRow
+        .getByRole("button", {
+          name: `Remove ${relationshipLabel} association from ${project.name}`
+        })
+        .click();
+      let lifecycleDialog = page.getByRole("dialog", {
+        name: "Remove this Project association?"
+      });
+      await lifecycleDialog.waitFor();
+      assert(
+        await lifecycleDialog.getByRole("button", { name: "Remove association" }).isDisabled(),
+        `${fixture.label} unlink confirmation did not require a reason`
+      );
+      const removalReason = `${testRunId} confirms the source keeps ownership while this ProjectLink is soft removed.`;
+      await lifecycleDialog.getByLabel("Unlink reason").fill(removalReason);
+
+      if (index === 0) {
+        await page.route("**/api/projects", async (route) => {
+          if (route.request().method() !== "PATCH") {
+            await route.continue();
+            return;
+          }
+          await route.fulfill({
+            status: 503,
+            contentType: "application/json",
+            body: JSON.stringify({
+              ok: false,
+              error: "Simulated Projects lifecycle outage"
+            })
+          });
+        });
+        await lifecycleDialog.getByRole("button", { name: "Remove association" }).click();
+        await lifecycleDialog
+          .getByText("Your unlink reason was preserved.", { exact: false })
+          .waitFor();
+        assert(
+          (await lifecycleDialog.getByLabel("Unlink reason").inputValue()) === removalReason,
+          "Failed Resource-Projects unlink did not preserve the removal reason"
+        );
+        await page.unroute("**/api/projects");
+      }
+
+      const removeResponsePromise = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/projects" &&
+          response.request().method() === "PATCH"
+      );
+      await lifecycleDialog.getByRole("button", { name: "Remove association" }).click();
+      const removeResponse = await removeResponsePromise;
+      assert(
+        removeResponse.ok(),
+        `${fixture.label} Project association unlink failed with ${removeResponse.status()}: ${await removeResponse.text()}`
+      );
+      await page
+        .getByText("was not deleted, and the association remains available to restore.", {
+          exact: false
+        })
+        .waitFor();
+      await page.waitForFunction(
+        ({ projectId, relationship }) =>
+          document
+            .querySelector(
+              `[data-project-lifecycle-project-id="${projectId}"][data-project-link-relationship="${relationship}"]`
+            )
+            ?.getAttribute("data-project-link-state") === "removed",
+        { projectId: project.id, relationship: fixture.relationship }
+      );
+      assert(
+        (await lifecycleRow.innerText()).includes(removalReason),
+        `${fixture.label} removed association did not retain its reason`
+      );
+
+      await lifecycleRow
+        .getByRole("button", {
+          name: `Restore ${relationshipLabel} association to ${project.name}`
+        })
+        .click();
+      lifecycleDialog = page.getByRole("dialog", {
+        name: "Restore this Project association?"
+      });
+      await lifecycleDialog.waitFor();
+      assert(
+        (await lifecycleDialog.innerText()).includes(
+          "No duplicate"
+        ),
+        `${fixture.label} restore confirmation did not explain the ownership consequence`
+      );
+      const restoreResponsePromise = page.waitForResponse(
+        (response) =>
+          new URL(response.url()).pathname === "/api/projects" &&
+          response.request().method() === "PATCH"
+      );
+      await lifecycleDialog.getByRole("button", { name: "Restore association" }).click();
+      const restoreResponse = await restoreResponsePromise;
+      assert(
+        restoreResponse.ok(),
+        `${fixture.label} Project association restore failed with ${restoreResponse.status()}: ${await restoreResponse.text()}`
+      );
+      await page.waitForFunction(
+        ({ projectId, relationship }) =>
+          document
+            .querySelector(
+              `[data-project-lifecycle-project-id="${projectId}"][data-project-link-relationship="${relationship}"]`
+            )
+            ?.getAttribute("data-project-link-state") === "active",
+        { projectId: project.id, relationship: fixture.relationship }
+      );
+      await assertNoHorizontalOverflow(page, `${fixture.label}-Projects desktop workflow`);
+    }
+
+    await page.goto(
+      `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=files-links`,
+      { waitUntil: "networkidle" }
+    );
+    const projectReferences = page
+      .getByRole("heading", { name: "Native project references" })
+      .locator("xpath=ancestor::section[1]");
+    await projectReferences.getByText(resource.title, { exact: true }).waitFor();
+    await projectReferences.getByText(media.title, { exact: true }).first().waitFor();
+    const projectReferenceText = await projectReferences.innerText();
+    assert(
+      projectReferenceText.includes("Source Material") &&
+        projectReferenceText.includes("Evidence") &&
+        projectReferenceText.includes("required evidence"),
+      "Projects Files & Links did not expose the typed Resource and Media association state"
+    );
+    await assertNoHorizontalOverflow(page, "Projects Files & Links desktop workflow");
+    await desktopContext.close();
+
+    for (const viewport of [
+      { label: "1920x1080", width: 1920, height: 1080 },
+      { label: "1440x900", width: 1440, height: 900 },
+      { label: "1024x768", width: 1024, height: 768 },
+      { label: "390x844", width: 390, height: 844 }
+    ]) {
+      for (const fixture of fixtures) {
+        const context = await authenticatedContext({
+          width: viewport.width,
+          height: viewport.height
+        });
+        const responsivePage = await context.newPage();
+        observe(responsivePage);
+        await responsivePage.goto(`${baseUrl}${fixture.path}`, { waitUntil: "networkidle" });
+        const projectPanel = responsivePage.locator(
+          `[data-linked-projects="${fixture.sourceModule}:${fixture.sourceObjectType}:root:${fixture.sourceId}"]`
+        );
+        if (viewport.width <= 1240 && fixture.key === "resource") {
+          await responsivePage
+            .getByRole("button", {
+              name: "Open Resource details"
+            })
+            .click();
+        }
+        await projectPanel.locator(`[data-project-id="${project.id}"]`).waitFor();
+        const lifecycleRow = projectPanel.locator(
+          `[data-project-lifecycle-project-id="${project.id}"][data-project-link-relationship="${fixture.relationship}"]`
+        );
+        await lifecycleRow.waitFor();
+        await projectPanel.scrollIntoViewIfNeeded();
+        assert(
+          (await lifecycleRow.getAttribute("data-project-link-state")) === "active",
+          `${fixture.label} lifecycle state was not active at ${viewport.label}`
+        );
+        await assertNoHorizontalOverflow(
+          responsivePage,
+          `${fixture.label} lifecycle panel at ${viewport.label}`
+        );
+        if (viewport.width <= 760) {
+          await assertMobileTargets(
+            projectPanel,
+            `${fixture.label} lifecycle panel at ${viewport.label}`
+          );
+        }
+        await projectPanel.screenshot({
+          path: path.join(
+            screenshotDir,
+            `${fixture.key}-lifecycle-${viewport.label}.png`
+          )
+        });
+        await responsivePage
+          .getByRole("button", { name: "Associate Project", exact: true })
+          .click();
+        const sheet = responsivePage.locator(
+          `[data-project-association="${fixture.sourceModule}:${fixture.sourceObjectType}:${fixture.sourceId}"]`
+        );
+        await sheet.waitFor();
+        const sheetText = await sheet.innerText();
+        const normalizedSheetText = sheetText.toLowerCase();
+        assert(
+          normalizedSheetText.includes("projects-owned write") &&
+            normalizedSheetText.includes("ownership boundary") &&
+            await sheet.locator("option").filter({ hasText: project.name }).count() === 1,
+          `${fixture.label} association sheet lost its owner boundary at ${viewport.label}`
+        );
+        await assertNoHorizontalOverflow(
+          responsivePage,
+          `${fixture.label} association sheet at ${viewport.label}`
+        );
+        if (viewport.width <= 760) {
+          await assertMobileTargets(
+            sheet,
+            `${fixture.label} association sheet at ${viewport.label}`
+          );
+        }
+        await responsivePage.screenshot({
+          path: path.join(
+            screenshotDir,
+            `${fixture.key}-association-${viewport.label}.png`
+          ),
+          fullPage: true
+        });
+        await context.close();
+      }
+
+      const projectContext = await authenticatedContext({
+        width: viewport.width,
+        height: viewport.height
+      });
+      const projectPage = await projectContext.newPage();
+      observe(projectPage);
+      await projectPage.goto(
+        `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=files-links`,
+        { waitUntil: "networkidle" }
+      );
+      const projectReferencesAtViewport = projectPage
+        .getByRole("heading", { name: "Native project references" })
+        .locator("xpath=ancestor::section[1]");
+      await projectReferencesAtViewport.getByText(resource.title, { exact: true }).waitFor();
+      await projectReferencesAtViewport.getByText(media.title, { exact: true }).first().waitFor();
+      await assertNoHorizontalOverflow(
+        projectPage,
+        `Projects Files & Links at ${viewport.label}`
+      );
+      if (viewport.width <= 760) {
+        const sourceRow = projectReferencesAtViewport
+          .getByText(resource.title, { exact: true })
+          .locator("xpath=ancestor::li[1]");
+        const sourceRowLayout = await sourceRow.evaluate((row) => {
+          const body = row.firstElementChild;
+          const actions = row.lastElementChild;
+          if (!(body instanceof HTMLElement) || !(actions instanceof HTMLElement)) {
+            return null;
+          }
+          const rowBox = row.getBoundingClientRect();
+          const bodyBox = body.getBoundingClientRect();
+          const actionsBox = actions.getBoundingClientRect();
+          return {
+            rowWidth: rowBox.width,
+            bodyWidth: bodyBox.width,
+            bodyBottom: bodyBox.bottom,
+            actionsTop: actionsBox.top
+          };
+        });
+        assert(
+          sourceRowLayout &&
+            sourceRowLayout.bodyWidth >= sourceRowLayout.rowWidth * 0.8 &&
+            sourceRowLayout.actionsTop >= sourceRowLayout.bodyBottom - 1,
+          `Projects linked-source content was squeezed beside its actions at ${viewport.label}`
+        );
+        await assertMobileTargets(
+          projectReferencesAtViewport,
+          `Projects Files & Links at ${viewport.label}`
+        );
+
+        const activeTab = projectPage.getByRole("tab", { name: /Files & Links/ });
+        const activeTabLayout = await activeTab.evaluate((tab) => {
+          const tabBox = tab.getBoundingClientRect();
+          const tabListBox = tab.parentElement?.getBoundingClientRect();
+          return {
+            fullyVisible: Boolean(
+              tabListBox &&
+                tabBox.left >= tabListBox.left - 1 &&
+                tabBox.right <= tabListBox.right + 1
+            ),
+            gap: Number.parseFloat(getComputedStyle(tab).columnGap)
+          };
+        });
+        assert(
+          activeTabLayout.fullyVisible && activeTabLayout.gap >= 4,
+          `Projects active tab or count spacing was clipped at ${viewport.label}`
+        );
+      }
+      await projectPage.screenshot({
+        path: path.join(screenshotDir, `project-files-links-${viewport.label}.png`),
+        fullPage: true
+      });
+      await projectContext.close();
+    }
+
+    const finalProjects = await requestJson(baseUrl, cookieJar, "/api/projects");
+    const finalRecords = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+    assert(
+      finalProjects.response.ok &&
+        finalProjects.payload.state.projects.length === initialProjectCount &&
+        finalRecords.response.ok &&
+        finalRecords.payload.items.filter((item) => item.className === "resource").length ===
+          initialResourceCount &&
+        finalRecords.payload.items.filter((item) => item.className === "file").length ===
+          initialMediaCount,
+      "Resource/Media-Projects workflow duplicated an owner object"
+    );
+    for (const fixture of fixtures) {
+      const finalLinks = finalProjects.payload.state.links.filter(
+        (item) =>
+          item.projectId === project.id &&
+          item.linkState !== "removed" &&
+          item.source?.module === fixture.sourceModule &&
+          item.source?.objectType === fixture.sourceObjectType &&
+          item.source?.objectId === fixture.sourceId &&
+          item.relationship === fixture.relationship
+      );
+      assert(
+        finalLinks.length === 1 &&
+          finalLinks[0].relationshipStrength === fixture.strength &&
+          finalLinks[0].isRequiredEvidence === fixture.required &&
+          finalLinks[0].projectSpecificNote === fixture.context,
+        `${fixture.label}-Projects workflow lost typed association state or created a duplicate`
+      );
+      const createdAudits = finalProjects.payload.state.auditEvents.filter(
+        (event) =>
+          event.action === "project_link.created" &&
+          event.object?.objectId === finalLinks[0].id
+      );
+      assert(
+        createdAudits.length === 1,
+        `${fixture.label}-Projects association was not represented by exactly one Projects audit event`
+      );
+      const lifecycleEvents = finalProjects.payload.state.timelineEvents.filter(
+        (event) =>
+          event.projectId === project.id &&
+          event.sourceRef?.module === fixture.sourceModule &&
+          event.sourceRef?.objectType === fixture.sourceObjectType &&
+          event.sourceRef?.objectId === fixture.sourceId &&
+          event.relatedObjectRef?.objectId === finalLinks[0].id &&
+          ["link_removed", "link_restored"].includes(event.eventType)
+      );
+      assert(
+        lifecycleEvents.filter((event) => event.eventType === "link_removed").length === 1 &&
+          lifecycleEvents.filter((event) => event.eventType === "link_restored").length === 1,
+        `${fixture.label}-Projects lifecycle did not record one unlink and one restore event`
+      );
+    }
+    assert(
+      browserMutations.length === 10 &&
+        browserMutations.filter((mutation) => mutation === "POST /api/projects").length === 5 &&
+        browserMutations.filter((mutation) => mutation === "PATCH /api/projects").length === 5,
+      `Resource/Media-Projects browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
+    );
+    assert(
+      expectedFailedResponses.length === 2 &&
+        expectedFailedResponses.every((response) => response === "503 /api/projects"),
+      `Resource/Media-Projects failed-write recovery did not observe the expected isolated failure: ${expectedFailedResponses.join(" | ")}`
+    );
+    assert(
+      browserErrors.length === 0,
+      `Resource/Media-Projects browser checks emitted errors: ${browserErrors.join(" | ")}`
+    );
+    assert(
+      failedResponses.length === 0,
+      `Resource/Media-Projects browser checks received failed responses: ${failedResponses.join(" | ")}`
+    );
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "project-fremen-regression-"));
   const port = await getFreePort();
@@ -8008,6 +10764,53 @@ async function main() {
     assert(personEditPage.body.includes("Edit Profile"), "People edit route missing explicit editor state");
     pass("People create/update/clear/reload/direct-route flow works through the Personal Records adapter");
 
+    const peopleBridgeFollowUpTitle = `${testRunId}-people-status-bridge`;
+    const createPeopleBridgeFollowUp = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/personal/ops",
+      {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          family: "followUps",
+          input: {
+            title: peopleBridgeFollowUpTitle,
+            followUpType: "person_check_in",
+            context: "Verify that People reads current status from the Personal Ops-owned object.",
+            lifecycle: "active",
+            followUpState: "scheduled",
+            priority: "medium",
+            domain: "Relationships",
+            dueAt: "2026-08-14T12:00:00.000Z",
+            sourceRefs: [
+              {
+                module: "people",
+                objectType: "person",
+                objectId: createdPerson.id,
+                label: updatedPersonTitle
+              }
+            ]
+          }
+        })
+      }
+    );
+    assert(
+      createPeopleBridgeFollowUp.response.ok && createPeopleBridgeFollowUp.payload?.created,
+      `People Follow-up bridge fixture create failed: ${JSON.stringify(createPeopleBridgeFollowUp.payload)}`
+    );
+    await checkPeopleFollowUpBridgeBrowserState(
+      server.baseUrl,
+      cookieJar,
+      csrfToken,
+      { id: createdPerson.id, title: updatedPersonTitle },
+      createPeopleBridgeFollowUp.payload.item
+    );
+    pass("People reads current Personal Ops Follow-up status without duplicate ownership and preserves owner-route history");
+
     logStep("Checking Notes adapter persistence and canonical editor route");
     const sharedContentSourceUrl = "https://example.com/regression-content-source";
     const noteTitle = `${testRunId}-note`;
@@ -8071,35 +10874,13 @@ async function main() {
     assert(noteDetailAfterUpdate.body.includes(updatedNoteTitle), "Updated Note title missing after editor reload");
     assert(noteDetailAfterUpdate.body.includes("Regression-updated authored knowledge."), "Updated Note body missing after editor reload");
 
-    const createNoteProjectReference = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-        "x-csrf-token": csrfToken
-      },
-      body: JSON.stringify({
-        operation: "create",
-        family: "links",
-        input: {
-          projectId: promotedProject.id,
-          source: {
-            module: "notes",
-            objectType: "note",
-            objectId: createdNote.id,
-            label: updatedNoteTitle
-          },
-          relationship: "supporting_context",
-          relationshipStrength: "normal",
-          projectSpecificNote: "Regression verifies the read-only Notes owner-reference index."
-        }
-      })
-    });
-    assert(
-      createNoteProjectReference.response.ok &&
-        createNoteProjectReference.payload?.item?.source?.objectId === createdNote.id &&
-        createNoteProjectReference.payload.item.linkState === "active",
-      `Note Project reference create failed: ${JSON.stringify(createNoteProjectReference.payload)}`
+    await checkNoteProjectAssociations(
+      server.baseUrl,
+      cookieJar,
+      promotedProject,
+      { ...createdNote, title: updatedNoteTitle }
     );
+    pass("Notes creates one protected Projects-owned association and exposes its shared soft-unlink lifecycle with failed-write recovery, idempotency, owner routing, history restoration, and responsive evidence");
 
     const recentNotesView = await requestText(
       server.baseUrl,
@@ -8848,6 +11629,15 @@ async function main() {
     );
     const mediaUsageFollowUp = createMediaUsageFollowUp.payload.item;
 
+    await checkResourceMediaProjectAssociations(
+      server.baseUrl,
+      cookieJar,
+      promotedProject,
+      { id: createdResource.id, title: resourceTitle },
+      { id: createdMedia.id, title: mediaTitle }
+    );
+    pass("Resources and Media create, soft-unlink, restore, and audit typed Projects-owned associations with failed-write recovery, owner routing, and responsive lifecycle controls");
+
     const sourceRecordExpectations = [
       { id: createdNote.id, className: "note", label: "Note", expectedUrl: sharedContentSourceUrl },
       { id: createdResource.id, className: "resource", label: "Resource", expectedUrl: sharedContentSourceUrl },
@@ -9213,7 +12003,7 @@ async function main() {
     for (const forbidden of [
       "Creates reference",
       "Confirmed citation",
-      "Resource usage event"
+      "Confirmed Resource usage event"
     ]) {
       assert(
         !resourceLinkedNotes.body.includes(forbidden),
@@ -10569,6 +13359,151 @@ async function main() {
     );
     weeklyReviewRun = addReviewCarryForward.payload.item;
     weeklyReviewView = addReviewCarryForward.payload.view;
+
+    const addReviewFollowUpCandidate = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/reviews/runs",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          id: weeklyReviewRun.id,
+          expectedUpdatedAt: weeklyReviewRun.updatedAt,
+          patch: {
+            action: "upsert_follow_up",
+            followUp: {
+              title: `${testRunId} review status candidate`,
+              sourceRef: {
+                module: "reviews",
+                objectType: "review_run",
+                objectId: weeklyReviewRun.id,
+                label: weeklyReviewRun.title
+              },
+              destinationModule: "personal_ops",
+              ownerId: "Codex Regression",
+              dueDate: "2026-08-21",
+              state: "suggested",
+              required: true,
+              blocksCompletion: true
+            }
+          }
+        })
+      }
+    );
+    assert(
+      addReviewFollowUpCandidate.response.ok &&
+        addReviewFollowUpCandidate.payload?.item?.followUps?.some(
+          (item) => item.title === `${testRunId} review status candidate`
+        ),
+      `Review Follow-up candidate did not persist: ${JSON.stringify(addReviewFollowUpCandidate.payload)}`
+    );
+    weeklyReviewRun = addReviewFollowUpCandidate.payload.item;
+    weeklyReviewView = addReviewFollowUpCandidate.payload.view;
+    const reviewStatusCandidate = weeklyReviewRun.followUps.find(
+      (item) => item.title === `${testRunId} review status candidate`
+    );
+
+    const crossModuleFollowUpResult = await checkCrossModuleFollowUpConnections(
+      server.baseUrl,
+      cookieJar,
+      csrfToken,
+      promotedProject,
+      projectBlocker,
+      { ...createdNote, title: updatedNoteTitle },
+      weeklyReviewRun,
+      reviewStatusCandidate,
+      createdResource,
+      createdMedia,
+      mediaUsageFollowUp
+    );
+    weeklyReviewRun = crossModuleFollowUpResult.run;
+    weeklyReviewView = crossModuleFollowUpResult.view;
+    pass("Projects, Blockers, Notes, and Reviews share exact Personal Ops Follow-up owner state without duplicate native objects");
+    pass("Resources and Media share current Personal Ops Follow-up owner state with duplicate-safe handoffs and recoverable refresh failures");
+
+    const addReviewDecisionCandidate = await requestJson(
+      server.baseUrl,
+      cookieJar,
+      "/api/reviews/runs",
+      {
+        method: "PATCH",
+        headers: {
+          "content-type": "application/json",
+          "x-csrf-token": csrfToken
+        },
+        body: JSON.stringify({
+          id: weeklyReviewRun.id,
+          expectedUpdatedAt: weeklyReviewRun.updatedAt,
+          patch: {
+            action: "upsert_decision",
+            decision: {
+              title: `${testRunId} review decision candidate`,
+              question: "Should the source-backed operating choice be filed as a durable Personal Ops Decision?",
+              sourceRef: {
+                module: "projects",
+                objectType: "project",
+                objectId: promotedProject.id,
+                label: promotedProject.name,
+                route: `/admin/projects/${encodeURIComponent(promotedProject.id)}`
+              },
+              destinationModule: "personal_ops",
+              destinationObjectType: "decision",
+              state: "candidate",
+              ownerId: "Codex Regression",
+              risk: "medium",
+              impact: "medium",
+              confidence: "medium",
+              reversibility: "reversible",
+              rationale: "",
+              recommendation: "Retain a single durable owner and link it back to this Review.",
+              alternatives: ["Leave the choice as an unowned review note"],
+              reversalCondition: "Supersede the Personal Ops Decision if the underlying project evidence changes.",
+              evidenceIds: [],
+              required: true,
+              blocksCompletion: true,
+              resolution: {}
+            }
+          }
+        })
+      }
+    );
+    assert(
+      addReviewDecisionCandidate.response.ok &&
+        addReviewDecisionCandidate.payload?.item?.decisions?.some(
+          (item) => item.title === `${testRunId} review decision candidate`
+        ),
+      `Review Decision candidate did not persist: ${JSON.stringify(addReviewDecisionCandidate.payload)}`
+    );
+    weeklyReviewRun = addReviewDecisionCandidate.payload.item;
+    weeklyReviewView = addReviewDecisionCandidate.payload.view;
+    const reviewDecisionCandidate = weeklyReviewRun.decisions.find(
+      (item) => item.title === `${testRunId} review decision candidate`
+    );
+
+    const crossModuleDecisionResult = await checkCrossModuleDecisionConnections(
+      server.baseUrl,
+      cookieJar,
+      csrfToken,
+      promotedProject,
+      weeklyReviewRun,
+      reviewDecisionCandidate
+    );
+    weeklyReviewRun = crossModuleDecisionResult.run;
+    weeklyReviewView = crossModuleDecisionResult.view;
+    pass("Projects, Reviews, and Finance share exact Personal Ops Decision state while preserving module ownership");
+
+    await checkPeopleProjectConnections(
+      server.baseUrl,
+      cookieJar,
+      csrfToken,
+      promotedProject.id,
+      personWithClearedUrls
+    );
+    pass("Projects selects and links existing People identities while People derives one current, deduplicated project-involvement view");
 
     for (const checklistItem of weeklyReviewRun.checklist.filter((item) => item.required && item.state !== "complete")) {
       const resolveWeeklyChecklist = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {

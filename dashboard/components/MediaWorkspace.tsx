@@ -13,9 +13,14 @@ import MediaReviewScheduleEditorSheet from "./media/MediaReviewScheduleEditorShe
 import DenseObjectRow from "./operational/DenseObjectRow";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import EvidenceChecklist from "./operational/EvidenceChecklist";
+import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
+import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import ObjectHeader from "./operational/ObjectHeader";
+import ProjectAssociationSheet from "./operational/ProjectAssociationSheet";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
+import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
+import { useProjectsState } from "./operational/useProjectsState";
 import ResourceEditorSheet from "./resources/ResourceEditorSheet";
 import {
   contentLinksForObject,
@@ -33,6 +38,12 @@ import {
 } from "../lib/modules/media/rights-evidence";
 import { formatMediaReviewCadence } from "../lib/modules/media/review-schedule";
 import type { MediaAsset, MediaResourceReference } from "../lib/modules/media/types";
+import {
+  buildFollowUpCreationRoute,
+  type FollowUpSourceRef
+} from "../lib/modules/personal-ops/follow-up-links";
+import type { PersonalOpsFollowUp } from "../lib/modules/personal-ops/types";
+import type { ProjectsState } from "../lib/modules/projects/types";
 import type { ResourceRecord } from "../lib/modules/resources/types";
 import {
   parseMediaUrlState,
@@ -48,6 +59,10 @@ type MediaWorkspaceProps = {
   initialAssets: MediaAsset[];
   initialResources: ResourceRecord[];
   contentGraph: LegacyContentGraph;
+  initialProjectsState: ProjectsState;
+  initialProjectsError?: string;
+  initialPersonalOpsFollowUps: PersonalOpsFollowUp[];
+  initialPersonalOpsFollowUpsError?: string;
   initialMode?: "index" | "detail";
   initialSelectedId?: string;
   initialLoadError?: string;
@@ -272,6 +287,20 @@ function relationEntries(asset: MediaAsset) {
   );
 }
 
+function mediaFollowUpSource(asset: MediaAsset): FollowUpSourceRef {
+  return {
+    ...asset.nativeRef,
+    module: "media",
+    objectType: "media_asset"
+  };
+}
+
+function mediaFollowUpCreationRoute(asset: MediaAsset) {
+  return buildFollowUpCreationRoute(mediaFollowUpSource(asset), {
+    dueAt: asset.provenance.time.nextReview || undefined
+  });
+}
+
 function hasConnectedBinary(asset: MediaAsset) {
   return Boolean(asset.source.rawFileId && asset.source.storageKey);
 }
@@ -395,6 +424,10 @@ export default function MediaWorkspace({
   initialAssets,
   initialResources,
   contentGraph,
+  initialProjectsState,
+  initialProjectsError = "",
+  initialPersonalOpsFollowUps,
+  initialPersonalOpsFollowUpsError = "",
   initialMode = "index",
   initialSelectedId,
   initialLoadError = "",
@@ -435,6 +468,7 @@ export default function MediaWorkspace({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [editorAssetId, setEditorAssetId] = useState<string | null>(null);
   const [reviewScheduleAssetId, setReviewScheduleAssetId] = useState<string | null>(null);
+  const [projectAssociationAssetId, setProjectAssociationAssetId] = useState<string | null>(null);
   const [reviewScheduleFeedback, setReviewScheduleFeedback] = useState<{
     assetId: string;
     message: string;
@@ -453,6 +487,21 @@ export default function MediaWorkspace({
   const isMobile = useMediaQuery("(max-width: 760px)");
   const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
   const searchParamKey = searchParams.toString();
+  const {
+    state: projectsState,
+    error: projectsError,
+    loading: projectsLoading,
+    refresh: refreshProjects
+  } = useProjectsState(initialProjectsState, initialProjectsError);
+  const {
+    followUps: personalOpsFollowUps,
+    error: personalOpsFollowUpsError,
+    loading: personalOpsFollowUpsLoading,
+    refresh: refreshPersonalOpsFollowUps
+  } = usePersonalOpsFollowUps(
+    initialPersonalOpsFollowUps,
+    initialPersonalOpsFollowUpsError
+  );
 
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
@@ -1108,6 +1157,21 @@ export default function MediaWorkspace({
     );
   }
 
+  function renderFollowUpsPanel(asset: MediaAsset, title: string) {
+    return (
+      <LinkedFollowUpsPanel
+        source={mediaFollowUpSource(asset)}
+        followUps={personalOpsFollowUps}
+        loading={personalOpsFollowUpsLoading}
+        error={personalOpsFollowUpsError}
+        onRefresh={() => void refreshPersonalOpsFollowUps()}
+        createHref={mediaFollowUpCreationRoute(asset)}
+        title={title}
+        wide
+      />
+    );
+  }
+
   function renderAssetPanels(asset: MediaAsset, tabsId: string) {
     const relations = relationEntries(asset);
     const readinessChecks = legacyReadinessChecks(asset);
@@ -1194,6 +1258,19 @@ export default function MediaWorkspace({
                 >
                   Edit title &amp; description
                 </button>
+                <button
+                  className={styles.button}
+                  type="button"
+                  onClick={() => setProjectAssociationAssetId(asset.id)}
+                >
+                  Associate Project
+                </button>
+                <Link
+                  className={`${styles.button} ${styles.linkButton}`}
+                  href={mediaFollowUpCreationRoute(asset)}
+                >
+                  Track next action
+                </Link>
                 {[
                   ["Replace", "Replacement and version synchronization are unresolved."],
                   ["Archive", "Legacy file lifecycle cannot be changed from Media."],
@@ -1216,6 +1293,8 @@ export default function MediaWorkspace({
                 ))}
               </div>
             </section>
+            {activeTab === "overview" &&
+              renderFollowUpsPanel(asset, "Media asset follow-through")}
           </div>
         </DetailTabPanel>
 
@@ -1270,6 +1349,8 @@ export default function MediaWorkspace({
                 ]}
               />
             </section>
+            {activeTab === "metadata" &&
+              renderFollowUpsPanel(asset, "Metadata follow-through")}
           </div>
         </DetailTabPanel>
 
@@ -1334,6 +1415,8 @@ export default function MediaWorkspace({
                 ]}
               />
             </section>
+            {activeTab === "rights" &&
+              renderFollowUpsPanel(asset, "Rights evidence follow-through")}
           </div>
         </DetailTabPanel>
 
@@ -1350,6 +1433,38 @@ export default function MediaWorkspace({
 
         <DetailTabPanel tabsId={tabsId} tabId="links" active={activeTab === "links"}>
           <div className={styles.overviewGrid}>
+            <section className={styles.panel} data-wide="true">
+              <div className={styles.panelHeader}>
+                <div>
+                  <h2>Project associations</h2>
+                  <p>Typed ProjectLink records that point back to this Media-owned asset.</p>
+                </div>
+                <button
+                  type="button"
+                  className={styles.button}
+                  data-primary="true"
+                  onClick={() => setProjectAssociationAssetId(asset.id)}
+                >
+                  Associate Project
+                </button>
+              </div>
+              <LinkedProjectsPanel
+                source={asset.nativeRef}
+                sourceLabel={asset.title}
+                state={projectsState}
+                loading={projectsLoading}
+                error={projectsError}
+                onRefresh={refreshProjects}
+                manageLifecycle
+                legacyProjectLabels={asset.provenance.projects}
+                legacyLabel="Legacy Media routing labels, not stable links:"
+                title="Projects using this Media asset"
+                ownerTab="files-links"
+                emptyDescription="No active Projects-owned association points to this Media asset yet."
+                boundary="Media owns the asset identity, binary lifecycle, rights, and versions. Projects owns relationship semantics, evidence flags, and association lifecycle."
+                limit={8}
+              />
+            </section>
             <section className={styles.panel} data-wide="true">
               <h2>Resource candidates</h2>
               {renderSourceReferences(asset)}
@@ -1477,6 +1592,8 @@ export default function MediaWorkspace({
                 </div>
               )}
             </section>
+            {activeTab === "review" &&
+              renderFollowUpsPanel(asset, "Media review follow-through")}
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>
                 <div>
@@ -1638,6 +1755,8 @@ export default function MediaWorkspace({
                 </div>
               )}
             </section>
+
+            {renderFollowUpsPanel(asset, "Readiness follow-through")}
 
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>
@@ -1864,7 +1983,7 @@ export default function MediaWorkspace({
     </InspectorRail>
   );
 
-  const aiDock = editorAssetId || reviewScheduleAssetId || resourceHandoffTarget || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? null : (
+  const aiDock = editorAssetId || reviewScheduleAssetId || projectAssociationAssetId || resourceHandoffTarget || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? null : (
     <SharedAIDock
       open={aiOpen}
       onOpenChange={(next) => {
@@ -1896,6 +2015,25 @@ export default function MediaWorkspace({
       asset={reviewScheduleAsset}
       onClose={() => setReviewScheduleAssetId(null)}
       onSaved={handleReviewTimingSaved}
+    />
+  ) : null;
+
+  const projectAssociationAsset = projectAssociationAssetId
+    ? assets.find((asset) => asset.id === projectAssociationAssetId) || null
+    : null;
+  const projectAssociationEditor = projectAssociationAsset ? (
+    <ProjectAssociationSheet
+      key={`media-project-association:${projectAssociationAsset.id}`}
+      open
+      source={projectAssociationAsset.nativeRef}
+      sourceKind="Media asset"
+      state={projectsState}
+      loading={projectsLoading}
+      error={projectsError}
+      defaultRelationship="evidence"
+      onRefresh={refreshProjects}
+      onClose={() => setProjectAssociationAssetId(null)}
+      onLinked={() => router.refresh()}
     />
   ) : null;
 
@@ -1934,6 +2072,7 @@ export default function MediaWorkspace({
       >
         {metadataEditor}
         {reviewScheduleEditor}
+        {projectAssociationEditor}
         {resourceHandoffEditor}
         <button
           className={`${styles.button} ${styles.mobileMenuButton}`}
@@ -1999,6 +2138,7 @@ export default function MediaWorkspace({
     >
       {metadataEditor}
       {reviewScheduleEditor}
+      {projectAssociationEditor}
       {resourceHandoffEditor}
       <button
         className={`${styles.button} ${styles.mobileMenuButton}`}

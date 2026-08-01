@@ -16,6 +16,22 @@ import MetricStrip from "../operational/MetricStrip";
 import ObjectHeader from "../operational/ObjectHeader";
 import QuickActionBar, { type QuickAction } from "../operational/QuickActionBar";
 import SystemState from "../operational/SystemState";
+import LinkedDecisionsPanel from "../operational/LinkedDecisionsPanel";
+import LinkedFollowUpsPanel from "../operational/LinkedFollowUpsPanel";
+import { usePersonalOpsDecisions } from "../operational/usePersonalOpsDecisions";
+import { usePersonalOpsFollowUps } from "../operational/usePersonalOpsFollowUps";
+import {
+  buildDecisionCreationRoute,
+  type DecisionSourceRef
+} from "../../lib/modules/personal-ops/decision-links";
+import {
+  buildFollowUpCreationRoute,
+  type FollowUpSourceRef
+} from "../../lib/modules/personal-ops/follow-up-links";
+import type {
+  PersonalOpsDecision,
+  PersonalOpsFollowUp
+} from "../../lib/modules/personal-ops/types";
 import { createProjectsRepository } from "../../lib/modules/projects/repository";
 import type {
   Project,
@@ -33,7 +49,8 @@ import type {
   ProjectsWorkspaceSnapshot
 } from "../../lib/modules/projects/view-model";
 import { createNativeObjectRef, getModuleRoute, getNativeObjectRoute } from "../../lib/native-objects/routes";
-import type { ModuleId } from "../../lib/native-objects/types";
+import type { ModuleId, NativeObjectRef } from "../../lib/native-objects/types";
+import type { PersonalRecord } from "../../lib/personal-records-store";
 import {
   parseProjectsUrlState,
   serializeProjectsUrlState,
@@ -50,6 +67,11 @@ type ProjectsWorkspaceProps = {
   initialMode?: "index" | "detail";
   initialProjectId?: string;
   initialLoadError?: string;
+  initialPersonalOpsDecisions: PersonalOpsDecision[];
+  initialDecisionsError?: string;
+  initialPersonalOpsFollowUps: PersonalOpsFollowUp[];
+  initialFollowUpsError?: string;
+  initialPeople: PersonalRecord[];
 };
 
 type EditorKind =
@@ -320,6 +342,7 @@ function projectDisplayFromNative(project: Project): ProjectDisplayRecord {
     cadence: project.cadence,
     priority: project.priority,
     owner: project.owner,
+    ownerRef: project.ownerRef,
     area: project.area,
     objective: project.objective,
     starred: project.starred,
@@ -349,14 +372,52 @@ function emptyDirectoryItem(project: Project): ProjectDirectoryItem {
   };
 }
 
+function projectFollowUpSource(
+  project: ProjectDisplayRecord,
+  source?: { objectType: string; objectId: string; label: string }
+): FollowUpSourceRef {
+  return {
+    module: "projects",
+    objectType: source?.objectType || "project",
+    objectId: source?.objectId || project.id,
+    ...(source ? { containerObjectId: project.id } : {}),
+    label: source?.label || project.name,
+    route: getNativeObjectRoute({
+      module: "projects",
+      objectType: source?.objectType || "project",
+      objectId: source?.objectId || project.id,
+      ...(source ? { containerObjectId: project.id } : {})
+    })
+  };
+}
+
+function projectDecisionSource(project: ProjectDisplayRecord): DecisionSourceRef {
+  return {
+    module: "projects",
+    objectType: "project",
+    objectId: project.id,
+    label: project.name,
+    route: getNativeObjectRoute({
+      module: "projects",
+      objectType: "project",
+      objectId: project.id
+    })
+  };
+}
+
 function personalOpsCreateHref(
   collection: "decisions" | "follow-ups",
   project: ProjectDisplayRecord,
   source?: { objectType: string; objectId: string; label: string }
 ) {
-  const isDecision = collection === "decisions";
+  if (collection === "follow-ups") {
+    return buildFollowUpCreationRoute(projectFollowUpSource(project, source));
+  }
+  if (!source) {
+    return buildDecisionCreationRoute(projectDecisionSource(project));
+  }
   const params = new URLSearchParams({
-    create: isDecision ? "decision" : "follow-up",
+    create: "decision",
     sourceModule: "projects",
     sourceObjectType: source?.objectType || "project",
     sourceObjectId: source?.objectId || project.id,
@@ -374,6 +435,15 @@ function nativeCreateHref(module: "notes" | "people" | "media" | "resources", pr
     sourceLabel: project.name
   });
   return `${getModuleRoute(module)}?${params.toString()}`;
+}
+
+function peopleIdentityRef(record: PersonalRecord): NativeObjectRef {
+  return createNativeObjectRef({
+    module: "people",
+    objectType: record.className === "org" ? "organization" : "person",
+    objectId: record.id,
+    label: record.profile?.fullName || record.title
+  });
 }
 
 const FOCUSABLE = "button:not([disabled]),a[href],input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex='-1'])";
@@ -502,12 +572,29 @@ export default function ProjectsWorkspace({
   initialSnapshot,
   initialMode = "index",
   initialProjectId,
-  initialLoadError = ""
+  initialLoadError = "",
+  initialPersonalOpsDecisions,
+  initialDecisionsError = "",
+  initialPersonalOpsFollowUps,
+  initialFollowUpsError = "",
+  initialPeople
 }: ProjectsWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const repository = useMemo(() => createProjectsRepository(), []);
+  const {
+    decisions,
+    error: decisionsError,
+    loading: decisionsLoading,
+    refresh: refreshDecisions
+  } = usePersonalOpsDecisions(initialPersonalOpsDecisions, initialDecisionsError);
+  const {
+    followUps,
+    error: followUpsError,
+    loading: followUpsLoading,
+    refresh: refreshFollowUps
+  } = usePersonalOpsFollowUps(initialPersonalOpsFollowUps, initialFollowUpsError);
   const selectedChildRef = useRef<HTMLElement>(null);
   const [initialUrlState] = useState(() => parseProjectsUrlState(searchParams));
   const initialDetail = initialMode === "detail";
@@ -714,11 +801,22 @@ export default function ProjectsWorkspace({
     setEditorError("");
   }
 
-  function openEditor(kind: EditorKind, item?: ProjectDirectoryItem, object?: ProjectBlocker) {
+  function changeEditorValues(values: Record<string, string | boolean>) {
+    setEditor((current) => current ? { ...current, values: { ...current.values, ...values } } : current);
+    setEditorDirty(true);
+    setEditorError("");
+  }
+
+  function openEditor(
+    kind: EditorKind,
+    item?: ProjectDirectoryItem,
+    object?: ProjectBlocker,
+    preset: Record<string, string | boolean> = {}
+  ) {
     clearFeedback();
     let values: Record<string, string | boolean> = {};
     if (kind === "project-create") {
-      values = { name: "", description: "", objective: "", completionTarget: "", area: "", owner: "", lifecycle: "planned", priority: "medium" };
+      values = { name: "", description: "", objective: "", completionTarget: "", area: "", owner: "", ownerIdentityId: "", lifecycle: "planned", priority: "medium" };
     } else if (kind === "project-edit" && item) {
       const nativeProject = snapshot.nativeState.projects.find((project) => project.id === item.project.id);
       values = {
@@ -727,6 +825,7 @@ export default function ProjectsWorkspace({
         objective: item.project.objective || "",
         area: item.project.area || "",
         owner: item.project.owner || "",
+        ownerIdentityId: nativeProject?.ownerRef?.objectId || "",
         lifecycle: item.project.lifecycle,
         priority: item.project.priority,
         review: item.project.review,
@@ -734,7 +833,7 @@ export default function ProjectsWorkspace({
         completionTarget: nativeProject?.completionTarget || ""
       };
     } else if (kind === "legacy-promote" && item) {
-      values = { objective: item.project.objective || "", area: item.project.area || "", owner: item.project.owner || "", priority: item.project.priority };
+      values = { objective: item.project.objective || "", area: item.project.area || "", owner: item.project.owner || "", ownerIdentityId: "", priority: item.project.priority };
     } else if (kind === "milestone-create") {
       values = { title: "", description: "", dueAt: "", owner: "", completionCriteria: "" };
     } else if (kind === "blocker-create") {
@@ -749,11 +848,12 @@ export default function ProjectsWorkspace({
         sourceContainerObjectId: "",
         sourceLabel: "",
         relationship: "supporting_context",
+        relationshipStrength: "normal",
         projectSpecificNote: "",
         isRequiredEvidence: false
       };
     }
-    setEditor({ kind, projectId: item?.project.id, objectId: object?.id, values });
+    setEditor({ kind, projectId: item?.project.id, objectId: object?.id, values: { ...values, ...preset } });
     setEditorDirty(false);
     setEditorError("");
   }
@@ -855,6 +955,17 @@ export default function ProjectsWorkspace({
     if (!editor || mutationBusy) return;
     const value = (name: string) => String(editor.values[name] ?? "").trim();
     const optional = (name: string) => value(name) || undefined;
+    const currentNativeProject = editor.projectId
+      ? snapshot.nativeState.projects.find((project) => project.id === editor.projectId)
+      : undefined;
+    const selectedOwner = initialPeople.find(
+      (person) => person.id === value("ownerIdentityId")
+    );
+    const selectedOwnerRef = selectedOwner
+      ? peopleIdentityRef(selectedOwner)
+      : value("ownerIdentityId") === currentNativeProject?.ownerRef?.objectId
+        ? currentNativeProject.ownerRef
+        : undefined;
     setEditorError("");
     setMutationBusy(true);
     try {
@@ -869,6 +980,7 @@ export default function ProjectsWorkspace({
           objective: optional("objective"),
           area: optional("area"),
           owner: optional("owner"),
+          ownerRef: selectedOwnerRef,
           completionTarget: optional("completionTarget"),
           lifecycle: value("lifecycle") as "draft" | "planned" | "active",
           priority: value("priority") as ProjectPriority
@@ -901,7 +1013,8 @@ export default function ProjectsWorkspace({
           lifecycle: value("lifecycle") as Project["lifecycle"],
           priority: value("priority") as ProjectPriority,
           review: value("review") as Project["review"],
-          cadence: value("cadence") as Project["cadence"]
+          cadence: value("cadence") as Project["cadence"],
+          ownerRef: selectedOwnerRef
         }, item.project.updatedAt);
         if (!result.ok) {
           setEditorError(result.error.message);
@@ -921,6 +1034,7 @@ export default function ProjectsWorkspace({
           objective: optional("objective"),
           area: optional("area"),
           owner: optional("owner"),
+          ownerRef: selectedOwnerRef,
           priority: value("priority") as ProjectPriority
         });
         if (!result.ok) {
@@ -1034,6 +1148,7 @@ export default function ProjectsWorkspace({
           projectId: item.project.id,
           source,
           relationship: value("relationship") as ProjectLinkRelationship,
+          relationshipStrength: value("relationshipStrength") as ProjectLink["relationshipStrength"],
           projectSpecificNote: optional("projectSpecificNote"),
           isRequiredEvidence: Boolean(editor.values.isRequiredEvidence)
         });
@@ -1042,9 +1157,18 @@ export default function ProjectsWorkspace({
           return;
         }
         applyMutationEnvelope(result.data);
-        setActiveTab("files-links");
+        const nextTab: ProjectTab =
+          sourceModule === "people"
+            ? "people"
+            : sourceModule === "notes" || (
+                sourceModule === "personal_ops" &&
+                sourceObjectType === "decision"
+              )
+              ? "notes-decisions"
+              : "files-links";
+        setActiveTab(nextTab);
         setSelectedChildId(result.data.item.id);
-        updateUrl({ tab: "files-links", item: initialDetail ? result.data.item.id : item.project.id });
+        updateUrl({ tab: nextTab, item: initialDetail ? result.data.item.id : item.project.id });
         setNotice(`Reference to “${result.data.item.source.label}” was linked without copying its native object.`);
       }
       closeEditor();
@@ -1400,6 +1524,17 @@ export default function ProjectsWorkspace({
             <div className={styles.panelHeader}><h2>Current objective</h2>{item.project.editable && <button type="button" className={styles.button} onClick={() => openEditor("project-edit", item)} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={item.project.lifecycle === "complete" ? "Completed projects are read-only." : item.project.lifecycle === "archived" ? "Restore this project before editing it." : undefined}>Edit context</button>}</div>
             <p>{item.project.objective || "No project objective has been recorded. Add one before treating completion as ready."}</p>
           </section>
+          <LinkedFollowUpsPanel
+            source={projectFollowUpSource(item.project)}
+            followUps={followUps}
+            loading={followUpsLoading}
+            error={followUpsError}
+            onRefresh={() => void refreshFollowUps()}
+            createHref={personalOpsCreateHref("follow-ups", item.project)}
+            className={styles.panel}
+            wide
+            title="Project follow-through"
+          />
           <section className={styles.panel}>
             <h2>Project context</h2>
             <div className={styles.factGrid}>
@@ -1529,6 +1664,17 @@ export default function ProjectsWorkspace({
           </div>
           {noteContext.length || decisionContext.length ? renderLinkedRows(item, ["notes", "personal_ops"]) : <SystemState variant="empty" compact title="No linked notes or durable decisions" description="Open the owner module to author the object, then link it here by stable ID." />}
         </section>
+        <LinkedDecisionsPanel
+          source={projectDecisionSource(item.project)}
+          decisions={decisions}
+          loading={decisionsLoading}
+          error={decisionsError}
+          onRefresh={() => void refreshDecisions()}
+          createHref={personalOpsCreateHref("decisions", item.project)}
+          className={styles.panel}
+          wide
+          title="Project decisions"
+        />
         <section className={styles.panel}>
           <h2>Legacy KPI context</h2>
           {item.legacyKpis.length ? (
@@ -1547,12 +1693,24 @@ export default function ProjectsWorkspace({
     const people = item.linkedContext.filter((context) => context.ref.module === "people");
     return (
       <div className={styles.overviewGrid}>
-        <section className={styles.panel} data-wide="true">
+        <section className={styles.panel} data-wide="true" data-project-people={item.project.id}>
           <div className={styles.panelHeader}>
             <div><h2>Project people and roles</h2><p>People owns identity, contact history, and relationship cadence. Projects stores only project context and typed references.</p></div>
             <span className={styles.inlineActions}>
               <Link className={styles.textLink} href={nativeCreateHref("people", item.project)}>Open People</Link>
-              <button type="button" className={styles.button} onClick={() => openEditor("link-create", item)} disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined}>Link person</button>
+              <button
+                type="button"
+                className={styles.button}
+                onClick={() => openEditor("link-create", item, undefined, {
+                  sourceModule: "people",
+                  sourceObjectType: "person",
+                  relationship: "advisor_context"
+                })}
+                disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)}
+                title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined}
+              >
+                Link person
+              </button>
             </span>
           </div>
           {people.length ? renderLinkedRows(item, ["people"]) : <SystemState variant="empty" compact title="No linked people" description="Link an existing People identity; do not recreate the person inside Projects." />}
@@ -1561,7 +1719,14 @@ export default function ProjectsWorkspace({
           <h2>Project owner</h2>
           <div className={styles.factGrid}>
             <div className={styles.fact}><span>Display owner</span><strong>{item.project.owner || "Missing"}</strong></div>
-            <div className={styles.fact}><span>Identity link</span><strong>{people.find((context) => context.relationship.toLowerCase().includes("owner"))?.ref.label || "Not linked"}</strong></div>
+            <div className={styles.fact}>
+              <span>Identity link</span>
+              <strong>
+                {item.project.ownerRef
+                  ? <Link className={styles.textLink} href={item.project.ownerRef.route}>{item.project.ownerRef.label}</Link>
+                  : "Not linked"}
+              </strong>
+            </div>
           </div>
         </section>
         <section className={styles.panel}>
@@ -1755,6 +1920,24 @@ export default function ProjectsWorkspace({
               <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title })}>Create follow-up</Link>
               {blocker.sourceRefs.map((ref) => <Link className={styles.textLink} href={ref.route} key={`${ref.module}-${ref.objectId}`}>Open {ref.label}</Link>)}
             </div>
+            <LinkedFollowUpsPanel
+              source={projectFollowUpSource(item.project, {
+                objectType: "blocker",
+                objectId: blocker.id,
+                label: blocker.title
+              })}
+              followUps={followUps}
+              loading={followUpsLoading}
+              error={followUpsError}
+              onRefresh={() => void refreshFollowUps()}
+              createHref={personalOpsCreateHref("follow-ups", item.project, {
+                objectType: "blocker",
+                objectId: blocker.id,
+                label: blocker.title
+              })}
+              compact
+              title="Blocker follow-through"
+            />
           </div>
         )}
 
@@ -1905,6 +2088,16 @@ export default function ProjectsWorkspace({
           <label className={styles.field} data-wide="true">Completion target<textarea name="completionTarget" value={value("completionTarget")} onChange={(event) => changeEditorValue("completionTarget", event.target.value)} placeholder="Describe the project-level finish condition. Completion remains disabled until native gate semantics are resolved." /></label>
           <label className={styles.field}>Area<input name="area" value={value("area")} onChange={(event) => changeEditorValue("area", event.target.value)} placeholder="e.g. Unigentamos" /></label>
           <label className={styles.field}>Owner<input name="owner" value={value("owner")} onChange={(event) => changeEditorValue("owner", event.target.value)} placeholder="Display owner" /></label>
+          <label className={styles.field}>Owner identity<select aria-label="Project owner identity" value={value("ownerIdentityId")} onChange={(event) => {
+            const person = initialPeople.find((candidate) => candidate.id === event.target.value);
+            changeEditorValues({
+              ownerIdentityId: event.target.value,
+              ...(person ? { owner: person.profile?.fullName || person.title } : {})
+            });
+          }}>
+            <option value="">Display name only</option>
+            {initialPeople.map((person) => <option value={person.id} key={person.id}>{person.profile?.fullName || person.title}</option>)}
+          </select></label>
           <label className={styles.field}>Lifecycle<select name="lifecycle" value={value("lifecycle")} onChange={(event) => changeEditorValue("lifecycle", event.target.value)}>{["draft", "planned", "active"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</select></label>
           <label className={styles.field}>Priority<select name="priority" value={value("priority")} onChange={(event) => changeEditorValue("priority", event.target.value)}>{["low", "medium", "high", "critical"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</select></label>
           {editor.kind === "project-edit" && <>
@@ -1922,6 +2115,16 @@ export default function ProjectsWorkspace({
             <label className={styles.field} data-wide="true">Current objective<textarea value={value("objective")} onChange={(event) => changeEditorValue("objective", event.target.value)} autoFocus /></label>
             <label className={styles.field}>Area<input value={value("area")} onChange={(event) => changeEditorValue("area", event.target.value)} /></label>
             <label className={styles.field}>Owner<input value={value("owner")} onChange={(event) => changeEditorValue("owner", event.target.value)} /></label>
+            <label className={styles.field}>Owner identity<select aria-label="Project owner identity" value={value("ownerIdentityId")} onChange={(event) => {
+              const person = initialPeople.find((candidate) => candidate.id === event.target.value);
+              changeEditorValues({
+                ownerIdentityId: event.target.value,
+                ...(person ? { owner: person.profile?.fullName || person.title } : {})
+              });
+            }}>
+              <option value="">Display name only</option>
+              {initialPeople.map((person) => <option value={person.id} key={person.id}>{person.profile?.fullName || person.title}</option>)}
+            </select></label>
             <label className={styles.field}>Priority<select value={value("priority")} onChange={(event) => changeEditorValue("priority", event.target.value)}>{["low", "medium", "high", "critical"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</select></label>
           </div>
         </>
@@ -1948,14 +2151,47 @@ export default function ProjectsWorkspace({
     if (editor.kind === "blocker-resolve") {
       return <label className={styles.field}>Resolution record<textarea value={value("resolution")} onChange={(event) => changeEditorValue("resolution", event.target.value)} required autoFocus placeholder="What changed, and what evidence confirms the blocker is resolved?" /></label>;
     }
+    const linkingPeople = value("sourceModule") === "people";
     return <div className={styles.formGrid}>
-      <label className={styles.field}>Owner module<select value={value("sourceModule")} onChange={(event) => changeEditorValue("sourceModule", event.target.value)}>{LINK_MODULES.map((module) => <option value={module} key={module}>{displayLabel(module)}</option>)}</select></label>
-      <label className={styles.field}>Object type<input value={value("sourceObjectType")} onChange={(event) => changeEditorValue("sourceObjectType", event.target.value)} required placeholder="note, resource, media_asset…" /></label>
-      <label className={styles.field}>Stable object ID<input value={value("sourceObjectId")} onChange={(event) => changeEditorValue("sourceObjectId", event.target.value)} required autoFocus /></label>
-      <label className={styles.field}>Parent / container ID<input value={value("sourceContainerObjectId")} onChange={(event) => changeEditorValue("sourceContainerObjectId", event.target.value)} placeholder="Required for nested Project or Review objects" /></label>
-      <label className={styles.field}>Source label<input value={value("sourceLabel")} onChange={(event) => changeEditorValue("sourceLabel", event.target.value)} required /></label>
-      <label className={styles.field}>Relationship<select value={value("relationship")} onChange={(event) => changeEditorValue("relationship", event.target.value)}>{LINK_RELATIONSHIPS.map((relationship) => <option value={relationship} key={relationship}>{displayLabel(relationship)}</option>)}</select></label>
-      <label className={styles.field} data-wide="true">Project-specific note<textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} /></label>
+      <label className={styles.field}>Owner module<select value={value("sourceModule")} onChange={(event) => changeEditorValues({
+        sourceModule: event.target.value,
+        sourceObjectType: event.target.value === "people" ? "person" : "",
+        sourceObjectId: "",
+        sourceContainerObjectId: "",
+        sourceLabel: ""
+      })}>{LINK_MODULES.map((module) => <option value={module} key={module}>{displayLabel(module)}</option>)}</select></label>
+      {linkingPeople ? (
+        <label className={styles.field} data-wide="true">
+          People identity
+          <select
+            aria-label="People identity"
+            value={value("sourceObjectId")}
+            onChange={(event) => {
+              const person = initialPeople.find((candidate) => candidate.id === event.target.value);
+              changeEditorValues({
+                sourceObjectId: event.target.value,
+                sourceObjectType: person?.className === "org" ? "organization" : "person",
+                sourceLabel: person?.profile?.fullName || person?.title || ""
+              });
+            }}
+            required
+            autoFocus
+          >
+            <option value="">Choose an existing People identity</option>
+            {initialPeople.map((person) => <option value={person.id} key={person.id}>{person.profile?.fullName || person.title}</option>)}
+          </select>
+        </label>
+      ) : (
+        <>
+          <label className={styles.field}>Object type<input value={value("sourceObjectType")} onChange={(event) => changeEditorValue("sourceObjectType", event.target.value)} required placeholder="note, resource, media_asset…" /></label>
+          <label className={styles.field}>Stable object ID<input value={value("sourceObjectId")} onChange={(event) => changeEditorValue("sourceObjectId", event.target.value)} required autoFocus /></label>
+          <label className={styles.field}>Parent / container ID<input value={value("sourceContainerObjectId")} onChange={(event) => changeEditorValue("sourceContainerObjectId", event.target.value)} placeholder="Required for nested Project or Review objects" /></label>
+          <label className={styles.field}>Source label<input value={value("sourceLabel")} onChange={(event) => changeEditorValue("sourceLabel", event.target.value)} required /></label>
+        </>
+      )}
+      <label className={styles.field}>Relationship<select aria-label="Relationship" value={value("relationship")} onChange={(event) => changeEditorValue("relationship", event.target.value)}>{LINK_RELATIONSHIPS.map((relationship) => <option value={relationship} key={relationship}>{displayLabel(relationship)}</option>)}</select></label>
+      <label className={styles.field}>Relationship strength<select aria-label="Relationship strength" value={value("relationshipStrength")} onChange={(event) => changeEditorValue("relationshipStrength", event.target.value)}>{["weak", "normal", "strong"].map((strength) => <option value={strength} key={strength}>{displayLabel(strength)}</option>)}</select></label>
+      <label className={styles.field} data-wide="true">{linkingPeople ? "Project role or contribution" : "Project-specific note"}<textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} placeholder={linkingPeople ? "e.g. Design advisor, technical lead, stakeholder" : undefined} /></label>
       <label className={styles.field}><span><input type="checkbox" checked={Boolean(editor.values.isRequiredEvidence)} onChange={(event) => changeEditorValue("isRequiredEvidence", event.target.checked)} /> Required completion evidence</span></label>
     </div>;
   }

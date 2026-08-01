@@ -6,6 +6,7 @@ import {
   createEmptyReviewsState,
   readReviewsState
 } from "../../../lib/modules/reviews/store";
+import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
 import type { FinanceReviewBridge } from "../../../lib/modules/reviews/types";
 import { readReviews } from "../../../lib/reviews-store";
 import { requireAdminSession } from "../../../lib/require-admin";
@@ -29,7 +30,7 @@ export default async function ReviewsRoutePage({
 }) {
   await requireAdminSession();
 
-  const [nativeResult, legacyResult] = await Promise.all([
+  const [nativeResult, legacyResult, personalOpsResult] = await Promise.all([
     readReviewsState()
       .then((state) => ({ ok: true as const, state }))
       .catch((error: unknown) => ({
@@ -41,6 +42,12 @@ export default async function ReviewsRoutePage({
       .catch((error: unknown) => ({
         ok: false as const,
         error: error instanceof Error ? error.message : "Legacy review entries could not be loaded."
+      })),
+    readPersonalOpsState()
+      .then((state) => ({ ok: true as const, state }))
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error: error instanceof Error ? error.message : "Personal Ops Follow-ups could not be loaded."
       }))
   ]);
 
@@ -80,6 +87,10 @@ export default async function ReviewsRoutePage({
         initialSelectedReviewId={reviewId}
         initialLoadError={loadErrors.length ? loadErrors.join(" ") : undefined}
         financeBridge={FINANCE_REVIEW_BRIDGE}
+        initialPersonalOpsDecisions={personalOpsResult.ok ? personalOpsResult.state.decisions : []}
+        initialDecisionsError={personalOpsResult.ok ? "" : personalOpsResult.error}
+        initialPersonalOpsFollowUps={personalOpsResult.ok ? personalOpsResult.state.followUps : []}
+        initialFollowUpsError={personalOpsResult.ok ? "" : personalOpsResult.error}
       />
     </div>
   );

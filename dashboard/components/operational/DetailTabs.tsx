@@ -50,11 +50,12 @@ export default function DetailTabs({
     const activeLeft = active.offsetLeft;
     const activeRight = activeLeft + active.offsetWidth;
 
-    if (activeLeft < visibleLeft + padding) {
-      tablist.scrollLeft = Math.max(0, activeLeft - padding);
-    } else if (activeRight > visibleRight) {
-      tablist.scrollLeft = activeRight - tablist.clientWidth + endInset;
-    }
+    if (activeLeft >= visibleLeft + padding && activeRight <= visibleRight) return;
+
+    const usableWidth = Math.max(active.offsetWidth, tablist.clientWidth - endInset);
+    const centeredLeft = activeLeft - (usableWidth - active.offsetWidth) / 2;
+    const maxScrollLeft = Math.max(0, tablist.scrollWidth - tablist.clientWidth);
+    tablist.scrollLeft = Math.min(maxScrollLeft, Math.max(0, centeredLeft));
   }, [activeTab]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>, currentId: string) {

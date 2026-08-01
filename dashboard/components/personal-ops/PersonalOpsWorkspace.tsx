@@ -12,6 +12,7 @@ import {
   type ReactNode
 } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
+import { getActiveFollowUpsForSource } from "../../lib/modules/personal-ops/follow-up-links";
 import { createPersonalOpsRepository } from "../../lib/modules/personal-ops/repository";
 import type {
   DecisionCreateInput,
@@ -36,7 +37,11 @@ import {
   type PersonalOpsSort,
   type PersonalOpsTab
 } from "../../lib/native-objects/url-state";
-import type { ModuleId, NativeObjectRef } from "../../lib/native-objects/types";
+import {
+  isModuleId,
+  type ModuleId,
+  type NativeObjectRef
+} from "../../lib/native-objects/types";
 import InspectorRail from "../admin-shell/InspectorRail";
 import SharedAIDock from "../admin-shell/SharedAIDock";
 import ConfirmationSheet from "../operational/ConfirmationSheet";
@@ -198,6 +203,42 @@ const SOURCE_MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
   reviews: "Reviews",
   resources: "Resources",
   finance: "Finance"
+};
+
+const FOLLOW_UP_SOURCE_OBJECT_TYPES: Readonly<
+  Partial<Record<ModuleId, readonly string[]>>
+> = {
+  media: ["media_asset"],
+  notes: ["note", "decision_candidate"],
+  people: ["person", "organization"],
+  projects: [
+    "project",
+    "milestone",
+    "project_milestone",
+    "blocker",
+    "project_blocker",
+    "open_loop",
+    "project_open_loop",
+    "timeline_event",
+    "project_timeline_event",
+    "project_link"
+  ],
+  resources: ["resource"],
+  reviews: [
+    "review_run",
+    "weekly_review",
+    "monthly_review",
+    "checklist_item",
+    "review_checklist_item",
+    "evidence_item",
+    "review_evidence_item",
+    "decision_item",
+    "review_decision_item",
+    "follow_up_link",
+    "review_follow_up",
+    "carry_forward_item",
+    "review_carry_forward_item"
+  ]
 };
 
 const INSPECTOR_TABS: readonly DetailTab[] = [
@@ -559,46 +600,10 @@ function sourceRefFromParams(params: URLSearchParams): NativeObjectRef | undefin
   const containerObjectId = params.get("sourceContainerObjectId")?.trim();
   const label = params.get("sourceLabel")?.trim();
   if (!objectId || !label) return undefined;
-  if (
-    module !== "notes" &&
-    module !== "people" &&
-    module !== "projects" &&
-    module !== "reviews"
-  ) return undefined;
+  if (!module || !isModuleId(module)) return undefined;
 
-  const allowedObjectTypes =
-    module === "notes"
-      ? ["note", "decision_candidate"]
-      : module === "people"
-        ? ["person", "organization"]
-        : module === "projects"
-          ? [
-              "project",
-              "milestone",
-              "project_milestone",
-              "blocker",
-              "project_blocker",
-              "open_loop",
-              "project_open_loop",
-              "timeline_event",
-              "project_timeline_event",
-              "project_link"
-            ]
-          : [
-              "review_run",
-              "weekly_review",
-              "monthly_review",
-              "checklist_item",
-              "review_checklist_item",
-              "evidence_item",
-              "review_evidence_item",
-              "decision_item",
-              "review_decision_item",
-              "follow_up_link",
-              "review_follow_up",
-              "carry_forward_item",
-              "review_carry_forward_item"
-            ];
+  const allowedObjectTypes = FOLLOW_UP_SOURCE_OBJECT_TYPES[module];
+  if (!allowedObjectTypes) return undefined;
 
   const fallbackObjectType =
     module === "notes" ? "decision_candidate" : module === "people" ? "person" : "";
@@ -618,29 +623,6 @@ function sourceRefFromParams(params: URLSearchParams): NativeObjectRef | undefin
     containerObjectId,
     label
   });
-}
-
-function sameNativeObjectIdentity(left: NativeObjectRef, right: NativeObjectRef): boolean {
-  return (
-    left.module === right.module &&
-    left.objectType === right.objectType &&
-    left.objectId === right.objectId &&
-    (left.containerObjectId || "") === (right.containerObjectId || "")
-  );
-}
-
-function activeFollowUpsForSource(
-  followUps: PersonalOpsFollowUp[],
-  sourceRef?: NativeObjectRef
-): PersonalOpsFollowUp[] {
-  if (!sourceRef) return [];
-  return followUps.filter(
-    (followUp) =>
-      followUp.lifecycle !== "archived" &&
-      followUp.lifecycle !== "complete" &&
-      followUp.followUpState !== "complete" &&
-      followUp.sourceRefs.some((ref) => sameNativeObjectIdentity(ref, sourceRef))
-  );
 }
 
 function followUpRoute(item: PersonalOpsFollowUp): string {
@@ -1067,7 +1049,7 @@ export default function PersonalOpsWorkspace({
   const sourceDuplicates = useMemo(
     () =>
       openForm?.family === "followUps" && !openForm.item
-        ? activeFollowUpsForSource(state.followUps, openForm.sourceRef)
+        ? getActiveFollowUpsForSource(state.followUps, openForm.sourceRef)
         : [],
     [openForm, state.followUps]
   );

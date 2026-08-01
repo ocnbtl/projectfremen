@@ -2,9 +2,17 @@
 
 import InspectorRail from "../admin-shell/InspectorRail";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "../operational/DetailTabs";
+import LinkedDecisionsPanel from "../operational/LinkedDecisionsPanel";
 import ObjectHeader from "../operational/ObjectHeader";
 import QuickActionBar from "../operational/QuickActionBar";
 import SystemState from "../operational/SystemState";
+import {
+  buildDecisionCreationRoute,
+  decisionOwnerRoute,
+  getLinkedDecisions,
+  type DecisionSourceRef
+} from "../../lib/modules/personal-ops/decision-links";
+import type { PersonalOpsDecision } from "../../lib/modules/personal-ops/types";
 import type { FinanceAccountsViewModel } from "../../lib/modules/finance/accounts-view-model";
 import type { FinanceBillsViewModel } from "../../lib/modules/finance/bills-view-model";
 import type { FinanceBudgetsViewModel } from "../../lib/modules/finance/budgets-view-model";
@@ -12,7 +20,7 @@ import type { FinanceMonthlyReviewViewModel } from "../../lib/modules/finance/mo
 import type { FinanceTransactionsViewModel } from "../../lib/modules/finance/transactions-view-model";
 import type { FinanceLinkedContext, FinanceTransaction } from "../../lib/modules/finance/types";
 import type { FinanceTab } from "../../lib/native-objects/url-state";
-import { getModuleRoute, getModuleViewRoute } from "../../lib/native-objects/routes";
+import { createNativeObjectRef, getModuleRoute, getModuleViewRoute } from "../../lib/native-objects/routes";
 import { Chip, Icon, money } from "./FinancePrimitives";
 import styles from "./FinanceOperational.module.css";
 
@@ -90,6 +98,19 @@ function linkedContextRoute(item: FinanceLinkedContext) {
   return `${getModuleRoute(module)}?query=${encodeURIComponent(item.title)}`;
 }
 
+function financeDecisionSource(
+  objectType: "budget" | "finance_close_check",
+  objectId: string,
+  label: string
+): DecisionSourceRef {
+  return createNativeObjectRef({
+    module: "finance",
+    objectType,
+    objectId,
+    label
+  }) as DecisionSourceRef;
+}
+
 function CloseButton({ onClose }: { onClose: () => void }) {
   return <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance inspector"><Icon name="X" /></button>;
 }
@@ -129,6 +150,10 @@ type FinanceInspectorProps = {
   budgetsModel: FinanceBudgetsViewModel;
   monthlyReviewModel: FinanceMonthlyReviewViewModel;
   linkedContext: readonly FinanceLinkedContext[];
+  decisions: PersonalOpsDecision[];
+  decisionsError: string;
+  decisionsLoading: boolean;
+  onRefreshDecisions: () => void;
   activeTab: FinanceTab;
   onTabChange: (tab: FinanceTab) => void;
   onClose: () => void;
@@ -145,6 +170,10 @@ export default function FinanceInspector({
   budgetsModel,
   monthlyReviewModel,
   linkedContext,
+  decisions,
+  decisionsError,
+  decisionsLoading,
+  onRefreshDecisions,
   activeTab,
   onTabChange,
   onClose,
@@ -160,6 +189,18 @@ export default function FinanceInspector({
   const budgetRow = view === "budgets" ? budgetsModel.selected : null;
   const reviewRow = view === "review" ? monthlyReviewModel.selected : null;
   if (!accountRow && !transaction && !billRow && !budgetRow && !reviewRow) return null;
+  const budgetDecisionSource = budgetRow
+    ? financeDecisionSource("budget", budgetRow.budget.id, budgetRow.budget.category)
+    : null;
+  const budgetDecisions = budgetDecisionSource
+    ? getLinkedDecisions(decisions, budgetDecisionSource)
+    : [];
+  const closeDecisionSource = reviewRow
+    ? financeDecisionSource("finance_close_check", reviewRow.item.id, reviewRow.item.label)
+    : null;
+  const closeDecisions = closeDecisionSource
+    ? getLinkedDecisions(decisions, closeDecisionSource)
+    : [];
 
   const objectTitle = accountRow?.account.name
     || transaction?.merchant
@@ -222,7 +263,7 @@ export default function FinanceInspector({
       footer={(
         <div className={styles.inspectorFooter}>
           <QuickActionBar
-            ariaLabel={`${objectTitle} unavailable actions`}
+            ariaLabel={`${objectTitle} actions`}
             actions={accountRow ? [
               { id: "finance-account-reconcile", label: "Reconcile", disabled: true, disabledReason: READ_ONLY_REASON },
               { id: "finance-account-transfer", label: "Transfer", disabled: true, disabledReason: READ_ONLY_REASON },
@@ -239,14 +280,26 @@ export default function FinanceInspector({
               { id: "finance-bill-value", label: "Review value", disabled: true, disabledReason: READ_ONLY_REASON },
               { id: "finance-bill-close", label: "Link to close", disabled: true, disabledReason: READ_ONLY_REASON }
             ] : budgetRow ? [
-              { id: "finance-budget-decision", label: "Create decision", disabled: true, disabledReason: "Durable Decisions belong to Personal Ops; no accepted cross-module write path is connected." },
+              {
+                id: "finance-budget-decision",
+                label: budgetDecisions.length > 0 ? "Open Decision" : "File decision",
+                href: budgetDecisions.length > 0
+                  ? decisionOwnerRoute(budgetDecisions[0])
+                  : buildDecisionCreationRoute(budgetDecisionSource!)
+              },
               { id: "finance-budget-adjust", label: "Adjust cap", disabled: true, disabledReason: READ_ONLY_REASON },
               { id: "finance-budget-buffer", label: "Cover from buffer", disabled: true, disabledReason: READ_ONLY_REASON },
               { id: "finance-budget-close", label: "Link to close", disabled: true, disabledReason: READ_ONLY_REASON }
             ] : [
               { id: "finance-close-item", label: reviewRow?.isComplete ? "Reopen item" : "Mark complete", disabled: true, disabledReason: READ_ONLY_REASON },
               { id: "finance-close-evidence", label: "Attach evidence", disabled: true, disabledReason: READ_ONLY_REASON },
-              { id: "finance-close-carry", label: "Carry forward", disabled: true, disabledReason: READ_ONLY_REASON },
+              {
+                id: "finance-close-decision",
+                label: closeDecisions.length > 0 ? "Open Decision" : "File decision",
+                href: closeDecisions.length > 0
+                  ? decisionOwnerRoute(closeDecisions[0])
+                  : buildDecisionCreationRoute(closeDecisionSource!)
+              },
               { id: "finance-close-complete", label: "Complete close", disabled: true, disabledReason: "Required fixture checks remain open and close persistence, audit, and reopen semantics are not connected." }
             ]}
           />
@@ -451,7 +504,17 @@ export default function FinanceInspector({
               <div><span>Review state</span><strong>{budgetRow.remaining < 0 ? "Literal overage" : "No literal overage"}</strong></div>
             </div>
             <section className={styles.inspectorSection}><h3>Literal variance only</h3><p>{budgetRow.budget.category} has {money(budgetRow.remaining, { cents: true })} remaining from its fixture cap. No forecast, confidence, project allocation, or decision is inferred.</p></section>
-            <div className={styles.boundary}><strong>Cap changes require rationale and audit</strong><span>Adjust, buffer, reclassify, review, and decision actions remain unavailable. A material overage never silently changes the cap.</span></div>
+            <LinkedDecisionsPanel
+              source={budgetDecisionSource!}
+              decisions={decisions}
+              loading={decisionsLoading}
+              error={decisionsError}
+              onRefresh={onRefreshDecisions}
+              createHref={buildDecisionCreationRoute(budgetDecisionSource!)}
+              compact
+              title="Budget decisions"
+            />
+            <div className={styles.boundary}><strong>Cap changes require Finance persistence and audit</strong><span>A Personal Ops Decision may record the choice without changing this fixture. Adjust, buffer, reclassify, and review actions remain unavailable, and a material overage never silently changes the cap.</span></div>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="transactions" active={safeTab === "transactions"} className={styles.inspectorPanel}>
             <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?query=${encodeURIComponent(budgetRow.budget.category)}`}><span><strong>Search Transactions</strong><small>Transactions owns transaction facts; this is a category search, not a persisted link.</small></span><span>Open</span></a>
@@ -493,19 +556,29 @@ export default function FinanceInspector({
             <section className={styles.inspectorSection}><h3>Close item boundary</h3><p>{reviewRow.item.label} is a literal fixture checklist item. The fixture does not identify required versus optional status, evidence references, waivers, carry-forward destination, or audit history.</p></section>
             <div className={styles.boundary}><strong>Complete Close remains blocked</strong><span>Every required check must eventually be complete, waived with reason, or explicitly carried forward. This fixture cannot establish those states.</span></div>
           </DetailTabPanel>
-          {(["evidence", "decisions", "activity"] as const).map((panelTab) => (
+          {(["evidence", "activity"] as const).map((panelTab) => (
             <DetailTabPanel tabsId="finance-object-tabs" tabId={panelTab} active={safeTab === panelTab} key={panelTab}>
               <SystemState
                 variant="read_only"
                 title={`${panelTab[0].toUpperCase()}${panelTab.slice(1)} not connected`}
                 description={panelTab === "evidence"
                   ? "No Resource- or Media-owned evidence reference is stored, and missing evidence is not silently waived."
-                  : panelTab === "decisions"
-                    ? "No FinanceCloseDecision or accepted Personal Ops Decision is stored. Drafting or filing cannot be simulated."
-                    : "No context-pull, reconciliation, evidence, carry-forward, completion, or reopen audit event is available."}
+                  : "No context-pull, reconciliation, evidence, carry-forward, completion, or reopen audit event is available."}
               />
             </DetailTabPanel>
           ))}
+          <DetailTabPanel tabsId="finance-object-tabs" tabId="decisions" active={safeTab === "decisions"} className={styles.inspectorPanel}>
+            <LinkedDecisionsPanel
+              source={closeDecisionSource!}
+              decisions={decisions}
+              loading={decisionsLoading}
+              error={decisionsError}
+              onRefresh={onRefreshDecisions}
+              createHref={buildDecisionCreationRoute(closeDecisionSource!)}
+              title="Close-item decisions"
+            />
+            <div className={styles.boundary}><strong>Finance close remains read-only</strong><span>Personal Ops owns the durable Decision. Filing one does not resolve this checklist item, satisfy evidence, change close readiness, or create Finance audit history.</span></div>
+          </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="links" active={safeTab === "links"} className={styles.inspectorPanel}>
             <a className={styles.compactRow} href={getModuleRoute("reviews")}><span><strong>Reviews coordination</strong><small>Reviews may reference Finance close state but does not own it.</small></span><span>Open</span></a>
             <a className={styles.compactRow} href={getModuleViewRoute("finance", "review")}><span><strong>Finance Monthly Review</strong><small>Canonical Finance-owned close route</small></span><span>Current</span></a>

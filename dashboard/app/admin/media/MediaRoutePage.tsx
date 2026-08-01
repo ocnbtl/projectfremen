@@ -15,7 +15,10 @@ import {
 import { legacyPersonalRecordsToNotes } from "../../../lib/modules/notes/legacy-adapter";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
 import type { PersonalOpsState } from "../../../lib/modules/personal-ops/types";
-import { readProjectsState } from "../../../lib/modules/projects/store";
+import {
+  createEmptyProjectsState,
+  readProjectsState
+} from "../../../lib/modules/projects/store";
 import type { ProjectsState } from "../../../lib/modules/projects/types";
 import {
   legacyPersonalRecordsToResources,
@@ -58,17 +61,26 @@ export default async function MediaRoutePage({
   queueMode?: MediaQueueMode;
 }) {
   await requireAdminSession();
-  const ownerStatePromise = queueMode === "in-use"
-    ? Promise.allSettled([readProjectsState(), readReviewsState(), readPersonalOpsState()] as const)
-    : null;
-  let records: PersonalRecord[] = [];
-  let loadError = "";
-
-  try {
-    records = await readPersonalRecords();
-  } catch (error) {
-    loadError = error instanceof Error ? error.message : "Media records could not be loaded.";
-  }
+  const [recordsResult, ownerStateResults] = await Promise.all([
+    readPersonalRecords()
+      .then((records) => ({ ok: true as const, records }))
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error:
+          error instanceof Error
+            ? error.message
+            : "Media records could not be loaded."
+      })),
+    Promise.allSettled([
+      readProjectsState(),
+      readReviewsState(),
+      readPersonalOpsState()
+    ] as const)
+  ]);
+  const records: PersonalRecord[] = recordsResult.ok
+    ? recordsResult.records
+    : [];
+  const loadError = recordsResult.ok ? "" : recordsResult.error;
 
   const serverAssets = legacyPersonalRecordsToMediaAssets(records);
   const assets = serverAssets.map(mediaAssetForClient);
@@ -76,13 +88,13 @@ export default async function MediaRoutePage({
   const resources = legacyPersonalRecordsToResources(records);
   const clientResources = resources.map(resourceForClient);
   const contentGraph = buildLegacyContentGraph({ notes, resources, media: assets });
+  const [projectsResult, reviewsResult, personalOpsResult] = ownerStateResults;
   if (!loadError && assetId && !assets.some((asset) => asset.id === assetId)) {
     notFound();
   }
 
   let inUseEvidence = null;
-  if (queueMode === "in-use" && ownerStatePromise) {
-    const [projectsResult, reviewsResult, personalOpsResult] = await ownerStatePromise;
+  if (queueMode === "in-use") {
     inUseEvidence = buildMediaUsageEvidence({
       assets,
       legacyContentGraph: contentGraph,
@@ -116,6 +128,26 @@ export default async function MediaRoutePage({
           initialAssets={assets}
           initialResources={clientResources}
           contentGraph={contentGraph}
+          initialProjectsState={
+            projectsResult.status === "fulfilled"
+              ? projectsResult.value
+              : createEmptyProjectsState()
+          }
+          initialProjectsError={
+            projectsResult.status === "fulfilled"
+              ? ""
+              : "Projects associations could not be loaded."
+          }
+          initialPersonalOpsFollowUps={
+            personalOpsResult.status === "fulfilled"
+              ? personalOpsResult.value.followUps
+              : []
+          }
+          initialPersonalOpsFollowUpsError={
+            personalOpsResult.status === "fulfilled"
+              ? ""
+              : "Personal Ops Follow-up status could not be loaded."
+          }
           initialMode={mode}
           initialSelectedId={assetId}
           initialLoadError={loadError}

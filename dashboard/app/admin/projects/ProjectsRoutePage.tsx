@@ -99,6 +99,13 @@ export default async function ProjectsRoutePage({
         initialMode={mode}
         initialProjectId={selected?.project.id}
         initialLoadError={loadErrors.length ? loadErrors.join(" ") : undefined}
+        initialPersonalOpsDecisions={personalOps.value?.decisions || []}
+        initialDecisionsError={personalOps.error}
+        initialPersonalOpsFollowUps={personalOps.value?.followUps || []}
+        initialFollowUpsError={personalOps.error}
+        initialPeople={personalRecords.value.filter(
+          (record) => record.className === "person" || record.className === "org"
+        )}
       />
     </div>
   );

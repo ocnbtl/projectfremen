@@ -3,7 +3,15 @@
 import MetricStrip from "../operational/MetricStrip";
 import QuickActionBar from "../operational/QuickActionBar";
 import SystemState from "../operational/SystemState";
+import {
+  buildDecisionCreationRoute,
+  decisionOwnerRoute,
+  getLinkedDecisions,
+  type DecisionSourceRef
+} from "../../lib/modules/personal-ops/decision-links";
+import type { PersonalOpsDecision } from "../../lib/modules/personal-ops/types";
 import type { FinanceMonthlyReviewViewModel } from "../../lib/modules/finance/monthly-review-view-model";
+import { createNativeObjectRef } from "../../lib/native-objects/routes";
 import type { FinanceFilter, FinanceSort } from "../../lib/native-objects/url-state";
 import {
   Chip,
@@ -17,10 +25,20 @@ import {
 } from "./FinancePrimitives";
 import styles from "./FinanceOperational.module.css";
 
-const WRITE_REASON = "This Finance Monthly Review is a read-only fixture. Checklist writes, evidence links, durable Decisions, carry-forward, and close audit are not connected.";
+const WRITE_REASON = "This Finance Monthly Review is a read-only fixture. Checklist writes, evidence links, carry-forward, and close audit are not connected.";
+
+function closeDecisionSource(item: { id: string; label: string }) {
+  return createNativeObjectRef({
+    module: "finance",
+    objectType: "finance_close_check",
+    objectId: item.id,
+    label: item.label
+  }) as DecisionSourceRef;
+}
 
 export type FinanceMonthlyReviewViewProps = {
   model: FinanceMonthlyReviewViewModel;
+  decisions: PersonalOpsDecision[];
   filter: FinanceFilter;
   onQueryChange: (query: string) => void;
   onFilterChange: (filter: FinanceFilter) => void;
@@ -33,6 +51,7 @@ export type FinanceMonthlyReviewViewProps = {
 
 export default function FinanceMonthlyReviewView({
   model,
+  decisions,
   filter,
   onQueryChange,
   onFilterChange,
@@ -46,6 +65,10 @@ export default function FinanceMonthlyReviewView({
   const overallOpen = model.overallLiteralBlockers.length;
   const overallComplete = model.sourceCount - overallOpen;
   const selectedItem = model.selected?.item ?? null;
+  const selectedDecisionSource = selectedItem ? closeDecisionSource(selectedItem) : null;
+  const selectedDecisions = selectedDecisionSource
+    ? getLinkedDecisions(decisions, selectedDecisionSource)
+    : [];
   const closeReason = overallOpen > 0
     ? `Complete Close is unavailable: ${overallOpen} literal checklist item${overallOpen === 1 ? " remains" : "s remain"} open, and close persistence and reopen policy are not connected.`
     : "Complete Close is unavailable because close persistence, audit, and reopen policy are not connected.";
@@ -210,7 +233,13 @@ export default function FinanceMonthlyReviewView({
           actions={[
             { id: "finance-close-item-status", label: selectedItem.done ? "Reopen item" : "Mark complete", intent: "primary", disabled: true, disabledReason: WRITE_REASON },
             { id: "finance-close-evidence", label: "Attach evidence", disabled: true, disabledReason: WRITE_REASON },
-            { id: "finance-close-decision", label: "File Decision", disabled: true, disabledReason: "Durable Decisions belong to Personal Ops, and the cross-module write path is not connected." },
+            {
+              id: "finance-close-decision",
+              label: selectedDecisions.length > 0 ? "Open Decision" : "File Decision",
+              href: selectedDecisions.length > 0
+                ? decisionOwnerRoute(selectedDecisions[0])
+                : buildDecisionCreationRoute(selectedDecisionSource!)
+            },
             { id: "finance-close-complete", label: "Complete Close", disabled: true, disabledReason: closeReason }
           ]}
         />

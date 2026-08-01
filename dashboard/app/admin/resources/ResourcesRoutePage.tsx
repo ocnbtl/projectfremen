@@ -7,7 +7,10 @@ import { legacyPersonalRecordsToNotes } from "../../../lib/modules/notes/legacy-
 import { legacyPersonalRecordsToPeople } from "../../../lib/modules/people/legacy-adapter";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
 import type { PersonalOpsState } from "../../../lib/modules/personal-ops/types";
-import { readProjectsState } from "../../../lib/modules/projects/store";
+import {
+  createEmptyProjectsState,
+  readProjectsState
+} from "../../../lib/modules/projects/store";
 import type { ProjectsState } from "../../../lib/modules/projects/types";
 import {
   buildResourceLinkedContextEvidence,
@@ -112,6 +115,26 @@ export default async function ResourcesRoutePage({
         initialResources={clientResources}
         contentGraph={contentGraph}
         linkedContextEvidence={linkedContextEvidence}
+        initialProjectsState={
+          projectsResult.status === "fulfilled"
+            ? projectsResult.value
+            : createEmptyProjectsState()
+        }
+        initialProjectsError={
+          projectsResult.status === "fulfilled"
+            ? ""
+            : "Projects associations could not be loaded."
+        }
+        initialPersonalOpsFollowUps={
+          personalOpsResult.status === "fulfilled"
+            ? personalOpsResult.value.followUps
+            : []
+        }
+        initialPersonalOpsFollowUpsError={
+          personalOpsResult.status === "fulfilled"
+            ? ""
+            : "Personal Ops Follow-up status could not be loaded."
+        }
         initialMode={mode}
         initialSelectedId={resourceId}
         initialLoadError={loadError}

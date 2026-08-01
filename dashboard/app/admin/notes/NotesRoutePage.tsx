@@ -10,7 +10,10 @@ import {
 } from "../../../lib/modules/notes/reference-evidence";
 import { legacyPersonalRecordsToPeople } from "../../../lib/modules/people/legacy-adapter";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
-import { readProjectsState } from "../../../lib/modules/projects/store";
+import {
+  createEmptyProjectsState,
+  readProjectsState
+} from "../../../lib/modules/projects/store";
 import type { ProjectsState } from "../../../lib/modules/projects/types";
 import { legacyPersonalRecordsToResources } from "../../../lib/modules/resources/legacy-adapter";
 import { readReviewsState } from "../../../lib/modules/reviews/store";
@@ -89,6 +92,16 @@ export default async function NotesRoutePage({
         initialNotes={notes}
         contentGraph={contentGraph}
         referenceEvidence={referenceEvidence}
+        initialProjectsState={
+          projectsResult.status === "fulfilled"
+            ? projectsResult.value
+            : createEmptyProjectsState()
+        }
+        initialProjectsError={
+          projectsResult.status === "fulfilled"
+            ? ""
+            : "Projects associations could not be loaded."
+        }
         initialMediaAssets={media}
         initialResources={resources}
         initialMode={mode}
@@ -97,6 +110,8 @@ export default async function NotesRoutePage({
         initialPersonalOpsDecisions={personalOpsResult.ok ? personalOpsResult.state.decisions : []}
         initialDecisionMappings={personalOpsResult.ok ? personalOpsResult.state.legacyMappings : []}
         initialDecisionLoadError={personalOpsResult.ok ? "" : personalOpsResult.error}
+        initialPersonalOpsFollowUps={personalOpsResult.ok ? personalOpsResult.state.followUps : []}
+        initialFollowUpsError={personalOpsResult.ok ? "" : personalOpsResult.error}
       />
     </div>
   );

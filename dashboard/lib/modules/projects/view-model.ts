@@ -50,6 +50,7 @@ export type ProjectDisplayRecord = {
   cadence: ProjectCadenceState;
   priority: ProjectPriority;
   owner?: string;
+  ownerRef?: NativeObjectRef;
   area?: string;
   objective?: string;
   lifecycleBeforeArchive?: Project["lifecycleBeforeArchive"];
@@ -152,6 +153,7 @@ function displayFromNative(project: Project): ProjectDisplayRecord {
     cadence: project.cadence,
     priority: project.priority,
     owner: project.owner,
+    ownerRef: project.ownerRef,
     area: project.area,
     objective: project.objective,
     lifecycleBeforeArchive: project.lifecycleBeforeArchive,

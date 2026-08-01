@@ -15,6 +15,10 @@ import MetricStrip from "./operational/MetricStrip";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
 import ConfirmationSheet from "./operational/ConfirmationSheet";
+import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
+import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
+import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
+import { useProjectsState } from "./operational/useProjectsState";
 import NoteAttachmentsView, { NoteAttachmentInspector } from "./notes/NoteAttachmentsView";
 import NoteDecisionsView from "./notes/NoteDecisionsView";
 import NotePropertiesEditorSheet from "./notes/NotePropertiesEditorSheet";
@@ -52,8 +56,19 @@ import type {
 import type { MediaAsset } from "../lib/modules/media/types";
 import type {
   PersonalOpsDecision,
+  PersonalOpsFollowUp,
   PersonalOpsLegacyMapping
 } from "../lib/modules/personal-ops/types";
+import {
+  buildFollowUpCreationRoute,
+  type FollowUpSourceRef
+} from "../lib/modules/personal-ops/follow-up-links";
+import { createProjectsRepository } from "../lib/modules/projects/repository";
+import type {
+  ProjectLinkRelationship,
+  ProjectLinkStrength,
+  ProjectsState
+} from "../lib/modules/projects/types";
 import type { ResourceRecord } from "../lib/modules/resources/types";
 import {
   parseNotesUrlState,
@@ -70,6 +85,8 @@ type NotesWorkspaceProps = {
   initialNotes: NoteRecord[];
   contentGraph: LegacyContentGraph;
   referenceEvidence: NoteReferenceEvidenceIndex;
+  initialProjectsState: ProjectsState;
+  initialProjectsError?: string;
   initialMediaAssets: MediaAsset[];
   initialResources: ResourceRecord[];
   initialMode?: "index" | "detail";
@@ -78,6 +95,8 @@ type NotesWorkspaceProps = {
   initialPersonalOpsDecisions?: PersonalOpsDecision[];
   initialDecisionMappings?: PersonalOpsLegacyMapping[];
   initialDecisionLoadError?: string;
+  initialPersonalOpsFollowUps?: PersonalOpsFollowUp[];
+  initialFollowUpsError?: string;
 };
 
 type NoteReviewEvidenceCheck = {
@@ -91,6 +110,34 @@ type NoteReviewEvidenceCheck = {
 };
 
 type SaveState = "saved" | "unsaved" | "saving" | "failed";
+
+type ProjectLinkDraft = {
+  projectId: string;
+  relationship: ProjectLinkRelationship;
+  relationshipStrength: ProjectLinkStrength;
+  projectSpecificNote: string;
+  isRequiredEvidence: boolean;
+};
+
+const DEFAULT_PROJECT_LINK_DRAFT: ProjectLinkDraft = {
+  projectId: "",
+  relationship: "supporting_context",
+  relationshipStrength: "normal",
+  projectSpecificNote: "",
+  isRequiredEvidence: false
+};
+
+const NOTE_PROJECT_RELATIONSHIPS: readonly {
+  value: ProjectLinkRelationship;
+  label: string;
+}[] = [
+  { value: "supporting_context", label: "Supporting context" },
+  { value: "source_material", label: "Source material" },
+  { value: "decision_support", label: "Decision support" },
+  { value: "evidence", label: "Evidence" },
+  { value: "background_reference", label: "Background reference" },
+  { value: "review_input", label: "Review input" }
+];
 
 const NOTES_DIRTY_HISTORY_GUARD = "__unigentamos_notes_dirty_guard";
 const NOTES_HISTORY_BACK_DESTINATION = "__notes_history_back__";
@@ -180,6 +227,22 @@ function displayLabel(value: string) {
 function noteDecisionsRoute(note: NoteRecord) {
   const params = new URLSearchParams({ tab: "decisions" });
   return `${note.nativeRef.route}?${params.toString()}`;
+}
+
+function noteFollowUpSource(note: NoteRecord): FollowUpSourceRef {
+  return {
+    module: "notes",
+    objectType: "note",
+    objectId: note.id,
+    label: note.title,
+    route: note.nativeRef.route
+  };
+}
+
+function noteFollowUpCreationRoute(note: NoteRecord) {
+  return buildFollowUpCreationRoute(noteFollowUpSource(note), {
+    dueAt: note.nextReviewAt
+  });
 }
 
 function resourceSearchRoute(value: string) {
@@ -358,6 +421,8 @@ export default function NotesWorkspace({
   initialNotes,
   contentGraph,
   referenceEvidence,
+  initialProjectsState,
+  initialProjectsError = "",
   initialMediaAssets,
   initialResources,
   initialMode = "index",
@@ -365,17 +430,32 @@ export default function NotesWorkspace({
   initialLoadError = "",
   initialPersonalOpsDecisions = [],
   initialDecisionMappings = [],
-  initialDecisionLoadError = ""
+  initialDecisionLoadError = "",
+  initialPersonalOpsFollowUps = [],
+  initialFollowUpsError = ""
 }: NotesWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const repository = useMemo(() => createNotesRepository(), []);
+  const projectsRepository = useMemo(() => createProjectsRepository(), []);
   const [firstUrlState] = useState(() => parseNotesUrlState(searchParams));
   const [recentReferenceTime] = useState(() => Date.now());
   const [notes, setNotes] = useState(initialNotes);
   const [personalOpsDecisions, setPersonalOpsDecisions] = useState(initialPersonalOpsDecisions);
   const [decisionMappings, setDecisionMappings] = useState(initialDecisionMappings);
+  const {
+    followUps,
+    error: followUpsError,
+    loading: followUpsLoading,
+    refresh: refreshFollowUps
+  } = usePersonalOpsFollowUps(initialPersonalOpsFollowUps, initialFollowUpsError);
+  const {
+    state: projectsState,
+    error: projectsError,
+    loading: projectsLoading,
+    refresh: refreshProjects
+  } = useProjectsState(initialProjectsState, initialProjectsError);
   const [query, setQuery] = useState(firstUrlState.query);
   const [view, setView] = useState<NotesView>(firstUrlState.view);
   const [filter, setFilter] = useState<NotesFilter>(firstUrlState.filter);
@@ -409,8 +489,13 @@ export default function NotesWorkspace({
   const [pendingNavigation, setPendingNavigation] = useState<string | null>(null);
   const [propertyEditorNoteId, setPropertyEditorNoteId] = useState<string | null>(null);
   const [reviewScheduleEditorNoteId, setReviewScheduleEditorNoteId] = useState<string | null>(null);
+  const [projectLinkDraft, setProjectLinkDraft] = useState<ProjectLinkDraft>(DEFAULT_PROJECT_LINK_DRAFT);
+  const [projectLinkSaving, setProjectLinkSaving] = useState(false);
+  const [projectLinkError, setProjectLinkError] = useState("");
+  const [projectLinkNotice, setProjectLinkNotice] = useState("");
   const [captureFocusRequested, setCaptureFocusRequested] = useState(false);
   const captureTitleRef = useRef<HTMLInputElement>(null);
+  const projectLinkFormRef = useRef<HTMLFormElement>(null);
   const dirtyHistoryGuardRef = useRef<string | null>(null);
   const suppressDirtyPopRef = useRef(false);
   const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
@@ -445,6 +530,16 @@ export default function NotesWorkspace({
   );
   const attachmentEvidenceKey = selectedAttachmentEvidence?.items.map((item) => item.id).join("|") || "";
   const writableSelectedLifecycle = selectedNote ? writableLifecycleFor(selectedNote) : null;
+  const linkableProjects = useMemo(
+    () => projectsState.projects
+      .filter((project) => !["complete", "archived"].includes(project.lifecycle))
+      .sort((left, right) => {
+        const activeDelta =
+          Number(right.lifecycle === "active") - Number(left.lifecycle === "active");
+        return activeDelta || left.name.localeCompare(right.name);
+      }),
+    [projectsState.projects]
+  );
   const counts = useMemo(() => buildNoteViewCounts(notes), [notes]);
   const referenceEvidenceByNoteId = useMemo(
     () => new Map(referenceEvidence.records.map((record) => [record.noteId, record] as const)),
@@ -528,6 +623,9 @@ export default function NotesWorkspace({
     setDraftLifecycle(writableLifecycleFor(selectedNote) || "active");
     setSaveState("saved");
     setSaveError("");
+    setProjectLinkDraft(DEFAULT_PROJECT_LINK_DRAFT);
+    setProjectLinkError("");
+    setProjectLinkNotice("");
   }, [selectedNote?.id]);
 
   useEffect(() => {
@@ -689,19 +787,29 @@ export default function NotesWorkspace({
       (writableSelectedLifecycle !== null && draftLifecycle !== writableSelectedLifecycle)
     )
   );
+  const projectLinkDraftDirty = Boolean(
+    initialMode === "detail" && (
+      projectLinkDraft.projectId ||
+      projectLinkDraft.relationship !== DEFAULT_PROJECT_LINK_DRAFT.relationship ||
+      projectLinkDraft.relationshipStrength !== DEFAULT_PROJECT_LINK_DRAFT.relationshipStrength ||
+      projectLinkDraft.projectSpecificNote.trim() ||
+      projectLinkDraft.isRequiredEvidence
+    )
+  );
+  const workspaceDirty = editorDirty || projectLinkDraftDirty;
 
   useEffect(() => {
     if (!editorDirty) {
-      if (dirtyHistoryGuardRef.current) void releaseDirtyHistoryGuard();
+      if (!workspaceDirty && dirtyHistoryGuardRef.current) void releaseDirtyHistoryGuard();
       if (saveState !== "saving" && saveState !== "saved") setSaveState("saved");
       if (saveError) setSaveError("");
       return;
     }
     if (saveState !== "failed" && saveState !== "saving") setSaveState("unsaved");
-  }, [draftBody, draftLifecycle, draftTitle, editorDirty]);
+  }, [draftBody, draftLifecycle, draftTitle, editorDirty, workspaceDirty]);
 
   useEffect(() => {
-    if (!editorDirty) return;
+    if (!workspaceDirty) return;
     if (!dirtyHistoryGuardRef.current) {
       const marker = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
       dirtyHistoryGuardRef.current = marker;
@@ -743,7 +851,7 @@ export default function NotesWorkspace({
       window.removeEventListener("popstate", handlePopState);
       document.removeEventListener("click", handleLinkNavigation, true);
     };
-  }, [editorDirty]);
+  }, [workspaceDirty]);
 
   useEffect(() => {
     if (initialMode !== "detail") return;
@@ -807,6 +915,45 @@ export default function NotesWorkspace({
     await releaseDirtyHistoryGuard();
   }
 
+  async function submitProjectAssociation(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedNote || projectLinkSaving) return;
+    const project = linkableProjects.find((item) => item.id === projectLinkDraft.projectId);
+    if (!project) {
+      setProjectLinkError("Choose an active or planned Project before creating this association.");
+      return;
+    }
+
+    setProjectLinkSaving(true);
+    setProjectLinkError("");
+    setProjectLinkNotice("");
+    const result = await projectsRepository.create("links", {
+      projectId: project.id,
+      source: selectedNote.nativeRef,
+      relationship: projectLinkDraft.relationship,
+      relationshipStrength: projectLinkDraft.relationshipStrength,
+      isRequiredEvidence: projectLinkDraft.isRequiredEvidence,
+      projectSpecificNote: projectLinkDraft.projectSpecificNote.trim() || undefined
+    });
+    if (!result.ok) {
+      setProjectLinkSaving(false);
+      setProjectLinkError(
+        `${result.error.message} Your Project-association draft was preserved.`
+      );
+      return;
+    }
+
+    setProjectLinkDraft(DEFAULT_PROJECT_LINK_DRAFT);
+    setProjectLinkNotice(
+      result.data.created
+        ? `Linked this Note to ${result.data.project.name}. Projects now owns the association and its lifecycle.`
+        : `This exact ${displayLabel(result.data.item.relationship)} association already exists in ${result.data.project.name}; no duplicate was created.`
+    );
+    await refreshProjects();
+    router.refresh();
+    setProjectLinkSaving(false);
+  }
+
   async function discardChanges() {
     const destination = pendingNavigation;
     setConfirmOpen(false);
@@ -825,6 +972,9 @@ export default function NotesWorkspace({
       setDraftBody(selectedNote.body);
       setDraftLifecycle(writableLifecycleFor(selectedNote) || "active");
     }
+    setProjectLinkDraft(DEFAULT_PROJECT_LINK_DRAFT);
+    setProjectLinkError("");
+    setProjectLinkNotice("");
     router.push(destination || getModuleRoute("notes"));
   }
 
@@ -984,6 +1134,19 @@ export default function NotesWorkspace({
     const mediaTargets = targetGroups.filter((group) => group.target.module === "media");
     const unresolvedUrls = unresolved.filter((reference) => reference.kind === "external_url_candidate");
     const unresolvedIds = unresolved.filter((reference) => reference.kind === "legacy_relation_id");
+    const projectLinks = projectsState.links.filter(
+      (link) =>
+        link.linkState !== "removed" &&
+        link.source.module === note.nativeRef.module &&
+        link.source.objectType === note.nativeRef.objectType &&
+        link.source.objectId === note.nativeRef.objectId &&
+        (link.source.containerObjectId || "") === (note.nativeRef.containerObjectId || "")
+    );
+    const existingDraftLink = projectLinks.find(
+      (link) =>
+        link.projectId === projectLinkDraft.projectId &&
+        link.relationship === projectLinkDraft.relationship
+    );
 
     return (
       <DetailTabPanel tabsId={tabsId} tabId="links" active>
@@ -994,7 +1157,7 @@ export default function NotesWorkspace({
               items={[
                 { id: "url", label: "Exact normalized URL candidates", value: exactUrlCandidates.length },
                 { id: "id", label: "Exact ID candidates", value: exactIdCandidates.length },
-                { id: "persisted", label: "Persisted ObjectLinks", value: 0, tone: "attention" },
+                { id: "persisted", label: "Projects-owned links", value: projectLinks.length, tone: projectLinks.length ? "positive" : "attention" },
                 { id: "unresolved", label: "Unresolved references", value: unresolved.length, tone: unresolved.length ? "attention" : "positive" },
                 { id: "resources", label: "Resource targets", value: resourceTargets.length },
                 { id: "media", label: "Media targets", value: mediaTargets.length }
@@ -1006,6 +1169,177 @@ export default function NotesWorkspace({
                 These rows come from exact normalized URLs or retained record IDs. They can open the owning object, but they are not citations, attachments, backlinks, or persisted ObjectLinks and cannot be edited or removed here.
               </span>
             </div>
+          </section>
+
+          <section className={styles.panel} data-wide="true">
+            <div className={styles.panelHeader}>
+              <div>
+                <h2>Project associations</h2>
+                <p>Exact, typed ProjectLink records that point back to this Notes-owned object.</p>
+              </div>
+              <strong>{projectLinks.length}</strong>
+            </div>
+            <LinkedProjectsPanel
+              source={note.nativeRef}
+              sourceLabel={note.title}
+              state={projectsState}
+              loading={projectsLoading}
+              error={projectsError}
+              onRefresh={refreshProjects}
+              manageLifecycle
+              legacyProjectLabels={note.projects}
+              legacyLabel="Legacy Note routing labels, not stable links:"
+              title="Projects using this Note"
+              ownerTab="notes-decisions"
+              emptyDescription="No active Projects-owned association points to this Note yet."
+              boundary="Notes owns the title, body, review timing, and legacy routing labels. Projects owns relationship semantics, evidence flags, and association lifecycle."
+              limit={8}
+            />
+          </section>
+
+          <section className={styles.panel} data-wide="true">
+            <form
+              ref={projectLinkFormRef}
+              className={styles.projectAssociationForm}
+              data-project-link-editor={note.id}
+              onSubmit={(event) => void submitProjectAssociation(event)}
+            >
+              <div className={styles.panelHeader}>
+                <div>
+                  <h2>Associate with a Project</h2>
+                  <p>Create one protected ProjectLink without copying or changing this Note.</p>
+                </div>
+                <span className={styles.stateChip} data-tone="blue">Projects-owned write</span>
+              </div>
+              {projectLinkError && <p className={styles.errorBanner} role="alert">{projectLinkError}</p>}
+              {projectLinkNotice && <p className={styles.successBanner} role="status">{projectLinkNotice}</p>}
+              <div className={styles.projectAssociationGrid}>
+                <label className={styles.field}>
+                  Destination Project
+                  <select
+                    aria-label="Destination Project"
+                    value={projectLinkDraft.projectId}
+                    onChange={(event) => {
+                      setProjectLinkDraft((current) => ({ ...current, projectId: event.target.value }));
+                      setProjectLinkError("");
+                      setProjectLinkNotice("");
+                    }}
+                    disabled={projectLinkSaving || !linkableProjects.length}
+                    required
+                  >
+                    <option value="">Choose a Project</option>
+                    {linkableProjects.map((project) => (
+                      <option value={project.id} key={project.id}>
+                        {project.name} · {displayLabel(project.lifecycle)}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.field}>
+                  Relationship
+                  <select
+                    aria-label="Project relationship"
+                    value={projectLinkDraft.relationship}
+                    onChange={(event) => {
+                      setProjectLinkDraft((current) => ({
+                        ...current,
+                        relationship: event.target.value as ProjectLinkRelationship
+                      }));
+                      setProjectLinkError("");
+                      setProjectLinkNotice("");
+                    }}
+                    disabled={projectLinkSaving}
+                  >
+                    {NOTE_PROJECT_RELATIONSHIPS.map((relationship) => (
+                      <option value={relationship.value} key={relationship.value}>
+                        {relationship.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={styles.field}>
+                  Relationship strength
+                  <select
+                    aria-label="Relationship strength"
+                    value={projectLinkDraft.relationshipStrength}
+                    onChange={(event) => setProjectLinkDraft((current) => ({
+                      ...current,
+                      relationshipStrength: event.target.value as ProjectLinkStrength
+                    }))}
+                    disabled={projectLinkSaving}
+                  >
+                    <option value="weak">Weak</option>
+                    <option value="normal">Normal</option>
+                    <option value="strong">Strong</option>
+                  </select>
+                </label>
+                <label className={styles.projectAssociationCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={projectLinkDraft.isRequiredEvidence}
+                    onChange={(event) => setProjectLinkDraft((current) => ({
+                      ...current,
+                      isRequiredEvidence: event.target.checked
+                    }))}
+                    disabled={projectLinkSaving}
+                  />
+                  <span>
+                    <strong>Required evidence</strong>
+                    <small>The Project cannot treat this as optional context.</small>
+                  </span>
+                </label>
+              </div>
+              <label className={styles.field}>
+                Project-specific context
+                <textarea
+                  aria-label="Project-specific context"
+                  value={projectLinkDraft.projectSpecificNote}
+                  onChange={(event) => setProjectLinkDraft((current) => ({
+                    ...current,
+                    projectSpecificNote: event.target.value
+                  }))}
+                  placeholder="Why this Note matters to this Project. The text is stored with the ProjectLink, not in the Note body."
+                  disabled={projectLinkSaving}
+                />
+              </label>
+              {existingDraftLink && (
+                <div className={styles.readOnlyNotice}>
+                  <strong>Exact association already present</strong>
+                  <span>
+                    This Project already has a {displayLabel(existingDraftLink.relationship)} link to this Note. Submitting will verify the idempotent owner record instead of creating a duplicate.
+                  </span>
+                </div>
+              )}
+              {!linkableProjects.length && (
+                <SystemState
+                  variant={projectsError ? "error" : "empty"}
+                  compact
+                  title={projectsError ? "Projects are unavailable" : "No linkable native Projects"}
+                  description={projectsError || "Create or promote a Project before associating this Note. Completed and archived Projects remain read-only."}
+                />
+              )}
+              <div className={styles.sourceBoundary}>
+                <strong>Ownership boundary</strong>
+                <span>
+                  This action writes only a Projects-owned ProjectLink through the existing protected API. It does not alter the Note, create a second Note, or convert legacy project labels.
+                </span>
+              </div>
+              <div className={styles.projectAssociationActions}>
+                <Link className={styles.linkButton} href={getModuleRoute("projects")}>Open Projects directory</Link>
+                <button
+                  type="submit"
+                  className={styles.button}
+                  data-primary="true"
+                  disabled={projectLinkSaving || !linkableProjects.length || !projectLinkDraft.projectId}
+                >
+                  {projectLinkSaving
+                    ? "Associating…"
+                    : existingDraftLink
+                      ? "Verify existing association"
+                      : "Create Project association"}
+                </button>
+              </div>
+            </form>
           </section>
 
           <section className={styles.panel} data-wide="true">
@@ -1099,7 +1433,16 @@ export default function NotesWorkspace({
             <h2>Safe link actions</h2>
             <QuickActionBar
               actions={[
-                { id: "link", label: "Link object", disabled: true, disabledReason: "Native NoteLink persistence and relationship provenance are not connected." },
+                {
+                  id: "link-project",
+                  label: "Associate Project",
+                  intent: "primary",
+                  onSelect: () => {
+                    projectLinkFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+                    projectLinkFormRef.current?.querySelector<HTMLSelectElement>("select")?.focus();
+                  }
+                },
+                { id: "link", label: "Link other object", disabled: true, disabledReason: "Native NoteLink persistence and relationship provenance are not connected for non-Project objects." },
                 { id: "promote", label: "Promote candidate", disabled: true, disabledReason: "Candidate promotion requires an approved link repository and explicit audit event." },
                 { id: "repair", label: "Repair unresolved ID", disabled: true, disabledReason: `${unresolvedIds.length} retained ID reference${unresolvedIds.length === 1 ? "" : "s"} need an ownership-safe relink workflow.` },
                 { id: "remove", label: "Remove link", disabled: true, disabledReason: "No persisted ObjectLink exists to remove. Neither source nor target will be deleted.", intent: "destructive" }
@@ -1416,24 +1759,35 @@ export default function NotesWorkspace({
   function renderDetailDecisionsPanel(note: NoteRecord, tabsId: string) {
     return (
       <DetailTabPanel tabsId={tabsId} tabId="decisions" active>
-        <NoteDecisionsView
-          note={note}
-          decisions={personalOpsDecisions}
-          mappings={decisionMappings}
-          loadError={initialDecisionLoadError}
-          onConverted={(decision, mapping) => {
-            setPersonalOpsDecisions((current) => [
-              decision,
-              ...current.filter((item) => item.id !== decision.id)
-            ]);
-            if (mapping) {
-              setDecisionMappings((current) => [
-                mapping,
-                ...current.filter((item) => item.id !== mapping.id)
+        <div className={styles.followUpStack}>
+          <NoteDecisionsView
+            note={note}
+            decisions={personalOpsDecisions}
+            mappings={decisionMappings}
+            loadError={initialDecisionLoadError}
+            onConverted={(decision, mapping) => {
+              setPersonalOpsDecisions((current) => [
+                decision,
+                ...current.filter((item) => item.id !== decision.id)
               ]);
-            }
-          }}
-        />
+              if (mapping) {
+                setDecisionMappings((current) => [
+                  mapping,
+                  ...current.filter((item) => item.id !== mapping.id)
+                ]);
+              }
+            }}
+          />
+          <LinkedFollowUpsPanel
+            source={noteFollowUpSource(note)}
+            followUps={followUps}
+            loading={followUpsLoading}
+            error={followUpsError}
+            onRefresh={() => void refreshFollowUps()}
+            createHref={noteFollowUpCreationRoute(note)}
+            title="Note follow-through"
+          />
+        </div>
       </DetailTabPanel>
     );
   }
@@ -1573,8 +1927,7 @@ export default function NotesWorkspace({
                   {
                     id: "follow-up",
                     label: "Create Follow-up",
-                    disabled: true,
-                    disabledReason: "Follow-up creation needs a separate Personal Ops preview and confirmation."
+                    href: noteFollowUpCreationRoute(selectedNote)
                   },
                   {
                     id: "review-link",
@@ -1585,6 +1938,17 @@ export default function NotesWorkspace({
                 ]}
               />
             </section>
+            <LinkedFollowUpsPanel
+              source={noteFollowUpSource(selectedNote)}
+              followUps={followUps}
+              loading={followUpsLoading}
+              error={followUpsError}
+              onRefresh={() => void refreshFollowUps()}
+              createHref={noteFollowUpCreationRoute(selectedNote)}
+              className={styles.panel}
+              wide
+              title="Note follow-through"
+            />
             <section className={styles.panel} data-wide="true">
               <h2>Object boundary</h2>
               <div className={styles.sourceBoundary}>Decision is owned by Personal Ops. The Note body remains intact; the source mapping preserves provenance.</div>
@@ -1953,9 +2317,12 @@ export default function NotesWorkspace({
           open={confirmOpen}
           onOpenChange={(open) => { setConfirmOpen(open); if (!open) setPendingNavigation(null); }}
           onConfirm={() => void discardChanges()}
-          title="Discard unsaved Note changes?"
-          description="The current title, body, or lifecycle changes have not been written to the Personal Records adapter."
-          consequences={["The stored Note remains unchanged.", "Only this unsaved editor draft will be discarded."]}
+          title="Discard unsaved Notes workspace changes?"
+          description="The current Note editor or Project-association draft has not been written to its owning repository."
+          consequences={[
+            "The stored Note and existing Project associations remain unchanged.",
+            "Only the unsaved editor and association drafts will be discarded."
+          ]}
           confirmLabel="Discard changes"
           tone="danger"
         />
