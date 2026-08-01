@@ -407,6 +407,46 @@
   background: #f4f9fb;
 }
 
+.projectHandoff {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid #8dbbd0;
+  border-radius: 8px;
+  background: #eff8fc;
+}
+
+.projectHandoff > div:first-child {
+  min-width: 0;
+}
+
+.projectHandoff h2,
+.projectHandoff p {
+  margin: 0;
+}
+
+.projectHandoff h2 {
+  overflow-wrap: anywhere;
+  font: 900 16px var(--font-heading);
+}
+
+.projectHandoff p {
+  margin-top: 3px;
+  color: #355667;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.handoffLabel {
+  color: #166b95;
+  font: 850 10px var(--font-heading);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
 .notice {
   border-color: #aed2c2;
   background: #f1faf6;
@@ -848,7 +888,7 @@
     transition: transform 160ms ease;
   }
 
-  .shell > :global(.inspector-rail)[data-overlay-open="true"] {
+  .shell > :global(.inspector-rail[data-overlay-open="true"]) {
     transform: translateX(0);
   }
 
@@ -938,6 +978,22 @@
 
   .headerActions {
     width: 100%;
+  }
+
+  .projectHandoff {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .projectHandoff .inlineActions {
+    display: grid;
+    grid-template-columns: 1fr;
+    width: 100%;
+  }
+
+  .projectHandoff .inlineActions > * {
+    width: 100%;
+    min-height: 44px;
   }
 
   .headerActions .button {

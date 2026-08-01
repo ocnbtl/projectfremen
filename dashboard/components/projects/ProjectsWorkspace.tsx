@@ -43,6 +43,14 @@ import type {
   ProjectPriority,
   ProjectsObjectByFamily
 } from "../../lib/modules/projects/types";
+import {
+  buildProjectReviewHandoffRoute,
+  getProjectReviewContexts,
+  getProjectSourceReviewContexts,
+  type ProjectReviewSource
+} from "../../lib/modules/reviews/project-context";
+import { createReviewsRepository } from "../../lib/modules/reviews/repository";
+import type { ReviewRunView } from "../../lib/modules/reviews/types";
 import type {
   ProjectDirectoryItem,
   ProjectDisplayRecord,
@@ -72,6 +80,8 @@ type ProjectsWorkspaceProps = {
   initialPersonalOpsFollowUps: PersonalOpsFollowUp[];
   initialFollowUpsError?: string;
   initialPeople: PersonalRecord[];
+  initialReviewViews: ReviewRunView[];
+  initialReviewsError?: string;
 };
 
 type EditorKind =
@@ -405,6 +415,18 @@ function projectDecisionSource(project: ProjectDisplayRecord): DecisionSourceRef
   };
 }
 
+function projectReviewSource(
+  project: ProjectDisplayRecord,
+  source?: { objectType: "milestone" | "blocker"; objectId: string; label: string }
+): ProjectReviewSource {
+  return {
+    objectType: source?.objectType || "project",
+    objectId: source?.objectId || project.id,
+    ...(source ? { containerObjectId: project.id } : {}),
+    label: source?.label || project.name
+  };
+}
+
 function personalOpsCreateHref(
   collection: "decisions" | "follow-ups",
   project: ProjectDisplayRecord,
@@ -577,12 +599,15 @@ export default function ProjectsWorkspace({
   initialDecisionsError = "",
   initialPersonalOpsFollowUps,
   initialFollowUpsError = "",
-  initialPeople
+  initialPeople,
+  initialReviewViews,
+  initialReviewsError = ""
 }: ProjectsWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const repository = useMemo(() => createProjectsRepository(), []);
+  const reviewsRepository = useMemo(() => createReviewsRepository(), []);
   const {
     decisions,
     error: decisionsError,
@@ -628,6 +653,9 @@ export default function ProjectsWorkspace({
   const [mutationBusy, setMutationBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [mutationError, setMutationError] = useState("");
+  const [reviewViews, setReviewViews] = useState(initialReviewViews);
+  const [reviewsError, setReviewsError] = useState(initialReviewsError);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
   const isMobile = useMediaQuery("(max-width: 760px)");
   const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
   const searchParamKey = searchParams.toString();
@@ -649,6 +677,21 @@ export default function ProjectsWorkspace({
     () => snapshot.projects.filter((item) => matchesQuery(item, query)),
     [query, snapshot.projects]
   );
+
+  async function refreshReviewContext() {
+    if (reviewsLoading) return;
+    setReviewsLoading(true);
+    const result = await reviewsRepository.readState({ includeArchived: true });
+    if (!result.ok) {
+      setReviewsError(result.error.message);
+      setReviewsLoading(false);
+      return;
+    }
+    setReviewViews(result.data.items);
+    setReviewsError("");
+    setReviewsLoading(false);
+    setNotice("Review context refreshed from the Reviews owner module.");
+  }
 
   useEffect(() => {
     const next = parseProjectsUrlState(searchParams);
@@ -1501,6 +1544,83 @@ export default function ProjectsWorkspace({
     );
   }
 
+  function renderReviewCoverage(
+    item: ProjectDirectoryItem,
+    source?: { objectType: "milestone" | "blocker"; objectId: string; label: string },
+    compact = false
+  ) {
+    const target = projectReviewSource(item.project, source);
+    const contexts = source
+      ? getProjectSourceReviewContexts(reviewViews, target)
+      : getProjectReviewContexts(reviewViews, item.project.id);
+    const targetLabel = source ? displayLabel(source.objectType) : "project";
+    const Heading = compact ? "h3" : "h2";
+    return (
+      <section
+        className={`${styles.panel} ${styles.reviewCoverage}`}
+        data-wide={!compact || undefined}
+        data-compact={compact || undefined}
+        aria-busy={reviewsLoading || undefined}
+      >
+        <div className={styles.panelHeader}>
+          <div>
+            <Heading>Review coverage</Heading>
+            <p>Explicit ReviewRun context for this {targetLabel}; Reviews remains the owner.</p>
+          </div>
+          <div className={styles.inlineActions}>
+            <button
+              type="button"
+              className={styles.button}
+              onClick={() => void refreshReviewContext()}
+              disabled={reviewsLoading}
+              aria-label={`Refresh Review coverage for ${target.label}`}
+            >{reviewsLoading ? "Refreshing…" : "Refresh"}</button>
+            <Link className={styles.textLink} href={buildProjectReviewHandoffRoute(target)}>
+              Link in Reviews
+            </Link>
+          </div>
+        </div>
+        {reviewsError && (
+          <SystemState
+            variant="error"
+            compact
+            title="Current Review state could not be refreshed"
+            description={`${reviewsError} Last-known Review context remains visible.`}
+            action={{ label: "Retry", onSelect: () => void refreshReviewContext() }}
+          />
+        )}
+        {contexts.length ? (
+          <ul className={styles.reviewCoverageList}>
+            {contexts.map((context) => (
+              <li key={context.reviewRef.objectId}>
+                <span className={styles.itemBody}>
+                  <strong>{context.title}</strong>
+                  <small>
+                    {displayLabel(context.cadence)} · {displayLabel(context.lifecycle)} · {context.blockerCount} completion blocker{context.blockerCount === 1 ? "" : "s"}
+                  </small>
+                </span>
+                <span className={styles.inlineActions}>
+                  <span className={styles.rowState} data-tone={context.linkState === "linked" ? "green" : context.linkState === "broken" ? "red" : "amber"}>
+                    {displayLabel(context.linkState)}
+                  </span>
+                  {context.current && <span className={styles.relationshipChip} data-tone="blue">Current</span>}
+                  <Link className={styles.textLink} href={context.reviewRef.route}>Open ReviewRun</Link>
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <SystemState
+            variant="empty"
+            compact
+            title={`No ReviewRun links this ${targetLabel}`}
+            description="Open Reviews with this exact source prefilled, choose a ReviewRun, and confirm the link. No Project object will be copied."
+          />
+        )}
+      </section>
+    );
+  }
+
   function renderOverview(item: ProjectDirectoryItem) {
     const milestone = nextMilestone(item);
     const blockers = openBlockers(item);
@@ -1535,6 +1655,7 @@ export default function ProjectsWorkspace({
             wide
             title="Project follow-through"
           />
+          {renderReviewCoverage(item)}
           <section className={styles.panel}>
             <h2>Project context</h2>
             <div className={styles.factGrid}>
@@ -1626,6 +1747,7 @@ export default function ProjectsWorkspace({
             </ul>
           ) : <SystemState variant="empty" compact title="No native blockers" description="Legacy action items are deliberately not inferred as Project blockers." />}
         </section>
+        {renderReviewCoverage(item)}
         <section className={styles.panel} data-wide="true">
           <div className={styles.panelHeader}>
             <div><h2>Audit-derived timeline</h2><p>Native mutations add immutable timeline and audit events.</p></div>
@@ -1902,6 +2024,7 @@ export default function ProjectsWorkspace({
               {milestone.completionCriteria.length ? <ul className={styles.criteriaList}>{milestone.completionCriteria.map((criterion) => <li key={criterion}>{criterion}</li>)}</ul> : <p className={styles.notice}>No completion criteria are stored. Completion stays disabled until criteria are added.</p>}
             </div>
             {milestone.linkedRefs.length > 0 && <div className={styles.inlineActions}>{milestone.linkedRefs.map((ref) => <Link className={styles.textLink} href={ref.route} key={`${ref.module}-${ref.objectId}`}>{ref.label}</Link>)}</div>}
+            {renderReviewCoverage(item, { objectType: "milestone", objectId: milestone.id, label: milestone.title }, true)}
           </div>
         )}
 
@@ -1938,6 +2061,7 @@ export default function ProjectsWorkspace({
               compact
               title="Blocker follow-through"
             />
+            {renderReviewCoverage(item, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, true)}
           </div>
         )}
 
@@ -2002,6 +2126,7 @@ export default function ProjectsWorkspace({
           {renderStateChip(item.project.review)}
           <span className={styles.relationshipChip} data-tone="blue">Links {item.linkedContext.length}</span>
           <span className={styles.relationshipChip} data-tone="purple">Milestones {activeMilestones(item).length}</span>
+          <span className={styles.relationshipChip} data-tone="blue">Reviews {getProjectReviewContexts(reviewViews, item.project.id).length}</span>
           {item.project.sourceKind === "legacy_projection" && <span className={`${styles.relationshipChip} ${styles.legacyBadge}`}>Read-only legacy projection</span>}
         </div>
         {mutationError && <p className={styles.errorBanner} role="alert">{mutationError}</p>}
@@ -2026,6 +2151,7 @@ export default function ProjectsWorkspace({
   function renderCompletionRail(item: ProjectDirectoryItem) {
     const incompleteMilestones = activeMilestones(item);
     const blockers = openBlockers(item);
+    const reviewContexts = getProjectReviewContexts(reviewViews, item.project.id);
     return (
       <>
         <section className={styles.panel}>
@@ -2035,6 +2161,7 @@ export default function ProjectsWorkspace({
             <li><span>Milestones complete</span><span className={styles.rowState} data-tone={incompleteMilestones.length ? "amber" : "green"}>{incompleteMilestones.length ? `${incompleteMilestones.length} open` : "Ready"}</span></li>
             <li><span>Blockers resolved or waived</span><span className={styles.rowState} data-tone={blockers.length ? "red" : "green"}>{blockers.length ? `${blockers.length} open` : "Ready"}</span></li>
             <li><span>Project owner assigned</span><span className={styles.rowState} data-tone={item.project.owner ? "green" : "amber"}>{item.project.owner ? "Ready" : "Missing"}</span></li>
+            <li><span>Review evidence linked</span><span className={styles.rowState} data-tone={reviewContexts.length ? "green" : "amber"}>{reviewContexts.length ? `${reviewContexts.length} ReviewRun${reviewContexts.length === 1 ? "" : "s"}` : "Not linked"}</span></li>
           </ul>
         </section>
         <section className={styles.panel}>
@@ -2047,8 +2174,11 @@ export default function ProjectsWorkspace({
             <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link>
             <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project)}>Create follow-up</Link>
             <Link className={styles.textLink} href={getModuleRoute("reviews")}>Open Reviews</Link>
+            <Link className={styles.textLink} href={buildProjectReviewHandoffRoute(projectReviewSource(item.project))}>Link project context</Link>
+            <button type="button" className={styles.button} onClick={() => void refreshReviewContext()} disabled={reviewsLoading}>{reviewsLoading ? "Refreshing…" : "Refresh Review state"}</button>
           </div>
         </section>
+        {reviewsError && <p className={styles.errorBanner} role="alert">{reviewsError} Last-known Review context remains visible.</p>}
         <div className={styles.boundary}>
           <strong>Completion is intentionally unavailable</strong>
           Readiness context is visible, but the repository rejects completion until native completion-gate semantics are configured. No linked follow-up, decision, or source object is closed automatically.

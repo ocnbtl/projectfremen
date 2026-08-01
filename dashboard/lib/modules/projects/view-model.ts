@@ -1,4 +1,4 @@
-import type { DocsIndexState, KpiEntry, ReviewEntry } from "../../types";
+import type { DocsIndexState, KpiEntry } from "../../types";
 import type { PersonalRecord } from "../../personal-records-store";
 import { createNativeObjectRef } from "../../native-objects/routes";
 import type {
@@ -119,7 +119,6 @@ type BuildProjectsWorkspaceSnapshotInput = {
   personalOpsState?: PersonalOpsState;
   kpis?: KpiEntry[];
   docsState?: DocsIndexState;
-  reviews?: ReviewEntry[];
   sourceAvailability?: ProjectsSourceAvailability;
 };
 
@@ -393,11 +392,8 @@ export function buildProjectsWorkspaceSnapshot({
   personalOpsState,
   kpis = [],
   docsState,
-  reviews: _reviews = [],
   sourceAvailability = {}
 }: BuildProjectsWorkspaceSnapshotInput): ProjectsWorkspaceSnapshot {
-  // Legacy Reviews are intentionally not inferred into ReviewRuns or project links.
-  void _reviews;
   const mappedLegacyKeys = new Set(state.legacyMappings.map((mapping) => mapping.legacyKey));
   const displayProjects: ProjectDisplayRecord[] = [
     ...state.projects.map(displayFromNative),

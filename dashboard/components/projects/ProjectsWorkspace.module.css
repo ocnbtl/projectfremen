@@ -641,6 +641,7 @@
 .objectList,
 .timelineList,
 .linkList,
+.reviewCoverageList,
 .roleList,
 .guardList {
   display: grid;
@@ -653,6 +654,7 @@
 .objectList li,
 .timelineList li,
 .linkList li,
+.reviewCoverageList li,
 .roleList li,
 .guardList li {
   display: grid;
@@ -679,6 +681,7 @@
 .objectList li > span,
 .timelineList li > span,
 .linkList li > span,
+.reviewCoverageList li > span,
 .roleList li > span,
 .guardList li > span {
   min-width: 0;
@@ -711,6 +714,18 @@
   font-size: 10px;
 }
 
+.reviewCoverage[data-compact="true"] {
+  margin-top: 2px;
+  padding: 12px 0 0;
+  border-width: 1px 0 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.reviewCoverageList li {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
 .boundary {
   display: grid;
   gap: 5px;
@@ -737,6 +752,7 @@
   outline: 0;
   background: var(--selected-bg);
   box-shadow: inset 3px 0 0 var(--action-primary);
+  scroll-margin-top: 76px;
 }
 
 .selectedChildPanel:focus-visible {
@@ -758,7 +774,12 @@
 
 .selectedChildHeader h2 {
   margin-top: 3px;
+  overflow-wrap: anywhere;
   font: 900 18px var(--font-heading);
+}
+
+.selectedChildHeader > div {
+  min-width: 0;
 }
 
 .selectedChildBody {
@@ -1198,6 +1219,15 @@
   .linkList li {
     grid-template-columns: minmax(0, 1fr);
     align-items: start;
+  }
+
+  .reviewCoverageList li {
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .reviewCoverageList li > .inlineActions {
+    width: 100%;
   }
 
   .linkList li > .inlineActions {

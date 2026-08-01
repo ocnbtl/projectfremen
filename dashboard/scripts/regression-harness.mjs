@@ -7642,6 +7642,214 @@ async function checkResourceMediaProjectAssociations(
   }
 }
 
+async function checkProjectReviewContextBrowserState(
+  baseUrl,
+  cookieJar,
+  project,
+  blocker,
+  reviewRun
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const expectedFailedResponses = [];
+  const mutatingRequests = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "projects-reviews-context-checkpoint"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function authenticatedContext(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  function observe(page) {
+    page.on("pageerror", (error) => browserErrors.push(error.message));
+    page.on("console", (message) => {
+      if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+        browserErrors.push(message.text());
+      }
+    });
+    page.on("request", (request) => {
+      const url = new URL(request.url());
+      if (
+        url.origin === new URL(baseUrl).origin &&
+        !["GET", "HEAD", "OPTIONS"].includes(request.method()) &&
+        !url.pathname.startsWith("/_vercel/")
+      ) {
+        mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      }
+    });
+    page.on("requestfailed", (request) => {
+      const url = new URL(request.url());
+      const failure = request.failure()?.errorText || "";
+      if (!url.pathname.startsWith("/_vercel/") && !failure.toLowerCase().includes("aborted")) {
+        failedResponses.push(`requestfailed ${request.method()} ${request.url()}`);
+      }
+    });
+    page.on("response", (response) => {
+      const url = new URL(response.url());
+      if (response.status() < 400 || url.pathname === "/_vercel/insights/script.js") return;
+      if (response.status() === 503 && url.pathname === "/api/reviews/runs") {
+        expectedFailedResponses.push(`${response.status()} ${url.pathname}`);
+        return;
+      }
+      failedResponses.push(`${response.status()} ${response.url()}`);
+    });
+  }
+
+  async function assertNoHorizontalOverflow(page, label) {
+    const overflow = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(!overflow.overflowX, `${label} has document overflow: ${JSON.stringify(overflow)}`);
+  }
+
+  try {
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1440, height: 900, label: "1440x900" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await authenticatedContext({ width: viewport.width, height: viewport.height });
+      const page = await context.newPage();
+      observe(page);
+      const projectRoute = `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}&probe=keep`;
+      await page.goto(projectRoute, { waitUntil: "domcontentloaded" });
+      await page.getByRole("heading", { name: blocker.title }).waitFor();
+      assert(
+        await page.getByRole("heading", { name: "Review coverage" }).count() >= 1,
+        `Projects ${viewport.label} omitted Review coverage`
+      );
+      assert(
+        await page.getByText(reviewRun.title, { exact: true }).count() >= 1,
+        `Projects ${viewport.label} omitted the linked native ReviewRun`
+      );
+      assert(
+        await page.getByRole("link", { name: "Open ReviewRun" }).count() >= 1,
+        `Projects ${viewport.label} omitted the Review owner route`
+      );
+      assert(new URL(page.url()).searchParams.get("probe") === "keep", `Projects ${viewport.label} dropped safe URL state`);
+      await assertNoHorizontalOverflow(page, `Projects Review coverage at ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `project-review-coverage-${viewport.label}.png`)
+      });
+
+      if (viewport.width === 1440) {
+        await page.route("**/api/reviews/runs?includeArchived=1", async (route) => {
+          await route.fulfill({
+            status: 503,
+            contentType: "application/json",
+            body: JSON.stringify({ ok: false, error: "Simulated Reviews repository outage" })
+          });
+        });
+        await page.getByRole("button", { name: `Refresh Review coverage for ${blocker.title}` }).first().click();
+        await page.getByText(/Simulated Reviews repository outage/).first().waitFor();
+        assert(
+          await page.getByText(reviewRun.title, { exact: true }).count() >= 1,
+          "Failed Review refresh discarded last-known Project context"
+        );
+        await page.unroute("**/api/reviews/runs?includeArchived=1");
+        await page.getByRole("button", { name: "Retry" }).first().click();
+        await page.getByText("Review context refreshed from the Reviews owner module.").waitFor();
+        await page.getByRole("link", { name: "Open ReviewRun" }).first().click();
+        await page.waitForURL(new RegExp(`/admin/reviews/${reviewRun.id.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`));
+        await page.goBack({ waitUntil: "domcontentloaded" });
+        await page.getByText(reviewRun.title, { exact: true }).first().waitFor();
+        assert(new URL(page.url()).searchParams.get("item") === blocker.id, "Browser history lost the selected Project blocker");
+      }
+
+      const handoffParams = new URLSearchParams({
+        review: reviewRun.id,
+        handoff: "project-context",
+        sourceModule: "projects",
+        sourceObjectType: "blocker",
+        sourceObjectId: blocker.id,
+        sourceContainerObjectId: project.id,
+        sourceLabel: blocker.title,
+        probe: "keep"
+      });
+      await page.goto(`${baseUrl}/admin/reviews?${handoffParams.toString()}`, { waitUntil: "domcontentloaded" });
+      await page.getByRole("heading", { name: blocker.title }).waitFor();
+      if (viewport.width <= 1180) {
+        await page.waitForFunction(() => {
+          const rail = document.querySelector('.inspector-rail[data-overlay-open="true"]');
+          if (!(rail instanceof HTMLElement)) return false;
+          const rect = rail.getBoundingClientRect();
+          return Math.abs(rect.right - window.innerWidth) < 2;
+        });
+      }
+      assert(
+        await page.getByText(`This Blocker is already linked to ${reviewRun.title}.`, { exact: true }).count() === 1,
+        `Reviews ${viewport.label} did not detect the idempotent existing source link`
+      );
+      const ownerHref = await page.getByRole("link", { name: "Open Project source" }).getAttribute("href");
+      assert(
+        ownerHref === `/admin/projects/${project.id}?tab=timeline&item=${encodeURIComponent(blocker.id)}`,
+        `Reviews ${viewport.label} emitted a noncanonical Project owner route: ${ownerHref}`
+      );
+      await assertNoHorizontalOverflow(page, `Reviews Project handoff at ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `reviews-project-handoff-${viewport.label}.png`)
+      });
+      await page.getByRole("button", { name: "Done" }).click();
+      await page.waitForFunction(() => !new URL(window.location.href).searchParams.has("handoff"));
+      assert(new URL(page.url()).searchParams.get("probe") === "keep", `Reviews ${viewport.label} dropped unrelated URL state`);
+
+      if (viewport.width <= 760) {
+        const undersizedTargets = await page.locator('button:visible, a[href]:visible').evaluateAll((elements) => elements
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+              width: rect.width,
+              height: rect.height
+            };
+          })
+          .filter((item) => item.width > 0 && item.height > 0 && (item.width < 44 || item.height < 44)));
+        assert(
+          undersizedTargets.length === 0,
+          `Project/Reviews ${viewport.label} targets below 44px: ${JSON.stringify(undersizedTargets)}`
+        );
+      }
+      await context.close();
+    }
+
+    assert(mutatingRequests.length === 0, `Project/Reviews browser checks emitted mutations: ${mutatingRequests.join(" | ")}`);
+    assert(
+      expectedFailedResponses.length === 1 && expectedFailedResponses[0] === "503 /api/reviews/runs",
+      `Project/Reviews failed-refresh coverage was unexpected: ${expectedFailedResponses.join(" | ")}`
+    );
+    assert(browserErrors.length === 0, `Project/Reviews browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Project/Reviews browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await browser.close();
+  }
+}
+
 async function main() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "project-fremen-regression-"));
   const port = await getFreePort();
@@ -13128,6 +13336,13 @@ async function main() {
       containerObjectId: promotedProject.id,
       label: `${testRunId}-project-blocker`
     };
+    const projectsBeforeReviewContext = await requestJson(server.baseUrl, cookieJar, "/api/projects");
+    assert(
+      projectsBeforeReviewContext.response.ok && projectsBeforeReviewContext.payload?.state,
+      `Project state could not be captured before Review linking: ${JSON.stringify(projectsBeforeReviewContext.payload)}`
+    );
+    const projectCountBeforeReviewContext = projectsBeforeReviewContext.payload.state.projects.length;
+    const projectLinkCountBeforeReviewContext = projectsBeforeReviewContext.payload.state.links.length;
     const linkReviewContext = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
       method: "PATCH",
       headers: {
@@ -13275,6 +13490,127 @@ async function main() {
       `Nested Project source lost its parent or canonical owner route after Review reload: ${JSON.stringify(reloadedNestedProjectRef)}`
     );
     pass("Review context unlink is soft and retains the nested Projects owner, parent, and canonical route");
+
+    const relinkReviewContext = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "link_context",
+          sourceRef: reviewContextSource,
+          relationship: "blocker_source"
+        }
+      })
+    });
+    const relinkedProjectContexts = relinkReviewContext.payload?.item?.contextLinks?.filter(
+      (link) =>
+        link.state !== "removed" &&
+        link.sourceRef?.module === "projects" &&
+        link.sourceRef?.objectType === "blocker" &&
+        link.sourceRef?.objectId === projectBlocker.id &&
+        link.sourceRef?.containerObjectId === promotedProject.id
+    );
+    assert(
+      relinkReviewContext.response.ok &&
+        relinkedProjectContexts?.length === 1 &&
+        relinkedProjectContexts[0].id === linkedReviewContext.id,
+      `Review context relink did not restore the original stable relationship: ${JSON.stringify(relinkReviewContext.payload)}`
+    );
+    weeklyReviewRun = relinkReviewContext.payload.item;
+    weeklyReviewView = relinkReviewContext.payload.view;
+
+    const relinkReviewContextAgain = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "link_context",
+          sourceRef: reviewContextSource,
+          relationship: "blocker_source"
+        }
+      })
+    });
+    const duplicateSafeProjectContexts = relinkReviewContextAgain.payload?.item?.contextLinks?.filter(
+      (link) =>
+        link.state !== "removed" &&
+        link.sourceRef?.module === "projects" &&
+        link.sourceRef?.objectType === "blocker" &&
+        link.sourceRef?.objectId === projectBlocker.id &&
+        link.sourceRef?.containerObjectId === promotedProject.id
+    );
+    assert(
+      relinkReviewContextAgain.response.ok &&
+        duplicateSafeProjectContexts?.length === 1 &&
+        duplicateSafeProjectContexts[0].id === linkedReviewContext.id,
+      `Repeated Project context linking created a duplicate Review relationship: ${JSON.stringify(relinkReviewContextAgain.payload)}`
+    );
+    weeklyReviewRun = relinkReviewContextAgain.payload.item;
+    weeklyReviewView = relinkReviewContextAgain.payload.view;
+
+    const projectsAfterReviewContext = await requestJson(server.baseUrl, cookieJar, "/api/projects");
+    assert(
+      projectsAfterReviewContext.response.ok &&
+        projectsAfterReviewContext.payload?.state?.projects?.length === projectCountBeforeReviewContext &&
+        projectsAfterReviewContext.payload.state.links?.length === projectLinkCountBeforeReviewContext,
+      "Review context linking duplicated or mutated a Projects-owned record"
+    );
+
+    const projectReviewCoveragePage = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/projects/${encodeURIComponent(promotedProject.id)}?tab=timeline&item=${encodeURIComponent(projectBlocker.id)}&probe=keep`
+    );
+    assert(
+      projectReviewCoveragePage.response.ok &&
+        projectReviewCoveragePage.body.includes("Review coverage") &&
+        projectReviewCoveragePage.body.includes(weeklyReviewRun.title) &&
+        projectReviewCoveragePage.body.includes(`/admin/reviews/${weeklyReviewRun.id}`) &&
+        projectReviewCoveragePage.body.includes("Open ReviewRun"),
+      `Projects did not render explicit ReviewRun coverage after reload: ${describeStatus(projectReviewCoveragePage.response)}`
+    );
+
+    const reviewHandoffParams = new URLSearchParams({
+      review: weeklyReviewRun.id,
+      handoff: "project-context",
+      sourceModule: "projects",
+      sourceObjectType: "blocker",
+      sourceObjectId: projectBlocker.id,
+      sourceContainerObjectId: promotedProject.id,
+      sourceLabel: projectBlocker.title,
+      probe: "keep"
+    });
+    const reviewProjectHandoffPage = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/reviews?${reviewHandoffParams.toString()}`
+    );
+    assert(
+      reviewProjectHandoffPage.response.ok &&
+        reviewProjectHandoffPage.body.includes("Project context handoff") &&
+        reviewProjectHandoffPage.body.includes(projectBlocker.title) &&
+        reviewProjectHandoffPage.body.includes(`already linked to ${weeklyReviewRun.title}`) &&
+        reviewProjectHandoffPage.body.includes(`/admin/projects/${promotedProject.id}?tab=timeline&amp;item=${encodeURIComponent(projectBlocker.id)}`),
+      `Reviews did not reconstruct the canonical Project context handoff: ${describeStatus(reviewProjectHandoffPage.response)}`
+    );
+
+    await checkProjectReviewContextBrowserState(
+      server.baseUrl,
+      cookieJar,
+      promotedProject,
+      projectBlocker,
+      weeklyReviewRun
+    );
+    pass("Projects and Reviews share one explicit, refreshable, duplicate-safe context relationship with canonical owner routing");
     await checkNotesSmartViewsBrowserState(
       server.baseUrl,
       cookieJar,

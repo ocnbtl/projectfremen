@@ -6,13 +6,17 @@ import { readKpis } from "../../../lib/kpis-store";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
 import { createEmptyProjectsState, readProjectsState } from "../../../lib/modules/projects/store";
 import {
+  createEmptyReviewsState,
+  readReviewsState,
+  toReviewRunView
+} from "../../../lib/modules/reviews/store";
+import {
   buildProjectsWorkspaceSnapshot,
   findProjectDirectoryItem,
   type ProjectsSourceAvailability
 } from "../../../lib/modules/projects/view-model";
 import { readPersonalRecords } from "../../../lib/personal-records-store";
 import { requireAdminSession } from "../../../lib/require-admin";
-import { readReviews } from "../../../lib/reviews-store";
 
 export type ProjectsRouteMode = "index" | "detail";
 
@@ -55,7 +59,11 @@ export default async function ProjectsRoutePage({
     settleSource(readPersonalOpsState(), undefined, "Personal Ops context could not be loaded."),
     settleSource(readKpis(), [], "Legacy KPI context could not be loaded."),
     settleSource(readDocsIndex(), undefined, "Legacy document context could not be loaded."),
-    settleSource(readReviews(), [], "Legacy Review context could not be loaded.")
+    settleSource(
+      readReviewsState(),
+      createEmptyReviewsState(),
+      "Native ReviewRun context could not be loaded."
+    )
   ]);
 
   const sourceAvailability: ProjectsSourceAvailability = {
@@ -72,9 +80,9 @@ export default async function ProjectsRoutePage({
     personalOpsState: personalOps.value,
     kpis: kpis.value,
     docsState: docs.value,
-    reviews: reviews.value,
     sourceAvailability
   });
+  const reviewViews = reviews.value.runs.map(toReviewRunView);
   const selected = projectId ? findProjectDirectoryItem(snapshot, projectId) : null;
 
   if (mode === "detail" && projectId && !selected) {
@@ -106,6 +114,8 @@ export default async function ProjectsRoutePage({
         initialPeople={personalRecords.value.filter(
           (record) => record.className === "person" || record.className === "org"
         )}
+        initialReviewViews={reviewViews}
+        initialReviewsError={reviews.error}
       />
     </div>
   );
