@@ -1187,6 +1187,7 @@ export default function NotesWorkspace({
               error={projectsError}
               onRefresh={refreshProjects}
               manageLifecycle
+              manageHealth
               legacyProjectLabels={note.projects}
               legacyLabel="Legacy Note routing labels, not stable links:"
               title="Projects using this Note"

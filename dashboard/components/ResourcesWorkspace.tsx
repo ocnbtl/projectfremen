@@ -1141,6 +1141,7 @@ export default function ResourcesWorkspace({
                 error={projectsError}
                 onRefresh={refreshProjects}
                 manageLifecycle
+                manageHealth
                 legacyProjectLabels={selectedResource.provenance.projects}
                 legacyLabel="Legacy Resource routing labels, not stable links:"
                 title="Projects using this Resource"

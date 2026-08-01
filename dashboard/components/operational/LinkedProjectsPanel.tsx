@@ -28,6 +28,7 @@ type LinkedProjectsPanelProps = {
   limit?: number;
   compact?: boolean;
   manageLifecycle?: boolean;
+  manageHealth?: boolean;
   showBoundary?: boolean;
   title?: string;
   ownerTab?: "people" | "notes-decisions" | "files-links";
@@ -37,7 +38,7 @@ type LinkedProjectsPanelProps = {
 };
 
 type PendingLifecycleAction = {
-  kind: "remove" | "restore";
+  kind: "remove" | "restore" | "report";
   link: ProjectLink;
   projectName: string;
 };
@@ -85,6 +86,7 @@ export default function LinkedProjectsPanel({
   limit = 4,
   compact = false,
   manageLifecycle = false,
+  manageHealth = false,
   showBoundary = true,
   title = "Project involvement",
   ownerTab,
@@ -112,7 +114,8 @@ export default function LinkedProjectsPanel({
       ].join(":")
     : "unavailable";
   const [pendingAction, setPendingAction] = useState<PendingLifecycleAction | null>(null);
-  const [removalReason, setRemovalReason] = useState("");
+  const [actionReason, setActionReason] = useState("");
+  const [healthState, setHealthState] = useState<"stale" | "broken" | "missing">("stale");
   const [mutationBusy, setMutationBusy] = useState(false);
   const [mutationError, setMutationError] = useState("");
   const [mutationNotice, setMutationNotice] = useState("");
@@ -138,10 +141,26 @@ export default function LinkedProjectsPanel({
 
   useEffect(() => {
     setPendingAction(null);
-    setRemovalReason("");
+    setActionReason("");
+    setHealthState("stale");
     setMutationError("");
     setMutationNotice("");
   }, [sourceKey]);
+
+  useEffect(() => {
+    function refreshAfterHistoryNavigation() {
+      void Promise.resolve(onRefresh());
+    }
+    function refreshAfterPageRestore(event: PageTransitionEvent) {
+      if (event.persisted) refreshAfterHistoryNavigation();
+    }
+    window.addEventListener("popstate", refreshAfterHistoryNavigation);
+    window.addEventListener("pageshow", refreshAfterPageRestore);
+    return () => {
+      window.removeEventListener("popstate", refreshAfterHistoryNavigation);
+      window.removeEventListener("pageshow", refreshAfterPageRestore);
+    };
+  }, [onRefresh, sourceKey]);
 
   if (!sourceIdentity) return null;
 
@@ -168,16 +187,25 @@ export default function LinkedProjectsPanel({
     projectName: string
   ) {
     setPendingAction({ kind, link, projectName });
-    setRemovalReason("");
+    setActionReason(kind === "report" ? link.healthNote || "" : "");
+    setHealthState(
+      kind === "report" && ["stale", "broken", "missing"].includes(link.linkState)
+        ? link.linkState as "stale" | "broken" | "missing"
+        : "stale"
+    );
     setMutationError("");
     setMutationNotice("");
   }
 
   async function confirmLifecycleAction() {
     if (!pendingAction || mutationBusy) return;
-    const reason = removalReason.trim();
-    if (pendingAction.kind === "remove" && !reason) {
-      setMutationError("Explain why this Project association should be removed.");
+    const reason = actionReason.trim();
+    if (["remove", "report"].includes(pendingAction.kind) && !reason) {
+      setMutationError(
+        pendingAction.kind === "remove"
+          ? "Explain why this Project association should be removed."
+          : "Explain why this Project association is stale, broken, or missing."
+      );
       return;
     }
 
@@ -188,7 +216,9 @@ export default function LinkedProjectsPanel({
       pendingAction.link.id,
       pendingAction.kind === "remove"
         ? { linkState: "removed", removalReason: reason }
-        : { linkState: "active" },
+        : pendingAction.kind === "report"
+          ? { action: "update_link_health", linkState: healthState, healthReason: reason }
+          : { linkState: "active" },
       pendingAction.link.updatedAt
     );
     if (!result.ok) {
@@ -196,6 +226,8 @@ export default function LinkedProjectsPanel({
       setMutationError(
         pendingAction.kind === "remove"
           ? `${result.error.message} Your unlink reason was preserved.`
+          : pendingAction.kind === "report"
+            ? `${result.error.message} Your health explanation was preserved.`
           : `${result.error.message} The removed association remains visible so you can retry.`
       );
       return;
@@ -204,11 +236,13 @@ export default function LinkedProjectsPanel({
     const completedAction = pendingAction.kind;
     const completedProjectName = pendingAction.projectName;
     setPendingAction(null);
-    setRemovalReason("");
+    setActionReason("");
     setMutationNotice(
       completedAction === "remove"
         ? `Removed the Projects-owned association to ${completedProjectName}. The ${displaySourceKind.toLowerCase()} was not deleted, and the association remains available to restore.`
-        : `Restored the Projects-owned association to ${completedProjectName}.`
+        : completedAction === "report"
+          ? `Marked the Projects-owned association to ${completedProjectName} as ${healthState}. It remains visible for repair or removal.`
+          : `Restored the Projects-owned association to ${completedProjectName}.`
     );
     await Promise.resolve(onRefresh());
     setMutationBusy(false);
@@ -333,6 +367,8 @@ export default function LinkedProjectsPanel({
                         {link.isRequiredEvidence ? " · Required evidence" : ""}
                       </small>
                       {link.projectSpecificNote && <span>{link.projectSpecificNote}</span>}
+                      {link.healthNote && <span>{labelize(link.linkState)}: {link.healthNote}</span>}
+                      {link.lastRepair && <span>Last repair: {link.lastRepair.reason}</span>}
                       {link.linkState === "removed" && link.removalReason && (
                         <span>Removed: {link.removalReason}</span>
                       )}
@@ -344,9 +380,19 @@ export default function LinkedProjectsPanel({
                       {project ? labelize(link.linkState) : "Target unavailable"}
                     </span>
                     <span className={styles.linkActions}>
-                      <Link href={`${projectRoute}${project ? `?tab=${destinationTab}` : ""}`}>
-                        {project ? "Open in Projects" : "Repair in Projects"}
+                      <Link href={`${projectRoute}${project ? `?tab=${destinationTab}&item=${encodeURIComponent(link.id)}` : ""}`}>
+                        {project && !["stale", "broken", "missing"].includes(link.linkState) ? "Open in Projects" : "Repair in Projects"}
                       </Link>
+                      {manageHealth && link.linkState !== "removed" && (
+                        <button
+                          type="button"
+                          disabled={Boolean(readOnlyReason) || mutationBusy}
+                          title={readOnlyReason || undefined}
+                          onClick={() => beginLifecycleAction("report", link, projectName)}
+                        >
+                          {["stale", "broken", "missing"].includes(link.linkState) ? "Update issue" : "Report issue"}
+                        </button>
+                      )}
                       <button
                         type="button"
                         className={link.linkState === "removed" ? styles.restoreAction : styles.removeAction}
@@ -402,14 +448,17 @@ export default function LinkedProjectsPanel({
         onOpenChange={(open) => {
           if (!open && !mutationBusy) {
             setPendingAction(null);
-            setRemovalReason("");
+            setActionReason("");
+            setHealthState("stale");
             setMutationError("");
           }
         }}
         title={
           pendingAction?.kind === "remove"
             ? "Remove this Project association?"
-            : "Restore this Project association?"
+            : pendingAction?.kind === "report"
+              ? "Report an association issue?"
+              : "Restore this Project association?"
         }
         description={
           pendingAction
@@ -423,39 +472,65 @@ export default function LinkedProjectsPanel({
                 "Projects records the unlink in its timeline and audit history.",
                 "The removed association stays visible here so it can be restored."
               ]
-            : [
-                "The exact existing Projects-owned association becomes active again.",
+            : pendingAction?.kind === "report"
+              ? [
+                  "The Projects-owned association remains visible with your explanation.",
+                  "Broken and missing states route repair to the Projects owner surface.",
+                  `The ${sourceKind(sourceIdentity).toLowerCase()} is not changed or deleted.`
+                ]
+              : [
+                "The exact existing Projects-owned association returns to its state from before removal.",
                 `No duplicate ${sourceKind(sourceIdentity).toLowerCase()} or Project is created.`
               ]
         }
-        confirmLabel={pendingAction?.kind === "remove" ? "Remove association" : "Restore association"}
+        confirmLabel={pendingAction?.kind === "remove" ? "Remove association" : pendingAction?.kind === "report" ? "Save issue" : "Restore association"}
         tone={pendingAction?.kind === "remove" ? "danger" : "default"}
         busy={mutationBusy}
-        confirmDisabled={pendingAction?.kind === "remove" && !removalReason.trim()}
+        confirmDisabled={["remove", "report"].includes(pendingAction?.kind || "") && !actionReason.trim()}
         confirmDisabledReason={
-          pendingAction?.kind === "remove" && !removalReason.trim()
-            ? "Add an unlink reason before removing the association."
+          ["remove", "report"].includes(pendingAction?.kind || "") && !actionReason.trim()
+            ? pendingAction?.kind === "remove"
+              ? "Add an unlink reason before removing the association."
+              : "Add a health explanation before saving the issue."
             : undefined
         }
         dismissible={!mutationBusy}
         onConfirm={confirmLifecycleAction}
       >
-        {pendingAction?.kind === "remove" && (
+        {pendingAction?.kind === "report" && (
           <label className={styles.reasonField}>
-            Unlink reason
+            Observed state
+            <select
+              value={healthState}
+              onChange={(event) => setHealthState(event.target.value as "stale" | "broken" | "missing")}
+              disabled={mutationBusy}
+            >
+              <option value="stale">Stale</option>
+              <option value="broken">Broken</option>
+              <option value="missing">Missing</option>
+            </select>
+          </label>
+        )}
+        {(pendingAction?.kind === "remove" || pendingAction?.kind === "report") && (
+          <label className={styles.reasonField}>
+            {pendingAction.kind === "remove" ? "Unlink reason" : "Health explanation"}
             <textarea
-              value={removalReason}
+              value={actionReason}
               onChange={(event) => {
-                setRemovalReason(event.target.value);
+                setActionReason(event.target.value);
                 setMutationError("");
               }}
               maxLength={2000}
               rows={3}
               required
               disabled={mutationBusy}
-              placeholder="Explain why this association no longer belongs in the Project."
+              placeholder={
+                pendingAction.kind === "remove"
+                  ? "Explain why this association no longer belongs in the Project."
+                  : "Describe what was checked and why this association cannot currently be trusted."
+              }
             />
-            <span>{removalReason.length}/2000 · preserved if the save fails</span>
+            <span>{actionReason.length}/2000 · preserved if the save fails</span>
           </label>
         )}
         {mutationError && <p className={styles.error} role="alert">{mutationError}</p>}

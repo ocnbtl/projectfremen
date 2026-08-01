@@ -354,8 +354,15 @@
   opacity: 0.58;
 }
 
+.linkActions button:not(.removeAction):not(.restoreAction) {
+  border-color: #b9ced6;
+  background: #f7fbfc;
+  color: #275f74;
+}
+
 .linkActions a:focus-visible,
 .linkActions button:focus-visible,
+.reasonField select:focus-visible,
 .reasonField textarea:focus-visible {
   outline: 3px solid rgba(41, 106, 127, 0.22);
   outline-offset: 2px;
@@ -373,16 +380,20 @@
   font: 850 12px var(--font-heading, sans-serif);
 }
 
+.reasonField select,
 .reasonField textarea {
   width: 100%;
-  min-height: 92px;
-  resize: vertical;
   padding: 10px 11px;
   border: 1px solid #b9cbd2;
   border-radius: 8px;
   background: #fff;
   color: var(--text-strong, #102026);
   font: 500 13px/1.45 var(--font-body, sans-serif);
+}
+
+.reasonField textarea {
+  min-height: 92px;
+  resize: vertical;
 }
 
 .reasonField > span {

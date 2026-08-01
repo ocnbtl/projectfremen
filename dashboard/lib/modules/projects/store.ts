@@ -110,6 +110,7 @@ const LINK_RELATIONSHIPS: ProjectLinkRelationship[] = [
 ];
 const LINK_STRENGTHS: ProjectLinkStrength[] = ["weak", "normal", "strong"];
 const LINK_STATES: LinkState[] = ["active", "missing", "stale", "broken", "pending", "removed"];
+const UNHEALTHY_LINK_STATES: LinkState[] = ["missing", "stale", "broken"];
 const NATIVE_REVIEW_STATES: ReviewState[] = [
   "not_required",
   "not_reviewed",
@@ -265,6 +266,15 @@ function normalizeNativeRef(value: unknown, field: string): NativeObjectRef {
     label: requiredText(value.label, `${field}.label`, 240),
     versionId: optionalText(value.versionId, `${field}.versionId`, 240)
   });
+}
+
+function sameNativeRefIdentity(left: NativeObjectRef, right: NativeObjectRef): boolean {
+  return (
+    left.module === right.module &&
+    left.objectType === right.objectType &&
+    left.objectId === right.objectId &&
+    (left.containerObjectId || "") === (right.containerObjectId || "")
+  );
 }
 
 function optionalNativeRef(value: unknown, field: string): NativeObjectRef | undefined {
@@ -906,9 +916,7 @@ export async function createProjectsObject<Family extends ProjectObjectFamily>(
         (link) =>
           link.projectId === linkCandidate.projectId &&
           link.linkState !== "removed" &&
-          link.source.module === linkCandidate.source.module &&
-          link.source.objectType === linkCandidate.source.objectType &&
-          link.source.objectId === linkCandidate.source.objectId &&
+          sameNativeRefIdentity(link.source, linkCandidate.source) &&
           link.relationship === linkCandidate.relationship
       );
       if (existing) {
@@ -1216,12 +1224,106 @@ function applyLinkPatch(
   now: string,
   actorId: string
 ): ProjectLink {
+  const action = hasOwn(patch, "action")
+    ? requiredText(patch.action, "action", 64)
+    : "update";
+  if (!["update", "update_link_health", "repair_link"].includes(action)) {
+    validation("Unsupported Project link action", "action");
+  }
+
+  if (action === "update_link_health") {
+    if (current.linkState === "removed") {
+      throw new ProjectsStoreError("read_only", "Restore this link before reporting its health.", { status: 409 });
+    }
+    const requestedState = enumValue(patch.linkState, LINK_STATES, current.linkState, "linkState");
+    if (!UNHEALTHY_LINK_STATES.includes(requestedState)) {
+      validation("Link health can only be reported as stale, broken, or missing.", "linkState");
+    }
+    const healthReason = requiredText(patch.healthReason, "healthReason", 2000);
+    const updatedAt = monotonicTimestamp(current.updatedAt, now);
+    return {
+      ...current,
+      linkState: requestedState,
+      healthNote: healthReason,
+      healthChangedAt: updatedAt,
+      healthChangedBy: actorId,
+      updatedAt,
+      updatedBy: actorId,
+      history: [
+        ...current.history,
+        historyEntry("health_updated", updatedAt, actorId, `${requestedState}: ${healthReason}`)
+      ]
+    };
+  }
+
+  if (action === "repair_link") {
+    if (!UNHEALTHY_LINK_STATES.includes(current.linkState)) {
+      throw new ProjectsStoreError(
+        "conflict",
+        "Only a stale, broken, or missing Project association can be repaired.",
+        { status: 409 }
+      );
+    }
+    const source = normalizeNativeRef(patch.source, "source");
+    const repairReason = requiredText(patch.repairReason, "repairReason", 2000);
+    if (source.module === "projects" && source.objectId === current.projectId) {
+      validation("A project cannot link to itself", "source");
+    }
+    const duplicate = state.links.find(
+      (link) =>
+        link.id !== current.id &&
+        link.projectId === current.projectId &&
+        link.linkState !== "removed" &&
+        link.relationship === current.relationship &&
+        sameNativeRefIdentity(link.source, source)
+    );
+    if (duplicate) {
+      throw new ProjectsStoreError(
+        "conflict",
+        "This Project already has an active association to that exact source and relationship.",
+        { status: 409 }
+      );
+    }
+    const updatedAt = monotonicTimestamp(current.updatedAt, now);
+    const next: ProjectLink = {
+      ...current,
+      source,
+      linkState: "active",
+      healthNote: undefined,
+      healthChangedAt: undefined,
+      healthChangedBy: undefined,
+      lastRepair: {
+        previousSource: current.source,
+        reason: repairReason,
+        repairedAt: updatedAt,
+        repairedBy: actorId
+      },
+      updatedAt,
+      updatedBy: actorId,
+      history: [
+        ...current.history,
+        historyEntry("repaired", updatedAt, actorId, repairReason)
+      ]
+    };
+    validateLinkAssociations(state, next as unknown as Record<string, unknown>, next.projectId);
+    return next;
+  }
+
+  if (hasOwn(patch, "source") || hasOwn(patch, "healthReason") || hasOwn(patch, "repairReason")) {
+    validation("Source and health fields require an explicit Project link action.", "action");
+  }
   const next: ProjectLink = { ...current };
-  const requestedState = hasOwn(patch, "linkState")
+  let requestedState = hasOwn(patch, "linkState")
     ? enumValue(patch.linkState, LINK_STATES, current.linkState, "linkState")
     : current.linkState;
   if (current.linkState === "removed" && requestedState === "removed") {
     throw new ProjectsStoreError("read_only", "Restore this link before editing it.", { status: 409 });
+  }
+  if (current.linkState !== "removed" && UNHEALTHY_LINK_STATES.includes(requestedState) && requestedState !== current.linkState) {
+    validation("Report stale, broken, or missing associations with an explanation.", "action");
+  }
+  if (UNHEALTHY_LINK_STATES.includes(current.linkState) && requestedState === "active") {
+    validation("Repair this association with a verified source and explanation before marking it active.", "action");
   }
   if (hasOwn(patch, "relationship")) {
     next.relationship = enumValue(patch.relationship, LINK_RELATIONSHIPS, current.relationship, "relationship");
@@ -1260,10 +1362,13 @@ function applyLinkPatch(
     next.removalReason = requiredText(patch.removalReason, "removalReason", 2000);
     next.removedAt = now;
     next.removedBy = actorId;
+    next.linkStateBeforeRemoval = current.linkState;
   } else if (current.linkState === "removed" && requestedState !== "removed") {
+    requestedState = current.linkStateBeforeRemoval || requestedState;
     next.removalReason = undefined;
     next.removedAt = undefined;
     next.removedBy = undefined;
+    next.linkStateBeforeRemoval = undefined;
   }
   next.linkState = requestedState;
   next.updatedAt = monotonicTimestamp(current.updatedAt, now);
@@ -1286,7 +1391,8 @@ function applyLinkPatch(
 
 function updateEventDetails(
   current: ProjectMilestone | ProjectBlocker | ProjectLink,
-  next: ProjectMilestone | ProjectBlocker | ProjectLink
+  next: ProjectMilestone | ProjectBlocker | ProjectLink,
+  mutationAction = "update"
 ) {
   if (next.objectType === "milestone" && current.objectType === "milestone") {
     const completed = current.state !== "complete" && next.state === "complete";
@@ -1314,15 +1420,33 @@ function updateEventDetails(
   const link = next as ProjectLink;
   const oldLink = current as ProjectLink;
   const eventType: ProjectTimelineEventType =
-    link.linkState === "removed" && oldLink.linkState !== "removed"
+    mutationAction === "update_link_health"
+      ? "link_health_updated"
+      : mutationAction === "repair_link"
+        ? "link_repaired"
+        : link.linkState === "removed" && oldLink.linkState !== "removed"
       ? "link_removed"
       : oldLink.linkState === "removed" && link.linkState !== "removed"
         ? "link_restored"
         : "link_updated";
   return {
     eventType,
-    title: eventType === "link_removed" ? "Link removed" : eventType === "link_restored" ? "Link restored" : "Link updated",
-    summary: `${link.source.label} is ${link.linkState}.`
+    title:
+      eventType === "link_removed"
+        ? "Link removed"
+        : eventType === "link_restored"
+          ? "Link restored"
+          : eventType === "link_health_updated"
+            ? "Link health updated"
+            : eventType === "link_repaired"
+              ? "Link repaired"
+              : "Link updated",
+    summary:
+      eventType === "link_health_updated" && link.healthNote
+        ? `${link.source.label} is ${link.linkState}: ${link.healthNote}`
+        : eventType === "link_repaired" && link.lastRepair
+          ? `${link.source.label} was repaired: ${link.lastRepair.reason}`
+          : `${link.source.label} is ${link.linkState}.`
   };
 }
 
@@ -1408,14 +1532,28 @@ export async function updateProjectsObject<Family extends ProjectObjectFamily>(
       actorId,
       `${childNext.objectType}:${childNext.id}`
     );
+    const linkMutationAction =
+      family === "links" && typeof rawPatch.action === "string" ? rawPatch.action : "update";
+    const auditAction =
+      childNext.objectType !== "project_link"
+        ? `${childNext.objectType}.updated`
+        : linkMutationAction === "update_link_health"
+          ? "project_link.health_updated"
+          : linkMutationAction === "repair_link"
+            ? "project_link.repaired"
+            : childCurrent.objectType === "project_link" && childNext.linkState === "removed" && childCurrent.linkState !== "removed"
+              ? "project_link.removed"
+              : childCurrent.objectType === "project_link" && childCurrent.linkState === "removed" && childNext.linkState !== "removed"
+                ? "project_link.restored"
+                : "project_link.updated";
     const auditEvent = moduleAuditEvent({
       item: childNext,
-      action: `${childNext.objectType}.updated`,
+      action: auditAction,
       actorId,
       occurredAt: childNext.updatedAt,
       before: childCurrent
     });
-    const details = updateEventDetails(childCurrent, childNext);
+    const details = updateEventDetails(childCurrent, childNext, linkMutationAction);
     const event = timelineEvent({
       project,
       ...details,

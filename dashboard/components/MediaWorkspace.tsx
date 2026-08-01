@@ -1456,6 +1456,7 @@ export default function MediaWorkspace({
                 error={projectsError}
                 onRefresh={refreshProjects}
                 manageLifecycle
+                manageHealth
                 legacyProjectLabels={asset.provenance.projects}
                 legacyLabel="Legacy Media routing labels, not stable links:"
                 title="Projects using this Media asset"

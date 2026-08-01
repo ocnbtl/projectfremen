@@ -28,6 +28,10 @@ export function useProjectsState(
   }, [repository]);
 
   useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
     const refreshOnReturn = () => {
       if (!document.hidden) void refresh();
     };

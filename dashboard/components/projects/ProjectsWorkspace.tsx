@@ -91,7 +91,9 @@ type EditorKind =
   | "milestone-create"
   | "blocker-create"
   | "blocker-resolve"
-  | "link-create";
+  | "link-create"
+  | "link-health"
+  | "link-repair";
 
 type EditorState = {
   kind: EditorKind;
@@ -312,11 +314,19 @@ function itemAttentionScore(item: ProjectDirectoryItem) {
 
 function stateTone(value: string): "green" | "amber" | "red" | "blue" | "purple" | undefined {
   if (["active", "healthy", "reviewed", "current", "complete", "resolved"].includes(value)) return "green";
-  if (["blocked", "critical", "broken", "overdue"].includes(value)) return "red";
+  if (["blocked", "critical", "broken", "missing", "overdue"].includes(value)) return "red";
   if (["attention", "high", "needs_review", "in_review", "due", "due_soon", "stale"].includes(value)) return "amber";
   if (["planned", "draft", "unknown", "unset"].includes(value)) return "blue";
   if (["archived", "paused", "waived", "carried_forward"].includes(value)) return "purple";
   return undefined;
+}
+
+function linkNeedsRepair(link: ProjectLink) {
+  return ["stale", "broken", "missing"].includes(link.linkState);
+}
+
+function linkSourceIsUnsafe(link: ProjectLink) {
+  return ["broken", "missing"].includes(link.linkState);
 }
 
 function useMediaQuery(query: string) {
@@ -853,7 +863,7 @@ export default function ProjectsWorkspace({
   function openEditor(
     kind: EditorKind,
     item?: ProjectDirectoryItem,
-    object?: ProjectBlocker,
+    object?: ProjectBlocker | ProjectLink,
     preset: Record<string, string | boolean> = {}
   ) {
     clearFeedback();
@@ -881,7 +891,7 @@ export default function ProjectsWorkspace({
       values = { title: "", description: "", dueAt: "", owner: "", completionCriteria: "" };
     } else if (kind === "blocker-create") {
       values = { title: "", condition: "", severity: "medium", owner: "", dueAt: "" };
-    } else if (kind === "blocker-resolve" && object) {
+    } else if (kind === "blocker-resolve" && object?.objectType === "blocker") {
       values = { resolution: object.resolution || "" };
     } else if (kind === "link-create") {
       values = {
@@ -894,6 +904,20 @@ export default function ProjectsWorkspace({
         relationshipStrength: "normal",
         projectSpecificNote: "",
         isRequiredEvidence: false
+      };
+    } else if (kind === "link-health" && object?.objectType === "project_link") {
+      values = {
+        healthState: linkNeedsRepair(object) ? object.linkState : "stale",
+        healthReason: object.healthNote || ""
+      };
+    } else if (kind === "link-repair" && object?.objectType === "project_link") {
+      values = {
+        sourceModule: object.source.module,
+        sourceObjectType: object.source.objectType,
+        sourceObjectId: object.source.objectId,
+        sourceContainerObjectId: object.source.containerObjectId || "",
+        sourceLabel: object.source.label,
+        repairReason: ""
       };
     }
     setEditor({ kind, projectId: item?.project.id, objectId: object?.id, values: { ...values, ...preset } });
@@ -1213,6 +1237,68 @@ export default function ProjectsWorkspace({
         setSelectedChildId(result.data.item.id);
         updateUrl({ tab: nextTab, item: initialDetail ? result.data.item.id : item.project.id });
         setNotice(`Reference to “${result.data.item.source.label}” was linked without copying its native object.`);
+      } else if (editor.kind === "link-health") {
+        const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
+        const link = item?.links.find((candidate) => candidate.id === editor.objectId);
+        if (!item || !link) {
+          setEditorError("The selected Project association is no longer available.");
+          return;
+        }
+        if (!value("healthReason")) {
+          setEditorError("Explain why this association is stale, broken, or missing.");
+          return;
+        }
+        const result = await repository.update("links", link.id, {
+          action: "update_link_health",
+          linkState: value("healthState") as ProjectLink["linkState"],
+          healthReason: value("healthReason")
+        }, link.updatedAt);
+        if (!result.ok) {
+          setEditorError(`${result.error.message} Your health explanation was preserved.`);
+          return;
+        }
+        applyMutationEnvelope(result.data);
+        selectChild(result.data.item.id, "files-links");
+        setNotice(`Association to "${result.data.item.source.label}" is now ${displayLabel(result.data.item.linkState).toLowerCase()}. The source object was not changed or deleted.`);
+      } else if (editor.kind === "link-repair") {
+        const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
+        const link = item?.links.find((candidate) => candidate.id === editor.objectId);
+        if (!item || !link) {
+          setEditorError("The selected Project association is no longer available.");
+          return;
+        }
+        if (!value("sourceObjectId") || !value("sourceLabel") || !value("sourceObjectType") || !value("repairReason")) {
+          setEditorError("Verified source identity, label, and repair explanation are required.");
+          return;
+        }
+        const sourceModule = value("sourceModule") as ModuleId;
+        const sourceObjectType = value("sourceObjectType");
+        const nestedOwnerObject =
+          (sourceModule === "projects" && sourceObjectType !== "project") ||
+          (sourceModule === "reviews" && !["review", "review_run"].includes(sourceObjectType));
+        if (nestedOwnerObject && !value("sourceContainerObjectId")) {
+          setEditorError("A parent / container ID is required for nested Project and Review objects so the owner route remains repairable.");
+          return;
+        }
+        const source = createNativeObjectRef({
+          module: sourceModule,
+          objectType: sourceObjectType,
+          objectId: value("sourceObjectId"),
+          containerObjectId: optional("sourceContainerObjectId"),
+          label: value("sourceLabel")
+        });
+        const result = await repository.update("links", link.id, {
+          action: "repair_link",
+          source,
+          repairReason: value("repairReason")
+        }, link.updatedAt);
+        if (!result.ok) {
+          setEditorError(`${result.error.message} Your verified source and repair explanation were preserved.`);
+          return;
+        }
+        applyMutationEnvelope(result.data);
+        selectChild(result.data.item.id, "files-links");
+        setNotice(`Association to "${result.data.item.source.label}" was repaired. The previous source identity remains in audit history.`);
       }
       closeEditor();
     } finally {
@@ -1877,14 +1963,24 @@ export default function ProjectsWorkspace({
           {item.links.length ? (
             <ul className={styles.linkList}>
               {item.links.map((link) => (
-                <li key={link.id} aria-current={selectedChildId === link.id || undefined}>
+                <li key={link.id} aria-current={selectedChildId === link.id || undefined} data-link-state={link.linkState}>
                   <span className={styles.itemBody}>
                     <strong>{link.source.label}</strong>
+                    {link.healthNote && <span>{displayLabel(link.linkState)}: {link.healthNote}</span>}
+                    {link.lastRepair && <span>Last repaired {formatDate(link.lastRepair.repairedAt)}: {link.lastRepair.reason}</span>}
                     <small>{displayLabel(link.source.module)} · {displayLabel(link.relationship)} · {displayLabel(link.linkState)}{link.isRequiredEvidence ? " · required evidence" : ""}</small>
                   </span>
+                  <span className={styles.rowState} data-tone={stateTone(link.linkState)}>{displayLabel(link.linkState)}</span>
                   <span className={styles.inlineActions}>
                     <button type="button" className={styles.button} onClick={() => selectChild(link.id, "files-links")}>Inspect</button>
-                    <Link className={styles.textLink} href={link.source.route}>Open source</Link>
+                    {linkSourceIsUnsafe(link) ? (
+                      <button type="button" className={styles.button} disabled title="Repair this retained association before opening its source.">Source unavailable</button>
+                    ) : <Link className={styles.textLink} href={link.source.route}>Open source</Link>}
+                    {linkNeedsRepair(link) ? (
+                      <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => openEditor("link-repair", item, link)}>Repair</button>
+                    ) : link.linkState !== "removed" ? (
+                      <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => openEditor("link-health", item, link)}>Report issue</button>
+                    ) : null}
                     {link.linkState === "removed" ? (
                       <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={item.project.lifecycle === "complete" ? "Completed projects are read-only; reopen behavior is intentionally unavailable." : item.project.lifecycle === "archived" ? "Restore the project before restoring its links." : undefined} onClick={() => {
                         setConfirmationReason("");
@@ -2073,6 +2169,8 @@ export default function ProjectsWorkspace({
         {link && (
           <div className={styles.selectedChildBody}>
             <p>{link.projectSpecificNote || "No project-specific relationship note recorded."}</p>
+            {link.healthNote && <div className={styles.boundary}><strong>{displayLabel(link.linkState)} association</strong>{link.healthNote}</div>}
+            {link.lastRepair && <div className={styles.boundary}><strong>Last repaired {formatDate(link.lastRepair.repairedAt)}</strong>{link.lastRepair.reason} Previous source: {link.lastRepair.previousSource.label}.</div>}
             <div className={styles.factGrid}>
               <div className={styles.fact}><span>Owner module</span><strong>{displayLabel(link.source.module)}</strong></div>
               <div className={styles.fact}><span>Relationship</span><strong>{displayLabel(link.relationship)}</strong></div>
@@ -2080,7 +2178,14 @@ export default function ProjectsWorkspace({
               <div className={styles.fact}><span>Evidence</span><strong>{link.isRequiredEvidence ? "Required" : "Supporting"}</strong></div>
             </div>
             <div className={styles.inlineActions}>
-              <Link className={styles.textLink} href={link.source.route}>Open source object</Link>
+              {linkSourceIsUnsafe(link) ? (
+                <button type="button" className={styles.button} disabled title="Repair this retained association before opening its source.">Source unavailable</button>
+              ) : <Link className={styles.textLink} href={link.source.route}>Open source object</Link>}
+              {linkNeedsRepair(link) ? (
+                <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("link-repair", item, link)}>Repair association</button>
+              ) : link.linkState !== "removed" ? (
+                <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("link-health", item, link)}>Report issue</button>
+              ) : null}
               {link.linkState === "removed" ? (
                 <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => {
                   setConfirmationReason("");
@@ -2204,11 +2309,19 @@ export default function ProjectsWorkspace({
             ? "Add blocker"
             : editor?.kind === "blocker-resolve"
               ? "Resolve blocker"
-              : "Link native object";
+              : editor?.kind === "link-health"
+                ? "Report association issue"
+                : editor?.kind === "link-repair"
+                  ? "Repair source association"
+                  : "Link native object";
   const editorDescription = editor?.kind === "legacy-promote"
     ? "Creates the native Project record while preserving legacy identity and route provenance. No legacy tasks, KPIs, notes, or documents are copied."
     : editor?.kind === "link-create"
       ? "Stores a typed reference and project relationship only. The source object remains in its owner module."
+      : editor?.kind === "link-health"
+        ? "Retains the source association and records why it needs attention. No source object is changed."
+        : editor?.kind === "link-repair"
+          ? "Replaces only this Project-owned source reference after verification. The previous identity stays in audit history."
       : "Changes are saved explicitly to the native Projects repository and recorded in audit history.";
 
   function renderEditorFields() {
@@ -2285,6 +2398,24 @@ export default function ProjectsWorkspace({
     }
     if (editor.kind === "blocker-resolve") {
       return <label className={styles.field}>Resolution record<textarea value={value("resolution")} onChange={(event) => changeEditorValue("resolution", event.target.value)} required autoFocus placeholder="What changed, and what evidence confirms the blocker is resolved?" /></label>;
+    }
+    if (editor.kind === "link-health") {
+      return <div className={styles.formGrid}>
+        <label className={styles.field}>Observed state<select value={value("healthState")} onChange={(event) => changeEditorValue("healthState", event.target.value)} autoFocus>{["stale", "broken", "missing"].map((state) => <option value={state} key={state}>{displayLabel(state)}</option>)}</select></label>
+        <label className={styles.field} data-wide="true">Health explanation<textarea value={value("healthReason")} onChange={(event) => changeEditorValue("healthReason", event.target.value)} maxLength={2000} required placeholder="What was checked, and why can this association no longer be trusted?" /><span>{value("healthReason").length}/2000 · preserved if the save fails</span></label>
+        <div className={styles.boundary} data-wide="true"><strong>The link stays visible</strong>Broken and missing associations remain inspectable until you repair or explicitly remove them. The native source object is never deleted by this action.</div>
+      </div>;
+    }
+    if (editor.kind === "link-repair") {
+      return <div className={styles.formGrid}>
+        <label className={styles.field}>Owner module<select value={value("sourceModule")} onChange={(event) => changeEditorValues({ sourceModule: event.target.value, sourceObjectType: "", sourceObjectId: "", sourceContainerObjectId: "", sourceLabel: "" })} autoFocus>{LINK_MODULES.map((module) => <option value={module} key={module}>{displayLabel(module)}</option>)}</select></label>
+        <label className={styles.field}>Object type<input value={value("sourceObjectType")} onChange={(event) => changeEditorValue("sourceObjectType", event.target.value)} required /></label>
+        <label className={styles.field}>Stable object ID<input value={value("sourceObjectId")} onChange={(event) => changeEditorValue("sourceObjectId", event.target.value)} required /></label>
+        <label className={styles.field}>Parent / container ID<input value={value("sourceContainerObjectId")} onChange={(event) => changeEditorValue("sourceContainerObjectId", event.target.value)} placeholder="Required for nested Project or Review objects" /></label>
+        <label className={styles.field} data-wide="true">Verified source label<input value={value("sourceLabel")} onChange={(event) => changeEditorValue("sourceLabel", event.target.value)} required /></label>
+        <label className={styles.field} data-wide="true">Repair explanation<textarea value={value("repairReason")} onChange={(event) => changeEditorValue("repairReason", event.target.value)} maxLength={2000} required placeholder="What was verified, and why is this the correct native source?" /><span>{value("repairReason").length}/2000 · preserved if the save fails</span></label>
+        <div className={styles.boundary} data-wide="true"><strong>Identity replacement only</strong>The relationship remains Project-owned. No Note, Resource, Media asset, Review, or other native object is copied, deleted, or merged.</div>
+      </div>;
     }
     const linkingPeople = value("sourceModule") === "people";
     return <div className={styles.formGrid}>
@@ -2366,7 +2497,7 @@ export default function ProjectsWorkspace({
           ? "The milestone completion will be recorded on the native project timeline."
           : confirmation?.kind === "link-remove"
             ? "Only the Project reference will be removed. The source object remains unchanged in its owner module."
-            : "The existing typed reference will become active again.";
+            : "The existing typed reference will return to its state from before removal.";
 
   const directory = (
     <DirectoryPane className={styles.directory} ariaLabel="Projects directory">

@@ -158,6 +158,13 @@ export type ProjectLinkRelationship =
 
 export type ProjectLinkStrength = "weak" | "normal" | "strong";
 
+export type ProjectLinkRepair = {
+  previousSource: NativeObjectRef;
+  reason: string;
+  repairedAt: string;
+  repairedBy: string;
+};
+
 export type ProjectLink = {
   id: string;
   objectType: "project_link";
@@ -174,6 +181,11 @@ export type ProjectLink = {
   linkedMilestoneId?: string;
   linkedDecisionId?: string;
   linkedReviewId?: string;
+  healthNote?: string;
+  healthChangedAt?: string;
+  healthChangedBy?: string;
+  lastRepair?: ProjectLinkRepair;
+  linkStateBeforeRemoval?: Exclude<LinkState, "removed">;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
@@ -200,6 +212,8 @@ export type ProjectTimelineEventType =
   | "blocker_carried_forward"
   | "link_created"
   | "link_updated"
+  | "link_health_updated"
+  | "link_repaired"
   | "link_removed"
   | "link_restored";
 
@@ -400,6 +414,10 @@ export type ProjectLinkUpdateInput = Partial<
     | "linkedReviewId"
   >
 > & {
+  action?: "update" | "update_link_health" | "repair_link";
+  source?: NativeObjectRef;
+  healthReason?: string;
+  repairReason?: string;
   removalReason?: string;
 };
 

@@ -7383,6 +7383,81 @@ async function checkResourceMediaProjectAssociations(
             ?.getAttribute("data-project-link-state") === "active",
         { projectId: project.id, relationship: fixture.relationship }
       );
+
+      if (index === 0) {
+        await lifecycleRow.getByRole("button", { name: "Report issue" }).click();
+        lifecycleDialog = page.getByRole("dialog", { name: "Report an association issue?" });
+        await lifecycleDialog.waitFor();
+        await lifecycleDialog.getByLabel("Observed state").selectOption("broken");
+        const healthReason = `${testRunId} could not verify the Resource owner route during the lifecycle check.`;
+        await lifecycleDialog.getByLabel("Health explanation").fill(healthReason);
+        const healthResponsePromise = page.waitForResponse(
+          (response) =>
+            new URL(response.url()).pathname === "/api/projects" &&
+            response.request().method() === "PATCH"
+        );
+        await lifecycleDialog.getByRole("button", { name: "Save issue" }).click();
+        const healthResponse = await healthResponsePromise;
+        assert(
+          healthResponse.ok(),
+          `Resource Project association health report failed with ${healthResponse.status()}: ${await healthResponse.text()}`
+        );
+        await page.waitForFunction(
+          ({ projectId, relationship }) =>
+            document
+              .querySelector(
+                `[data-project-lifecycle-project-id="${projectId}"][data-project-link-relationship="${relationship}"]`
+              )
+              ?.getAttribute("data-project-link-state") === "broken",
+          { projectId: project.id, relationship: fixture.relationship }
+        );
+        assert(
+          (await lifecycleRow.innerText()).includes(healthReason),
+          "Resource Project association did not retain its health explanation"
+        );
+        const repairOwnerLink = lifecycleRow.getByRole("link", { name: "Repair in Projects" });
+        const repairHref = await repairOwnerLink.getAttribute("href");
+        assert(
+          repairHref?.includes(`tab=files-links`) && repairHref.includes(`item=${encodeURIComponent(lifecycleRow ? await lifecycleRow.getAttribute("data-project-link-id") : "")}`),
+          `Resource repair route did not select the exact Projects-owned link: ${repairHref}`
+        );
+        await repairOwnerLink.click();
+        await page.waitForURL((url) => url.pathname === `/admin/projects/${project.id}` && url.searchParams.get("tab") === "files-links");
+        await page.getByRole("button", { name: "Repair association" }).click();
+        const repairDialog = page.getByRole("dialog", { name: "Repair source association" });
+        await repairDialog.waitFor();
+        const repairReason = `${testRunId} reverified the exact Resource identity and owner route.`;
+        await repairDialog.getByLabel("Repair explanation").fill(repairReason);
+        const repairResponsePromise = page.waitForResponse(
+          (response) =>
+            new URL(response.url()).pathname === "/api/projects" &&
+            response.request().method() === "PATCH"
+        );
+        await repairDialog.getByRole("button", { name: "Save", exact: true }).click();
+        const repairResponse = await repairResponsePromise;
+        assert(
+          repairResponse.ok(),
+          `Resource Project association repair failed with ${repairResponse.status()}: ${await repairResponse.text()}`
+        );
+        await page.getByText("previous source identity remains in audit history", { exact: false }).waitFor();
+        await page.goBack({ waitUntil: "networkidle" });
+        await lifecycleRow.waitFor();
+        await page.waitForFunction(
+          ({ projectId, relationship, repairReason }) => {
+            const row = document.querySelector(
+              `[data-project-lifecycle-project-id="${projectId}"][data-project-link-relationship="${relationship}"]`
+            );
+            return row?.getAttribute("data-project-link-state") === "active" &&
+              row.textContent?.includes(repairReason);
+          },
+          { projectId: project.id, relationship: fixture.relationship, repairReason }
+        );
+        assert(
+          (await lifecycleRow.getAttribute("data-project-link-state")) === "active" &&
+            (await lifecycleRow.innerText()).includes(repairReason),
+          "Resource Project association repair did not survive owner-route back navigation"
+        );
+      }
       await assertNoHorizontalOverflow(page, `${fixture.label}-Projects desktop workflow`);
     }
 
@@ -7591,7 +7666,8 @@ async function checkResourceMediaProjectAssociations(
         finalLinks.length === 1 &&
           finalLinks[0].relationshipStrength === fixture.strength &&
           finalLinks[0].isRequiredEvidence === fixture.required &&
-          finalLinks[0].projectSpecificNote === fixture.context,
+          finalLinks[0].projectSpecificNote === fixture.context &&
+          (fixture.key !== "resource" || finalLinks[0].lastRepair?.reason?.includes("reverified the exact Resource identity")),
         `${fixture.label}-Projects workflow lost typed association state or created a duplicate`
       );
       const createdAudits = finalProjects.payload.state.auditEvents.filter(
@@ -7619,9 +7695,9 @@ async function checkResourceMediaProjectAssociations(
       );
     }
     assert(
-      browserMutations.length === 10 &&
+      browserMutations.length === 12 &&
         browserMutations.filter((mutation) => mutation === "POST /api/projects").length === 5 &&
-        browserMutations.filter((mutation) => mutation === "PATCH /api/projects").length === 5,
+        browserMutations.filter((mutation) => mutation === "PATCH /api/projects").length === 7,
       `Resource/Media-Projects browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
     );
     assert(
@@ -9089,7 +9165,7 @@ async function main() {
     );
     const projectLink = createProjectLink.payload.item;
 
-    const removeProjectLink = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+    const rejectUnexplainedProjectLinkHealth = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
@@ -9099,6 +9175,180 @@ async function main() {
         family: "links",
         id: projectLink.id,
         expectedUpdatedAt: projectLink.updatedAt,
+        patch: { linkState: "stale" }
+      })
+    });
+    assert(
+      rejectUnexplainedProjectLinkHealth.response.status === 400 &&
+        rejectUnexplainedProjectLinkHealth.payload?.code === "validation",
+      `Project link accepted an unexplained health transition: ${JSON.stringify(rejectUnexplainedProjectLinkHealth.payload)}`
+    );
+
+    const projectLinkHealthReason = "The Notes owner route was checked and its current source could not be verified.";
+    const reportProjectLinkHealth = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "links",
+        id: projectLink.id,
+        expectedUpdatedAt: projectLink.updatedAt,
+        patch: {
+          action: "update_link_health",
+          linkState: "stale",
+          healthReason: projectLinkHealthReason
+        }
+      })
+    });
+    assert(
+      reportProjectLinkHealth.response.ok &&
+        reportProjectLinkHealth.payload?.item?.linkState === "stale" &&
+        reportProjectLinkHealth.payload.item.healthNote === projectLinkHealthReason &&
+        reportProjectLinkHealth.payload.auditEvent?.action === "project_link.health_updated" &&
+        reportProjectLinkHealth.payload.timelineEvent?.eventType === "link_health_updated",
+      `Project link health report failed: ${JSON.stringify(reportProjectLinkHealth.payload)}`
+    );
+    const staleProjectAssociation = reportProjectLinkHealth.payload.item;
+
+    const duplicateWhileStale = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        operation: "create",
+        family: "links",
+        input: {
+          projectId: promotedProject.id,
+          source: linkedProjectSource,
+          relationship: "supporting_context",
+          relationshipStrength: "strong"
+        }
+      })
+    });
+    assert(
+      duplicateWhileStale.response.ok &&
+        duplicateWhileStale.payload?.created === false &&
+        duplicateWhileStale.payload.item?.id === projectLink.id &&
+        duplicateWhileStale.payload.item?.linkState === "stale",
+      `Project link duplicate guard bypassed the retained stale association: ${JSON.stringify(duplicateWhileStale.payload)}`
+    );
+
+    const projectLinkReplacementSource = {
+      ...linkedProjectSource,
+      objectId: `${testRunId}-project-note-replacement`,
+      label: `${testRunId} Replacement Project source Note`
+    };
+    const createReplacementProjectLink = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        operation: "create",
+        family: "links",
+        input: {
+          projectId: promotedProject.id,
+          source: projectLinkReplacementSource,
+          relationship: "supporting_context"
+        }
+      })
+    });
+    assert(
+      createReplacementProjectLink.response.ok && createReplacementProjectLink.payload?.created === true,
+      `Replacement Project link fixture failed: ${JSON.stringify(createReplacementProjectLink.payload)}`
+    );
+    const rejectDuplicateProjectLinkRepair = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "links",
+        id: staleProjectAssociation.id,
+        expectedUpdatedAt: staleProjectAssociation.updatedAt,
+        patch: {
+          action: "repair_link",
+          source: projectLinkReplacementSource,
+          repairReason: "This repair should conflict with the existing canonical association."
+        }
+      })
+    });
+    assert(
+      rejectDuplicateProjectLinkRepair.response.status === 409 &&
+        rejectDuplicateProjectLinkRepair.payload?.code === "conflict",
+      `Project link repair created duplicate native ownership: ${JSON.stringify(rejectDuplicateProjectLinkRepair.payload)}`
+    );
+
+    const projectLinkRepairReason = "The exact Notes identity and owner route were reverified.";
+    const repairProjectLink = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "links",
+        id: staleProjectAssociation.id,
+        expectedUpdatedAt: staleProjectAssociation.updatedAt,
+        patch: {
+          action: "repair_link",
+          source: linkedProjectSource,
+          repairReason: projectLinkRepairReason
+        }
+      })
+    });
+    assert(
+      repairProjectLink.response.ok &&
+        repairProjectLink.payload?.item?.linkState === "active" &&
+        repairProjectLink.payload.item.healthNote === undefined &&
+        repairProjectLink.payload.item.lastRepair?.reason === projectLinkRepairReason &&
+        repairProjectLink.payload.item.lastRepair?.previousSource?.objectId === linkedProjectSource.objectId &&
+        repairProjectLink.payload.auditEvent?.action === "project_link.repaired" &&
+        repairProjectLink.payload.timelineEvent?.eventType === "link_repaired",
+      `Project link repair failed: ${JSON.stringify(repairProjectLink.payload)}`
+    );
+    const repairedSourceProjectLink = repairProjectLink.payload.item;
+
+    const rejectActiveProjectLinkRepair = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "links",
+        id: repairedSourceProjectLink.id,
+        expectedUpdatedAt: repairedSourceProjectLink.updatedAt,
+        patch: {
+          action: "repair_link",
+          source: linkedProjectSource,
+          repairReason: "A second repair should not be accepted for an active association."
+        }
+      })
+    });
+    assert(
+      rejectActiveProjectLinkRepair.response.status === 409 &&
+        rejectActiveProjectLinkRepair.payload?.code === "conflict",
+      `Project link accepted repair without an unhealthy state: ${JSON.stringify(rejectActiveProjectLinkRepair.payload)}`
+    );
+    pass("Project link health requires evidence, retains duplicate ownership, and records explicit repair provenance");
+
+    const removeProjectLink = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        family: "links",
+        id: repairedSourceProjectLink.id,
+        expectedUpdatedAt: repairedSourceProjectLink.updatedAt,
         patch: {
           linkState: "removed",
           removalReason: "Regression verifies that unlinking preserves both native objects."
