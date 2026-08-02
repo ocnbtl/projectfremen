@@ -8057,7 +8057,8 @@ async function checkProjectReviewContextBrowserState(
   cookieJar,
   project,
   blocker,
-  reviewRun
+  reviewRun,
+  sourceFixtures
 ) {
   const { chromium } = await import("@playwright/test");
   const browser = await chromium.launch({ headless: true });
@@ -8279,6 +8280,66 @@ async function checkProjectReviewContextBrowserState(
       await page.getByRole("button", { name: "Dismiss" }).click();
       await page.waitForFunction(() => !new URL(window.location.href).searchParams.has("handoff"));
       assert(new URL(page.url()).searchParams.get("probe") === "keep", `Reviews ${viewport.label} dropped unrelated URL state`);
+
+      for (const fixture of sourceFixtures) {
+        await page.goto(`${baseUrl}${fixture.pagePath}`, { waitUntil: "domcontentloaded" });
+        if (fixture.module === "resources" && viewport.width <= 1180) {
+          await page.getByRole("button", { name: "Open Resource details" }).click();
+          await page.waitForFunction(() => {
+            const rail = document.querySelector('#resource-inspector[data-overlay-open="true"]');
+            return rail instanceof HTMLElement && rail.getAttribute("aria-hidden") !== "true";
+          });
+          await page.locator("#resource-inspector").evaluate(async (element) => {
+            await Promise.all(
+              element.getAnimations({ subtree: false }).map((animation) => animation.finished.catch(() => undefined))
+            );
+          });
+        }
+        const panel = page.locator(
+          `[data-linked-review-contexts="${fixture.module}:${fixture.objectType}:root:${fixture.objectId}"]`
+        );
+        await panel.waitFor();
+        assert(
+          await panel.getByText(reviewRun.title, { exact: true }).count() === 1,
+          `${fixture.label} ${viewport.label} omitted the exact linked ReviewRun`
+        );
+        const ownerHref = await panel.getByRole("link", { name: "Open exact context in Reviews" }).getAttribute("href");
+        assert(
+          ownerHref?.startsWith(`/admin/reviews/${reviewRun.id}?tab=overview&item=`),
+          `${fixture.label} ${viewport.label} emitted a noncanonical Review owner route: ${ownerHref}`
+        );
+        const handoffHref = await panel.getByRole("link", { name: "Link in Reviews" }).getAttribute("href");
+        const parsedHandoff = new URL(handoffHref, baseUrl);
+        assert(
+          parsedHandoff.pathname === "/admin/reviews" &&
+            parsedHandoff.searchParams.get("handoff") === "review-source" &&
+            parsedHandoff.searchParams.get("sourceModule") === fixture.module &&
+            parsedHandoff.searchParams.get("sourceObjectType") === fixture.objectType &&
+            parsedHandoff.searchParams.get("sourceObjectId") === fixture.objectId,
+          `${fixture.label} ${viewport.label} emitted an invalid Review handoff: ${handoffHref}`
+        );
+        await assertNoHorizontalOverflow(page, `${fixture.label} Review context at ${viewport.label}`);
+        await page.screenshot({
+          path: path.join(screenshotDir, `${fixture.module}-review-context-${viewport.label}.png`)
+        });
+
+        if (viewport.width <= 760) {
+          const undersizedPanelTargets = await panel.locator("button:visible, a[href]:visible").evaluateAll((elements) => elements
+            .map((element) => {
+              const rect = element.getBoundingClientRect();
+              return {
+                label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+                width: rect.width,
+                height: rect.height
+              };
+            })
+            .filter((item) => item.width > 0 && item.height > 0 && (item.width < 44 || item.height < 44)));
+          assert(
+            undersizedPanelTargets.length === 0,
+            `${fixture.label} Review context ${viewport.label} targets below 44px: ${JSON.stringify(undersizedPanelTargets)}`
+          );
+        }
+      }
 
       if (viewport.width <= 760) {
         const undersizedTargets = await page.locator('button:visible, a[href]:visible').evaluateAll((elements) => elements
@@ -14082,6 +14143,139 @@ async function main() {
     );
     weeklyReviewRun = linkReviewMediaContext.payload.item;
     weeklyReviewView = linkReviewMediaContext.payload.view;
+
+    const reviewResourceSource = {
+      module: "resources",
+      objectType: "resource",
+      objectId: createdResource.id,
+      label: resourceTitle
+    };
+    const linkReviewResourceContext = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "link_context",
+          sourceRef: reviewResourceSource,
+          relationship: "evidence"
+        }
+      })
+    });
+    assert(
+      linkReviewResourceContext.response.ok &&
+        linkReviewResourceContext.payload?.item?.contextLinks?.some(
+          (link) => link.sourceRef?.module === "resources" && link.sourceRef?.objectId === createdResource.id && link.state === "linked"
+        ),
+      `Review Resource reference failed: ${JSON.stringify(linkReviewResourceContext.payload)}`
+    );
+    weeklyReviewRun = linkReviewResourceContext.payload.item;
+    weeklyReviewView = linkReviewResourceContext.payload.view;
+
+    const resourceContextCount = weeklyReviewRun.contextLinks.filter(
+      (link) => link.sourceRef?.module === "resources" && link.sourceRef?.objectId === createdResource.id
+    ).length;
+    const relinkReviewResourceContext = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "link_context",
+          sourceRef: reviewResourceSource,
+          relationship: "evidence"
+        }
+      })
+    });
+    const relinkedResourceContexts = relinkReviewResourceContext.payload?.item?.contextLinks?.filter(
+      (link) => link.sourceRef?.module === "resources" && link.sourceRef?.objectId === createdResource.id
+    ) || [];
+    assert(
+      relinkReviewResourceContext.response.ok && relinkedResourceContexts.length === resourceContextCount,
+      `Repeated Resource handoff created a duplicate Review context: ${JSON.stringify(relinkReviewResourceContext.payload)}`
+    );
+    weeklyReviewRun = relinkReviewResourceContext.payload.item;
+    weeklyReviewView = relinkReviewResourceContext.payload.view;
+
+    const exactReviewSources = [
+      {
+        label: "Note",
+        module: "notes",
+        objectType: "note",
+        objectId: createdNote.id,
+        sourceLabel: updatedNoteTitle,
+        sourcePath: `/admin/notes/${createdNote.id}`,
+        pagePath: `/admin/notes/${createdNote.id}?tab=review`
+      },
+      {
+        label: "Resource",
+        module: "resources",
+        objectType: "resource",
+        objectId: createdResource.id,
+        sourceLabel: resourceTitle,
+        sourcePath: `/admin/resources/${createdResource.id}`,
+        pagePath: `/admin/resources/${createdResource.id}?tab=review`
+      },
+      {
+        label: "Media",
+        module: "media",
+        objectType: "media_asset",
+        objectId: createdMedia.id,
+        sourceLabel: mediaUsageSourceRef.label,
+        sourcePath: `/admin/media/${createdMedia.id}`,
+        pagePath: `/admin/media/${createdMedia.id}?tab=review`
+      }
+    ];
+    for (const fixture of exactReviewSources) {
+      const contextLink = weeklyReviewRun.contextLinks.find(
+        (link) => link.sourceRef?.module === fixture.module && link.sourceRef?.objectId === fixture.objectId && link.state === "linked"
+      );
+      assert(contextLink, `${fixture.label} Review context fixture was not retained`);
+      const sourcePage = await requestText(server.baseUrl, cookieJar, fixture.pagePath);
+      assert(
+        sourcePage.response.ok &&
+          sourcePage.body.includes(`data-linked-review-contexts="${fixture.module}:${fixture.objectType}:root:${fixture.objectId}"`) &&
+          sourcePage.body.includes(`data-review-run-id="${weeklyReviewRun.id}"`) &&
+          sourcePage.body.includes(weeklyReviewRun.title) &&
+          sourcePage.body.includes(`/admin/reviews/${weeklyReviewRun.id}?tab=overview&amp;item=${contextLink.id}`) &&
+          sourcePage.body.includes("Link in Reviews"),
+        `${fixture.label} did not render exact Reviews-owned context and owner route after reload: ${describeStatus(sourcePage.response)}`
+      );
+
+      const handoffParams = new URLSearchParams({
+        review: weeklyReviewRun.id,
+        handoff: "review-source",
+        sourceModule: fixture.module,
+        sourceObjectType: fixture.objectType,
+        sourceObjectId: fixture.objectId,
+        sourceLabel: fixture.sourceLabel,
+        sourceRelationship: fixture.module === "notes" ? "context" : "evidence",
+        probe: "keep"
+      });
+      const handoffPage = await requestText(
+        server.baseUrl,
+        cookieJar,
+        `/admin/reviews?${handoffParams.toString()}`
+      );
+      assert(
+        handoffPage.response.ok &&
+          handoffPage.body.includes(`${fixture.label} context handoff`) &&
+          handoffPage.body.includes(fixture.sourceLabel) &&
+          handoffPage.body.includes(`already linked to ${weeklyReviewRun.title}`) &&
+          handoffPage.body.includes(fixture.sourcePath) &&
+          handoffPage.body.includes("Done"),
+        `Reviews did not reconstruct the exact ${fixture.label} handoff without duplicate creation: ${describeStatus(handoffPage.response)}`
+      );
+    }
+
     const linkedReviewContext = weeklyReviewRun.contextLinks.find(
       (link) => link.sourceRef?.objectId === projectBlocker.id
     );
@@ -14336,7 +14530,8 @@ async function main() {
       cookieJar,
       promotedProject,
       projectBlocker,
-      weeklyReviewRun
+      weeklyReviewRun,
+      exactReviewSources
     );
 
     const repairReason = "Verified the canonical Project blocker and refreshed its Review reference.";

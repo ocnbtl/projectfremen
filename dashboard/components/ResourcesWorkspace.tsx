@@ -15,6 +15,7 @@ import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import MetricStrip from "./operational/MetricStrip";
 import ObjectHeader from "./operational/ObjectHeader";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
+import LinkedReviewsPanel from "./operational/LinkedReviewsPanel";
 import ProjectAssociationSheet from "./operational/ProjectAssociationSheet";
 import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
@@ -44,6 +45,8 @@ import {
 import { buildResourceReviewEvidence } from "../lib/modules/resources/review-evidence";
 import { buildResourceReviewQueue } from "../lib/modules/resources/review-queue";
 import { formatResourceReviewCadence } from "../lib/modules/resources/review-schedule";
+import { buildReviewSourceHandoffRoute } from "../lib/modules/reviews/source-context";
+import type { ReviewRunView } from "../lib/modules/reviews/types";
 import { buildResourceSourceEvidenceReport } from "../lib/modules/resources/source-evidence";
 import {
   buildFollowUpCreationRoute,
@@ -70,6 +73,8 @@ type ResourcesWorkspaceProps = {
   initialMode?: "index" | "detail";
   initialSelectedId?: string;
   initialLoadError?: string;
+  initialReviewViews: ReviewRunView[];
+  initialReviewsError?: string;
 };
 
 type ResourcesView = ResourcesUrlState["view"];
@@ -300,6 +305,8 @@ export default function ResourcesWorkspace({
   initialProjectsError = "",
   initialPersonalOpsFollowUps,
   initialPersonalOpsFollowUpsError = "",
+  initialReviewViews,
+  initialReviewsError = "",
   initialMode = "index",
   initialSelectedId,
   initialLoadError = ""
@@ -987,6 +994,13 @@ export default function ResourcesWorkspace({
               wide
             />
 
+            <LinkedReviewsPanel
+              source={selectedResource.nativeRef}
+              initialReviewViews={initialReviewViews}
+              initialError={initialReviewsError}
+              title="Resource ReviewRun context"
+            />
+
             <section className={styles.panel}>
               <div className={styles.panelHeader}>
                 <h2>Freshness and trust evidence</h2>
@@ -1027,6 +1041,7 @@ export default function ResourcesWorkspace({
                 ariaLabel="Resource review actions"
                 actions={[
                   { id: "follow-up", label: "Track next action", href: resourceFollowUpCreationRoute(selectedResource) },
+                  { id: "review-run", label: "Link in Reviews", href: buildReviewSourceHandoffRoute(selectedResource.nativeRef) },
                   { id: "mark-reviewed", label: "Mark reviewed", intent: "primary", disabled: true, disabledReason: "Native Resource review checks, reviewer identity, timestamps, acknowledgement, outcome, and audit persistence are not connected." },
                   { id: "check-url", label: "Check URL", disabled: true, disabledReason: "No URL-health job or result persistence is connected." },
                   { id: "update-citations", label: "Update citations", disabled: true, disabledReason: "Persisted citations and per-Note diff confirmation are not connected." },

@@ -16,7 +16,7 @@ import {
 } from "../../../lib/modules/projects/store";
 import type { ProjectsState } from "../../../lib/modules/projects/types";
 import { legacyPersonalRecordsToResources } from "../../../lib/modules/resources/legacy-adapter";
-import { readReviewsState } from "../../../lib/modules/reviews/store";
+import { readReviewsState, toReviewRunView } from "../../../lib/modules/reviews/store";
 import type { ReviewsState } from "../../../lib/modules/reviews/types";
 import { readPersonalRecords, type PersonalRecord } from "../../../lib/personal-records-store";
 import { requireAdminSession } from "../../../lib/require-admin";
@@ -112,6 +112,16 @@ export default async function NotesRoutePage({
         initialDecisionLoadError={personalOpsResult.ok ? "" : personalOpsResult.error}
         initialPersonalOpsFollowUps={personalOpsResult.ok ? personalOpsResult.state.followUps : []}
         initialFollowUpsError={personalOpsResult.ok ? "" : personalOpsResult.error}
+        initialReviewViews={
+          reviewsResult.status === "fulfilled"
+            ? reviewsResult.value.runs.map(toReviewRunView)
+            : []
+        }
+        initialReviewsError={
+          reviewsResult.status === "fulfilled"
+            ? ""
+            : "Reviews-owned context could not be loaded."
+        }
       />
     </div>
   );

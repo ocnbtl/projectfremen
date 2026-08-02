@@ -35,9 +35,9 @@ import type {
 } from "../../lib/modules/personal-ops/types";
 import { createReviewsRepository } from "../../lib/modules/reviews/repository";
 import {
-  clearProjectReviewHandoffParams,
-  parseProjectReviewHandoff
-} from "../../lib/modules/reviews/project-context";
+  clearReviewSourceHandoffParams,
+  parseReviewSourceHandoff
+} from "../../lib/modules/reviews/source-context";
 import { REVIEW_DECISION_READINESS_CHECKS } from "../../lib/modules/reviews/templates";
 import type {
   FinanceReviewBridge,
@@ -182,6 +182,14 @@ const RESOLVED_FOLLOW_UP_STATES = new Set(["created", "carried_forward", "dismis
 
 function displayLabel(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function reviewSourceModuleLabel(module: ModuleId) {
+  if (module === "projects") return "Project";
+  if (module === "notes") return "Note";
+  if (module === "resources") return "Resource";
+  if (module === "media") return "Media";
+  return displayLabel(module);
 }
 
 function formatDate(value?: string, fallback = "Not recorded") {
@@ -518,7 +526,7 @@ export default function ReviewsWorkspace({
     refresh: refreshFollowUps
   } = usePersonalOpsFollowUps(initialPersonalOpsFollowUps, initialFollowUpsError);
   const urlState = useMemo(() => parseReviewsUrlState(searchParams), [searchParams]);
-  const projectHandoff = useMemo(() => parseProjectReviewHandoff(searchParams), [searchParams]);
+  const sourceHandoff = useMemo(() => parseReviewSourceHandoff(searchParams), [searchParams]);
   const [state, setState] = useState(initialState);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(initialLoadError);
@@ -550,8 +558,8 @@ export default function ReviewsWorkspace({
     else router.replace(next, { scroll: false });
   }, [pathname, router, searchParams, urlState]);
 
-  const clearProjectHandoff = useCallback(() => {
-    const params = clearProjectReviewHandoffParams(new URLSearchParams(searchParams.toString()));
+  const clearSourceHandoff = useCallback(() => {
+    const params = clearReviewSourceHandoffParams(new URLSearchParams(searchParams.toString()));
     const next = params.toString() ? `${pathname}?${params.toString()}` : pathname;
     router.replace(next, { scroll: false });
   }, [pathname, router, searchParams]);
@@ -929,17 +937,17 @@ export default function ReviewsWorkspace({
       return;
     }
     if (editor.kind === "context") {
-      const linksProjectHandoff = Boolean(
-        projectHandoff &&
-        editor.module === projectHandoff.sourceRef.module &&
-        editor.objectType.trim() === projectHandoff.sourceRef.objectType &&
-        editor.objectId.trim() === projectHandoff.sourceRef.objectId &&
-        editor.containerObjectId.trim() === (projectHandoff.sourceRef.containerObjectId || "")
+      const linksSourceHandoff = Boolean(
+        sourceHandoff &&
+        editor.module === sourceHandoff.sourceRef.module &&
+        editor.objectType.trim() === sourceHandoff.sourceRef.objectType &&
+        editor.objectId.trim() === sourceHandoff.sourceRef.objectId &&
+        editor.containerObjectId.trim() === (sourceHandoff.sourceRef.containerObjectId || "")
       );
       const ok = await patchRun(selectedRun, { action: "link_context", sourceRef: nativeRefFromDraft(editor), relationship: editor.relationship }, "Source context linked. The source object was not copied or changed.");
       if (ok) {
         setEditor(null);
-        if (linksProjectHandoff) clearProjectHandoff();
+        if (linksSourceHandoff) clearSourceHandoff();
       }
       return;
     }
@@ -1529,35 +1537,36 @@ export default function ReviewsWorkspace({
     );
   };
 
-  const renderProjectHandoff = (run?: ReviewRun | null) => {
-    if (!projectHandoff) return null;
+  const renderSourceHandoff = (run?: ReviewRun | null) => {
+    if (!sourceHandoff) return null;
+    const sourceModuleLabel = reviewSourceModuleLabel(sourceHandoff.sourceRef.module);
     const existingLink = run?.contextLinks.find((link) => (
       link.state !== "removed" &&
-      link.sourceRef.module === projectHandoff.sourceRef.module &&
-      link.sourceRef.objectType === projectHandoff.sourceRef.objectType &&
-      link.sourceRef.objectId === projectHandoff.sourceRef.objectId &&
-      (link.sourceRef.containerObjectId || "") === (projectHandoff.sourceRef.containerObjectId || "")
+      link.sourceRef.module === sourceHandoff.sourceRef.module &&
+      link.sourceRef.objectType === sourceHandoff.sourceRef.objectType &&
+      link.sourceRef.objectId === sourceHandoff.sourceRef.objectId &&
+      (link.sourceRef.containerObjectId || "") === (sourceHandoff.sourceRef.containerObjectId || "")
     ));
     const alreadyLinked = existingLink?.state === "linked";
     const needsRepair = existingLink?.state === "stale" || existingLink?.state === "broken";
     const readOnly = Boolean(run && reviewIsReadOnly(run));
     return (
-      <section className={styles.projectHandoff} aria-label="Project context handoff">
+      <section className={styles.projectHandoff} aria-label={`${sourceModuleLabel} context handoff`}>
         <div>
-          <span className={styles.handoffLabel}>Project context handoff</span>
-          <h2>{projectHandoff.source.label}</h2>
+          <span className={styles.handoffLabel}>{sourceModuleLabel} context handoff</span>
+          <h2>{sourceHandoff.sourceRef.label}</h2>
           <p>
             {run
               ? alreadyLinked
-                ? `This ${displayLabel(projectHandoff.source.objectType)} is already linked to ${run.title}.`
+                ? `This ${displayLabel(sourceHandoff.sourceRef.objectType)} is already linked to ${run.title}.`
                 : needsRepair
-                  ? `This ${displayLabel(projectHandoff.source.objectType)} reference is ${existingLink.state}. Review or repair it before relying on this context.`
-                : `Confirm the exact ${displayLabel(projectHandoff.source.objectType)} link in ${run.title}. Reviews stores only the reference.`
+                  ? `This ${displayLabel(sourceHandoff.sourceRef.objectType)} reference is ${existingLink.state}. Review or repair it before relying on this context.`
+                  : `Confirm the exact ${displayLabel(sourceHandoff.sourceRef.objectType)} link in ${run.title}. Reviews stores only the reference.`
               : "Select a native ReviewRun to link this exact source. Nothing is written until you confirm."}
           </p>
         </div>
         <div className={styles.inlineActions}>
-          <Link className={styles.textLink} href={projectHandoff.sourceRef.route}>Open Project source</Link>
+          <Link className={styles.textLink} href={sourceHandoff.sourceRef.route}>Open {sourceModuleLabel} source</Link>
           {run && !existingLink && (
             <button
               type="button"
@@ -1567,12 +1576,12 @@ export default function ReviewsWorkspace({
               title={readOnly ? "Completed, archived, and canceled ReviewRuns are read-only." : undefined}
               onClick={() => setEditor({
                 kind: "context",
-                relationship: projectHandoff.relationship,
-                module: "projects",
-                objectType: projectHandoff.source.objectType,
-                objectId: projectHandoff.source.objectId,
-                containerObjectId: projectHandoff.source.containerObjectId || "",
-                label: projectHandoff.source.label
+                relationship: sourceHandoff.relationship,
+                module: sourceHandoff.sourceRef.module,
+                objectType: sourceHandoff.sourceRef.objectType,
+                objectId: sourceHandoff.sourceRef.objectId,
+                containerObjectId: sourceHandoff.sourceRef.containerObjectId || "",
+                label: sourceHandoff.sourceRef.label
               })}
             >Review and link…</button>
           )}
@@ -1586,7 +1595,7 @@ export default function ReviewsWorkspace({
               onClick={() => openContextRepair(existingLink)}
             >Repair link…</button>
           )}
-          <button type="button" className={styles.button} onClick={clearProjectHandoff}>
+          <button type="button" className={styles.button} onClick={clearSourceHandoff}>
             {alreadyLinked ? "Done" : "Dismiss"}
           </button>
         </div>
@@ -1644,7 +1653,7 @@ export default function ReviewsWorkspace({
             headingLevel={headingLevel}
           />
         </div>
-        {renderProjectHandoff(run)}
+        {renderSourceHandoff(run)}
         <div className={styles.tabBar}><DetailTabs id={`review-${run.id}`} tabs={tabs} activeTab={activeTab} onTabChange={(tab) => updateUrl({ tab: tab as ReviewsTab, item: "" }, true)} ariaLabel="Review sections" /></div>
         <DetailTabPanel tabsId={`review-${run.id}`} tabId="overview" active={activeTab === "overview"}>{renderOverview(run)}</DetailTabPanel>
         <DetailTabPanel tabsId={`review-${run.id}`} tabId="checklist" active={activeTab === "checklist"}>{renderChecklist(run)}</DetailTabPanel>
@@ -1739,7 +1748,7 @@ export default function ReviewsWorkspace({
           <div className={styles.headerActions}><button type="button" className={styles.button} onClick={() => openCreate("weekly")}>Start weekly</button><button type="button" className={styles.button} data-primary="true" onClick={() => openCreate("monthly")}>Start monthly</button></div>
         </header>
         <p className={styles.ownershipBanner}>Reviews coordinates completion. It does not duplicate Project blockers, Personal Ops Decisions or Follow-ups, or Finance close state.</p>
-        {!selectedRun && renderProjectHandoff(null)}
+        {!selectedRun && renderSourceHandoff(null)}
         {initialLoadError && <SystemState variant="error" description={initialLoadError} action={{ label: "Retry", onSelect: () => void refreshState() }} />}
         <MetricStrip className={styles.metrics} items={[
           { id: "open", label: "Open native runs", value: openNative.length },

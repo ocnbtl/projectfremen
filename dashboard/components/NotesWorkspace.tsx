@@ -17,6 +17,7 @@ import SystemState from "./operational/SystemState";
 import ConfirmationSheet from "./operational/ConfirmationSheet";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
+import LinkedReviewsPanel from "./operational/LinkedReviewsPanel";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
 import NoteAttachmentsView, { NoteAttachmentInspector } from "./notes/NoteAttachmentsView";
@@ -70,6 +71,8 @@ import type {
   ProjectsState
 } from "../lib/modules/projects/types";
 import type { ResourceRecord } from "../lib/modules/resources/types";
+import { buildReviewSourceHandoffRoute } from "../lib/modules/reviews/source-context";
+import type { ReviewRunView } from "../lib/modules/reviews/types";
 import {
   parseNotesUrlState,
   serializeNotesUrlState,
@@ -97,6 +100,8 @@ type NotesWorkspaceProps = {
   initialDecisionLoadError?: string;
   initialPersonalOpsFollowUps?: PersonalOpsFollowUp[];
   initialFollowUpsError?: string;
+  initialReviewViews: ReviewRunView[];
+  initialReviewsError?: string;
 };
 
 type NoteReviewEvidenceCheck = {
@@ -432,7 +437,9 @@ export default function NotesWorkspace({
   initialDecisionMappings = [],
   initialDecisionLoadError = "",
   initialPersonalOpsFollowUps = [],
-  initialFollowUpsError = ""
+  initialFollowUpsError = "",
+  initialReviewViews,
+  initialReviewsError = ""
 }: NotesWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -1733,6 +1740,13 @@ export default function NotesWorkspace({
               <span>Resolve owner-module evidence where links are available. Notes will not claim a completed review until the required checks, waivers, reviewer, timestamp, and audit event can be persisted together.</span>
             </div>
           </section>
+
+          <LinkedReviewsPanel
+            source={note.nativeRef}
+            initialReviewViews={initialReviewViews}
+            initialError={initialReviewsError}
+            title="Note ReviewRun context"
+          />
         </div>
       </DetailTabPanel>
     );
@@ -1932,9 +1946,8 @@ export default function NotesWorkspace({
                   },
                   {
                     id: "review-link",
-                    label: "Attach Review",
-                    disabled: true,
-                    disabledReason: "Native Review context-link persistence is not connected."
+                    label: "Link in Reviews",
+                    href: buildReviewSourceHandoffRoute(selectedNote.nativeRef)
                   }
                 ]}
               />
@@ -2011,6 +2024,12 @@ export default function NotesWorkspace({
                 ]}
               />
             </section>
+            <LinkedReviewsPanel
+              source={selectedNote.nativeRef}
+              initialReviewViews={initialReviewViews}
+              initialError={initialReviewsError}
+              title="Note ReviewRun context"
+            />
             <section className={styles.panel} data-wide="true">
               <h2>Explicit review boundary</h2>
               <div className={styles.sourceBoundary}>

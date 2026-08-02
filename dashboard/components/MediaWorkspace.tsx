@@ -15,6 +15,7 @@ import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/Detail
 import EvidenceChecklist from "./operational/EvidenceChecklist";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
+import LinkedReviewsPanel from "./operational/LinkedReviewsPanel";
 import ObjectHeader from "./operational/ObjectHeader";
 import ProjectAssociationSheet from "./operational/ProjectAssociationSheet";
 import QuickActionBar from "./operational/QuickActionBar";
@@ -45,6 +46,8 @@ import {
 import type { PersonalOpsFollowUp } from "../lib/modules/personal-ops/types";
 import type { ProjectsState } from "../lib/modules/projects/types";
 import type { ResourceRecord } from "../lib/modules/resources/types";
+import { buildReviewSourceHandoffRoute } from "../lib/modules/reviews/source-context";
+import type { ReviewRunView } from "../lib/modules/reviews/types";
 import {
   parseMediaUrlState,
   serializeMediaUrlState,
@@ -69,6 +72,8 @@ type MediaWorkspaceProps = {
   initialView?: MediaView;
   initialTab?: MediaTab;
   queueMode?: "needs-review" | "missing-metadata" | "rights-usage";
+  initialReviewViews: ReviewRunView[];
+  initialReviewsError?: string;
 };
 
 type MediaView = MediaUrlState["view"];
@@ -428,6 +433,8 @@ export default function MediaWorkspace({
   initialProjectsError = "",
   initialPersonalOpsFollowUps,
   initialPersonalOpsFollowUpsError = "",
+  initialReviewViews,
+  initialReviewsError = "",
   initialMode = "index",
   initialSelectedId,
   initialLoadError = "",
@@ -1595,6 +1602,12 @@ export default function MediaWorkspace({
             </section>
             {activeTab === "review" &&
               renderFollowUpsPanel(asset, "Media review follow-through")}
+            <LinkedReviewsPanel
+              source={asset.nativeRef}
+              initialReviewViews={initialReviewViews}
+              initialError={initialReviewsError}
+              title="Media ReviewRun context"
+            />
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>
                 <div>
@@ -1759,6 +1772,13 @@ export default function MediaWorkspace({
 
             {renderFollowUpsPanel(asset, "Readiness follow-through")}
 
+            <LinkedReviewsPanel
+              source={asset.nativeRef}
+              initialReviewViews={initialReviewViews}
+              initialError={initialReviewsError}
+              title="Media ReviewRun context"
+            />
+
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>
                 <h2>Evidence checklist</h2>
@@ -1782,6 +1802,7 @@ export default function MediaWorkspace({
                 ariaLabel="Media readiness actions"
                 actions={[
                   { id: "edit-retained-metadata", label: "Edit title & description", intent: "primary", onSelect: () => openMetadataEditor(asset) },
+                  { id: "review-run", label: "Link in Reviews", href: buildReviewSourceHandoffRoute(asset.nativeRef) },
                   { id: "confirm-rights", label: "Confirm rights", disabled: true, disabledReason: "Rights evidence and confirmation audit are not connected." },
                   { id: "link-source", label: "Link source", disabled: true, disabledReason: "Media source and ResourceLink persistence are not connected." },
                   { id: "mark-reviewed", label: "Mark reviewed", disabled: true, disabledReason: "This queue is legacy readiness triage, not a native AssetReview workflow." }
