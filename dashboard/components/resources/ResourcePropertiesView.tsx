@@ -73,12 +73,24 @@ export default function ResourcePropertiesView({
   resource,
   selectedRuleId,
   onSelectRule,
-  onOpenTab
+  onOpenTab,
+  onEditResource,
+  onScheduleReview,
+  onCreateNote,
+  onAttachExistingNote,
+  onAssociateProject,
+  reviewTimingFeedback
 }: {
   resource: ResourceRecord;
   selectedRuleId: string;
   onSelectRule: (ruleId: string) => void;
-  onOpenTab: (tab: "source" | "links" | "review") => void;
+  onOpenTab: (tab: "source" | "links" | "notes" | "review") => void;
+  onEditResource: () => void;
+  onScheduleReview: () => void;
+  onCreateNote: () => void;
+  onAttachExistingNote: () => void;
+  onAssociateProject: () => void;
+  reviewTimingFeedback?: string;
 }) {
   const selectedRule = currentPropertyRule(selectedRuleId);
   const sourceOpenable = Boolean(resource.source.canonicalUrl);
@@ -88,7 +100,12 @@ export default function ResourcePropertiesView({
     { id: "id", label: "Resource ID", value: resource.id, detail: "stable legacy mapping" },
     { id: "owner", label: "Owner", value: "Not stored", detail: "no owner identity inferred", tone: "attention" as const },
     { id: "lifecycle", label: "Lifecycle", value: currentLifecycle, detail: "adapter-derived only" },
-    { id: "cadence", label: "Review cadence", value: displayLabel(resource.review.cadence), detail: "legacy field when present" },
+    {
+      id: "cadence",
+      label: "Review cadence",
+      value: resource.review.nextReviewAt ? displayLabel(resource.review.cadence) : "Not scheduled",
+      detail: "protected legacy timing"
+    },
     { id: "citation", label: "Citation", value: resource.citationCount ?? "Not connected", detail: "no citation registry", tone: "attention" as const },
     { id: "privacy", label: "Privacy", value: displayLabel(resource.provenance.privacy), detail: "legacy record privacy" },
     { id: "automation", label: "Automation", value: "Not connected", detail: "no run or audit", tone: "attention" as const },
@@ -100,10 +117,11 @@ export default function ResourcePropertiesView({
       <MetricStrip ariaLabel="Resource property summary" items={propertyMetrics} />
 
       <div className={styles.propertiesBoundary}>
-        <strong>Properties control plane · read-only policy preview</strong>
+        <strong>Properties control plane · live adapters and policy previews</strong>
         <span>
-          Current legacy evidence and approved ownership rules are shown separately. No native ResourceProperties record,
-          owner assignment, policy configuration, automation, lifecycle event, or audit entry exists in this checkpoint.
+          Retained Resource fields, review timing, exact Note source handoffs, and Project associations use the existing
+          protected writers. Native owner assignment, lifecycle, citation policy, automation, and ResourceProperties
+          audit records remain unavailable.
         </span>
       </div>
 
@@ -133,8 +151,8 @@ export default function ResourcePropertiesView({
           <QuickActionBar
             ariaLabel="Resource identity navigation"
             actions={[
-              { id: "inspect-source", label: "Inspect source", onSelect: () => onOpenTab("source"), intent: "primary" },
-              { id: "edit-identity", label: "Edit identity", disabled: true, disabledReason: "Identity changes require a native Resource writer, explicit save, diff preview, actor, version, and audit event." },
+              { id: "edit-resource", label: "Edit retained fields", onSelect: onEditResource, intent: "primary" },
+              { id: "inspect-source", label: "Inspect source", onSelect: () => onOpenTab("source") },
               { id: "refresh-metadata", label: "Refresh metadata", disabled: true, disabledReason: "No isolated fetch policy, metadata diff, persistence path, or audit writer is connected." }
             ]}
           />
@@ -176,7 +194,9 @@ export default function ResourcePropertiesView({
               <span className={styles.eyebrow}>Operating cadence</span>
               <h2>Review and cadence</h2>
             </div>
-            <span className={styles.stateChip} data-tone="amber">Not configured</span>
+            <span className={styles.stateChip} data-tone={resource.review.nextReviewAt ? "green" : "amber"}>
+              {resource.review.nextReviewAt ? "Scheduled" : "Not scheduled"}
+            </span>
           </div>
           <div className={styles.factGrid}>
             <div className={styles.fact}><span>Cadence</span><strong>{displayLabel(resource.review.cadence)}</strong></div>
@@ -192,10 +212,33 @@ export default function ResourcePropertiesView({
           </ul>
           <QuickActionBar
             actions={[
-              { id: "set-cadence", label: "Set cadence", disabled: true, disabledReason: "Cadence requires a Resource policy record, owner identity, next-date semantics, explicit save, and audit." },
-              { id: "create-review-note", label: "Create review note", disabled: true, disabledReason: "No reviewed Note draft, citation insertion, or source-link persistence path is connected." }
+              {
+                id: "set-cadence",
+                label: resource.review.nextReviewAt ? "Edit review timing" : "Schedule review",
+                onSelect: onScheduleReview,
+                intent: "primary"
+              },
+              {
+                id: "create-note",
+                label: "Create Note draft",
+                onSelect: sourceOpenable ? onCreateNote : undefined,
+                disabled: !sourceOpenable,
+                disabledReason: "A safe HTTP(S) Resource URL is required."
+              },
+              {
+                id: "attach-note",
+                label: "Attach to existing Note",
+                onSelect: sourceOpenable ? onAttachExistingNote : undefined,
+                disabled: !sourceOpenable,
+                disabledReason: "A safe HTTP(S) Resource URL is required."
+              }
             ]}
           />
+          {reviewTimingFeedback ? (
+            <div className={styles.sourceBoundary} role="status" aria-live="polite">
+              {reviewTimingFeedback}
+            </div>
+          ) : null}
         </section>
 
         <section className={styles.panel}>
@@ -209,14 +252,14 @@ export default function ResourcePropertiesView({
           <ul className={styles.propertyRows}>
             <li><span><strong>Citation storage</strong><small>Format remains an open product decision</small></span><span className={styles.stateChip}>Unresolved</span></li>
             <li><span><strong>Quote / snippet policy</strong><small>Short source-derived excerpts only</small></span><span className={styles.stateChip}>Boundary</span></li>
-            <li><span><strong>Promotion</strong><small>Create or update a Note and retain this Resource as source</small></span><span className={styles.stateChip}>No writer</span></li>
+            <li><span><strong>Promotion</strong><small>Create or attach a Note through exact source evidence</small></span><span className={styles.stateChip} data-tone="green">Protected handoff</span></li>
             <li><span><strong>Citation updates</strong><small>Preview per-Note patches and require confirmation</small></span><span className={styles.stateChip}>Explicit</span></li>
           </ul>
           <p>Resource source context never becomes authored Note wording silently.</p>
           <QuickActionBar
             actions={[
               { id: "configure-citations", label: "Configure defaults", disabled: true, disabledReason: "Citation format, anchor storage, extraction policy, and Note insertion contracts are unresolved." },
-              { id: "search-notes", label: "Inspect Note evidence", onSelect: () => onOpenTab("links") }
+              { id: "search-notes", label: "Inspect Note evidence", onSelect: () => onOpenTab("notes") }
             ]}
           />
         </section>
@@ -240,7 +283,8 @@ export default function ResourcePropertiesView({
           </ul>
           <QuickActionBar
             actions={[
-              { id: "inspect-links", label: "Inspect link evidence", onSelect: () => onOpenTab("links"), intent: "primary" },
+              { id: "associate-project", label: "Associate Project", onSelect: onAssociateProject, intent: "primary" },
+              { id: "inspect-links", label: "Inspect link evidence", onSelect: () => onOpenTab("links") },
               { id: "configure-links", label: "Configure policy", disabled: true, disabledReason: "Per-module ResourceLink policies and native ObjectLink persistence are not connected." }
             ]}
           />

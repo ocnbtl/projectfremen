@@ -687,6 +687,15 @@ export default function ResourcesWorkspace({
     updateUrl({ ai: false });
   }
 
+  function openProjectAssociation() {
+    if (!selectedResource) return;
+    setAiOpen(false);
+    setMobileSidebarOpen(false);
+    setInspectorOpen(false);
+    setProjectAssociationOpen(true);
+    updateUrl({ ai: false });
+  }
+
   function handleResourceSaved(saved: ResourceRecord, mode: "create" | "edit") {
     setResources((current) => [
       saved,
@@ -1128,7 +1137,7 @@ export default function ResourcesWorkspace({
                   type="button"
                   className={styles.button}
                   data-primary="true"
-                  onClick={() => setProjectAssociationOpen(true)}
+                  onClick={openProjectAssociation}
                 >
                   Associate Project
                 </button>
@@ -1425,6 +1434,16 @@ export default function ResourcesWorkspace({
               setSelectedEvidenceId("");
               updateUrl({ tab, item: "" }, { history: "push" });
             }}
+            onEditResource={() => openResourceEditor("edit")}
+            onScheduleReview={openReviewSchedule}
+            onCreateNote={() => openNotePromotion("create")}
+            onAttachExistingNote={() => openNotePromotion("existing")}
+            onAssociateProject={openProjectAssociation}
+            reviewTimingFeedback={
+              reviewScheduleFeedback?.resourceId === selectedResource.id
+                ? reviewScheduleFeedback.message
+                : undefined
+            }
           />
         </DetailTabPanel>
       );
@@ -1712,7 +1731,7 @@ export default function ResourcesWorkspace({
             )}
             <QuickActionBar
               actions={[
-                { id: "project", label: "Associate Project", onSelect: () => setProjectAssociationOpen(true) },
+                { id: "project", label: "Associate Project", onSelect: openProjectAssociation },
                 { id: "follow-up", label: "Track next action", href: resourceFollowUpCreationRoute(selectedResource) },
                 { id: "link", label: "Link other object", disabled: true, disabledReason: "General ResourceLink persistence is not connected." },
                 { id: "review", label: "Mark reviewed", disabled: true, disabledReason: "The Resource review workflow is not connected." },

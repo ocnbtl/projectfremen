@@ -1353,7 +1353,7 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     await desktop.screenshot({ path: path.join(screenshotDir, "resources-needs-review-1440x900.png") });
 
     await desktop.getByRole("tab", { name: "Properties" }).click();
-    await desktop.getByText("Properties control plane · read-only policy preview", { exact: true }).waitFor();
+    await desktop.getByText("Properties control plane · live adapters and policy previews", { exact: true }).waitFor();
     await desktop.screenshot({ path: path.join(screenshotDir, "resource-properties-1440x900.png") });
     await desktop.locator('[data-resource-property-rule="replace-canonical-with-diff"]').click();
     await desktop.waitForFunction(() => (
@@ -1374,6 +1374,72 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     await desktop.waitForFunction(() => (
       new URL(window.location.href).searchParams.get("item") === "replace-canonical-with-diff"
     ));
+
+    const propertyMutationsBefore = mutatingRequests.length;
+    await desktop.getByRole("button", { name: "Edit retained fields", exact: true }).click();
+    const resourceEditor = desktop.locator('[data-resource-editor="edit"]').getByRole("dialog");
+    await resourceEditor.waitFor();
+    assert(
+      await resourceEditor.getByRole("heading", { name: resourceTitle, exact: true }).count() === 1,
+      "Resource Properties edit action did not open the selected Resource editor"
+    );
+    assert(
+      await desktop.getByRole("button", { name: "Open AI assistant" }).count() === 0,
+      "Resources AI dock remained exposed beneath the Properties editor"
+    );
+    await resourceEditor.getByRole("button", { name: "Close Resource editor" }).click();
+    await resourceEditor.waitFor({ state: "detached" });
+
+    await desktop.getByRole("button", { name: /Schedule review|Edit review timing/ }).click();
+    const reviewTimingEditor = desktop
+      .locator("[data-resource-review-schedule-editor]")
+      .getByRole("dialog");
+    await reviewTimingEditor.waitFor();
+    await reviewTimingEditor
+      .getByRole("heading", { name: `Schedule review · ${resourceTitle}` })
+      .waitFor();
+    await reviewTimingEditor
+      .getByRole("button", { name: "Close Resource review schedule editor" })
+      .click();
+    await reviewTimingEditor.waitFor({ state: "detached" });
+
+    await desktop.getByRole("button", { name: "Create Note draft", exact: true }).click();
+    const noteDraftDialog = desktop.getByRole("dialog", { name: "Create authored follow-up" });
+    await noteDraftDialog.waitFor();
+    assert(
+      await noteDraftDialog.getByRole("button", { name: "New Note draft" }).getAttribute("aria-pressed") === "true",
+      "Resource Properties create-Note action did not open the new-draft handoff"
+    );
+    await noteDraftDialog.getByRole("button", { name: "Close Note draft workflow" }).click();
+    await noteDraftDialog.waitFor({ state: "detached" });
+
+    await desktop.getByRole("button", { name: "Attach to existing Note", exact: true }).click();
+    const noteAttachDialog = desktop.getByRole("dialog", { name: "Create authored follow-up" });
+    await noteAttachDialog.waitFor();
+    assert(
+      await noteAttachDialog.getByRole("button", { name: "Existing Note" }).getAttribute("aria-pressed") === "true",
+      "Resource Properties attach-Note action did not open the existing-Note handoff"
+    );
+    await noteAttachDialog.getByRole("button", { name: "Close Note draft workflow" }).click();
+    await noteAttachDialog.waitFor({ state: "detached" });
+
+    await desktop.getByRole("button", { name: "Associate Project", exact: true }).click();
+    const projectAssociationDialog = desktop.getByRole("dialog", { name: "Associate with a Project" });
+    await projectAssociationDialog.waitFor();
+    await projectAssociationDialog.getByRole("button", { name: "Close Project association" }).click();
+    await projectAssociationDialog.waitFor({ state: "detached" });
+
+    await desktop.getByRole("button", { name: "Inspect Note evidence", exact: true }).click();
+    await desktop.waitForFunction(() => new URL(window.location.href).searchParams.get("tab") === "notes");
+    await desktop.goBack();
+    await desktop.waitForFunction(() => (
+      new URL(window.location.href).searchParams.get("tab") === "properties" &&
+      new URL(window.location.href).searchParams.get("item") === "replace-canonical-with-diff"
+    ));
+    assert(
+      mutatingRequests.length === propertyMutationsBefore,
+      `Resource Properties workflow entry checks emitted mutations: ${mutatingRequests.slice(propertyMutationsBefore).join(" | ")}`
+    );
     await assertNoDocumentOverflow(desktop, "Resource Properties desktop");
 
     await desktop.setViewportSize({ width: 1920, height: 1080 });
@@ -1400,7 +1466,7 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     await desktop.getByRole("heading", { level: 1, name: "Needs Review" }).waitFor();
     await desktop.screenshot({ path: path.join(screenshotDir, "resources-needs-review-1920x1080.png") });
     await desktop.getByRole("tab", { name: "Properties" }).click();
-    await desktop.getByText("Properties control plane · read-only policy preview", { exact: true }).waitFor();
+    await desktop.getByText("Properties control plane · live adapters and policy previews", { exact: true }).waitFor();
     await desktop.screenshot({ path: path.join(screenshotDir, "resource-properties-1920x1080.png") });
     await assertNoDocumentOverflow(desktop, "Resource Properties wide desktop");
     await desktopContext.close();
@@ -1453,7 +1519,7 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     await openInspectorIfNeeded(tablet);
     assert(await tablet.getByRole("button", { name: "Open AI assistant" }).count() === 0, "Resources AI dock remained exposed beneath the tablet inspector");
     await tablet.getByRole("tab", { name: "Properties" }).click();
-    await tablet.getByText("Properties control plane · read-only policy preview", { exact: true }).waitFor();
+    await tablet.getByText("Properties control plane · live adapters and policy previews", { exact: true }).waitFor();
     await tablet.screenshot({ path: path.join(screenshotDir, "resource-properties-1024x768.png") });
     await assertNoDocumentOverflow(tablet, "Resource Properties tablet");
     await tabletContext.close();
@@ -1585,7 +1651,7 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     await mobile.waitForFunction(() => document.querySelector("#resource-inspector")?.contains(document.activeElement));
     assert(await mobile.getByRole("button", { name: "Open AI assistant" }).count() === 0, "Resources AI dock remained exposed beneath the mobile inspector");
     await mobile.getByRole("tab", { name: "Properties" }).click();
-    await mobile.getByText("Properties control plane · read-only policy preview", { exact: true }).waitFor();
+    await mobile.getByText("Properties control plane · live adapters and policy previews", { exact: true }).waitFor();
     await mobile.screenshot({ path: path.join(screenshotDir, "resource-properties-390x844.png") });
     await mobile.locator('[data-resource-property-rule="archive-preserves-history"]').click();
     await mobile.waitForFunction(() => (
@@ -12835,7 +12901,7 @@ async function main() {
       "Resource direct Properties tab URL state"
     );
     for (const expected of [
-      "Properties control plane · read-only policy preview",
+      "Properties control plane · live adapters and policy previews",
       "Resource identity",
       "Lifecycle state",
       "Review and cadence",
@@ -12845,7 +12911,11 @@ async function main() {
       "Canonical replacement requires a diff",
       "Access and opening",
       "Health and cleanup rules",
-      "No native ResourceProperties record"
+      "Edit retained fields",
+      "Create Note draft",
+      "Attach to existing Note",
+      "Associate Project",
+      "ResourceProperties"
     ]) {
       assert(resourceProperties.body.includes(expected), `Resource Properties omitted approved boundary: ${expected}`);
     }
