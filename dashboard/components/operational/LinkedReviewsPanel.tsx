@@ -108,18 +108,26 @@ export default function LinkedReviewsPanel({
               <Link
                 href={reviewContextOwnerRoute(context)}
                 className={styles.row}
-                aria-label="Open exact context in Reviews"
+                aria-label={context.evidenceUses.length ? "Open exact evidence use in Reviews" : "Open exact context in Reviews"}
                 data-review-run-id={context.reviewRef.objectId}
                 data-review-link-state={context.linkState}
+                data-review-evidence-use-count={context.evidenceUses.length}
               >
                 <span className={styles.rowBody}>
                   <strong>{context.title}</strong>
                   <small>
                     {labelize(context.cadence)} Â· {labelize(context.lifecycle)} Â· {context.blockerCount} completion blocker{context.blockerCount === 1 ? "" : "s"}
                   </small>
+                  {context.evidenceUses.length > 0 && (
+                    <small data-review-evidence-id={context.evidenceUses[0].id}>
+                      Evidence use · {context.evidenceUses.map((item) => item.title).join(" · ")}
+                    </small>
+                  )}
                 </span>
                 <span className={styles.state}>{labelize(context.linkState)}</span>
-                <small className={styles.ownerLink}>Open exact context in Reviews</small>
+                <small className={styles.ownerLink}>
+                  {context.evidenceUses.length ? "Open exact evidence use in Reviews" : "Open exact context in Reviews"}
+                </small>
               </Link>
             </li>
           ))}

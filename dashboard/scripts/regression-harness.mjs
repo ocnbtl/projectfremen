@@ -8303,9 +8303,16 @@ async function checkProjectReviewContextBrowserState(
           await panel.getByText(reviewRun.title, { exact: true }).count() === 1,
           `${fixture.label} ${viewport.label} omitted the exact linked ReviewRun`
         );
-        const ownerHref = await panel.getByRole("link", { name: "Open exact context in Reviews" }).getAttribute("href");
+        const ownerLink = panel.locator(`[data-review-run-id="${reviewRun.id}"]`);
+        const evidenceUseCount = Number(await ownerLink.getAttribute("data-review-evidence-use-count"));
+        const ownerHref = await ownerLink.getAttribute("href");
         assert(
-          ownerHref?.startsWith(`/admin/reviews/${reviewRun.id}?tab=overview&item=`),
+          await ownerLink.getAttribute("aria-label") ===
+            (evidenceUseCount > 0 ? "Open exact evidence use in Reviews" : "Open exact context in Reviews"),
+          `${fixture.label} ${viewport.label} did not distinguish evidence use from context in its accessible label`
+        );
+        assert(
+          ownerHref?.startsWith(`/admin/reviews/${reviewRun.id}?tab=${evidenceUseCount > 0 ? "evidence" : "overview"}&item=`),
           `${fixture.label} ${viewport.label} emitted a noncanonical Review owner route: ${ownerHref}`
         );
         const handoffHref = await panel.getByRole("link", { name: "Link in Reviews" }).getAttribute("href");
@@ -13898,9 +13905,13 @@ async function main() {
       createWeeklyReviewRun.response.ok &&
         createWeeklyReviewRun.payload?.ok &&
         createWeeklyReviewRun.payload.item?.cadence === "weekly" &&
+        createWeeklyReviewRun.payload.item.templateVersion === 2 &&
         createWeeklyReviewRun.payload.item.checklist?.length === 10 &&
+        createWeeklyReviewRun.payload.item.evidence?.some(
+          (item) => item.requirementId === "weekly-resource-cleanup" && item.required === false && item.blocksCompletion === false
+        ) &&
         createWeeklyReviewRun.payload.view?.counts?.requiredChecks === 8,
-      `Weekly ReviewRun did not instantiate the ten-check template: ${JSON.stringify(createWeeklyReviewRun.payload)}`
+      `Weekly ReviewRun did not instantiate the versioned ten-check template with optional Resource evidence: ${JSON.stringify(createWeeklyReviewRun.payload)}`
     );
     let weeklyReviewRun = createWeeklyReviewRun.payload.item;
     let weeklyReviewView = createWeeklyReviewRun.payload.view;
@@ -14205,6 +14216,47 @@ async function main() {
     weeklyReviewRun = relinkReviewResourceContext.payload.item;
     weeklyReviewView = relinkReviewResourceContext.payload.view;
 
+    const weeklyResourceEvidence = weeklyReviewRun.evidence.find(
+      (item) => item.requirementId === "weekly-resource-cleanup"
+    );
+    assert(weeklyResourceEvidence?.id, "Weekly template did not create its optional Resource evidence requirement");
+    const useReviewResourceEvidence = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "update_evidence",
+          evidence: {
+            evidenceId: weeklyResourceEvidence.id,
+            state: "linked",
+            sourceRef: reviewResourceSource
+          }
+        }
+      })
+    });
+    const resourceEvidenceUses = useReviewResourceEvidence.payload?.item?.evidence?.filter(
+      (item) => item.sourceRef?.module === "resources" && item.sourceRef?.objectId === createdResource.id
+    ) || [];
+    const resourceContextsAfterEvidence = useReviewResourceEvidence.payload?.item?.contextLinks?.filter(
+      (link) => link.sourceRef?.module === "resources" && link.sourceRef?.objectId === createdResource.id
+    ) || [];
+    assert(
+      useReviewResourceEvidence.response.ok &&
+        resourceEvidenceUses.length === 1 &&
+        resourceEvidenceUses[0].id === weeklyResourceEvidence.id &&
+        resourceEvidenceUses[0].state === "linked" &&
+        resourceContextsAfterEvidence.length === 1,
+      `Exact Resource evidence use was not linked without duplicating Review context: ${JSON.stringify(useReviewResourceEvidence.payload)}`
+    );
+    weeklyReviewRun = useReviewResourceEvidence.payload.item;
+    weeklyReviewView = useReviewResourceEvidence.payload.view;
+    pass("Reviews distinguishes exact Resource evidence use from duplicate-safe source context");
+
     const exactReviewSources = [
       {
         label: "Note",
@@ -14239,15 +14291,23 @@ async function main() {
         (link) => link.sourceRef?.module === fixture.module && link.sourceRef?.objectId === fixture.objectId && link.state === "linked"
       );
       assert(contextLink, `${fixture.label} Review context fixture was not retained`);
+      const evidenceUse = weeklyReviewRun.evidence.find(
+        (item) => item.sourceRef?.module === fixture.module && item.sourceRef?.objectId === fixture.objectId
+      );
+      const ownerRoute = evidenceUse
+        ? `/admin/reviews/${weeklyReviewRun.id}?tab=evidence&amp;item=${encodeURIComponent(evidenceUse.id)}`
+        : `/admin/reviews/${weeklyReviewRun.id}?tab=overview&amp;item=${contextLink.id}`;
       const sourcePage = await requestText(server.baseUrl, cookieJar, fixture.pagePath);
       assert(
         sourcePage.response.ok &&
           sourcePage.body.includes(`data-linked-review-contexts="${fixture.module}:${fixture.objectType}:root:${fixture.objectId}"`) &&
           sourcePage.body.includes(`data-review-run-id="${weeklyReviewRun.id}"`) &&
           sourcePage.body.includes(weeklyReviewRun.title) &&
-          sourcePage.body.includes(`/admin/reviews/${weeklyReviewRun.id}?tab=overview&amp;item=${contextLink.id}`) &&
+          sourcePage.body.includes(ownerRoute) &&
+          sourcePage.body.includes(`data-review-evidence-use-count="${evidenceUse ? 1 : 0}"`) &&
+          (!evidenceUse || sourcePage.body.includes(`data-review-evidence-id="${evidenceUse.id}"`)) &&
           sourcePage.body.includes("Link in Reviews"),
-        `${fixture.label} did not render exact Reviews-owned context and owner route after reload: ${describeStatus(sourcePage.response)}`
+        `${fixture.label} did not render exact Reviews-owned context/evidence state and owner route after reload: ${describeStatus(sourcePage.response)}`
       );
 
       const handoffParams = new URLSearchParams({
@@ -14267,9 +14327,14 @@ async function main() {
       );
       assert(
         handoffPage.response.ok &&
-          handoffPage.body.includes(`${fixture.label} context handoff`) &&
+          handoffPage.body.includes("Source handoff") &&
+          handoffPage.body.includes(`aria-label="Review source handoff from ${fixture.label}"`) &&
           handoffPage.body.includes(fixture.sourceLabel) &&
-          handoffPage.body.includes(`already linked to ${weeklyReviewRun.title}`) &&
+          handoffPage.body.includes(evidenceUse
+            ? `already used by 1 evidence requirement in ${weeklyReviewRun.title}`
+            : `linked as context in ${weeklyReviewRun.title}`) &&
+          (!evidenceUse || handoffPage.body.includes(evidenceUse.title)) &&
+          (fixture.module !== "media" || handoffPage.body.includes("context alone never satisfies evidence")) &&
           handoffPage.body.includes(fixture.sourcePath) &&
           handoffPage.body.includes("Done"),
         `Reviews did not reconstruct the exact ${fixture.label} handoff without duplicate creation: ${describeStatus(handoffPage.response)}`
@@ -14517,7 +14582,8 @@ async function main() {
     );
     assert(
       reviewProjectHandoffPage.response.ok &&
-        reviewProjectHandoffPage.body.includes("Project context handoff") &&
+        reviewProjectHandoffPage.body.includes("Source handoff") &&
+        reviewProjectHandoffPage.body.includes('aria-label="Review source handoff from Project"') &&
         reviewProjectHandoffPage.body.includes(projectBlocker.title) &&
         reviewProjectHandoffPage.body.includes("reference is stale") &&
         reviewProjectHandoffPage.body.includes("Repair link") &&
@@ -15075,8 +15141,12 @@ async function main() {
     assert(
       createMonthlyReviewRun.response.ok &&
         createMonthlyReviewRun.payload?.item?.cadence === "monthly" &&
-        createMonthlyReviewRun.payload.item.checklist?.length === 13,
-      `Monthly ReviewRun did not instantiate the thirteen-check template: ${JSON.stringify(createMonthlyReviewRun.payload)}`
+        createMonthlyReviewRun.payload.item.templateVersion === 2 &&
+        createMonthlyReviewRun.payload.item.checklist?.length === 13 &&
+        createMonthlyReviewRun.payload.item.evidence?.some(
+          (item) => item.requirementId === "monthly-resource-cleanup" && item.required === false && item.blocksCompletion === false
+        ),
+      `Monthly ReviewRun did not instantiate the versioned thirteen-check template with optional Resource evidence: ${JSON.stringify(createMonthlyReviewRun.payload)}`
     );
     let monthlyReviewRun = createMonthlyReviewRun.payload.item;
     let monthlyReviewView = createMonthlyReviewRun.payload.view;
@@ -15126,6 +15196,77 @@ async function main() {
     assert(updateMonthlySummary.response.ok, `Monthly Review summary save failed: ${JSON.stringify(updateMonthlySummary.payload)}`);
     monthlyReviewRun = updateMonthlySummary.payload.item;
     monthlyReviewView = updateMonthlySummary.payload.view;
+
+    const monthlyMediaEvidence = monthlyReviewRun.evidence.find(
+      (item) => item.requirementId === "monthly-media-review"
+    );
+    assert(monthlyMediaEvidence?.id, "Monthly template did not retain its optional Media evidence requirement");
+    const mediaHandoffParams = new URLSearchParams({
+      review: monthlyReviewRun.id,
+      handoff: "review-source",
+      sourceModule: "media",
+      sourceObjectType: "media_asset",
+      sourceObjectId: createdMedia.id,
+      sourceLabel: mediaUsageSourceRef.label,
+      sourceRelationship: "evidence"
+    });
+    const monthlyMediaHandoff = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/reviews?${mediaHandoffParams.toString()}`
+    );
+    assert(
+      monthlyMediaHandoff.response.ok &&
+        monthlyMediaHandoff.body.includes("Source handoff") &&
+        monthlyMediaHandoff.body.includes('aria-label="Review source handoff from Media"') &&
+        monthlyMediaHandoff.body.includes("Use for") &&
+        monthlyMediaHandoff.body.includes("Media review evidence"),
+      "Monthly Reviews did not offer the exact Media source to compatible unresolved evidence requirements"
+    );
+
+    const useMonthlyMediaEvidence = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: monthlyReviewRun.id,
+        expectedUpdatedAt: monthlyReviewRun.updatedAt,
+        patch: {
+          action: "update_evidence",
+          evidence: {
+            evidenceId: monthlyMediaEvidence.id,
+            state: "linked",
+            sourceRef: mediaUsageSourceRef
+          }
+        }
+      })
+    });
+    assert(
+      useMonthlyMediaEvidence.response.ok &&
+        useMonthlyMediaEvidence.payload?.item?.evidence?.some(
+          (item) => item.id === monthlyMediaEvidence.id && item.state === "linked" && item.sourceRef?.objectId === createdMedia.id
+        ),
+      `Monthly Review did not persist exact Media evidence use: ${JSON.stringify(useMonthlyMediaEvidence.payload)}`
+    );
+    monthlyReviewRun = useMonthlyMediaEvidence.payload.item;
+    monthlyReviewView = useMonthlyMediaEvidence.payload.view;
+
+    const mediaEvidenceOwnerPage = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/media/${encodeURIComponent(createdMedia.id)}?tab=review&reload=${Date.now()}`
+    );
+    assert(
+      mediaEvidenceOwnerPage.response.ok &&
+        mediaEvidenceOwnerPage.body.includes(`data-review-run-id="${monthlyReviewRun.id}"`) &&
+        mediaEvidenceOwnerPage.body.includes(`data-review-evidence-id="${monthlyMediaEvidence.id}"`) &&
+        mediaEvidenceOwnerPage.body.includes(`/admin/reviews/${monthlyReviewRun.id}?tab=evidence&amp;item=${encodeURIComponent(monthlyMediaEvidence.id)}`) &&
+        mediaEvidenceOwnerPage.body.includes("Evidence use"),
+      "Media did not show Reviews-owned evidence-use state with its exact owner route after reload"
+    );
+    pass("Resource and Media source pages expose exact Reviews-owned evidence use without copying source state");
 
     for (const evidenceItem of monthlyReviewRun.evidence.filter((item) => item.blocksCompletion)) {
       const sourceModule = evidenceItem.allowedSourceModules[0];

@@ -440,6 +440,16 @@
   line-height: 1.45;
 }
 
+.projectHandoff .handoffEvidenceState {
+  color: #176145;
+  font-weight: 850;
+}
+
+.projectHandoff .handoffBoundary {
+  max-width: 72ch;
+  color: #7a520d;
+}
+
 .handoffLabel {
   color: #166b95;
   font: 850 10px var(--font-heading);

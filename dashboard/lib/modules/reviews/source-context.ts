@@ -4,6 +4,7 @@ import type {
   ReviewContextLink,
   ReviewContextLinkState,
   ReviewContextRelationship,
+  ReviewEvidenceItem,
   ReviewRunView
 } from "./types";
 
@@ -46,7 +47,13 @@ export type LinkedReviewContextSummary = {
   blockerCount: number;
   linkState: Exclude<ReviewContextLinkState, "removed">;
   links: ReviewContextLink[];
+  evidenceUses: LinkedReviewEvidenceUse[];
 };
+
+export type LinkedReviewEvidenceUse = Pick<
+  ReviewEvidenceItem,
+  "id" | "title" | "state" | "required" | "blocksCompletion" | "updatedAt"
+>;
 
 function cleanParam(value: string | null, maxLength: number) {
   const clean = value?.trim() || "";
@@ -81,6 +88,31 @@ function sameSource(left: NativeObjectRef, right: NativeObjectRef) {
   );
 }
 
+function evidenceSource(item: ReviewEvidenceItem) {
+  if (item.state === "replaced") return item.replacement?.replacementSourceRef;
+  return item.sourceRef;
+}
+
+export function getReviewEvidenceUses(
+  run: Pick<ReviewRunView["run"], "evidence">,
+  sourceRef: NativeObjectRef
+): LinkedReviewEvidenceUse[] {
+  return run.evidence
+    .filter((item) => {
+      const source = evidenceSource(item);
+      return Boolean(source && sameSource(source, sourceRef));
+    })
+    .map(({ id, title, state, required, blocksCompletion, updatedAt }) => ({
+      id,
+      title,
+      state,
+      required,
+      blocksCompletion,
+      updatedAt
+    }))
+    .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
 function sortSummaries(items: LinkedReviewContextSummary[]) {
   return items.sort((left, right) => {
     if (left.current !== right.current) return left.current ? -1 : 1;
@@ -100,7 +132,8 @@ export function getLinkedReviewContexts(
       const links = view.run.contextLinks.filter(
         (link) => link.state !== "removed" && sameSource(link.sourceRef, sourceRef)
       );
-      if (!links.length) return [];
+      const evidenceUses = getReviewEvidenceUses(view.run, sourceRef);
+      if (!links.length && !evidenceUses.length) return [];
       return [{
         reviewRef: createNativeObjectRef({
           module: "reviews",
@@ -115,14 +148,19 @@ export function getLinkedReviewContexts(
         updatedAt: view.run.updatedAt,
         canComplete: view.canComplete,
         blockerCount: view.blockers.length,
-        linkState: activeLinkState(links),
-        links
+        linkState: links.length ? activeLinkState(links) : "linked",
+        links,
+        evidenceUses
       }];
     })
   );
 }
 
 export function reviewContextOwnerRoute(context: LinkedReviewContextSummary) {
+  const evidenceUse = context.evidenceUses[0];
+  if (evidenceUse) {
+    return `${context.reviewRef.route}?${new URLSearchParams({ tab: "evidence", item: evidenceUse.id }).toString()}`;
+  }
   const params = new URLSearchParams({
     tab: "overview",
     item: context.links[0]?.id || ""

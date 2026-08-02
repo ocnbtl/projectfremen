@@ -36,6 +36,7 @@ import type {
 import { createReviewsRepository } from "../../lib/modules/reviews/repository";
 import {
   clearReviewSourceHandoffParams,
+  getReviewEvidenceUses,
   parseReviewSourceHandoff
 } from "../../lib/modules/reviews/source-context";
 import { REVIEW_DECISION_READINESS_CHECKS } from "../../lib/modules/reviews/templates";
@@ -1540,6 +1541,12 @@ export default function ReviewsWorkspace({
   const renderSourceHandoff = (run?: ReviewRun | null) => {
     if (!sourceHandoff) return null;
     const sourceModuleLabel = reviewSourceModuleLabel(sourceHandoff.sourceRef.module);
+    const evidenceUses = run ? getReviewEvidenceUses(run, sourceHandoff.sourceRef) : [];
+    const evidenceCandidates = run?.evidence.filter((item) => (
+      evidenceUses.length === 0 &&
+      item.allowedSourceModules.includes(sourceHandoff.sourceRef.module) &&
+      ["missing", "stale", "duplicate"].includes(item.state)
+    )) || [];
     const existingLink = run?.contextLinks.find((link) => (
       link.state !== "removed" &&
       link.sourceRef.module === sourceHandoff.sourceRef.module &&
@@ -1551,27 +1558,57 @@ export default function ReviewsWorkspace({
     const needsRepair = existingLink?.state === "stale" || existingLink?.state === "broken";
     const readOnly = Boolean(run && reviewIsReadOnly(run));
     return (
-      <section className={styles.projectHandoff} aria-label={`${sourceModuleLabel} context handoff`}>
+      <section className={styles.projectHandoff} aria-label={`Review source handoff from ${sourceModuleLabel}`}>
         <div>
-          <span className={styles.handoffLabel}>{sourceModuleLabel} context handoff</span>
+          <span className={styles.handoffLabel}>Source handoff · {sourceModuleLabel} owner</span>
           <h2>{sourceHandoff.sourceRef.label}</h2>
           <p>
             {run
-              ? alreadyLinked
-                ? `This ${displayLabel(sourceHandoff.sourceRef.objectType)} is already linked to ${run.title}.`
+              ? evidenceUses.length
+                ? `This exact source is already used by ${evidenceUses.length} evidence requirement${evidenceUses.length === 1 ? "" : "s"} in ${run.title}.`
+                : alreadyLinked
+                  ? `This ${displayLabel(sourceHandoff.sourceRef.objectType)} is linked as context in ${run.title}. Evidence use remains separate.`
                 : needsRepair
                   ? `This ${displayLabel(sourceHandoff.sourceRef.objectType)} reference is ${existingLink.state}. Review or repair it before relying on this context.`
                   : `Confirm the exact ${displayLabel(sourceHandoff.sourceRef.objectType)} link in ${run.title}. Reviews stores only the reference.`
               : "Select a native ReviewRun to link this exact source. Nothing is written until you confirm."}
           </p>
+          {run && evidenceUses.length > 0 && (
+            <p className={styles.handoffEvidenceState}>
+              Evidence use · {evidenceUses.map((item) => `${item.title} (${displayLabel(item.state)})`).join(" · ")}
+            </p>
+          )}
+          {run && sourceHandoff.relationship === "evidence" && evidenceUses.length === 0 && evidenceCandidates.length === 0 && (
+            <p className={styles.handoffBoundary}>
+              This Review template has no unresolved {sourceModuleLabel}-compatible evidence requirement. Keep it as context or choose another ReviewRun; context alone never satisfies evidence.
+            </p>
+          )}
         </div>
         <div className={styles.inlineActions}>
           <Link className={styles.textLink} href={sourceHandoff.sourceRef.route}>Open {sourceModuleLabel} source</Link>
+          {run && evidenceUses.map((item) => (
+            <Link
+              className={styles.textLink}
+              href={`/admin/reviews/${encodeURIComponent(run.id)}?tab=evidence&item=${encodeURIComponent(item.id)}`}
+              key={item.id}
+            >Open {item.title}</Link>
+          ))}
+          {run && evidenceCandidates.map((item) => (
+            <button
+              type="button"
+              className={styles.button}
+              data-primary={evidenceCandidates.length === 1 || undefined}
+              disabled={busy || readOnly}
+              title={readOnly ? "Completed, archived, and canceled ReviewRuns are read-only." : `Use this exact source for ${item.title}.`}
+              onClick={() => setEditor({ kind: "evidence", evidenceId: item.id, ...sourceDraftFromRef(sourceHandoff.sourceRef) })}
+              key={item.id}
+            >Use for {item.title}…</button>
+          ))}
           {run && !existingLink && (
             <button
               type="button"
               className={styles.button}
-              data-primary="true"
+              data-primary={evidenceCandidates.length === 0 || undefined}
               disabled={busy || readOnly}
               title={readOnly ? "Completed, archived, and canceled ReviewRuns are read-only." : undefined}
               onClick={() => setEditor({
@@ -1583,7 +1620,7 @@ export default function ReviewsWorkspace({
                 containerObjectId: sourceHandoff.sourceRef.containerObjectId || "",
                 label: sourceHandoff.sourceRef.label
               })}
-            >Review and link…</button>
+            >Link as context…</button>
           )}
           {run && needsRepair && existingLink && (
             <button
@@ -1596,7 +1633,7 @@ export default function ReviewsWorkspace({
             >Repair link…</button>
           )}
           <button type="button" className={styles.button} onClick={clearSourceHandoff}>
-            {alreadyLinked ? "Done" : "Dismiss"}
+            {alreadyLinked || evidenceUses.length ? "Done" : "Dismiss"}
           </button>
         </div>
       </section>

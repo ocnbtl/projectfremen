@@ -763,7 +763,7 @@ function mutateEvidence(run: ReviewRun, input: ReviewEvidenceMutation, now: stri
     item.sourceRef = sourceRef;
     addContext(run, sourceRef, "evidence", now, actorId);
   } else if (state === "waived") {
-    const template = getReviewTemplate(run.cadence);
+    const template = getReviewTemplate(run.cadence, run.templateVersion);
     const waiverAllowed =
       template.id === run.templateId &&
       template.version === run.templateVersion &&

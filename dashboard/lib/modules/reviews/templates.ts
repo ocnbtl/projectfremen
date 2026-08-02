@@ -36,7 +36,7 @@ export type ReviewTemplateDefinition = {
   checklist: readonly ReviewTemplateChecklistDefinition[];
 };
 
-const WEEKLY_CHECKLIST = [
+const WEEKLY_CHECKLIST_V1 = [
   {
     id: "top-outcomes",
     label: "Top outcomes captured",
@@ -149,7 +149,7 @@ const WEEKLY_CHECKLIST = [
   }
 ] as const satisfies readonly ReviewTemplateChecklistDefinition[];
 
-const MONTHLY_CHECKLIST = [
+const MONTHLY_CHECKLIST_V1 = [
   {
     id: "finance-close-reviewed",
     label: "Finance close reviewed",
@@ -332,20 +332,87 @@ const MONTHLY_CHECKLIST = [
   }
 ] as const satisfies readonly ReviewTemplateChecklistDefinition[];
 
+function withEvidence(
+  checklist: readonly ReviewTemplateChecklistDefinition[],
+  definitionId: string,
+  evidence: ReviewTemplateEvidenceDefinition
+): readonly ReviewTemplateChecklistDefinition[] {
+  return checklist.map((definition) => (
+    definition.id === definitionId ? { ...definition, evidence } : definition
+  ));
+}
+
+const WEEKLY_CHECKLIST_V2 = withEvidence(WEEKLY_CHECKLIST_V1, "resources-cleanup", {
+  id: "weekly-resource-cleanup",
+  title: "Resource cleanup source",
+  description: "Resource-owned source or cleanup evidence supporting the weekly review.",
+  required: false,
+  blocksCompletion: false,
+  ownerModule: "resources",
+  allowedSourceModules: ["resources"],
+  relationship: "evidence"
+});
+
+const MONTHLY_CHECKLIST_V2 = withEvidence(MONTHLY_CHECKLIST_V1, "resources-cleanup-checked", {
+  id: "monthly-resource-cleanup",
+  title: "Resource cleanup source",
+  description: "Resource-owned source or cleanup evidence supporting the monthly review.",
+  required: false,
+  blocksCompletion: false,
+  ownerModule: "resources",
+  allowedSourceModules: ["resources"],
+  relationship: "evidence"
+});
+
+const REVIEW_TEMPLATE_HISTORY: Readonly<Record<ReviewCadence, readonly ReviewTemplateDefinition[]>> = {
+  weekly: [
+    {
+      id: "reviews-weekly-v1",
+      version: 1,
+      cadence: "weekly",
+      title: "Weekly Review",
+      checklist: WEEKLY_CHECKLIST_V1
+    },
+    {
+      id: "reviews-weekly-v1",
+      version: 2,
+      cadence: "weekly",
+      title: "Weekly Review",
+      checklist: WEEKLY_CHECKLIST_V2
+    }
+  ],
+  monthly: [
+    {
+      id: "reviews-monthly-v1",
+      version: 1,
+      cadence: "monthly",
+      title: "Monthly Review",
+      checklist: MONTHLY_CHECKLIST_V1
+    },
+    {
+      id: "reviews-monthly-v1",
+      version: 2,
+      cadence: "monthly",
+      title: "Monthly Review",
+      checklist: MONTHLY_CHECKLIST_V2
+    }
+  ]
+};
+
 export const REVIEW_TEMPLATES: Readonly<Record<ReviewCadence, ReviewTemplateDefinition>> = {
   weekly: {
     id: "reviews-weekly-v1",
-    version: 1,
+    version: 2,
     cadence: "weekly",
     title: "Weekly Review",
-    checklist: WEEKLY_CHECKLIST
+    checklist: WEEKLY_CHECKLIST_V2
   },
   monthly: {
     id: "reviews-monthly-v1",
-    version: 1,
+    version: 2,
     cadence: "monthly",
     title: "Monthly Review",
-    checklist: MONTHLY_CHECKLIST
+    checklist: MONTHLY_CHECKLIST_V2
   }
 };
 
@@ -361,7 +428,9 @@ export const REVIEW_DECISION_READINESS_CHECKS = [
   "Monthly decision summary saved"
 ] as const;
 
-export function getReviewTemplate(cadence: ReviewCadence): ReviewTemplateDefinition {
-  return REVIEW_TEMPLATES[cadence];
+export function getReviewTemplate(cadence: ReviewCadence, version?: number): ReviewTemplateDefinition {
+  if (version === undefined) return REVIEW_TEMPLATES[cadence];
+  const template = REVIEW_TEMPLATE_HISTORY[cadence].find((candidate) => candidate.version === version);
+  if (!template) throw new Error(`Unsupported ${cadence} Review template version ${version}`);
+  return template;
 }
-
