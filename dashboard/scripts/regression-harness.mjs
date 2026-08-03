@@ -8618,6 +8618,17 @@ async function checkNoteLinksLifecycle(baseUrl, cookieJar, csrfToken, note, reso
         await manager.locator(`button[data-note-link-id="${mediaLink.id}"][data-selected="true"]`).waitFor();
       }
       await page.screenshot({ path: path.join(screenshotDir, `note-links-${viewport.label}.png`), fullPage: true });
+
+      const indexRoute = `/admin/notes?note=${encodeURIComponent(note.id)}&tab=links&link=${encodeURIComponent(resourceLink.id)}`;
+      await page.goto(`${baseUrl}${indexRoute}`, { waitUntil: "domcontentloaded" });
+      const inspectorManager = page.locator(`[data-note-links-manager="${note.id}"]`);
+      await inspectorManager.waitFor();
+      await inspectorManager.locator(`button[data-note-link-id="${resourceLink.id}"][data-selected="true"]`).waitFor();
+      assert(
+        await page.getByText("Links is staged", { exact: true }).count() === 0,
+        `Notes index inspector kept the staged Links placeholder at ${viewport.label}`
+      );
+      await page.screenshot({ path: path.join(screenshotDir, `note-links-inspector-${viewport.label}.png`), fullPage: true });
       await context.close();
     }
   } finally {

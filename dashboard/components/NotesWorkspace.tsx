@@ -1951,6 +1951,10 @@ export default function NotesWorkspace({
       );
     }
 
+    if (inspectorDisplayTab === "links") {
+      return renderDetailLinksPanel(selectedNote, `note-home-${selectedNote.id}`);
+    }
+
     if (inspectorDisplayTab === "decisions") {
       const mapping = decisionMappings.find(
         (item) =>
