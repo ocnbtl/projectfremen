@@ -490,6 +490,7 @@ export type NotesUrlState = {
   note: string;
   tab: NotesTab;
   item: string;
+  link: string;
   ai: boolean;
 };
 
@@ -515,6 +516,13 @@ export const NOTES_URL_STATE_SCHEMA: UrlStateSchema<NotesUrlState> = {
   tab: enumCodec("tab", NOTES_TABS, "overview"),
   item: {
     param: "item",
+    defaultValue: "",
+    parse: (raw) => raw?.trim() || undefined,
+    serialize: (value) => value.trim(),
+    omit: (value) => value.trim() === ""
+  },
+  link: {
+    param: "link",
     defaultValue: "",
     parse: (raw) => raw?.trim() || undefined,
     serialize: (value) => value.trim(),

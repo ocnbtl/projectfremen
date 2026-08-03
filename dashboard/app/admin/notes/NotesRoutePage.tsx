@@ -5,6 +5,10 @@ import { buildLegacyContentGraph } from "../../../lib/modules/content-graph/lega
 import { legacyPersonalRecordsToMediaAssets } from "../../../lib/modules/media/legacy-adapter";
 import { legacyPersonalRecordsToNotes } from "../../../lib/modules/notes/legacy-adapter";
 import {
+  createEmptyNoteLinksState,
+  readNoteLinksState
+} from "../../../lib/modules/notes/links-store";
+import {
   buildNoteReferenceEvidence,
   type NoteReferenceEvidenceSource
 } from "../../../lib/modules/notes/reference-evidence";
@@ -45,7 +49,7 @@ export default async function NotesRoutePage({
   noteId?: string;
 }) {
   await requireAdminSession();
-  const [recordsResult, personalOpsResult, ownerStateResults] = await Promise.all([
+  const [recordsResult, personalOpsResult, noteLinksResult, ownerStateResults] = await Promise.all([
     readPersonalRecords()
       .then((records) => ({ ok: true as const, records }))
       .catch((error: unknown) => ({
@@ -57,6 +61,12 @@ export default async function NotesRoutePage({
       .catch((error: unknown) => ({
         ok: false as const,
         error: error instanceof Error ? error.message : "Personal Ops Decisions could not be loaded."
+      })),
+    readNoteLinksState()
+      .then((state) => ({ ok: true as const, state }))
+      .catch((error: unknown) => ({
+        ok: false as const,
+        error: error instanceof Error ? error.message : "NoteLinks could not be loaded."
       })),
     Promise.allSettled([readProjectsState(), readReviewsState()] as const)
   ]);
@@ -102,6 +112,8 @@ export default async function NotesRoutePage({
             ? ""
             : "Projects associations could not be loaded."
         }
+        initialNoteLinksState={noteLinksResult.ok ? noteLinksResult.state : createEmptyNoteLinksState()}
+        initialNoteLinksError={noteLinksResult.ok ? "" : noteLinksResult.error}
         initialMediaAssets={media}
         initialResources={resources}
         initialMode={mode}

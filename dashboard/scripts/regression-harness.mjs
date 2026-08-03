@@ -2645,13 +2645,13 @@ async function checkResourceNotePromotionBrowserState(
     await desktop.unroute("**/api/personal/records");
     await dialog.getByRole("button", { name: "Create Note draft" }).click();
     await dialog.getByText("Note draft created", { exact: true }).waitFor();
-    const openNoteLink = dialog.getByRole("link", { name: "Open Note" });
+    const openNoteLink = dialog.getByRole("link", { name: "Open NoteLink" });
     const createdNoteRoute = await openNoteLink.getAttribute("href");
     assert(
       createdNoteRoute?.startsWith("/admin/notes/"),
       `Resource → Note success did not expose a native Note route: ${createdNoteRoute}`
     );
-    const createdNoteId = createdNoteRoute.split("/").filter(Boolean).at(-1);
+    const createdNoteId = new URL(createdNoteRoute, baseUrl).pathname.split("/").filter(Boolean).at(-1);
     await desktop.screenshot({
       path: path.join(screenshotDir, "resource-note-create-success-1440x900.png")
     });
@@ -2709,17 +2709,22 @@ async function checkResourceNotePromotionBrowserState(
     await duplicateChoice.click();
     await duplicateDialog.getByText("Already attached", { exact: true }).first().waitFor();
     assert(
-      await duplicateDialog.getByRole("button", { name: "Attach source evidence", exact: true }).isDisabled(),
-      "Existing Note handoff allowed a duplicate normalized source attachment"
+      !(await duplicateDialog.getByRole("button", { name: "Attach source evidence", exact: true }).isDisabled()),
+      "Existing source evidence could not verify its exact Notes-owned relationship"
     );
-    await duplicateDialog.getByRole("button", { name: "Cancel" }).click();
-    await desktop
-      .getByRole("dialog", { name: "Discard this Notes handoff?" })
-      .getByRole("button", { name: "Discard handoff" })
-      .click();
+    await duplicateDialog.getByRole("button", { name: "Attach source evidence", exact: true }).click();
+    await duplicateDialog.getByText("Source evidence attached", { exact: true }).waitFor();
+    const linkStateAfterDuplicate = await requestJson(baseUrl, cookieJar, "/api/notes/links");
+    assert(
+      linkStateAfterDuplicate.payload?.state?.links?.filter(
+        (link) => link.noteRef?.objectId === existingNoteId && link.targetRef?.objectId === resourceId
+      ).length === 1,
+      "Existing source verification created a duplicate NoteLink"
+    );
+    await duplicateDialog.getByRole("button", { name: "Stay on Resource" }).click();
     await duplicateDialog.waitFor({ state: "detached" });
 
-    await desktop.goto(`${baseUrl}${createdNoteRoute}?tab=links`, {
+    await desktop.goto(`${baseUrl}${createdNoteRoute}`, {
       waitUntil: "domcontentloaded"
     });
     await desktop.getByText(createdTitle, { exact: true }).first().waitFor();
@@ -2861,6 +2866,10 @@ async function checkResourceNotePromotionBrowserState(
         (request) => request === "PATCH /api/personal/records"
       ).length === 2,
       `Resource → Note attach did not emit one failed and one successful PATCH: ${mutatingRequests.join(" | ")}`
+    );
+    assert(
+      mutatingRequests.filter((request) => request === "POST /api/notes/links").length === 3,
+      `Resource -> Note handoff did not connect and idempotently verify Notes-owned relationships: ${mutatingRequests.join(" | ")}`
     );
     assert(
       browserErrors.length === 0,
@@ -8379,6 +8388,247 @@ async function checkProjectReviewContextBrowserState(
   }
 }
 
+async function checkNoteLinksLifecycle(baseUrl, cookieJar, csrfToken, note, resource, media) {
+  const anonymousJar = new CookieJar();
+  const unauthenticated = await requestJson(baseUrl, anonymousJar, "/api/notes/links");
+  assert(unauthenticated.response.status === 401, "Unauthenticated NoteLinks GET was not blocked");
+
+  const sourceBefore = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+  assert(sourceBefore.response.ok && sourceBefore.payload?.ok, "Unable to capture NoteLink source records");
+  const sourceSnapshots = new Map(
+    [note.id, resource.id, media.id].map((id) => [
+      id,
+      JSON.stringify(sourceBefore.payload.items.find((item) => item.id === id))
+    ])
+  );
+  const noteRef = { module: "notes", objectType: "note", objectId: note.id, label: "client label is ignored" };
+  const resourceRef = { module: "resources", objectType: "resource", objectId: resource.id, label: "client label is ignored" };
+  const mediaRef = { module: "media", objectType: "media_asset", objectId: media.id, label: "client label is ignored" };
+
+  const missingCsrf = await requestJson(baseUrl, cookieJar, "/api/notes/links", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ input: { noteRef, targetRef: resourceRef, relationship: "source" } })
+  });
+  assert(missingCsrf.response.status === 403, "NoteLinks POST accepted a missing CSRF token");
+
+  const create = async (targetRef, relationship = "source") => requestJson(baseUrl, cookieJar, "/api/notes/links", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-csrf-token": csrfToken },
+    body: JSON.stringify({
+      input: {
+        noteRef,
+        targetRef,
+        relationship,
+        contextNote: "Regression-owned relationship context.",
+        provenance: "manual"
+      }
+    })
+  });
+  const patch = async (item, change, expectedUpdatedAt = item.updatedAt) => requestJson(baseUrl, cookieJar, "/api/notes/links", {
+    method: "PATCH",
+    headers: { "content-type": "application/json", "x-csrf-token": csrfToken },
+    body: JSON.stringify({ id: item.id, expectedUpdatedAt, patch: change })
+  });
+
+  const resourceCreate = await create(resourceRef);
+  assert(
+    resourceCreate.response.ok && resourceCreate.payload?.created === true,
+    `Resource NoteLink create failed: ${JSON.stringify(resourceCreate.payload)}`
+  );
+  let resourceLink = resourceCreate.payload.item;
+  assert(
+    resourceLink.noteRef.label === note.title && resourceLink.targetRef.label === resource.title,
+    "NoteLinks API trusted client-supplied labels instead of canonical owner records"
+  );
+
+  const duplicate = await create(resourceRef);
+  assert(
+    duplicate.response.ok && duplicate.payload?.created === false && duplicate.payload?.item?.id === resourceLink.id,
+    "Exact NoteLink create was not idempotent"
+  );
+  const mediaCreate = await create(mediaRef, "supporting_media");
+  assert(mediaCreate.response.ok && mediaCreate.payload?.created === true, "Media NoteLink create failed");
+  const mediaLink = mediaCreate.payload.item;
+
+  const missingTarget = await create({ ...resourceRef, objectId: `${testRunId}-missing-resource` });
+  assert(missingTarget.response.status === 409, "NoteLinks accepted an unavailable owner target");
+
+  const staleReport = await patch(resourceLink, {
+    action: "update_health",
+    state: "stale",
+    reason: "The source identity needs a deliberate verification pass."
+  });
+  assert(staleReport.response.ok && staleReport.payload?.item?.state === "stale", "NoteLink stale report failed");
+  const preStaleTimestamp = resourceLink.updatedAt;
+  resourceLink = staleReport.payload.item;
+
+  const duplicateRepair = await patch(resourceLink, {
+    action: "repair",
+    targetRef: mediaRef,
+    reason: "This attempted repair must collide with the existing exact Media link."
+  });
+  assert(duplicateRepair.response.status === 409, "NoteLink repair created a duplicate exact target");
+
+  const repaired = await patch(resourceLink, {
+    action: "repair",
+    targetRef: resourceRef,
+    reason: "Canonical Resource identity was reverified without mutating either owner object."
+  });
+  assert(
+    repaired.response.ok && repaired.payload?.item?.state === "active" && repaired.payload?.item?.lastRepair?.previousTargetRef?.objectId === resource.id,
+    "NoteLink repair did not retain prior target evidence"
+  );
+  resourceLink = repaired.payload.item;
+
+  const relationshipChanged = await patch(resourceLink, {
+    action: "change_relationship",
+    relationship: "reference",
+    contextNote: "Updated relationship context remains Notes-owned."
+  });
+  assert(
+    relationshipChanged.response.ok && relationshipChanged.payload?.item?.relationship === "reference",
+    "NoteLink relationship edit failed"
+  );
+  resourceLink = relationshipChanged.payload.item;
+
+  const staleOverwrite = await patch(resourceLink, { action: "remove", reason: "Stale request" }, preStaleTimestamp);
+  assert(staleOverwrite.response.status === 409 && staleOverwrite.payload?.code === "stale", "NoteLinks accepted a stale overwrite");
+
+  const removed = await patch(resourceLink, { action: "remove", reason: "Verify soft removal and restoration." });
+  assert(removed.response.ok && removed.payload?.item?.state === "removed", "NoteLink soft removal failed");
+  resourceLink = removed.payload.item;
+  const readRemoved = await requestJson(baseUrl, cookieJar, `/api/notes/links?id=${encodeURIComponent(resourceLink.id)}`);
+  assert(readRemoved.response.ok && readRemoved.payload?.item?.state === "removed", "Removed NoteLink history disappeared");
+
+  const restore = await patch(resourceLink, { action: "restore" });
+  assert(restore.response.ok && restore.payload?.item?.state === "active", "NoteLink restoration failed");
+  resourceLink = restore.payload.item;
+
+  const noteRoute = await requestText(
+    baseUrl,
+    cookieJar,
+    `/admin/notes/${encodeURIComponent(note.id)}?tab=links&link=${encodeURIComponent(resourceLink.id)}`
+  );
+  assert(
+    noteRoute.response.ok &&
+      noteRoute.body.includes(`data-note-links-manager="${note.id}"`) &&
+      noteRoute.body.includes(`data-note-link-id="${resourceLink.id}"`) &&
+      noteRoute.body.includes("Resource and Media links"),
+    "Notes direct NoteLink route did not restore the selected lifecycle surface"
+  );
+
+  const resourceRoute = await requestText(baseUrl, cookieJar, `/admin/resources/${resource.id}?tab=notes`);
+  assert(
+    resourceRoute.response.ok &&
+      resourceRoute.body.includes(`data-linked-notes="resources:resource:root:${resource.id}"`) &&
+      resourceRoute.body.includes(`data-note-link-id="${resourceLink.id}"`) &&
+      resourceRoute.body.includes("Manage in Notes"),
+    "Resource Notes tab did not expose the canonical Notes-owned relationship"
+  );
+  const mediaRoute = await requestText(baseUrl, cookieJar, `/admin/media/${media.id}?tab=links`);
+  assert(
+    mediaRoute.response.ok &&
+      mediaRoute.body.includes(`data-linked-notes="media:media_asset:root:${media.id}"`) &&
+      mediaRoute.body.includes(`data-note-link-id="${mediaLink.id}"`),
+    "Media Links tab did not expose the canonical Notes-owned relationship"
+  );
+
+  const sourceAfter = await requestJson(baseUrl, cookieJar, "/api/personal/records");
+  for (const [id, snapshot] of sourceSnapshots) {
+    assert(
+      JSON.stringify(sourceAfter.payload.items.find((item) => item.id === id)) === snapshot,
+      `NoteLink lifecycle mutated owner record ${id}`
+    );
+  }
+
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "note-links-checkpoint");
+  await mkdir(screenshotDir, { recursive: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+  try {
+    for (const viewport of [
+      { width: 1920, height: 1080, label: "1920x1080" },
+      { width: 1440, height: 900, label: "1440x900" },
+      { width: 1024, height: 768, label: "1024x768" },
+      { width: 390, height: 844, label: "390x844" }
+    ]) {
+      const context = await browser.newContext({ viewport });
+      await context.addCookies([
+        { name: "admin_session", value: cookieJar.get("admin_session"), url: baseUrl, httpOnly: true, sameSite: "Lax" },
+        { name: "admin_csrf", value: cookieJar.get("admin_csrf"), url: baseUrl, sameSite: "Lax" }
+      ]);
+      if (viewport.width === 390) await context.grantPermissions([]);
+      const page = await context.newPage();
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      page.on("pageerror", (error) => browserErrors.push(error.message));
+      page.on("console", (message) => {
+        if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) browserErrors.push(message.text());
+      });
+      page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (url.origin === new URL(baseUrl).origin && !["GET", "HEAD", "OPTIONS"].includes(request.method())) {
+          mutatingRequests.push(`${request.method()} ${url.pathname}`);
+        }
+      });
+      page.on("response", (response) => {
+        const url = new URL(response.url());
+        if (response.status() >= 400 && !url.pathname.startsWith("/_vercel/")) failedResponses.push(`${response.status()} ${url.pathname}`);
+      });
+      const route = `/admin/notes/${encodeURIComponent(note.id)}?tab=links&link=${encodeURIComponent(resourceLink.id)}`;
+      await page.goto(`${baseUrl}${route}`, { waitUntil: "domcontentloaded" });
+      const manager = page.locator(`[data-note-links-manager="${note.id}"]`);
+      await manager.waitFor();
+      await manager.locator(`button[data-note-link-id="${resourceLink.id}"][data-selected="true"]`).waitFor();
+      await manager.scrollIntoViewIfNeeded();
+      await page.waitForTimeout(100);
+      const overflow = await page.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth
+      }));
+      assert(overflow.scrollWidth <= overflow.innerWidth, `NoteLinks ${viewport.label} has horizontal overflow: ${JSON.stringify(overflow)}`);
+      const dockOverlap = await page.evaluate(() => {
+        const managerElement = document.querySelector("[data-note-links-manager]");
+        const refresh = Array.from(managerElement?.querySelectorAll("button") || []).find((button) => button.textContent?.includes("Refresh links"));
+        const dock = document.querySelector('[aria-label="Open AI assistant"]');
+        if (!(refresh instanceof HTMLElement) || !(dock instanceof HTMLElement)) return false;
+        const left = refresh.getBoundingClientRect();
+        const right = dock.getBoundingClientRect();
+        return left.left < right.right && left.right > right.left && left.top < right.bottom && left.bottom > right.top;
+      });
+      assert(!dockOverlap, `NoteLinks ${viewport.label} refresh action overlaps the global AI dock`);
+      if (viewport.width === 390) {
+        const undersized = await manager.locator("button:visible, a[href]:visible, select:visible, textarea:visible").evaluateAll((elements) => elements
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return { label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 50), width: rect.width, height: rect.height };
+          })
+          .filter((item) => item.width > 0 && item.height > 0 && (item.width < 44 || item.height < 44)));
+        assert(undersized.length === 0, `NoteLinks mobile targets below 44px: ${JSON.stringify(undersized)}`);
+      }
+      if (viewport.width === 1440) {
+        await manager.locator(`button[data-note-link-id="${mediaLink.id}"]`).click();
+        await page.waitForURL((url) => url.searchParams.get("link") === mediaLink.id);
+        await page.goBack({ waitUntil: "domcontentloaded" });
+        await manager.locator(`button[data-note-link-id="${resourceLink.id}"][data-selected="true"]`).waitFor();
+        await page.goForward({ waitUntil: "domcontentloaded" });
+        await manager.locator(`button[data-note-link-id="${mediaLink.id}"][data-selected="true"]`).waitFor();
+      }
+      await page.screenshot({ path: path.join(screenshotDir, `note-links-${viewport.label}.png`), fullPage: true });
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  assert(mutatingRequests.length === 0, `NoteLinks responsive read/history checks emitted mutations: ${mutatingRequests.join(" | ")}`);
+  assert(browserErrors.length === 0, `NoteLinks responsive checks emitted errors: ${browserErrors.join(" | ")}`);
+  assert(failedResponses.length === 0, `NoteLinks responsive checks received failed responses: ${failedResponses.join(" | ")}`);
+  return { resourceLink, mediaLink };
+}
+
 async function main() {
   const tempRoot = await mkdtemp(path.join(os.tmpdir(), "project-fremen-regression-"));
   const port = await getFreePort();
@@ -12558,6 +12808,16 @@ async function main() {
     );
     pass("Resources and Media create, soft-unlink, restore, and audit typed Projects-owned associations with failed-write recovery, owner routing, and responsive lifecycle controls");
 
+    await checkNoteLinksLifecycle(
+      server.baseUrl,
+      cookieJar,
+      csrfToken,
+      { id: createdNote.id, title: updatedNoteTitle },
+      { id: createdResource.id, title: resourceTitle },
+      { id: createdMedia.id, title: mediaTitle }
+    );
+    pass("Notes owns duplicate-safe Resource and Media link lifecycle with canonical labels, CSRF, optimistic concurrency, audit history, soft removal, repair, owner projections, and source-record isolation");
+
     const sourceRecordExpectations = [
       { id: createdNote.id, className: "note", label: "Note", expectedUrl: sharedContentSourceUrl },
       { id: createdResource.id, className: "resource", label: "Resource", expectedUrl: sharedContentSourceUrl },
@@ -12622,8 +12882,8 @@ async function main() {
       "Note Links route did not expose the matching Resource owner route"
     );
     assert(
-      noteLinksTab.body.includes("Candidate graph") && noteLinksTab.body.includes("not persisted"),
-      "Note Links route did not disclose that the exact-URL relationship is only a read-only candidate"
+      noteLinksTab.body.includes("Candidate graph") && noteLinksTab.body.includes("explicitly promoted"),
+      "Note Links route did not distinguish exact legacy candidates from explicit native NoteLinks"
     );
     assert(
       countRenderedToken(noteLinksTab.body, `data-content-target="resources:${createdResource.id}"`) === 1,

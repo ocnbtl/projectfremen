@@ -4,6 +4,8 @@ import Link from "next/link";
 import type { FormEvent } from "react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { createNotesRepository } from "../../lib/modules/notes/repository";
+import { createNoteLinksRepository } from "../../lib/modules/notes/links-repository";
+import { noteLinkOwnerRoute, type NoteLink } from "../../lib/modules/notes/links-types";
 import type { NoteRecord } from "../../lib/modules/notes/types";
 import {
   buildNoteSourceAttachment,
@@ -55,6 +57,7 @@ export default function ResourceNotePromotionSheet({
   const discardOpenRef = useRef(false);
   const onCloseRef = useRef(onClose);
   const repository = useMemo(() => createNotesRepository(), []);
+  const noteLinksRepository = useMemo(() => createNoteLinksRepository(), []);
   const sourceUrl = resourceNoteSourceUrl(resource);
   const initialTitle = defaultResourceNoteTitle(resource);
   const [mode, setMode] = useState<PromotionMode>(initialMode);
@@ -69,6 +72,8 @@ export default function ResourceNotePromotionSheet({
   const [error, setError] = useState("");
   const [savedNote, setSavedNote] = useState<NoteRecord | null>(null);
   const [savedMode, setSavedMode] = useState<PromotionMode | null>(null);
+  const [savedLink, setSavedLink] = useState<NoteLink | null>(null);
+  const [linkError, setLinkError] = useState("");
   const [discardOpen, setDiscardOpen] = useState(false);
   const selectedNote = notes.find((note) => note.id === selectedNoteId) || null;
   const selectedAlreadyAttached =
@@ -85,7 +90,7 @@ export default function ResourceNotePromotionSheet({
     !savedNote &&
     (mode === "create"
       ? titleValid
-      : Boolean(selectedNote) && !selectedAlreadyAttached);
+      : Boolean(selectedNote));
 
   busyRef.current = busy;
   dirtyRef.current = dirty;
@@ -197,10 +202,12 @@ export default function ResourceNotePromotionSheet({
               body: noteBody
             })!
           )
-        : await repository.update(
-            selectedNote!.id,
-            buildNoteSourceAttachment(selectedNote!, sourceUrl)!
-          );
+        : selectedAlreadyAttached
+          ? { ok: true as const, data: selectedNote! }
+          : await repository.update(
+              selectedNote!.id,
+              buildNoteSourceAttachment(selectedNote!, sourceUrl)!
+            );
 
     if (!result.ok) {
       setBusy(false);
@@ -208,13 +215,27 @@ export default function ResourceNotePromotionSheet({
       return;
     }
 
-    setBusy(false);
     setSavedNote(result.data);
     setSavedMode(mode);
     setNotes((current) => [
       result.data,
       ...current.filter((note) => note.id !== result.data.id)
     ]);
+    const linkResult = await noteLinksRepository.create({
+      noteRef: result.data.nativeRef,
+      targetRef: resource.nativeRef,
+      relationship: "source",
+      contextNote: "Authored from or explicitly attached to this Resource source.",
+      provenance: "resource_note_attach"
+    });
+    setBusy(false);
+    if (!linkResult.ok) {
+      setLinkError(`${linkResult.error.message} The Note and its saved source evidence were preserved; retry the Notes-owned relationship separately.`);
+      onSaved(result.data, mode);
+      return;
+    }
+    setSavedLink(linkResult.data.item);
+    setLinkError("");
     onSaved(result.data, mode);
   }
 
@@ -277,22 +298,50 @@ export default function ResourceNotePromotionSheet({
                     </h3>
                     <p>
                       <strong>{savedNote.title}</strong> now carries this Resource URL as legacy
-                      source evidence. The Resource remains unchanged.
+                      source evidence. {savedLink ? "A Notes-owned source relationship is also connected." : "The Resource remains unchanged."}
                     </p>
+                    {linkError && <p className={styles.error} role="alert">{linkError}</p>}
                   </div>
                   <dl className={styles.successFacts}>
                     <div><dt>Note lifecycle</dt><dd>{savedNote.lifecycleStatus}</dd></div>
                     <div><dt>Source evidence</dt><dd>1 Resource URL saved</dd></div>
+                    <div><dt>Native NoteLink</dt><dd>{savedLink ? "Connected" : "Needs retry"}</dd></div>
                     <div><dt>Native citation</dt><dd>Not created</dd></div>
                     <div><dt>Resource</dt><dd>Preserved</dd></div>
                   </dl>
                   <div className={styles.successActions}>
                     <Link
                       className={styles.primaryLink}
-                      href={getNativeObjectRoute(savedNote.nativeRef)}
+                      href={savedLink ? noteLinkOwnerRoute(savedLink) : getNativeObjectRoute(savedNote.nativeRef)}
                     >
-                      Open Note
+                      {savedLink ? "Open NoteLink" : "Open Note"}
                     </Link>
+                    {!savedLink && (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          setLinkError("");
+                          const retry = await noteLinksRepository.create({
+                            noteRef: savedNote.nativeRef,
+                            targetRef: resource.nativeRef,
+                            relationship: "source",
+                            contextNote: "Authored from or explicitly attached to this Resource source.",
+                            provenance: "resource_note_attach"
+                          });
+                          setBusy(false);
+                          if (!retry.ok) {
+                            setLinkError(`${retry.error.message} The saved Note was preserved.`);
+                            return;
+                          }
+                          setSavedLink(retry.data.item);
+                          onSaved(savedNote, savedMode);
+                        }}
+                      >
+                        {busy ? "Retrying..." : "Retry NoteLink"}
+                      </button>
+                    )}
                     <button type="button" onClick={onClose}>Stay on Resource</button>
                   </div>
                 </section>
@@ -502,7 +551,7 @@ export default function ResourceNotePromotionSheet({
                         : mode === "create" && !titleValid
                           ? "A Note title is required."
                           : selectedAlreadyAttached
-                            ? "This source evidence is already attached."
+                            ? "Source evidence is already attached; submit to verify the exact NoteLink."
                             : mode === "existing" && !selectedNote
                               ? "Select one existing Note."
                               : undefined

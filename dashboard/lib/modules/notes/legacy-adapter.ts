@@ -284,7 +284,7 @@ export function legacyPersonalRecordToNoteRecord(
     capabilities: {
       structuredBody: false,
       versionHistory: false,
-      nativeLinks: false
+      nativeLinks: true
     }
   };
 }

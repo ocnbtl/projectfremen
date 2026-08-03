@@ -4,6 +4,7 @@ import ResourcesWorkspace from "../../../components/ResourcesWorkspace";
 import { buildLegacyContentGraph } from "../../../lib/modules/content-graph/legacy-adapter";
 import { legacyPersonalRecordsToMediaAssets } from "../../../lib/modules/media/legacy-adapter";
 import { legacyPersonalRecordsToNotes } from "../../../lib/modules/notes/legacy-adapter";
+import { createEmptyNoteLinksState, readNoteLinksState } from "../../../lib/modules/notes/links-store";
 import { legacyPersonalRecordsToPeople } from "../../../lib/modules/people/legacy-adapter";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
 import type { PersonalOpsState } from "../../../lib/modules/personal-ops/types";
@@ -62,7 +63,8 @@ export default async function ResourcesRoutePage({
     Promise.allSettled([
       readProjectsState(),
       readReviewsState(),
-      readPersonalOpsState()
+      readPersonalOpsState(),
+      readNoteLinksState()
     ] as const)
   ]);
   const records: PersonalRecord[] = recordsResult.ok
@@ -80,7 +82,7 @@ export default async function ResourcesRoutePage({
     media,
     people
   });
-  const [projectsResult, reviewsResult, personalOpsResult] = ownerStateResults;
+  const [projectsResult, reviewsResult, personalOpsResult, noteLinksResult] = ownerStateResults;
   const linkedContextEvidence = buildResourceLinkedContextEvidence({
     resources,
     legacyContent: recordsResult.ok
@@ -124,6 +126,12 @@ export default async function ResourcesRoutePage({
           projectsResult.status === "fulfilled"
             ? ""
             : "Projects associations could not be loaded."
+        }
+        initialNoteLinksState={
+          noteLinksResult.status === "fulfilled" ? noteLinksResult.value : createEmptyNoteLinksState()
+        }
+        initialNoteLinksError={
+          noteLinksResult.status === "fulfilled" ? "" : "Notes-owned links could not be loaded."
         }
         initialPersonalOpsFollowUps={
           personalOpsResult.status === "fulfilled"

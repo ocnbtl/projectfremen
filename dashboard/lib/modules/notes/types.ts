@@ -87,7 +87,7 @@ export type NoteRecord = {
   capabilities: {
     structuredBody: false;
     versionHistory: false;
-    nativeLinks: false;
+    nativeLinks: boolean;
   };
 };
 

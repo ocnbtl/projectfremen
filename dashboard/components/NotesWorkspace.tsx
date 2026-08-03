@@ -20,8 +20,10 @@ import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import LinkedReviewsPanel from "./operational/LinkedReviewsPanel";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
+import { useNoteLinksState } from "./operational/useNoteLinksState";
 import NoteAttachmentsView, { NoteAttachmentInspector } from "./notes/NoteAttachmentsView";
 import NoteDecisionsView from "./notes/NoteDecisionsView";
+import NoteLinksManager from "./notes/NoteLinksManager";
 import NotePropertiesEditorSheet from "./notes/NotePropertiesEditorSheet";
 import NotePropertiesView, { NotePropertiesSummary } from "./notes/NotePropertiesView";
 import NoteReviewScheduleEditorSheet from "./notes/NoteReviewScheduleEditorSheet";
@@ -35,6 +37,7 @@ import {
 } from "../lib/modules/content-graph/types";
 import { createNotesRepository } from "../lib/modules/notes/repository";
 import { buildNoteAttachmentEvidence } from "../lib/modules/notes/attachment-evidence";
+import type { NoteLinksState } from "../lib/modules/notes/links-types";
 import {
   buildNotePropertyQueue,
   buildNotePropertyReadiness
@@ -90,6 +93,8 @@ type NotesWorkspaceProps = {
   referenceEvidence: NoteReferenceEvidenceIndex;
   initialProjectsState: ProjectsState;
   initialProjectsError?: string;
+  initialNoteLinksState: NoteLinksState;
+  initialNoteLinksError?: string;
   initialMediaAssets: MediaAsset[];
   initialResources: ResourceRecord[];
   initialMode?: "index" | "detail";
@@ -428,6 +433,8 @@ export default function NotesWorkspace({
   referenceEvidence,
   initialProjectsState,
   initialProjectsError = "",
+  initialNoteLinksState,
+  initialNoteLinksError = "",
   initialMediaAssets,
   initialResources,
   initialMode = "index",
@@ -463,6 +470,14 @@ export default function NotesWorkspace({
     loading: projectsLoading,
     refresh: refreshProjects
   } = useProjectsState(initialProjectsState, initialProjectsError);
+  const {
+    state: noteLinksState,
+    error: noteLinksError,
+    loading: noteLinksLoading,
+    refresh: refreshNoteLinks,
+    create: createNoteLink,
+    patch: patchNoteLink
+  } = useNoteLinksState(initialNoteLinksState, initialNoteLinksError);
   const [query, setQuery] = useState(firstUrlState.query);
   const [view, setView] = useState<NotesView>(firstUrlState.view);
   const [filter, setFilter] = useState<NotesFilter>(firstUrlState.filter);
@@ -470,6 +485,7 @@ export default function NotesWorkspace({
   const [density, setDensity] = useState(firstUrlState.density);
   const [selectedId, setSelectedId] = useState(initialSelectedId || firstUrlState.note || initialNotes[0]?.id || "");
   const [selectedAttachmentItemId, setSelectedAttachmentItemId] = useState(firstUrlState.item);
+  const [selectedLinkId, setSelectedLinkId] = useState(firstUrlState.link);
   const [activeTab, setActiveTab] = useState<NotesTab>(
     initialMode === "detail" && firstUrlState.tab === "overview" ? "body" : firstUrlState.tab
   );
@@ -547,6 +563,11 @@ export default function NotesWorkspace({
       }),
     [projectsState.projects]
   );
+  const noteLinkTargets = useMemo(
+    () => [...initialResources.map((resource) => resource.nativeRef), ...initialMediaAssets.map((asset) => asset.nativeRef)]
+      .sort((left, right) => left.label.localeCompare(right.label)),
+    [initialMediaAssets, initialResources]
+  );
   const counts = useMemo(() => buildNoteViewCounts(notes), [notes]);
   const referenceEvidenceByNoteId = useMemo(
     () => new Map(referenceEvidence.records.map((record) => [record.noteId, record] as const)),
@@ -608,6 +629,7 @@ export default function NotesWorkspace({
     setDensity(next.density);
     setAiOpen(next.ai);
     setSelectedAttachmentItemId(next.item);
+    setSelectedLinkId(next.link);
     if (!initialSelectedId) setSelectedId(next.note || initialNotes[0]?.id || "");
     setActiveTab(initialMode === "detail" && next.tab === "overview" ? "body" : next.tab);
     if (initialMode === "index") setInspectorTab(inspectorTabFor(next.tab));
@@ -664,6 +686,7 @@ export default function NotesWorkspace({
         note: path === getModuleRoute("notes") ? selectedId : "",
         tab: activeTab,
         item: selectedAttachmentItemId,
+        link: selectedLinkId,
         ai: aiOpen,
         ...partial
       },
@@ -684,10 +707,11 @@ export default function NotesWorkspace({
   function selectNote(id: string) {
     setSelectedId(id);
     setSelectedAttachmentItemId("");
+    setSelectedLinkId("");
     setInspectorOpen(true);
     setInspectorTab("overview");
     setActiveTab("overview");
-    updateUrl({ note: id, tab: "overview", item: "" }, { history: "push" });
+    updateUrl({ note: id, tab: "overview", item: "", link: "" }, { history: "push" });
   }
 
   function selectDirectoryView(nextView: NotesView, reason = "") {
@@ -1099,7 +1123,7 @@ export default function NotesWorkspace({
       mobileOpen={mobileSidebarOpen}
       onClose={() => setMobileSidebarOpen(false)}
       className={styles.sidebar}
-      footer={<p className={styles.sidebarFootnote}>Legacy Notes adapter · 30-day Recent view · owner references indexed read-only · native NoteLinks and versions pending</p>}
+      footer={<p className={styles.sidebarFootnote}>Legacy Note bodies - native Resource/Media NoteLinks - owner references indexed - versions and inferred backlinks pending</p>}
     />
   );
 
@@ -1141,6 +1165,20 @@ export default function NotesWorkspace({
     const mediaTargets = targetGroups.filter((group) => group.target.module === "media");
     const unresolvedUrls = unresolved.filter((reference) => reference.kind === "external_url_candidate");
     const unresolvedIds = unresolved.filter((reference) => reference.kind === "legacy_relation_id");
+    const persistedNoteLinks = noteLinksState.links.filter(
+      (link) =>
+        link.noteRef.module === note.nativeRef.module &&
+        link.noteRef.objectType === note.nativeRef.objectType &&
+        link.noteRef.objectId === note.nativeRef.objectId
+    );
+    const noteLinkCandidates = targetGroups
+      .filter((group) => group.target.module === "resources" || group.target.module === "media")
+      .map((group) => ({
+        target: group.target,
+        reason: group.candidates.some((candidate) => candidate.matchBasis === "exact_normalized_url")
+          ? "Exact normalized URL identity"
+          : "Exact retained owner ID"
+      }));
     const projectLinks = projectsState.links.filter(
       (link) =>
         link.linkState !== "removed" &&
@@ -1164,19 +1202,39 @@ export default function NotesWorkspace({
               items={[
                 { id: "url", label: "Exact normalized URL candidates", value: exactUrlCandidates.length },
                 { id: "id", label: "Exact ID candidates", value: exactIdCandidates.length },
-                { id: "persisted", label: "Projects-owned links", value: projectLinks.length, tone: projectLinks.length ? "positive" : "attention" },
+                { id: "persisted", label: "Persisted NoteLinks", value: persistedNoteLinks.filter((link) => link.state !== "removed").length, tone: persistedNoteLinks.length ? "positive" : "attention" },
+                { id: "projects", label: "Projects-owned links", value: projectLinks.length },
                 { id: "unresolved", label: "Unresolved references", value: unresolved.length, tone: unresolved.length ? "attention" : "positive" },
                 { id: "resources", label: "Resource targets", value: resourceTargets.length },
                 { id: "media", label: "Media targets", value: mediaTargets.length }
               ]}
             />
             <div className={styles.readOnlyNotice}>
-              <strong>Candidate graph · not persisted NoteLinks</strong>
+              <strong>Candidate graph - separate from persisted NoteLinks</strong>
               <span>
-                These rows come from exact normalized URLs or retained record IDs. They can open the owning object, but they are not citations, attachments, backlinks, or persisted ObjectLinks and cannot be edited or removed here.
+                Exact URL and retained-ID rows are candidates until explicitly promoted below. Persisted NoteLinks have their own relationship, health, repair, removal, and audit lifecycle; they still are not citations or backlinks.
               </span>
             </div>
           </section>
+
+          <div className={styles.panel} data-wide="true">
+            <NoteLinksManager
+              noteRef={note.nativeRef}
+              state={noteLinksState}
+              loading={noteLinksLoading}
+              error={noteLinksError}
+              onRefresh={refreshNoteLinks}
+              onCreate={createNoteLink}
+              onPatch={patchNoteLink}
+              availableTargets={noteLinkTargets}
+              candidates={noteLinkCandidates}
+              selectedLinkId={selectedLinkId}
+              onSelectLink={(id) => {
+                setSelectedLinkId(id);
+                updateUrl({ tab: "links", link: id }, { history: "push" });
+              }}
+            />
+          </div>
 
           <section className={styles.panel} data-wide="true">
             <div className={styles.panelHeader}>
@@ -1450,10 +1508,25 @@ export default function NotesWorkspace({
                     projectLinkFormRef.current?.querySelector<HTMLSelectElement>("select")?.focus();
                   }
                 },
-                { id: "link", label: "Link other object", disabled: true, disabledReason: "Native NoteLink persistence and relationship provenance are not connected for non-Project objects." },
-                { id: "promote", label: "Promote candidate", disabled: true, disabledReason: "Candidate promotion requires an approved link repository and explicit audit event." },
-                { id: "repair", label: "Repair unresolved ID", disabled: true, disabledReason: `${unresolvedIds.length} retained ID reference${unresolvedIds.length === 1 ? "" : "s"} need an ownership-safe relink workflow.` },
-                { id: "remove", label: "Remove link", disabled: true, disabledReason: "No persisted ObjectLink exists to remove. Neither source nor target will be deleted.", intent: "destructive" }
+                {
+                  id: "link",
+                  label: "Manage NoteLinks",
+                  onSelect: () => document.querySelector<HTMLElement>(`[data-note-links-manager="${note.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" })
+                },
+                {
+                  id: "promote",
+                  label: "Promote exact candidate",
+                  disabled: noteLinkCandidates.length === 0,
+                  disabledReason: "No exact Resource or Media candidate is available for explicit promotion.",
+                  onSelect: () => document.querySelector<HTMLElement>(`[data-note-links-manager="${note.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" })
+                },
+                {
+                  id: "repair",
+                  label: "Repair selected link",
+                  disabled: !persistedNoteLinks.some((link) => link.state === "stale" || link.state === "broken"),
+                  disabledReason: `${unresolvedIds.length} legacy retained ID reference${unresolvedIds.length === 1 ? "" : "s"} remain candidates; repair applies only to a persisted stale or broken NoteLink.`,
+                  onSelect: () => document.querySelector<HTMLElement>(`[data-note-links-manager="${note.id}"]`)?.scrollIntoView({ behavior: "smooth", block: "start" })
+                }
               ]}
             />
           </section>
@@ -1760,6 +1833,7 @@ export default function NotesWorkspace({
           note={note}
           readiness={readiness}
           context={propertyContextFor(note)}
+          nativeLinkCount={noteLinksState.links.filter((link) => link.noteRef.objectId === note.id && link.state !== "removed").length}
           onOpenTab={(tab) => {
             setActiveTab(tab);
             updateUrl({ tab });
@@ -1860,6 +1934,7 @@ export default function NotesWorkspace({
             note={selectedNote}
             readiness={selectedPropertyReadiness}
             context={propertyContextFor(selectedNote)}
+            nativeLinkCount={noteLinksState.links.filter((link) => link.noteRef.objectId === selectedNote.id && link.state !== "removed").length}
             onEditProperties={() => openPropertyEditor(selectedNote)}
             onOpenProperties={propertiesAreOpen
               ? undefined
@@ -2087,7 +2162,7 @@ export default function NotesWorkspace({
             <QuickActionBar
               actions={[
                 { id: "edit", label: "Open full editor", href: selectedNote.nativeRef.route, intent: "primary" },
-                { id: "link", label: "Link object", disabled: true, disabledReason: "Native NoteLink persistence is unresolved." },
+                 { id: "link", label: "Manage links", href: `${selectedNote.nativeRef.route}?tab=links` },
                 { id: "decision", label: "Review decision output", href: noteDecisionsRoute(selectedNote) },
                 { id: "schedule", label: selectedNote.nextReviewAt ? "Edit review schedule" : "Schedule review", onSelect: () => openReviewScheduleEditor(selectedNote) },
                 { id: "review", label: "Mark reviewed", disabled: true, disabledReason: "The legacy review action cannot enforce native review blockers." },

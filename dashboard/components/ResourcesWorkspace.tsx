@@ -12,6 +12,7 @@ import DenseObjectRow from "./operational/DenseObjectRow";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import EvidenceChecklist from "./operational/EvidenceChecklist";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
+import LinkedNotesPanel from "./operational/LinkedNotesPanel";
 import MetricStrip from "./operational/MetricStrip";
 import ObjectHeader from "./operational/ObjectHeader";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
@@ -21,6 +22,7 @@ import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
+import { useNoteLinksState } from "./operational/useNoteLinksState";
 import ResourceEditorSheet from "./resources/ResourceEditorSheet";
 import ResourceNotePromotionSheet from "./resources/ResourceNotePromotionSheet";
 import ResourcePropertiesView from "./resources/ResourcePropertiesView";
@@ -35,6 +37,7 @@ import type {
   ResourceSourceEvidenceState,
   ResourceType
 } from "../lib/modules/resources/types";
+import type { NoteLinksState } from "../lib/modules/notes/links-types";
 import { buildResourceDuplicateEvidenceIndex } from "../lib/modules/resources/duplicate-evidence";
 import {
   RESOURCE_LINKED_CONTEXT_MODULE_BY_VIEW,
@@ -68,6 +71,8 @@ type ResourcesWorkspaceProps = {
   linkedContextEvidence: ResourceLinkedContextEvidenceIndex;
   initialProjectsState: ProjectsState;
   initialProjectsError?: string;
+  initialNoteLinksState: NoteLinksState;
+  initialNoteLinksError?: string;
   initialPersonalOpsFollowUps: PersonalOpsFollowUp[];
   initialPersonalOpsFollowUpsError?: string;
   initialMode?: "index" | "detail";
@@ -303,6 +308,8 @@ export default function ResourcesWorkspace({
   linkedContextEvidence,
   initialProjectsState,
   initialProjectsError = "",
+  initialNoteLinksState,
+  initialNoteLinksError = "",
   initialPersonalOpsFollowUps,
   initialPersonalOpsFollowUpsError = "",
   initialReviewViews,
@@ -359,6 +366,12 @@ export default function ResourcesWorkspace({
     initialPersonalOpsFollowUps,
     initialPersonalOpsFollowUpsError
   );
+  const {
+    state: noteLinksState,
+    error: noteLinksError,
+    loading: noteLinksLoading,
+    refresh: refreshNoteLinks
+  } = useNoteLinksState(initialNoteLinksState, initialNoteLinksError);
 
   const selectedResource = useMemo(
     () => resources.find((resource) => resource.id === selectedId) || null,
@@ -1328,6 +1341,9 @@ export default function ResourcesWorkspace({
       const noteTargets = targetGroups.filter(
         (group) => group.candidates.some((candidate) => candidate.relationship === "note_source_candidate")
       );
+      const persistedNoteLinks = noteLinksState.links.filter(
+        (link) => link.targetRef.module === "resources" && link.targetRef.objectId === selectedResource.id && link.state !== "removed"
+      );
       return (
         <DetailTabPanel tabsId={tabsId} tabId="notes" active>
           <div className={styles.overviewGrid}>
@@ -1335,7 +1351,8 @@ export default function ResourcesWorkspace({
               <MetricStrip
                 ariaLabel="Resource Notes evidence"
                 items={[
-                  { id: "matches", label: "Matching Notes", value: noteTargets.length },
+                  { id: "matches", label: "Exact Note candidates", value: noteTargets.length },
+                  { id: "native", label: "Persisted NoteLinks", value: persistedNoteLinks.length, tone: persistedNoteLinks.length ? "positive" : "attention" },
                   { id: "context", label: "Source context", value: selectedResource.body ? "Present" : "Empty" },
                   { id: "extractions", label: "Native extractions", value: "Unavailable", tone: "attention" },
                   { id: "citations", label: "Persisted citations", value: "Unavailable", tone: "attention" }
@@ -1348,6 +1365,16 @@ export default function ResourcesWorkspace({
                 </span>
               </div>
             </section>
+
+            <LinkedNotesPanel
+              source={selectedResource.nativeRef}
+              state={noteLinksState}
+              loading={noteLinksLoading}
+              error={noteLinksError}
+              onRefresh={refreshNoteLinks}
+              limit={8}
+              title="Notes using this Resource"
+            />
 
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>

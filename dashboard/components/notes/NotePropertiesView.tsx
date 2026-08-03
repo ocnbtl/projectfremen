@@ -52,12 +52,14 @@ export function NotePropertiesSummary({
   note,
   readiness,
   context,
+  nativeLinkCount,
   onEditProperties,
   onOpenProperties,
 }: {
   note: NoteRecord;
   readiness: NotePropertyReadiness;
   context: NotePropertyContext;
+  nativeLinkCount: number;
   onEditProperties: () => void;
   onOpenProperties?: () => void;
 }) {
@@ -89,8 +91,8 @@ export function NotePropertiesSummary({
           },
           {
             id: "references",
-            label: "Retained references",
-            value: context.retainedRelationCount + context.sourceCandidateCount
+            label: "Native NoteLinks",
+            value: nativeLinkCount
           }
         ]}
       />
@@ -133,6 +135,7 @@ export default function NotePropertiesView({
   note,
   readiness,
   context,
+  nativeLinkCount,
   onOpenTab,
   onEditProperties,
   onScheduleReview
@@ -140,6 +143,7 @@ export default function NotePropertiesView({
   note: NoteRecord;
   readiness: NotePropertyReadiness;
   context: NotePropertyContext;
+  nativeLinkCount: number;
   onOpenTab: (tab: "body" | "links" | "review") => void;
   onEditProperties: () => void;
   onScheduleReview: () => void;
@@ -308,12 +312,12 @@ export default function NotePropertiesView({
             <div className={styles.fact}><span>Source candidates</span><strong>{sourceCount}</strong></div>
             <div className={styles.fact}><span>Resolved owner targets</span><strong>{context.resolvedOwnerTargetCount}</strong></div>
             <div className={styles.fact}><span>Unresolved references</span><strong>{context.unresolvedReferenceCount}</strong></div>
-            <div className={styles.fact}><span>Persisted NoteLinks</span><strong>Not connected</strong></div>
+            <div className={styles.fact}><span>Persisted NoteLinks</span><strong>{nativeLinkCount}</strong></div>
             <div className={styles.fact}><span>Inferred backlinks</span><strong>Not connected</strong></div>
             <div className={styles.fact}><span>Attachments</span><strong>Not connected</strong></div>
             <div className={styles.fact}><span>Decision candidates</span><strong>{note.type === "decision" ? 1 : 0}</strong></div>
           </div>
-          <p>Retained IDs and exact owner-route candidates remain evidence. They are not promoted into native NoteLinks.</p>
+          <p>Retained IDs and exact owner-route candidates remain evidence until explicitly promoted. Resource and Media NoteLinks are persisted separately and keep their own audit lifecycle.</p>
           <QuickActionBar
             actions={[
               { id: "inspect-links", label: "Inspect link evidence", onSelect: () => onOpenTab("links"), intent: "primary" },

@@ -13,6 +13,7 @@ import {
   type MediaUsageEvidenceSource
 } from "../../../lib/modules/media/usage-evidence";
 import { legacyPersonalRecordsToNotes } from "../../../lib/modules/notes/legacy-adapter";
+import { createEmptyNoteLinksState, readNoteLinksState } from "../../../lib/modules/notes/links-store";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
 import type { PersonalOpsState } from "../../../lib/modules/personal-ops/types";
 import {
@@ -74,7 +75,8 @@ export default async function MediaRoutePage({
     Promise.allSettled([
       readProjectsState(),
       readReviewsState(),
-      readPersonalOpsState()
+      readPersonalOpsState(),
+      readNoteLinksState()
     ] as const)
   ]);
   const records: PersonalRecord[] = recordsResult.ok
@@ -88,7 +90,7 @@ export default async function MediaRoutePage({
   const resources = legacyPersonalRecordsToResources(records);
   const clientResources = resources.map(resourceForClient);
   const contentGraph = buildLegacyContentGraph({ notes, resources, media: assets });
-  const [projectsResult, reviewsResult, personalOpsResult] = ownerStateResults;
+  const [projectsResult, reviewsResult, personalOpsResult, noteLinksResult] = ownerStateResults;
   if (!loadError && assetId && !assets.some((asset) => asset.id === assetId)) {
     notFound();
   }
@@ -137,6 +139,12 @@ export default async function MediaRoutePage({
             projectsResult.status === "fulfilled"
               ? ""
               : "Projects associations could not be loaded."
+          }
+          initialNoteLinksState={
+            noteLinksResult.status === "fulfilled" ? noteLinksResult.value : createEmptyNoteLinksState()
+          }
+          initialNoteLinksError={
+            noteLinksResult.status === "fulfilled" ? "" : "Notes-owned links could not be loaded."
           }
           initialPersonalOpsFollowUps={
             personalOpsResult.status === "fulfilled"

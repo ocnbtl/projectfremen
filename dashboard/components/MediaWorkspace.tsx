@@ -14,6 +14,7 @@ import DenseObjectRow from "./operational/DenseObjectRow";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import EvidenceChecklist from "./operational/EvidenceChecklist";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
+import LinkedNotesPanel from "./operational/LinkedNotesPanel";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import LinkedReviewsPanel from "./operational/LinkedReviewsPanel";
 import ObjectHeader from "./operational/ObjectHeader";
@@ -22,6 +23,7 @@ import QuickActionBar from "./operational/QuickActionBar";
 import SystemState from "./operational/SystemState";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
+import { useNoteLinksState } from "./operational/useNoteLinksState";
 import ResourceEditorSheet from "./resources/ResourceEditorSheet";
 import {
   contentLinksForObject,
@@ -39,6 +41,7 @@ import {
 } from "../lib/modules/media/rights-evidence";
 import { formatMediaReviewCadence } from "../lib/modules/media/review-schedule";
 import type { MediaAsset, MediaResourceReference } from "../lib/modules/media/types";
+import type { NoteLinksState } from "../lib/modules/notes/links-types";
 import {
   buildFollowUpCreationRoute,
   type FollowUpSourceRef
@@ -64,6 +67,8 @@ type MediaWorkspaceProps = {
   contentGraph: LegacyContentGraph;
   initialProjectsState: ProjectsState;
   initialProjectsError?: string;
+  initialNoteLinksState: NoteLinksState;
+  initialNoteLinksError?: string;
   initialPersonalOpsFollowUps: PersonalOpsFollowUp[];
   initialPersonalOpsFollowUpsError?: string;
   initialMode?: "index" | "detail";
@@ -431,6 +436,8 @@ export default function MediaWorkspace({
   contentGraph,
   initialProjectsState,
   initialProjectsError = "",
+  initialNoteLinksState,
+  initialNoteLinksError = "",
   initialPersonalOpsFollowUps,
   initialPersonalOpsFollowUpsError = "",
   initialReviewViews,
@@ -509,6 +516,12 @@ export default function MediaWorkspace({
     initialPersonalOpsFollowUps,
     initialPersonalOpsFollowUpsError
   );
+  const {
+    state: noteLinksState,
+    error: noteLinksError,
+    loading: noteLinksLoading,
+    refresh: refreshNoteLinks
+  } = useNoteLinksState(initialNoteLinksState, initialNoteLinksError);
 
   useEffect(() => {
     const focusSearch = (event: KeyboardEvent) => {
@@ -1440,6 +1453,15 @@ export default function MediaWorkspace({
 
         <DetailTabPanel tabsId={tabsId} tabId="links" active={activeTab === "links"}>
           <div className={styles.overviewGrid}>
+            <LinkedNotesPanel
+              source={asset.nativeRef}
+              state={noteLinksState}
+              loading={noteLinksLoading}
+              error={noteLinksError}
+              onRefresh={refreshNoteLinks}
+              limit={8}
+              title="Notes using this Media asset"
+            />
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>
                 <div>
