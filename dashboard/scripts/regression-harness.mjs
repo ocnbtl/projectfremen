@@ -14341,6 +14341,168 @@ async function main() {
       );
     }
 
+    const markResourceEvidenceStale = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "update_evidence",
+          evidence: {
+            evidenceId: weeklyResourceEvidence.id,
+            state: "stale"
+          }
+        }
+      })
+    });
+    const staleResourceEvidence = markResourceEvidenceStale.payload?.item?.evidence?.find(
+      (item) => item.id === weeklyResourceEvidence.id
+    );
+    assert(
+      markResourceEvidenceStale.response.ok &&
+        markResourceEvidenceStale.payload?.auditEventId &&
+        staleResourceEvidence?.state === "stale" &&
+        staleResourceEvidence.sourceRef?.objectId === createdResource.id,
+      `Stale Review evidence did not retain its exact Resource source: ${JSON.stringify(markResourceEvidenceStale.payload)}`
+    );
+    weeklyReviewRun = markResourceEvidenceStale.payload.item;
+    weeklyReviewView = markResourceEvidenceStale.payload.view;
+
+    const staleResourceOwnerPage = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/resources/${encodeURIComponent(createdResource.id)}?tab=review&stale=${Date.now()}`
+    );
+    assert(
+      staleResourceOwnerPage.response.ok &&
+        staleResourceOwnerPage.body.includes(`data-review-evidence-id="${weeklyResourceEvidence.id}"`) &&
+        staleResourceOwnerPage.body.includes('data-review-evidence-state="stale"') &&
+        staleResourceOwnerPage.body.includes('data-review-evidence-needs-review="true"') &&
+        staleResourceOwnerPage.body.includes("Repair exact evidence in Reviews") &&
+        staleResourceOwnerPage.body.includes("Needs review"),
+      "Resource did not expose the stale Reviews-owned evidence state and repair route"
+    );
+
+    const staleResourceHandoffParams = new URLSearchParams({
+      review: weeklyReviewRun.id,
+      handoff: "review-source",
+      sourceModule: "resources",
+      sourceObjectType: "resource",
+      sourceObjectId: createdResource.id,
+      sourceLabel: resourceTitle,
+      sourceRelationship: "evidence"
+    });
+    const staleResourceHandoff = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/reviews?${staleResourceHandoffParams.toString()}`
+    );
+    assert(
+      staleResourceHandoff.response.ok &&
+        staleResourceHandoff.body.includes(`${weeklyResourceEvidence.title} (Stale)`) &&
+        staleResourceHandoff.body.includes(`Repair ${weeklyResourceEvidence.title}`) &&
+        staleResourceHandoff.body.includes(`/admin/reviews/${weeklyReviewRun.id}?tab=evidence&amp;item=${encodeURIComponent(weeklyResourceEvidence.id)}`),
+      "Reviews did not reconstruct a recoverable exact Resource evidence handoff"
+    );
+
+    const refreshResourceEvidence = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "update_evidence",
+          evidence: {
+            evidenceId: weeklyResourceEvidence.id,
+            state: "linked",
+            sourceRef: reviewResourceSource
+          }
+        }
+      })
+    });
+    assert(
+      refreshResourceEvidence.response.ok &&
+        refreshResourceEvidence.payload?.auditEventId &&
+        refreshResourceEvidence.payload.item.evidence.filter(
+          (item) => item.sourceRef?.module === "resources" && item.sourceRef?.objectId === createdResource.id
+        ).length === 1,
+      `Resource evidence refresh duplicated or lost its source: ${JSON.stringify(refreshResourceEvidence.payload)}`
+    );
+    weeklyReviewRun = refreshResourceEvidence.payload.item;
+    weeklyReviewView = refreshResourceEvidence.payload.view;
+
+    const duplicateEvidenceTarget = weeklyReviewRun.evidence.find((item) => item.id !== weeklyResourceEvidence.id);
+    assert(duplicateEvidenceTarget?.id, "Review duplicate-evidence test requires another evidence item");
+    const markResourceEvidenceDuplicate = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "update_evidence",
+          evidence: {
+            evidenceId: weeklyResourceEvidence.id,
+            state: "duplicate",
+            duplicateOfId: duplicateEvidenceTarget.id
+          }
+        }
+      })
+    });
+    const duplicateResourceEvidence = markResourceEvidenceDuplicate.payload?.item?.evidence?.find(
+      (item) => item.id === weeklyResourceEvidence.id
+    );
+    assert(
+      markResourceEvidenceDuplicate.response.ok &&
+        duplicateResourceEvidence?.state === "duplicate" &&
+        duplicateResourceEvidence.duplicateOfId === duplicateEvidenceTarget.id &&
+        duplicateResourceEvidence.sourceRef?.objectId === createdResource.id,
+      `Duplicate Review evidence did not retain its repairable Resource source: ${JSON.stringify(markResourceEvidenceDuplicate.payload)}`
+    );
+    weeklyReviewRun = markResourceEvidenceDuplicate.payload.item;
+    weeklyReviewView = markResourceEvidenceDuplicate.payload.view;
+
+    const resolveDuplicateResourceEvidence = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: weeklyReviewRun.id,
+        expectedUpdatedAt: weeklyReviewRun.updatedAt,
+        patch: {
+          action: "update_evidence",
+          evidence: {
+            evidenceId: weeklyResourceEvidence.id,
+            state: "linked",
+            sourceRef: reviewResourceSource
+          }
+        }
+      })
+    });
+    assert(
+      resolveDuplicateResourceEvidence.response.ok &&
+        resolveDuplicateResourceEvidence.payload?.item?.evidence?.some(
+          (item) => item.id === weeklyResourceEvidence.id && item.state === "linked" && !item.duplicateOfId
+        ),
+      `Duplicate Review evidence did not resolve through the canonical linked state: ${JSON.stringify(resolveDuplicateResourceEvidence.payload)}`
+    );
+    weeklyReviewRun = resolveDuplicateResourceEvidence.payload.item;
+    weeklyReviewView = resolveDuplicateResourceEvidence.payload.view;
+    pass("Resource evidence retains stale and duplicate source identity, owner routing, audit, and a duplicate-safe repair path");
+
     const linkedReviewContext = weeklyReviewRun.contextLinks.find(
       (link) => link.sourceRef?.objectId === projectBlocker.id
     );
@@ -15266,7 +15428,142 @@ async function main() {
         mediaEvidenceOwnerPage.body.includes("Evidence use"),
       "Media did not show Reviews-owned evidence-use state with its exact owner route after reload"
     );
-    pass("Resource and Media source pages expose exact Reviews-owned evidence use without copying source state");
+
+    const replacementMediaSourceRef = {
+      module: "media",
+      objectType: "media_asset",
+      objectId: createdMediaResourceHandoff.id,
+      label: mediaResourceHandoffTitle
+    };
+    const replacementReason = "Use the retained source-handoff asset because it contains the current review evidence.";
+    const replaceMonthlyMediaEvidence = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: monthlyReviewRun.id,
+        expectedUpdatedAt: monthlyReviewRun.updatedAt,
+        patch: {
+          action: "update_evidence",
+          evidence: {
+            evidenceId: monthlyMediaEvidence.id,
+            state: "replaced",
+            replacement: {
+              replacementSourceRef: replacementMediaSourceRef,
+              reason: replacementReason,
+              reviewed: false
+            }
+          }
+        }
+      })
+    });
+    const pendingMediaReplacement = replaceMonthlyMediaEvidence.payload?.item?.evidence?.find(
+      (item) => item.id === monthlyMediaEvidence.id
+    );
+    assert(
+      replaceMonthlyMediaEvidence.response.ok &&
+        replaceMonthlyMediaEvidence.payload?.auditEventId &&
+        pendingMediaReplacement?.state === "replaced" &&
+        pendingMediaReplacement.replacement?.previousSourceRef?.objectId === createdMedia.id &&
+        pendingMediaReplacement.replacement?.replacementSourceRef?.objectId === createdMediaResourceHandoff.id &&
+        pendingMediaReplacement.replacement?.reviewed === false,
+      `Media evidence replacement did not preserve the previous source and pending-review gate: ${JSON.stringify(replaceMonthlyMediaEvidence.payload)}`
+    );
+    monthlyReviewRun = replaceMonthlyMediaEvidence.payload.item;
+    monthlyReviewView = replaceMonthlyMediaEvidence.payload.view;
+
+    const pendingReplacementOwnerPage = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/media/${encodeURIComponent(createdMediaResourceHandoff.id)}?tab=review&replacement=${Date.now()}`
+    );
+    assert(
+      pendingReplacementOwnerPage.response.ok &&
+        pendingReplacementOwnerPage.body.includes(`data-review-evidence-id="${monthlyMediaEvidence.id}"`) &&
+        pendingReplacementOwnerPage.body.includes('data-review-evidence-state="replaced"') &&
+        pendingReplacementOwnerPage.body.includes('data-review-evidence-needs-review="true"') &&
+        pendingReplacementOwnerPage.body.includes("Repair exact evidence in Reviews"),
+      "Replacement Media source did not expose its pending Reviews-owned evidence state"
+    );
+
+    const replacementHandoffParams = new URLSearchParams({
+      review: monthlyReviewRun.id,
+      handoff: "review-source",
+      sourceModule: "media",
+      sourceObjectType: "media_asset",
+      sourceObjectId: createdMediaResourceHandoff.id,
+      sourceLabel: mediaResourceHandoffTitle,
+      sourceRelationship: "evidence"
+    });
+    const replacementHandoffPage = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/reviews?${replacementHandoffParams.toString()}`
+    );
+    assert(
+      replacementHandoffPage.response.ok &&
+        replacementHandoffPage.body.includes(`${monthlyMediaEvidence.title} (Replaced)`) &&
+        replacementHandoffPage.body.includes(`Review ${monthlyMediaEvidence.title}`) &&
+        replacementHandoffPage.body.includes(`/admin/reviews/${monthlyReviewRun.id}?tab=evidence&amp;item=${encodeURIComponent(monthlyMediaEvidence.id)}`),
+      "Reviews did not expose the pending replacement review from the exact Media source handoff"
+    );
+
+    const confirmMonthlyMediaReplacement = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: monthlyReviewRun.id,
+        expectedUpdatedAt: monthlyReviewRun.updatedAt,
+        patch: {
+          action: "update_evidence",
+          evidence: {
+            evidenceId: monthlyMediaEvidence.id,
+            state: "replaced",
+            replacement: {
+              replacementSourceRef: replacementMediaSourceRef,
+              reason: replacementReason,
+              reviewed: true
+            }
+          }
+        }
+      })
+    });
+    const reviewedMediaReplacement = confirmMonthlyMediaReplacement.payload?.item?.evidence?.find(
+      (item) => item.id === monthlyMediaEvidence.id
+    );
+    assert(
+      confirmMonthlyMediaReplacement.response.ok &&
+        confirmMonthlyMediaReplacement.payload?.auditEventId &&
+        reviewedMediaReplacement?.replacement?.previousSourceRef?.objectId === createdMedia.id &&
+        reviewedMediaReplacement.replacement?.replacementSourceRef?.objectId === createdMediaResourceHandoff.id &&
+        reviewedMediaReplacement.replacement?.reviewed === true &&
+        reviewedMediaReplacement.replacement?.reviewedAt &&
+        reviewedMediaReplacement.replacement?.reviewedBy === "admin",
+      `Reviewing replacement evidence lost lifecycle or audit metadata: ${JSON.stringify(confirmMonthlyMediaReplacement.payload)}`
+    );
+    monthlyReviewRun = confirmMonthlyMediaReplacement.payload.item;
+    monthlyReviewView = confirmMonthlyMediaReplacement.payload.view;
+
+    const reviewedReplacementDetail = await requestText(
+      server.baseUrl,
+      cookieJar,
+      `/admin/reviews/${encodeURIComponent(monthlyReviewRun.id)}?tab=evidence&item=${encodeURIComponent(monthlyMediaEvidence.id)}&reviewed=${Date.now()}`
+    );
+    assert(
+      reviewedReplacementDetail.response.ok &&
+        reviewedReplacementDetail.body.includes('data-evidence-state="replaced"') &&
+        reviewedReplacementDetail.body.includes('data-evidence-ready="true"') &&
+        reviewedReplacementDetail.body.includes("Replacement reviewed") &&
+        reviewedReplacementDetail.body.includes(replacementReason) &&
+        reviewedReplacementDetail.body.includes(createdMedia.id),
+      "Reviewed replacement evidence did not retain its source transition in the Reviews ledger"
+    );
+    pass("Resource and Media source pages expose exact Reviews-owned evidence use with stale, duplicate, replacement-review, and audit state");
 
     for (const evidenceItem of monthlyReviewRun.evidence.filter((item) => item.blocksCompletion)) {
       const sourceModule = evidenceItem.allowedSourceModules[0];

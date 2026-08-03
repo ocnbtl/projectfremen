@@ -747,7 +747,10 @@ function mutateEvidence(run: ReviewRun, input: ReviewEvidenceMutation, now: stri
   const id = requiredText(input.evidenceId, "evidence.evidenceId", 240);
   const item = run.evidence.find((candidate) => candidate.id === id);
   if (!item) throw new ReviewsStoreError("not_found", "Review evidence item not found", { status: 404 });
-  const previousSourceRef = item.sourceRef;
+  const previousReplacement = item.replacement;
+  const activeSourceRef = item.state === "replaced"
+    ? previousReplacement?.replacementSourceRef
+    : item.sourceRef;
   const state = enumValue(input.state, EVIDENCE_STATES, item.state, "evidence.state");
   item.state = state;
   item.sourceRef = undefined;
@@ -790,8 +793,15 @@ function mutateEvidence(run: ReviewRun, input: ReviewEvidenceMutation, now: stri
     if (!item.allowedSourceModules.includes(replacementSourceRef.module)) {
       validation("The replacement source module is not allowed for this evidence requirement", "evidence.replacement.replacementSourceRef.module");
     }
+    const confirmsExistingReplacement = Boolean(
+      previousReplacement &&
+      activeSourceRef &&
+      nativeRefKey(activeSourceRef) === nativeRefKey(replacementSourceRef)
+    );
     item.replacement = {
-      previousSourceRef,
+      previousSourceRef: confirmsExistingReplacement
+        ? previousReplacement?.previousSourceRef
+        : activeSourceRef,
       replacementSourceRef,
       reason: requiredText(input.replacement.reason, "evidence.replacement.reason", 4000),
       reviewed: booleanValue(input.replacement.reviewed, false, "evidence.replacement.reviewed"),
@@ -805,7 +815,10 @@ function mutateEvidence(run: ReviewRun, input: ReviewEvidenceMutation, now: stri
     if (duplicateOfId === item.id || !run.evidence.some((candidate) => candidate.id === duplicateOfId)) {
       validation("evidence.duplicateOfId must reference another evidence item", "evidence.duplicateOfId");
     }
+    item.sourceRef = activeSourceRef;
     item.duplicateOfId = duplicateOfId;
+  } else if (state === "stale") {
+    item.sourceRef = activeSourceRef;
   }
   item.updatedAt = now;
 }

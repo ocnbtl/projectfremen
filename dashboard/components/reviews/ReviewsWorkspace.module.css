@@ -445,6 +445,18 @@
   font-weight: 850;
 }
 
+.projectHandoff .handoffEvidenceState[data-attention="true"] {
+  color: #7a520d;
+}
+
+.handoffEvidenceActions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .projectHandoff .handoffBoundary {
   max-width: 72ch;
   color: #7a520d;
@@ -762,6 +774,44 @@
 
 .sourceLine a {
   color: #265e76;
+  overflow-wrap: anywhere;
+}
+
+.evidenceResolution,
+.evidenceReviewSummary {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #b9d7c9;
+  border-radius: 7px;
+  background: #f4faf7;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.evidenceResolution[data-pending="true"] {
+  border-color: #e4c98f;
+  background: #fff9e9;
+}
+
+.evidenceResolution span,
+.evidenceResolution small,
+.evidenceReviewSummary small,
+.evidenceReviewSummary p {
+  margin: 0;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.evidenceReviewSummary {
+  grid-column: 1 / -1;
+}
+
+.evidenceReviewSummary a {
+  color: #265e76;
+  font-weight: 850;
   overflow-wrap: anywhere;
 }
 

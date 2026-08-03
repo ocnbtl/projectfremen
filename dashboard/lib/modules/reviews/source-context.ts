@@ -53,7 +53,10 @@ export type LinkedReviewContextSummary = {
 export type LinkedReviewEvidenceUse = Pick<
   ReviewEvidenceItem,
   "id" | "title" | "state" | "required" | "blocksCompletion" | "updatedAt"
->;
+> & {
+  ready: boolean;
+  needsReview: boolean;
+};
 
 function cleanParam(value: string | null, maxLength: number) {
   const clean = value?.trim() || "";
@@ -73,12 +76,6 @@ function acceptedRelationship(value: string, fallback: ReviewContextRelationship
     : fallback;
 }
 
-function activeLinkState(links: readonly ReviewContextLink[]): LinkedReviewContextSummary["linkState"] {
-  if (links.some((link) => link.state === "broken")) return "broken";
-  if (links.some((link) => link.state === "stale")) return "stale";
-  return "linked";
-}
-
 function sameSource(left: NativeObjectRef, right: NativeObjectRef) {
   return (
     left.module === right.module &&
@@ -93,6 +90,20 @@ function evidenceSource(item: ReviewEvidenceItem) {
   return item.sourceRef;
 }
 
+function evidenceUseReady(item: ReviewEvidenceItem) {
+  if (item.state === "linked") return Boolean(item.sourceRef);
+  if (item.state === "replaced") {
+    return Boolean(
+      item.replacement?.replacementSourceRef &&
+      item.replacement.reason.trim() &&
+      item.replacement.reviewed &&
+      item.replacement.reviewedAt &&
+      item.replacement.reviewedBy
+    );
+  }
+  return false;
+}
+
 export function getReviewEvidenceUses(
   run: Pick<ReviewRunView["run"], "evidence">,
   sourceRef: NativeObjectRef
@@ -102,15 +113,29 @@ export function getReviewEvidenceUses(
       const source = evidenceSource(item);
       return Boolean(source && sameSource(source, sourceRef));
     })
-    .map(({ id, title, state, required, blocksCompletion, updatedAt }) => ({
-      id,
-      title,
-      state,
-      required,
-      blocksCompletion,
-      updatedAt
-    }))
+    .map((item) => {
+      const ready = evidenceUseReady(item);
+      return {
+        id: item.id,
+        title: item.title,
+        state: item.state,
+        required: item.required,
+        blocksCompletion: item.blocksCompletion,
+        updatedAt: item.updatedAt,
+        ready,
+        needsReview: item.state === "stale" || item.state === "duplicate" || (item.state === "replaced" && !ready)
+      };
+    })
     .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+}
+
+function summaryLinkState(
+  links: readonly ReviewContextLink[],
+  evidenceUses: readonly LinkedReviewEvidenceUse[]
+): LinkedReviewContextSummary["linkState"] {
+  if (links.some((link) => link.state === "broken")) return "broken";
+  if (links.some((link) => link.state === "stale") || evidenceUses.some((item) => item.needsReview)) return "stale";
+  return "linked";
 }
 
 function sortSummaries(items: LinkedReviewContextSummary[]) {
@@ -148,7 +173,7 @@ export function getLinkedReviewContexts(
         updatedAt: view.run.updatedAt,
         canComplete: view.canComplete,
         blockerCount: view.blockers.length,
-        linkState: links.length ? activeLinkState(links) : "linked",
+        linkState: summaryLinkState(links, evidenceUses),
         links,
         evidenceUses
       }];
