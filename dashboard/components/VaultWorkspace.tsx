@@ -369,7 +369,7 @@ export default function VaultWorkspace() {
                 <div>
                   <h3>Enter the one-time code</h3>
                   <p><strong>Show pairing code</strong> opens a private page served by this PC. You can also find it from Start → Unigentamos Vault Companion.</p>
-                  <label>Six-digit pairing code<input value={setupCode} onChange={(event) => setSetupCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" /></label>
+                  <label>Six-digit pairing code<input value={setupCode} onChange={(event) => setSetupCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="Enter code from helper" /></label>
                 </div>
               </div>}
 
