@@ -39,10 +39,29 @@ $existing = if (Test-Path -LiteralPath $configPath) {
 } else {
   $null
 }
+function New-SecureSetupCode {
+  $range = [uint64]900000
+  $fullRange = [uint64][uint32]::MaxValue + 1
+  $acceptBelow = $fullRange - ($fullRange % $range)
+  $bytes = New-Object byte[] 4
+  $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+
+  try {
+    do {
+      $rng.GetBytes($bytes)
+      $value = [uint64][System.BitConverter]::ToUInt32($bytes, 0)
+    } while ($value -ge $acceptBelow)
+
+    return [string](100000 + [int]($value % $range))
+  } finally {
+    $rng.Dispose()
+  }
+}
+
 $setupCode = if ($existing -and $existing.setupCode) {
   [string]$existing.setupCode
 } else {
-  [string][System.Security.Cryptography.RandomNumberGenerator]::GetInt32(100000, 1000000)
+  New-SecureSetupCode
 }
 $resolvedBackup = if ($BackupDirectory) {
   [System.IO.Path]::GetFullPath($BackupDirectory)
