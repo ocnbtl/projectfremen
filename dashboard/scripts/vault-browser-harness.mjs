@@ -194,30 +194,41 @@ try {
     if (response.status() >= 500 && pathname !== "/api/vault/sync") unexpectedFailures.push(`${response.status()} ${pathname}`);
   });
 
+  const updatePage = await context.newPage();
+  await updatePage.goto(`${baseUrl}/vault`, { waitUntil: "domcontentloaded" });
+  await updatePage.waitForFunction(() => {
+    window.dispatchEvent(new Event("unigentamos:update-ready"));
+    return document.body.textContent?.includes("A newer version is ready.");
+  });
+  await updatePage.getByRole("button", { name: "Update now" }).waitFor();
+  await updatePage.screenshot({ path: path.join(artifactRoot, "vault-update-ready-desktop.png"), fullPage: true });
+  await updatePage.close();
+
   await page.goto(`${baseUrl}/vault`, { waitUntil: "domcontentloaded" });
-  const master = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Create your desktop vault" }) });
-  await master.getByText("Companion found").waitFor();
-  await master.getByLabel("Six-digit pairing code").fill("123456");
+  const master = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Set up this Windows PC" }) });
+  await master.getByText("Windows helper ready").waitFor();
+  await master.getByLabel("Six-digit code").fill("123456");
   await master.getByLabel("Vault password").fill("correct horse battery staple");
   await page.screenshot({ path: path.join(artifactRoot, "vault-onboarding-desktop.png"), fullPage: true });
-  await master.getByRole("button", { name: "Create and unlock my vault" }).click();
-  await page.getByText("Desktop master vault created and unlocked.").waitFor();
+  await master.getByRole("button", { name: "Create my vault" }).click();
+  await page.getByText("Your Windows vault is ready.").waitFor();
+  await page.getByRole("heading", { name: "Your devices" }).waitFor();
 
   await page.getByLabel("Title").fill("Offline continuity note");
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("first encrypted version");
-  await page.getByRole("button", { name: "Save encrypted version" }).last().click();
-  await page.getByText("Note saved locally and queued for encrypted sync.").waitFor();
+  await page.getByRole("button", { name: "Save version" }).last().click();
+  await page.getByText("Note saved. It will sync automatically.").waitFor();
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("second encrypted version");
-  await page.getByRole("button", { name: "Save encrypted version" }).last().click();
+  await page.getByRole("button", { name: "Save version" }).last().click();
   await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > div').length === 2);
   assert.equal(await page.getByLabel("Version history").locator(":scope > div").count(), 2);
 
-  await page.getByRole("button", { name: "Create desktop backup" }).click();
-  await page.getByText(/Created backup .* configured encrypted backup directory/).waitFor();
+  await page.getByRole("button", { name: "Back up this PC" }).click();
+  await page.getByText("Backup created on this PC.").waitFor();
   assert.equal((await readdir(backupRoot)).length, 1);
 
   const recoveryDownloadPromise = page.waitForEvent("download");
-  await page.getByRole("button", { name: "Export recovery package" }).click();
+  await page.getByRole("button", { name: "Download recovery file" }).click();
   const recoveryDownload = await recoveryDownloadPromise;
   const recoveryPath = await recoveryDownload.path();
   assert.ok(recoveryPath);
@@ -228,47 +239,47 @@ try {
   await applePage.goto(`${baseUrl}/vault`, { waitUntil: "domcontentloaded" });
   await applePage.getByRole("heading", { name: "Connect this Apple device" }).waitFor();
   await applePage.locator('input[type="file"]').setInputFiles(recoveryPath);
-  await applePage.getByText("Encrypted recovery file ready.", { exact: false }).waitFor();
+  await applePage.getByText("Recovery file ready.", { exact: false }).waitFor();
   await applePage.getByLabel("Vault password").fill("correct horse battery staple");
   await applePage.screenshot({ path: path.join(artifactRoot, "vault-onboarding-iphone.png"), fullPage: true });
   await applePage.getByRole("button", { name: "Connect this device" }).click();
-  await applePage.getByText("This device joined the encrypted vault.").waitFor();
+  await applePage.getByText("This device is connected.").waitFor();
   await applePage.getByText("Offline continuity note", { exact: true }).waitFor();
-  await applePage.getByRole("heading", { name: "All registered devices are current" }).waitFor();
+  await applePage.getByRole("heading", { name: "Everything is up to date" }).waitFor();
   await applePage.screenshot({ path: path.join(artifactRoot, "vault-devices-iphone.png"), fullPage: true });
   assert.equal(await applePage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
 
-  await page.getByRole("button", { name: "Refresh status" }).click();
-  await page.getByText("Device sync status refreshed.").waitFor();
-  await page.getByRole("heading", { name: "All registered devices are current" }).waitFor();
-  assert.equal(await page.getByRole("list", { name: "Registered vault devices" }).getByRole("listitem").count(), 2);
+  await page.getByRole("button", { name: "Check now" }).click();
+  await page.getByText("Device status updated.").waitFor();
+  await page.getByRole("heading", { name: "Everything is up to date" }).waitFor();
+  assert.equal(await page.getByRole("list", { name: "Connected vault devices" }).getByRole("listitem").count(), 2);
   await page.screenshot({ path: path.join(artifactRoot, "vault-devices-desktop.png"), fullPage: true });
   await appleContext.close();
 
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload({ waitUntil: "domcontentloaded" });
-  await page.getByRole("heading", { name: "Unlock this device" }).waitFor();
+  await page.getByRole("heading", { name: "Unlock your vault" }).waitFor();
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.screenshot({ path: path.join(artifactRoot, "vault-offline-reload.png"), fullPage: true });
   const offlineBody = await page.locator("body").innerText();
-  if (!offlineBody.includes("Unlock this device")) throw new Error(`Offline vault shell did not reach unlock state: ${offlineBody.slice(0, 600)}`);
-  await page.getByRole("heading", { name: "Unlock this device" }).waitFor();
+  if (!offlineBody.includes("Unlock your vault")) throw new Error(`Offline vault shell did not reach unlock state: ${offlineBody.slice(0, 600)}`);
+  await page.getByRole("heading", { name: "Unlock your vault" }).waitFor();
   await page.getByLabel("Vault password").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Unlock vault" }).click();
   await page.getByText("Offline continuity note", { exact: true }).waitFor();
-  await page.getByText(/Offline.*local saves safe/i).first().waitFor();
+  await page.getByText(/Offline.*your work is safe/i).first().waitFor();
 
   await page.getByText("Offline continuity note", { exact: true }).click();
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("third encrypted version saved offline");
-  await page.getByRole("button", { name: "Save encrypted version" }).last().click();
+  await page.getByRole("button", { name: "Save version" }).last().click();
   await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > div').length === 3);
   assert.equal(await page.getByLabel("Version history").locator(":scope > div").count(), 3);
   assert.deepEqual(unexpectedFailures, []);
 
   await context.setOffline(false);
   await context.close();
-  console.log("[pass] guided desktop setup, Apple recovery-file join, cross-device relay, encrypted device status, backup, service-worker offline reload, and offline save passed");
+  console.log("[pass] guided setup, visible device status, natural copy, app-update notice, cross-device sync, backup, offline reload, and offline save passed");
 } catch (error) {
   console.error("[vault-browser] application output:\n", application?.output() || "");
   console.error("[vault-browser] companion output:\n", companion?.output() || "");
