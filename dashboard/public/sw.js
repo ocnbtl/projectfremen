@@ -1,4 +1,4 @@
-const CACHE_VERSION = "unigentamos-static-v5";
+const CACHE_VERSION = "unigentamos-static-v6";
 const PUBLIC_SHELL = ["/offline", "/unigentamos-logo.svg"];
 
 async function installOfflineShell() {

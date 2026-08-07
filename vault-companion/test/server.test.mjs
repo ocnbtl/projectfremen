@@ -235,11 +235,68 @@ test("companion setup, authorization, unlock, and encrypted backup", { timeout: 
     const backupIds = await readdir(backupRoot);
     assert.equal(backupIds.length, 1);
     assert.ok((await readdir(join(backupRoot, backupIds[0]))).includes("vault.sqlite3"));
+    assert.ok((await readdir(join(backupRoot, backupIds[0]))).includes("manifest.json"));
+    const listedBackups = await fetch(`http://127.0.0.1:${port}/v1/backups`, {
+      headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
+    }).then((response) => response.json());
+    assert.equal(listedBackups.backups.length, 1);
+    assert.equal(listedBackups.backups[0].verified, true);
+    const verifiedBackup = await fetch(`http://127.0.0.1:${port}/v1/backups/${backupBody.backupId}/verify`, {
+      method: "POST",
+      headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
+    });
+    assert.equal(verifiedBackup.status, 200);
     const backupLimit = await fetch(`http://127.0.0.1:${port}/v1/backups`, {
       method: "POST",
       headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
     });
     assert.equal(backupLimit.status, 507);
+
+    const simulatedLoss = new DatabaseSync(join(root, "vault.sqlite3"), { timeout: 5_000 });
+    try {
+      simulatedLoss.exec(`
+        delete from encrypted_objects;
+        delete from encrypted_versions;
+        delete from encrypted_envelopes;
+        delete from encrypted_media;
+      `);
+    } finally {
+      simulatedLoss.close();
+    }
+    await rm(join(root, "media", digest.slice(0, 2), `${digest}.uvblob`), { force: true });
+    const preview = await fetch(`http://127.0.0.1:${port}/v1/backups/${backupBody.backupId}/restore-preview`, {
+      method: "POST",
+      headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
+    }).then((response) => response.json());
+    assert.equal(preview.preview.currentObjects, 0);
+    assert.equal(preview.preview.backupVersions, 2);
+    assert.equal(preview.preview.restorableVersions, 2);
+    assert.equal(preview.preview.restorableMediaFiles, 1);
+    const wrongRestore = await fetch(`http://127.0.0.1:${port}/v1/backups/${backupBody.backupId}/restore`, {
+      method: "POST",
+      headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmation: "RESTORE WRONG" })
+    });
+    assert.equal(wrongRestore.status, 400);
+    const restored = await fetch(`http://127.0.0.1:${port}/v1/backups/${backupBody.backupId}/restore`, {
+      method: "POST",
+      headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmation: `RESTORE ${backupBody.backupId.slice(-8).toUpperCase()}` })
+    }).then((response) => response.json());
+    assert.equal(restored.restoredVersions, 2);
+    assert.equal(restored.restoredMediaFiles, 1);
+    const recoveredStatus = await fetch(`http://127.0.0.1:${port}/v1/status`, {
+      headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
+    }).then((response) => response.json());
+    assert.deepEqual(recoveredStatus.status.counts, { objects: 1, versions: 2, media: 1 });
+    const recoveredMedia = await fetch(`http://127.0.0.1:${port}/v1/media/${digest}`, {
+      headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
+    });
+    assert.deepEqual(Buffer.from(await recoveredMedia.arrayBuffer()), media);
+    const recoveredEnvelopes = await fetch(`http://127.0.0.1:${port}/v1/envelopes?after=0&limit=10`, {
+      headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
+    }).then((response) => response.json());
+    assert.equal(recoveredEnvelopes.envelopes.length, 2);
 
     const databaseFiles = (await readdir(root)).filter((name) => name.startsWith("vault.sqlite3"));
     const databaseBytes = Buffer.concat(await Promise.all(databaseFiles.map((name) => readFile(join(root, name)))));

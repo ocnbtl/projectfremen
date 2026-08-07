@@ -10,12 +10,13 @@ import {
   randomUUID,
   timingSafeEqual
 } from "node:crypto";
-import { cp, mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, join, relative, resolve } from "node:path";
 import process from "node:process";
 import { DatabaseSync, backup as backupDatabase } from "node:sqlite";
 
-const VERSION = "0.1.0";
+const VERSION = "0.2.0";
 const HOST = "127.0.0.1";
 
 function integerEnv(name, fallback, minimum, maximum) {
@@ -119,6 +120,15 @@ database.exec(`
   create table if not exists backup_log (
     id text primary key,
     path_key text not null,
+    created_at text not null,
+    verified_at text,
+    manifest_hash text
+  ) strict;
+  create table if not exists restore_log (
+    id text primary key,
+    backup_id text not null,
+    restored_versions integer not null,
+    restored_media_files integer not null,
     created_at text not null
   ) strict;
 `);
@@ -126,6 +136,9 @@ const mediaColumns = database.prepare("pragma table_info(encrypted_media)").all(
 if (!mediaColumns.some((column) => column.name === "byte_length")) {
   database.exec("alter table encrypted_media add column byte_length integer not null default 0");
 }
+const backupColumns = database.prepare("pragma table_info(backup_log)").all();
+if (!backupColumns.some((column) => column.name === "verified_at")) database.exec("alter table backup_log add column verified_at text");
+if (!backupColumns.some((column) => column.name === "manifest_hash")) database.exec("alter table backup_log add column manifest_hash text");
 database.enableDefensive(true);
 
 let vaultKey = null;
@@ -262,6 +275,7 @@ function validateChange(change, envelope) {
     || Object.keys(change.fields).length > 10_000
     || Object.keys(change.fieldClocks).length > 10_000
     || change.baseVersionId !== undefined && (typeof change.baseVersionId !== "string" || !UUID.test(change.baseVersionId))
+    || change.restoredFromVersionId !== undefined && (typeof change.restoredFromVersionId !== "string" || !UUID.test(change.restoredFromVersionId))
     || change.tombstone !== undefined && typeof change.tombstone !== "boolean"
     || typeof change.createdAt !== "string"
     || !Number.isFinite(Date.parse(change.createdAt))
@@ -283,7 +297,7 @@ function corsHeaders(origin) {
   return origin ? {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Credentials": "false",
-    "Access-Control-Allow-Headers": "authorization, content-type",
+    "Access-Control-Allow-Headers": "authorization, content-type, x-unigentamos-digest-algorithm, x-unigentamos-chunk-size",
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
     "Access-Control-Allow-Private-Network": "true",
     Vary: "Origin"
@@ -596,6 +610,18 @@ async function unlock(request) {
 
 let mediaUploadActive = false;
 
+function chunkRootV1(plaintext, chunkSize) {
+  if (!Number.isSafeInteger(chunkSize) || chunkSize < 1 || chunkSize > 8 * 1024 * 1024) {
+    throw Object.assign(new Error("Media chunk size is invalid"), { status: 400 });
+  }
+  const root = createHash("sha256");
+  root.update(`unigentamos-media-root-v1:${plaintext.length}:${chunkSize}:`);
+  for (let offset = 0; offset < plaintext.length; offset += chunkSize) {
+    root.update(createHash("sha256").update(plaintext.subarray(offset, Math.min(plaintext.length, offset + chunkSize))).digest());
+  }
+  return root.digest("hex");
+}
+
 async function storeMedia(request, digest) {
   if (mediaUploadActive) throw exposedError("Another encrypted media upload is already in progress", 429);
   mediaUploadActive = true;
@@ -605,7 +631,11 @@ async function storeMedia(request, digest) {
   try {
     plaintext = await readBody(request, MAX_MEDIA_BYTES);
     const normalizedDigest = digest.toLowerCase();
-    const actual = createHash("sha256").update(plaintext).digest("hex");
+    const digestAlgorithm = request.headers["x-unigentamos-digest-algorithm"] || "sha256";
+    const actual = digestAlgorithm === "chunk-root-v1"
+      ? chunkRootV1(plaintext, Number(request.headers["x-unigentamos-chunk-size"]))
+      : digestAlgorithm === "sha256" ? createHash("sha256").update(plaintext).digest("hex") : "";
+    if (!actual) throw Object.assign(new Error("Media digest algorithm is invalid"), { status: 400 });
     if (!sameSecret(actual, normalizedDigest)) throw Object.assign(new Error("Media digest does not match its content"), { status: 400 });
     const digestKey = opaqueKey("media", normalizedDigest);
     const existing = database.prepare("select byte_length from encrypted_media where digest_key = ?").get(digestKey);
@@ -647,14 +677,120 @@ async function readMedia(digest) {
   return aesOpen(vaultKey, { iv: packed.subarray(8, 20), tag: packed.subarray(20, 36), ciphertext: packed.subarray(36) }, `media:${digest.toLowerCase()}`);
 }
 
+function backupTarget(id) {
+  if (typeof id !== "string" || !/^[0-9A-Za-z-]{16,120}$/.test(id)) throw exposedError("Backup ID is invalid", 400);
+  const target = resolve(BACKUP_ROOT, id);
+  const relativeTarget = relative(BACKUP_ROOT, target);
+  if (!isAbsolute(target) || !relativeTarget || relativeTarget.startsWith("..") || isAbsolute(relativeTarget)) {
+    throw new Error("Backup target is invalid");
+  }
+  return target;
+}
+
+async function sha256File(path) {
+  const digest = createHash("sha256");
+  let bytes = 0;
+  for await (const chunk of createReadStream(path)) {
+    bytes += chunk.length;
+    digest.update(chunk);
+  }
+  return { bytes, sha256: digest.digest("hex") };
+}
+
+async function encryptedMediaFiles(root, relativeRoot = "media") {
+  const output = [];
+  let entries;
+  try {
+    entries = await readdir(root, { withFileTypes: true });
+  } catch (error) {
+    if (error?.code === "ENOENT") return output;
+    throw error;
+  }
+  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
+    const absolute = join(root, entry.name);
+    const relativePath = `${relativeRoot}/${entry.name}`;
+    if (entry.isDirectory()) output.push(...await encryptedMediaFiles(absolute, relativePath));
+    else if (entry.isFile() && /^[0-9a-f]{64}\.uvblob$/i.test(entry.name)) {
+      output.push({ path: relativePath.replaceAll("\\", "/"), ...await sha256File(absolute) });
+    }
+  }
+  return output;
+}
+
+function unsignedManifest(manifest) {
+  const { signature: _signature, ...unsigned } = manifest;
+  return unsigned;
+}
+
+function signBackupManifest(manifest) {
+  return createHmac("sha256", vaultKey).update("unigentamos-vault-backup-v1\0").update(JSON.stringify(unsignedManifest(manifest))).digest("hex");
+}
+
+function backupSummary(manifest, verified) {
+  return {
+    backupId: manifest.backupId,
+    createdAt: manifest.createdAt,
+    verified,
+    databaseBytes: manifest.database.bytes,
+    mediaFiles: manifest.media.length,
+    mediaBytes: manifest.media.reduce((sum, file) => sum + file.bytes, 0)
+  };
+}
+
+async function readBackupManifest(id, verifyFiles = false) {
+  const target = backupTarget(id);
+  const manifestPath = join(target, "manifest.json");
+  const manifestBytes = await readFile(manifestPath);
+  if (manifestBytes.length > MAX_JSON_BYTES) throw new Error("Backup manifest is too large");
+  let manifest;
+  try {
+    manifest = JSON.parse(manifestBytes.toString("utf8"));
+  } catch {
+    throw exposedError("Backup manifest is damaged", 409);
+  }
+  if (
+    !record(manifest)
+    || manifest.format !== "unigentamos-vault-backup-v1"
+    || manifest.backupId !== id
+    || typeof manifest.createdAt !== "string" || !Number.isFinite(Date.parse(manifest.createdAt))
+    || typeof manifest.vaultProof !== "string" || !SHA256.test(manifest.vaultProof)
+    || !record(manifest.database) || manifest.database.path !== "vault.sqlite3"
+    || !Number.isSafeInteger(manifest.database.bytes) || manifest.database.bytes < 1
+    || typeof manifest.database.sha256 !== "string" || !SHA256.test(manifest.database.sha256)
+    || !Array.isArray(manifest.media)
+    || typeof manifest.signature !== "string" || !SHA256.test(manifest.signature)
+    || !sameSecret(manifest.vaultProof, createHmac("sha256", vaultKey).update("backup-vault\0").update(config().vault_id).digest("hex"))
+    || !sameSecret(manifest.signature, signBackupManifest(manifest))
+  ) throw exposedError("Backup does not belong to this vault or its manifest was changed", 409);
+  for (const file of manifest.media) {
+    if (
+      !record(file)
+      || typeof file.path !== "string" || !/^media\/[0-9a-f]{2}\/[0-9a-f]{64}\.uvblob$/i.test(file.path)
+      || !Number.isSafeInteger(file.bytes) || file.bytes < 37
+      || typeof file.sha256 !== "string" || !SHA256.test(file.sha256)
+    ) throw exposedError("Backup media manifest is invalid", 409);
+  }
+  if (verifyFiles) {
+    const databaseDigest = await sha256File(join(target, "vault.sqlite3"));
+    if (databaseDigest.bytes !== manifest.database.bytes || !sameSecret(databaseDigest.sha256, manifest.database.sha256)) {
+      throw exposedError("Backup database failed integrity verification", 409);
+    }
+    for (const file of manifest.media) {
+      const digest = await sha256File(join(target, ...file.path.split("/")));
+      if (digest.bytes !== file.bytes || !sameSecret(digest.sha256, file.sha256)) {
+        throw exposedError("A backup media file failed integrity verification", 409);
+      }
+    }
+  }
+  return { target, manifest, manifestHash: createHash("sha256").update(manifestBytes).digest("hex") };
+}
+
 async function activeBackupCount() {
   const rows = database.prepare("select id from backup_log").all();
   const missing = [];
   let count = 0;
   for (const row of rows) {
-    const target = resolve(BACKUP_ROOT, row.id);
-    const relativeTarget = relative(BACKUP_ROOT, target);
-    if (!relativeTarget || relativeTarget.startsWith("..") || isAbsolute(relativeTarget)) throw new Error("Recorded backup target is invalid");
+    const target = backupTarget(row.id);
     try {
       await stat(target);
       count += 1;
@@ -683,9 +819,7 @@ async function createBackup() {
     throw exposedError("Encrypted backup limit reached; move an older verified backup out of the configured backup directory before creating another", 507);
   }
   const id = `${new Date().toISOString().replaceAll(":", "-").replaceAll(".", "-")}-${randomBytes(4).toString("hex")}`;
-  const target = resolve(BACKUP_ROOT, id);
-  const relativeTarget = relative(BACKUP_ROOT, target);
-  if (!isAbsolute(target) || !relativeTarget || relativeTarget.startsWith("..") || isAbsolute(relativeTarget)) throw new Error("Backup target is invalid");
+  const target = backupTarget(id);
   await mkdir(target, { recursive: false });
   try {
     await backupDatabase(database, join(target, "vault.sqlite3"));
@@ -695,8 +829,21 @@ async function createBackup() {
     } catch (error) {
       if (error?.code !== "ENOENT") throw error;
     }
+    const createdAt = new Date().toISOString();
+    const manifest = {
+      format: "unigentamos-vault-backup-v1",
+      backupId: id,
+      createdAt,
+      vaultProof: createHmac("sha256", vaultKey).update("backup-vault\0").update(config().vault_id).digest("hex"),
+      database: { path: "vault.sqlite3", ...await sha256File(join(target, "vault.sqlite3")) },
+      media: await encryptedMediaFiles(join(target, "media"))
+    };
+    const signedManifest = { ...manifest, signature: signBackupManifest(manifest) };
+    const manifestBytes = Buffer.from(JSON.stringify(signedManifest, null, 2));
+    await writeFile(join(target, "manifest.json"), manifestBytes, { flag: "wx", mode: 0o600 });
     const pathKey = opaqueKey("backup", target);
-    database.prepare("insert into backup_log(id, path_key, created_at) values (?, ?, ?)").run(id, pathKey, new Date().toISOString());
+    database.prepare("insert into backup_log(id, path_key, created_at, verified_at, manifest_hash) values (?, ?, ?, ?, ?)")
+      .run(id, pathKey, createdAt, createdAt, createHash("sha256").update(manifestBytes).digest("hex"));
   } catch (error) {
     await rm(target, { recursive: true, force: true }).catch(() => {});
     throw error;
@@ -706,6 +853,160 @@ async function createBackup() {
     location: process.env.UNIGENTAMOS_VAULT_BACKUP_DIR
       ? "configured encrypted backup directory"
       : "local encrypted backup directory"
+  };
+}
+
+async function listBackups() {
+  await activeBackupCount();
+  const rows = database.prepare("select id, verified_at, manifest_hash from backup_log order by created_at desc").all();
+  const backups = [];
+  for (const row of rows) {
+    try {
+      const { manifest, manifestHash } = await readBackupManifest(row.id, false);
+      backups.push(backupSummary(manifest, Boolean(row.verified_at && row.manifest_hash && sameSecret(row.manifest_hash, manifestHash))));
+    } catch {
+      backups.push({ backupId: row.id, createdAt: "", verified: false, databaseBytes: 0, mediaFiles: 0, mediaBytes: 0 });
+    }
+  }
+  return backups;
+}
+
+async function verifyBackup(id) {
+  const { manifest, manifestHash } = await readBackupManifest(id, true);
+  database.prepare("update backup_log set verified_at = ?, manifest_hash = ? where id = ?")
+    .run(new Date().toISOString(), manifestHash, id);
+  return backupSummary(manifest, true);
+}
+
+function databaseCounts(db) {
+  const row = db.prepare(`
+    select
+      (select count(*) from encrypted_objects) as objects,
+      (select count(*) from encrypted_versions) as versions,
+      (select count(*) from encrypted_media) as media
+  `).get();
+  return { objects: Number(row.objects), versions: Number(row.versions), media: Number(row.media) };
+}
+
+async function previewRestore(id) {
+  const { target, manifest } = await readBackupManifest(id, true);
+  const backup = new DatabaseSync(join(target, "vault.sqlite3"), { readOnly: true });
+  try {
+    const backupConfig = backup.prepare("select vault_id from vault_config where id = 1").get();
+    if (!backupConfig || backupConfig.vault_id !== config().vault_id) throw exposedError("Backup belongs to another vault", 409);
+    const currentCounts = databaseCounts(database);
+    const backupCounts = databaseCounts(backup);
+    const findVersion = database.prepare("select 1 as found from encrypted_versions where version_key = ?");
+    const backupVersionKeys = backup.prepare("select version_key from encrypted_versions").all();
+    const restorableVersions = backupVersionKeys.reduce((count, row) => count + (findVersion.get(row.version_key) ? 0 : 1), 0);
+    let restorableMediaFiles = 0;
+    for (const file of manifest.media) {
+      try { await stat(join(ROOT, ...file.path.split("/"))); } catch (error) {
+        if (error?.code === "ENOENT") restorableMediaFiles += 1;
+        else throw error;
+      }
+    }
+    return {
+      ...backupSummary(manifest, true),
+      currentObjects: currentCounts.objects,
+      backupObjects: backupCounts.objects,
+      currentVersions: currentCounts.versions,
+      backupVersions: backupCounts.versions,
+      restorableVersions,
+      restorableMediaFiles
+    };
+  } finally {
+    backup.close();
+  }
+}
+
+async function restoreBackup(id, confirmation) {
+  const expectedConfirmation = `RESTORE ${id.slice(-8).toUpperCase()}`;
+  if (!sameSecret(String(confirmation || ""), expectedConfirmation)) throw exposedError(`Type ${expectedConfirmation} to restore this backup`, 400);
+  const { target, manifest } = await readBackupManifest(id, true);
+  const backup = new DatabaseSync(join(target, "vault.sqlite3"), { readOnly: true });
+  let restoredMediaFiles = 0;
+  try {
+    const backupConfig = backup.prepare("select vault_id from vault_config where id = 1").get();
+    if (!backupConfig || backupConfig.vault_id !== config().vault_id) throw exposedError("Backup belongs to another vault", 409);
+    const envelopes = backup.prepare("select change_key, object_key, iv, tag, ciphertext, received_at from encrypted_envelopes order by sequence").all();
+    const versions = backup.prepare("select version_key, object_key, parent_key, iv, tag, ciphertext, created_at from encrypted_versions order by created_at").all();
+    const objects = backup.prepare("select object_key, version_key, iv, tag, ciphertext, updated_at from encrypted_objects").all();
+    const mediaRows = backup.prepare("select digest_key, iv, tag, manifest, byte_length, stored_at from encrypted_media").all();
+    const findEnvelope = database.prepare("select 1 as found from encrypted_envelopes where change_key = ?");
+    const findVersion = database.prepare("select 1 as found from encrypted_versions where version_key = ?");
+    const findObject = database.prepare("select 1 as found from encrypted_objects where object_key = ?");
+    const missingEnvelopes = envelopes.filter((row) => !findEnvelope.get(row.change_key));
+    const missingVersions = versions.filter((row) => !findVersion.get(row.version_key));
+    const missingObjects = objects.filter((row) => !findObject.get(row.object_key));
+    const currentUsage = database.prepare(`
+      select coalesce((select sum(length(iv) + length(tag) + length(ciphertext)) from encrypted_envelopes), 0)
+        + coalesce((select sum(length(iv) + length(tag) + length(ciphertext)) from encrypted_versions), 0)
+        + coalesce((select sum(length(iv) + length(tag) + length(ciphertext)) from encrypted_objects), 0) as bytes
+    `).get();
+    const missingRecordBytes = [...missingEnvelopes, ...missingVersions, ...missingObjects]
+      .reduce((total, row) => total + row.iv.length + row.tag.length + row.ciphertext.length, 0);
+    const currentCounts = databaseCounts(database);
+    if (currentCounts.versions + missingVersions.length > MAX_HISTORY_VERSIONS) {
+      throw exposedError("Restoring this backup would exceed the configured history limit", 507);
+    }
+    if (Number(currentUsage.bytes) + missingRecordBytes > MAX_RECORD_STORAGE_BYTES) {
+      throw exposedError("Restoring this backup would exceed the configured encrypted record storage limit", 507);
+    }
+    for (const file of manifest.media) {
+      const source = join(target, ...file.path.split("/"));
+      const destination = join(ROOT, ...file.path.split("/"));
+      try {
+        await stat(destination);
+      } catch (error) {
+        if (error?.code !== "ENOENT") throw error;
+        await mkdir(dirname(destination), { recursive: true });
+        await cp(source, destination, { errorOnExist: true });
+        restoredMediaFiles += 1;
+      }
+    }
+    const insertEnvelope = database.prepare("insert or ignore into encrypted_envelopes(change_key, object_key, iv, tag, ciphertext, received_at) values (?, ?, ?, ?, ?, ?)");
+    const insertVersion = database.prepare("insert or ignore into encrypted_versions(version_key, object_key, parent_key, iv, tag, ciphertext, created_at) values (?, ?, ?, ?, ?, ?, ?)");
+    const insertObject = database.prepare("insert or ignore into encrypted_objects(object_key, version_key, iv, tag, ciphertext, updated_at) values (?, ?, ?, ?, ?, ?)");
+    const insertMedia = database.prepare("insert or ignore into encrypted_media(digest_key, iv, tag, manifest, byte_length, stored_at) values (?, ?, ?, ?, ?, ?)");
+    let restoredVersions = 0;
+    database.exec("begin immediate");
+    try {
+      for (const row of envelopes) insertEnvelope.run(row.change_key, row.object_key, row.iv, row.tag, row.ciphertext, row.received_at);
+      for (const row of versions) restoredVersions += Number(insertVersion.run(row.version_key, row.object_key, row.parent_key, row.iv, row.tag, row.ciphertext, row.created_at).changes);
+      for (const row of objects) insertObject.run(row.object_key, row.version_key, row.iv, row.tag, row.ciphertext, row.updated_at);
+      for (const row of mediaRows) insertMedia.run(row.digest_key, row.iv, row.tag, row.manifest, row.byte_length, row.stored_at);
+      const receiptId = randomUUID();
+      database.prepare("insert into restore_log(id, backup_id, restored_versions, restored_media_files, created_at) values (?, ?, ?, ?, ?)")
+        .run(receiptId, id, restoredVersions, restoredMediaFiles, new Date().toISOString());
+      database.exec("commit");
+      return { receiptId, restoredVersions, restoredMediaFiles };
+    } catch (error) {
+      database.exec("rollback");
+      throw error;
+    }
+  } finally {
+    backup.close();
+  }
+}
+
+function storedEnvelopes(afterValue, limitValue) {
+  const after = Number(afterValue || 0);
+  const limit = Number(limitValue || 10);
+  if (!Number.isSafeInteger(after) || after < 0 || !Number.isSafeInteger(limit) || limit < 1 || limit > 10) {
+    throw exposedError("Envelope recovery cursor is invalid", 400);
+  }
+  const rows = database.prepare("select sequence, change_key, iv, tag, ciphertext from encrypted_envelopes where sequence > ? order by sequence limit ?").all(after, limit + 1);
+  const page = rows.slice(0, limit);
+  const envelopes = page.map((row) => JSON.parse(aesOpen(vaultKey, {
+    iv: Buffer.from(row.iv),
+    tag: Buffer.from(row.tag),
+    ciphertext: Buffer.from(row.ciphertext)
+  }, `envelope:${row.change_key}`).toString("utf8")));
+  return {
+    envelopes,
+    nextCursor: page.length ? Number(page[page.length - 1].sequence) : after,
+    hasMore: rows.length > limit
   };
 }
 
@@ -739,12 +1040,29 @@ const server = createServer(async (request, response) => {
     if (request.method === "GET" && url.pathname === "/v1/status") {
       return sendJson(response, 200, { ok: true, status: currentStatus() }, origin);
     }
+    if (request.method === "GET" && url.pathname === "/v1/envelopes") {
+      return sendJson(response, 200, { ok: true, ...storedEnvelopes(url.searchParams.get("after"), url.searchParams.get("limit")) }, origin);
+    }
     if (request.method === "POST" && url.pathname === "/v1/envelopes") {
       const body = await readJson(request);
       return sendJson(response, 200, { ok: true, acceptedChangeIds: storeEnvelopes(body.envelopes) }, origin);
     }
     if (request.method === "POST" && url.pathname === "/v1/backups") {
       return sendJson(response, 201, { ok: true, ...(await createBackup()) }, origin);
+    }
+    if (request.method === "GET" && url.pathname === "/v1/backups") {
+      return sendJson(response, 200, { ok: true, backups: await listBackups() }, origin);
+    }
+    const backupMatch = url.pathname.match(/^\/v1\/backups\/([0-9A-Za-z-]{16,120})\/(verify|restore-preview|restore)$/);
+    if (backupMatch && request.method === "POST" && backupMatch[2] === "verify") {
+      return sendJson(response, 200, { ok: true, backup: await verifyBackup(backupMatch[1]) }, origin);
+    }
+    if (backupMatch && request.method === "POST" && backupMatch[2] === "restore-preview") {
+      return sendJson(response, 200, { ok: true, preview: await previewRestore(backupMatch[1]) }, origin);
+    }
+    if (backupMatch && request.method === "POST" && backupMatch[2] === "restore") {
+      const body = await readJson(request);
+      return sendJson(response, 200, { ok: true, ...(await restoreBackup(backupMatch[1], body.confirmation)) }, origin);
     }
     const mediaMatch = url.pathname.match(/^\/v1\/media\/([0-9a-f]{64})$/i);
     if (mediaMatch && request.method === "PUT") {

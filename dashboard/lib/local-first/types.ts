@@ -44,6 +44,7 @@ export type VaultChange = {
   fields: Record<string, VaultFieldValue>;
   fieldClocks: Record<string, HybridLogicalClock>;
   tombstone?: boolean;
+  restoredFromVersionId?: string;
   createdAt: string;
 };
 
@@ -144,7 +145,55 @@ export type VaultObjectSnapshot = {
   fields: Record<string, VaultFieldValue>;
   fieldClocks: Record<string, HybridLogicalClock>;
   tombstone: boolean;
+  restoredFromVersionId?: string;
   updatedAt: string;
+};
+
+export type VaultMediaManifest = {
+  format: "unigentamos-vault-media-v1";
+  mediaId: string;
+  objectId: string;
+  contentRoot: string;
+  digestAlgorithm: "chunk-root-v1";
+  fileName: string;
+  mimeType: string;
+  byteLength: number;
+  chunkSize: number;
+  totalChunks: number;
+  createdAt: string;
+};
+
+export type EncryptedVaultMediaChunk = {
+  format: "unigentamos-vault-media-chunk-v1";
+  vaultId: string;
+  mediaId: string;
+  contentRoot: string;
+  chunkIndex: number;
+  totalChunks: number;
+  keyVersion: number;
+  iv: string;
+  ciphertext: string;
+  aadHash: string;
+  plaintextHash: string;
+  byteLength: number;
+};
+
+export type VaultBackupSummary = {
+  backupId: string;
+  createdAt: string;
+  verified: boolean;
+  databaseBytes: number;
+  mediaFiles: number;
+  mediaBytes: number;
+};
+
+export type VaultBackupRestorePreview = VaultBackupSummary & {
+  currentObjects: number;
+  backupObjects: number;
+  currentVersions: number;
+  backupVersions: number;
+  restorableVersions: number;
+  restorableMediaFiles: number;
 };
 
 export type MergeConflict = {

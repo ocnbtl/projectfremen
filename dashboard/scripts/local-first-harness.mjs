@@ -45,11 +45,15 @@ try {
     createVaultKeyEnvelope,
     decryptVaultChange,
     decryptVaultDeviceDescriptor,
+    decryptVaultMediaChunk,
     encryptVaultChange,
     encryptVaultDeviceDescriptor,
+    encryptVaultMediaChunk,
+    mediaContentRoot,
+    sha256Hex,
     unlockVaultKey
   } = await import(pathToFileURL(path.join(outputRoot, "crypto.mjs")));
-  const { validateEncryptedDeviceDescriptor, validateEncryptedEnvelope } = await import(pathToFileURL(path.join(outputRoot, "relay-store.mjs")));
+  const { validateEncryptedDeviceDescriptor, validateEncryptedEnvelope, validateEncryptedMediaChunk } = await import(pathToFileURL(path.join(outputRoot, "relay-store.mjs")));
 
   const text = threeWayMergeText("alpha\nbeta\ngamma", "ALPHA\nbeta\ngamma", "alpha\nbeta\nGAMMA");
   assert.deepEqual(text, { value: "ALPHA\nbeta\nGAMMA", conflict: false });
@@ -143,6 +147,25 @@ try {
     /metadata|belongs/i
   );
 
+  const mediaPlaintext = new TextEncoder().encode("encrypted media fixture");
+  const plaintextHash = await sha256Hex(mediaPlaintext);
+  const contentRoot = await mediaContentRoot({ byteLength: mediaPlaintext.byteLength, chunkSize: 1_500_000, plaintextHashes: [plaintextHash] });
+  const mediaId = crypto.randomUUID();
+  const encryptedMedia = await encryptVaultMediaChunk({
+    vaultId: envelopeVaultId,
+    mediaId,
+    contentRoot,
+    chunkIndex: 0,
+    totalChunks: 1,
+    keyVersion: 1,
+    plaintext: mediaPlaintext,
+    plaintextHash
+  }, vaultKey);
+  assert.equal(encryptedMedia.ciphertext.includes("encrypted media fixture"), false);
+  assert.deepEqual(await decryptVaultMediaChunk(encryptedMedia, unlocked), mediaPlaintext);
+  assert.deepEqual(validateEncryptedMediaChunk(encryptedMedia, envelopeVaultId), encryptedMedia);
+  assert.throws(() => validateEncryptedMediaChunk({ ...encryptedMedia, chunkIndex: 1 }, envelopeVaultId), /metadata/i);
+
   const futureChange = {
     ...change,
     changeId: crypto.randomUUID(),
@@ -178,8 +201,16 @@ try {
   assert.match(deviceStatusRoute, /isCsrfRequestValid/i);
   assert.match(deviceStatusRoute, /MAX_REQUEST_BYTES = 64 \* 1024/i);
   assert.match(deviceStatusRoute, /recordVaultDeviceStatus/i);
+  const mediaMigration = await readFile("supabase/migrations/20260807170000_add_encrypted_media_relay_bucket.sql", "utf8");
+  assert.match(mediaMigration, /vault-media-relay/i);
+  assert.match(mediaMigration, /false/i);
+  assert.doesNotMatch(mediaMigration, /create policy/i);
+  const mediaRoute = await readFile("app/api/vault/media/route.ts", "utf8");
+  assert.match(mediaRoute, /hasAdminSession/i);
+  assert.match(mediaRoute, /isCsrfRequestValid/i);
+  assert.match(mediaRoute, /MAX_REQUEST_BYTES = 2_500_000/i);
   const serviceWorker = await readFile("public/sw.js", "utf8");
-  assert.match(serviceWorker, /unigentamos-static-v5/i);
+  assert.match(serviceWorker, /unigentamos-static-v6/i);
   assert.match(serviceWorker, /event\.data\?\.type === "SKIP_WAITING"/i);
   assert.match(serviceWorker, /cache\.put\("\/vault", response\.clone\(\)\)/i);
   const serviceWorkerRegistration = await readFile("components/ServiceWorkerRegistration.tsx", "utf8");
@@ -189,6 +220,8 @@ try {
   const vaultWorkspace = await readFile("components/VaultWorkspace.tsx", "utf8");
   assert.ok(vaultWorkspace.indexOf("Your devices") < vaultWorkspace.indexOf("Bring in your current data"));
   assert.doesNotMatch(vaultWorkspace, /Relay progress|sequence it has safely applied|Waiting for the first device acknowledgement/i);
+  assert.match(vaultWorkspace, /Restore this version/i);
+  assert.match(vaultWorkspace, /It does not replace newer work/i);
 
   console.log("[pass] local-first merge, clock correction, conflict retention, device status, natural copy, app updating, and encryption checks passed");
 } finally {
