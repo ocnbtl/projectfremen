@@ -22,7 +22,9 @@ The defaults reserve room on the master computer instead of allowing an unexpect
 
 When the backup-set limit is reached, move an older, restore-tested backup folder out of the configured backup directory before creating another. The companion notices the move and frees the slot; it never automatically deletes a backup.
 
-The installer prints the one-time six-digit pairing code. Open `https://unigentamos.com/vault`; the website detects the companion without requiring you to visit a localhost URL. Development can still use `npm.cmd start` from this directory, where the pairing code is printed in the terminal.
+The installer prints the one-time six-digit pairing code and adds **Unigentamos Vault Companion** to the Windows Start menu. Open that Start-menu item whenever you need to see the local pairing/status page, or visit `http://127.0.0.1:43127/` directly. Then open `https://unigentamos.com/vault`, choose **Windows desktop**, and use **Check this desktop** if the browser asks for local-network permission. Development can still use `npm.cmd start` from this directory, where the pairing code is printed in the terminal.
+
+iPhone, iPad, and MacBook do not install the Windows companion. After the Windows vault is configured and unlocked, export its encrypted recovery file from the Vault page, transfer that file to the Apple device, then choose the Apple-device setup path and select the file. The same vault password unwraps it locally on that device.
 
 The vault password is sent only from the approved website origin to loopback during setup or unlock. It is never written to disk or logged. Losing both the password and every recovery package makes the data unrecoverable by design.
 

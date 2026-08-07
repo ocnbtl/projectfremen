@@ -68,6 +68,21 @@ test("companion setup, authorization, unlock, and encrypted backup", { timeout: 
     const health = await waitForHealth(port);
     assert.equal(health.configured, false);
     const origin = "http://localhost:3000";
+    const preflight = await fetch(`http://127.0.0.1:${port}/health`, {
+      method: "OPTIONS",
+      headers: {
+        Origin: origin,
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Private-Network": "true"
+      }
+    });
+    assert.equal(preflight.status, 204);
+    assert.equal(preflight.headers.get("access-control-allow-private-network"), "true");
+    const pairingHelper = await fetch(`http://127.0.0.1:${port}/`);
+    assert.equal(pairingHelper.status, 200);
+    assert.match(pairingHelper.headers.get("content-security-policy") || "", /frame-ancestors 'none'/);
+    assert.equal(pairingHelper.headers.get("x-frame-options"), "DENY");
+    assert.match(await pairingHelper.text(), /123456/);
     const wrongOrigin = await fetch(`http://127.0.0.1:${port}/v1/setup`, {
       method: "POST",
       headers: { Origin: "https://attacker.example", "Content-Type": "application/json" },
@@ -89,6 +104,8 @@ test("companion setup, authorization, unlock, and encrypted backup", { timeout: 
     const setupBody = await setup.json();
     assert.equal(setupBody.recoveryPackage.format, "unigentamos-vault-recovery-v1");
     assert.match(setupBody.recoveryPackage.vaultId, /^[0-9a-f-]{36}$/);
+    const configuredHelper = await fetch(`http://127.0.0.1:${port}/`);
+    assert.doesNotMatch(await configuredHelper.text(), /123456/);
 
     const unauthorized = await fetch(`http://127.0.0.1:${port}/v1/status`, { headers: { Origin: origin } });
     assert.equal(unauthorized.status, 401);

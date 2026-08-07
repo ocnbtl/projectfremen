@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { chromium } from "@playwright/test";
+import { chromium, devices } from "@playwright/test";
 
 const dashboardRoot = process.cwd();
 const repositoryRoot = path.resolve(dashboardRoot, "..");
@@ -76,6 +76,7 @@ const backupRoot = path.join(tempRoot, "backups");
 const dataRoot = path.join(tempRoot, "data");
 const webPort = await freePort();
 const baseUrl = `http://127.0.0.1:${webPort}`;
+const artifactRoot = path.join(dashboardRoot, "output", "playwright");
 let companion;
 let application;
 let browser;
@@ -115,6 +116,7 @@ try {
     waitFor("http://127.0.0.1:43127/health"),
     waitFor(`${baseUrl}/vault`)
   ]);
+  await mkdir(artifactRoot, { recursive: true });
 
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
@@ -126,10 +128,12 @@ try {
   });
 
   await page.goto(`${baseUrl}/vault`, { waitUntil: "domcontentloaded" });
-  const master = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Create the desktop vault" }) });
-  await master.getByLabel("Desktop pairing code").fill("123456");
+  const master = page.getByRole("article").filter({ has: page.getByRole("heading", { name: "Create your desktop vault" }) });
+  await master.getByText("Companion found").waitFor();
+  await master.getByLabel("Six-digit pairing code").fill("123456");
   await master.getByLabel("Vault password").fill("correct horse battery staple");
-  await master.getByRole("button", { name: "Create desktop master vault" }).click();
+  await page.screenshot({ path: path.join(artifactRoot, "vault-onboarding-desktop.png"), fullPage: true });
+  await master.getByRole("button", { name: "Create and unlock my vault" }).click();
   await page.getByText("Desktop master vault created and unlocked.").waitFor();
 
   await page.getByLabel("Title").fill("Offline continuity note");
@@ -144,6 +148,25 @@ try {
   await page.getByRole("button", { name: "Create desktop backup" }).click();
   await page.getByText(/Created backup .* configured encrypted backup directory/).waitFor();
   assert.equal((await readdir(backupRoot)).length, 1);
+
+  const recoveryDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export recovery package" }).click();
+  const recoveryDownload = await recoveryDownloadPromise;
+  const recoveryPath = await recoveryDownload.path();
+  assert.ok(recoveryPath);
+
+  const appleContext = await browser.newContext({ ...devices["iPhone 15"], acceptDownloads: true });
+  const applePage = await appleContext.newPage();
+  await applePage.goto(`${baseUrl}/vault`, { waitUntil: "domcontentloaded" });
+  await applePage.getByRole("heading", { name: "Connect this Apple device" }).waitFor();
+  await applePage.locator('input[type="file"]').setInputFiles(recoveryPath);
+  await applePage.getByText("Encrypted recovery file ready.", { exact: false }).waitFor();
+  await applePage.getByLabel("Vault password").fill("correct horse battery staple");
+  await applePage.screenshot({ path: path.join(artifactRoot, "vault-onboarding-iphone.png"), fullPage: true });
+  await applePage.getByRole("button", { name: "Connect this device" }).click();
+  await applePage.getByText("This device joined the encrypted vault.").waitFor();
+  assert.equal(await applePage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
+  await appleContext.close();
 
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload({ waitUntil: "domcontentloaded" });
@@ -165,7 +188,7 @@ try {
 
   await context.setOffline(false);
   await context.close();
-  console.log("[pass] browser vault setup, encrypted history, backup, service-worker offline reload, and offline save passed");
+  console.log("[pass] guided desktop setup, Apple recovery-file join, encrypted history, backup, service-worker offline reload, and offline save passed");
 } catch (error) {
   console.error("[vault-browser] application output:\n", application?.output() || "");
   console.error("[vault-browser] companion output:\n", companion?.output() || "");

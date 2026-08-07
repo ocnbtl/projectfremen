@@ -8,6 +8,19 @@ import styles from "./VaultWorkspace.module.css";
 
 type VaultStatus = Awaited<ReturnType<typeof browserVault.status>>;
 type BootstrapObject = { canonicalId: string; objectKind: VaultObjectKind; fields: Record<string, VaultFieldValue> };
+type SetupTarget = "windows" | "apple";
+
+const COMPANION_HELPER_URL = "http://127.0.0.1:43127/";
+const MAX_RECOVERY_FILE_BYTES = 256 * 1024;
+
+function suggestedDevice(): { target: SetupTarget; name: string } {
+  if (typeof navigator === "undefined") return { target: "windows", name: "Windows desktop" };
+  const userAgent = navigator.userAgent;
+  if (/iPhone/i.test(userAgent)) return { target: "apple", name: "iPhone" };
+  if (/iPad/i.test(userAgent) || /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1) return { target: "apple", name: "iPad" };
+  if (/Macintosh/i.test(userAgent)) return { target: "apple", name: "MacBook" };
+  return { target: "windows", name: "Windows desktop" };
+}
 
 function downloadJson(filename: string, value: unknown) {
   const url = URL.createObjectURL(new Blob([JSON.stringify(value, null, 2)], { type: "application/json" }));
@@ -22,10 +35,13 @@ export default function VaultWorkspace() {
   const [status, setStatus] = useState<VaultStatus | null>(null);
   const [password, setPassword] = useState("");
   const [deviceName, setDeviceName] = useState("Windows desktop");
+  const [setupTarget, setSetupTarget] = useState<SetupTarget>("windows");
   const [setupCode, setSetupCode] = useState("");
   const [recoveryText, setRecoveryText] = useState("");
+  const [recoveryFileName, setRecoveryFileName] = useState("");
   const [message, setMessage] = useState("Checking this device…");
   const [busy, setBusy] = useState(false);
+  const [checkingCompanion, setCheckingCompanion] = useState(false);
   const [online, setOnline] = useState(true);
   const [journal, setJournal] = useState("");
   const [journalId, setJournalId] = useState<string | null>(null);
@@ -48,6 +64,9 @@ export default function VaultWorkspace() {
   }, []);
 
   useEffect(() => {
+    const suggested = suggestedDevice();
+    setSetupTarget(suggested.target);
+    setDeviceName(suggested.name);
     setOnline(navigator.onLine);
     refresh().then(() => setMessage("")).catch((error) => setMessage(error instanceof Error ? error.message : "Vault status failed"));
     const handleOnline = () => { setOnline(navigator.onLine); void browserVault.syncOnce().finally(refresh); };
@@ -60,6 +79,50 @@ export default function VaultWorkspace() {
       window.removeEventListener("offline", handleOnline);
     };
   }, [refresh]);
+
+  function chooseSetupTarget(target: SetupTarget) {
+    setSetupTarget(target);
+    const suggested = suggestedDevice();
+    setDeviceName(target === "windows" ? "Windows desktop" : suggested.target === "apple" ? suggested.name : "My Apple device");
+    setMessage("");
+  }
+
+  async function checkCompanion() {
+    setCheckingCompanion(true);
+    setMessage("Checking this Windows desktop…");
+    try {
+      const next = await refresh();
+      setMessage(next.localCompanion.available
+        ? "Windows companion found. Continue with the next step."
+        : "The companion is installed but this browser could not reach it. Open Show pairing code, return here, then choose Check this desktop again. Allow local-network access if the browser asks.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Desktop check failed");
+    } finally {
+      setCheckingCompanion(false);
+    }
+  }
+
+  async function loadRecoveryFile(file: File | undefined) {
+    if (!file) return;
+    if (file.size > MAX_RECOVERY_FILE_BYTES) {
+      setMessage("That recovery file is unexpectedly large. Choose the encrypted JSON file exported by Unigentamos.");
+      return;
+    }
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as Partial<VaultRecoveryPackage>;
+      if (parsed.format !== "unigentamos-vault-recovery-v1" || !parsed.vaultId || !parsed.keyEnvelope) {
+        throw new Error("That file is not an Unigentamos vault recovery file.");
+      }
+      setRecoveryText(text);
+      setRecoveryFileName(file.name);
+      setMessage("Encrypted recovery file ready. Enter the same vault password used on Windows.");
+    } catch (error) {
+      setRecoveryText("");
+      setRecoveryFileName("");
+      setMessage(error instanceof Error ? error.message : "Recovery file could not be read");
+    }
+  }
 
   useEffect(() => {
     if (status?.unlocked) void loadObjects().catch(() => undefined);
@@ -118,6 +181,7 @@ export default function VaultWorkspace() {
       browserVault.startSync();
       await loadObjects();
       setRecoveryText("");
+      setRecoveryFileName("");
       setMessage("This device joined the encrypted vault.");
     });
   }
@@ -243,37 +307,142 @@ export default function VaultWorkspace() {
         <div><p>Encrypted local-first workspace</p><h1>Vault & sync</h1></div>
       </header>
 
-      <section className={styles.statusGrid} aria-label="Vault status">
+      {status?.configured && <section className={styles.statusGrid} aria-label="Vault status">
         {cards.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
-      </section>
+      </section>}
 
       {message && <p className={styles.notice} role="status">{message}</p>}
 
       {!status?.configured ? (
-        <section className={styles.grid}>
-          <article className={styles.panel}>
-            <p className={styles.eyebrow}>Windows master</p>
-            <h2>Create the desktop vault</h2>
-            <p>The companion generates the only data key, wraps it with your password, and stores encrypted SQLite and media files on this PC.</p>
-            <label>Device name<input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} /></label>
-            {!status?.localCompanion.configured && <label>Desktop pairing code<input value={setupCode} onChange={(event) => setSetupCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" /></label>}
-            <label>Vault password<input type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-            {status?.localCompanion.configured
-              ? <button disabled={busy || password.length < 14} onClick={connectDesktop}>Connect configured desktop vault</button>
-              : <button disabled={busy || !status?.localCompanion.available || setupCode.length !== 6 || password.length < 14} onClick={setupDesktop}>Create desktop master vault</button>}
-            {!status?.localCompanion.available && <small>Run the checked-in Vault Companion on the Windows desktop, then reload this page.</small>}
-            {status?.localCompanion.available && !status.localCompanion.configured && <small>Enter the six-digit one-time code shown when the companion starts. This prevents another website from claiming an unconfigured vault.</small>}
-            {status?.localCompanion.configured && <small>The desktop already owns a vault. Enter its password to attach this browser without replacing anything.</small>}
-          </article>
-          <article className={styles.panel}>
-            <p className={styles.eyebrow}>iPhone, iPad, or MacBook</p>
-            <h2>Join the existing vault</h2>
-            <p>Paste the password-wrapped recovery package exported by the master device. The unwrapped key never enters cloud storage.</p>
-            <label>Device name<input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} /></label>
-            <label>Recovery package<textarea value={recoveryText} onChange={(event) => setRecoveryText(event.target.value)} rows={7} spellCheck={false} /></label>
-            <label>Vault password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
-            <button disabled={busy || !recoveryText.trim() || password.length < 14} onClick={joinDevice}>Join encrypted vault</button>
-          </article>
+        <section className={styles.setupShell} aria-labelledby="setup-title">
+          <div className={styles.setupIntro}>
+            <p className={styles.eyebrow}>First-time setup</p>
+            <h2 id="setup-title">Connect this device to your private vault</h2>
+            <p>Choose the device in your hands. We will show only the steps it needs.</p>
+          </div>
+
+          <div className={styles.devicePicker} role="tablist" aria-label="Device to set up">
+            <button type="button" role="tab" aria-selected={setupTarget === "windows"} onClick={() => chooseSetupTarget("windows")}>
+              <span className={styles.deviceIcon} aria-hidden="true">▦</span>
+              <span><strong>Windows desktop</strong><small>Create or reconnect the master vault</small></span>
+              <span className={styles.recommended}>Master</span>
+            </button>
+            <button type="button" role="tab" aria-selected={setupTarget === "apple"} onClick={() => chooseSetupTarget("apple")}>
+              <span className={styles.deviceIcon} aria-hidden="true">◇</span>
+              <span><strong>iPhone, iPad, or MacBook</strong><small>Join the vault created on Windows</small></span>
+            </button>
+          </div>
+
+          <div className={styles.syncNote}>
+            <span aria-hidden="true">↻</span>
+            <div><strong>For live sync, sign in on every device</strong><small>Offline use stays local, but encrypted changes move between devices only while that browser is signed into Unigentamos.</small></div>
+            <Link href="/admin">Open admin</Link>
+          </div>
+
+          {setupTarget === "windows" ? (
+            <article className={styles.setupCard} aria-labelledby="windows-setup-title">
+              <div className={styles.deviceTrail} aria-label="Windows master stores encrypted data and syncs approved devices">
+                <strong>Windows master</strong><span>→</span><span>Encrypted sync</span><span>→</span><span>Your other devices</span>
+              </div>
+              <div className={styles.setupHeading}>
+                <div><p className={styles.eyebrow}>Windows master</p><h2 id="windows-setup-title">Create your desktop vault</h2></div>
+                <span className={`${styles.statusPill} ${status?.localCompanion.available ? styles.statusReady : styles.statusWaiting}`}>
+                  {status?.localCompanion.available ? "Companion found" : "Companion check needed"}
+                </span>
+              </div>
+
+              <div className={styles.setupStep}>
+                <span className={styles.stepNumber}>1</span>
+                <div>
+                  <h3>Confirm the Windows companion</h3>
+                  <p>It is the private helper that keeps SQLite and media encrypted on this PC. It runs in the background after sign-in.</p>
+                  <div className={styles.actionRow}>
+                    <button type="button" className={styles.secondaryButton} disabled={checkingCompanion} onClick={checkCompanion}>{checkingCompanion ? "Checking…" : "Check this desktop"}</button>
+                    <a className={styles.textButton} href={COMPANION_HELPER_URL} target="_blank" rel="noreferrer">Show pairing code ↗</a>
+                  </div>
+                  {!status?.localCompanion.available && <small>If the browser asks to find devices on your local network, choose Allow. The helper is available only on this PC.</small>}
+                </div>
+              </div>
+
+              {!status?.localCompanion.configured && <div className={styles.setupStep}>
+                <span className={styles.stepNumber}>2</span>
+                <div>
+                  <h3>Enter the one-time code</h3>
+                  <p><strong>Show pairing code</strong> opens a private page served by this PC. You can also find it from Start → Unigentamos Vault Companion.</p>
+                  <label>Six-digit pairing code<input value={setupCode} onChange={(event) => setSetupCode(event.target.value.replace(/\D/g, "").slice(0, 6))} inputMode="numeric" autoComplete="one-time-code" placeholder="000000" /></label>
+                </div>
+              </div>}
+
+              <div className={styles.setupStep}>
+                <span className={styles.stepNumber}>{status?.localCompanion.configured ? "2" : "3"}</span>
+                <div>
+                  <h3>{status?.localCompanion.configured ? "Connect this browser" : "Choose the vault password"}</h3>
+                  <p>{status?.localCompanion.configured ? "The desktop vault already exists. Its password reconnects this browser without replacing anything." : "Use one memorable password with at least 14 characters. It never leaves this device."}</p>
+                  <div className={styles.fieldPair}>
+                    <label>Device name<input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} autoComplete="off" /></label>
+                    <label>Vault password<input type="password" autoComplete={status?.localCompanion.configured ? "current-password" : "new-password"} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+                  </div>
+                  {status?.localCompanion.configured
+                    ? <button className={styles.primaryButton} disabled={busy || password.length < 14} onClick={connectDesktop}>Connect this Windows browser</button>
+                    : <button className={styles.primaryButton} disabled={busy || !status?.localCompanion.available || setupCode.length !== 6 || password.length < 14} onClick={setupDesktop}>Create and unlock my vault</button>}
+                </div>
+              </div>
+            </article>
+          ) : (
+            <article className={styles.setupCard} aria-labelledby="apple-setup-title">
+              <div className={styles.deviceTrail} aria-label="Windows master exports an encrypted recovery file to this Apple device">
+                <strong>Windows master</strong><span>→</span><span>Encrypted recovery file</span><span>→</span><span>This device</span>
+              </div>
+              <div className={styles.setupHeading}>
+                <div><p className={styles.eyebrow}>iPhone, iPad, or MacBook</p><h2 id="apple-setup-title">Connect this Apple device</h2></div>
+                <span className={`${styles.statusPill} ${styles.statusReady}`}>No companion install</span>
+              </div>
+
+              <div className={styles.setupStep}>
+                <span className={styles.stepNumber}>1</span>
+                <div><h3>Export once from Windows</h3><p>On the unlocked Windows vault, open <strong>Protect the vault</strong> and choose <strong>Export recovery package</strong>. The downloaded JSON file is encrypted.</p></div>
+              </div>
+              <div className={styles.setupStep}>
+                <span className={styles.stepNumber}>2</span>
+                <div>
+                  <h3>Choose that encrypted file here</h3>
+                  <p>Move it with AirDrop, iCloud Drive, or the Files app, then select it below.</p>
+                  <label className={styles.filePicker}>
+                    <input className={styles.fileInput} type="file" accept=".json,application/json" onChange={(event) => void loadRecoveryFile(event.currentTarget.files?.[0])} />
+                    <span aria-hidden="true">⇧</span>
+                    <strong>{recoveryFileName || "Choose recovery file"}</strong>
+                    <small>{recoveryFileName ? "Encrypted file ready" : "unigentamos-vault-recovery-….json"}</small>
+                  </label>
+                  <details className={styles.pasteFallback}>
+                    <summary>Paste recovery text instead</summary>
+                    <label>Encrypted recovery package<textarea value={recoveryText} onChange={(event) => { setRecoveryText(event.target.value); setRecoveryFileName(""); }} rows={6} spellCheck={false} /></label>
+                  </details>
+                </div>
+              </div>
+              <div className={styles.setupStep}>
+                <span className={styles.stepNumber}>3</span>
+                <div>
+                  <h3>Unlock it on this device</h3>
+                  <p>Use the same vault password as Windows. The key is unwrapped only in this browser.</p>
+                  <div className={styles.fieldPair}>
+                    <label>Device name<input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} autoComplete="off" /></label>
+                    <label>Vault password<input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+                  </div>
+                  <button className={styles.primaryButton} disabled={busy || !recoveryText.trim() || password.length < 14} onClick={joinDevice}>Connect this device</button>
+                </div>
+              </div>
+
+              <aside className={styles.appleNote}>
+                <strong>After it connects</strong>
+                <span>In Safari, use Share → Add to Home Screen on iPhone/iPad, or File → Add to Dock on Mac. Text and metadata stay available offline; large media remains on the Windows master until requested.</span>
+              </aside>
+            </article>
+          )}
+
+          <aside className={styles.privacyNote}>
+            <strong>What stays private</strong>
+            <span>Your password and unwrapped vault key never enter GitHub, Vercel, or Supabase. Cloud sync carries encrypted envelopes only.</span>
+          </aside>
         </section>
       ) : !status.unlocked ? (
         <section className={`${styles.panel} ${styles.unlock}`}>

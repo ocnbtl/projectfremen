@@ -700,7 +700,7 @@ export class BrowserVaultEngine {
 
   async companionStatus(): Promise<{ available: boolean; version?: string; configured?: boolean; unlocked?: boolean; pairingRequired?: boolean }> {
     try {
-      const response = await fetch("http://127.0.0.1:43127/health", { mode: "cors", cache: "no-store", signal: AbortSignal.timeout(750) });
+      const response = await fetch("http://127.0.0.1:43127/health", { mode: "cors", cache: "no-store", signal: AbortSignal.timeout(2_500) });
       if (!response.ok) return { available: false };
       const payload = await response.json() as { version?: string; configured?: boolean; unlocked?: boolean; pairingRequired?: boolean };
       return {

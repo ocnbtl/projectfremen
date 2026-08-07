@@ -6,6 +6,12 @@ Unigentamos uses a local-first encrypted vault with the Windows desktop as the m
 
 The iPhone, iPad, and MacBook retain encrypted text, metadata, and version history in their browser storage. The desktop retains the same records plus the full encrypted media library. Secondary-device media is selective and on demand; full media-relay transport is not part of this release.
 
+## Device setup
+
+On Windows, open `https://unigentamos.com/vault`, choose **Windows desktop**, and use **Check this desktop**. If the browser requests local-network access, allow it so the hosted page can reach the loopback-only companion. Choose **Show pairing code** to open the companion's local page, or find **Unigentamos Vault Companion** in the Windows Start menu. Enter the six-digit code, choose a vault password of at least 14 characters, and create the master vault.
+
+On iPhone, iPad, or MacBook, no companion is installed. Sign into Unigentamos in that browser so live relay sync is authorized. First unlock the Windows vault and export its encrypted recovery file from **Protect the vault**. Move that file with AirDrop, iCloud Drive, or the Files app. On the Apple device, open the Vault page, select the Apple-device path, choose the recovery file, and enter the same vault password. After connection, Safari can install the site with **Share → Add to Home Screen** on iPhone/iPad or **File → Add to Dock** on Mac.
+
 ## Data flow
 
 ```mermaid

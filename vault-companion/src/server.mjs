@@ -302,6 +302,62 @@ function sendJson(response, status, body, origin = null) {
   response.end(payload);
 }
 
+function sendPairingHelper(response) {
+  const configured = Boolean(config());
+  const title = configured ? "Desktop vault connected" : "Your desktop pairing code";
+  const detail = configured
+    ? "This Windows companion already owns a vault. Return to Unigentamos and enter the vault password to connect this browser."
+    : "Enter this one-time code in Unigentamos on this Windows desktop. It can only be used before the desktop vault is created.";
+  const pairing = configured
+    ? '<div class="ready" aria-label="Companion status">Companion ready</div>'
+    : `<div class="code" aria-label="Desktop pairing code">${setupCode}</div>`;
+  const payload = Buffer.from(`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${title} · Unigentamos</title>
+  <style>
+    :root { color-scheme: light; font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #eef3f0; color: #17312c; }
+    * { box-sizing: border-box; }
+    body { min-height: 100vh; margin: 0; display: grid; place-items: center; padding: 24px; }
+    main { width: min(100%, 520px); padding: 32px; border: 1px solid rgba(23,49,44,.12); border-radius: 20px; background: #fff; box-shadow: 0 18px 60px rgba(23,49,44,.10); }
+    .brand { display: flex; align-items: center; gap: 10px; margin-bottom: 32px; font-weight: 800; }
+    .mark { display: grid; width: 36px; height: 36px; place-items: center; border-radius: 10px; color: #fff; background: #1f5a49; }
+    .eyebrow { margin: 0 0 7px; color: #628077; font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+    h1 { margin: 0; font-size: clamp(28px, 7vw, 40px); line-height: 1.06; letter-spacing: -.04em; text-wrap: balance; }
+    p { margin: 16px 0 0; color: #536a62; font-size: 16px; line-height: 1.6; text-wrap: pretty; }
+    .code { margin: 28px 0 8px; padding: 20px; border-radius: 14px; color: #17312c; background: #e6f2ed; font-size: clamp(40px, 12vw, 64px); font-weight: 850; letter-spacing: .12em; text-align: center; font-variant-numeric: tabular-nums; }
+    .ready { margin: 28px 0 8px; padding: 18px; border-radius: 14px; color: #15563f; background: #e6f2ed; font-size: 20px; font-weight: 800; text-align: center; }
+    .local { margin-top: 18px; color: #71837d; font-size: 13px; }
+    a { display: inline-flex; min-height: 44px; align-items: center; margin-top: 24px; border-radius: 9px; padding: 0 16px; color: #fff; background: #1f5a49; font-weight: 800; text-decoration: none; }
+    a:focus-visible { outline: 3px solid rgba(31,90,73,.25); outline-offset: 3px; }
+  </style>
+</head>
+<body>
+  <main>
+    <div class="brand"><span class="mark">U</span> Unigentamos</div>
+    <p class="eyebrow">Windows vault companion</p>
+    <h1>${title}</h1>
+    <p>${detail}</p>
+    ${pairing}
+    <p class="local">This page comes directly from the companion on this PC. Nothing on it is sent to the internet.</p>
+    <a href="https://unigentamos.com/vault">Return to Vault setup</a>
+  </main>
+</body>
+</html>`);
+  response.writeHead(200, {
+    "Cache-Control": "no-store, private",
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+    "Content-Type": "text/html; charset=utf-8",
+    "Content-Length": payload.length,
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY"
+  });
+  response.end(payload);
+}
+
 async function readBody(request, limit) {
   const declared = Number(request.headers["content-length"] || 0);
   if (declared > limit) throw Object.assign(new Error("Request is too large"), { status: 413 });
@@ -662,6 +718,9 @@ const server = createServer(async (request, response) => {
       return response.end();
     }
     const url = new URL(request.url || "/", `http://${HOST}:${PORT}`);
+    if (request.method === "GET" && url.pathname === "/") {
+      return sendPairingHelper(response);
+    }
     if (request.method === "GET" && url.pathname === "/health") {
       return sendJson(response, 200, { ok: true, version: VERSION, configured: Boolean(config()), unlocked: Boolean(vaultKey), pairingRequired: !config() }, origin);
     }

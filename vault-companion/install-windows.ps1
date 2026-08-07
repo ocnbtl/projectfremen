@@ -28,6 +28,30 @@ $vaultDirectory = Join-Path $env:LOCALAPPDATA "Unigentamos\Vault"
 $configPath = Join-Path $installRoot "companion-config.json"
 $runnerPath = Join-Path $installRoot "run-companion.ps1"
 $taskName = "Unigentamos Vault Companion"
+$programsPath = [Environment]::GetFolderPath("Programs")
+$shortcutPath = Join-Path $programsPath "Unigentamos Vault Companion.url"
+
+$existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+if ($existingTask) {
+  Stop-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+  $listener = Get-NetTCPConnection -LocalPort 43127 -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($listener) {
+    $installedScript = [System.IO.Path]::GetFullPath((Join-Path $appRoot "src\server.mjs"))
+    $companionProcess = Get-CimInstance Win32_Process -Filter "ProcessId = $($listener.OwningProcess)"
+    $commandLine = if ($companionProcess) { [string]$companionProcess.CommandLine } else { "" }
+    if (-not $companionProcess -or $commandLine.IndexOf($installedScript, [System.StringComparison]::OrdinalIgnoreCase) -lt 0) {
+      throw "Port 43127 is owned by an unexpected process. Stop it before updating the Vault Companion."
+    }
+    Stop-Process -Id $listener.OwningProcess -Force
+  }
+  for ($attempt = 0; $attempt -lt 20; $attempt += 1) {
+    if (-not (Get-NetTCPConnection -LocalPort 43127 -State Listen -ErrorAction SilentlyContinue)) { break }
+    Start-Sleep -Milliseconds 250
+  }
+  if (Get-NetTCPConnection -LocalPort 43127 -State Listen -ErrorAction SilentlyContinue) {
+    throw "The existing Vault Companion did not stop cleanly."
+  }
+}
 
 New-Item -ItemType Directory -Path $appRoot -Force | Out-Null
 New-Item -ItemType Directory -Path $vaultDirectory -Force | Out-Null
@@ -103,6 +127,13 @@ Set-Location -LiteralPath ([string]$config.appRoot)
 & ([string]$config.nodePath) (Join-Path ([string]$config.appRoot) "src\server.mjs")
 '@ | Set-Content -LiteralPath $runnerPath -Encoding UTF8
 
+@"
+[InternetShortcut]
+URL=http://127.0.0.1:43127/
+IconFile=$env:SystemRoot\System32\imageres.dll
+IconIndex=2
+"@ | Set-Content -LiteralPath $shortcutPath -Encoding ASCII
+
 $currentUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
 $action = New-ScheduledTaskAction `
   -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
@@ -131,6 +162,7 @@ if (-not $DoNotStart) {
 Write-Host "Unigentamos Vault Companion installed for $currentUser."
 Write-Host "It runs invisibly at sign-in and listens only on 127.0.0.1:43127."
 Write-Host "Limits: $MaxMediaLibraryGiB GiB media, $MaxRecordStorageGiB GiB record history, $MaxHistoryVersions versions, $MaxBackups backup sets."
+Write-Host "Find pairing and status anytime: Start menu > Unigentamos Vault Companion."
 if (-not $existing) {
   Write-Host "One-time desktop pairing code: $setupCode"
 }
