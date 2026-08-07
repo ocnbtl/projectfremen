@@ -4,7 +4,7 @@
 
 Unigentamos uses a local-first encrypted vault with the Windows desktop as the master device. The normal interface remains `https://unigentamos.com/vault`. A small companion process runs invisibly on the desktop at loopback only; it supplies durable SQLite and encrypted-file storage that a hosted website cannot safely or reliably obtain from a browser alone.
 
-The iPhone, iPad, and MacBook retain encrypted text, metadata, and version history in their browser storage. The desktop retains the same records plus the full encrypted media library. Secondary-device media is selective and on demand; full media-relay transport is not part of this release.
+The iPhone, iPad, and MacBook retain encrypted text, metadata, and version history in their browser storage. The desktop retains the same records plus the full encrypted media library. Secondary-device media is selective and on demand: encrypted chunks are cached on a device only when a file is added or opened, and an Apple-originated file is copied into the Windows master library the first time Windows opens it.
 
 ## Device setup
 
@@ -19,6 +19,8 @@ flowchart LR
   UI["unigentamos.com/vault"] --> IDB["Encrypted IndexedDB on each device"]
   IDB -->|"opaque encrypted envelopes"| Relay["Supabase free-plan relay"]
   Relay --> IDB
+  IDB -->|"authenticated encrypted chunks"| MediaRelay["Private Supabase media cache"]
+  MediaRelay --> IDB
   UI -->|"loopback only on Windows"| Companion["Vault Companion"]
   Companion --> SQLite["Encrypted SQLite records and history"]
   Companion --> Media["AES-GCM media blobs"]
@@ -57,11 +59,11 @@ On reconnection:
 
 ## Current implementation boundary
 
-The Vault workspace is local-first for Notes, Contacts, and Resources, including editing and version browsing. Existing online mutations in Notes, People, Resources, Media, Personal Records, and Finance also create an encrypted local mirror when the vault is unlocked in that browser session.
+The Vault workspace is local-first for Notes, Contacts, and Resources, including editing, complete version browsing, and restore-as-a-new-version. Projects, Personal Ops, Reviews, Finance, Media, and other mirrored records are also browsable and restorable without deleting their later history. Existing online mutations in Notes, People, Resources, Media, Personal Records, and Finance create an encrypted local mirror when the vault is unlocked in that browser session.
 
 The older dashboard modules have not all been made offline-editable. Their existing Supabase-backed APIs remain canonical for their specialized validation, authorization, audits, Finance invariants, and cross-module ownership rules. Bootstrap can import their current state into encrypted history without mutating production records. This prevents a risky destructive migration while the remaining domain editors move to local-first commands one at a time.
 
-The desktop companion already stores encrypted media and can return it by digest to the approved site. A user-facing media ingest/on-demand transfer workflow for secondary devices remains future work. Until it exists, do not treat mobile media as fully available offline.
+The Vault page accepts files up to 256 MiB, encrypts them in 1.5 MB plaintext chunks before relay upload, and stores only ciphertext in IndexedDB and the private Supabase Storage bucket. Windows also stores an authenticated encrypted local copy. Secondary devices download and decrypt a file only when it is opened; previously opened ciphertext remains available to that device offline. Media that has never been opened on a secondary device is not promised offline there. If free relay storage is temporarily unavailable, the record and encrypted local/Windows copies remain visible and upload retries later.
 
 ## Relay and scale
 
@@ -69,11 +71,13 @@ The additive `vault_sync_changes` table is append-only in this release. Its payl
 
 Encrypted checkpoints and safe compaction are still required before the relay can operate indefinitely without manual capacity management. Device acknowledgements now provide the safe per-device cursor needed for that future compaction, but this release does not delete relay history. The desktop archive remains usable if the relay is full, unavailable, or later replaced.
 
-Text and metadata volume is appropriate for SQLite and IndexedDB. Large media belongs in encrypted desktop files, not Postgres rows or mobile browser storage. Free Supabase limits are a practical relay constraint, not a data-loss boundary; queued local changes remain on-device when the relay is unavailable.
+Text and metadata volume is appropriate for SQLite and IndexedDB. Large media belongs in encrypted desktop files, not Postgres rows or full mobile-library replication. The `vault-media-relay` bucket is private, accepts only bounded JSON ciphertext chunks through the authenticated server route, and has no anonymous or authenticated browser policies. Free Supabase limits are a practical relay constraint, not a data-loss boundary; queued local changes and encrypted media remain on-device when the relay is unavailable.
 
 ## Backups and recovery
 
-The companion backup copies the SQLite database and encrypted media tree as one encrypted backup set. By default it writes beside the local vault, which protects against application-level damage but not disk failure. Reinstall with `-BackupDirectory` as soon as an external SSD is available. A future server rack can use the same directory format without changing vault encryption. The default retention boundary is three backup sets; the companion stops and asks for capacity rather than deleting old backups. Move an older, restore-tested set out of the configured directory to free a slot.
+The companion backup copies the SQLite database and encrypted media tree as one encrypted backup set. Each set includes a vault-key-signed manifest with the database and every media file's path, size, and SHA-256 digest. The Vault page lists backups, verifies every file before recovery, previews the exact number of missing versions and media files, requires a typed confirmation, and records a restore receipt. Restore is additive: missing encrypted versions, envelopes, current-object pointers, and media files are inserted without deleting data or overwriting a newer current record. Repeating the same restore is idempotent.
+
+By default backups are written beside the local vault, which protects against application-level damage but not disk failure. Reinstall with `-BackupDirectory` as soon as an external SSD is available. A future server rack can use the same directory format without changing vault encryption. The default retention boundary is three backup sets; the companion stops and asks for capacity rather than deleting old backups. Move an older, restore-tested set out of the configured directory to free a slot.
 
 Required recovery practice:
 
