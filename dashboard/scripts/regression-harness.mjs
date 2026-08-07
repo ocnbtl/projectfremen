@@ -9246,16 +9246,18 @@ async function main() {
     pass("Public and protected entry responses include the security-header baseline");
 
     const publicVaultShell = await requestText(server.baseUrl, cookieJar, "/vault");
-    assert(publicVaultShell.response.ok && publicVaultShell.body.includes("Encrypted Vault") && publicVaultShell.body.includes("Vault &amp; sync"), "Public encrypted vault shell failed to render");
+    assert(publicVaultShell.response.ok && publicVaultShell.body.includes("Private workspace") && publicVaultShell.body.includes("Your vault") && publicVaultShell.body.includes("Connect to your vault"), "Public vault shell failed to render");
     const serviceWorker = await requestText(server.baseUrl, cookieJar, "/sw.js");
     assert(
       serviceWorker.response.ok &&
-        serviceWorker.body.includes("unigentamos-static-v4") &&
+        serviceWorker.body.includes("unigentamos-static-v5") &&
         serviceWorker.body.includes('url.pathname.startsWith("/api/")') &&
-        serviceWorker.body.includes('html.matchAll(/(?:src|href)='),
+        serviceWorker.body.includes('html.matchAll(/(?:src|href)=') &&
+        serviceWorker.body.includes('event.data?.type === "SKIP_WAITING"') &&
+        serviceWorker.body.includes('cache.put("/vault", response.clone())'),
       "Offline shell worker is missing, does not cache its application assets, or does not exclude API data"
     );
-    pass("Encrypted vault and static-only offline shell load without exposing authenticated data");
+    pass("Vault and static-only offline shell load without exposing authenticated data");
 
     logStep("Checking unauthenticated API protection");
     const unauthKpis = await requestJson(server.baseUrl, cookieJar, "/api/kpis");

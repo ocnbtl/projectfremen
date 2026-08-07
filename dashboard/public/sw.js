@@ -1,4 +1,4 @@
-const CACHE_VERSION = "unigentamos-static-v4";
+const CACHE_VERSION = "unigentamos-static-v5";
 const PUBLIC_SHELL = ["/offline", "/unigentamos-logo.svg"];
 
 async function installOfflineShell() {
@@ -15,7 +15,10 @@ async function installOfflineShell() {
 
 self.addEventListener("install", (event) => {
   event.waitUntil(installOfflineShell());
-  self.skipWaiting();
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -42,9 +45,18 @@ self.addEventListener("fetch", (event) => {
   }
 
   if (request.mode === "navigate") {
-    event.respondWith(fetch(request).catch(async () => (
-      await caches.match(url.pathname === "/vault" ? "/vault" : "/offline")
-      || new Response("Unigentamos is offline.", { status: 503, headers: { "Content-Type": "text/plain" } })
-    )));
+    event.respondWith((async () => {
+      try {
+        const response = await fetch(request);
+        if (response.ok && url.pathname === "/vault") {
+          const cache = await caches.open(CACHE_VERSION);
+          await cache.put("/vault", response.clone());
+        }
+        return response;
+      } catch {
+        return await caches.match(url.pathname === "/vault" ? "/vault" : "/offline")
+          || new Response("Unigentamos is offline.", { status: 503, headers: { "Content-Type": "text/plain" } });
+      }
+    })());
   }
 });

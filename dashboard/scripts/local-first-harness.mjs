@@ -178,8 +178,19 @@ try {
   assert.match(deviceStatusRoute, /isCsrfRequestValid/i);
   assert.match(deviceStatusRoute, /MAX_REQUEST_BYTES = 64 \* 1024/i);
   assert.match(deviceStatusRoute, /recordVaultDeviceStatus/i);
+  const serviceWorker = await readFile("public/sw.js", "utf8");
+  assert.match(serviceWorker, /unigentamos-static-v5/i);
+  assert.match(serviceWorker, /event\.data\?\.type === "SKIP_WAITING"/i);
+  assert.match(serviceWorker, /cache\.put\("\/vault", response\.clone\(\)\)/i);
+  const serviceWorkerRegistration = await readFile("components/ServiceWorkerRegistration.tsx", "utf8");
+  assert.match(serviceWorkerRegistration, /updateViaCache: "none"/i);
+  assert.match(serviceWorkerRegistration, /next\.update\(\)/i);
+  assert.match(serviceWorkerRegistration, /A newer version is ready\./i);
+  const vaultWorkspace = await readFile("components/VaultWorkspace.tsx", "utf8");
+  assert.ok(vaultWorkspace.indexOf("Your devices") < vaultWorkspace.indexOf("Bring in your current data"));
+  assert.doesNotMatch(vaultWorkspace, /Relay progress|sequence it has safely applied|Waiting for the first device acknowledgement/i);
 
-  console.log("[pass] local-first merge, clock correction, conflict retention, encrypted device status, and encryption checks passed");
+  console.log("[pass] local-first merge, clock correction, conflict retention, device status, natural copy, app updating, and encryption checks passed");
 } finally {
   await rm(outputRoot, { recursive: true, force: true });
 }

@@ -2,8 +2,8 @@ import type { Metadata } from "next";
 import VaultWorkspace from "../../components/VaultWorkspace";
 
 export const metadata: Metadata = {
-  title: "Encrypted Vault · Unigentamos",
-  description: "Local-first encrypted storage, history, and synchronization"
+  title: "Your Vault · Unigentamos",
+  description: "Private offline access, device sync, backups, and version history"
 };
 
 export default function VaultPage() {
