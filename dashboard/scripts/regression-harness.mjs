@@ -9250,7 +9250,7 @@ async function main() {
     const serviceWorker = await requestText(server.baseUrl, cookieJar, "/sw.js");
     assert(
       serviceWorker.response.ok &&
-        serviceWorker.body.includes("unigentamos-static-v5") &&
+        serviceWorker.body.includes("unigentamos-static-v6") &&
         serviceWorker.body.includes('url.pathname.startsWith("/api/")') &&
         serviceWorker.body.includes('html.matchAll(/(?:src|href)=') &&
         serviceWorker.body.includes('event.data?.type === "SKIP_WAITING"') &&

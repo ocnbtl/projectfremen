@@ -1,6 +1,7 @@
 import {
   VAULT_ENVELOPE_VERSION,
   type EncryptedVaultDeviceDescriptor,
+  type EncryptedVaultMediaChunk,
   type EncryptedChangeEnvelope,
   type VaultDeviceDescriptor,
   type VaultChange,
@@ -34,6 +35,104 @@ function base64ToBytes(value: string): Uint8Array<ArrayBuffer> {
   const binary = atob(value);
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+  return bytes;
+}
+
+function bytesToHex(value: Uint8Array<ArrayBufferLike>): string {
+  return Array.from(value, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function mediaChunkAad(input: Pick<EncryptedVaultMediaChunk,
+  "format" | "vaultId" | "mediaId" | "contentRoot" | "chunkIndex" | "totalChunks" | "keyVersion" | "plaintextHash"
+>): Uint8Array<ArrayBuffer> {
+  return encoder.encode(JSON.stringify([
+    input.format,
+    input.vaultId,
+    input.mediaId,
+    input.contentRoot,
+    input.chunkIndex,
+    input.totalChunks,
+    input.keyVersion,
+    input.plaintextHash
+  ]));
+}
+
+export async function sha256Hex(value: ArrayBuffer | Uint8Array<ArrayBufferLike>): Promise<string> {
+  const bytes = value instanceof Uint8Array ? new Uint8Array(value) : new Uint8Array(value);
+  return bytesToHex(new Uint8Array(await subtle().digest("SHA-256", bytes)));
+}
+
+export async function mediaContentRoot(input: {
+  byteLength: number;
+  chunkSize: number;
+  plaintextHashes: readonly string[];
+}): Promise<string> {
+  if (!Number.isSafeInteger(input.byteLength) || input.byteLength < 1 || !Number.isSafeInteger(input.chunkSize) || input.chunkSize < 1) {
+    throw new Error("Media root parameters are invalid");
+  }
+  const prefix = encoder.encode(`unigentamos-media-root-v1:${input.byteLength}:${input.chunkSize}:`);
+  const hashes = input.plaintextHashes.map((hash) => {
+    if (!/^[0-9a-f]{64}$/i.test(hash)) throw new Error("Media chunk hash is invalid");
+    return Uint8Array.from(hash.match(/.{2}/g) || [], (pair) => Number.parseInt(pair, 16));
+  });
+  const joined = new Uint8Array(prefix.byteLength + hashes.length * 32);
+  joined.set(prefix, 0);
+  let offset = prefix.byteLength;
+  for (const hash of hashes) {
+    joined.set(hash, offset);
+    offset += hash.byteLength;
+  }
+  return sha256Hex(joined);
+}
+
+export async function encryptVaultMediaChunk(input: {
+  vaultId: string;
+  mediaId: string;
+  contentRoot: string;
+  chunkIndex: number;
+  totalChunks: number;
+  keyVersion: number;
+  plaintext: Uint8Array<ArrayBuffer>;
+  plaintextHash: string;
+}, vaultKey: CryptoKey): Promise<EncryptedVaultMediaChunk> {
+  const metadata = {
+    format: "unigentamos-vault-media-chunk-v1" as const,
+    vaultId: input.vaultId,
+    mediaId: input.mediaId,
+    contentRoot: input.contentRoot,
+    chunkIndex: input.chunkIndex,
+    totalChunks: input.totalChunks,
+    keyVersion: input.keyVersion,
+    plaintextHash: input.plaintextHash
+  };
+  const aad = mediaChunkAad(metadata);
+  const iv = randomBytes(12);
+  const ciphertext = await subtle().encrypt({ name: "AES-GCM", iv, additionalData: aad }, vaultKey, input.plaintext);
+  return {
+    ...metadata,
+    iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
+    aadHash: bytesToBase64(new Uint8Array(await subtle().digest("SHA-256", aad))),
+    byteLength: ciphertext.byteLength
+  };
+}
+
+export async function decryptVaultMediaChunk(chunk: EncryptedVaultMediaChunk, vaultKey: CryptoKey): Promise<Uint8Array<ArrayBuffer>> {
+  const aad = mediaChunkAad(chunk);
+  const aadHash = bytesToBase64(new Uint8Array(await subtle().digest("SHA-256", aad)));
+  if (aadHash !== chunk.aadHash) throw new Error("Encrypted media metadata failed integrity validation");
+  let plaintext: ArrayBuffer;
+  try {
+    plaintext = await subtle().decrypt(
+      { name: "AES-GCM", iv: base64ToBytes(chunk.iv), additionalData: aad },
+      vaultKey,
+      base64ToBytes(chunk.ciphertext)
+    );
+  } catch {
+    throw new Error("Encrypted media chunk authentication failed");
+  }
+  const bytes = new Uint8Array(plaintext);
+  if (await sha256Hex(bytes) !== chunk.plaintextHash) throw new Error("Decrypted media chunk failed integrity validation");
   return bytes;
 }
 
@@ -273,6 +372,7 @@ function validateVaultChange(
     || !record(value.fields)
     || !record(value.fieldClocks)
     || value.baseVersionId !== undefined && (typeof value.baseVersionId !== "string" || !UUID.test(value.baseVersionId))
+    || value.restoredFromVersionId !== undefined && (typeof value.restoredFromVersionId !== "string" || !UUID.test(value.restoredFromVersionId))
     || value.tombstone !== undefined && typeof value.tombstone !== "boolean"
     || typeof value.createdAt !== "string"
     || !Number.isFinite(Date.parse(value.createdAt))

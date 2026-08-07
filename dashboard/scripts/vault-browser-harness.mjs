@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readdir, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -80,7 +80,9 @@ const baseUrl = `http://127.0.0.1:${webPort}`;
 const companionBaseUrl = `http://127.0.0.1:${companionPort}`;
 const artifactRoot = path.join(dashboardRoot, "output", "playwright");
 const relayEnvelopes = [];
+const mediaChunks = new Map();
 const deviceStatuses = new Map();
+let rejectMediaUploads = false;
 let companion;
 let application;
 let browser;
@@ -151,6 +153,22 @@ async function mockVaultRuntime(context) {
     }
     return jsonResponse(route, deviceStatusPayload());
   });
+  await context.route("**/api/vault/media*", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      if (rejectMediaUploads) {
+        return route.fulfill({ status: 507, contentType: "application/json", body: JSON.stringify({ ok: false, error: "Encrypted relay storage is temporarily full" }) });
+      }
+      const input = request.postDataJSON();
+      const chunk = input.chunk;
+      mediaChunks.set(`${chunk.vaultId}:${chunk.mediaId}:${chunk.chunkIndex}`, chunk);
+      return jsonResponse(route, { ok: true, alreadyStored: false });
+    }
+    const url = new URL(request.url());
+    const key = `${url.searchParams.get("vaultId")}:${url.searchParams.get("mediaId")}:${url.searchParams.get("chunkIndex")}`;
+    const chunk = mediaChunks.get(key);
+    return chunk ? jsonResponse(route, { ok: true, chunk }) : route.fulfill({ status: 404, contentType: "application/json", body: JSON.stringify({ ok: false, error: "Not found" }) });
+  });
 }
 
 try {
@@ -191,7 +209,9 @@ try {
   const unexpectedFailures = [];
   page.on("response", (response) => {
     const pathname = new URL(response.url()).pathname;
-    if (response.status() >= 500 && pathname !== "/api/vault/sync") unexpectedFailures.push(`${response.status()} ${pathname}`);
+    if (response.status() >= 500 && pathname !== "/api/vault/sync" && !(response.status() === 507 && pathname === "/api/vault/media")) {
+      unexpectedFailures.push(`${response.status()} ${pathname}`);
+    }
   });
 
   const updatePage = await context.newPage();
@@ -214,18 +234,47 @@ try {
   await page.getByText("Your Windows vault is ready.").waitFor();
   await page.getByRole("heading", { name: "Your devices" }).waitFor();
 
+  await page.getByRole("tab", { name: "Notes" }).click();
   await page.getByLabel("Title").fill("Offline continuity note");
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("first encrypted version");
   await page.getByRole("button", { name: "Save version" }).last().click();
   await page.getByText("Note saved. It will sync automatically.").waitFor();
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("second encrypted version");
   await page.getByRole("button", { name: "Save version" }).last().click();
-  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > div').length === 2);
-  assert.equal(await page.getByLabel("Version history").locator(":scope > div").count(), 2);
+  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 2);
+  assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 2);
+  await page.getByLabel("Version history").locator(":scope > button").nth(1).click();
+  await page.getByRole("button", { name: "Restore this version" }).click();
+  await page.getByRole("button", { name: "Yes, restore it" }).click();
+  await page.getByText("That saved version is now the latest.", { exact: false }).waitFor();
+  assert.equal(await page.getByRole("textbox", { name: "Note", exact: true }).inputValue(), "first encrypted version");
+  assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 3);
 
   await page.getByRole("button", { name: "Back up this PC" }).click();
-  await page.getByText("Backup created on this PC.").waitFor();
+  await page.getByText("Backup created and checked.", { exact: false }).waitFor();
   assert.equal((await readdir(backupRoot)).length, 1);
+
+  const mediaFixture = path.join(tempRoot, "private-photo.txt");
+  await writeFile(mediaFixture, "private media that must be encrypted in transit");
+  await page.locator('input[type="file"]').last().setInputFiles(mediaFixture);
+  await page.getByText("private-photo.txt is encrypted and ready on your devices.").waitFor();
+  const mediaDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Open file" }).click();
+  const mediaDownload = await mediaDownloadPromise;
+  assert.equal((await readFile(await mediaDownload.path())).toString(), "private media that must be encrypted in transit");
+
+  rejectMediaUploads = true;
+  const resilientMediaFixture = path.join(tempRoot, "windows-safe-while-cloud-full.txt");
+  await writeFile(resilientMediaFixture, "encrypted locally even while relay storage is unavailable");
+  await page.locator('input[type="file"]').last().setInputFiles(resilientMediaFixture);
+  await page.getByText("windows-safe-while-cloud-full.txt is encrypted on Windows.", { exact: false }).waitFor();
+  const resilientDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Open file" }).click();
+  const resilientDownload = await resilientDownloadPromise;
+  assert.equal((await readFile(await resilientDownload.path())).toString(), "encrypted locally even while relay storage is unavailable");
+  rejectMediaUploads = false;
+  await page.getByRole("button", { name: "Check now" }).click();
+  await page.getByText("Device status updated.").waitFor();
 
   const recoveryDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download recovery file" }).click();
@@ -245,6 +294,31 @@ try {
   await applePage.getByRole("button", { name: "Connect this device" }).click();
   await applePage.getByText("This device is connected.").waitFor();
   await applePage.getByText("Offline continuity note", { exact: true }).waitFor();
+  await applePage.getByRole("tab", { name: "Media" }).click();
+  await applePage.getByText("private-photo.txt", { exact: true }).click();
+  const appleMediaDownloadPromise = applePage.waitForEvent("download");
+  await applePage.getByRole("button", { name: "Open file" }).click();
+  const appleMediaDownload = await appleMediaDownloadPromise;
+  assert.equal((await readFile(await appleMediaDownload.path())).toString(), "private media that must be encrypted in transit");
+
+  const appleOriginFixture = path.join(tempRoot, "added-from-iphone.txt");
+  await writeFile(appleOriginFixture, "encrypted on iPhone and promoted to the Windows master when opened");
+  await applePage.locator('input[type="file"]').last().setInputFiles(appleOriginFixture);
+  await applePage.getByText("added-from-iphone.txt is encrypted and ready on your devices.").waitFor();
+  await applePage.getByRole("button", { name: "Check now" }).click();
+  await applePage.getByText("Device status updated.").waitFor();
+  await page.getByRole("button", { name: "Check now" }).click();
+  await page.getByText("Device status updated.").waitFor();
+  await page.getByRole("button", { name: /^added-from-iphone\.txt Media/ }).click();
+  const windowsPromotedDownloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Open file" }).click();
+  const windowsPromotedDownload = await windowsPromotedDownloadPromise;
+  assert.equal((await readFile(await windowsPromotedDownload.path())).toString(), "encrypted on iPhone and promoted to the Windows master when opened");
+  const mediaPrefixes = await readdir(path.join(vaultRoot, "media"));
+  const companionMediaFiles = (await Promise.all(mediaPrefixes.map(async (prefix) => readdir(path.join(vaultRoot, "media", prefix))))).flat();
+  assert.equal(companionMediaFiles.filter((name) => name.endsWith(".uvblob")).length, 3);
+  await applePage.getByRole("button", { name: "Check now" }).click();
+  await applePage.getByText("Device status updated.").waitFor();
   await applePage.getByRole("heading", { name: "Everything is up to date" }).waitFor();
   await applePage.screenshot({ path: path.join(artifactRoot, "vault-devices-iphone.png"), fullPage: true });
   assert.equal(await applePage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
@@ -273,13 +347,13 @@ try {
   await page.getByText("Offline continuity note", { exact: true }).click();
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("third encrypted version saved offline");
   await page.getByRole("button", { name: "Save version" }).last().click();
-  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > div').length === 3);
-  assert.equal(await page.getByLabel("Version history").locator(":scope > div").count(), 3);
+  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 4);
+  assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 4);
   assert.deepEqual(unexpectedFailures, []);
 
   await context.setOffline(false);
   await context.close();
-  console.log("[pass] guided setup, visible device status, natural copy, app-update notice, cross-device sync, backup, offline reload, and offline save passed");
+  console.log("[pass] guided setup, append-only restore, encrypted on-demand media, verified backup, cross-device sync, offline reload, and offline save passed");
 } catch (error) {
   console.error("[vault-browser] application output:\n", application?.output() || "");
   console.error("[vault-browser] companion output:\n", companion?.output() || "");

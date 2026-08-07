@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { Buffer } from "node:buffer";
 import type {
   EncryptedChangeEnvelope,
+  EncryptedVaultMediaChunk,
   EncryptedVaultDeviceDescriptor,
   EncryptedVaultDeviceStatus,
   SequencedChangeEnvelope
@@ -13,6 +14,9 @@ const MAX_DEVICE_DESCRIPTOR_BYTES = 16_384;
 const MAX_PENDING_CHANGES = 1_000_000;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
+const SHA256 = /^[0-9a-f]{64}$/i;
+const MEDIA_BUCKET = "vault-media-relay";
+const MAX_MEDIA_CHUNK_BYTES = 1_600_016;
 
 type SupabaseConfig = { url: string; key: string };
 
@@ -87,6 +91,103 @@ export function validateEncryptedEnvelope(value: unknown, expectedVaultId: strin
     || ciphertextBytes.byteLength !== byteLength
   ) throw new Error("Encrypted envelope encoding or declared size is invalid");
   return { envelopeVersion: 1, vaultId, changeId, deviceId, keyVersion, iv, ciphertext, aadHash, byteLength };
+}
+
+export function validateEncryptedMediaChunk(value: unknown, expectedVaultId: string): EncryptedVaultMediaChunk {
+  const raw = record(value, "Encrypted media chunk");
+  const format = text(raw.format, "format", 40);
+  const vaultId = validateVaultId(raw.vaultId);
+  const mediaId = text(raw.mediaId, "mediaId", 36, UUID);
+  const contentRoot = text(raw.contentRoot, "contentRoot", 64, SHA256).toLowerCase();
+  const chunkIndex = integer(raw.chunkIndex, "chunkIndex", 0, 1_000_000);
+  const totalChunks = integer(raw.totalChunks, "totalChunks", 1, 1_000_001);
+  const keyVersion = integer(raw.keyVersion, "keyVersion", 1, 1_000_000);
+  const iv = text(raw.iv, "iv", 64, BASE64);
+  const ciphertext = text(raw.ciphertext, "ciphertext", 2_200_000, BASE64);
+  const aadHash = text(raw.aadHash, "aadHash", 64, BASE64);
+  const plaintextHash = text(raw.plaintextHash, "plaintextHash", 64, SHA256).toLowerCase();
+  const byteLength = integer(raw.byteLength, "byteLength", 17, MAX_MEDIA_CHUNK_BYTES);
+  if (format !== "unigentamos-vault-media-chunk-v1" || vaultId !== expectedVaultId || chunkIndex >= totalChunks) {
+    throw new Error("Encrypted media chunk metadata is invalid");
+  }
+  const ivBytes = Buffer.from(iv, "base64");
+  const ciphertextBytes = Buffer.from(ciphertext, "base64");
+  const aadHashBytes = Buffer.from(aadHash, "base64");
+  const expectedAadHash = createHash("sha256").update(JSON.stringify([
+    format,
+    vaultId,
+    mediaId,
+    contentRoot,
+    chunkIndex,
+    totalChunks,
+    keyVersion,
+    plaintextHash
+  ])).digest();
+  if (
+    ivBytes.toString("base64") !== iv
+    || ciphertextBytes.toString("base64") !== ciphertext
+    || aadHashBytes.toString("base64") !== aadHash
+    || ivBytes.byteLength !== 12
+    || ciphertextBytes.byteLength !== byteLength
+    || aadHashBytes.byteLength !== 32
+    || !timingSafeEqual(aadHashBytes, expectedAadHash)
+  ) throw new Error("Encrypted media chunk encoding or integrity metadata is invalid");
+  return {
+    format: "unigentamos-vault-media-chunk-v1",
+    vaultId,
+    mediaId,
+    contentRoot,
+    chunkIndex,
+    totalChunks,
+    keyVersion,
+    iv,
+    ciphertext,
+    aadHash,
+    plaintextHash,
+    byteLength
+  };
+}
+
+function mediaObjectPath(chunk: Pick<EncryptedVaultMediaChunk, "vaultId" | "mediaId" | "chunkIndex">): string {
+  return `${chunk.vaultId}/${chunk.mediaId}/${chunk.chunkIndex}.json`;
+}
+
+export async function putEncryptedMediaChunk(vaultIdValue: unknown, chunkValue: unknown): Promise<{ alreadyStored: boolean }> {
+  const vaultId = validateVaultId(vaultIdValue);
+  const chunk = validateEncryptedMediaChunk(chunkValue, vaultId);
+  const supabase = config();
+  const body = JSON.stringify(chunk);
+  const objectUrl = `${supabase.url}/storage/v1/object/${MEDIA_BUCKET}/${mediaObjectPath(chunk)}`;
+  const response = await fetch(objectUrl, {
+    method: "POST",
+    headers: { ...headers(supabase), "Content-Type": "application/json", "x-upsert": "false" },
+    body,
+    cache: "no-store"
+  });
+  if (response.ok) return { alreadyStored: false };
+  if (response.status === 400 || response.status === 409) {
+    const existing = await fetch(objectUrl, { headers: headers(supabase), cache: "no-store" });
+    if (existing.ok && await existing.text() === body) return { alreadyStored: true };
+  }
+  if (response.status === 413) throw Object.assign(new Error("Encrypted media chunk is too large"), { status: 413 });
+  if (response.status === 507) throw Object.assign(new Error("Encrypted media relay storage is full"), { status: 507 });
+  throw new Error(`Encrypted media relay write failed (${response.status})`);
+}
+
+export async function getEncryptedMediaChunk(input: {
+  vaultId: unknown;
+  mediaId: unknown;
+  chunkIndex: unknown;
+}): Promise<EncryptedVaultMediaChunk> {
+  const vaultId = validateVaultId(input.vaultId);
+  const mediaId = text(input.mediaId, "mediaId", 36, UUID);
+  const chunkIndex = integer(input.chunkIndex, "chunkIndex", 0, 1_000_000);
+  const supabase = config();
+  const objectUrl = `${supabase.url}/storage/v1/object/${MEDIA_BUCKET}/${vaultId}/${mediaId}/${chunkIndex}.json`;
+  const response = await fetch(objectUrl, { headers: headers(supabase), cache: "no-store" });
+  if (response.status === 404) throw Object.assign(new Error("Encrypted media chunk was not found"), { status: 404 });
+  if (!response.ok) throw new Error(`Encrypted media relay read failed (${response.status})`);
+  return validateEncryptedMediaChunk(await response.json(), vaultId);
 }
 
 export function validateEncryptedDeviceDescriptor(

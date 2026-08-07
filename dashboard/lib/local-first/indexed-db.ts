@@ -3,6 +3,7 @@
 import type {
   ClockHealth,
   EncryptedChangeEnvelope,
+  EncryptedVaultMediaChunk,
   HybridLogicalClock,
   SequencedChangeEnvelope,
   VaultKeyEnvelope,
@@ -37,6 +38,14 @@ type StoredObjectEnvelope = {
 
 type OutboxRow = EncryptedChangeEnvelope & { queuedAt: string; attempts: number };
 type InboxRow = SequencedChangeEnvelope & { appliedAt?: string; rejectedAt?: string; rejectionReason?: string };
+export type StoredMediaChunk = {
+  digest: string;
+  mediaId: string;
+  chunkIndex: number;
+  packet: EncryptedVaultMediaChunk;
+  uploaded: boolean;
+  cachedAt: string;
+};
 
 function requestResult<Result>(request: IDBRequest<Result>): Promise<Result> {
   return new Promise((resolve, reject) => {
@@ -275,6 +284,40 @@ export class BrowserVaultStore {
   async putConflict(row: Record<string, unknown> & { conflictId: string }): Promise<void> {
     const transaction = this.database.transaction("conflicts", "readwrite");
     transaction.objectStore("conflicts").put(row);
+    await transactionDone(transaction);
+  }
+
+  async putMediaChunk(packet: EncryptedVaultMediaChunk, uploaded = false): Promise<void> {
+    const digest = `${packet.mediaId}:${packet.chunkIndex}`;
+    const transaction = this.database.transaction("media", "readwrite");
+    transaction.objectStore("media").put({
+      digest,
+      mediaId: packet.mediaId,
+      chunkIndex: packet.chunkIndex,
+      packet,
+      uploaded,
+      cachedAt: new Date().toISOString()
+    } satisfies StoredMediaChunk);
+    await transactionDone(transaction);
+  }
+
+  async mediaChunk(mediaId: string, chunkIndex: number): Promise<StoredMediaChunk | null> {
+    const transaction = this.database.transaction("media", "readonly");
+    return (await requestResult(transaction.objectStore("media").get(`${mediaId}:${chunkIndex}`))) || null;
+  }
+
+  async mediaChunks(mediaId: string): Promise<StoredMediaChunk[]> {
+    const transaction = this.database.transaction("media", "readonly");
+    const rows = await requestResult(transaction.objectStore("media").getAll()) as StoredMediaChunk[];
+    return rows.filter((row) => row.mediaId === mediaId).sort((left, right) => left.chunkIndex - right.chunkIndex);
+  }
+
+  async markMediaChunkUploaded(mediaId: string, chunkIndex: number): Promise<void> {
+    const transaction = this.database.transaction("media", "readwrite");
+    const store = transaction.objectStore("media");
+    const key = `${mediaId}:${chunkIndex}`;
+    const row = await requestResult(store.get(key)) as StoredMediaChunk | undefined;
+    if (row) store.put({ ...row, uploaded: true });
     await transactionDone(transaction);
   }
 }

@@ -5,8 +5,12 @@ import {
   createVaultKeyEnvelope,
   decryptVaultChange,
   decryptVaultDeviceDescriptor,
+  decryptVaultMediaChunk,
   encryptVaultChange,
   encryptVaultDeviceDescriptor,
+  encryptVaultMediaChunk,
+  mediaContentRoot,
+  sha256Hex,
   unlockVaultKey
 } from "./crypto";
 import { assessClockHealth, receiveHlc, tickHlc } from "./hlc";
@@ -15,12 +19,16 @@ import { mergeVaultSnapshots } from "./merge";
 import {
   VAULT_PROTOCOL_VERSION,
   type EncryptedChangeEnvelope,
+  type EncryptedVaultMediaChunk,
   type EncryptedVaultDeviceStatus,
   type SequencedChangeEnvelope,
   type VaultChange,
   type VaultDeviceKind,
   type VaultDeviceStatusSnapshot,
   type VaultFieldValue,
+  type VaultBackupRestorePreview,
+  type VaultBackupSummary,
+  type VaultMediaManifest,
   type VaultObjectKind,
   type VaultObjectSnapshot,
   type VaultRecoveryPackage
@@ -37,6 +45,8 @@ type VaultSession = {
 const CANONICAL_BASE_FIELD = "__unigentamosCanonicalBaseV1";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEVICE_STATUS_HEARTBEAT_MS = 30_000;
+const MEDIA_CHUNK_SIZE = 1_500_000;
+const MAX_MEDIA_FILE_BYTES = 256 * 1024 * 1024;
 
 type CanonicalBaseMetadata = {
   versionId: string;
@@ -97,8 +107,29 @@ function snapshotFromChange(change: VaultChange): VaultObjectSnapshot {
     fields: change.fields,
     fieldClocks: change.fieldClocks,
     tombstone: Boolean(change.tombstone),
+    ...(change.restoredFromVersionId ? { restoredFromVersionId: change.restoredFromVersionId } : {}),
     updatedAt: new Date(change.hlc.wallMs).toISOString()
   };
+}
+
+function mediaManifestFromSnapshot(snapshot: VaultObjectSnapshot): VaultMediaManifest | null {
+  const value = snapshot.fields.mediaManifest;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const manifest = value as Partial<VaultMediaManifest>;
+  if (
+    manifest.format !== "unigentamos-vault-media-v1"
+    || typeof manifest.mediaId !== "string" || !UUID.test(manifest.mediaId)
+    || manifest.objectId !== snapshot.objectId
+    || typeof manifest.contentRoot !== "string" || !/^[0-9a-f]{64}$/i.test(manifest.contentRoot)
+    || manifest.digestAlgorithm !== "chunk-root-v1"
+    || typeof manifest.fileName !== "string" || !manifest.fileName || manifest.fileName.length > 240
+    || typeof manifest.mimeType !== "string" || !manifest.mimeType || manifest.mimeType.length > 200
+    || !Number.isSafeInteger(manifest.byteLength) || Number(manifest.byteLength) < 1 || Number(manifest.byteLength) > MAX_MEDIA_FILE_BYTES
+    || manifest.chunkSize !== MEDIA_CHUNK_SIZE
+    || !Number.isSafeInteger(manifest.totalChunks) || Number(manifest.totalChunks) < 1
+    || typeof manifest.createdAt !== "string" || !Number.isFinite(Date.parse(manifest.createdAt))
+  ) return null;
+  return manifest as VaultMediaManifest;
 }
 
 export async function deterministicVaultObjectId(canonicalKey: string): Promise<string> {
@@ -347,6 +378,56 @@ export class BrowserVaultEngine {
     }));
     return snapshots.filter((snapshot): snapshot is VaultObjectSnapshot => Boolean(snapshot))
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  async restoreVersion(objectId: string, versionId: string): Promise<VaultObjectSnapshot> {
+    const session = this.requireSession();
+    if (!UUID.test(objectId) || !UUID.test(versionId)) throw new Error("Saved version is invalid");
+    const [current, target] = await Promise.all([this.readObject(objectId), this.version(objectId, versionId)]);
+    if (!current || !target) throw new Error("That saved version is no longer available on this device");
+    if (current.objectKind !== target.objectKind) throw new Error("Saved version type does not match the current item");
+    const metadata = await session.store.metadata();
+    if (!metadata) throw new Error("Local vault metadata is missing");
+    const hlc = tickHlc(metadata.lastClock, session.deviceId, await this.correctedWallMs());
+    const restoredFields = cloneFields(target.fields);
+    const allFields = new Set([...Object.keys(current.fields), ...Object.keys(restoredFields)]);
+    const change: VaultChange = {
+      protocolVersion: VAULT_PROTOCOL_VERSION,
+      changeId: crypto.randomUUID(),
+      objectId,
+      objectKind: current.objectKind,
+      deviceId: session.deviceId,
+      hlc,
+      baseVersionId: current.versionId,
+      fields: restoredFields,
+      fieldClocks: Object.fromEntries(Array.from(allFields, (field) => [field, hlc])),
+      tombstone: target.tombstone,
+      restoredFromVersionId: target.versionId,
+      createdAt: new Date(hlc.wallMs).toISOString()
+    };
+    const envelope = await encryptVaultChange(change, session.vaultId, session.key, session.keyVersion);
+    const snapshot = snapshotFromChange(change);
+    await session.store.putVersion({
+      versionId: snapshot.versionId,
+      objectId,
+      objectKind: snapshot.objectKind,
+      parentVersionIds: [current.versionId, target.versionId],
+      envelope,
+      createdAt: snapshot.updatedAt,
+      restoredFromVersionId: target.versionId
+    });
+    await session.store.putObject({
+      objectId,
+      objectKind: snapshot.objectKind,
+      versionId: snapshot.versionId,
+      envelope,
+      updatedAt: snapshot.updatedAt
+    });
+    await session.store.queue(envelope);
+    await session.store.updateMetadata({ lastClock: hlc });
+    await this.mirrorEnvelopes([envelope]);
+    void this.syncOnce().catch(() => undefined);
+    return snapshot;
   }
 
   async saveObject(input: {
@@ -671,6 +752,7 @@ export class BrowserVaultEngine {
       this.lastSyncError = rejected.length
         ? `${rejected.length} encrypted change${rejected.length === 1 ? " was" : "s were"} quarantined because validation failed`
         : null;
+      await this.syncPendingMedia();
       this.lastSyncedAt = new Date().toISOString();
       try {
         await this.reportDeviceStatus(syncChanged);
@@ -777,6 +859,210 @@ export class BrowserVaultEngine {
     }
   }
 
+  private async uploadMediaPacket(packet: EncryptedVaultMediaChunk): Promise<void> {
+    const response = await fetch("/api/vault/media", {
+      method: "POST",
+      headers: buildJsonHeadersWithCsrf(),
+      body: JSON.stringify({ vaultId: packet.vaultId, chunk: packet })
+    });
+    const payload = await response.json() as { ok?: boolean; error?: string };
+    if (!response.ok || !payload.ok) throw new Error(payload.error || "Encrypted media upload failed");
+  }
+
+  private async syncMediaChunks(manifest: VaultMediaManifest, onProgress?: (completed: number, total: number) => void): Promise<void> {
+    const session = this.requireSession();
+    const cached = await session.store.mediaChunks(manifest.mediaId);
+    if (cached.length !== manifest.totalChunks) throw new Error("This device does not have every encrypted media chunk needed to finish the upload");
+    let completed = cached.filter((row) => row.uploaded).length;
+    onProgress?.(completed, manifest.totalChunks);
+    for (const row of cached) {
+      if (row.uploaded) continue;
+      await this.uploadMediaPacket(row.packet);
+      await session.store.markMediaChunkUploaded(manifest.mediaId, row.chunkIndex);
+      completed += 1;
+      onProgress?.(completed, manifest.totalChunks);
+    }
+  }
+
+  private async syncPendingMedia(limit = 8): Promise<void> {
+    if (!navigator.onLine) return;
+    const session = this.requireSession();
+    const media = await this.listObjects(["media"]);
+    let uploaded = 0;
+    for (const snapshot of media) {
+      const manifest = mediaManifestFromSnapshot(snapshot);
+      if (!manifest) continue;
+      const chunks = await session.store.mediaChunks(manifest.mediaId);
+      for (const row of chunks) {
+        if (row.uploaded) continue;
+        await this.uploadMediaPacket(row.packet);
+        await session.store.markMediaChunkUploaded(manifest.mediaId, row.chunkIndex);
+        uploaded += 1;
+        if (uploaded >= limit) return;
+      }
+    }
+  }
+
+  async addMedia(file: File, onProgress?: (phase: "reading" | "encrypting" | "uploading" | "saving", completed: number, total: number) => void): Promise<{ snapshot: VaultObjectSnapshot; cloudCached: boolean; desktopStored: boolean }> {
+    const session = this.requireSession();
+    if (!(file instanceof File) || file.size < 1) throw new Error("Choose a file to add");
+    if (file.size > MAX_MEDIA_FILE_BYTES) throw new Error("Files larger than 256 MB are not supported yet");
+    const fileName = file.name.trim().slice(0, 240) || "Untitled file";
+    const mimeType = (file.type || "application/octet-stream").slice(0, 200);
+    const totalChunks = Math.ceil(file.size / MEDIA_CHUNK_SIZE);
+    const plaintextHashes: string[] = [];
+    for (let index = 0; index < totalChunks; index += 1) {
+      const bytes = new Uint8Array(await file.slice(index * MEDIA_CHUNK_SIZE, Math.min(file.size, (index + 1) * MEDIA_CHUNK_SIZE)).arrayBuffer());
+      plaintextHashes.push(await sha256Hex(bytes));
+      bytes.fill(0);
+      onProgress?.("reading", index + 1, totalChunks);
+    }
+    const contentRoot = await mediaContentRoot({ byteLength: file.size, chunkSize: MEDIA_CHUNK_SIZE, plaintextHashes });
+    const mediaId = crypto.randomUUID();
+    const objectId = crypto.randomUUID();
+    const manifest: VaultMediaManifest = {
+      format: "unigentamos-vault-media-v1",
+      mediaId,
+      objectId,
+      contentRoot,
+      digestAlgorithm: "chunk-root-v1",
+      fileName,
+      mimeType,
+      byteLength: file.size,
+      chunkSize: MEDIA_CHUNK_SIZE,
+      totalChunks,
+      createdAt: new Date().toISOString()
+    };
+    for (let index = 0; index < totalChunks; index += 1) {
+      const bytes = new Uint8Array(await file.slice(index * MEDIA_CHUNK_SIZE, Math.min(file.size, (index + 1) * MEDIA_CHUNK_SIZE)).arrayBuffer());
+      const packet = await encryptVaultMediaChunk({
+        vaultId: session.vaultId,
+        mediaId,
+        contentRoot,
+        chunkIndex: index,
+        totalChunks,
+        keyVersion: session.keyVersion,
+        plaintext: bytes,
+        plaintextHash: plaintextHashes[index]
+      }, session.key);
+      bytes.fill(0);
+      await session.store.putMediaChunk(packet);
+      onProgress?.("encrypting", index + 1, totalChunks);
+    }
+    let desktopStored = false;
+    if (this.companionCapability) {
+      try {
+        const response = await fetch(`http://127.0.0.1:43127/v1/media/${contentRoot}`, {
+          method: "PUT",
+          mode: "cors",
+          headers: {
+            Authorization: `Bearer ${this.companionCapability}`,
+            "Content-Type": "application/octet-stream",
+            "X-Unigentamos-Digest-Algorithm": "chunk-root-v1",
+            "X-Unigentamos-Chunk-Size": String(MEDIA_CHUNK_SIZE)
+          },
+          body: file
+        });
+        const payload = await response.json() as { ok?: boolean; error?: string };
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "Windows could not store this file");
+        desktopStored = true;
+      } catch (error) {
+        this.lastSyncError = error instanceof Error ? error.message : "Windows will retry storing this file";
+      }
+    }
+    let cloudCached = false;
+    onProgress?.("saving", 0, 1);
+    let snapshot = await this.saveObject({
+      objectId,
+      objectKind: "media",
+      fields: {
+        title: fileName,
+        mediaManifest: manifest as unknown as VaultFieldValue,
+        mediaState: {
+          desktopStored,
+          cloudCached,
+          encryptedOnDevice: true
+        }
+      }
+    });
+    onProgress?.("saving", 1, 1);
+    if (navigator.onLine) {
+      try {
+        await this.syncMediaChunks(manifest, (completed, total) => onProgress?.("uploading", completed, total));
+        cloudCached = true;
+        snapshot = await this.saveObject({
+          objectId,
+          objectKind: "media",
+          fields: {
+            mediaState: {
+              desktopStored,
+              cloudCached: true,
+              encryptedOnDevice: true
+            }
+          }
+        });
+      } catch (error) {
+        this.lastSyncError = error instanceof Error ? error.message : "Encrypted file sync will retry";
+      }
+    }
+    return { snapshot, cloudCached, desktopStored };
+  }
+
+  async openMedia(snapshotOrObjectId: VaultObjectSnapshot | string, onProgress?: (completed: number, total: number) => void): Promise<{ blob: Blob; fileName: string }> {
+    const session = this.requireSession();
+    const snapshot = typeof snapshotOrObjectId === "string" ? await this.readObject(snapshotOrObjectId) : snapshotOrObjectId;
+    if (!snapshot || snapshot.objectKind !== "media") throw new Error("Media item was not found");
+    const manifest = mediaManifestFromSnapshot(snapshot);
+    if (!manifest) throw new Error("Encrypted media details are invalid");
+    if (this.companionCapability) {
+      const response = await fetch(`http://127.0.0.1:43127/v1/media/${manifest.contentRoot}`, {
+        mode: "cors",
+        headers: { Authorization: `Bearer ${this.companionCapability}` },
+        cache: "no-store"
+      });
+      if (response.ok) return { blob: new Blob([await response.arrayBuffer()], { type: manifest.mimeType }), fileName: manifest.fileName };
+    }
+    const plaintext: BlobPart[] = [];
+    for (let index = 0; index < manifest.totalChunks; index += 1) {
+      let stored = await session.store.mediaChunk(manifest.mediaId, index);
+      if (!stored) {
+        if (!navigator.onLine) throw new Error("Connect to the internet once to download this file to this device");
+        const response = await fetch(`/api/vault/media?vaultId=${encodeURIComponent(session.vaultId)}&mediaId=${encodeURIComponent(manifest.mediaId)}&chunkIndex=${index}`, { cache: "no-store" });
+        const payload = await response.json() as { ok?: boolean; chunk?: EncryptedVaultMediaChunk; error?: string };
+        if (!response.ok || !payload.ok || !payload.chunk) throw new Error(payload.error || "Encrypted media download failed");
+        if (payload.chunk.contentRoot !== manifest.contentRoot || payload.chunk.totalChunks !== manifest.totalChunks) {
+          throw new Error("Encrypted media does not match its saved details");
+        }
+        await session.store.putMediaChunk(payload.chunk, true);
+        stored = await session.store.mediaChunk(manifest.mediaId, index);
+      }
+      if (!stored) throw new Error("Encrypted media cache failed");
+      plaintext.push(await decryptVaultMediaChunk(stored.packet, session.key));
+      onProgress?.(index + 1, manifest.totalChunks);
+    }
+    const blob = new Blob(plaintext, { type: manifest.mimeType });
+    if (this.companionCapability) {
+      try {
+        const response = await fetch(`http://127.0.0.1:43127/v1/media/${manifest.contentRoot}`, {
+          method: "PUT",
+          mode: "cors",
+          headers: {
+            Authorization: `Bearer ${this.companionCapability}`,
+            "Content-Type": "application/octet-stream",
+            "X-Unigentamos-Digest-Algorithm": "chunk-root-v1",
+            "X-Unigentamos-Chunk-Size": String(MEDIA_CHUNK_SIZE)
+          },
+          body: blob
+        });
+        const payload = await response.json() as { ok?: boolean; error?: string };
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "Windows could not keep its local copy");
+      } catch (error) {
+        this.lastSyncError = error instanceof Error ? error.message : "Windows will retry keeping this file";
+      }
+    }
+    return { blob, fileName: manifest.fileName };
+  }
+
   async createDesktopBackup(): Promise<{ backupId: string; location: string }> {
     if (!this.companionCapability) throw new Error("Unlock the desktop companion first");
     const response = await fetch("http://127.0.0.1:43127/v1/backups", {
@@ -787,6 +1073,116 @@ export class BrowserVaultEngine {
     const payload = await response.json() as { ok?: boolean; backupId?: string; location?: string; error?: string };
     if (!response.ok || !payload.ok || !payload.backupId || !payload.location) throw new Error(payload.error || "Desktop backup failed");
     return { backupId: payload.backupId, location: payload.location };
+  }
+
+  async listDesktopBackups(): Promise<VaultBackupSummary[]> {
+    if (!this.companionCapability) throw new Error("Unlock the Windows helper first");
+    const response = await fetch("http://127.0.0.1:43127/v1/backups", {
+      mode: "cors",
+      headers: { Authorization: `Bearer ${this.companionCapability}` },
+      cache: "no-store"
+    });
+    const payload = await response.json() as { ok?: boolean; backups?: VaultBackupSummary[]; error?: string };
+    if (!response.ok || !payload.ok || !Array.isArray(payload.backups)) throw new Error(payload.error || "Backups could not be checked");
+    return payload.backups;
+  }
+
+  async verifyDesktopBackup(backupId: string): Promise<VaultBackupSummary> {
+    if (!this.companionCapability) throw new Error("Unlock the Windows helper first");
+    const response = await fetch(`http://127.0.0.1:43127/v1/backups/${encodeURIComponent(backupId)}/verify`, {
+      method: "POST",
+      mode: "cors",
+      headers: { Authorization: `Bearer ${this.companionCapability}` }
+    });
+    const payload = await response.json() as { ok?: boolean; backup?: VaultBackupSummary; error?: string };
+    if (!response.ok || !payload.ok || !payload.backup) throw new Error(payload.error || "Backup verification failed");
+    return payload.backup;
+  }
+
+  async previewDesktopRestore(backupId: string): Promise<VaultBackupRestorePreview> {
+    if (!this.companionCapability) throw new Error("Unlock the Windows helper first");
+    const response = await fetch(`http://127.0.0.1:43127/v1/backups/${encodeURIComponent(backupId)}/restore-preview`, {
+      method: "POST",
+      mode: "cors",
+      headers: { Authorization: `Bearer ${this.companionCapability}` }
+    });
+    const payload = await response.json() as { ok?: boolean; preview?: VaultBackupRestorePreview; error?: string };
+    if (!response.ok || !payload.ok || !payload.preview) throw new Error(payload.error || "Restore preview failed");
+    return payload.preview;
+  }
+
+  private async recoverDesktopEnvelopes(): Promise<number> {
+    if (!this.companionCapability) return 0;
+    const session = this.requireSession();
+    let cursor = 0;
+    let imported = 0;
+    let hasMore = true;
+    while (hasMore) {
+      const response = await fetch(`http://127.0.0.1:43127/v1/envelopes?after=${cursor}&limit=10`, {
+        mode: "cors",
+        headers: { Authorization: `Bearer ${this.companionCapability}` },
+        cache: "no-store"
+      });
+      const payload = await response.json() as {
+        ok?: boolean;
+        envelopes?: EncryptedChangeEnvelope[];
+        nextCursor?: number;
+        hasMore?: boolean;
+        error?: string;
+      };
+      if (!response.ok || !payload.ok || !Array.isArray(payload.envelopes) || !Number.isSafeInteger(payload.nextCursor)) {
+        throw new Error(payload.error || "Restored history could not be copied back into this browser");
+      }
+      for (const envelope of payload.envelopes) {
+        const change = await decryptVaultChange(envelope, session.key);
+        const existing = await this.version(change.objectId, change.changeId);
+        if (!existing) {
+          const snapshot = snapshotFromChange(change);
+          await session.store.putVersion({
+            versionId: snapshot.versionId,
+            objectId: snapshot.objectId,
+            objectKind: snapshot.objectKind,
+            parentVersionIds: change.baseVersionId ? [change.baseVersionId] : [],
+            envelope,
+            createdAt: snapshot.updatedAt
+          });
+          const current = await this.readObject(snapshot.objectId);
+          if (!current || change.baseVersionId === current.versionId) {
+            await session.store.putObject({
+              objectId: snapshot.objectId,
+              objectKind: snapshot.objectKind,
+              versionId: snapshot.versionId,
+              envelope,
+              updatedAt: snapshot.updatedAt
+            });
+          }
+          imported += 1;
+        }
+        await session.store.queue(envelope);
+      }
+      cursor = Number(payload.nextCursor);
+      hasMore = Boolean(payload.hasMore);
+    }
+    void this.syncOnce().catch(() => undefined);
+    return imported;
+  }
+
+  async restoreDesktopBackup(backupId: string, confirmation: string): Promise<{ receiptId: string; restoredVersions: number; restoredMediaFiles: number }> {
+    if (!this.companionCapability) throw new Error("Unlock the Windows helper first");
+    const response = await fetch(`http://127.0.0.1:43127/v1/backups/${encodeURIComponent(backupId)}/restore`, {
+      method: "POST",
+      mode: "cors",
+      headers: { Authorization: `Bearer ${this.companionCapability}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ confirmation })
+    });
+    const payload = await response.json() as { ok?: boolean; receiptId?: string; restoredVersions?: number; restoredMediaFiles?: number; error?: string };
+    if (!response.ok || !payload.ok || !payload.receiptId) throw new Error(payload.error || "Backup restore failed");
+    await this.recoverDesktopEnvelopes();
+    return {
+      receiptId: payload.receiptId,
+      restoredVersions: Number(payload.restoredVersions || 0),
+      restoredMediaFiles: Number(payload.restoredMediaFiles || 0)
+    };
   }
 
   private async recordClockHealth(serverDate: string | null) {

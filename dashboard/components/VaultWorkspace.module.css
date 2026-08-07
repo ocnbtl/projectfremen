@@ -449,6 +449,7 @@
 .privacyNote strong { white-space: nowrap; }
 
 .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.grid > .panel:nth-child(3) { grid-column: 1 / -1; }
 .panel { max-width: 1148px; margin: 0 auto 18px; padding: clamp(20px, 3vw, 32px); }
 .grid .panel { width: auto; margin: 0; }
 .panel h2 { margin: 0 0 10px; font-size: 24px; letter-spacing: -.025em; }
@@ -485,10 +486,29 @@
 .unlockDeviceHint { display: grid; gap: 4px; margin-top: 20px; border-radius: 11px; padding: 14px; color: #35584d; background: var(--vault-mint); }
 .unlockDeviceHint span { font-size: 13px; line-height: 1.5; }
 .buttonRow span { color: #60746d; font-size: 13px; }
+.backupList { display: grid; gap: 0; margin-top: 20px; border: 1px solid var(--vault-border); border-radius: 11px; overflow: hidden; }
+.backupList > div { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px; background: #f8faf9; }
+.backupList > div + div { border-top: 1px solid var(--vault-border); }
+.backupList > div > span:first-child { display: grid; min-width: 0; gap: 3px; }
+.backupList small { margin: 0; }
+.inlineActions { display: flex; flex: none; align-items: center; gap: 7px; }
+.inlineActions button { min-height: 36px; padding: 7px 10px; font-size: 12px; }
+.panel .quietButton { border: 1px solid rgba(31, 90, 73, .25); color: var(--vault-accent); background: #fff; }
+.panel .quietButton:hover { background: var(--vault-mint); }
+.restorePanel { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(260px, .8fr); gap: 20px 32px; border-color: rgba(31, 90, 73, .28); }
+.restorePanel dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.restorePanel dl div { display: grid; gap: 4px; padding: 12px; border-radius: 10px; background: #edf4f1; }
+.restorePanel dt { color: var(--vault-muted); font-size: 10px; font-weight: 800; text-transform: uppercase; }
+.restorePanel dd { margin: 0; font-size: 18px; font-weight: 800; }
+.restorePanel label,
+.restorePanel .buttonRow { grid-column: 1 / -1; }
 .metrics strong { font-size: 27px; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
 .lock { display: block; margin: 24px auto 0; background: #4a5d56; }
 .workspaceHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
-.kindTabs { display: flex; gap: 7px; margin: 20px 0 14px; border-bottom: 1px solid #d8e2de; }
+.workspaceHeader > div { max-width: 760px; }
+.workspaceHeader p { margin-bottom: 0; }
+.recordSearch { max-width: 520px; }
+.kindTabs { display: flex; gap: 7px; margin: 20px 0 14px; padding-bottom: 1px; overflow-x: auto; border-bottom: 1px solid #d8e2de; scrollbar-width: thin; }
 .kindTabs button { border-radius: 8px 8px 0 0; color: #476258; background: transparent; }
 .kindTabs button[aria-selected="true"] { color: white; background: var(--vault-accent); }
 .objectGrid { display: grid; grid-template-columns: minmax(180px, .7fr) minmax(300px, 1.5fr) minmax(200px, .8fr); gap: 18px; }
@@ -503,8 +523,27 @@
 .objectEditor label { margin-top: 0; }
 .fieldGrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
 .historyList { padding: 14px; }
-.historyList h3 { margin: 0 0 12px; font-size: 15px; }
-.historyList > div { display: grid; gap: 5px; padding: 10px 0; border-bottom: 1px solid #dce5e1; }
+.historyList h3 { margin: 0; font-size: 15px; }
+.historyHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
+.historyList > button { display: grid; width: 100%; min-height: 0; gap: 5px; border: 0; border-bottom: 1px solid #dce5e1; border-radius: 0; padding: 10px 8px; color: #244139; background: transparent; text-align: left; }
+.historyList > button[data-selected="true"] { color: white; background: #2b6654; }
+.versionPreview { display: grid; gap: 10px; margin-top: 14px; border-top: 1px solid var(--vault-border); padding-top: 14px; }
+.versionPreview > div:first-child { display: grid; gap: 4px; }
+.versionPreview p { margin: 0; padding: 0; }
+.versionPreview pre,
+.readOnlyRecord pre { max-height: 240px; margin: 0; overflow: auto; border: 1px solid var(--vault-border); border-radius: 9px; padding: 11px; color: #29473d; background: #fff; font: 11px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.restoreConfirm { display: grid; gap: 6px; border-radius: 10px; padding: 12px; color: #29473d; background: #edf4f1; }
+.restoreConfirm > span { font-size: 12px; }
+.readOnlyRecord { display: grid; align-content: start; gap: 12px; }
+.readOnlyRecord h3 { margin: 0; font-size: 22px; }
+.readOnlyRecord p { margin: 0; }
+.recordFields { display: grid; gap: 0; margin: 0; border: 1px solid var(--vault-border); border-radius: 10px; overflow: hidden; background: #fff; }
+.recordFields div { display: grid; grid-template-columns: minmax(90px, .45fr) minmax(0, 1fr); gap: 12px; padding: 10px 11px; }
+.recordFields div + div { border-top: 1px solid var(--vault-border); }
+.recordFields dt { color: var(--vault-muted); font-size: 11px; font-weight: 800; }
+.recordFields dd { margin: 0; overflow-wrap: anywhere; color: #29473d; font-size: 12px; line-height: 1.5; white-space: pre-wrap; }
+.recordType { width: fit-content; border-radius: 999px; padding: 5px 8px; color: #2d594a; background: var(--vault-mint); font-size: 11px; font-weight: 800; }
+.editorEmpty { display: grid; min-height: 300px; place-content: center; gap: 5px; color: var(--vault-muted); text-align: center; }
 
 @media (max-width: 1000px) {
   .objectGrid { grid-template-columns: minmax(180px, .7fr) minmax(300px, 1.5fr); }
@@ -521,6 +560,8 @@
   .deviceCard:nth-child(n + 2) { border-top: 1px solid var(--vault-border); }
   .objectList { min-height: 0; max-height: 260px; }
   .historyList { grid-column: auto; }
+  .restorePanel { grid-template-columns: 1fr; }
+  .restorePanel dl { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 620px) {
@@ -545,6 +586,10 @@
   .devicesHeader button { width: 100%; }
   .deviceCardTop { align-items: flex-start; }
   .deviceCard dl { grid-template-columns: 1fr 1fr; }
+  .backupList > div { align-items: stretch; flex-direction: column; }
+  .inlineActions button { flex: 1; }
+  .restorePanel dl { grid-template-columns: 1fr; }
+  .workspaceHeader { align-items: stretch; flex-direction: column; }
   .statusGrid,
   .metrics { grid-template-columns: 1fr 1fr; }
   .statusGrid strong { overflow-wrap: anywhere; }
