@@ -50,6 +50,8 @@ export interface FinanceBill {
   dueIn: number;
   status: FinanceBillStatus;
   account: string;
+  /** Canonical native relationship. `account` remains display-only. */
+  accountId?: string;
   category: string;
   hue: FinanceHue;
   recurring: FinanceRecurringCadence;
@@ -71,6 +73,8 @@ export interface FinanceTransaction {
   entity: string;
   merchant: string;
   account: string;
+  /** Canonical native relationship. `account` remains display-only. */
+  accountId?: string;
   accountType: FinanceAccountKind;
   category: string;
   spendCategory: string;
@@ -124,7 +128,7 @@ export interface FinanceCashflowSeries {
   readonly savings: readonly number[];
 }
 
-export interface FinanceFixtureSnapshot {
+export interface FinanceSnapshot {
   readonly lastMonthOut: number;
   readonly netWorthDeltaLabel: string;
   readonly liquidDeltaLabel: string;
@@ -140,7 +144,7 @@ export interface FinanceFixtureSnapshot {
   readonly attentionItems: readonly FinanceAttentionItem[];
 }
 
-export interface FinanceFixtureDataset {
+export interface FinanceDataset {
   readonly accounts: readonly FinanceAccount[];
   readonly budgets: readonly FinanceBudget[];
   readonly bills: readonly FinanceBill[];
@@ -148,20 +152,7 @@ export interface FinanceFixtureDataset {
   readonly reviewItems: readonly FinanceReviewItem[];
   readonly reminders: readonly FinanceReminder[];
   readonly linkedContext: readonly FinanceLinkedContext[];
-  readonly snapshot: FinanceFixtureSnapshot;
-}
-
-export interface FinanceFixtureMetadata {
-  readonly id: string;
-  readonly periodLabel: string;
-  readonly previewLabel: string;
-  readonly readOnly: true;
-  readonly persistenceConnected: false;
-}
-
-export interface FinanceFixtureRepository {
-  readonly metadata: FinanceFixtureMetadata;
-  read(): FinanceFixtureDataset;
+  readonly snapshot: FinanceSnapshot;
 }
 
 export type FinanceRuleType =
@@ -258,7 +249,7 @@ export interface FinanceRuleTestCase {
 export interface FinanceRuleActivity {
   readonly id: string;
   readonly occurredAt: string;
-  readonly action: "fixture_defined" | "test_previewed" | "review_requested" | "disabled";
+  readonly action: "created" | "test_previewed" | "review_requested" | "disabled";
   readonly summary: string;
 }
 
@@ -286,19 +277,6 @@ export interface FinanceRule {
   readonly activity: readonly FinanceRuleActivity[];
 }
 
-export interface FinanceRulesFixtureDataset {
+export interface FinanceRulesDataset {
   readonly rules: readonly FinanceRule[];
-}
-
-export interface FinanceRulesFixtureMetadata {
-  readonly id: string;
-  readonly previewLabel: string;
-  readonly readOnly: true;
-  readonly persistenceConnected: false;
-  readonly testExecution: "deterministic_browser_preview";
-}
-
-export interface FinanceRulesFixtureRepository {
-  readonly metadata: FinanceRulesFixtureMetadata;
-  read(): FinanceRulesFixtureDataset;
 }

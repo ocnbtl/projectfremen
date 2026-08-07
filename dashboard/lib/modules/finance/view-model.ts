@@ -2,13 +2,13 @@ import type { FinanceView } from "../../native-objects/url-state";
 import type {
   FinanceAccount,
   FinanceBill,
-  FinanceFixtureDataset,
+  FinanceDataset,
   FinanceTransaction
 } from "./types";
 
 export type FinanceSmartViewId = "attention" | "due-week" | "unreviewed" | "recurring" | "linked-projects";
 
-export interface FinanceFixtureViewModel {
+export interface FinanceViewModel {
   readonly counts: {
     readonly accounts: number;
     readonly budgets: number;
@@ -49,14 +49,14 @@ export interface FinanceFixtureViewModel {
   readonly cashflowSummary: string;
 }
 
-function monthlyEquivalent(amount: number, cadence: FinanceFixtureDataset["bills"][number]["recurring"]): number {
+function monthlyEquivalent(amount: number, cadence: FinanceDataset["bills"][number]["recurring"]): number {
   if (cadence === "monthly") return amount;
   if (cadence === "annual") return amount / 12;
   if (cadence === "weekly") return amount * 52 / 12;
   return 0;
 }
 
-export function buildFinanceFixtureViewModel(dataset: FinanceFixtureDataset): FinanceFixtureViewModel {
+export function buildFinanceViewModel(dataset: FinanceDataset): FinanceViewModel {
   const overBudget = dataset.budgets.filter((budget) => budget.spent > budget.limit).length;
   const liquid = dataset.accounts
     .filter((account) => account.balance > 0 && account.kind !== "Brokerage")
@@ -108,7 +108,7 @@ export function buildFinanceFixtureViewModel(dataset: FinanceFixtureDataset): Fi
       liquid,
       debt,
       net,
-      runway: liquid / lastMonthOut
+      runway: lastMonthOut > 0 ? liquid / lastMonthOut : 0
     },
     budgetTotals: {
       spent: budgetSpent,
@@ -126,7 +126,7 @@ export function buildFinanceFixtureViewModel(dataset: FinanceFixtureDataset): Fi
   };
 }
 
-export function getFinanceSmartViewCount(viewModel: FinanceFixtureViewModel, id: string): number {
+export function getFinanceSmartViewCount(viewModel: FinanceViewModel, id: string): number {
   if (id === "attention") return viewModel.counts.attention;
   if (id === "due-week") return viewModel.counts.dueThisWeek;
   if (id === "unreviewed") return viewModel.counts.pendingTransactions;
@@ -136,7 +136,7 @@ export function getFinanceSmartViewCount(viewModel: FinanceFixtureViewModel, id:
   return 0;
 }
 
-export function getFinanceViewBadge(viewModel: FinanceFixtureViewModel, view: FinanceView): string {
+export function getFinanceViewBadge(viewModel: FinanceViewModel, view: FinanceView): string {
   if (view === "budgets") return `${viewModel.counts.overBudget} over`;
   if (view === "bills") return `${viewModel.counts.dueOrOverdue} due/overdue`;
   return "";

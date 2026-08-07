@@ -3,7 +3,7 @@ import type {
   FinanceAccount,
   FinanceAccountKind,
   FinanceBill,
-  FinanceFixtureDataset,
+  FinanceDataset,
   FinanceTransaction
 } from "./types";
 
@@ -32,10 +32,9 @@ export type FinanceAccountGroup =
   | "credit-and-liabilities"
   | "investments-and-business";
 
-export interface FinanceFixtureAccountActivity {
-  /** Fixture rows carry display names rather than durable account IDs. */
-  readonly matchBasis: "fixture-display-name";
-  readonly durableLink: false;
+export interface FinanceAccountActivity {
+  readonly matchBasis: "native-account-id";
+  readonly durableLink: true;
   readonly accountDisplayName: string;
   readonly transactions: readonly FinanceTransaction[];
   readonly bills: readonly FinanceBill[];
@@ -52,7 +51,7 @@ export interface FinanceFixtureAccountActivity {
 export interface FinanceAccountRowViewModel {
   readonly account: FinanceAccount;
   readonly group: FinanceAccountGroup;
-  readonly fixtureActivity: FinanceFixtureAccountActivity;
+  readonly activity: FinanceAccountActivity;
 }
 
 export interface FinanceAccountsViewModel {
@@ -64,10 +63,10 @@ export interface FinanceAccountsViewModel {
   readonly rows: readonly FinanceAccountRowViewModel[];
   readonly selectedId: string | null;
   readonly selected: FinanceAccountRowViewModel | null;
-  readonly selectionBasis: "requested-visible-id" | "primary-operating-fixture-id" | "first-visible" | null;
+  readonly selectionBasis: "requested-visible-id" | "first-visible" | null;
   readonly totals: {
     readonly assets: number;
-    /** Signed liability balance; debt remains negative in the fixture contract. */
+    /** Signed liability balance; debt remains negative in the Finance contract. */
     readonly liabilities: number;
     readonly debtOwed: number;
     readonly net: number;
@@ -136,16 +135,16 @@ function isLiquidAccount(kind: FinanceAccountKind): boolean {
   }
 }
 
-function buildFixtureActivity(
-  dataset: FinanceFixtureDataset,
+function buildAccountActivity(
+  dataset: FinanceDataset,
   account: FinanceAccount
-): FinanceFixtureAccountActivity {
-  const transactions = dataset.transactions.filter((transaction) => transaction.account === account.name);
-  const bills = dataset.bills.filter((bill) => bill.account === account.name);
+): FinanceAccountActivity {
+  const transactions = dataset.transactions.filter((transaction) => transaction.accountId ? transaction.accountId === account.id : transaction.account === account.name);
+  const bills = dataset.bills.filter((bill) => bill.accountId ? bill.accountId === account.id : bill.account === account.name);
 
   return {
-    matchBasis: "fixture-display-name",
-    durableLink: false,
+    matchBasis: "native-account-id",
+    durableLink: true,
     accountDisplayName: account.name,
     transactions,
     bills,
@@ -177,7 +176,7 @@ function accountSearchText(row: FinanceAccountRowViewModel): string {
 }
 
 export function buildFinanceAccountsViewModel(
-  dataset: FinanceFixtureDataset,
+  dataset: FinanceDataset,
   input: FinanceAccountsViewInput = {}
 ): FinanceAccountsViewModel {
   const query = input.query?.trim().toLowerCase() ?? "";
@@ -187,7 +186,7 @@ export function buildFinanceAccountsViewModel(
     row: {
       account,
       group: accountGroup(account.kind),
-      fixtureActivity: buildFixtureActivity(dataset, account)
+      activity: buildAccountActivity(dataset, account)
     } satisfies FinanceAccountRowViewModel,
     sourceIndex
   }));
@@ -217,16 +216,13 @@ export function buildFinanceAccountsViewModel(
   const requestedSelection = input.selectedId
     ? visibleRows.find((row) => row.account.id === input.selectedId) ?? null
     : null;
-  const operatingSelection = visibleRows.find((row) => row.account.id === "operating") ?? null;
   const selected = hasRequestedSelection
     ? requestedSelection
-    : operatingSelection ?? visibleRows[0] ?? null;
+    : visibleRows[0] ?? null;
   const selectionBasis = requestedSelection
     ? "requested-visible-id" as const
     : hasRequestedSelection
       ? null
-      : operatingSelection
-      ? "primary-operating-fixture-id" as const
       : selected
         ? "first-visible" as const
         : null;

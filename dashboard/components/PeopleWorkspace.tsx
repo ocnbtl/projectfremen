@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
+import { mirrorPersonalRecord } from "../lib/local-first/domain-mirror";
 import {
   buildFollowUpCreationRoute,
   type FollowUpSourceRef
@@ -1465,6 +1466,7 @@ export default function PeopleWorkspace({
       setCadence("P1M");
       setReferenceUrl("");
       if (createdPerson) {
+        await mirrorPersonalRecord(createdPerson);
         await releaseDirtyHistoryGuard();
         router.replace(`${getNativeObjectRoute({ module: "people", objectType: "person", objectId: createdPerson.id })}?tab=overview`);
       }
@@ -1522,6 +1524,7 @@ export default function PeopleWorkspace({
 
       const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
       const updatedPerson = nextPeople.find((record) => record.id === id);
+      if (updatedPerson) await mirrorPersonalRecord(updatedPerson);
       setPeople(nextPeople);
       setSelectedId(id);
       if (updatedPerson) setProfileDraft(getProfile(updatedPerson));

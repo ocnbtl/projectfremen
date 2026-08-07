@@ -23,3 +23,11 @@ node_modules/
 # Local recovery snapshots
 .repair-backups/
 .git-repair-backups/
+.codex-security-writeups/
+
+# Local encrypted vault runtime (never source-controlled)
+vault-companion/.unigentamos-vault/
+vault-companion/data/
+vault-companion/backups/
+*.sqlite3-wal
+*.sqlite3-shm

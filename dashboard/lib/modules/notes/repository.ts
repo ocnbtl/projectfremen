@@ -3,6 +3,7 @@
 import { buildJsonHeadersWithCsrf } from "../../client-csrf";
 import type { MutationErrorCode } from "../../native-objects/mutation-result";
 import type { PersonalRecord } from "../../personal-records-store";
+import { mirrorPersonalRecord } from "../../local-first/domain-mirror";
 import {
   legacyPersonalRecordsToNotes,
   noteCreateInputToLegacy,
@@ -193,6 +194,8 @@ export function createNotesRepository(options: NotesRepositoryOptions = {}): Not
       const created =
         notes.find((note) => note.title === normalizedTitle && note.body === normalizedBody) ||
         notes[0];
+      const rawCreated = created ? result.data.find((record) => record.id === created.id) : undefined;
+      if (rawCreated) await mirrorPersonalRecord(rawCreated);
       return created
         ? { ok: true, data: created }
         : failure("unknown", "The created Note was missing from the response");
@@ -207,10 +210,11 @@ export function createNotesRepository(options: NotesRepositoryOptions = {}): Not
       if (!result.ok) return result;
 
       const updated = toNotes(result.data).find((note) => note.id === id);
+      const rawUpdated = updated ? result.data.find((record) => record.id === updated.id) : undefined;
+      if (rawUpdated) await mirrorPersonalRecord(rawUpdated);
       return updated
         ? { ok: true, data: updated }
         : failure("not_found", "The updated Note was missing from the response", { status: 404 });
     }
   };
 }
-

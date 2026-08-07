@@ -16,6 +16,7 @@ import FinanceMonthlyReviewRouteView from "./finance/FinanceMonthlyReviewView";
 import FinanceRulesInspector, { isFinanceRuleTab } from "./finance/FinanceRulesInspector";
 import FinanceRulesRouteView from "./finance/FinanceRulesView";
 import FinanceTransactionsRouteView from "./finance/FinanceTransactionsView";
+import FinanceMutationDialog, { activeCloseForState, type FinanceOperation } from "./finance/FinanceMutationDialog";
 import {
   createNativeObjectRef,
   getModuleRoute,
@@ -24,12 +25,13 @@ import {
 } from "../lib/native-objects/routes";
 import { normalizeFinanceUrlStateForView, parseFinanceUrlState, serializeFinanceUrlState } from "../lib/native-objects/url-state";
 import type { FinanceFilter, FinanceSort, FinanceTab, FinanceView } from "../lib/native-objects/url-state";
-import { financeFixtureRepository } from "../lib/modules/finance/fixture-repository";
 import { buildFinanceAccountsViewModel } from "../lib/modules/finance/accounts-view-model";
 import { buildFinanceBillsViewModel } from "../lib/modules/finance/bills-view-model";
 import { buildFinanceBudgetsViewModel } from "../lib/modules/finance/budgets-view-model";
 import { buildFinanceMonthlyReviewViewModel } from "../lib/modules/finance/monthly-review-view-model";
-import { financeRulesFixtureRepository } from "../lib/modules/finance/rules-fixture-repository";
+import { financeStateToDataset, financeStateToRulesDataset } from "../lib/modules/finance/native-view-model";
+import type { FinanceRecordKind, FinanceState } from "../lib/modules/finance/native-types";
+import { createFinanceRepository } from "../lib/modules/finance/repository";
 import {
   buildFinanceRulesViewModel,
   runFinanceRuleTests,
@@ -37,24 +39,18 @@ import {
 } from "../lib/modules/finance/rules-view-model";
 import { buildFinanceTransactionsViewModel } from "../lib/modules/finance/transactions-view-model";
 import {
-  buildFinanceFixtureViewModel,
+  buildFinanceViewModel,
   getFinanceSmartViewCount,
   getFinanceViewBadge
 } from "../lib/modules/finance/view-model";
 import type {
   FinanceAccount as Account,
   FinanceAccountKind as AccountKind,
+  FinanceBillStatus,
   FinanceHue as Hue,
+  FinanceDataset,
   FinanceTransaction as Txn
 } from "../lib/modules/finance/types";
-
-const financeDataset = financeFixtureRepository.read();
-const financeRulesDataset = financeRulesFixtureRepository.read();
-const financeViewModel = buildFinanceFixtureViewModel(financeDataset);
-const financeRulesSummary = buildFinanceRulesViewModel(financeRulesDataset);
-const { accounts, budgets, bills, transactions, reviewItems, reminders, linkedContext, snapshot } = financeDataset;
-const FINANCE_PREVIEW_LABEL = financeFixtureRepository.metadata.previewLabel;
-const FINANCE_PREVIEW_REASON = `${FINANCE_PREVIEW_LABEL}. Persistent Finance mutations are not connected.`;
 
 type ViewId = FinanceView;
 type ModalKind = "record" | "filter" | "account" | "category" | "bill" | "columns" | "pay" | "transfer" | "group" | "period" | null;
@@ -87,24 +83,15 @@ const VIEWS: Array<{ id: ViewId; label: string; hue: Hue }> = [
 ];
 
 const SMART_VIEWS: Array<{ id: string; label: string; hue: Hue; view: ViewId; notice: string; mode?: "filter" | "jump"; disabledReason?: string }> = [
-  { id: "attention", label: "Needs attention", hue: "crimson", view: "overview", mode: "jump", notice: "Command shows all three fixture attention items. This is a summary jump, not a filtered record set." },
+  { id: "attention", label: "Needs attention", hue: "crimson", view: "overview", mode: "jump", notice: "Command shows the current derived attention queue." },
   { id: "due-week", label: "Due this week", hue: "orange", view: "bills", notice: "Bills are narrowed to obligations due within seven days." },
-  { id: "unreviewed", label: "Unreviewed", hue: "yellow", view: "transactions", notice: "Transactions are narrowed to pending fixture items." },
-  { id: "recurring", label: "Recurring", hue: "violet", view: "bills", notice: "Bills are narrowed to recurring fixture obligations." },
-  { id: "linked-projects", label: "Linked to projects", hue: "indigo", view: "overview", notice: "", disabledReason: "A Finance-to-Projects filter is not connected in this fixture checkpoint." },
-  { id: "savings-movement", label: "Savings movement", hue: "green", view: "accounts", mode: "jump", notice: "Accounts shows the fixture snapshot's actual $3,900 savings evidence. This is a summary jump, not a filtered record set; source, destination, and evidence records are not connected." }
+  { id: "unreviewed", label: "Unreviewed", hue: "yellow", view: "transactions", notice: "Transactions are narrowed to pending or unreconciled records." },
+  { id: "recurring", label: "Recurring", hue: "violet", view: "bills", notice: "Bills are narrowed to current recurring obligations." },
+  { id: "linked-projects", label: "Linked to projects", hue: "indigo", view: "overview", notice: "", disabledReason: "No current Finance records contain canonical Project references." },
+  { id: "savings-movement", label: "Savings movement", hue: "green", view: "accounts", mode: "jump", notice: "Accounts shows current first-class savings movement evidence." }
 ];
 
-function smartViewCount(id: string) {
-  return getFinanceSmartViewCount(financeViewModel, id);
-}
-
-function viewBadge(view: ViewId) {
-  if (view === "rules") return `${financeRulesSummary.counts.active} active`;
-  return getFinanceViewBadge(financeViewModel, view);
-}
-
-function statusHue(status: (typeof bills)[number]["status"]): Hue {
+function statusHue(status: FinanceBillStatus): Hue {
   if (status === "overdue") return "crimson";
   if (status === "due") return "orange";
   if (status === "soon") return "yellow";
@@ -132,10 +119,6 @@ function money(value: number, options: { cents?: boolean; sign?: boolean } = {})
   }).format(abs);
   if (options.sign) return `${value >= 0 ? "+" : "-"}${formatted}`;
   return `${value < 0 ? "-" : ""}${formatted}`;
-}
-
-function totals() {
-  return financeViewModel.accountTotals;
 }
 
 function classNames(...parts: Array<string | false | null | undefined>) {
@@ -242,17 +225,43 @@ function HeaderAction({
   );
 }
 
-function FixtureDatasetNotice() {
+function NativeDatasetNotice({ state, error }: { state: FinanceState; error: string }) {
+  const recordCount = state.accounts.length + state.transactions.length + state.bills.length + state.budgets.length + state.closePeriods.length + state.rules.length;
   return (
     <section id="finance-preview-status" className="finance-dataset-notice" aria-label="Finance data source status">
-      <IconTile hue="brown" icon="Wallet" />
+      <IconTile hue={error ? "crimson" : "green"} icon="Wallet" />
       <div>
-        <strong>{FINANCE_PREVIEW_LABEL}</strong>
-        <span>Navigation, search, filters, sorting, selection, inspectors, and charts work across Finance. Persistent Finance mutations are not connected; saving, importing, reconciling, linking, paying, budgeting, and closing remain unavailable.</span>
+        <strong>{error ? "Finance unavailable" : "Native Finance · persistent and auditable"}</strong>
+        <span>{error || (recordCount === 0
+          ? "No Finance records exist yet. Add an account or begin a monthly close; sample records are never promoted into this store."
+          : `${recordCount} current native record${recordCount === 1 ? "" : "s"}. Balances remain explicit facts; transfers, imports, close resolutions, and rule changes retain audit history.`)}</span>
       </div>
-      <Chip hue="brown" dot>NOT CONNECTED</Chip>
+      <Chip hue={error ? "crimson" : "green"} dot>{error ? "UNAVAILABLE" : "CONNECTED"}</Chip>
     </section>
   );
+}
+
+function ArchivedFinanceRecords({ state, onRestore }: {
+  state: FinanceState;
+  onRestore: (selection: { kind: FinanceRecordKind; id: string }) => void;
+}) {
+  const archived = [
+    ...state.accounts.filter((item) => item.archivedAt).map((item) => ({ kind: "account" as const, id: item.id, label: item.name })),
+    ...state.transactions.filter((item) => item.archivedAt).map((item) => ({ kind: "transaction" as const, id: item.id, label: item.merchant })),
+    ...state.transfers.filter((item) => item.archivedAt).map((item) => ({ kind: "transfer" as const, id: item.id, label: `Transfer ${money(item.amount, { cents: true })}` })),
+    ...state.savingsMovements.filter((item) => item.archivedAt).map((item) => ({ kind: "savings_movement" as const, id: item.id, label: `Savings ${money(item.amount, { cents: true })}` })),
+    ...state.bills.filter((item) => item.archivedAt).map((item) => ({ kind: "bill" as const, id: item.id, label: item.name })),
+    ...state.budgets.filter((item) => item.archivedAt).map((item) => ({ kind: "budget" as const, id: item.id, label: `${item.period} ${item.category}` })),
+    ...state.closePeriods.filter((item) => item.archivedAt).map((item) => ({ kind: "close_period" as const, id: item.id, label: `${item.period} close` })),
+    ...state.rules.filter((item) => item.archivedAt).map((item) => ({ kind: "rule" as const, id: item.id, label: item.name }))
+  ];
+  if (!archived.length) return null;
+  return <section className="finance-archived-records" aria-label="Archived Finance records">
+    <strong>Archived</strong>
+    <span>{archived.length} record{archived.length === 1 ? "" : "s"}</span>
+    {archived.slice(0, 6).map((item) => <button key={`${item.kind}:${item.id}`} type="button" onClick={() => onRestore(item)}>{item.label} · restore</button>)}
+    {archived.length > 6 && <small>{archived.length - 6} more retained in the Finance store.</small>}
+  </section>;
 }
 
 function WorkspaceHeader({
@@ -296,8 +305,11 @@ function Sparkline({ values, hue }: { values: readonly number[]; hue: Hue }) {
   );
 }
 
-function CashflowChart({ compact = false }: { compact?: boolean }) {
-  const { income, spend, savings, months } = snapshot.cashflow;
+function CashflowChart({ dataset, summary, compact = false }: { dataset: FinanceDataset; summary: string; compact?: boolean }) {
+  const { income: rawIncome, spend: rawSpend, savings: rawSavings, months } = dataset.snapshot.cashflow;
+  const income = rawIncome.map((value) => value / 1000);
+  const spend = rawSpend.map((value) => value / 1000);
+  const savings = rawSavings.map((value) => value / 1000);
   const width = 920;
   const height = compact ? 185 : 210;
   const padX = 48;
@@ -358,7 +370,7 @@ function CashflowChart({ compact = false }: { compact?: boolean }) {
           </text>
         ))}
       </svg>
-      <p id={descriptionId} className="sr-only">{financeViewModel.cashflowSummary}</p>
+      <p id={descriptionId} className="sr-only">{summary}</p>
     </div>
   );
 }
@@ -406,12 +418,12 @@ function AccountRow({
   );
 }
 
-function RecentTransactionsRail({ onOpenTransaction }: { onOpenTransaction: (id: string) => void }) {
+function RecentTransactionsRail({ transactions, onOpenTransaction }: { transactions: readonly Txn[]; onOpenTransaction: (id: string) => void }) {
   return (
     <section className="finance-context-card finance-recent-card" aria-label="Recent transactions">
       <div className="finance-context-heading">
         <span><Swatch hue="blue" />Recent</span>
-        <strong>{financeViewModel.counts.transactions}</strong>
+        <strong>{transactions.length}</strong>
       </div>
       <div className="finance-recent-list">
         {transactions.slice(0, 7).map((txn) => (
@@ -427,12 +439,14 @@ function RecentTransactionsRail({ onOpenTransaction }: { onOpenTransaction: (id:
 }
 
 function FinanceContextRail({
+  transactions,
   onOpenTransaction,
   mobileOpen,
   overlay,
   overlayOpen,
   onClose
 }: {
+  transactions: readonly Txn[];
   onOpenTransaction: (id: string) => void;
   mobileOpen: boolean;
   overlay: boolean;
@@ -442,18 +456,24 @@ function FinanceContextRail({
   const closeAction = <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance context"><Icon name="X" /></button>;
   return (
     <InspectorRail id="finance-inspector" title="Recent activity" actions={closeAction} className={classNames("finance-context-rail", mobileOpen && "is-mobile-open")} ariaLabel="Finance context" readOnly overlay={overlay} overlayOpen={overlayOpen} onRequestClose={onClose}>
-      <RecentTransactionsRail onOpenTransaction={onOpenTransaction} />
+      <RecentTransactionsRail transactions={transactions} onOpenTransaction={onOpenTransaction} />
     </InspectorRail>
   );
 }
 
 function FinanceSidebar({
+  periodLabel,
+  viewBadges,
+  smartCounts,
   view,
   smartFilter,
   onSmart,
   mobileOpen,
   onClose
 }: {
+  periodLabel: string;
+  viewBadges: Readonly<Record<string, string>>;
+  smartCounts: Readonly<Record<string, number>>;
   view: ViewId;
   smartFilter: string;
   onSmart: (id: string) => void;
@@ -464,8 +484,8 @@ function FinanceSidebar({
     <ModuleSidebar
       id="finance-module-sidebar"
       title="Finance"
-      description={`${financeFixtureRepository.metadata.periodLabel} · fixture dataset`}
-      status={<Chip hue="brown" dot>READ ONLY</Chip>}
+      description={`${periodLabel} · native records`}
+      status={<Chip hue="green" dot>CONNECTED</Chip>}
       ariaLabel="Finance sidebar"
       className="finance-module-sidebar"
       mobileOpen={mobileOpen}
@@ -476,7 +496,7 @@ function FinanceSidebar({
           label: "Finance",
           items: VIEWS.map((item) => ({
             id: item.id,
-            label: viewBadge(item.id) ? `${item.label} · ${viewBadge(item.id)}` : item.label,
+            label: viewBadges[item.id] ? `${item.label} · ${viewBadges[item.id]}` : item.label,
             icon: <Swatch hue={item.hue} />,
             active: view === item.id && !smartFilter,
             href: getModuleViewRoute("finance", item.id)
@@ -489,7 +509,7 @@ function FinanceSidebar({
             id: item.id,
             label: item.label,
             icon: <Swatch hue={item.hue} />,
-            count: smartViewCount(item.id),
+            count: smartCounts[item.id] || 0,
             active: smartFilter === item.id,
             onSelect: item.disabledReason ? undefined : () => onSmart(item.id),
             disabled: Boolean(item.disabledReason),
@@ -503,20 +523,17 @@ function FinanceSidebar({
             {
               id: "data-accounts",
               label: "Accounts data",
-              disabled: true,
-              disabledReason: "Use Accounts & Cashflow for the current read path. A separate account-management surface remains unresolved."
+              href: getModuleViewRoute("finance", "accounts")
             },
             {
               id: "data-categories",
               label: "Categories",
-              disabled: true,
-              disabledReason: "No native Finance category repository or management route is connected."
+              href: getModuleViewRoute("finance", "budgets")
             },
             {
               id: "data-imports",
               label: "Imports",
-              disabled: true,
-              disabledReason: "No import source, batch, repair, or reconciliation repository is connected."
+              href: `${getModuleViewRoute("finance", "transactions")}?filter=unreviewed`
             },
             {
               id: "data-settings",
@@ -527,40 +544,45 @@ function FinanceSidebar({
           ]
         }
       ]}
-      footer={<p className="finance-sidebar-footnote">Fixture values are not live account data.</p>}
+      footer={<p className="finance-sidebar-footnote">Manual facts and confirmed CSV imports only. Finance never connects to a bank or executes payments.</p>}
     />
   );
 }
 
 function OverviewView({
+  dataset,
+  viewModel,
   onSelect,
   onOpenBill,
   onOpenBudget,
   onView,
-  onModal,
+  onOperation,
   onNotice
 }: {
+  dataset: FinanceDataset;
+  viewModel: ReturnType<typeof buildFinanceViewModel>;
   onSelect: (account: Account) => void;
   onOpenBill: (id: string) => void;
   onOpenBudget: (id: string) => void;
   onView: (view: ViewId) => void;
-  onModal: (modal: ModalKind) => void;
+  onOperation: (operation: FinanceOperation) => void;
   onNotice: (notice: string) => void;
 }) {
-  const summary = totals();
+  const { accounts, bills, snapshot } = dataset;
+  const summary = viewModel.accountTotals;
   return (
     <>
       <WorkspaceHeader
         title="Command"
         subtitle="What matters now · due soon · changed · needs review"
-        actions={<><HeaderAction icon="Filter" onClick={() => onModal("filter")}>Filter preview</HeaderAction><HeaderAction icon="Plus" primary disabled title={FINANCE_PREVIEW_REASON}>Record unavailable</HeaderAction></>}
+        actions={<><HeaderAction icon="Plus" onClick={() => onOperation("account")}>Add account</HeaderAction><HeaderAction icon="Plus" primary disabled={!accounts.length} title={!accounts.length ? "Add an account before recording ledger facts." : undefined} onClick={() => onOperation("transaction")}>Record transaction</HeaderAction></>}
       />
       <Panel className="finance-kpi-strip">
         {[
           ["Net worth", money(summary.net), snapshot.netWorthDeltaLabel, "indigo"],
           ["Liquid", money(summary.liquid), snapshot.liquidDeltaLabel, "teal"],
           ["Debt", money(summary.debt), snapshot.debtDeltaLabel, "crimson"],
-          ["Runway", `${summary.runway.toFixed(1)} mo`, "at current spend", "violet"]
+          ["Runway", snapshot.lastMonthOut > 0 ? `${summary.runway.toFixed(1)} mo` : "Unavailable", snapshot.lastMonthOut > 0 ? "at prior-month spend" : "no prior-month spend", "violet"]
         ].map(([label, value, sub, hue]) => (
           <article key={label} style={hueStyle(hue as Hue)}>
             <p><Swatch hue={hue as Hue} />{label}</p>
@@ -575,7 +597,7 @@ function OverviewView({
             <h2>Cashflow <span>6 mo · $k</span></h2>
             <div><Chip hue="teal" dot>in</Chip><Chip hue="orange" dot>out</Chip><Chip hue="indigo" dot>savings</Chip></div>
           </div>
-          <CashflowChart compact />
+          <CashflowChart dataset={dataset} summary={viewModel.cashflowSummary} compact />
           <div className="finance-cash-footer">
             <div><span>Net this month</span><strong className="is-green">{money(snapshot.netThisMonth, { sign: true })}</strong></div>
             <div><span>Avg burn</span><strong>{money(snapshot.averageBurn)}</strong></div>
@@ -583,20 +605,19 @@ function OverviewView({
           </div>
         </Panel>
         <Panel hue="crimson">
-          <div className="finance-panel-heading"><h2>Needs attention <span>{financeViewModel.counts.attention}</span></h2></div>
+          <div className="finance-panel-heading"><h2>Needs attention <span>{viewModel.counts.attention}</span></h2></div>
           <div className="finance-attention-list">
             {snapshot.attentionItems.map((item) => (
               <button
                 type="button"
                 key={item.title}
                 onClick={() => {
-                  if (item.title.startsWith("AWS")) onOpenBill("aws");
-                  else if (item.title.startsWith("Travel")) onOpenBudget("travel");
-                  else {
-                    const reserve = accounts.find((account) => account.id === "reserve");
-                    if (reserve) onSelect(reserve);
-                    else onNotice(`${item.title} is unavailable in this fixture.`);
-                  }
+                  if (item.label === "Bills") {
+                    const target = bills.find((bill) => bill.status === "overdue") || bills[0];
+                    if (target) onOpenBill(target.id);
+                  } else if (item.label === "Transactions") onView("transactions");
+                  else if (item.label === "Monthly close") onView("review");
+                  else onNotice(`${item.title} remains available through its owner route.`);
                 }}
               >
                 <IconTile hue={item.hue} icon={item.icon} />
@@ -607,7 +628,7 @@ function OverviewView({
           </div>
         </Panel>
         <Panel hue="blue" className="finance-span-2">
-          <div className="finance-panel-heading"><h2>Accounts <span>{financeViewModel.counts.accounts}</span></h2><button type="button" onClick={() => onView("accounts")}>View all -&gt;</button></div>
+          <div className="finance-panel-heading"><h2>Accounts <span>{viewModel.counts.accounts}</span></h2><button type="button" onClick={() => onView("accounts")}>View all -&gt;</button></div>
           <div className="finance-account-list">
             {accounts.slice(0, 4).map((account) => (
               <AccountRow key={account.id} account={account} onSelect={onSelect} />
@@ -629,6 +650,53 @@ function OverviewView({
       </div>
     </>
   );
+}
+
+function NativeActionBar({
+  view,
+  hasSelection,
+  hasAccounts,
+  closeStatus,
+  onOperation
+}: {
+  view: ViewId;
+  hasSelection: boolean;
+  hasAccounts: boolean;
+  closeStatus: "none" | "open" | "closed";
+  onOperation: (operation: FinanceOperation) => void;
+}) {
+  const actions: React.ReactNode[] = [];
+  if (view === "accounts") actions.push(
+    <HeaderAction key="account" icon="Plus" onClick={() => onOperation("account")}>Add account</HeaderAction>,
+    <HeaderAction key="balance" icon="Check" disabled={!hasSelection} title={!hasSelection ? "Select an account first." : undefined} onClick={() => onOperation("balance")}>Balance snapshot</HeaderAction>,
+    <HeaderAction key="transfer" icon="Send" disabled={!hasAccounts} onClick={() => onOperation("transfer")}>Transfer</HeaderAction>,
+    <HeaderAction key="savings" icon="Trending" disabled={!hasAccounts} onClick={() => onOperation("savings")}>Savings</HeaderAction>,
+    <HeaderAction key="import" icon="Link" primary disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
+  );
+  if (view === "transactions") actions.push(
+    <HeaderAction key="transaction" icon="Plus" primary disabled={!hasAccounts} onClick={() => onOperation("transaction")}>Record</HeaderAction>,
+    <HeaderAction key="review" icon="Check" disabled={!hasSelection} title={!hasSelection ? "Select a transaction first." : undefined} onClick={() => onOperation("transaction_review")}>Reconcile</HeaderAction>,
+    <HeaderAction key="import" icon="Link" disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
+  );
+  if (view === "bills") actions.push(
+    <HeaderAction key="bill" icon="Plus" primary disabled={!hasAccounts} onClick={() => onOperation("bill")}>Add bill</HeaderAction>,
+    <HeaderAction key="payment" icon="Check" disabled={!hasSelection} title={!hasSelection ? "Select a bill first." : undefined} onClick={() => onOperation("payment")}>Record payment</HeaderAction>
+  );
+  if (view === "budgets") actions.push(<HeaderAction key="budget" icon="Plus" primary onClick={() => onOperation("budget")}>New budget</HeaderAction>);
+  if (view === "review") {
+    if (closeStatus === "none") actions.push(<HeaderAction key="close" icon="Plus" primary onClick={() => onOperation("close")}>Start close</HeaderAction>);
+    if (closeStatus === "open") actions.push(
+      <HeaderAction key="check" icon="Check" disabled={!hasSelection} title={!hasSelection ? "Select a close check first." : undefined} onClick={() => onOperation("close_check")}>Resolve check</HeaderAction>,
+      <HeaderAction key="complete" icon="Check" primary onClick={() => onOperation("complete_close")}>Complete close</HeaderAction>
+    );
+    if (closeStatus === "closed") actions.push(<HeaderAction key="reopen" icon="Calendar" onClick={() => onOperation("reopen_close")}>Reopen close</HeaderAction>);
+  }
+  if (view === "rules") actions.push(<HeaderAction key="rule" icon="Plus" primary onClick={() => onOperation("rule")}>New rule</HeaderAction>);
+  if (hasSelection && !["overview", "review"].includes(view)) actions.push(
+    <HeaderAction key="archive" icon="X" onClick={() => onOperation("archive")}>Archive selected</HeaderAction>
+  );
+  if (!actions.length) return null;
+  return <section className="finance-native-action-bar" aria-label="Finance actions">{actions}</section>;
 }
 
 function ModalShell({ modal, onClose }: { modal: ModalKind; onClose: () => void }) {
@@ -673,16 +741,16 @@ function ModalShell({ modal, onClose }: { modal: ModalKind; onClose: () => void 
   }, [modal]);
   if (!modal) return null;
   const content: Record<Exclude<ModalKind, null>, { title: string; body: string; fields: string[] }> = {
-    record: { title: "Recording unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Type", "Amount", "Linked context"] },
-    filter: { title: "Finance filters preview", body: "Filter structure is shown for review. Use search and Smart Views for the working fixture interactions in this checkpoint.", fields: ["Status", "Account", "Category"] },
-    account: { title: "Account linking unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Account name", "Institution", "Type"] },
-    category: { title: "Budget category creation unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Category", "Monthly cap", "Hue"] },
-    bill: { title: "Bill creation unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Vendor", "Amount", "Due date"] },
-    columns: { title: "Transaction columns preview", body: "Column customization is not persisted in this fixture checkpoint.", fields: ["Date", "Category", "Linked note"] },
-    pay: { title: "Payments unavailable", body: FINANCE_PREVIEW_REASON, fields: ["Bill", "Amount", "Funding account"] },
-    transfer: { title: "Transfers unavailable", body: FINANCE_PREVIEW_REASON, fields: ["From", "To", "Amount"] },
-    group: { title: "Account grouping preview", body: "The current read path groups accounts by cash and deposits, credit and liabilities, and investments and business. Custom grouping is not persisted.", fields: ["Current grouping", "Custom grouping", "Saved view"] },
-    period: { title: "Budget period preview", body: "The fixture represents June 2026. Changing, comparing, or closing budget periods requires a durable Finance period repository.", fields: ["Current period", "Comparison period", "Rollover policy"] }
+    record: { title: "Record from the route action bar", body: "Use the native Record transaction action. Failed saves preserve the current form until you retry or cancel.", fields: ["Type", "Amount", "Linked context"] },
+    filter: { title: "Finance filters", body: "Search, URL-restorable filters, and Smart Views operate on current native records.", fields: ["Status", "Account", "Category"] },
+    account: { title: "Add an account", body: "Use the native Add account action. Labels and masks are display-only; immutable IDs own relationships.", fields: ["Account name", "Institution", "Type"] },
+    category: { title: "Create a budget", body: "Use New budget to create a category cap for a specific month and entity scope.", fields: ["Category", "Monthly cap", "Period"] },
+    bill: { title: "Add a bill", body: "Use Add bill to create a persistent obligation without executing payment.", fields: ["Vendor", "Amount", "Due date"] },
+    columns: { title: "Transaction columns", body: "Core transaction columns are fixed in this version; filter and selection state is preserved in the URL.", fields: ["Date", "Category", "Evidence"] },
+    pay: { title: "Record an observed payment", body: "Use Record payment on a selected bill. Finance records evidence or an explicit exception and never sends money.", fields: ["Bill", "Evidence", "Exception"] },
+    transfer: { title: "Record a paired transfer", body: "Use Record transfer. Paired rows remain excluded from income and spending.", fields: ["From", "To", "Amount"] },
+    group: { title: "Account grouping", body: "Accounts remain grouped by current role. Immutable account IDs preserve links when names or display masks change.", fields: ["Current grouping", "Entity scope", "Account type"] },
+    period: { title: "Budget period", body: "Budgets are stored by YYYY-MM period. MTD and EOM are supported without invented forecasts.", fields: ["Current period", "Entity scope", "Variance"] }
   };
   const item = content[modal];
   return (
@@ -702,13 +770,17 @@ function ModalShell({ modal, onClose }: { modal: ModalKind; onClose: () => void 
 
 export default function FinanceWorkspace({
   initialView,
+  initialFinanceState,
+  initialFinanceError = "",
   initialPersonalOpsDecisions = [],
   initialDecisionsError = ""
 }: {
   initialView?: FinanceView;
+  initialFinanceState: FinanceState;
+  initialFinanceError?: string;
   initialPersonalOpsDecisions?: PersonalOpsDecision[];
   initialDecisionsError?: string;
-} = {}) {
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -718,6 +790,16 @@ export default function FinanceWorkspace({
     loading: decisionsLoading,
     refresh: refreshDecisions
   } = usePersonalOpsDecisions(initialPersonalOpsDecisions, initialDecisionsError);
+  const [financeState, setFinanceState] = useState(initialFinanceState);
+  const [financeError, setFinanceError] = useState(initialFinanceError);
+  const [operation, setOperation] = useState<FinanceOperation | null>(null);
+  const [operationTarget, setOperationTarget] = useState<{ kind: FinanceRecordKind; id: string } | null>(null);
+  const financeRepository = useRef(createFinanceRepository()).current;
+  const financeDataset = useMemo(() => financeStateToDataset(financeState), [financeState]);
+  const financeRulesDataset = useMemo(() => financeStateToRulesDataset(financeState), [financeState]);
+  const financeViewModel = useMemo(() => buildFinanceViewModel(financeDataset), [financeDataset]);
+  const financeRulesSummary = useMemo(() => buildFinanceRulesViewModel(financeRulesDataset), [financeRulesDataset]);
+  const { accounts, budgets, bills, transactions, reminders, linkedContext, snapshot } = financeDataset;
   const parsedInitialUrlState = parseFinanceUrlState(searchParams);
   const routedInitialView = initialView || parsedInitialUrlState.view;
   const initialUrlState = normalizeFinanceUrlStateForView(routedInitialView, parsedInitialUrlState);
@@ -744,6 +826,11 @@ export default function FinanceWorkspace({
   const [query, setQuery] = useState(initialUrlState.query);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const [ruleTestRuns, setRuleTestRuns] = useState<Readonly<Record<string, FinanceRuleTestRun>>>({});
+  const smartCounts = useMemo(() => Object.fromEntries(SMART_VIEWS.map((item) => [item.id, getFinanceSmartViewCount(financeViewModel, item.id)])), [financeViewModel]);
+  const viewBadges = useMemo(() => Object.fromEntries(VIEWS.map((item) => [
+    item.id,
+    item.id === "rules" ? `${financeRulesSummary.counts.active} active` : getFinanceViewBadge(financeViewModel, item.id)
+  ])), [financeRulesSummary, financeViewModel]);
   const searchParamKey = searchParams.toString();
   const accountsModel = buildFinanceAccountsViewModel(financeDataset, {
     query: view === "accounts" ? query : "",
@@ -781,6 +868,23 @@ export default function FinanceWorkspace({
     selectedId: selectedSecondaryId || undefined
   });
   const selectedAccount = accounts.find((account) => account.id === accountsModel.selectedId) || null;
+  const activeClose = activeCloseForState(financeState);
+  const operationSelection = view === "accounts" && accountsModel.selectedId
+    ? { kind: "account" as const, id: accountsModel.selectedId }
+    : view === "transactions" && transactionsModel.selectedId
+      ? { kind: "transaction" as const, id: transactionsModel.selectedId }
+      : view === "bills" && billsModel.selectedId
+        ? { kind: "bill" as const, id: billsModel.selectedId }
+        : view === "budgets" && budgetsModel.selectedId
+          ? { kind: "budget" as const, id: budgetsModel.selectedId }
+          : view === "review" && activeClose
+            ? { kind: "close_period" as const, id: activeClose.id }
+            : view === "rules" && rulesModel.selectedId
+              ? { kind: "rule" as const, id: rulesModel.selectedId }
+              : null;
+  const hasRouteSelection = view === "review"
+    ? Boolean(monthlyReviewModel.selectedId)
+    : Boolean(operationSelection);
 
   useEffect(() => {
     const media = window.matchMedia("(max-width: 1100px)");
@@ -1088,21 +1192,36 @@ export default function FinanceWorkspace({
     setInspectorOpen(false);
   }
 
-  function runSelectedRuleTests() {
+  async function runSelectedRuleTests() {
     const rule = rulesModel.selected;
     if (!rule) {
-      setNotice("Select a visible rule before running its deterministic fixture tests.");
+      setNotice("Select a visible rule before running its deterministic tests.");
       return;
     }
     const run = runFinanceRuleTests(rule, new Date().toISOString());
     setRuleTestRuns((current) => ({ ...current, [rule.id]: run }));
+    const nativeRule = financeState.rules.find((item) => item.id === rule.id);
+    if (nativeRule) {
+      const saved = await financeRepository.patch({
+        kind: "rule",
+        id: nativeRule.id,
+        expectedUpdatedAt: nativeRule.updatedAt,
+        action: "test_rule",
+        passed: run.failed === 0 && run.review === 0
+      });
+      if (saved.ok) setFinanceState(saved.data.state);
+      else {
+        setNotice(`${rule.name}: tests ran, but the audit save failed: ${saved.error.message}`);
+        return;
+      }
+    }
     setNotice(
       `${rule.name}: ${run.passed} passed, ${run.failed} failed, ${run.review} need review. ` +
-      "The preview made 0 source mutations and was not persisted."
+      "The deterministic result was audited; it made 0 source mutations."
     );
   }
 
-  function runVisibleRuleTests() {
+  async function runVisibleRuleTests() {
     const executedAt = new Date().toISOString();
     const runs = Object.fromEntries(
       rulesModel.rows.map((rule) => [rule.id, runFinanceRuleTests(rule, executedAt)])
@@ -1112,9 +1231,25 @@ export default function FinanceWorkspace({
     const failed = values.reduce((sum, run) => sum + run.failed, 0);
     const review = values.reduce((sum, run) => sum + run.review, 0);
     setRuleTestRuns((current) => ({ ...current, ...runs }));
+    const saved = await Promise.all(financeState.rules
+      .filter((rule) => Boolean(runs[rule.id]))
+      .map((rule) => financeRepository.patch({
+        kind: "rule",
+        id: rule.id,
+        expectedUpdatedAt: rule.updatedAt,
+        action: "test_rule",
+        passed: runs[rule.id].failed === 0 && runs[rule.id].review === 0
+      })));
+    const failedSave = saved.find((result) => !result.ok);
+    const refreshed = await financeRepository.readState();
+    if (refreshed.ok) setFinanceState(refreshed.data);
+    if (failedSave && !failedSave.ok) {
+      setNotice(`Rule tests ran, but an audit save failed: ${failedSave.error.message}`);
+      return;
+    }
     setNotice(
       `${rulesModel.visibleCount} visible rules tested: ${passed} passed, ${failed} failed, ${review} need review. ` +
-      "The deterministic preview made 0 source mutations and was not persisted."
+      "Results were audited and made 0 source mutations."
     );
   }
 
@@ -1124,7 +1259,16 @@ export default function FinanceWorkspace({
       mode={showRail ? "detail" : "directory"}
       ariaLabel="Finance workspace"
       className={classNames("finance-workspace", "finance-module-shell", showContext && "has-context", showRail && "has-rail")}
-      sidebar={<FinanceSidebar view={view} smartFilter={smartFilter} onSmart={handleSmart} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />}
+      sidebar={<FinanceSidebar
+        periodLabel={activeClose?.period || new Date().toISOString().slice(0, 7)}
+        viewBadges={viewBadges}
+        smartCounts={smartCounts}
+        view={view}
+        smartFilter={smartFilter}
+        onSmart={handleSmart}
+        mobileOpen={mobileSidebarOpen}
+        onClose={() => setMobileSidebarOpen(false)}
+      />}
       inspector={
         showRail
           ? view === "rules" && rulesModel.selected
@@ -1143,6 +1287,7 @@ export default function FinanceWorkspace({
                 overlayOpen={compactInspector && inspectorOpen}
               />
             : <FinanceInspector
+                financeState={financeState}
                 view={view as "accounts" | "transactions" | "bills" | "budgets" | "review"}
                 accountModel={accountsModel}
                 transactionModel={transactionsModel}
@@ -1165,7 +1310,7 @@ export default function FinanceWorkspace({
                 overlayOpen={compactInspector && inspectorOpen}
               />
           : showContext
-            ? <FinanceContextRail onOpenTransaction={(id) => navigateToSelected("transactions", id)} mobileOpen={inspectorOpen} overlay={compactInspector} overlayOpen={compactInspector && inspectorOpen} onClose={closeInspector} />
+            ? <FinanceContextRail transactions={transactions} onOpenTransaction={(id) => navigateToSelected("transactions", id)} mobileOpen={inspectorOpen} overlay={compactInspector} overlayOpen={compactInspector && inspectorOpen} onClose={closeInspector} />
             : undefined
       }
       aiDock={
@@ -1180,14 +1325,14 @@ export default function FinanceWorkspace({
             module: "finance",
             object: aiObject,
             activeTab: `${activeView.label} · ${tab}`,
-            visibleScope: FINANCE_PREVIEW_LABEL,
+            visibleScope: `${accounts.length} accounts · ${transactions.length} transactions · ${bills.length} bills`,
             allowedActions: [
-              "Explain visible fixture values",
+              "Explain visible native Finance records",
               "Summarize the selected object without saving",
               "Draft questions for manual review"
             ]
           }}
-          footer={<p className="finance-ai-disclaimer">Finance remains read-only while the shared assistant is disconnected.</p>}
+          footer={<p className="finance-ai-disclaimer">The assistant is contextual and cannot silently mutate Finance records.</p>}
         />
       }
     >
@@ -1231,9 +1376,20 @@ export default function FinanceWorkspace({
       )}
       {inspectorOpen && <button type="button" className="finance-inspector-scrim" onClick={closeInspector} aria-label="Close Finance context" />}
       <div className="finance-main-workspace">
-        <FixtureDatasetNotice />
-        {notice && <div className="finance-notice" role="status" aria-live="polite"><Swatch hue={activeSmart?.hue || "indigo"} /><span>{notice}</span><button type="button" onClick={() => setNotice("")}>Clear</button></div>}
-        {view === "overview" && <OverviewView onSelect={selectAccount} onOpenBill={(id) => navigateToSelected("bills", id)} onOpenBudget={(id) => navigateToSelected("budgets", id)} onView={navigateView} onModal={setModal} onNotice={setNotice} />}
+        <NativeDatasetNotice state={financeState} error={financeError} />
+        <ArchivedFinanceRecords
+          state={financeState}
+          onRestore={(selection) => { setOperationTarget(selection); setOperation("restore"); }}
+        />
+        <NativeActionBar
+          view={view}
+          hasSelection={hasRouteSelection}
+          hasAccounts={financeState.accounts.some((item) => !item.archivedAt)}
+          closeStatus={activeClose?.status || "none"}
+          onOperation={(nextOperation) => { setOperationTarget(null); setOperation(nextOperation); }}
+        />
+        {notice && <div className="finance-notice" role="status" aria-live="polite"><Swatch hue={activeSmart?.hue || "indigo"} /><span className="finance-notice__message">{notice}</span><button type="button" onClick={() => setNotice("")}>Clear</button></div>}
+        {view === "overview" && <OverviewView dataset={financeDataset} viewModel={financeViewModel} onSelect={selectAccount} onOpenBill={(id) => navigateToSelected("bills", id)} onOpenBudget={(id) => navigateToSelected("budgets", id)} onView={navigateView} onOperation={setOperation} onNotice={setNotice} />}
         {view === "accounts" && (
           <FinanceAccountsRouteView
             model={accountsModel}
@@ -1385,6 +1541,19 @@ export default function FinanceWorkspace({
         )}
       </div>
       <ModalShell modal={modal} onClose={() => setModal(null)} />
+      <FinanceMutationDialog
+        operation={operation}
+        state={financeState}
+        selection={operationTarget || operationSelection}
+        closeCheckId={view === "review" ? monthlyReviewModel.selectedId || undefined : undefined}
+        onClose={() => { setOperation(null); setOperationTarget(null); }}
+        onState={(nextState, message) => {
+          setFinanceState(nextState);
+          setFinanceError("");
+          setNotice(message);
+          setOperationTarget(null);
+        }}
+      />
     </ModuleShell>
   );
 }

@@ -242,13 +242,29 @@ async function stopServer(child) {
   }
 
   await new Promise((resolve) => {
-    child.once("exit", () => resolve());
+    let finished = false;
+    let forceTimer;
+    let deadlineTimer;
+    const finish = () => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(forceTimer);
+      clearTimeout(deadlineTimer);
+      resolve();
+    };
+    child.once("exit", finish);
     child.kill("SIGTERM");
-    setTimeout(() => {
+    forceTimer = setTimeout(() => {
       if (child.exitCode === null) {
         child.kill("SIGKILL");
       }
     }, 2000);
+    deadlineTimer = setTimeout(() => {
+      child.stdout?.destroy();
+      child.stderr?.destroy();
+      child.unref();
+      finish();
+    }, 5000);
   });
 }
 
@@ -724,6 +740,417 @@ async function checkFinanceBrowserState(baseUrl, cookieJar) {
   } finally {
     await browser.close();
   }
+}
+
+async function checkNativeFinanceLifecycle(baseUrl, cookieJar) {
+  const csrfToken = cookieJar.get("admin_csrf");
+  assert(csrfToken, "Finance lifecycle requires the authenticated CSRF cookie");
+  const jsonHeaders = { "content-type": "application/json", "x-csrf-token": csrfToken };
+  const create = (input, key, operation = "create") => requestJson(baseUrl, cookieJar, "/api/finance", {
+    method: "POST",
+    headers: { ...jsonHeaders, "idempotency-key": key },
+    body: JSON.stringify({ operation, input })
+  });
+  const patchRecord = (input) => requestJson(baseUrl, cookieJar, "/api/finance", {
+    method: "PATCH",
+    headers: jsonHeaders,
+    body: JSON.stringify({ input })
+  });
+
+  const anonymous = await requestJson(baseUrl, new CookieJar(), "/api/finance");
+  assert(anonymous.response.status === 401, "Finance API allowed an unauthenticated read");
+
+  const initial = await requestJson(baseUrl, cookieJar, "/api/finance");
+  assert(initial.response.ok && initial.payload?.ok, "Finance API did not return its initial state");
+  for (const collection of ["accounts", "transactions", "transfers", "savingsMovements", "bills", "budgets", "closePeriods", "rules", "importPreviews", "importBatches"]) {
+    assert(initial.payload.state[collection].length === 0, `Finance production fallback was not empty: ${collection}`);
+  }
+
+  const csrfBlocked = await requestJson(baseUrl, cookieJar, "/api/finance", {
+    method: "POST",
+    headers: { "content-type": "application/json", "idempotency-key": `${testRunId}-finance-csrf` },
+    body: JSON.stringify({ operation: "create", input: { kind: "account", name: "Blocked" } })
+  });
+  assert(csrfBlocked.response.status === 403, "Finance mutation did not enforce CSRF");
+
+  const operatingInput = {
+    kind: "account", accountKind: "Checking", name: "Operating", currentBalance: 2500,
+    balanceAsOf: "2026-08-01", balanceSource: "manual", entityScope: "personal"
+  };
+  const operating = await create(operatingInput, `${testRunId}-finance-account-operating`);
+  assert(operating.response.ok && operating.payload?.created, "Finance did not create an account");
+  const operatingId = operating.payload.item.id;
+  const operatingInitialUpdatedAt = operating.payload.item.updatedAt;
+
+  const replay = await create(operatingInput, `${testRunId}-finance-account-operating`);
+  assert(replay.response.ok && replay.payload?.created === false && replay.payload.item.id === operatingId, "Finance idempotency did not replay the original create");
+  const mismatchedReplay = await create({ kind: "account", name: "Mismatched replay payload" }, `${testRunId}-finance-account-operating`);
+  assert(mismatchedReplay.response.status === 409, "Finance replayed an idempotency key for a different request payload");
+
+  const savings = await create({
+    kind: "account", accountKind: "Savings", name: "Reserve", currentBalance: 5000, balanceAsOf: "2026-08-01",
+    balanceSource: "manual", entityScope: "personal"
+  }, `${testRunId}-finance-account-reserve`);
+  assert(savings.response.ok, "Finance did not create the second account");
+  const savingsId = savings.payload.item.id;
+
+  const balanceUpdate = await patchRecord({
+    kind: "account", id: operatingId, expectedUpdatedAt: operatingInitialUpdatedAt, action: "update",
+    fields: { currentBalance: 2750, balanceAsOf: "2026-08-02", balanceSource: "manual" }
+  });
+  assert(balanceUpdate.response.ok && balanceUpdate.payload.item.currentBalance === 2750, "Finance balance snapshot did not persist");
+  const staleUpdate = await patchRecord({
+    kind: "account", id: operatingId, expectedUpdatedAt: operatingInitialUpdatedAt, action: "update",
+    fields: { currentBalance: 1 }
+  });
+  assert(staleUpdate.response.status === 409 && staleUpdate.payload?.code === "stale", "Finance optimistic concurrency did not reject a stale update");
+
+  const income = await create({
+    kind: "transaction", occurredOn: "2026-08-01", merchant: "Client payment", accountId: operatingId,
+    amount: 3200, direction: "income", category: "Revenue", entityScope: "business", status: "cleared", reviewed: true
+  }, `${testRunId}-finance-income`);
+  const expense = await create({
+    kind: "transaction", occurredOn: "2026-08-02", merchant: "Office supply", accountId: operatingId,
+    amount: 80, direction: "expense", category: "Office", entityScope: "business", status: "cleared", reviewed: true
+  }, `${testRunId}-finance-expense`);
+  assert(income.response.ok && expense.response.ok, "Finance manual transactions did not persist");
+  const forgedManualTransfer = await create({
+    kind: "transaction", occurredOn: "2026-08-02", merchant: "Forged transfer", accountId: operatingId,
+    amount: 1, direction: "transfer", category: "Transfer", entityScope: "business"
+  }, `${testRunId}-finance-forged-manual-transfer`);
+  assert(forgedManualTransfer.response.status === 400, "Finance allowed a generic transaction to impersonate a transfer aggregate");
+  const extremeAmount = await create({
+    kind: "transaction", occurredOn: "2026-08-02", merchant: "Extreme amount", accountId: operatingId,
+    amount: "1e308", direction: "expense", category: "Invalid", entityScope: "business"
+  }, `${testRunId}-finance-extreme-amount`);
+  assert(extremeAmount.response.status === 400, "Finance accepted a monetary value that overflows cents");
+
+  const transfer = await create({
+    kind: "transfer", occurredOn: "2026-08-02", fromAccountId: operatingId, toAccountId: savingsId,
+    amount: 500, memo: "Reserve allocation"
+  }, `${testRunId}-finance-transfer`);
+  assert(transfer.response.ok && transfer.payload.state.transactions.filter((item) => item.transferId === transfer.payload.item.id).length === 2, "Finance transfer was not paired in the ledger");
+  const linkedLedgerRow = transfer.payload.state.transactions.find((item) => item.transferId === transfer.payload.item.id);
+  const linkedMutation = await patchRecord({
+    kind: "transaction", id: linkedLedgerRow.id, expectedUpdatedAt: linkedLedgerRow.updatedAt,
+    action: "update", fields: { amount: 1 }
+  });
+  assert(linkedMutation.response.status === 409, "Finance allowed one side of a paired transfer to be rewritten independently");
+  const savingMovement = await create({
+    kind: "savings_movement", occurredOn: "2026-08-02", direction: "to_savings",
+    fromAccountId: operatingId, toAccountId: savingsId, amount: 500, transferId: transfer.payload.item.id
+  }, `${testRunId}-finance-savings`);
+  assert(savingMovement.response.ok && savingMovement.payload.item.transferId === transfer.payload.item.id, "Finance savings movement did not retain its transfer reference");
+
+  const csvText = [
+    "date,description,amount,direction,category,memo",
+    "2026-08-03,Cloud vendor,-42.50,expense,Software,August service",
+    "2026-08-04,Needs review,-18.00,expense,,Missing category",
+    "not-a-date,Broken row,nope,expense,Office,Rejected"
+  ].join("\n");
+  const preview = await requestJson(baseUrl, cookieJar, "/api/finance", {
+    method: "POST", headers: jsonHeaders,
+    body: JSON.stringify({ operation: "preview_import", input: { accountId: operatingId, entityScope: "business", sourceFilename: "bank-export.csv", csvText } })
+  });
+  assert(preview.response.ok, "Finance CSV preview failed");
+  assert(preview.payload.preview.counts.accepted === 1 && preview.payload.preview.counts.ambiguous === 1 && preview.payload.preview.counts.rejected === 1, "Finance CSV preview did not classify accepted, ambiguous, and rejected rows");
+  const ambiguousFingerprint = preview.payload.preview.rows.find((row) => row.status === "ambiguous").fingerprint;
+  const ambiguousImport = await create({
+    previewId: preview.payload.preview.previewId,
+    selectedFingerprints: [ambiguousFingerprint]
+  }, `${testRunId}-finance-import-ambiguous`, "confirm_import");
+  assert(ambiguousImport.response.status === 400, "Finance accepted an ambiguous import row outside the accepted-only server policy");
+  const importInput = {
+    previewId: preview.payload.preview.previewId,
+    selectedFingerprints: preview.payload.preview.rows.filter((row) => row.status === "accepted").map((row) => row.fingerprint)
+  };
+  const imported = await create(importInput, `${testRunId}-finance-import`, "confirm_import");
+  assert(imported.response.ok && imported.payload.item.counts.ambiguous === 1 && imported.payload.item.counts.rejected === 1, "Finance import did not retain review results");
+  assert(imported.payload.state.transactions.some((item) => item.source.importBatchId === imported.payload.item.id && item.status === "pending"), "Finance import did not create pending review facts");
+  const importReplay = await create(importInput, `${testRunId}-finance-import`, "confirm_import");
+  assert(importReplay.response.ok && importReplay.payload.created === false, "Finance import idempotency replay failed");
+  const duplicateImport = await create(importInput, `${testRunId}-finance-import-duplicate`, "confirm_import");
+  assert(duplicateImport.response.status === 409, "Finance accepted the same CSV twice for one account");
+
+  const bill = await create({
+    kind: "bill", name: "Studio internet", amount: 95, dueDate: "2026-08-10", accountId: operatingId,
+    category: "Utilities", recurring: "monthly", autopay: false, entityScope: "business"
+  }, `${testRunId}-finance-bill`);
+  assert(bill.response.ok, "Finance bill creation failed");
+  const unsupportedPayment = await patchRecord({ kind: "bill", id: bill.payload.item.id, expectedUpdatedAt: bill.payload.item.updatedAt, action: "mark_paid" });
+  assert(unsupportedPayment.response.status === 400, "Finance marked a bill paid without evidence or exception");
+  const forgedEvidencePayment = await patchRecord({
+    kind: "bill", id: bill.payload.item.id, expectedUpdatedAt: bill.payload.item.updatedAt, action: "mark_paid",
+    paymentEvidenceRef: { module: "notes", objectType: "note", objectId: "missing-note", label: "Forged", route: "/admin/notes/missing-note" }
+  });
+  assert(forgedEvidencePayment.response.status === 409, "Finance accepted an unresolved native reference as payment evidence");
+  const paidBill = await patchRecord({
+    kind: "bill", id: bill.payload.item.id, expectedUpdatedAt: bill.payload.item.updatedAt, action: "mark_paid",
+    exceptionReason: "Observed on provider statement; canonical statement record is not available in this isolated run."
+  });
+  assert(paidBill.response.ok && paidBill.payload.item.status === "paid" && paidBill.payload.item.paymentExceptionReason, "Finance did not persist the observed-payment exception");
+
+  const budgetInput = { kind: "budget", period: "2026-08", category: "Software", limit: 300, entityScope: "business" };
+  const budget = await create(budgetInput, `${testRunId}-finance-budget`);
+  assert(budget.response.ok, "Finance budget creation failed");
+  const duplicateBudget = await create(budgetInput, `${testRunId}-finance-budget-duplicate`);
+  assert(duplicateBudget.response.status === 409, "Finance allowed a duplicate budget period/category/entity scope");
+
+  const restoreAccount = await create({
+    kind: "account", accountKind: "Checking", name: "Restore invariant", currentBalance: 0,
+    balanceAsOf: "2026-08-01", balanceSource: "manual", entityScope: "personal"
+  }, `${testRunId}-finance-restore-account`);
+  const archivedRestoreAccount = await patchRecord({
+    kind: "account", id: restoreAccount.payload.item.id, expectedUpdatedAt: restoreAccount.payload.item.updatedAt,
+    action: "archive", reason: "Regression verifies uniqueness on restore."
+  });
+  const replacementAccount = await create({
+    kind: "account", accountKind: "Checking", name: "Restore invariant", currentBalance: 0,
+    balanceAsOf: "2026-08-01", balanceSource: "manual", entityScope: "personal"
+  }, `${testRunId}-finance-restore-replacement`);
+  assert(replacementAccount.response.ok, "Finance did not allow an archived account identity to be replaced");
+  const duplicateRestore = await patchRecord({
+    kind: "account", id: restoreAccount.payload.item.id, expectedUpdatedAt: archivedRestoreAccount.payload.item.updatedAt,
+    action: "restore"
+  });
+  assert(duplicateRestore.response.status === 409, "Finance restored a duplicate active account identity");
+
+  const close = await create({ kind: "close_period", period: "2026-08" }, `${testRunId}-finance-close`);
+  assert(close.response.ok && close.payload.item.checks.length === 6, "Finance close did not create its named checks");
+  assert(close.payload.item.checks.every((check) => check.id.startsWith(`${close.payload.item.id}-check-`)), "Finance close checks are not scoped to their parent close identity");
+  assert(new Set(close.payload.item.checks.map((check) => check.id)).size === close.payload.item.checks.length, "Finance reused a close-check identity inside one monthly container");
+  const blockedClose = await patchRecord({ kind: "close_period", id: close.payload.item.id, expectedUpdatedAt: close.payload.item.updatedAt, action: "complete_close" });
+  assert(blockedClose.response.status === 409, "Finance completed a close with open required checks");
+  const firstCheckWithoutEvidence = await patchRecord({
+    kind: "close_period", id: close.payload.item.id, expectedUpdatedAt: close.payload.item.updatedAt,
+    action: "resolve_close_check", checkId: close.payload.item.checks[0].id, resolution: "complete"
+  });
+  assert(firstCheckWithoutEvidence.response.status === 400, "Finance completed a close check without evidence or a note");
+  const forgedCarryForward = await patchRecord({
+    kind: "close_period", id: close.payload.item.id, expectedUpdatedAt: close.payload.item.updatedAt,
+    action: "resolve_close_check", checkId: close.payload.item.checks[5].id, resolution: "carried_forward",
+    reason: "Forged owner should not satisfy the gate.",
+    carryForwardOwnerRef: { module: "personal_ops", objectType: "follow_up", objectId: "missing-follow-up", label: "Forged", route: "/admin/personal/follow-ups?selected=missing-follow-up" }
+  });
+  assert(forgedCarryForward.response.status === 409, "Finance accepted an unresolved carry-forward owner");
+  let closeRecord = close.payload.item;
+  for (const [index, check] of closeRecord.checks.entries()) {
+    const resolution = index >= 4 ? "waived" : "complete";
+    const resolved = await patchRecord({
+      kind: "close_period", id: closeRecord.id, expectedUpdatedAt: closeRecord.updatedAt,
+      action: "resolve_close_check", checkId: check.id, resolution,
+      reason: resolution === "complete" ? `Verified ${check.label} in the isolated regression.` : "Not applicable to this isolated month."
+    });
+    assert(resolved.response.ok, `Finance close check failed to resolve: ${check.label}`);
+    closeRecord = resolved.payload.item;
+  }
+  const completedClose = await patchRecord({ kind: "close_period", id: closeRecord.id, expectedUpdatedAt: closeRecord.updatedAt, action: "complete_close" });
+  assert(completedClose.response.ok && completedClose.payload.item.status === "closed", "Finance close did not complete after every named check resolved");
+  const reopenedClose = await patchRecord({
+    kind: "close_period", id: closeRecord.id, expectedUpdatedAt: completedClose.payload.item.updatedAt,
+    action: "reopen_close", reason: "Regression verifies the explicit reopen trail."
+  });
+  assert(reopenedClose.response.ok && reopenedClose.payload.item.reopenReason, "Finance close did not retain its reopen reason");
+
+  const ruleActionId = `${testRunId}-finance-rule-action`;
+  const rule = await create({
+    kind: "rule", name: "Cloud vendor review", type: "categorization", mode: "suggest", enabled: true,
+    scope: "Finance transactions", trigger: "Manual deterministic evaluation",
+    conditions: [{ id: `${testRunId}-finance-rule-condition`, field: "merchant", operator: "contains", value: "Cloud", label: "Merchant contains Cloud", required: true }],
+    actions: [{ id: ruleActionId, label: "Suggest Software", destination: "finance", approvalRequired: true, mutationLevel: "flag_only" }],
+    tests: [{ id: `${testRunId}-finance-rule-test`, label: "Cloud merchant", input: { merchant: "Cloud vendor" }, expectedActionIds: [ruleActionId] }]
+  }, `${testRunId}-finance-rule`);
+  assert(rule.response.ok && rule.payload.item.actions[0].approvalRequired === true, "Finance rule did not retain its approval boundary");
+  const testedRule = await patchRecord({ kind: "rule", id: rule.payload.item.id, expectedUpdatedAt: rule.payload.item.updatedAt, action: "test_rule", passed: false });
+  assert(testedRule.response.ok && testedRule.payload.item.lastTestPassed === true, "Finance trusted the caller's rule-health attestation instead of rerunning the test server-side");
+
+  const archived = await patchRecord({ kind: "bill", id: paidBill.payload.item.id, expectedUpdatedAt: paidBill.payload.item.updatedAt, action: "archive", reason: "Regression archive/restore check" });
+  assert(archived.response.ok && archived.payload.item.archivedAt, "Finance archive did not preserve the record");
+  const archivedMutation = await patchRecord({ kind: "bill", id: paidBill.payload.item.id, expectedUpdatedAt: archived.payload.item.updatedAt, action: "update", fields: { amount: 1 } });
+  assert(archivedMutation.response.status === 409, "Finance allowed mutation of an archived record");
+  const restored = await patchRecord({ kind: "bill", id: paidBill.payload.item.id, expectedUpdatedAt: archived.payload.item.updatedAt, action: "restore" });
+  assert(restored.response.ok && !restored.payload.item.archivedAt, "Finance restore recreated or lost the archived record");
+
+  const reloaded = await requestJson(baseUrl, cookieJar, "/api/finance");
+  assert(reloaded.response.ok && reloaded.payload.state.accounts.length === 4, "Finance state did not survive a repository reload");
+  assert(reloaded.payload.state.transactions.filter((item) => item.direction === "transfer").length === 2, "Finance paired transfers were lost or misclassified");
+  assert(reloaded.payload.state.importBatches[0].rows.every((row) => !("raw" in row) && !("csvText" in row)), "Finance import batch retained raw CSV fields");
+  assert(reloaded.payload.state.importPreviews.length === 0, "Finance retained a consumed import preview");
+  assert(!reloaded.payload.state.transactions.some((item) => item.merchant === "Extreme amount"), "Finance persisted an overflowed monetary transaction");
+  for (const amount of [
+    ...reloaded.payload.state.accounts.map((item) => item.currentBalance),
+    ...reloaded.payload.state.transactions.map((item) => item.amount),
+    ...reloaded.payload.state.transfers.map((item) => item.amount),
+    ...reloaded.payload.state.savingsMovements.map((item) => item.amount),
+    ...reloaded.payload.state.bills.map((item) => item.amount),
+    ...reloaded.payload.state.budgets.map((item) => item.limit)
+  ]) assert(Number.isFinite(amount), "Finance persisted a non-finite monetary value");
+  assert(reloaded.payload.state.auditEvents.some((event) => event.action === "finance.close.completed") && reloaded.payload.state.auditEvents.some((event) => event.action === "finance.rule.test_recorded"), "Finance audit trail omitted critical workflow events");
+  return reloaded.payload.state;
+}
+
+async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "finance-native");
+  await mkdir(screenshotDir, { recursive: true });
+  const viewports = [
+    { label: "mobile", width: 390, height: 844 },
+    { label: "tablet", width: 768, height: 1024 },
+    { label: "desktop", width: 1440, height: 900 },
+    { label: "wide", width: 2048, height: 1152 }
+  ];
+  try {
+    for (const viewport of viewports) {
+      const context = await browser.newContext({ viewport });
+      await context.addCookies([
+        { name: "admin_session", value: cookieJar.get("admin_session"), url: baseUrl, httpOnly: true, sameSite: "Lax" },
+        { name: "admin_csrf", value: cookieJar.get("admin_csrf"), url: baseUrl, sameSite: "Lax" }
+      ]);
+      const page = await context.newPage();
+      page.on("pageerror", (error) => browserErrors.push(`${viewport.label}: ${error.message}`));
+      page.on("console", (message) => {
+        if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) browserErrors.push(`${viewport.label}: ${message.text()}`);
+      });
+      page.on("response", (response) => {
+        const url = new URL(response.url());
+        if (response.status() >= 400 && !url.pathname.startsWith("/_vercel/")) failedResponses.push(`${viewport.label}: ${response.status()} ${url.pathname}`);
+      });
+      await page.goto(`${baseUrl}/admin/finance/transactions?view=review&sort=amount-desc&probe=keep`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { level: 1, name: "Transactions" }).waitFor();
+      const canonical = new URL(page.url());
+      assert(canonical.pathname === "/admin/finance/transactions" && !canonical.searchParams.has("view") && canonical.searchParams.get("probe") === "keep", `Finance ${viewport.label} route state was not canonicalized safely`);
+      assert(await page.locator("[data-finance-transaction-id]").count() >= 5, `Finance ${viewport.label} did not render native ledger records`);
+      const diagnostics = await page.evaluate(() => {
+        const actionBar = document.querySelector(".finance-native-action-bar");
+        const dock = document.querySelector('[aria-label="Open AI assistant"]');
+        const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        return {
+          overflow: document.documentElement.scrollWidth > window.innerWidth,
+          dockOverlap: actionBar instanceof HTMLElement && dock instanceof HTMLElement ? intersects(actionBar.getBoundingClientRect(), dock.getBoundingClientRect()) : false
+        };
+      });
+      assert(!diagnostics.overflow, `Finance ${viewport.label} has horizontal overflow`);
+      assert(!diagnostics.dockOverlap, `Finance ${viewport.label} action bar overlaps the AI dock`);
+      await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}-transactions.png`), fullPage: true });
+      if (viewport.width === 390) {
+        const undersized = await page.locator("button:visible, a[href]:visible, input:visible, select:visible").evaluateAll((elements) => elements.map((element) => {
+          const rect = element.getBoundingClientRect();
+          return { label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 45), width: rect.width, height: rect.height };
+        }).filter((item) => item.width > 0 && item.height > 0 && (item.width < 44 || item.height < 44)));
+        assert(undersized.length === 0, `Finance mobile targets below 44px: ${JSON.stringify(undersized)}`);
+      }
+      if (viewport.width === 1440) {
+        await page.goto(`${baseUrl}/admin/finance`, { waitUntil: "networkidle" });
+        await page.getByRole("button", { name: "Add account" }).click();
+        await page.getByLabel("Account name").fill("Operating");
+        const [duplicateResponse] = await Promise.all([
+          page.waitForResponse((response) => new URL(response.url()).pathname === "/api/finance" && response.request().method() === "POST"),
+          page.getByRole("button", { name: "Save" }).click()
+        ]);
+        assert(duplicateResponse.status() === 409, `Finance duplicate account returned ${duplicateResponse.status()} instead of 409`);
+        await page.getByText("An active account already uses this name.", { exact: true }).waitFor();
+        assert(await page.getByLabel("Account name").inputValue() === "Operating", "Finance failed mutation discarded form input");
+        await page.getByRole("button", { name: "Close Finance operation" }).click();
+        await page.goto(`${baseUrl}/admin/finance/rules`, { waitUntil: "networkidle" });
+        await page.locator("[data-finance-rule-id]").first().click();
+        await page.getByRole("button", { name: "Test rule", exact: true }).click();
+        const financeNotice = page.locator(".finance-notice");
+        await financeNotice.waitFor({ state: "attached" });
+        const noticeDiagnostics = await financeNotice.evaluate((element) => {
+          const rect = element.getBoundingClientRect();
+          const message = element.children.item(1);
+          const messageRect = message instanceof HTMLElement ? message.getBoundingClientRect() : null;
+          const style = window.getComputedStyle(element);
+          return { display: style.display, visibility: style.visibility, opacity: style.opacity, width: rect.width, height: rect.height, top: rect.top, messageWidth: messageRect?.width || 0, messageClass: message?.className || "", text: element.textContent };
+        });
+        assert(await financeNotice.isVisible(), `Finance saved-result notice was not visible: ${JSON.stringify(noticeDiagnostics)}`);
+        assert(/1 passed, 0 failed, 0 need review/i.test(noticeDiagnostics.text || ""), "Finance visible saved-result notice omitted deterministic test counts");
+        assert(noticeDiagnostics.messageWidth >= Math.min(480, noticeDiagnostics.width * 0.6), `Finance saved-result notice text collapsed: ${JSON.stringify(noticeDiagnostics)}`);
+        await page.screenshot({ path: path.join(screenshotDir, "desktop-rules-test-result.png"), fullPage: true });
+      }
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  assert(browserErrors.length === 0, `Native Finance browser checks emitted errors: ${browserErrors.join(" | ")}`);
+  assert(failedResponses.filter((item) => !item.includes("409 /api/finance")).length === 0, `Native Finance browser checks received failed responses: ${failedResponses.join(" | ")}`);
+}
+
+async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const errors = [];
+  const failedResponses = [];
+  const mutations = [];
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "command-center-native");
+  await mkdir(screenshotDir, { recursive: true });
+  const pending = financeState.transactions.filter((item) => !item.archivedAt && (item.status === "pending" || !item.reviewed)).length;
+  const accounts = financeState.accounts.filter((item) => !item.archivedAt).length;
+  try {
+    for (const viewport of [
+      { label: "mobile", width: 390, height: 844 },
+      { label: "tablet", width: 768, height: 1024 },
+      { label: "desktop", width: 1440, height: 900 },
+      { label: "wide", width: 2048, height: 1152 }
+    ]) {
+      const context = await browser.newContext({ viewport });
+      await context.addCookies([
+        { name: "admin_session", value: cookieJar.get("admin_session"), url: baseUrl, httpOnly: true, sameSite: "Lax" },
+        { name: "admin_csrf", value: cookieJar.get("admin_csrf"), url: baseUrl, sameSite: "Lax" }
+      ]);
+      const page = await context.newPage();
+      page.on("pageerror", (error) => errors.push(`${viewport.label}: ${error.message}`));
+      page.on("console", (message) => {
+        if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) errors.push(`${viewport.label}: ${message.text()}`);
+      });
+      page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (url.origin === new URL(baseUrl).origin && !["GET", "HEAD", "OPTIONS"].includes(request.method())) mutations.push(`${request.method()} ${url.pathname}`);
+      });
+      page.on("response", (response) => {
+        const url = new URL(response.url());
+        if (response.status() >= 400 && !url.pathname.startsWith("/_vercel/")) failedResponses.push(`${viewport.label}: ${response.status()} ${url.pathname}`);
+      });
+      await page.goto(`${baseUrl}/admin`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { level: 1, name: "What needs attention" }).waitFor();
+      const command = page.locator(".command-center-grid");
+      await command.waitFor();
+      const text = await command.innerText();
+      assert(text.includes(`${accounts} accounts · ${pending} pending`), `Command Center ${viewport.label} did not derive the current Finance module count`);
+      for (const forbidden of ["AI suggestions", "Sync checks", "Media queued", "Across live project lanes", "12 Active goals"]) {
+        assert(!text.includes(forbidden), `Command Center ${viewport.label} retained invented copy: ${forbidden}`);
+      }
+      const diagnostics = await page.evaluate(() => {
+        const commandElement = document.querySelector(".command-center-grid");
+        const dock = document.querySelector('[aria-label="Open AI assistant"]');
+        const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        return {
+          overflow: document.documentElement.scrollWidth > window.innerWidth,
+          dockOverlap: commandElement instanceof HTMLElement && dock instanceof HTMLElement ? intersects(commandElement.getBoundingClientRect(), dock.getBoundingClientRect()) : false
+        };
+      });
+      assert(!diagnostics.overflow, `Command Center ${viewport.label} has horizontal overflow`);
+      assert(!diagnostics.dockOverlap, `Command Center ${viewport.label} is obscured by the AI launcher`);
+      if (viewport.width === 390) {
+        const undersized = await command.locator("button:visible, a[href]:visible").evaluateAll((elements) => elements.map((element) => {
+          const rect = element.getBoundingClientRect();
+          return { label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 45), width: rect.width, height: rect.height };
+        }).filter((item) => item.width > 0 && item.height > 0 && (item.width < 44 || item.height < 44)));
+        assert(undersized.length === 0, `Command Center mobile targets below 44px: ${JSON.stringify(undersized)}`);
+      }
+      await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}.png`), fullPage: true });
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+  assert(mutations.length === 0, `Command Center read-through emitted mutations: ${mutations.join(" | ")}`);
+  assert(errors.length === 0, `Command Center browser checks emitted errors: ${errors.join(" | ")}`);
+  assert(failedResponses.length === 0, `Command Center browser checks received failed responses: ${failedResponses.join(" | ")}`);
 }
 
 async function checkMediaDuplicatesBrowserState(baseUrl, cookieJar, duplicateToken) {
@@ -5886,9 +6313,26 @@ async function checkCrossModuleDecisionConnections(
   milestone,
   blocker,
   reviewRun,
-  reviewDecision
+  reviewDecision,
+  financeState
 ) {
   const { chromium } = await import("@playwright/test");
+  const nativeBudget = financeState.budgets.find((item) => !item.archivedAt);
+  const nativeClose = financeState.closePeriods.find((item) => !item.archivedAt);
+  const nativeCloseCheck = nativeClose?.checks[0];
+  const handoffCloseCheck = nativeClose?.checks[1];
+  assert(nativeBudget && nativeClose && nativeCloseCheck && handoffCloseCheck, "Cross-module Decision check requires native Finance budget and close records");
+  const handoffBudgetCreate = await requestJson(baseUrl, cookieJar, "/api/finance", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+      "x-csrf-token": csrfToken,
+      "idempotency-key": `${testRunId}-finance-decision-handoff-budget`
+    },
+    body: JSON.stringify({ operation: "create", input: { kind: "budget", period: nativeBudget.period, category: "Operations", limit: 450, entityScope: "business" } })
+  });
+  assert(handoffBudgetCreate.response.ok, `Finance handoff budget creation failed: ${JSON.stringify(handoffBudgetCreate.payload)}`);
+  const handoffBudget = handoffBudgetCreate.payload.item;
   const sources = [
     {
       key: "project",
@@ -5920,11 +6364,11 @@ async function checkCrossModuleDecisionConnections(
       source: {
         module: "finance",
         objectType: "budget",
-        objectId: "travel",
-        label: "Travel",
-        route: "/admin/finance/budgets?selected=travel&tab=overview"
+        objectId: nativeBudget.id,
+        label: nativeBudget.category,
+        route: `/admin/finance/budgets?selected=${encodeURIComponent(nativeBudget.id)}&tab=overview`
       },
-      title: "Travel budget · variance decision",
+      title: `${nativeBudget.category} budget · variance decision`,
       state: "open"
     },
     {
@@ -5932,11 +6376,12 @@ async function checkCrossModuleDecisionConnections(
       source: {
         module: "finance",
         objectType: "finance_close_check",
-        objectId: "budget-overruns",
-        label: "Review budget overruns (Travel +24%)",
-        route: "/admin/finance/monthly-review?selected=budget-overruns&tab=decisions"
+        objectId: nativeCloseCheck.id,
+        containerObjectId: nativeClose.id,
+        label: nativeCloseCheck.label,
+        route: `/admin/finance/monthly-review?selected=${encodeURIComponent(nativeCloseCheck.id)}&tab=decisions`
       },
-      title: "Travel overage · monthly close decision",
+      title: `${nativeCloseCheck.label} · monthly close decision`,
       state: "open"
     },
     {
@@ -6220,29 +6665,28 @@ async function checkCrossModuleDecisionConnections(
     await financeBudgetPage.goto(`${baseUrl}${sources[2].source.route}`, { waitUntil: "networkidle" });
     await assertPanel(financeBudgetPage, sources[2], "Finance budget decisions");
     assert(
-      await financeBudgetPage.getByText("Read-only fixture", { exact: true }).count() >= 1 &&
-        await financeBudgetPage.getByText("Open Decision", { exact: true }).count() >= 1,
-      "Finance budget did not preserve its read-only boundary and owner-aware Decision action"
+      await financeBudgetPage.getByText("Finance owns the cap", { exact: true }).count() >= 1,
+      "Finance budget did not preserve its native ownership boundary and owner-aware Decision action"
     );
 
     await financeBudgetPage.goto(
-      `${baseUrl}/admin/finance/budgets?selected=saas&tab=overview`,
+      `${baseUrl}/admin/finance/budgets?selected=${encodeURIComponent(handoffBudget.id)}&tab=overview`,
       { waitUntil: "networkidle" }
     );
-    await financeBudgetPage.getByText("File decision", { exact: true }).click();
+    await financeBudgetPage.getByText("File in Personal Ops", { exact: true }).click();
     await financeBudgetPage.waitForURL((url) =>
       url.pathname === "/admin/personal/decisions" &&
       url.searchParams.get("create") === "decision" &&
       url.searchParams.get("sourceModule") === "finance" &&
       url.searchParams.get("sourceObjectType") === "budget" &&
-      url.searchParams.get("sourceObjectId") === "saas"
+      url.searchParams.get("sourceObjectId") === handoffBudget.id
     );
     const financeDecisionDialog = financeBudgetPage.getByRole("dialog", { name: "New Decision" });
     await financeDecisionDialog.waitFor();
     await financeDecisionDialog
       .getByText("This creates a linked operating object. The source stays in Finance.", { exact: true })
       .waitFor();
-    const handoffDecisionTitle = "Software & SaaS budget · source-preserving decision";
+    const handoffDecisionTitle = `${handoffBudget.category} budget · source-preserving decision`;
     await financeDecisionDialog.getByLabel("Title").fill(handoffDecisionTitle);
     await financeDecisionDialog.getByLabel("Question").fill("What choice should retain this exact Finance budget as its source?");
     await financeDecisionDialog.getByRole("checkbox", { name: /Create one linked follow-up/ }).uncheck();
@@ -6268,8 +6712,8 @@ async function checkCrossModuleDecisionConnections(
         financeHandoffDecision?.sourceRefs?.length === 1 &&
         financeHandoffDecision.sourceRefs[0].module === "finance" &&
         financeHandoffDecision.sourceRefs[0].objectType === "budget" &&
-        financeHandoffDecision.sourceRefs[0].objectId === "saas" &&
-        financeHandoffDecision.sourceRefs[0].route === "/admin/finance/budgets?selected=saas",
+        financeHandoffDecision.sourceRefs[0].objectId === handoffBudget.id &&
+        financeHandoffDecision.sourceRefs[0].route === `/admin/finance/budgets?selected=${encodeURIComponent(handoffBudget.id)}`,
       `Finance Decision handoff did not persist its exact native source: ${JSON.stringify(financeHandoffDecision)}`
     );
 
@@ -6278,16 +6722,17 @@ async function checkCrossModuleDecisionConnections(
     await financeClosePage.goto(`${baseUrl}${sources[3].source.route}`, { waitUntil: "networkidle" });
     await assertPanel(financeClosePage, sources[3], "Finance close-item decisions");
     assert(
-      await financeClosePage.getByText("Finance close remains read-only", { exact: true }).count() === 1 &&
-        await financeClosePage.getByText("Open Decision", { exact: true }).count() >= 1,
-      "Finance close item did not preserve its explicit boundary and owner-aware Decision action"
+      await financeClosePage.getByText("Finance retains close ownership", { exact: true }).count() === 1 &&
+        await financeClosePage.getByText("Open in Personal Ops", { exact: true }).count() >= 1,
+      "Finance close item did not preserve its native ownership boundary and owner-aware Decision action"
     );
     const closeHandoffParams = new URLSearchParams({
       create: "decision",
       sourceModule: "finance",
       sourceObjectType: "finance_close_check",
-      sourceObjectId: "budget-overruns",
-      sourceLabel: "Review budget overruns (Travel +24%)"
+      sourceObjectId: handoffCloseCheck.id,
+      sourceContainerObjectId: nativeClose.id,
+      sourceLabel: handoffCloseCheck.label
     });
     await financeClosePage.goto(
       `${baseUrl}/admin/personal/decisions?${closeHandoffParams.toString()}`,
@@ -6301,6 +6746,10 @@ async function checkCrossModuleDecisionConnections(
     assert(
       new URL(financeClosePage.url()).searchParams.get("sourceObjectType") === "finance_close_check",
       "Finance close Decision handoff did not preserve its source object type"
+    );
+    assert(
+      new URL(financeClosePage.url()).searchParams.get("sourceContainerObjectId") === nativeClose.id,
+      "Finance close Decision handoff did not preserve its parent close period"
     );
     await desktopContext.close();
 
@@ -8796,6 +9245,12 @@ async function main() {
     );
     pass("Public and protected entry responses include the security-header baseline");
 
+    const publicVaultShell = await requestText(server.baseUrl, cookieJar, "/vault");
+    assert(publicVaultShell.response.ok && publicVaultShell.body.includes("Encrypted Vault") && publicVaultShell.body.includes("Vault &amp; sync"), "Public encrypted vault shell failed to render");
+    const serviceWorker = await requestText(server.baseUrl, cookieJar, "/sw.js");
+    assert(serviceWorker.response.ok && serviceWorker.body.includes("unigentamos-static-v3") && serviceWorker.body.includes('url.pathname.startsWith("/api/")'), "Offline shell worker is missing or does not exclude API data");
+    pass("Encrypted vault and static-only offline shell load without exposing authenticated data");
+
     logStep("Checking unauthenticated API protection");
     const unauthKpis = await requestJson(server.baseUrl, cookieJar, "/api/kpis");
     assert(unauthKpis.response.status === 401, `Expected /api/kpis to return 401, got ${describeStatus(unauthKpis.response)}`);
@@ -8845,6 +9300,22 @@ async function main() {
       `Expected /api/reviews/runs to return 401, got ${describeStatus(unauthReviewRuns.response)}`
     );
     pass("Unauthenticated native Reviews API is blocked");
+
+    for (const pathname of [
+      "/api/vault/time",
+      "/api/vault/bootstrap",
+      `/api/vault/sync?vaultId=${crypto.randomUUID()}&since=0`
+    ]) {
+      const unauthenticatedVaultApi = await requestJson(server.baseUrl, cookieJar, pathname);
+      assert(unauthenticatedVaultApi.response.status === 401, `Expected ${pathname} to reject an unauthenticated request`);
+    }
+    const unauthenticatedVaultPush = await requestJson(server.baseUrl, cookieJar, "/api/vault/sync", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": "unauthenticated" },
+      body: JSON.stringify({ vaultId: crypto.randomUUID(), envelopes: [] })
+    });
+    assert(unauthenticatedVaultPush.response.status === 401, "Encrypted relay push checked CSRF or content before authentication");
+    pass("Unauthenticated vault time, bootstrap, pull, and push APIs are blocked");
 
     const unauthPersonal = await requestText(server.baseUrl, cookieJar, "/admin/personal");
     assert(
@@ -8991,6 +9462,24 @@ async function main() {
     assert(cookieJar.get("admin_session"), "Login did not set admin_session cookie");
     assert(cookieJar.get("admin_csrf"), "Login did not set admin_csrf cookie");
     pass("Admin login succeeded and set session cookies");
+
+    const vaultTime = await requestJson(server.baseUrl, cookieJar, "/api/vault/time");
+    assert(vaultTime.response.ok && vaultTime.payload?.ok && vaultTime.response.headers.get("date"), "Vault time endpoint did not return authenticated server time");
+    const vaultBootstrap = await requestJson(server.baseUrl, cookieJar, "/api/vault/bootstrap");
+    assert(vaultBootstrap.response.ok && vaultBootstrap.payload?.ok && Array.isArray(vaultBootstrap.payload?.objects), "Vault bootstrap did not return an authenticated object list");
+    const vaultPushWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/vault/sync", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ vaultId: crypto.randomUUID(), envelopes: [] })
+    });
+    assert(vaultPushWithoutCsrf.response.status === 403, "Vault relay push accepted a request without CSRF proof");
+    const vaultPushInvalidBatch = await requestJson(server.baseUrl, cookieJar, "/api/vault/sync", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ vaultId: crypto.randomUUID(), envelopes: [] })
+    });
+    assert(vaultPushInvalidBatch.response.status === 400, "Vault relay did not validate its bounded encrypted batch before configuration access");
+    pass("Authenticated vault time/bootstrap and relay CSRF/input boundaries work");
 
     logStep("Checking protected pages and locked navigation");
     const adminHome = await requestText(server.baseUrl, cookieJar, `/admin?run=${encodeURIComponent(testRunId)}`);
@@ -9362,6 +9851,34 @@ async function main() {
     assert(resourcesPage.body.includes("Search resources, source, context"), "Resources page missing its source search");
     pass("Resources directory loads through the external-source adapter");
 
+    const nativeFinanceState = await checkNativeFinanceLifecycle(server.baseUrl, cookieJar);
+    assert(nativeFinanceState.accounts.length === 4 && nativeFinanceState.rules.length === 1, "Native Finance lifecycle returned incomplete persisted state");
+    pass("Finance API enforces auth, CSRF, idempotency, concurrency, evidence gates, paired transfers, imports, close checks, rules, audit, and archive/restore");
+
+    const nativeFinanceRoutes = [
+      ["/admin/finance", "Command", "Finance command view"],
+      ["/admin/finance/accounts?view=transactions", "Accounts &amp; Cashflow", 'data-finance-account-id='],
+      ["/admin/finance/transactions?view=review", "Transactions", 'aria-label="Finance transactions"'],
+      ["/admin/finance/bills?view=budgets", "Bills &amp; Subscriptions", "Payment queue"],
+      ["/admin/finance/budgets?view=bills", "Budgets", 'aria-label="Budget categories"'],
+      ["/admin/finance/monthly-review?view=accounts", "Monthly Review", "Close checklist"],
+      ["/admin/finance/rules?view=accounts", "Rules / Automation", 'data-finance-rule-id=']
+    ];
+    for (const [pathname, heading, marker] of nativeFinanceRoutes) {
+      const route = await requestText(server.baseUrl, cookieJar, pathname);
+      assert(route.response.ok && route.body.includes(`<h1>${heading}</h1>`) && route.body.includes(marker), `Native Finance route failed: ${pathname}`);
+      assert(route.body.includes("Native Finance") && route.body.includes("CONNECTED"), `Native Finance route omitted its connected source disclosure: ${pathname}`);
+      assert(!route.body.includes("Fixture dataset") && !route.body.includes("read-only preview") && !route.body.includes("NOT CONNECTED"), `Native Finance route retained a fixture/read-only claim: ${pathname}`);
+    }
+    pass("Canonical Finance routes render persisted native records without fixture claims");
+
+    await checkNativeFinanceBrowserState(server.baseUrl, cookieJar);
+    pass("Hydrated Finance routes pass canonical URL, failed-input recovery, rule-test, and four-viewport checks");
+
+    await checkCommandCenterBrowserState(server.baseUrl, cookieJar, nativeFinanceState);
+    pass("Command Center derives native module state and passes four-viewport read-through checks without invented counts");
+
+    if (false) {
     const financePage = await requestText(server.baseUrl, cookieJar, "/admin/finance");
     assert(financePage.response.ok, `Finance page failed: ${describeStatus(financePage.response)}`);
     assert(financePage.body.includes("Finance command view"), "Finance page missing command view text");
@@ -9505,6 +10022,7 @@ async function main() {
       "Finance Rules route did not render the complete sixteen-scenario fixture"
     );
     pass("Finance Rules loads as a searchable, testable, explicitly non-persistent rules preview");
+    }
 
     const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
     assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);
@@ -15350,7 +15868,8 @@ async function main() {
       projectMilestone,
       projectBlocker,
       weeklyReviewRun,
-      reviewDecisionCandidate
+      reviewDecisionCandidate,
+      nativeFinanceState
     );
     weeklyReviewRun = crossModuleDecisionResult.run;
     weeklyReviewView = crossModuleDecisionResult.view;

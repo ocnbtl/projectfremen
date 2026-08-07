@@ -2,7 +2,7 @@ import type {
   FinanceAccount,
   FinanceBill,
   FinanceBillStatus,
-  FinanceFixtureDataset,
+  FinanceDataset,
   FinanceRecurringCadence
 } from "./types";
 
@@ -37,10 +37,9 @@ export interface FinanceBillRowViewModel {
   readonly monthlyEquivalent: number;
 }
 
-export interface FinanceBillAccountFixtureMatch {
-  /** Equality is against a fixture display name, not an account reference ID. */
-  readonly matchBasis: "fixture-display-name";
-  readonly durableLink: false;
+export interface FinanceBillAccountMatch {
+  readonly matchBasis: "native-account-id" | "legacy-display-name";
+  readonly durableLink: boolean;
   readonly billAccountDisplayName: string;
   readonly account: FinanceAccount | null;
 }
@@ -54,7 +53,7 @@ export interface FinanceBillsViewModel {
   readonly rows: readonly FinanceBillRowViewModel[];
   readonly selectedId: string | null;
   readonly selected: FinanceBillRowViewModel | null;
-  readonly selectedAccountFixtureMatch: FinanceBillAccountFixtureMatch | null;
+  readonly selectedAccountMatch: FinanceBillAccountMatch | null;
   readonly selectionBasis: "requested-visible-id" | "highest-urgency-unresolved" | "first-visible" | null;
   readonly counts: {
     readonly overdue: number;
@@ -105,7 +104,7 @@ function normalizeSort(value: string | undefined): FinanceBillsSort {
 }
 
 /**
- * Converts a recurring fixture amount to a monthly equivalent. The conversion
+ * Converts a recurring obligation amount to a monthly equivalent. The conversion
  * is explicit for every cadence; non-recurring (`null`) rows contribute zero.
  */
 export function getFinanceBillMonthlyEquivalent(
@@ -158,7 +157,7 @@ function billSearchText(bill: FinanceBill): string {
 }
 
 export function buildFinanceBillsViewModel(
-  dataset: FinanceFixtureDataset,
+  dataset: FinanceDataset,
   input: FinanceBillsViewInput = {}
 ): FinanceBillsViewModel {
   const query = input.query?.trim().toLowerCase() ?? "";
@@ -212,12 +211,12 @@ export function buildFinanceBillsViewModel(
       : selected
         ? "first-visible" as const
         : null;
-  const selectedAccountFixtureMatch = selected
+  const selectedAccountMatch = selected
     ? {
-        matchBasis: "fixture-display-name" as const,
-        durableLink: false as const,
+        matchBasis: selected.bill.accountId ? "native-account-id" as const : "legacy-display-name" as const,
+        durableLink: Boolean(selected.bill.accountId),
         billAccountDisplayName: selected.bill.account,
-        account: dataset.accounts.find((account) => account.name === selected.bill.account) ?? null
+        account: dataset.accounts.find((account) => selected.bill.accountId ? account.id === selected.bill.accountId : account.name === selected.bill.account) ?? null
       }
     : null;
 
@@ -230,7 +229,7 @@ export function buildFinanceBillsViewModel(
     rows,
     selectedId: selected?.bill.id ?? null,
     selected,
-    selectedAccountFixtureMatch,
+    selectedAccountMatch,
     selectionBasis,
     counts: {
       overdue: rows.filter(({ bill }) => bill.status === "overdue").length,

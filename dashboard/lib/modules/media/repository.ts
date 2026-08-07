@@ -3,6 +3,7 @@
 import { buildJsonHeadersWithCsrf } from "../../client-csrf";
 import type { MutationErrorCode } from "../../native-objects/mutation-result";
 import type { PersonalRecord } from "../../personal-records-store";
+import { mirrorPersonalRecord } from "../../local-first/domain-mirror";
 import {
   legacyPersonalRecordsToMediaAssets,
   mediaAssetForClient,
@@ -190,6 +191,8 @@ export function createMediaRepository(options: MediaRepositoryOptions = {}): Med
       if (!result.ok) return result;
 
       const updated = toMedia(result.data).find((asset) => asset.id === normalizedId);
+      const rawUpdated = updated ? result.data.find((record) => record.id === updated.id) : undefined;
+      if (rawUpdated) await mirrorPersonalRecord(rawUpdated);
       return updated
         ? { ok: true, data: updated }
         : failure("not_found", "The updated Media asset was missing from the response", {

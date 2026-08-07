@@ -15,7 +15,7 @@ import {
 } from "./FinancePrimitives";
 import styles from "./FinanceRules.module.css";
 
-const RULE_MUTATION_REASON = "A native FinanceRule repository, actor model, rule-run audit, and source-mutation policy are not connected.";
+const RULE_MUTATION_REASON = "Use the Finance action bar to create a persistent controlled rule. High-impact outcomes still require confirmation.";
 const SAVED_VIEW_REASON = "Saved-view persistence remains an open product decision. This filter state is already preserved in the URL.";
 
 const FILTERS: ReadonlyArray<{ id: FinanceFilter; label: string }> = [
@@ -135,7 +135,7 @@ function RuleRow({
         <span className={styles.mono}>{lastEventLabel(rule.lastEventAt)}</span>
         <span className={styles.secondaryCell}>
           <strong>{rule.nextAction}</strong>
-          <small>{rule.generatedCloseBlockers ? `${rule.generatedCloseBlockers} fixture blocker${rule.generatedCloseBlockers === 1 ? "" : "s"}` : "No fixture blocker"}</small>
+          <small>{rule.generatedCloseBlockers ? `${rule.generatedCloseBlockers} close suggestion${rule.generatedCloseBlockers === 1 ? "" : "s"}` : "No close suggestion"}</small>
         </span>
       </button>
     </li>
@@ -173,7 +173,7 @@ export default function FinanceRulesRouteView({
     { id: "budget", label: "Budget", value: counts.budget, detail: "variance flags" },
     { id: "savings", label: "Savings", value: counts.savings, detail: "confirm only" },
     { id: "imports", label: "Imports", value: counts.imports, detail: "mapping repair" },
-    { id: "close", label: "Close", value: counts.closeBlockersGenerated, detail: "fixture blockers" }
+    { id: "close", label: "Close", value: counts.closeBlockersGenerated, detail: "controlled suggestions" }
   ];
 
   return (
@@ -199,7 +199,7 @@ export default function FinanceRulesRouteView({
         )}
       />
 
-      <MetricStrip className={styles.metrics} ariaLabel="Rules fixture metrics" items={metrics} />
+      <MetricStrip className={styles.metrics} ariaLabel="Finance rule metrics" items={metrics} />
 
       <section className={styles.scopeBar} aria-label="Rule search and filters">
         <label className={styles.search}>
@@ -291,13 +291,13 @@ export default function FinanceRulesRouteView({
             className={styles.empty}
             variant="empty"
             title="No rules match this scope"
-            description="Clear the query or choose All to return to the complete approved-scenario fixture."
+            description="Clear the query or choose All to return to all current Finance rules."
             action={{
               label: "Clear scope",
               onSelect: () => {
                 onQueryChange("");
                 onFilterChange("");
-                onNotice("Rules scope reset to the complete fixture.");
+                onNotice("Rules scope reset to all current rules.");
               }
             }}
           />

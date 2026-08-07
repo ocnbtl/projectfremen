@@ -2,6 +2,7 @@
 
 import { buildJsonHeadersWithCsrf } from "../../client-csrf";
 import type { PersonalRecord } from "../../personal-records-store";
+import { mirrorPersonalRecord } from "../../local-first/domain-mirror";
 import type { MutationErrorCode } from "../../native-objects/mutation-result";
 import {
   legacyPersonalRecordsToPeople,
@@ -168,6 +169,8 @@ export function createPeopleRepository(options: PeopleRepositoryOptions = {}): P
 
       const people = legacyPersonalRecordsToPeople(result.data);
       const created = people.find((person) => person.fullName === input.fullName) || people[0];
+      const rawCreated = created ? result.data.find((record) => record.id === created.id) : undefined;
+      if (rawCreated) await mirrorPersonalRecord(rawCreated);
       return created
         ? { ok: true, data: created }
         : failure("unknown", "The created person was missing from the response");
@@ -182,6 +185,8 @@ export function createPeopleRepository(options: PeopleRepositoryOptions = {}): P
       if (!result.ok) return result;
 
       const updated = legacyPersonalRecordsToPeople(result.data).find((person) => person.id === id);
+      const rawUpdated = updated ? result.data.find((record) => record.id === updated.id) : undefined;
+      if (rawUpdated) await mirrorPersonalRecord(rawUpdated);
       return updated
         ? { ok: true, data: updated }
         : failure("not_found", "The updated person was missing from the response", { status: 404 });

@@ -5,7 +5,7 @@ import type {
   FinanceRuleHealth,
   FinanceRuleTestCase,
   FinanceRuleTestInput,
-  FinanceRulesFixtureDataset
+  FinanceRulesDataset
 } from "./types";
 
 export type FinanceRulesFilter =
@@ -75,7 +75,7 @@ export interface FinanceRuleTestResult {
 export interface FinanceRuleTestRun {
   readonly ruleId: string;
   readonly executedAt: string;
-  readonly executionMode: "deterministic_browser_preview";
+  readonly executionMode: "deterministic_browser_preview" | "deterministic_server";
   readonly results: readonly FinanceRuleTestResult[];
   readonly passed: number;
   readonly failed: number;
@@ -170,7 +170,7 @@ function lastEventValue(rule: FinanceRule): number {
 }
 
 export function buildFinanceRulesViewModel(
-  dataset: FinanceRulesFixtureDataset,
+  dataset: FinanceRulesDataset,
   input: FinanceRulesViewInput = {}
 ): FinanceRulesViewModel {
   const query = input.query?.trim().toLowerCase() ?? "";
@@ -268,7 +268,7 @@ function conditionMatches(condition: FinanceRuleCondition, input: FinanceRuleTes
   return comparable < condition.value;
 }
 
-function missingRequiredFields(rule: FinanceRule, testCase: FinanceRuleTestCase): string[] {
+function missingRequiredFields(rule: Pick<FinanceRule, "conditions">, testCase: FinanceRuleTestCase): string[] {
   return rule.conditions
     .filter((item) => item.required)
     .filter((item) => testCase.input[item.field] === undefined)
@@ -283,7 +283,7 @@ function sameActionSet(left: readonly string[], right: readonly string[]): boole
 }
 
 export function evaluateFinanceRuleTest(
-  rule: FinanceRule,
+  rule: Pick<FinanceRule, "conditions" | "actions">,
   testCase: FinanceRuleTestCase
 ): FinanceRuleTestResult {
   const missingFields = missingRequiredFields(rule, testCase);
@@ -311,17 +311,21 @@ export function evaluateFinanceRuleTest(
     explanation: passed
       ? triggered
         ? `${actualActionIds.length} expected preview action${actualActionIds.length === 1 ? "" : "s"} matched.`
-        : "The rule correctly stayed inactive for this fixture."
+        : "The rule correctly stayed inactive for this stored test case."
       : `Expected ${testCase.expectedActionIds.length} action${testCase.expectedActionIds.length === 1 ? "" : "s"}, previewed ${actualActionIds.length}.`
   };
 }
 
-export function runFinanceRuleTests(rule: FinanceRule, executedAt: string): FinanceRuleTestRun {
+export function runFinanceRuleTests(
+  rule: Pick<FinanceRule, "id" | "conditions" | "actions" | "tests">,
+  executedAt: string,
+  executionMode: FinanceRuleTestRun["executionMode"] = "deterministic_browser_preview"
+): FinanceRuleTestRun {
   const results = rule.tests.map((testCase) => evaluateFinanceRuleTest(rule, testCase));
   return {
     ruleId: rule.id,
     executedAt,
-    executionMode: "deterministic_browser_preview",
+    executionMode,
     results,
     passed: results.filter((result) => result.status === "pass").length,
     failed: results.filter((result) => result.status === "fail").length,

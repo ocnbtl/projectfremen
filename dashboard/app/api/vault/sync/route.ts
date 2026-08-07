@@ -1,0 +1,108 @@
+import { NextResponse } from "next/server";
+import { hasAdminSession } from "../../../../lib/admin-session";
+import { isCsrfRequestValid } from "../../../../lib/csrf";
+import { pullEncryptedChanges, pushEncryptedChanges } from "../../../../lib/local-first/relay-store";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const MAX_REQUEST_BYTES = 8 * 1024 * 1024;
+
+function requestError(message: string, status: number) {
+  return Object.assign(new Error(message), { status });
+}
+
+async function readBoundedJson(request: Request): Promise<Record<string, unknown>> {
+  if (!request.body) throw requestError("Request body must be an object", 400);
+  const reader = request.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let received = 0;
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      received += value.byteLength;
+      if (received > MAX_REQUEST_BYTES) {
+        await reader.cancel();
+        throw requestError("Encrypted sync batch exceeds 8 MB", 413);
+      }
+      chunks.push(value);
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  const bytes = new Uint8Array(received);
+  let offset = 0;
+  for (const chunk of chunks) {
+    bytes.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    throw requestError("Request body must contain valid JSON", 400);
+  }
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw requestError("Request body must be an object", 400);
+  }
+  return value as Record<string, unknown>;
+}
+
+function response(body: Record<string, unknown>, status = 200) {
+  return NextResponse.json(body, {
+    status,
+    headers: {
+      "Cache-Control": "no-store, private",
+      Date: new Date().toUTCString()
+    }
+  });
+}
+
+async function requireAdmin() {
+  return await hasAdminSession() ? null : response({ ok: false, error: "Unauthorized" }, 401);
+}
+
+function clientError(error: unknown) {
+  const message = error instanceof Error ? error.message : "Encrypted sync relay failed";
+  const requestedStatus = Number((error as { status?: unknown } | null)?.status);
+  if (Number.isSafeInteger(requestedStatus) && requestedStatus >= 400 && requestedStatus <= 599) {
+    return response(
+      { ok: false, error: requestedStatus >= 500 && requestedStatus !== 507 ? "Encrypted sync relay is unavailable" : message },
+      requestedStatus
+    );
+  }
+  const validation = /invalid|must|contain|belongs|duplicate|exceeds|cursor/i.test(message);
+  return response({ ok: false, error: validation ? message : "Encrypted sync relay is unavailable" }, validation ? 400 : 503);
+}
+
+export async function GET(request: Request) {
+  const accessError = await requireAdmin();
+  if (accessError) return accessError;
+  try {
+    const url = new URL(request.url);
+    const envelopes = await pullEncryptedChanges(
+      url.searchParams.get("vaultId"),
+      url.searchParams.get("since"),
+      url.searchParams.get("limit")
+    );
+    return response({ ok: true, envelopes, serverTime: new Date().toISOString() });
+  } catch (error) {
+    return clientError(error);
+  }
+}
+
+export async function POST(request: Request) {
+  const accessError = await requireAdmin();
+  if (accessError) return accessError;
+  if (!isCsrfRequestValid(request)) return response({ ok: false, error: "Invalid CSRF token" }, 403);
+  const contentLength = Number(request.headers.get("content-length") || 0);
+  if (contentLength > MAX_REQUEST_BYTES) return response({ ok: false, error: "Encrypted sync batch exceeds 8 MB" }, 413);
+  try {
+    const input = await readBoundedJson(request);
+    const acceptedChangeIds = await pushEncryptedChanges(input.vaultId, input.envelopes);
+    return response({ ok: true, acceptedChangeIds, serverTime: new Date().toISOString() });
+  } catch (error) {
+    return clientError(error);
+  }
+}

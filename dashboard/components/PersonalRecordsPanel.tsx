@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
+import { mirrorPersonalRecord } from "../lib/local-first/domain-mirror";
 import type { PersonalSystemDomain } from "../lib/personal-systems";
 import type {
   PersonalRecord,
@@ -493,6 +494,10 @@ export default function PersonalRecordsPanel({
       return;
     }
 
+    const createdRecord = payload.items
+      .filter((record) => record.title === title.trim() && record.className === className)
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
+    if (createdRecord) await mirrorPersonalRecord(createdRecord);
     setRecords(payload.items);
     setTitle("");
     setClassName("note");
@@ -538,6 +543,8 @@ export default function PersonalRecordsPanel({
       setError(payload.error || "Failed to update note");
       return;
     }
+    const updatedRecord = payload.items.find((record) => record.id === id);
+    if (updatedRecord) await mirrorPersonalRecord(updatedRecord);
     setRecords(payload.items);
   }
 

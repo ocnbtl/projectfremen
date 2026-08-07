@@ -25,7 +25,7 @@ import {
 } from "./FinancePrimitives";
 import styles from "./FinanceOperational.module.css";
 
-const WRITE_REASON = "This Finance Monthly Review is a read-only fixture. Checklist writes, evidence links, carry-forward, and close audit are not connected.";
+const WRITE_REASON = "Use the Finance action bar to resolve the selected check with evidence, a reasoned waiver, or a canonical carry-forward owner.";
 
 function closeDecisionSource(item: { id: string; label: string }) {
   return createNativeObjectRef({
@@ -70,8 +70,8 @@ export default function FinanceMonthlyReviewView({
     ? getLinkedDecisions(decisions, selectedDecisionSource)
     : [];
   const closeReason = overallOpen > 0
-    ? `Complete Close is unavailable: ${overallOpen} literal checklist item${overallOpen === 1 ? " remains" : "s remain"} open, and close persistence and reopen policy are not connected.`
-    : "Complete Close is unavailable because close persistence, audit, and reopen policy are not connected.";
+    ? `Complete Close remains blocked while ${overallOpen} required checklist item${overallOpen === 1 ? " is" : "s are"} open.`
+    : "Use the Finance action bar to complete the audited close.";
 
   return (
     <>
@@ -82,7 +82,7 @@ export default function FinanceMonthlyReviewView({
           <>
             <HeaderAction icon="Link" onClick={onOpenReviews}>Open Reviews</HeaderAction>
             <HeaderAction icon="Filter" onClick={onOpenFilterPreview}>More filters</HeaderAction>
-            <HeaderAction icon="Check" primary disabled title={closeReason}>Complete Close</HeaderAction>
+            <HeaderAction icon="Check" primary disabled title={closeReason}>Close gate</HeaderAction>
           </>
         )}
       />
@@ -92,9 +92,9 @@ export default function FinanceMonthlyReviewView({
         ariaLabel="Monthly close literal metrics"
         items={[
           { id: "complete", label: "Complete", value: overallComplete, detail: `${model.sourceCount} literal checklist items`, tone: "positive" },
-          { id: "open", label: "Open", value: overallOpen, detail: "Each open item blocks fixture close", tone: overallOpen ? "attention" : "default" },
+          { id: "open", label: "Open", value: overallOpen, detail: "Each required open item blocks close", tone: overallOpen ? "attention" : "default" },
           { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.visibleCompletion.complete} complete · ${model.visibleCompletion.open} open in current scope` },
-          { id: "actual-savings", label: "Actual snapshot movement", value: money(model.savings.actualSnapshotMovement.amount, { sign: true, cents: true }), detail: "Fixture snapshot; transfer proof not connected", tone: "positive" },
+          { id: "actual-savings", label: "Actual savings movement", value: money(model.savings.actualSnapshotMovement.amount, { sign: true, cents: true }), detail: "Native first-class movement facts", tone: "positive" },
           { id: "proposal", label: "Savings proposals", value: model.savings.proposalReminders.rows.length, detail: "Reminder candidates; not persisted movement" },
           { id: "readiness", label: "Readiness score", value: "Not calculated", detail: "No approved weighted formula" }
         ]}
@@ -108,7 +108,7 @@ export default function FinanceMonthlyReviewView({
             aria-label="Search close checklist"
             value={model.query}
             onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search close checklist labels or fixture IDs"
+            placeholder="Search close checklist labels or IDs"
           />
         </label>
         <div className={styles.filterGroup} role="group" aria-label="Monthly review filters">
@@ -125,7 +125,7 @@ export default function FinanceMonthlyReviewView({
             onChange={(event) => onSortChange(event.target.value as FinanceSort)}
           >
             <option value="open-first">Open first</option>
-            <option value="source-order">Fixture order</option>
+            <option value="source-order">Checklist order</option>
             <option value="label-asc">Label A–Z</option>
           </select>
         </label>
@@ -181,7 +181,7 @@ export default function FinanceMonthlyReviewView({
               <div className={styles.compactRow}>
                 <span>
                   <strong>Actual snapshot movement</strong>
-                  <small>Fixture month-saved value; source and destination proof are not connected</small>
+                  <small>Current first-class movement total for the selected close period</small>
                 </span>
                 <span className={`${styles.evidenceValue} ${styles.positive}`}>{money(model.savings.actualSnapshotMovement.amount, { sign: true, cents: true })}</span>
               </div>
@@ -206,7 +206,7 @@ export default function FinanceMonthlyReviewView({
               ))}
             </ul>
             {model.savings.proposalReminders.rows.length === 0 ? (
-              <SystemState variant="empty" compact title="No savings proposal reminders in this fixture" />
+              <SystemState variant="empty" compact title="No savings proposal reminders" />
             ) : null}
           </Panel>
 
@@ -214,12 +214,12 @@ export default function FinanceMonthlyReviewView({
             <div className="finance-panel-heading"><h2>Close boundary</h2></div>
             <div className={styles.compactList}>
               <div className={styles.compactRow}>
-                <span><strong>Literal blockers</strong><small>Incomplete fixture checklist items; no weighted readiness formula</small></span>
+                <span><strong>Required blockers</strong><small>Open named checklist items; no decorative readiness percentage</small></span>
                 <span className={styles.evidenceValue}>{overallOpen}</span>
               </div>
               <div className={styles.compactRow}>
                 <span><strong>Close persistence</strong><small>Completion, audit, carry-forward, and reopen behavior remain unresolved</small></span>
-                <Chip hue="brown">Not connected</Chip>
+                <Chip hue={overallOpen ? "yellow" : "green"}>{overallOpen ? "Open" : "Resolved"}</Chip>
               </div>
             </div>
           </Panel>

@@ -227,7 +227,7 @@ export interface HeaderActionProps {
   readonly disabled?: boolean;
   /** A concise unavailable reason. It is visible as a tooltip and announced through aria-describedby. */
   readonly title?: string;
-  /** Optionally associates the action with an existing visible explanation, such as FixtureDatasetNotice. */
+  /** Optionally associates the action with an existing visible explanation. */
   readonly reasonId?: string;
 }
 
@@ -426,30 +426,5 @@ export function CashflowChart({ cashflow, summary, compact = false, ariaLabel }:
       </svg>
       <p id={descriptionId} className="sr-only">{summary}</p>
     </div>
-  );
-}
-
-export interface FixtureDatasetNoticeProps {
-  readonly previewLabel: string;
-  readonly reason: string;
-  readonly id?: string;
-  readonly statusLabel?: string;
-}
-
-export function FixtureDatasetNotice({
-  previewLabel,
-  reason,
-  id = "finance-preview-status",
-  statusLabel = "NOT CONNECTED"
-}: FixtureDatasetNoticeProps) {
-  return (
-    <section id={id} className="finance-dataset-notice" aria-label="Finance data source status">
-      <IconTile hue="brown" icon="Wallet" />
-      <div>
-        <strong>{previewLabel}</strong>
-        <span>{reason}</span>
-      </div>
-      <Chip hue="brown" dot>{statusLabel}</Chip>
-    </section>
   );
 }

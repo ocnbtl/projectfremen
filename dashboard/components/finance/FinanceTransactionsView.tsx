@@ -1,7 +1,6 @@
 "use client";
 
 import MetricStrip from "../operational/MetricStrip";
-import QuickActionBar from "../operational/QuickActionBar";
 import SystemState from "../operational/SystemState";
 import type { FinanceFilter, FinanceSort } from "../../lib/native-objects/url-state";
 import type { FinanceTransactionsViewModel } from "../../lib/modules/finance/transactions-view-model";
@@ -14,8 +13,6 @@ import {
   money
 } from "./FinancePrimitives";
 import styles from "./FinanceOperational.module.css";
-
-const PREVIEW_REASON = "This Finance dataset is a read-only fixture. Persistent transaction writes, reconciliation, evidence attachment, and saved views are not connected.";
 
 export type FinanceTransactionsViewProps = {
   model: FinanceTransactionsViewModel;
@@ -55,13 +52,11 @@ export default function FinanceTransactionsView({
     <>
       <WorkspaceHeader
         title="Transactions"
-        subtitle="Search, classify, and inspect money movement without changing fixture records"
+        subtitle="Search, classify, reconcile, and inspect persistent money movement"
         actions={(
           <>
             <HeaderAction icon="Filter" onClick={onOpenFilterPreview}>Filter</HeaderAction>
             <HeaderAction icon="Sliders" onClick={onOpenColumnsPreview}>Columns</HeaderAction>
-            <HeaderAction icon="Check" disabled title={PREVIEW_REASON} reasonId="finance-preview-status">Reconcile</HeaderAction>
-            <HeaderAction icon="Plus" primary disabled title={PREVIEW_REASON} reasonId="finance-preview-status">Record</HeaderAction>
           </>
         )}
       />
@@ -70,7 +65,7 @@ export default function FinanceTransactionsView({
         className={styles.metrics}
         ariaLabel="Transaction scope metrics"
         items={[
-          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.sourceCount} fixture records` },
+          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.sourceCount} native records` },
           { id: "income", label: "Income", value: money(model.totals.income, { cents: true }), detail: `${model.counts.income} classified`, tone: "positive" },
           { id: "spending", label: "Spending", value: money(model.totals.spending, { cents: true }), detail: `${model.counts.expense} classified` },
           { id: "pending", label: "Pending", value: model.counts.pending, detail: "Needs review", tone: model.counts.pending ? "attention" : "default" },
@@ -128,18 +123,6 @@ export default function FinanceTransactionsView({
           )}
         </div>
 
-        {checkedIds.size > 0 && (
-          <QuickActionBar
-            ariaLabel="Transaction batch actions"
-            actions={[
-              { id: "finance-tx-batch-reconcile", label: "Reconcile", disabled: true, disabledReason: PREVIEW_REASON },
-              { id: "finance-tx-batch-categorize", label: "Categorize", disabled: true, disabledReason: PREVIEW_REASON },
-              { id: "finance-tx-batch-receipt", label: "Attach receipt", disabled: true, disabledReason: PREVIEW_REASON },
-              { id: "finance-tx-batch-export", label: "Export", disabled: true, disabledReason: "No stable Finance export contract is connected." }
-            ]}
-          />
-        )}
-
         <div className={styles.columnHeader} aria-hidden="true">
           <span />
           <div className={styles.columnHeaderBody}>
@@ -177,7 +160,7 @@ export default function FinanceTransactionsView({
                 >
                   <span className={styles.secondaryCell}><strong>{transaction.date}</strong><span>{transaction.weekdayName} · W{transaction.week}</span></span>
                   <span className={styles.primaryCell}><strong>{transaction.merchant}</strong><span>{transaction.entity}</span></span>
-                  <span className={styles.secondaryCell}><strong>{transaction.id}</strong><span>{transaction.ufInit ? "fixture source" : "manual"}</span></span>
+                  <span className={styles.secondaryCell}><strong>{transaction.id}</strong><span>{transaction.ufInit ? "reviewed" : "needs review"}</span></span>
                   <span className={styles.secondaryCell}><strong>{transaction.account}</strong><span>{transaction.accountType}</span></span>
                   <span><Chip hue={transaction.hue}>{transaction.category}</Chip></span>
                   <span><Chip hue={statusTone(transaction.status)}>{transaction.status}</Chip></span>
@@ -193,7 +176,7 @@ export default function FinanceTransactionsView({
             variant="empty"
             className={styles.empty}
             title="No transactions match this scope"
-            description="Clear the search or return to All. No fixture record was changed."
+            description="Clear the search or return to All. Filter changes never mutate records."
             action={{ label: "Clear filters", onSelect: () => { onQueryChange(""); onFilterChange(""); } }}
           />
         )}

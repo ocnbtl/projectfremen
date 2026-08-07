@@ -92,6 +92,11 @@ export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
     label: "Finance",
     href: "/admin/finance",
     description: "Cash flow and review prep"
+  },
+  {
+    label: "Vault",
+    href: "/vault",
+    description: "Encrypted local-first storage and sync"
   }
 ];
 

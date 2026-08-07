@@ -1,4 +1,4 @@
-import type { FinanceBudget, FinanceFixtureDataset } from "./types";
+import type { FinanceBudget, FinanceDataset } from "./types";
 
 export type FinanceBudgetsFilter = "all" | "over-budget" | "at-or-under-budget";
 export type FinanceBudgetsSort =
@@ -20,7 +20,7 @@ export interface FinanceBudgetRowViewModel {
   readonly remaining: number;
   /** Exact ratio for display formatting; null when the cap is zero. */
   readonly usedPercent: number | null;
-  /** No approved fixture forecast formula exists. */
+  /** No approved forecast formula exists. */
   readonly forecast: null;
 }
 
@@ -92,7 +92,7 @@ function literalUtilization(row: FinanceBudgetRowViewModel): number {
 }
 
 export function buildFinanceBudgetsViewModel(
-  dataset: FinanceFixtureDataset,
+  dataset: FinanceDataset,
   input: FinanceBudgetsViewInput = {}
 ): FinanceBudgetsViewModel {
   const query = input.query?.trim().toLowerCase() ?? "";

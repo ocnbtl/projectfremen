@@ -1,5 +1,5 @@
 import type {
-  FinanceFixtureDataset,
+  FinanceDataset,
   FinanceReminder,
   FinanceReviewItem
 } from "./types";
@@ -17,9 +17,9 @@ export interface FinanceMonthlyReviewViewInput {
 export interface FinanceCloseChecklistRowViewModel {
   readonly item: FinanceReviewItem;
   readonly isComplete: boolean;
-  /** The fixture has only a literal done flag; it has no required/optional field. */
+  /** The compatibility row exposes a literal resolution flag; required state is read from the native close. */
   readonly isLiteralBlocker: boolean;
-  readonly blockerBasis: "incomplete-fixture-checklist-item" | null;
+  readonly blockerBasis: "incomplete-native-checklist-item" | null;
 }
 
 export interface FinanceMonthlyReviewViewModel {
@@ -31,7 +31,7 @@ export interface FinanceMonthlyReviewViewModel {
   readonly rows: readonly FinanceCloseChecklistRowViewModel[];
   readonly selectedId: string | null;
   readonly selected: FinanceCloseChecklistRowViewModel | null;
-  readonly selectionBasis: "requested-visible-id" | "first-open-in-fixture-order" | "first-visible-in-fixture-order" | null;
+  readonly selectionBasis: "requested-visible-id" | "first-open" | "first-visible" | null;
   /** Completion is a literal count, not a weighted readiness score. */
   readonly completion: {
     readonly complete: number;
@@ -51,10 +51,10 @@ export interface FinanceMonthlyReviewViewModel {
   readonly savings: {
     readonly actualSnapshotMovement: {
       readonly amount: number;
-      readonly source: "fixture-snapshot-month-saved";
+      readonly source: "native-savings-movement";
     };
     readonly proposalReminders: {
-      readonly source: "fixture-reminder-text-match";
+      readonly source: "native-reminder-text-match";
       readonly persistedMovement: false;
       readonly rows: readonly FinanceReminder[];
     };
@@ -79,7 +79,7 @@ function toRow(item: FinanceReviewItem): FinanceCloseChecklistRowViewModel {
     item,
     isComplete: item.done,
     isLiteralBlocker: !item.done,
-    blockerBasis: item.done ? null : "incomplete-fixture-checklist-item"
+    blockerBasis: item.done ? null : "incomplete-native-checklist-item"
   };
 }
 
@@ -97,7 +97,7 @@ function isSavingsProposalReminder(reminder: FinanceReminder): boolean {
 }
 
 export function buildFinanceMonthlyReviewViewModel(
-  dataset: FinanceFixtureDataset,
+  dataset: FinanceDataset,
   input: FinanceMonthlyReviewViewInput = {}
 ): FinanceMonthlyReviewViewModel {
   const query = input.query?.trim().toLowerCase() ?? "";
@@ -150,9 +150,9 @@ export function buildFinanceMonthlyReviewViewModel(
       : hasRequestedSelection
         ? null
         : openSelection
-        ? "first-open-in-fixture-order"
+        ? "first-open"
         : firstSourceSelection
-          ? "first-visible-in-fixture-order"
+          ? "first-visible"
           : null,
     completion: {
       complete: overallComplete,
@@ -172,10 +172,10 @@ export function buildFinanceMonthlyReviewViewModel(
     savings: {
       actualSnapshotMovement: {
         amount: dataset.snapshot.monthSaved,
-        source: "fixture-snapshot-month-saved"
+        source: "native-savings-movement"
       },
       proposalReminders: {
-        source: "fixture-reminder-text-match",
+        source: "native-reminder-text-match",
         persistedMovement: false,
         rows: dataset.reminders.filter(isSavingsProposalReminder)
       }

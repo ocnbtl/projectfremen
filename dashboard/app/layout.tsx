@@ -6,6 +6,7 @@ import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/inconsolata/wght.css";
 import "./globals.css";
 import "./figma-transfer.css";
+import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
 
 export const metadata: Metadata = {
   applicationName: "Unigentamos",
@@ -42,6 +43,7 @@ export default function RootLayout({
     <html lang="en" data-scroll-behavior="smooth">
       <body>
         {children}
+        <ServiceWorkerRegistration />
         {process.env.VERCEL === "1" ? <Analytics /> : null}
       </body>
     </html>

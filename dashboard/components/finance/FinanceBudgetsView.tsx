@@ -1,7 +1,6 @@
 "use client";
 
 import MetricStrip from "../operational/MetricStrip";
-import QuickActionBar from "../operational/QuickActionBar";
 import SystemState from "../operational/SystemState";
 import type { FinanceBudgetsViewModel } from "../../lib/modules/finance/budgets-view-model";
 import type { FinanceFilter, FinanceSort } from "../../lib/native-objects/url-state";
@@ -18,7 +17,6 @@ import {
 } from "./FinancePrimitives";
 import styles from "./FinanceOperational.module.css";
 
-const MUTATION_REASON = "This Finance dataset is a read-only fixture. Budget caps, allocations, period resets, and persistent categories are not connected.";
 const FORECAST_REASON = "Forecasting is unavailable because no approved Finance forecast formula or durable forecast source is connected.";
 
 export type FinanceBudgetsViewProps = {
@@ -52,7 +50,6 @@ export default function FinanceBudgetsView({
   onOpenPeriodPreview
 }: FinanceBudgetsViewProps) {
   const displayedSort = model.sort;
-  const selectedBudget = model.selected?.budget ?? null;
 
   return (
     <>
@@ -63,7 +60,6 @@ export default function FinanceBudgetsView({
           <>
             <HeaderAction icon="Calendar" onClick={onOpenPeriodPreview}>Period preview</HeaderAction>
             <HeaderAction icon="Filter" onClick={onOpenFilterPreview}>More filters</HeaderAction>
-            <HeaderAction icon="Plus" primary disabled title={MUTATION_REASON} reasonId="finance-preview-status">New category</HeaderAction>
           </>
         )}
       />
@@ -72,8 +68,8 @@ export default function FinanceBudgetsView({
         className={styles.metrics}
         ariaLabel="Budget scope metrics"
         items={[
-          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.sourceCount} fixture categories` },
-          { id: "spent", label: "Spent", value: money(model.totals.spent, { cents: true }), detail: "Visible fixture spend" },
+          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.sourceCount} native categories` },
+          { id: "spent", label: "Spent", value: money(model.totals.spent, { cents: true }), detail: "Derived current spending" },
           { id: "cap", label: "Cap", value: money(model.totals.limit, { cents: true }), detail: "Visible literal caps" },
           { id: "remaining", label: "Remaining", value: money(model.totals.remaining, { cents: true }), detail: `${percent(model.totals.usedPercent)} used`, tone: model.totals.remaining < 0 ? "danger" : "positive" },
           { id: "over", label: "Over cap", value: model.counts.overBudget, detail: `${model.counts.atOrUnderBudget} at or under`, tone: model.counts.overBudget ? "danger" : "default" },
@@ -177,18 +173,6 @@ export default function FinanceBudgetsView({
         />
       )}
 
-      {selectedBudget && (
-        <QuickActionBar
-          ariaLabel={`Actions for ${selectedBudget.category}`}
-          label={<span>Selected: <strong>{selectedBudget.category}</strong></span>}
-          actions={[
-            { id: "finance-budget-cap", label: "Edit cap", intent: "primary", disabled: true, disabledReason: MUTATION_REASON },
-            { id: "finance-budget-allocate", label: "Allocate", disabled: true, disabledReason: MUTATION_REASON },
-            { id: "finance-budget-reset", label: "Reset period", disabled: true, disabledReason: MUTATION_REASON },
-            { id: "finance-budget-forecast", label: "Run forecast", disabled: true, disabledReason: FORECAST_REASON }
-          ]}
-        />
-      )}
     </>
   );
 }

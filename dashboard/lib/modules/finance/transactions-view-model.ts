@@ -1,6 +1,6 @@
 import type {
   FinanceAccount,
-  FinanceFixtureDataset,
+  FinanceDataset,
   FinanceTransaction,
   FinanceTransactionDirection
 } from "./types";
@@ -30,10 +30,9 @@ export interface FinanceTransactionsViewInput {
   readonly selectedId?: string;
 }
 
-export interface FinanceTransactionAccountFixtureMatch {
-  /** Equality is against a fixture display name, not an account reference ID. */
-  readonly matchBasis: "fixture-display-name";
-  readonly durableLink: false;
+export interface FinanceTransactionAccountMatch {
+  readonly matchBasis: "native-account-id" | "legacy-display-name";
+  readonly durableLink: boolean;
   readonly transactionAccountDisplayName: string;
   readonly account: FinanceAccount | null;
 }
@@ -47,8 +46,8 @@ export interface FinanceTransactionsViewModel {
   readonly rows: readonly FinanceTransaction[];
   readonly selectedId: string | null;
   readonly selected: FinanceTransaction | null;
-  readonly selectedAccountFixtureMatch: FinanceTransactionAccountFixtureMatch | null;
-  readonly selectionBasis: "requested-visible-id" | "first-pending-in-fixture-order" | "first-visible-in-fixture-order" | null;
+  readonly selectedAccountMatch: FinanceTransactionAccountMatch | null;
+  readonly selectionBasis: "requested-visible-id" | "first-pending" | "first-visible" | null;
   readonly counts: {
     readonly pending: number;
     readonly cleared: number;
@@ -142,7 +141,7 @@ function sumDirection(
 }
 
 export function buildFinanceTransactionsViewModel(
-  dataset: FinanceFixtureDataset,
+  dataset: FinanceDataset,
   input: FinanceTransactionsViewInput = {}
 ): FinanceTransactionsViewModel {
   const query = input.query?.trim().toLowerCase() ?? "";
@@ -185,16 +184,16 @@ export function buildFinanceTransactionsViewModel(
     : hasRequestedSelection
       ? null
       : pendingSelection
-      ? "first-pending-in-fixture-order" as const
+      ? "first-pending" as const
       : firstSourceSelection
-        ? "first-visible-in-fixture-order" as const
+        ? "first-visible" as const
         : null;
-  const selectedAccountFixtureMatch = selected
+  const selectedAccountMatch = selected
     ? {
-        matchBasis: "fixture-display-name" as const,
-        durableLink: false as const,
+        matchBasis: selected.accountId ? "native-account-id" as const : "legacy-display-name" as const,
+        durableLink: Boolean(selected.accountId),
         transactionAccountDisplayName: selected.account,
-        account: dataset.accounts.find((account) => account.name === selected.account) ?? null
+        account: dataset.accounts.find((account) => selected.accountId ? account.id === selected.accountId : account.name === selected.account) ?? null
       }
     : null;
 
@@ -207,7 +206,7 @@ export function buildFinanceTransactionsViewModel(
     rows,
     selectedId: selected?.id ?? null,
     selected,
-    selectedAccountFixtureMatch,
+    selectedAccountMatch,
     selectionBasis,
     counts: {
       pending: rows.filter((transaction) => transaction.status === "pending").length,

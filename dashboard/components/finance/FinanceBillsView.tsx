@@ -1,7 +1,6 @@
 "use client";
 
 import MetricStrip from "../operational/MetricStrip";
-import QuickActionBar from "../operational/QuickActionBar";
 import SystemState from "../operational/SystemState";
 import type { FinanceBillsViewModel } from "../../lib/modules/finance/bills-view-model";
 import type { FinanceBillStatus, FinanceHue } from "../../lib/modules/finance/types";
@@ -18,8 +17,6 @@ import {
   money
 } from "./FinancePrimitives";
 import styles from "./FinanceOperational.module.css";
-
-const MUTATION_REASON = "This Finance dataset is a read-only fixture. Bill payments, schedule changes, autopay changes, and persistent bill records are not connected.";
 
 export type FinanceBillsViewProps = {
   model: FinanceBillsViewModel;
@@ -69,18 +66,16 @@ export default function FinanceBillsView({
   onOpenPaymentPreview
 }: FinanceBillsViewProps) {
   const displayedSort = model.sort;
-  const selectedBill = model.selected?.bill ?? null;
 
   return (
     <>
       <WorkspaceHeader
         title="Bills & Subscriptions"
-        subtitle="Payment timing, recurring value, and autopay evidence kept as separate fixture facts"
+        subtitle="Persistent obligations, timing, recurrence, and evidence-gated observed payments"
         actions={(
           <>
             <HeaderAction icon="Filter" onClick={onOpenFilterPreview}>More filters</HeaderAction>
-            <HeaderAction icon="Send" onClick={onOpenPaymentPreview}>Payment preview</HeaderAction>
-            <HeaderAction icon="Plus" primary disabled title={MUTATION_REASON} reasonId="finance-preview-status">Add bill</HeaderAction>
+            <HeaderAction icon="Send" onClick={onOpenPaymentPreview}>Payment boundary</HeaderAction>
           </>
         )}
       />
@@ -89,7 +84,7 @@ export default function FinanceBillsView({
         className={styles.metrics}
         ariaLabel="Bill scope metrics"
         items={[
-          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.sourceCount} fixture obligations` },
+          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.sourceCount} native obligations` },
           { id: "urgent", label: "Due / overdue", value: model.counts.due + model.counts.overdue, detail: `${model.counts.overdue} overdue`, tone: model.counts.overdue ? "danger" : "default" },
           { id: "week", label: "Due this week", value: model.counts.dueThisWeek, detail: "Literal due-date window", tone: model.counts.dueThisWeek ? "attention" : "default" },
           { id: "recurring", label: "Monthly recurring", value: money(model.totals.monthlyRecurring, { cents: true }), detail: `${model.counts.recurring} recurring rows` },
@@ -189,24 +184,12 @@ export default function FinanceBillsView({
             variant="empty"
             className={styles.empty}
             title="No bills match this scope"
-            description="Clear the search or return to All. No fixture obligation was changed."
+            description="Clear the search or return to All. Filtering never changes an obligation."
             action={{ label: "Clear filters", onSelect: () => { onQueryChange(""); onFilterChange(""); } }}
           />
         )}
       </Panel>
 
-      {selectedBill && (
-        <QuickActionBar
-          ariaLabel={`Actions for ${selectedBill.name}`}
-          label={<span>Selected: <strong>{selectedBill.name}</strong></span>}
-          actions={[
-            { id: "finance-bill-pay", label: "Record payment", intent: "primary", disabled: true, disabledReason: MUTATION_REASON },
-            { id: "finance-bill-paid", label: "Mark paid", disabled: true, disabledReason: MUTATION_REASON },
-            { id: "finance-bill-schedule", label: "Edit schedule", disabled: true, disabledReason: MUTATION_REASON },
-            { id: "finance-bill-autopay", label: "Change autopay", disabled: true, disabledReason: MUTATION_REASON }
-          ]}
-        />
-      )}
     </>
   );
 }

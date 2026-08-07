@@ -73,11 +73,11 @@ export default function FinanceRulesInspector({
 }) {
   const safeTab = isFinanceRuleTab(activeTab) ? activeTab : "overview";
   const facts: ReadonlyArray<readonly [string, string]> = [
-    ["Status", rule.enabled ? "Active fixture" : rule.mode === "draft" ? "Draft fixture" : "Disabled fixture"],
+    ["Status", rule.enabled ? "Active" : rule.mode === "draft" ? "Draft" : "Disabled"],
     ["Rule type", rule.type.replaceAll("_", " ")],
     ["Mode", financeRuleModeLabel(rule.mode)],
-    ["Fixture tests", String(rule.tests.length)],
-    ["Fixture blockers", String(rule.generatedCloseBlockers)],
+    ["Deterministic tests", String(rule.tests.length)],
+    ["Close suggestions", String(rule.generatedCloseBlockers)],
     ["Linked references", String(rule.linkedObjects.length)],
     ["Health", financeRuleHealthLabel(rule.health)],
     ["Owner", "Finance"]
@@ -90,7 +90,7 @@ export default function FinanceRulesInspector({
         <ObjectHeader
           headingLevel="h2"
           className={styles.inspectorHeader}
-          objectType="Selected Finance rule fixture"
+          objectType="Selected Finance rule"
           title={rule.name}
           subtitle={`${rule.id} · ${rule.scope}`}
           identity={initials(rule.name)}
@@ -102,7 +102,7 @@ export default function FinanceRulesInspector({
               {rule.requiresApproval ? <Chip hue="crimson">Requires approval</Chip> : null}
             </>
           )}
-          metadata={`${rule.conditions.length} conditions · ${rule.actions.length} actions · ${rule.tests.length} fixture tests`}
+          metadata={`${rule.conditions.length} conditions · ${rule.actions.length} actions · ${rule.tests.length} deterministic tests`}
         />
       )}
       actions={<button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance rule inspector"><Icon name="X" /></button>}
@@ -163,8 +163,8 @@ export default function FinanceRulesInspector({
             <p><strong>Failure mode:</strong> {rule.failureMode}</p>
           </section>
           <div className={styles.boundary}>
-            <strong>Read-only deterministic preview</strong>
-            <span>Tests run only against literal browser fixtures. They create no rule run, blocker, decision, evidence request, transaction change, or audit event.</span>
+            <strong>Deterministic evaluation · confirmation required</strong>
+            <span>Tests evaluate stored cases without changing source records. The result is written to the Finance audit; suggested high-impact outcomes remain unconfirmed.</span>
           </div>
         </DetailTabPanel>
 
@@ -204,7 +204,7 @@ export default function FinanceRulesInspector({
         <DetailTabPanel tabsId="finance-rule-tabs" tabId="tests" active={safeTab === "tests"} className={styles.inspectorPanel}>
           <section className={styles.inspectorSection}>
             <div className={styles.testSummary}>
-              <h3>Deterministic fixture tests</h3>
+              <h3>Deterministic rule tests</h3>
               <button type="button" className={styles.testButton} onClick={onRunTests}>Run tests</button>
             </div>
             {run ? (
@@ -218,7 +218,7 @@ export default function FinanceRulesInspector({
                 <p>Ran {formatTimestamp(run.executedAt)} in deterministic browser-preview mode.</p>
               </>
             ) : (
-              <p>Run the selected fixture cases to compare expected actions with the condition engine. No request leaves the browser.</p>
+              <p>Run the stored cases to compare expected actions with the condition engine. Finance saves only the test outcome and audit event.</p>
             )}
             <ul className={styles.compactList}>
               {rule.tests.map((testCase) => {
@@ -248,7 +248,7 @@ export default function FinanceRulesInspector({
           {rule.linkedObjects.length ? (
             <section className={`${styles.inspectorSection} ${styles.linkList}`}>
               <h3>Verified owner-route references</h3>
-              <p>Opening a reference preserves native ownership; the rule fixture does not copy the target object.</p>
+              <p>Opening a reference preserves native ownership; the Finance rule never copies the target object.</p>
               {rule.linkedObjects.map((reference) => (
                 <Link href={reference.route} key={`${reference.module}:${reference.objectType}:${reference.objectId}`}>
                   <strong>{reference.label}</strong>
@@ -257,13 +257,13 @@ export default function FinanceRulesInspector({
               ))}
             </section>
           ) : (
-            <SystemState variant="empty" title="No stable fixture references" description="No link is inferred from display text alone. Future links must use NativeObjectRef identities." />
+            <SystemState variant="empty" title="No canonical references" description="No link is inferred from display text alone. Links use NativeObjectRef identities." />
           )}
         </DetailTabPanel>
 
         <DetailTabPanel tabsId="finance-rule-tabs" tabId="activity" active={safeTab === "activity"} className={styles.inspectorPanel}>
           <section className={styles.inspectorSection}>
-            <h3>Fixture provenance</h3>
+            <h3>Rule provenance</h3>
             <ul className={styles.compactList}>
               {rule.activity.map((item) => (
                 <li key={item.id}>
@@ -279,7 +279,7 @@ export default function FinanceRulesInspector({
               ) : null}
             </ul>
           </section>
-          <SystemState variant="read_only" title="No authoritative FinanceRule audit exists" description="Fixture provenance and session-only test results are deliberately separate from a future append-only rule audit." />
+          <SystemState variant="read_only" title="FinanceRule audit connected" description="This history view is read-only. Creates, edits, enablement, test outcomes, archive, and restore retain append-only Finance audit events." />
         </DetailTabPanel>
 
         <DetailTabPanel tabsId="finance-rule-tabs" tabId="properties" active={safeTab === "properties"}>
@@ -290,13 +290,13 @@ export default function FinanceRulesInspector({
             <div><span>Scope</span><strong>{rule.scope}</strong></div>
             <div><span>Mode</span><strong>{rule.mode}</strong></div>
             <div><span>Health</span><strong>{rule.health}</strong></div>
-            <div><span>Enabled fixture</span><strong>{rule.enabled ? "true" : "false"}</strong></div>
+            <div><span>Enabled</span><strong>{rule.enabled ? "true" : "false"}</strong></div>
             <div><span>Approval required</span><strong>{rule.requiresApproval ? "true" : "false"}</strong></div>
             <div><span>Condition count</span><strong>{rule.conditions.length}</strong></div>
             <div><span>Action count</span><strong>{rule.actions.length}</strong></div>
             <div><span>Test count</span><strong>{rule.tests.length}</strong></div>
-            <div><span>Last fixture event</span><strong>{formatTimestamp(rule.lastEventAt)}</strong></div>
-            <div><span>Persistence</span><strong>Not connected</strong></div>
+            <div><span>Last event</span><strong>{formatTimestamp(rule.lastEventAt)}</strong></div>
+            <div><span>Persistence</span><strong>Native Finance store</strong></div>
             <div><span>Execution mode</span><strong>Browser preview only</strong></div>
           </div>
         </DetailTabPanel>

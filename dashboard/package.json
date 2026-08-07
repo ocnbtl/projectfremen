@@ -8,6 +8,8 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "test:vault": "node ./scripts/local-first-harness.mjs",
+    "test:vault-browser": "node ./scripts/vault-browser-harness.mjs",
     "regress": "node ./scripts/regression-harness.mjs"
   },
   "dependencies": {
