@@ -1,8 +1,20 @@
-const CACHE_VERSION = "unigentamos-static-v3";
-const PUBLIC_SHELL = ["/vault", "/offline", "/unigentamos-logo.svg"];
+const CACHE_VERSION = "unigentamos-static-v4";
+const PUBLIC_SHELL = ["/offline", "/unigentamos-logo.svg"];
+
+async function installOfflineShell() {
+  const cache = await caches.open(CACHE_VERSION);
+  await cache.addAll(PUBLIC_SHELL);
+  const response = await fetch("/vault", { cache: "reload" });
+  if (!response.ok) throw new Error("Vault shell could not be cached");
+  await cache.put("/vault", response.clone());
+  const html = await response.text();
+  const assets = new Set();
+  for (const match of html.matchAll(/(?:src|href)=["'](\/_next\/static\/[^"']+)["']/g)) assets.add(match[1]);
+  await Promise.all([...assets].map((asset) => cache.add(asset).catch(() => undefined)));
+}
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE_VERSION).then((cache) => cache.addAll(PUBLIC_SHELL)));
+  event.waitUntil(installOfflineShell());
   self.skipWaiting();
 });
 

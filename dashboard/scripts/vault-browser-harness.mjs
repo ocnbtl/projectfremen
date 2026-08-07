@@ -75,26 +75,92 @@ const vaultRoot = path.join(tempRoot, "vault");
 const backupRoot = path.join(tempRoot, "backups");
 const dataRoot = path.join(tempRoot, "data");
 const webPort = await freePort();
+const companionPort = await freePort();
 const baseUrl = `http://127.0.0.1:${webPort}`;
+const companionBaseUrl = `http://127.0.0.1:${companionPort}`;
 const artifactRoot = path.join(dashboardRoot, "output", "playwright");
+const relayEnvelopes = [];
+const deviceStatuses = new Map();
 let companion;
 let application;
 let browser;
 
-try {
-  try {
-    const existing = await fetch("http://127.0.0.1:43127/health", { signal: AbortSignal.timeout(300) });
-    if (existing.ok) throw new Error("Port 43127 is already in use; stop the running Vault Companion before this isolated test");
-  } catch (error) {
-    if (error instanceof Error && error.message.includes("already in use")) throw error;
-  }
+function jsonResponse(route, body) {
+  return route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    headers: { Date: new Date().toUTCString(), "Cache-Control": "no-store" },
+    body: JSON.stringify(body)
+  });
+}
 
+function deviceStatusPayload() {
+  return {
+    ok: true,
+    relayHeadSequence: relayEnvelopes.at(-1)?.sequence || 0,
+    devices: [...deviceStatuses.values()].sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt)),
+    serverTime: new Date().toISOString()
+  };
+}
+
+async function mockVaultRuntime(context) {
+  await context.route("http://127.0.0.1:43127/**", async (route) => {
+    const url = new URL(route.request().url());
+    await route.continue({ url: `${companionBaseUrl}${url.pathname}${url.search}` });
+  });
+  await context.route("**/api/vault/sync*", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      const input = request.postDataJSON();
+      const acceptedChangeIds = [];
+      for (const envelope of input.envelopes || []) {
+        acceptedChangeIds.push(envelope.changeId);
+        if (relayEnvelopes.some((item) => item.vaultId === envelope.vaultId && item.changeId === envelope.changeId)) continue;
+        relayEnvelopes.push({ ...envelope, sequence: relayEnvelopes.length + 1, receivedAt: new Date().toISOString() });
+      }
+      return jsonResponse(route, { ok: true, acceptedChangeIds, serverTime: new Date().toISOString() });
+    }
+    const url = new URL(request.url());
+    const since = Number(url.searchParams.get("since") || 0);
+    const vaultId = url.searchParams.get("vaultId");
+    return jsonResponse(route, {
+      ok: true,
+      envelopes: relayEnvelopes.filter((item) => item.vaultId === vaultId && item.sequence > since),
+      serverTime: new Date().toISOString()
+    });
+  });
+  await context.route("**/api/vault/devices*", async (route) => {
+    const request = route.request();
+    if (request.method() === "POST") {
+      const input = request.postDataJSON();
+      const now = new Date().toISOString();
+      const head = relayEnvelopes.at(-1)?.sequence || 0;
+      const key = `${input.vaultId}:${input.deviceId}`;
+      const existing = deviceStatuses.get(key);
+      const acknowledgedSequence = Math.max(existing?.acknowledgedSequence || 0, Math.min(input.acknowledgedSequence, head));
+      const current = input.pendingChanges === 0 && input.blockedChanges === 0 && acknowledgedSequence >= head;
+      deviceStatuses.set(key, {
+        deviceId: input.deviceId,
+        descriptor: input.descriptor,
+        acknowledgedSequence,
+        pendingChanges: input.pendingChanges,
+        blockedChanges: input.blockedChanges,
+        lastSeenAt: now,
+        lastSyncedAt: current ? now : existing?.lastSyncedAt || null
+      });
+    }
+    return jsonResponse(route, deviceStatusPayload());
+  });
+}
+
+try {
   companion = spawnCaptured(process.execPath, [companionEntrypoint], {
     cwd: repositoryRoot,
     env: {
       ...process.env,
       UNIGENTAMOS_VAULT_DIR: vaultRoot,
       UNIGENTAMOS_VAULT_BACKUP_DIR: backupRoot,
+      UNIGENTAMOS_VAULT_PORT: String(companionPort),
       UNIGENTAMOS_SETUP_CODE: "123456",
       UNIGENTAMOS_ALLOWED_ORIGINS: baseUrl
     }
@@ -113,13 +179,14 @@ try {
     }
   });
   await Promise.all([
-    waitFor("http://127.0.0.1:43127/health"),
+    waitFor(`${companionBaseUrl}/health`),
     waitFor(`${baseUrl}/vault`)
   ]);
   await mkdir(artifactRoot, { recursive: true });
 
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
+  await mockVaultRuntime(context);
   const page = await context.newPage();
   const unexpectedFailures = [];
   page.on("response", (response) => {
@@ -156,6 +223,7 @@ try {
   assert.ok(recoveryPath);
 
   const appleContext = await browser.newContext({ ...devices["iPhone 15"], acceptDownloads: true });
+  await mockVaultRuntime(appleContext);
   const applePage = await appleContext.newPage();
   await applePage.goto(`${baseUrl}/vault`, { waitUntil: "domcontentloaded" });
   await applePage.getByRole("heading", { name: "Connect this Apple device" }).waitFor();
@@ -165,7 +233,16 @@ try {
   await applePage.screenshot({ path: path.join(artifactRoot, "vault-onboarding-iphone.png"), fullPage: true });
   await applePage.getByRole("button", { name: "Connect this device" }).click();
   await applePage.getByText("This device joined the encrypted vault.").waitFor();
+  await applePage.getByText("Offline continuity note", { exact: true }).waitFor();
+  await applePage.getByRole("heading", { name: "All registered devices are current" }).waitFor();
+  await applePage.screenshot({ path: path.join(artifactRoot, "vault-devices-iphone.png"), fullPage: true });
   assert.equal(await applePage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
+
+  await page.getByRole("button", { name: "Refresh status" }).click();
+  await page.getByText("Device sync status refreshed.").waitFor();
+  await page.getByRole("heading", { name: "All registered devices are current" }).waitFor();
+  assert.equal(await page.getByRole("list", { name: "Registered vault devices" }).getByRole("listitem").count(), 2);
+  await page.screenshot({ path: path.join(artifactRoot, "vault-devices-desktop.png"), fullPage: true });
   await appleContext.close();
 
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -173,6 +250,9 @@ try {
   await page.getByRole("heading", { name: "Unlock this device" }).waitFor();
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
+  await page.screenshot({ path: path.join(artifactRoot, "vault-offline-reload.png"), fullPage: true });
+  const offlineBody = await page.locator("body").innerText();
+  if (!offlineBody.includes("Unlock this device")) throw new Error(`Offline vault shell did not reach unlock state: ${offlineBody.slice(0, 600)}`);
   await page.getByRole("heading", { name: "Unlock this device" }).waitFor();
   await page.getByLabel("Vault password").fill("correct horse battery staple");
   await page.getByRole("button", { name: "Unlock vault" }).click();
@@ -188,7 +268,7 @@ try {
 
   await context.setOffline(false);
   await context.close();
-  console.log("[pass] guided desktop setup, Apple recovery-file join, encrypted history, backup, service-worker offline reload, and offline save passed");
+  console.log("[pass] guided desktop setup, Apple recovery-file join, cross-device relay, encrypted device status, backup, service-worker offline reload, and offline save passed");
 } catch (error) {
   console.error("[vault-browser] application output:\n", application?.output() || "");
   console.error("[vault-browser] companion output:\n", companion?.output() || "");

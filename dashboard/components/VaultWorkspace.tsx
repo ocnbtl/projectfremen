@@ -3,7 +3,13 @@
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { browserVault, deterministicVaultObjectId } from "../lib/local-first/browser-engine";
-import type { VaultFieldValue, VaultObjectKind, VaultObjectSnapshot, VaultRecoveryPackage } from "../lib/local-first/types";
+import type {
+  VaultDeviceStatus,
+  VaultFieldValue,
+  VaultObjectKind,
+  VaultObjectSnapshot,
+  VaultRecoveryPackage
+} from "../lib/local-first/types";
 import styles from "./VaultWorkspace.module.css";
 
 type VaultStatus = Awaited<ReturnType<typeof browserVault.status>>;
@@ -29,6 +35,51 @@ function downloadJson(filename: string, value: unknown) {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+}
+
+function relativeTime(value: string | null): string {
+  if (!value) return "Never";
+  const elapsed = Math.max(0, Date.now() - Date.parse(value));
+  if (elapsed < 15_000) return "Just now";
+  if (elapsed < 60_000) return `${Math.floor(elapsed / 1_000)} seconds ago`;
+  if (elapsed < 3_600_000) return `${Math.floor(elapsed / 60_000)} minutes ago`;
+  if (elapsed < 86_400_000) return `${Math.floor(elapsed / 3_600_000)} hours ago`;
+  return `${Math.floor(elapsed / 86_400_000)} days ago`;
+}
+
+function deviceKindLabel(device: VaultDeviceStatus): string {
+  return {
+    windows: "Windows",
+    iphone: "iPhone",
+    ipad: "iPad",
+    macbook: "MacBook",
+    browser: "Browser"
+  }[device.descriptor.deviceKind];
+}
+
+function deviceSyncState(device: VaultDeviceStatus, relayHeadSequence: number): {
+  label: string;
+  detail: string;
+  tone: "current" | "pending" | "attention" | "inactive";
+  current: boolean;
+} {
+  const active = Date.now() - Date.parse(device.lastSeenAt) < 90_000;
+  if (device.blockedChanges > 0) {
+    return { label: "Needs attention", detail: `${device.blockedChanges} quarantined change${device.blockedChanges === 1 ? "" : "s"}`, tone: "attention", current: false };
+  }
+  if (device.pendingChanges > 0) {
+    return { label: active ? "Uploading" : "Open to upload", detail: `${device.pendingChanges} queued change${device.pendingChanges === 1 ? "" : "s"}`, tone: "pending", current: false };
+  }
+  if (device.acknowledgedSequence < relayHeadSequence) {
+    const behind = relayHeadSequence - device.acknowledgedSequence;
+    return { label: active ? "Updating" : "Open to update", detail: `${behind} change${behind === 1 ? "" : "s"} behind`, tone: active ? "pending" : "inactive", current: false };
+  }
+  return {
+    label: active ? "Current" : "Current · inactive",
+    detail: active ? "All encrypted changes applied" : `Last seen ${relativeTime(device.lastSeenAt)}`,
+    tone: active ? "current" : "inactive",
+    current: true
+  };
 }
 
 export default function VaultWorkspace() {
@@ -126,7 +177,7 @@ export default function VaultWorkspace() {
 
   useEffect(() => {
     if (status?.unlocked) void loadObjects().catch(() => undefined);
-  }, [loadObjects, status?.unlocked]);
+  }, [loadObjects, status?.diagnostics.objects, status?.unlocked]);
 
   async function run(action: () => Promise<void>) {
     setBusy(true);
@@ -234,6 +285,14 @@ export default function VaultWorkspace() {
     });
   }
 
+  async function refreshDevices() {
+    await run(async () => {
+      await browserVault.syncOnce();
+      await browserVault.refreshDeviceStatuses();
+      setMessage("Device sync status refreshed.");
+    });
+  }
+
   function stringField(snapshot: VaultObjectSnapshot, field: string): string {
     const value = snapshot.fields[field];
     return typeof value === "string" ? value : "";
@@ -299,6 +358,12 @@ export default function VaultWorkspace() {
     ["Clock", clockLabel],
     ["Desktop", companionLabel]
   ], [clockLabel, companionLabel, networkLabel, stateLabel]);
+  const deviceSnapshot = status?.devices.snapshot;
+  const registeredDevices = deviceSnapshot?.devices || [];
+  const currentDevices = deviceSnapshot
+    ? registeredDevices.filter((device) => deviceSyncState(device, deviceSnapshot.relayHeadSequence).current).length
+    : 0;
+  const allDevicesCurrent = registeredDevices.length > 0 && currentDevices === registeredDevices.length;
 
   return (
     <main className={styles.page}>
@@ -434,14 +499,14 @@ export default function VaultWorkspace() {
 
               <aside className={styles.appleNote}>
                 <strong>After it connects</strong>
-                <span>In Safari, use Share → Add to Home Screen on iPhone/iPad, or File → Add to Dock on Mac. Text and metadata stay available offline; large media remains on the Windows master until requested.</span>
+                <span>In Safari, use Share → Add to Home Screen on iPhone/iPad, or File → Add to Dock on Mac. Open the new icon and connect it with the same recovery file because Apple keeps its local Vault separate from Safari. Text and metadata stay available offline; large media remains on the Windows master until requested.</span>
               </aside>
             </article>
           )}
 
           <aside className={styles.privacyNote}>
             <strong>What stays private</strong>
-            <span>Your password and unwrapped vault key never enter GitHub, Vercel, or Supabase. Cloud sync carries encrypted envelopes only.</span>
+            <span>Your password and unwrapped vault key never enter GitHub, Vercel, or Supabase. Cloud sync carries encrypted envelopes plus minimal sequence counters; device labels are encrypted too.</span>
           </aside>
         </section>
       ) : !status.unlocked ? (
@@ -471,6 +536,55 @@ export default function VaultWorkspace() {
               </div>
               <small>The recovery file is still encrypted, but it should be kept separately from the password. A later SSD/server target can receive the same encrypted backup set.</small>
             </article>
+          </section>
+
+          <section className={`${styles.panel} ${styles.devicesPanel}`} aria-labelledby="devices-sync-title">
+            <div className={styles.devicesHeader}>
+              <div>
+                <p className={styles.eyebrow}>Devices & sync status</p>
+                <h2 id="devices-sync-title">{allDevicesCurrent ? "All registered devices are current" : deviceSnapshot ? `${currentDevices} of ${registeredDevices.length} devices current` : "Checking your devices"}</h2>
+                <p>Each device reports only encrypted identity metadata and the sequence it has safely applied. Open and unlock a device when it needs to catch up.</p>
+              </div>
+              <button disabled={busy || !online} onClick={refreshDevices}>Refresh status</button>
+            </div>
+            {status.devices.lastError && <p className={styles.deviceError} role="status">Status detail unavailable: {status.devices.lastError}. Encrypted content sync continues independently.</p>}
+            {deviceSnapshot && registeredDevices.length > 0 ? (
+              <div className={styles.deviceList} role="list" aria-label="Registered vault devices">
+                {registeredDevices.map((device) => {
+                  const deviceState = deviceSyncState(device, deviceSnapshot.relayHeadSequence);
+                  const isThisDevice = device.deviceId === status.metadata?.deviceId;
+                  const deviceToneClass = {
+                    current: styles.deviceBadgeCurrent,
+                    pending: styles.deviceBadgePending,
+                    attention: styles.deviceBadgeAttention,
+                    inactive: styles.deviceBadgeInactive
+                  }[deviceState.tone];
+                  return (
+                    <article className={styles.deviceCard} role="listitem" key={device.deviceId}>
+                      <div className={styles.deviceCardTop}>
+                        <div>
+                          <strong>{device.descriptor.deviceName}</strong>
+                          <span>{deviceKindLabel(device)}{isThisDevice ? " · This device" : ""}</span>
+                        </div>
+                        <span className={`${styles.deviceBadge} ${deviceToneClass}`}>{deviceState.label}</span>
+                      </div>
+                      <p>{deviceState.detail}</p>
+                      <dl>
+                        <div><dt>Last seen</dt><dd>{relativeTime(device.lastSeenAt)}</dd></div>
+                        <div><dt>Last fully synced</dt><dd>{relativeTime(device.lastSyncedAt)}</dd></div>
+                        <div><dt>Relay progress</dt><dd>{device.acknowledgedSequence.toLocaleString()} / {deviceSnapshot.relayHeadSequence.toLocaleString()}</dd></div>
+                      </dl>
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className={styles.deviceEmpty}>
+                <strong>{online ? "Waiting for the first device acknowledgement" : "Connect to refresh device status"}</strong>
+                <span>Devices appear after their Vault is opened, unlocked, and synchronized.</span>
+              </div>
+            )}
+            <small>Safari and a Home Screen installation are separate encrypted device stores. If you use both, each appears here and must synchronize independently.</small>
           </section>
 
           <section className={styles.panel}>

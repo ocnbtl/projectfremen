@@ -41,8 +41,15 @@ try {
   for (const moduleName of ["types", "hlc", "merge", "crypto", "relay-store"]) await compile(moduleName);
   const { assessClockHealth, compareHlc, tickHlc } = await import(pathToFileURL(path.join(outputRoot, "hlc.mjs")));
   const { mergeVaultSnapshots, threeWayMergeText } = await import(pathToFileURL(path.join(outputRoot, "merge.mjs")));
-  const { createVaultKeyEnvelope, decryptVaultChange, encryptVaultChange, unlockVaultKey } = await import(pathToFileURL(path.join(outputRoot, "crypto.mjs")));
-  const { validateEncryptedEnvelope } = await import(pathToFileURL(path.join(outputRoot, "relay-store.mjs")));
+  const {
+    createVaultKeyEnvelope,
+    decryptVaultChange,
+    decryptVaultDeviceDescriptor,
+    encryptVaultChange,
+    encryptVaultDeviceDescriptor,
+    unlockVaultKey
+  } = await import(pathToFileURL(path.join(outputRoot, "crypto.mjs")));
+  const { validateEncryptedDeviceDescriptor, validateEncryptedEnvelope } = await import(pathToFileURL(path.join(outputRoot, "relay-store.mjs")));
 
   const text = threeWayMergeText("alpha\nbeta\ngamma", "ALPHA\nbeta\ngamma", "alpha\nbeta\nGAMMA");
   assert.deepEqual(text, { value: "ALPHA\nbeta\nGAMMA", conflict: false });
@@ -117,6 +124,25 @@ try {
     /work factor/i
   );
 
+  const deviceDescriptor = {
+    format: "unigentamos-vault-device-v1",
+    vaultId: envelopeVaultId,
+    deviceId,
+    deviceName: "Ocean's iPhone",
+    deviceKind: "iphone"
+  };
+  const encryptedDeviceDescriptor = await encryptVaultDeviceDescriptor(deviceDescriptor, vaultKey);
+  assert.equal(encryptedDeviceDescriptor.ciphertext.includes("Ocean's iPhone"), false);
+  assert.deepEqual(await decryptVaultDeviceDescriptor(encryptedDeviceDescriptor, unlocked), deviceDescriptor);
+  assert.deepEqual(
+    validateEncryptedDeviceDescriptor(encryptedDeviceDescriptor, envelopeVaultId, deviceId),
+    encryptedDeviceDescriptor
+  );
+  assert.throws(
+    () => validateEncryptedDeviceDescriptor({ ...encryptedDeviceDescriptor, deviceId: crypto.randomUUID() }, envelopeVaultId),
+    /metadata|belongs/i
+  );
+
   const futureChange = {
     ...change,
     changeId: crypto.randomUUID(),
@@ -140,8 +166,20 @@ try {
   const hardeningMigration = await readFile("supabase/migrations/202608060002_harden_existing_functions.sql", "utf8");
   assert.match(hardeningMigration, /alter function public\.set_updated_at\(\) set search_path = pg_catalog/i);
   assert.match(hardeningMigration, /revoke all on function public\.rls_auto_enable\(\) from public, anon, authenticated/i);
+  const deviceStatusMigration = await readFile("supabase/migrations/20260807150346_add_vault_device_sync_status.sql", "utf8");
+  assert.match(deviceStatusMigration, /create table if not exists public\.vault_sync_devices/i);
+  assert.match(deviceStatusMigration, /force row level security/i);
+  assert.match(deviceStatusMigration, /revoke all on table public\.vault_sync_devices from public, anon, authenticated, service_role/i);
+  assert.match(deviceStatusMigration, /new\.acknowledged_sequence := least\(new\.acknowledged_sequence, relay_head\)/i);
+  assert.match(deviceStatusMigration, /new\.blocked_changes = 0/i);
+  assert.match(deviceStatusMigration, /device_count >= 64/i);
+  const deviceStatusRoute = await readFile("app/api/vault/devices/route.ts", "utf8");
+  assert.match(deviceStatusRoute, /hasAdminSession/i);
+  assert.match(deviceStatusRoute, /isCsrfRequestValid/i);
+  assert.match(deviceStatusRoute, /MAX_REQUEST_BYTES = 64 \* 1024/i);
+  assert.match(deviceStatusRoute, /recordVaultDeviceStatus/i);
 
-  console.log("[pass] local-first merge, clock correction, conflict retention, and encryption checks passed");
+  console.log("[pass] local-first merge, clock correction, conflict retention, encrypted device status, and encryption checks passed");
 } finally {
   await rm(outputRoot, { recursive: true, force: true });
 }
