@@ -1,6 +1,8 @@
 import {
   VAULT_ENVELOPE_VERSION,
+  type EncryptedVaultDeviceDescriptor,
   type EncryptedChangeEnvelope,
+  type VaultDeviceDescriptor,
   type VaultChange,
   type VaultKeyEnvelope
 } from "./types";
@@ -112,6 +114,88 @@ function envelopeAad(input: {
     input.deviceId,
     input.keyVersion
   ]));
+}
+
+function deviceDescriptorAad(input: {
+  descriptorVersion: number;
+  vaultId: string;
+  deviceId: string;
+  keyVersion: number;
+}): Uint8Array<ArrayBuffer> {
+  return encoder.encode(JSON.stringify([
+    "unigentamos-vault-device-v1",
+    input.descriptorVersion,
+    input.vaultId,
+    input.deviceId,
+    input.keyVersion
+  ]));
+}
+
+export async function encryptVaultDeviceDescriptor(
+  descriptor: VaultDeviceDescriptor,
+  vaultKey: CryptoKey,
+  keyVersion = 1
+): Promise<EncryptedVaultDeviceDescriptor> {
+  if (
+    descriptor.format !== "unigentamos-vault-device-v1"
+    || !UUID.test(descriptor.vaultId)
+    || !UUID.test(descriptor.deviceId)
+    || !descriptor.deviceName.trim()
+    || descriptor.deviceName.length > 120
+    || !["windows", "iphone", "ipad", "macbook", "browser"].includes(descriptor.deviceKind)
+  ) throw new Error("Vault device descriptor is invalid");
+  const metadata = {
+    descriptorVersion: VAULT_ENVELOPE_VERSION,
+    vaultId: descriptor.vaultId,
+    deviceId: descriptor.deviceId,
+    keyVersion
+  };
+  const aad = deviceDescriptorAad(metadata);
+  const aadDigest = await subtle().digest("SHA-256", aad);
+  const plaintext = encoder.encode(JSON.stringify(descriptor));
+  const iv = randomBytes(12);
+  const ciphertext = await subtle().encrypt({ name: "AES-GCM", iv, additionalData: aad }, vaultKey, plaintext);
+  plaintext.fill(0);
+  return {
+    ...metadata,
+    iv: bytesToBase64(iv),
+    ciphertext: bytesToBase64(new Uint8Array(ciphertext)),
+    aadHash: bytesToBase64(new Uint8Array(aadDigest)),
+    byteLength: ciphertext.byteLength
+  };
+}
+
+export async function decryptVaultDeviceDescriptor(
+  descriptor: EncryptedVaultDeviceDescriptor,
+  vaultKey: CryptoKey
+): Promise<VaultDeviceDescriptor> {
+  if (descriptor.descriptorVersion !== VAULT_ENVELOPE_VERSION) {
+    throw new Error("Unsupported encrypted device descriptor");
+  }
+  const aad = deviceDescriptorAad(descriptor);
+  const aadDigest = bytesToBase64(new Uint8Array(await subtle().digest("SHA-256", aad)));
+  if (aadDigest !== descriptor.aadHash) throw new Error("Encrypted device metadata failed integrity validation");
+  let plaintext: ArrayBuffer;
+  try {
+    plaintext = await subtle().decrypt(
+      { name: "AES-GCM", iv: base64ToBytes(descriptor.iv), additionalData: aad },
+      vaultKey,
+      base64ToBytes(descriptor.ciphertext)
+    );
+  } catch {
+    throw new Error("Encrypted device descriptor authentication failed");
+  }
+  const parsed = JSON.parse(decoder.decode(plaintext)) as Partial<VaultDeviceDescriptor>;
+  if (
+    parsed.format !== "unigentamos-vault-device-v1"
+    || parsed.vaultId !== descriptor.vaultId
+    || parsed.deviceId !== descriptor.deviceId
+    || typeof parsed.deviceName !== "string"
+    || !parsed.deviceName.trim()
+    || parsed.deviceName.length > 120
+    || !["windows", "iphone", "ipad", "macbook", "browser"].includes(String(parsed.deviceKind))
+  ) throw new Error("Encrypted device descriptor is invalid");
+  return parsed as VaultDeviceDescriptor;
 }
 
 export async function encryptVaultChange(

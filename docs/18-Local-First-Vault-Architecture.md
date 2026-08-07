@@ -42,6 +42,8 @@ Encryption greatly reduces exposure, but no design is literally impossible to ha
 
 Every save first creates an encrypted local version and queues it for relay and desktop mirroring. Network or companion failure does not discard the save. Sync retries every two seconds while the vault is unlocked and online.
 
+Each unlocked browser also publishes a bounded sync acknowledgement at most every 30 seconds and immediately after material sync work. The acknowledgement contains the last relay sequence safely applied, queued and quarantined change counts, and a vault-key-encrypted device descriptor. Device names and kinds are therefore unreadable to Supabase. The **Devices & sync status** panel reports a device as current only when it has applied the relay head and has no queued or quarantined changes. Browsers that have not opened recently remain visible as inactive instead of being silently treated as synchronized. Safari and an installed Home Screen web app are separate local device stores and appear separately.
+
 Each field carries a hybrid logical clock. When online, server time is checked before saves and used to correct a bad device clock. A two-minute difference produces a warning; a fifteen-minute difference produces a blocked clock state while authenticated server time remains the ordering source. Offline work continues from the last known correction and monotonic counter, but a badly wrong clock should be fixed before long offline periods.
 
 On reconnection:
@@ -65,7 +67,7 @@ The desktop companion already stores encrypted media and can return it by digest
 
 The additive `vault_sync_changes` table is append-only in this release. Its payload is encrypted, accessible only through the authenticated server route, and protected by CSRF validation on writes. The route measures the actual streamed request body rather than trusting `Content-Length`. A transaction-serialized database trigger caps each vault at 200,000 envelopes or 192 MiB of declared ciphertext, whichever comes first, retaining room for indexes and database maintenance. When the mailbox reaches that ceiling, new changes remain queued on-device and the user sees a storage-limit error; the relay never acknowledges and discards them.
 
-Encrypted checkpoints, device acknowledgements, and safe compaction are still required before the relay can operate indefinitely without manual capacity management. The desktop archive remains usable if the relay is full, unavailable, or later replaced.
+Encrypted checkpoints and safe compaction are still required before the relay can operate indefinitely without manual capacity management. Device acknowledgements now provide the safe per-device cursor needed for that future compaction, but this release does not delete relay history. The desktop archive remains usable if the relay is full, unavailable, or later replaced.
 
 Text and metadata volume is appropriate for SQLite and IndexedDB. Large media belongs in encrypted desktop files, not Postgres rows or mobile browser storage. Free Supabase limits are a practical relay constraint, not a data-loss boundary; queued local changes remain on-device when the relay is unavailable.
 

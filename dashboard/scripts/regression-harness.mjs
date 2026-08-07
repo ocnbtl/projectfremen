@@ -9248,7 +9248,13 @@ async function main() {
     const publicVaultShell = await requestText(server.baseUrl, cookieJar, "/vault");
     assert(publicVaultShell.response.ok && publicVaultShell.body.includes("Encrypted Vault") && publicVaultShell.body.includes("Vault &amp; sync"), "Public encrypted vault shell failed to render");
     const serviceWorker = await requestText(server.baseUrl, cookieJar, "/sw.js");
-    assert(serviceWorker.response.ok && serviceWorker.body.includes("unigentamos-static-v3") && serviceWorker.body.includes('url.pathname.startsWith("/api/")'), "Offline shell worker is missing or does not exclude API data");
+    assert(
+      serviceWorker.response.ok &&
+        serviceWorker.body.includes("unigentamos-static-v4") &&
+        serviceWorker.body.includes('url.pathname.startsWith("/api/")') &&
+        serviceWorker.body.includes('html.matchAll(/(?:src|href)='),
+      "Offline shell worker is missing, does not cache its application assets, or does not exclude API data"
+    );
     pass("Encrypted vault and static-only offline shell load without exposing authenticated data");
 
     logStep("Checking unauthenticated API protection");
@@ -9304,7 +9310,8 @@ async function main() {
     for (const pathname of [
       "/api/vault/time",
       "/api/vault/bootstrap",
-      `/api/vault/sync?vaultId=${crypto.randomUUID()}&since=0`
+      `/api/vault/sync?vaultId=${crypto.randomUUID()}&since=0`,
+      `/api/vault/devices?vaultId=${crypto.randomUUID()}`
     ]) {
       const unauthenticatedVaultApi = await requestJson(server.baseUrl, cookieJar, pathname);
       assert(unauthenticatedVaultApi.response.status === 401, `Expected ${pathname} to reject an unauthenticated request`);
@@ -9315,7 +9322,13 @@ async function main() {
       body: JSON.stringify({ vaultId: crypto.randomUUID(), envelopes: [] })
     });
     assert(unauthenticatedVaultPush.response.status === 401, "Encrypted relay push checked CSRF or content before authentication");
-    pass("Unauthenticated vault time, bootstrap, pull, and push APIs are blocked");
+    const unauthenticatedDeviceStatus = await requestJson(server.baseUrl, cookieJar, "/api/vault/devices", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": "unauthenticated" },
+      body: JSON.stringify({ vaultId: crypto.randomUUID() })
+    });
+    assert(unauthenticatedDeviceStatus.response.status === 401, "Device status write checked CSRF or content before authentication");
+    pass("Unauthenticated vault time, bootstrap, relay, and device-status APIs are blocked");
 
     const unauthPersonal = await requestText(server.baseUrl, cookieJar, "/admin/personal");
     assert(
@@ -9479,7 +9492,19 @@ async function main() {
       body: JSON.stringify({ vaultId: crypto.randomUUID(), envelopes: [] })
     });
     assert(vaultPushInvalidBatch.response.status === 400, "Vault relay did not validate its bounded encrypted batch before configuration access");
-    pass("Authenticated vault time/bootstrap and relay CSRF/input boundaries work");
+    const vaultDeviceStatusWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/vault/devices", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ vaultId: crypto.randomUUID() })
+    });
+    assert(vaultDeviceStatusWithoutCsrf.response.status === 403, "Vault device status accepted a request without CSRF proof");
+    const vaultDeviceStatusInvalidBody = await requestJson(server.baseUrl, cookieJar, "/api/vault/devices", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ vaultId: crypto.randomUUID() })
+    });
+    assert(vaultDeviceStatusInvalidBody.response.status === 400, "Vault device status did not validate its bounded encrypted descriptor before configuration access");
+    pass("Authenticated vault time/bootstrap, relay, and device-status CSRF/input boundaries work");
 
     logStep("Checking protected pages and locked navigation");
     const adminHome = await requestText(server.baseUrl, cookieJar, `/admin?run=${encodeURIComponent(testRunId)}`);

@@ -422,6 +422,31 @@
 .panel h2 { margin: 0 0 10px; font-size: 24px; letter-spacing: -.025em; }
 .panel p { color: var(--vault-copy); line-height: 1.6; }
 .panel small { display: block; margin-top: 12px; color: var(--vault-muted); line-height: 1.5; }
+.devicesPanel { display: grid; width: 100%; box-sizing: border-box; gap: 20px; }
+.devicesHeader { display: grid; grid-template-columns: minmax(0, 1fr) 150px; align-items: flex-start; gap: 24px; }
+.devicesHeader > div { min-width: 0; max-width: 760px; }
+.devicesHeader h2 { margin-bottom: 8px; }
+.devicesHeader p { margin: 0; }
+.devicesHeader button { width: 150px; }
+.deviceError { margin: 0; border: 1px solid #e6c078; border-radius: 10px; padding: 12px 14px; color: #6b4811 !important; background: #fff8e8; }
+.deviceList { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.deviceCard { min-width: 0; border: 1px solid var(--vault-border); border-radius: 12px; padding: 16px; background: #f8faf9; }
+.deviceCardTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.deviceCardTop > div { display: grid; min-width: 0; gap: 3px; }
+.deviceCardTop strong { overflow-wrap: anywhere; color: var(--vault-ink); font-size: 16px; }
+.deviceCardTop span { color: var(--vault-muted); font-size: 12px; }
+.deviceBadge { display: inline-flex; min-height: 28px; flex: 0 0 auto; align-items: center; border-radius: 999px; padding: 4px 9px; font-size: 11px !important; font-weight: 850; white-space: nowrap; }
+.deviceBadgeCurrent { color: #1c664a !important; background: #dff3e9; }
+.deviceBadgePending { color: #775516 !important; background: #fff0cb; }
+.deviceBadgeAttention { color: #8a2f2f !important; background: #fde5e5; }
+.deviceBadgeInactive { color: #50645d !important; background: #e7ecea; }
+.deviceCard > p { margin: 14px 0; color: #36564b; font-size: 13px; }
+.deviceCard dl { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin: 0; }
+.deviceCard dl div { display: grid; min-width: 0; gap: 3px; }
+.deviceCard dt { color: var(--vault-muted); font-size: 10px; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
+.deviceCard dd { margin: 0; overflow-wrap: anywhere; color: #28483e; font-size: 12px; font-variant-numeric: tabular-nums; }
+.deviceEmpty { display: grid; gap: 4px; border: 1px dashed rgba(31, 90, 73, .35); border-radius: 12px; padding: 20px; color: #36564b; background: #f2f7f5; }
+.deviceEmpty span { color: var(--vault-muted); font-size: 13px; }
 .unlock { width: min(560px, calc(100% - 36px)); box-sizing: border-box; }
 .buttonRow span { color: #60746d; font-size: 13px; }
 .metrics strong { font-size: 27px; letter-spacing: -.035em; font-variant-numeric: tabular-nums; }
@@ -455,6 +480,7 @@
   .grid,
   .devicePicker { grid-template-columns: 1fr; }
   .objectGrid { grid-template-columns: 1fr; }
+  .deviceList { grid-template-columns: 1fr; }
   .objectList { min-height: 0; max-height: 260px; }
   .historyList { grid-column: auto; }
 }
@@ -475,6 +501,10 @@
   .primaryButton { width: 100%; }
   .appleNote { margin: 0 20px 22px; }
   .privacyNote { grid-template-columns: 1fr; gap: 3px; }
+  .devicesHeader { grid-template-columns: 1fr; align-items: stretch; gap: 14px; }
+  .devicesHeader button { width: 100%; }
+  .deviceCardTop { align-items: flex-start; }
+  .deviceCard dl { grid-template-columns: 1fr 1fr; }
   .statusGrid,
   .metrics { grid-template-columns: 1fr 1fr; }
   .statusGrid strong { overflow-wrap: anywhere; }

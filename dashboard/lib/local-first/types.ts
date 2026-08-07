@@ -64,6 +64,47 @@ export type SequencedChangeEnvelope = EncryptedChangeEnvelope & {
   receivedAt: string;
 };
 
+export type VaultDeviceKind = "windows" | "iphone" | "ipad" | "macbook" | "browser";
+
+export type VaultDeviceDescriptor = {
+  format: "unigentamos-vault-device-v1";
+  vaultId: string;
+  deviceId: string;
+  deviceName: string;
+  deviceKind: VaultDeviceKind;
+};
+
+export type EncryptedVaultDeviceDescriptor = {
+  descriptorVersion: typeof VAULT_ENVELOPE_VERSION;
+  vaultId: string;
+  deviceId: string;
+  keyVersion: number;
+  iv: string;
+  ciphertext: string;
+  aadHash: string;
+  byteLength: number;
+};
+
+export type EncryptedVaultDeviceStatus = {
+  deviceId: string;
+  descriptor: EncryptedVaultDeviceDescriptor;
+  acknowledgedSequence: number;
+  pendingChanges: number;
+  blockedChanges: number;
+  lastSeenAt: string;
+  lastSyncedAt: string | null;
+};
+
+export type VaultDeviceStatus = Omit<EncryptedVaultDeviceStatus, "descriptor"> & {
+  descriptor: VaultDeviceDescriptor;
+};
+
+export type VaultDeviceStatusSnapshot = {
+  relayHeadSequence: number;
+  devices: VaultDeviceStatus[];
+  refreshedAt: string;
+};
+
 export type VaultKeyEnvelope = {
   envelopeVersion: typeof VAULT_ENVELOPE_VERSION;
   kdf: "PBKDF2-SHA-256";

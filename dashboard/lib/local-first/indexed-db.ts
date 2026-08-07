@@ -117,11 +117,14 @@ export class BrowserVaultStore {
     return navigator.storage.persist();
   }
 
-  async diagnostics(): Promise<{ objects: number; versions: number; outbox: number; desktopOutbox: number; inbox: number; conflicts: number; media: number }> {
+  async diagnostics(): Promise<{ objects: number; versions: number; outbox: number; desktopOutbox: number; inbox: number; conflicts: number; media: number; blockedChanges: number }> {
     const names = ["objects", "versions", "outbox", "desktopOutbox", "inbox", "conflicts", "media"] as const;
     const transaction = this.database.transaction(names, "readonly");
-    const counts = await Promise.all(names.map((name) => requestResult(transaction.objectStore(name).count())));
-    return Object.fromEntries(names.map((name, index) => [name, counts[index]])) as {
+    const [counts, inboxRows] = await Promise.all([
+      Promise.all(names.map((name) => requestResult(transaction.objectStore(name).count()))),
+      requestResult(transaction.objectStore("inbox").getAll()) as Promise<InboxRow[]>
+    ]);
+    return { ...Object.fromEntries(names.map((name, index) => [name, counts[index]])), blockedChanges: inboxRows.filter((row) => Boolean(row.rejectedAt)).length } as {
       objects: number;
       versions: number;
       outbox: number;
@@ -129,6 +132,7 @@ export class BrowserVaultStore {
       inbox: number;
       conflicts: number;
       media: number;
+      blockedChanges: number;
     };
   }
 

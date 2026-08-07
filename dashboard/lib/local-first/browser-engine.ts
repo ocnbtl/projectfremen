@@ -1,15 +1,25 @@
 "use client";
 
 import { buildJsonHeadersWithCsrf } from "../client-csrf";
-import { decryptVaultChange, encryptVaultChange, createVaultKeyEnvelope, unlockVaultKey } from "./crypto";
+import {
+  createVaultKeyEnvelope,
+  decryptVaultChange,
+  decryptVaultDeviceDescriptor,
+  encryptVaultChange,
+  encryptVaultDeviceDescriptor,
+  unlockVaultKey
+} from "./crypto";
 import { assessClockHealth, receiveHlc, tickHlc } from "./hlc";
 import { BrowserVaultStore } from "./indexed-db";
 import { mergeVaultSnapshots } from "./merge";
 import {
   VAULT_PROTOCOL_VERSION,
   type EncryptedChangeEnvelope,
+  type EncryptedVaultDeviceStatus,
   type SequencedChangeEnvelope,
   type VaultChange,
+  type VaultDeviceKind,
+  type VaultDeviceStatusSnapshot,
   type VaultFieldValue,
   type VaultObjectKind,
   type VaultObjectSnapshot,
@@ -26,6 +36,7 @@ type VaultSession = {
 
 const CANONICAL_BASE_FIELD = "__unigentamosCanonicalBaseV1";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const DEVICE_STATUS_HEARTBEAT_MS = 30_000;
 
 type CanonicalBaseMetadata = {
   versionId: string;
@@ -64,6 +75,19 @@ function fieldsEqual(left: Record<string, VaultFieldValue>, right: Record<string
   return JSON.stringify(stableValue(left)) === JSON.stringify(stableValue(right));
 }
 
+function normalizedDeviceName(value: string, fallback: string): string {
+  return (value.trim() || fallback).slice(0, 120);
+}
+
+function currentDeviceKind(): VaultDeviceKind {
+  const userAgent = navigator.userAgent;
+  if (/iPhone/i.test(userAgent)) return "iphone";
+  if (/iPad/i.test(userAgent) || /Macintosh/i.test(userAgent) && navigator.maxTouchPoints > 1) return "ipad";
+  if (/Macintosh/i.test(userAgent)) return "macbook";
+  if (/Windows/i.test(userAgent)) return "windows";
+  return "browser";
+}
+
 function snapshotFromChange(change: VaultChange): VaultObjectSnapshot {
   return {
     objectId: change.objectId,
@@ -93,6 +117,9 @@ export class BrowserVaultEngine {
   private syncing = false;
   private lastSyncError: string | null = null;
   private lastSyncedAt: string | null = null;
+  private deviceStatusSnapshot: VaultDeviceStatusSnapshot | null = null;
+  private lastDeviceStatusError: string | null = null;
+  private lastDeviceHeartbeatAt = 0;
 
   isUnlocked(): boolean {
     return Boolean(this.session);
@@ -114,6 +141,10 @@ export class BrowserVaultEngine {
           lastError: this.lastSyncError,
           lastSyncedAt: this.lastSyncedAt
         },
+        devices: {
+          snapshot: this.deviceStatusSnapshot,
+          lastError: this.lastDeviceStatusError
+        },
         localCompanion: await this.companionStatus()
       };
     } finally {
@@ -131,7 +162,7 @@ export class BrowserVaultEngine {
       await store.initialize({
         vaultId,
         deviceId,
-        deviceName: deviceName.trim() || "Browser device",
+        deviceName: normalizedDeviceName(deviceName, "Browser device"),
         keyEnvelope: envelope,
         keyVersion: envelope.keyVersion
       });
@@ -154,7 +185,7 @@ export class BrowserVaultEngine {
       await store.initialize({
         vaultId: recovery.vaultId,
         deviceId: crypto.randomUUID(),
-        deviceName: deviceName.trim() || "Browser device",
+        deviceName: normalizedDeviceName(deviceName, "Browser device"),
         keyEnvelope: recovery.keyEnvelope,
         keyVersion: recovery.keyVersion
       });
@@ -247,6 +278,9 @@ export class BrowserVaultEngine {
       }).catch(() => undefined);
     }
     this.companionCapability = null;
+    this.deviceStatusSnapshot = null;
+    this.lastDeviceStatusError = null;
+    this.lastDeviceHeartbeatAt = 0;
     this.session?.store.close();
     this.session = null;
   }
@@ -600,6 +634,7 @@ export class BrowserVaultEngine {
     try {
       const session = this.session;
       const outbox = await session.store.outbox();
+      let syncChanged = outbox.length > 0;
       if (outbox.length) {
         await this.mirrorEnvelopes(outbox);
         const response = await fetch("/api/vault/sync", {
@@ -618,6 +653,7 @@ export class BrowserVaultEngine {
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Vault pull failed");
       await this.recordClockHealth(response.headers.get("date"));
       const incoming = (payload.envelopes || []).filter((item) => item.deviceId !== session.deviceId);
+      syncChanged ||= incoming.length > 0;
       await session.store.storeInbox(incoming);
       const rejected: string[] = [];
       for (const item of incoming) {
@@ -636,12 +672,86 @@ export class BrowserVaultEngine {
         ? `${rejected.length} encrypted change${rejected.length === 1 ? " was" : "s were"} quarantined because validation failed`
         : null;
       this.lastSyncedAt = new Date().toISOString();
+      try {
+        await this.reportDeviceStatus(syncChanged);
+      } catch (error) {
+        this.lastDeviceStatusError = error instanceof Error ? error.message : "Device sync status is unavailable";
+      }
     } catch (error) {
       this.lastSyncError = error instanceof Error ? error.message : "Encrypted relay sync failed";
       throw error;
     } finally {
       this.syncing = false;
     }
+  }
+
+  private async reportDeviceStatus(force = false): Promise<void> {
+    const now = Date.now();
+    if (!force && now - this.lastDeviceHeartbeatAt < DEVICE_STATUS_HEARTBEAT_MS) return;
+    const session = this.requireSession();
+    const metadata = await session.store.metadata();
+    if (!metadata) throw new Error("Local vault metadata is missing");
+    const diagnostics = await session.store.diagnostics();
+    const descriptor = await encryptVaultDeviceDescriptor({
+      format: "unigentamos-vault-device-v1",
+      vaultId: session.vaultId,
+      deviceId: session.deviceId,
+      deviceName: normalizedDeviceName(metadata.deviceName, "Browser device"),
+      deviceKind: currentDeviceKind()
+    }, session.key, session.keyVersion);
+    const response = await fetch("/api/vault/devices", {
+      method: "POST",
+      headers: buildJsonHeadersWithCsrf(),
+      body: JSON.stringify({
+        vaultId: session.vaultId,
+        deviceId: session.deviceId,
+        descriptor,
+        acknowledgedSequence: metadata.lastSequence,
+        pendingChanges: diagnostics.outbox,
+        blockedChanges: diagnostics.blockedChanges
+      })
+    });
+    const payload = await response.json() as {
+      ok?: boolean;
+      relayHeadSequence?: number;
+      devices?: EncryptedVaultDeviceStatus[];
+      error?: string;
+    };
+    if (!response.ok || !payload.ok || !Number.isSafeInteger(payload.relayHeadSequence) || !Array.isArray(payload.devices)) {
+      throw new Error(payload.error || "Device sync status is unavailable");
+    }
+    let unreadable = 0;
+    const devices = await Promise.all(payload.devices.map(async (item) => {
+      try {
+        return { ...item, descriptor: await decryptVaultDeviceDescriptor(item.descriptor, session.key) };
+      } catch {
+        unreadable += 1;
+        return {
+          ...item,
+          descriptor: {
+            format: "unigentamos-vault-device-v1" as const,
+            vaultId: session.vaultId,
+            deviceId: item.deviceId,
+            deviceName: "Unreadable device",
+            deviceKind: "browser" as const
+          }
+        };
+      }
+    }));
+    this.deviceStatusSnapshot = {
+      relayHeadSequence: payload.relayHeadSequence as number,
+      devices,
+      refreshedAt: new Date().toISOString()
+    };
+    this.lastDeviceStatusError = unreadable
+      ? `${unreadable} encrypted device descriptor${unreadable === 1 ? " is" : "s are"} unreadable`
+      : null;
+    this.lastDeviceHeartbeatAt = now;
+  }
+
+  async refreshDeviceStatuses(): Promise<void> {
+    if (!this.session) throw new Error("Unlock the local vault first");
+    await this.reportDeviceStatus(true);
   }
 
   private async mirrorEnvelopes(envelopes: readonly EncryptedChangeEnvelope[]): Promise<void> {
