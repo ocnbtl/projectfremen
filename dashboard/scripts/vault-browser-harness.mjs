@@ -76,7 +76,7 @@ const backupRoot = path.join(tempRoot, "backups");
 const dataRoot = path.join(tempRoot, "data");
 const webPort = await freePort();
 const companionPort = await freePort();
-const baseUrl = `http://127.0.0.1:${webPort}`;
+const baseUrl = `http://localhost:${webPort}`;
 const companionBaseUrl = `http://127.0.0.1:${companionPort}`;
 const artifactRoot = path.join(dashboardRoot, "output", "playwright");
 const relayEnvelopes = [];
@@ -105,12 +105,27 @@ function deviceStatusPayload() {
   };
 }
 
-async function mockVaultRuntime(context) {
+async function rejectUnauthorizedVaultRequest(context, route, required) {
+  if (!required) return false;
+  const cookies = await context.cookies(baseUrl);
+  if (cookies.some((cookie) => cookie.name === "admin_session" && cookie.value)) return false;
+  await route.fulfill({
+    status: 401,
+    contentType: "application/json",
+    headers: { "Cache-Control": "no-store" },
+    body: JSON.stringify({ ok: false, error: "Unauthorized" })
+  });
+  return true;
+}
+
+async function mockVaultRuntime(context, { requireAdminSession = false, companionAvailable = true } = {}) {
   await context.route("http://127.0.0.1:43127/**", async (route) => {
+    if (!companionAvailable) return route.fulfill({ status: 404, body: "Not found" });
     const url = new URL(route.request().url());
     await route.continue({ url: `${companionBaseUrl}${url.pathname}${url.search}` });
   });
   await context.route("**/api/vault/sync*", async (route) => {
+    if (await rejectUnauthorizedVaultRequest(context, route, requireAdminSession)) return;
     const request = route.request();
     if (request.method() === "POST") {
       const input = request.postDataJSON();
@@ -132,6 +147,7 @@ async function mockVaultRuntime(context) {
     });
   });
   await context.route("**/api/vault/devices*", async (route) => {
+    if (await rejectUnauthorizedVaultRequest(context, route, requireAdminSession)) return;
     const request = route.request();
     if (request.method() === "POST") {
       const input = request.postDataJSON();
@@ -154,6 +170,7 @@ async function mockVaultRuntime(context) {
     return jsonResponse(route, deviceStatusPayload());
   });
   await context.route("**/api/vault/media*", async (route) => {
+    if (await rejectUnauthorizedVaultRequest(context, route, requireAdminSession)) return;
     const request = route.request();
     if (request.method() === "POST") {
       if (rejectMediaUploads) {
@@ -282,6 +299,42 @@ try {
   const recoveryPath = await recoveryDownload.path();
   assert.ok(recoveryPath);
 
+  const devicesBeforeAuthRecovery = new Set(deviceStatuses.keys());
+  const authContext = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+    acceptDownloads: true,
+    userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/18.5 Safari/605.1.15"
+  });
+  await mockVaultRuntime(authContext, { requireAdminSession: true, companionAvailable: false });
+  const authPage = await authContext.newPage();
+  await authPage.goto(`${baseUrl}/vault`, { waitUntil: "domcontentloaded" });
+  await authPage.getByRole("heading", { name: "Connect this Apple device" }).waitFor();
+  await authPage.locator('input[type="file"]').setInputFiles(recoveryPath);
+  await authPage.getByText("Recovery file ready.", { exact: false }).waitFor();
+  await authPage.getByLabel("Vault password").fill("correct horse battery staple");
+  await authPage.getByRole("button", { name: "Connect this device" }).click();
+  await authPage.getByRole("heading", { name: "Sign in to connect this browser" }).waitFor();
+  assert.equal((await authPage.locator("body").innerText()).includes("Unauthorized"), false);
+  assert.equal(await authPage.getByRole("link", { name: "Sign in to sync" }).first().getAttribute("href"), "/admin/login?next=%2Fvault");
+  await authPage.screenshot({ path: path.join(artifactRoot, "vault-sync-sign-in-recovery.png"), fullPage: true });
+
+  await authPage.getByRole("link", { name: "Sign in to sync" }).first().click();
+  await authPage.waitForURL(`${baseUrl}/admin/login?next=%2Fvault`);
+  assert.equal(await authPage.locator('input[name="successPath"]').getAttribute("value"), "/vault");
+  assert.equal(await authPage.locator('input[name="errorPath"]').getAttribute("value"), "/admin/login?next=%2Fvault");
+  await authPage.getByLabel("Password").fill("isolated-browser-test-password");
+  await authPage.getByRole("button", { name: "Enter" }).click();
+  await authPage.waitForURL(`${baseUrl}/vault`);
+  await authPage.getByRole("heading", { name: "Unlock your vault" }).waitFor();
+  await authPage.getByLabel("Vault password").fill("correct horse battery staple");
+  await authPage.getByRole("button", { name: "Unlock vault" }).click();
+  await authPage.getByRole("heading", { name: "Everything is up to date" }).waitFor();
+  await authPage.getByText("MacBook", { exact: true }).waitFor();
+  await authContext.close();
+  for (const key of deviceStatuses.keys()) {
+    if (!devicesBeforeAuthRecovery.has(key)) deviceStatuses.delete(key);
+  }
+
   const appleContext = await browser.newContext({ ...devices["iPhone 15"], acceptDownloads: true });
   await mockVaultRuntime(appleContext);
   const applePage = await appleContext.newPage();
@@ -353,7 +406,7 @@ try {
 
   await context.setOffline(false);
   await context.close();
-  console.log("[pass] guided setup, append-only restore, encrypted on-demand media, verified backup, cross-device sync, offline reload, and offline save passed");
+  console.log("[pass] guided setup, friendly sign-in recovery, append-only restore, encrypted on-demand media, verified backup, cross-device sync, offline reload, and offline save passed");
 } catch (error) {
   console.error("[vault-browser] application output:\n", application?.output() || "");
   console.error("[vault-browser] companion output:\n", companion?.output() || "");

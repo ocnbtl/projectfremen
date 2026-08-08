@@ -2,7 +2,12 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { browserVault, deterministicVaultObjectId } from "../lib/local-first/browser-engine";
+import {
+  browserVault,
+  deterministicVaultObjectId,
+  isVaultOnlineAuthorizationError,
+  VAULT_ONLINE_SIGN_IN_MESSAGE
+} from "../lib/local-first/browser-engine";
 import type {
   VaultDeviceStatus,
   VaultBackupRestorePreview,
@@ -268,7 +273,10 @@ export default function VaultWorkspace() {
       await action();
       await refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "That did not work. Try again.");
+      await refresh().catch(() => undefined);
+      setMessage(isVaultOnlineAuthorizationError(error)
+        ? VAULT_ONLINE_SIGN_IN_MESSAGE
+        : error instanceof Error ? error.message : "That did not work. Try again.");
     } finally {
       setPassword("");
       setBusy(false);
@@ -519,6 +527,7 @@ export default function VaultWorkspace() {
     ? registeredDevices.filter((device) => deviceSyncState(device, deviceSnapshot.relayHeadSequence).current).length
     : 0;
   const allDevicesCurrent = registeredDevices.length > 0 && currentDevices === registeredDevices.length;
+  const onlineAuthorizationRequired = Boolean(status?.sync.authorizationRequired);
   const clock = status?.metadata?.clockHealth;
   const filteredObjects = useMemo(() => objects.filter((item) => {
     if (activeKind !== "all" && item.objectKind !== activeKind) return false;
@@ -541,10 +550,13 @@ export default function VaultWorkspace() {
       .filter((field) => !field.startsWith("__unigentamos") && JSON.stringify(selectedObject.fields[field]) !== JSON.stringify(selectedVersion.fields[field]))
     : [];
   const stateLabel = !status?.configured ? "Set up needed" : status.unlocked ? "Open" : "Locked";
-  const networkLabel = status?.sync.state === "synced" ? "Up to date"
+  const networkLabel = onlineAuthorizationRequired ? "Sign in to sync"
+    : status?.sync.state === "synced" ? "Up to date"
     : status?.sync.state === "retrying" ? "Trying again · your work is safe"
       : status?.sync.state === "offline" ? "Offline · your work is safe" : online ? "Checking for changes" : "Offline · your work is safe";
-  const deviceCountLabel = !status?.unlocked ? "Unlock to check" : deviceSnapshot ? `${registeredDevices.length} connected` : "Checking";
+  const deviceCountLabel = !status?.unlocked ? "Unlock to check"
+    : onlineAuthorizationRequired ? "Sign in to connect"
+      : deviceSnapshot ? `${registeredDevices.length} connected` : "Checking";
   const clockLabel = clock?.state === "healthy" ? "Checked" : clock ? "Needs attention" : "Checking";
   const cards = useMemo(() => [
     ["Vault", stateLabel],
@@ -594,7 +606,7 @@ export default function VaultWorkspace() {
           <div className={styles.syncNote}>
             <span aria-hidden="true">↻</span>
             <div><strong>Stay signed in to sync</strong><small>Your work stays on this device when you are offline and syncs when you are back online.</small></div>
-            <Link href="/admin">Sign in</Link>
+            <Link href="/admin/login?next=%2Fvault">Sign in to sync</Link>
           </div>
 
           {setupTarget === "windows" ? (
@@ -713,7 +725,17 @@ export default function VaultWorkspace() {
         </section>
       ) : (
         <>
-          <section className={`${styles.panel} ${styles.devicesPanel}`} aria-labelledby="devices-sync-title">
+          {onlineAuthorizationRequired && <section className={styles.syncSignIn} role="status" aria-labelledby="vault-sync-sign-in-title">
+            <div>
+              <p className={styles.eyebrow}>Online sync is paused</p>
+              <h2 id="vault-sync-sign-in-title">Sign in to connect this browser</h2>
+              <p>Your Vault is open and your local work is safe. Use your normal Unigentamos sign-in password, then return here and unlock the Vault once more.</p>
+              <small>Brave, Dia, Safari, and Home Screen apps each keep their own sign-in. Sign in once in every browser or app you want to sync.</small>
+            </div>
+            <Link className={styles.signInButton} href="/admin/login?next=%2Fvault">Sign in to sync</Link>
+          </section>}
+
+          {!onlineAuthorizationRequired && <section className={`${styles.panel} ${styles.devicesPanel}`} aria-labelledby="devices-sync-title">
             <div className={styles.devicesHeader}>
               <div>
                 <p className={styles.eyebrow}>Your devices</p>
@@ -760,7 +782,7 @@ export default function VaultWorkspace() {
               </div>
             )}
             <small>Each browser or Home Screen app counts as its own device.</small>
-          </section>
+          </section>}
 
           <section className={styles.grid}>
             <article className={styles.panel}>
