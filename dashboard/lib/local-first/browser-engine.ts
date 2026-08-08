@@ -13,8 +13,8 @@ import {
   sha256Hex,
   unlockVaultKey
 } from "./crypto";
-import { assessClockHealth, receiveHlc, tickHlc } from "./hlc";
-import { BrowserVaultStore } from "./indexed-db";
+import { assessClockHealth, compareHlc, receiveHlc, tickHlc } from "./hlc";
+import { BrowserVaultStore, type RejectedInboxRow } from "./indexed-db";
 import { mergeVaultSnapshots } from "./merge";
 import {
   VAULT_PROTOCOL_VERSION,
@@ -48,6 +48,43 @@ const DEVICE_STATUS_HEARTBEAT_MS = 30_000;
 const MEDIA_CHUNK_SIZE = 1_500_000;
 const MAX_MEDIA_FILE_BYTES = 256 * 1024 * 1024;
 export const VAULT_ONLINE_SIGN_IN_MESSAGE = "Sign in to Unigentamos in this browser to sync your Vault.";
+
+export type VaultSyncIssue = {
+  sequence: number;
+  kind: "history" | "clock" | "protected";
+  title: string;
+  detail: string;
+  rejectedAt: string;
+};
+
+function friendlySyncIssue(row: RejectedInboxRow): VaultSyncIssue {
+  const reason = row.rejectionReason.toLocaleLowerCase();
+  if (reason.includes("base version") || reason.includes("divergent")) {
+    return {
+      sequence: row.sequence,
+      kind: "history",
+      title: "An earlier version was missing",
+      detail: "Both saved versions are still protected. The Vault can safely merge them and keep the earlier copy in history.",
+      rejectedAt: row.rejectedAt
+    };
+  }
+  if (reason.includes("clock") || reason.includes("server time") || reason.includes("too far ahead")) {
+    return {
+      sequence: row.sequence,
+      kind: "clock",
+      title: "This device's time needs another check",
+      detail: "The Vault will check secure server time before trying this saved change again.",
+      rejectedAt: row.rejectedAt
+    };
+  }
+  return {
+    sequence: row.sequence,
+    kind: "protected",
+    title: "A saved change is protected",
+    detail: "The Vault could not safely read this encrypted change, so it kept it separate instead of overwriting anything.",
+    rejectedAt: row.rejectedAt
+  };
+}
 
 export class VaultOnlineAuthorizationError extends Error {
   readonly code = "vault_online_authorization_required";
@@ -98,6 +135,12 @@ function stableValue(value: VaultFieldValue): VaultFieldValue {
 
 function fieldsEqual(left: Record<string, VaultFieldValue>, right: Record<string, VaultFieldValue>): boolean {
   return JSON.stringify(stableValue(left)) === JSON.stringify(stableValue(right));
+}
+
+function snapshotsEquivalent(left: VaultObjectSnapshot, right: VaultObjectSnapshot): boolean {
+  return left.objectKind === right.objectKind
+    && left.tombstone === right.tombstone
+    && fieldsEqual(withoutCanonicalBase(left.fields), withoutCanonicalBase(right.fields));
 }
 
 function normalizedDeviceName(value: string, fallback: string): string {
@@ -176,24 +219,30 @@ export class BrowserVaultEngine {
     const store = await BrowserVaultStore.open();
     try {
       const metadata = await store.metadata();
+      const [diagnostics, rejected, localCompanion] = await Promise.all([
+        store.diagnostics(),
+        store.rejectedInbox(),
+        this.companionStatus()
+      ]);
       return {
         configured: Boolean(metadata),
         unlocked: Boolean(this.session),
         metadata,
-        diagnostics: await store.diagnostics(),
+        diagnostics,
         sync: {
           state: !navigator.onLine ? "offline" as const
             : this.lastSyncError ? "retrying" as const
               : this.lastSyncedAt ? "synced" as const : "pending" as const,
           lastError: this.lastSyncError,
           lastSyncedAt: this.lastSyncedAt,
-          authorizationRequired: this.onlineAuthorizationRequired
+          authorizationRequired: this.onlineAuthorizationRequired,
+          issues: rejected.map(friendlySyncIssue)
         },
         devices: {
           snapshot: this.deviceStatusSnapshot,
           lastError: this.lastDeviceStatusError
         },
-        localCompanion: await this.companionStatus()
+        localCompanion
       };
     } finally {
       store.close();
@@ -668,16 +717,43 @@ export class BrowserVaultEngine {
       envelope,
       createdAt: remote.updatedAt
     });
+    if (local && (local.versionId === remote.versionId || snapshotsEquivalent(local, remote))) {
+      if (local.versionId !== remote.versionId && compareHlc(remote.hlc, local.hlc) > 0) {
+        await session.store.putObject({
+          objectId: remote.objectId,
+          objectKind: remote.objectKind,
+          versionId: remote.versionId,
+          envelope,
+          updatedAt: remote.updatedAt
+        });
+      }
+      await this.mirrorEnvelopes([envelope]);
+      const metadata = await session.store.metadata();
+      await session.store.updateMetadata({
+        lastSequence: Math.max(metadata?.lastSequence || 0, envelope.sequence),
+        lastClock: receiveHlc(metadata?.lastClock || null, remote.hlc, session.deviceId, metadata?.clockHealth?.adjustedWallMs || Date.now())
+      });
+      return;
+    }
     let applied = remote;
     let appliedEnvelope: EncryptedChangeEnvelope = envelope;
     let appliedParentVersionIds = remoteChange.baseVersionId ? [remoteChange.baseVersionId] : [];
-    if (local && remoteChange.baseVersionId !== local.versionId) {
+    if (local && local.versionId !== remote.versionId && remoteChange.baseVersionId !== local.versionId) {
       const metadata = initialMetadata || await session.store.metadata();
       if (metadata?.clockHealth?.state === "blocked" && !metadata.clockHealth.orderingSafe) {
         throw new Error("Clock health blocks newest-wins conflict resolution until server time is confirmed");
       }
-      const base = remoteChange.baseVersionId ? await this.version(remote.objectId, remoteChange.baseVersionId) : null;
-      if (!base) throw new Error("A divergent change is missing its base version");
+      const storedBase = remoteChange.baseVersionId ? await this.version(remote.objectId, remoteChange.baseVersionId) : null;
+      const base: VaultObjectSnapshot = storedBase || {
+        objectId: remote.objectId,
+        objectKind: remote.objectKind,
+        versionId: remoteChange.baseVersionId || remote.versionId,
+        hlc: compareHlc(local.hlc, remote.hlc) <= 0 ? local.hlc : remote.hlc,
+        fields: {},
+        fieldClocks: {},
+        tombstone: false,
+        updatedAt: new Date(Math.min(local.hlc.wallMs, remote.hlc.wallMs)).toISOString()
+      };
       const merged = mergeVaultSnapshots(base, local, remote);
       const hlc = receiveHlc(local.hlc, remote.hlc, session.deviceId, metadata?.clockHealth?.adjustedWallMs || Date.now());
       const mergeChange: VaultChange = {
@@ -765,10 +841,10 @@ export class BrowserVaultEngine {
       if (!response.ok || !payload.ok) throw this.vaultRequestError(response, payload.error, "Vault pull failed");
       this.markVaultRequestAuthorized();
       await this.recordClockHealth(response.headers.get("date"));
+      const previouslyRejected = await session.store.rejectedInbox(500);
       const incoming = (payload.envelopes || []).filter((item) => item.deviceId !== session.deviceId);
       syncChanged ||= incoming.length > 0;
       await session.store.storeInbox(incoming);
-      const rejected: string[] = [];
       for (const item of incoming) {
         try {
           await this.applyRemote(item);
@@ -776,16 +852,28 @@ export class BrowserVaultEngine {
         } catch (error) {
           const reason = error instanceof Error ? error.message : "Encrypted change failed validation";
           await session.store.markInboxRejected(item.sequence, reason);
-          rejected.push(item.changeId);
+        }
+      }
+      for (const item of previouslyRejected) {
+        if (friendlySyncIssue(item).kind !== "history") continue;
+        try {
+          await this.applyRemote(item);
+          await session.store.markInboxApplied(item.sequence);
+          syncChanged = true;
+        } catch (error) {
+          const reason = error instanceof Error ? error.message : "Encrypted change failed validation";
+          await session.store.markInboxRejected(item.sequence, reason);
         }
       }
       const highestSequence = Math.max(metadata?.lastSequence || 0, ...(payload.envelopes || []).map((item) => item.sequence));
       await session.store.updateMetadata({ lastSequence: highestSequence });
-      this.lastSyncError = rejected.length
-        ? `${rejected.length} encrypted change${rejected.length === 1 ? " was" : "s were"} quarantined because validation failed`
+      const remainingRejected = await session.store.rejectedInbox(500);
+      this.lastSyncError = remainingRejected.length
+        ? `${remainingRejected.length} saved change${remainingRejected.length === 1 ? " needs" : "s need"} a safe retry`
         : null;
       await this.syncPendingMedia();
       this.lastSyncedAt = new Date().toISOString();
+      if (syncChanged) window.dispatchEvent(new Event("unigentamos-vault-data-changed"));
       try {
         await this.reportDeviceStatus(syncChanged);
       } catch (error) {
@@ -797,6 +885,16 @@ export class BrowserVaultEngine {
     } finally {
       this.syncing = false;
     }
+  }
+
+  async repairSyncIssues(): Promise<{ repaired: number; remaining: number }> {
+    if (!this.session) throw new Error("Unlock the local vault first");
+    if (!navigator.onLine) throw new Error("Connect to the internet, then try the safe repair again.");
+    if (this.syncing) throw new Error("Sync is already checking your changes. Try again in a moment.");
+    const before = await this.session.store.rejectedInbox(500);
+    await this.syncOnce();
+    const after = await this.session.store.rejectedInbox(500);
+    return { repaired: Math.max(0, before.length - after.length), remaining: after.length };
   }
 
   private async reportDeviceStatus(force = false): Promise<void> {

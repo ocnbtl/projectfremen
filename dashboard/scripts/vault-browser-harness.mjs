@@ -70,6 +70,63 @@ async function waitFor(url, timeoutMs = 30_000) {
   throw new Error(`Timed out waiting for ${url}`);
 }
 
+async function setLocalInboxRejection(page, rejectionReason) {
+  return page.evaluate(async (reason) => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("unigentamos-vault-v1", 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await new Promise((resolve, reject) => {
+      const request = database.transaction("inbox", "readonly").objectStore("inbox").getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const candidate = rows.filter((row) => row.appliedAt).at(-1);
+    if (!candidate) throw new Error("Applied recovery inbox row is missing");
+    delete candidate.appliedAt;
+    candidate.rejectedAt = new Date().toISOString();
+    candidate.rejectionReason = reason;
+    const transaction = database.transaction("inbox", "readwrite");
+    transaction.objectStore("inbox").put(candidate);
+    await new Promise((resolve, reject) => {
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    database.close();
+  }, rejectionReason);
+}
+
+async function clearLocalInboxRejections(page) {
+  return page.evaluate(async () => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("unigentamos-vault-v1", 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await new Promise((resolve, reject) => {
+      const request = database.transaction("inbox", "readonly").objectStore("inbox").getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction("inbox", "readwrite");
+    for (const row of rows) {
+      if (!row.rejectedAt) continue;
+      delete row.rejectedAt;
+      delete row.rejectionReason;
+      row.appliedAt = new Date().toISOString();
+      transaction.objectStore("inbox").put(row);
+    }
+    await new Promise((resolve, reject) => {
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    database.close();
+  });
+}
+
 const tempRoot = await mkdtemp(path.join(tmpdir(), "unigentamos-vault-browser-"));
 const vaultRoot = path.join(tempRoot, "vault");
 const backupRoot = path.join(tempRoot, "backups");
@@ -381,6 +438,124 @@ try {
   await page.getByRole("heading", { name: "Everything is up to date" }).waitFor();
   assert.equal(await page.getByRole("list", { name: "Connected vault devices" }).getByRole("listitem").count(), 2);
   await page.screenshot({ path: path.join(artifactRoot, "vault-devices-desktop.png"), fullPage: true });
+
+  await context.setOffline(true);
+  await page.getByRole("tab", { name: "Notes" }).click();
+  await page.getByText("Offline continuity note", { exact: true }).click();
+  await page.getByRole("textbox", { name: "Note", exact: true }).fill("Windows offline branch kept in history");
+  await page.getByRole("button", { name: "Save version" }).last().click();
+  await page.getByText("Note saved. It will sync automatically.").waitFor();
+  const removedBaseVersions = await page.evaluate(async () => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("unigentamos-vault-v1", 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const objects = await new Promise((resolve, reject) => {
+      const request = database.transaction("objects", "readonly").objectStore("objects").getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const note = objects.find((item) => item.objectKind === "note");
+    if (!note) throw new Error("Recovery test note is missing");
+    const versions = await new Promise((resolve, reject) => {
+      const request = database.transaction("versions", "readonly").objectStore("versions").index("objectId").getAll(note.objectId);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction("versions", "readwrite");
+    let removed = 0;
+    for (const version of versions) {
+      if (version.versionId === note.versionId) continue;
+      transaction.objectStore("versions").delete(version.versionId);
+      removed += 1;
+    }
+    await new Promise((resolve, reject) => {
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    database.close();
+    return removed;
+  });
+  assert.ok(removedBaseVersions >= 1);
+
+  await applePage.getByRole("tab", { name: "Notes" }).click();
+  await applePage.getByText("Offline continuity note", { exact: true }).click();
+  await applePage.waitForTimeout(50);
+  await applePage.getByRole("textbox", { name: "Note", exact: true }).fill("iPhone later branch wins while Windows stays in history");
+  await applePage.getByRole("button", { name: "Save version" }).last().click();
+  await applePage.getByText("Note saved. It will sync automatically.").waitFor();
+  await applePage.getByRole("button", { name: "Check now" }).click();
+  await applePage.getByText("Device status updated.").waitFor();
+
+  await context.setOffline(false);
+  await page.getByRole("button", { name: "Check now" }).click();
+  await page.getByText("Device status updated.").waitFor();
+  let recoveredBody = "";
+  const recoveryDeadline = Date.now() + 15_000;
+  while (Date.now() < recoveryDeadline) {
+    await page.getByRole("tab", { name: "Notes" }).click();
+    await page.getByText("Offline continuity note", { exact: true }).click();
+    recoveredBody = await page.getByRole("textbox", { name: "Note", exact: true }).inputValue();
+    if (recoveredBody === "iPhone later branch wins while Windows stays in history") break;
+    await page.waitForTimeout(250);
+  }
+  assert.equal(recoveredBody, "iPhone later branch wins while Windows stays in history");
+  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length >= 3);
+  const recoveryHistory = await page.getByLabel("Version history").innerText();
+  assert.match(recoveryHistory, /Windows offline branch kept in history/);
+  assert.match(recoveryHistory, /iPhone later branch wins while Windows stays in history/);
+
+  await setLocalInboxRejection(page, "A divergent change is missing its base version");
+  await page.getByRole("button", { name: "Check now" }).click();
+  await page.getByText("Device status updated.").waitFor();
+  const rejectedAfterRepair = await page.evaluate(async () => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("unigentamos-vault-v1", 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await new Promise((resolve, reject) => {
+      const request = database.transaction("inbox", "readonly").objectStore("inbox").getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    return rows.filter((row) => row.rejectedAt && !row.appliedAt).length;
+  });
+  assert.equal(rejectedAfterRepair, 0);
+  assert.equal((await page.locator("body").innerText()).includes("Needs a safe merge"), false);
+  let recoverySettled = false;
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    await page.getByRole("button", { name: "Check now" }).click();
+    await page.waitForTimeout(150);
+    await applePage.getByRole("button", { name: "Check now" }).click();
+    await applePage.waitForTimeout(150);
+    await page.getByRole("button", { name: "Check now" }).click();
+    await page.waitForTimeout(150);
+    recoverySettled = await page.getByRole("heading", { name: "Everything is up to date" }).isVisible()
+      && await applePage.getByRole("heading", { name: "Everything is up to date" }).isVisible();
+    if (recoverySettled) break;
+  }
+  assert.equal(recoverySettled, true);
+  await applePage.getByRole("tab", { name: "Notes" }).click();
+  await applePage.getByText("Offline continuity note", { exact: true }).click();
+  assert.equal(await applePage.getByRole("textbox", { name: "Note", exact: true }).inputValue(), "iPhone later branch wins while Windows stays in history");
+  await page.screenshot({ path: path.join(artifactRoot, "vault-safe-merge-recovered-desktop.png"), fullPage: true });
+
+  await setLocalInboxRejection(page, "Encrypted change authentication failed");
+  await page.getByRole("heading", { name: "A saved change is protected" }).waitFor({ timeout: 7_000 });
+  await page.getByRole("button", { name: "Try safe repair" }).click();
+  await page.getByText("That change is still protected.", { exact: false }).waitFor();
+  await page.screenshot({ path: path.join(artifactRoot, "vault-sync-recovery-desktop.png"), fullPage: true });
+  await clearLocalInboxRejections(page);
+
+  await setLocalInboxRejection(applePage, "Encrypted change authentication failed");
+  await applePage.getByRole("heading", { name: "A saved change is protected" }).waitFor({ timeout: 7_000 });
+  await applePage.screenshot({ path: path.join(artifactRoot, "vault-sync-recovery-iphone.png"), fullPage: true });
+  assert.equal(await applePage.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
+  await clearLocalInboxRejections(applePage);
   await appleContext.close();
 
   await page.evaluate(() => navigator.serviceWorker.ready);
@@ -406,7 +581,7 @@ try {
 
   await context.setOffline(false);
   await context.close();
-  console.log("[pass] guided setup, friendly sign-in recovery, append-only restore, encrypted on-demand media, verified backup, cross-device sync, offline reload, and offline save passed");
+  console.log("[pass] guided setup, friendly sign-in recovery, append-only restore, encrypted on-demand media, verified backup, cross-device sync, missing-base safe merge recovery, blocked-inbox retry, offline reload, and offline save passed");
 } catch (error) {
   console.error("[vault-browser] application output:\n", application?.output() || "");
   console.error("[vault-browser] companion output:\n", companion?.output() || "");

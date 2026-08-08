@@ -131,7 +131,12 @@ function deviceSyncState(device: VaultDeviceStatus, relayHeadSequence: number): 
 } {
   const active = Date.now() - Date.parse(device.lastSeenAt) < 90_000;
   if (device.blockedChanges > 0) {
-    return { label: "Needs attention", detail: `${device.blockedChanges} change${device.blockedChanges === 1 ? " could" : "s could"} not be applied. The earlier version is still saved.`, tone: "attention", current: false };
+    return {
+      label: "Needs a safe merge",
+      detail: `${device.blockedChanges} saved change${device.blockedChanges === 1 ? " is" : "s are"} waiting to be merged. Open and unlock the Vault on this device; nothing was deleted.`,
+      tone: "attention",
+      current: false
+    };
   }
   if (device.pendingChanges > 0) {
     return { label: active ? "Syncing" : "Open to sync", detail: `${device.pendingChanges} change${device.pendingChanges === 1 ? " is" : "s are"} waiting to sync`, tone: "pending", current: false };
@@ -194,15 +199,18 @@ export default function VaultWorkspace() {
     setOnline(navigator.onLine);
     refresh().then(() => setMessage("")).catch(() => setMessage("We could not check this device. Try again."));
     const handleOnline = () => { setOnline(navigator.onLine); void browserVault.syncOnce().finally(refresh); };
+    const handleVaultDataChanged = () => { void Promise.all([loadObjects(), refresh()]); };
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOnline);
+    window.addEventListener("unigentamos-vault-data-changed", handleVaultDataChanged);
     const timer = window.setInterval(() => void refresh(), 5_000);
     return () => {
       window.clearInterval(timer);
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOnline);
+      window.removeEventListener("unigentamos-vault-data-changed", handleVaultDataChanged);
     };
-  }, [refresh]);
+  }, [loadObjects, refresh]);
 
   function chooseSetupTarget(target: SetupTarget) {
     setSetupTarget(target);
@@ -453,6 +461,16 @@ export default function VaultWorkspace() {
     });
   }
 
+  async function repairSyncIssues() {
+    await run(async () => {
+      const result = await browserVault.repairSyncIssues();
+      await loadObjects();
+      setMessage(result.remaining === 0
+        ? "Sync fixed. Both versions are saved in history and your devices can catch up."
+        : "That change is still protected. Nothing was overwritten; keep this device open while the Vault checks it again.");
+    });
+  }
+
   function stringField(snapshot: VaultObjectSnapshot, field: string): string {
     const value = snapshot.fields[field];
     return typeof value === "string" ? value : "";
@@ -528,6 +546,7 @@ export default function VaultWorkspace() {
     : 0;
   const allDevicesCurrent = registeredDevices.length > 0 && currentDevices === registeredDevices.length;
   const onlineAuthorizationRequired = Boolean(status?.sync.authorizationRequired);
+  const syncIssues = status?.sync.issues || [];
   const clock = status?.metadata?.clockHealth;
   const filteredObjects = useMemo(() => objects.filter((item) => {
     if (activeKind !== "all" && item.objectKind !== activeKind) return false;
@@ -551,13 +570,14 @@ export default function VaultWorkspace() {
     : [];
   const stateLabel = !status?.configured ? "Set up needed" : status.unlocked ? "Open" : "Locked";
   const networkLabel = onlineAuthorizationRequired ? "Sign in to sync"
+    : syncIssues.length ? `${syncIssues.length} saved change${syncIssues.length === 1 ? " needs" : "s need"} help`
     : status?.sync.state === "synced" ? "Up to date"
     : status?.sync.state === "retrying" ? "Trying again · your work is safe"
       : status?.sync.state === "offline" ? "Offline · your work is safe" : online ? "Checking for changes" : "Offline · your work is safe";
   const deviceCountLabel = !status?.unlocked ? "Unlock to check"
     : onlineAuthorizationRequired ? "Sign in to connect"
       : deviceSnapshot ? `${registeredDevices.length} connected` : "Checking";
-  const clockLabel = clock?.state === "healthy" ? "Checked" : clock ? "Needs attention" : "Checking";
+  const clockLabel = clock?.state === "healthy" ? "Checked" : clock?.orderingSafe ? "Corrected" : clock ? "Check needed" : "Checking";
   const cards = useMemo(() => [
     ["Vault", stateLabel],
     ["Sync", networkLabel],
@@ -735,12 +755,22 @@ export default function VaultWorkspace() {
             <Link className={styles.signInButton} href="/admin/login?next=%2Fvault">Sign in to sync</Link>
           </section>}
 
+          {!onlineAuthorizationRequired && syncIssues.length > 0 && <section className={styles.syncRecovery} role="status" aria-labelledby="vault-sync-recovery-title">
+            <div>
+              <p className={styles.eyebrow}>Your work is safe</p>
+              <h2 id="vault-sync-recovery-title">{syncIssues.length === 1 ? syncIssues[0].title : `${syncIssues.length} saved changes need a safe merge`}</h2>
+              <p>{syncIssues.length === 1 ? syncIssues[0].detail : "The Vault kept every version separate. It can retry the merge without deleting either copy."}</p>
+              <small>Automatic repair keeps both versions in history. If the same field changed twice, the newest saved value stays on top.</small>
+            </div>
+            <button disabled={busy || !online} onClick={repairSyncIssues}>Try safe repair</button>
+          </section>}
+
           {!onlineAuthorizationRequired && <section className={`${styles.panel} ${styles.devicesPanel}`} aria-labelledby="devices-sync-title">
             <div className={styles.devicesHeader}>
               <div>
                 <p className={styles.eyebrow}>Your devices</p>
                 <h2 id="devices-sync-title">{allDevicesCurrent ? "Everything is up to date" : deviceSnapshot ? `${currentDevices} of ${registeredDevices.length} devices are up to date` : "Checking your devices…"}</h2>
-                <p>Open the Vault on any device that needs to catch up.</p>
+                <p>Keep the Vault open and unlocked on any device that needs to catch up.</p>
               </div>
               <button disabled={busy || !online} onClick={refreshDevices}>Check now</button>
             </div>
@@ -781,7 +811,7 @@ export default function VaultWorkspace() {
                 <span>Open the Vault once on each device. It will appear here when it syncs.</span>
               </div>
             )}
-            <small>Each browser or Home Screen app counts as its own device.</small>
+            <small>Each browser or Home Screen app counts as its own device. Sync runs while that Vault is open and unlocked.</small>
           </section>}
 
           <section className={styles.grid}>

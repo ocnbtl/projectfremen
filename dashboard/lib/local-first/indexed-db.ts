@@ -38,6 +38,7 @@ type StoredObjectEnvelope = {
 
 type OutboxRow = EncryptedChangeEnvelope & { queuedAt: string; attempts: number };
 type InboxRow = SequencedChangeEnvelope & { appliedAt?: string; rejectedAt?: string; rejectionReason?: string };
+export type RejectedInboxRow = SequencedChangeEnvelope & { rejectedAt: string; rejectionReason: string };
 export type StoredMediaChunk = {
   digest: string;
   mediaId: string;
@@ -223,9 +224,20 @@ export class BrowserVaultStore {
 
   async storeInbox(envelopes: readonly SequencedChangeEnvelope[]): Promise<void> {
     if (!envelopes.length) return;
+    const existingTransaction = this.database.transaction("inbox", "readonly");
+    const existingRows = await requestResult(existingTransaction.objectStore("inbox").getAll()) as InboxRow[];
+    const existingBySequence = new Map(existingRows.map((row) => [row.sequence, row]));
     const transaction = this.database.transaction("inbox", "readwrite");
     const store = transaction.objectStore("inbox");
-    for (const envelope of envelopes) store.put(envelope satisfies InboxRow);
+    for (const envelope of envelopes) {
+      const existing = existingBySequence.get(envelope.sequence);
+      store.put({
+        ...envelope,
+        ...(existing?.appliedAt ? { appliedAt: existing.appliedAt } : {}),
+        ...(existing?.rejectedAt ? { rejectedAt: existing.rejectedAt } : {}),
+        ...(existing?.rejectionReason ? { rejectionReason: existing.rejectionReason } : {})
+      } satisfies InboxRow);
+    }
     await transactionDone(transaction);
     notify("inbox-changed", { count: envelopes.length });
   }
@@ -236,11 +248,22 @@ export class BrowserVaultStore {
     return (rows as InboxRow[]).filter((row) => !row.appliedAt && !row.rejectedAt).sort((left, right) => left.sequence - right.sequence);
   }
 
+  async rejectedInbox(limit = 200): Promise<RejectedInboxRow[]> {
+    const transaction = this.database.transaction("inbox", "readonly");
+    const rows = await requestResult(transaction.objectStore("inbox").getAll(null, Math.min(Math.max(limit, 1), 500))) as InboxRow[];
+    return rows
+      .filter((row): row is RejectedInboxRow => Boolean(row.rejectedAt && row.rejectionReason) && !row.appliedAt)
+      .sort((left, right) => left.sequence - right.sequence);
+  }
+
   async markInboxApplied(sequence: number): Promise<void> {
     const transaction = this.database.transaction("inbox", "readwrite");
     const store = transaction.objectStore("inbox");
     const row = await requestResult(store.get(sequence)) as InboxRow | undefined;
-    if (row) store.put({ ...row, appliedAt: new Date().toISOString() });
+    if (row) {
+      const { rejectedAt: _rejectedAt, rejectionReason: _rejectionReason, ...rest } = row;
+      store.put({ ...rest, appliedAt: new Date().toISOString() });
+    }
     await transactionDone(transaction);
   }
 
@@ -248,7 +271,10 @@ export class BrowserVaultStore {
     const transaction = this.database.transaction("inbox", "readwrite");
     const store = transaction.objectStore("inbox");
     const row = await requestResult(store.get(sequence)) as InboxRow | undefined;
-    if (row) store.put({ ...row, rejectedAt: new Date().toISOString(), rejectionReason: reason.slice(0, 500) });
+    if (row) {
+      const { appliedAt: _appliedAt, ...rest } = row;
+      store.put({ ...rest, rejectedAt: new Date().toISOString(), rejectionReason: reason.slice(0, 500) });
+    }
     await transactionDone(transaction);
   }
 
