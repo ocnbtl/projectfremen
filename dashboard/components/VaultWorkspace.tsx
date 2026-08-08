@@ -730,7 +730,7 @@ export default function VaultWorkspace() {
               <p className={styles.eyebrow}>Online sync is paused</p>
               <h2 id="vault-sync-sign-in-title">Sign in to connect this browser</h2>
               <p>Your Vault is open and your local work is safe. Use your normal Unigentamos sign-in password, then return here and unlock the Vault once more.</p>
-              <small>Brave, Dia, Safari, and Home Screen apps each keep their own sign-in. Sign in once in every browser or app you want to sync.</small>
+              <small>Brave, Dia, Safari, and Home Screen apps each keep their own sign-in. Sign in in every browser or app you want to sync. The Vault will tell you if a secure session needs to be renewed.</small>
             </div>
             <Link className={styles.signInButton} href="/admin/login?next=%2Fvault">Sign in to sync</Link>
           </section>}
