@@ -13,6 +13,7 @@ type Pixel = {
 type LandingProps = {
   hasError?: boolean;
   errorPath: string;
+  successPath?: string;
   showBackLink?: boolean;
 };
 
@@ -161,6 +162,7 @@ function nextPixels(
 export default function AnimatedLandingPage({
   hasError = false,
   errorPath,
+  successPath = "/admin?welcome=1",
   showBackLink = false
 }: LandingProps) {
   const [animationComplete, setAnimationComplete] = useState(false);
@@ -344,7 +346,7 @@ export default function AnimatedLandingPage({
         >
           <form action="/api/admin/login" method="post" className="landing-login-form">
             <input type="hidden" name="errorPath" value={errorPath} />
-            <input type="hidden" name="successPath" value="/admin?welcome=1" />
+            <input type="hidden" name="successPath" value={successPath} />
 
             {hasError && (
               <p className="landing-error" role="alert">

@@ -47,6 +47,21 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const DEVICE_STATUS_HEARTBEAT_MS = 30_000;
 const MEDIA_CHUNK_SIZE = 1_500_000;
 const MAX_MEDIA_FILE_BYTES = 256 * 1024 * 1024;
+export const VAULT_ONLINE_SIGN_IN_MESSAGE = "Sign in to Unigentamos in this browser to sync your Vault.";
+
+export class VaultOnlineAuthorizationError extends Error {
+  readonly code = "vault_online_authorization_required";
+
+  constructor() {
+    super(VAULT_ONLINE_SIGN_IN_MESSAGE);
+    this.name = "VaultOnlineAuthorizationError";
+  }
+}
+
+export function isVaultOnlineAuthorizationError(error: unknown): error is VaultOnlineAuthorizationError {
+  return error instanceof VaultOnlineAuthorizationError
+    || error instanceof Error && "code" in error && error.code === "vault_online_authorization_required";
+}
 
 type CanonicalBaseMetadata = {
   versionId: string;
@@ -151,6 +166,7 @@ export class BrowserVaultEngine {
   private deviceStatusSnapshot: VaultDeviceStatusSnapshot | null = null;
   private lastDeviceStatusError: string | null = null;
   private lastDeviceHeartbeatAt = 0;
+  private onlineAuthorizationRequired = false;
 
   isUnlocked(): boolean {
     return Boolean(this.session);
@@ -170,7 +186,8 @@ export class BrowserVaultEngine {
             : this.lastSyncError ? "retrying" as const
               : this.lastSyncedAt ? "synced" as const : "pending" as const,
           lastError: this.lastSyncError,
-          lastSyncedAt: this.lastSyncedAt
+          lastSyncedAt: this.lastSyncedAt,
+          authorizationRequired: this.onlineAuthorizationRequired
         },
         devices: {
           snapshot: this.deviceStatusSnapshot,
@@ -332,6 +349,19 @@ export class BrowserVaultEngine {
   private requireSession(): VaultSession {
     if (!this.session) throw new Error("Unlock the local vault first");
     return this.session;
+  }
+
+  private vaultRequestError(response: Response, error: string | undefined, fallback: string): Error {
+    if (response.status === 401) {
+      this.onlineAuthorizationRequired = true;
+      return new VaultOnlineAuthorizationError();
+    }
+    this.onlineAuthorizationRequired = false;
+    return new Error(error || fallback);
+  }
+
+  private markVaultRequestAuthorized() {
+    this.onlineAuthorizationRequired = false;
   }
 
   private async correctedWallMs(): Promise<number> {
@@ -724,14 +754,16 @@ export class BrowserVaultEngine {
           body: JSON.stringify({ vaultId: session.vaultId, envelopes: outbox })
         });
         const payload = await response.json() as { ok?: boolean; acceptedChangeIds?: string[]; error?: string };
-        if (!response.ok || !payload.ok) throw new Error(payload.error || "Vault push failed");
+        if (!response.ok || !payload.ok) throw this.vaultRequestError(response, payload.error, "Vault push failed");
+        this.markVaultRequestAuthorized();
         await session.store.acknowledge(payload.acceptedChangeIds || []);
         await this.recordClockHealth(response.headers.get("date"));
       }
       const metadata = await session.store.metadata();
       const response = await fetch(`/api/vault/sync?vaultId=${encodeURIComponent(session.vaultId)}&since=${metadata?.lastSequence || 0}`, { cache: "no-store" });
       const payload = await response.json() as { ok?: boolean; envelopes?: SequencedChangeEnvelope[]; error?: string };
-      if (!response.ok || !payload.ok) throw new Error(payload.error || "Vault pull failed");
+      if (!response.ok || !payload.ok) throw this.vaultRequestError(response, payload.error, "Vault pull failed");
+      this.markVaultRequestAuthorized();
       await this.recordClockHealth(response.headers.get("date"));
       const incoming = (payload.envelopes || []).filter((item) => item.deviceId !== session.deviceId);
       syncChanged ||= incoming.length > 0;
@@ -800,8 +832,9 @@ export class BrowserVaultEngine {
       error?: string;
     };
     if (!response.ok || !payload.ok || !Number.isSafeInteger(payload.relayHeadSequence) || !Array.isArray(payload.devices)) {
-      throw new Error(payload.error || "Device sync status is unavailable");
+      throw this.vaultRequestError(response, payload.error, "Device sync status is unavailable");
     }
+    this.markVaultRequestAuthorized();
     let unreadable = 0;
     const devices = await Promise.all(payload.devices.map(async (item) => {
       try {
@@ -866,7 +899,8 @@ export class BrowserVaultEngine {
       body: JSON.stringify({ vaultId: packet.vaultId, chunk: packet })
     });
     const payload = await response.json() as { ok?: boolean; error?: string };
-    if (!response.ok || !payload.ok) throw new Error(payload.error || "Encrypted media upload failed");
+    if (!response.ok || !payload.ok) throw this.vaultRequestError(response, payload.error, "Encrypted media upload failed");
+    this.markVaultRequestAuthorized();
   }
 
   private async syncMediaChunks(manifest: VaultMediaManifest, onProgress?: (completed: number, total: number) => void): Promise<void> {
@@ -1029,7 +1063,8 @@ export class BrowserVaultEngine {
         if (!navigator.onLine) throw new Error("Connect to the internet once to download this file to this device");
         const response = await fetch(`/api/vault/media?vaultId=${encodeURIComponent(session.vaultId)}&mediaId=${encodeURIComponent(manifest.mediaId)}&chunkIndex=${index}`, { cache: "no-store" });
         const payload = await response.json() as { ok?: boolean; chunk?: EncryptedVaultMediaChunk; error?: string };
-        if (!response.ok || !payload.ok || !payload.chunk) throw new Error(payload.error || "Encrypted media download failed");
+        if (!response.ok || !payload.ok || !payload.chunk) throw this.vaultRequestError(response, payload.error, "Encrypted media download failed");
+        this.markVaultRequestAuthorized();
         if (payload.chunk.contentRoot !== manifest.contentRoot || payload.chunk.totalChunks !== manifest.totalChunks) {
           throw new Error("Encrypted media does not match its saved details");
         }

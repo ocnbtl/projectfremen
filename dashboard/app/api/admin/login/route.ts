@@ -19,6 +19,12 @@ function sanitizePath(value: string, fallback: string) {
   return value;
 }
 
+function redirectWithError(request: Request, errorPath: string) {
+  const target = new URL(errorPath, request.url);
+  target.searchParams.set("error", "1");
+  return NextResponse.redirect(target, { status: 303 });
+}
+
 function isSameOriginRequest(request: Request): boolean {
   const expectedOrigin = new URL(request.url).origin;
   const origin = request.headers.get("origin");
@@ -59,7 +65,7 @@ export async function POST(request: Request) {
       status: "denied",
       detail: `retryAfterSeconds=${allowance.retryAfterSeconds}`
     });
-    return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url), { status: 303 });
+    return redirectWithError(request, errorPath);
   }
 
   if (!isSameOriginRequest(request)) {
@@ -72,7 +78,7 @@ export async function POST(request: Request) {
       ip,
       status: "denied"
     });
-    return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url), { status: 303 });
+    return redirectWithError(request, errorPath);
   }
 
   if (!adminPassword || password !== adminPassword) {
@@ -85,7 +91,7 @@ export async function POST(request: Request) {
       ip,
       status: "denied"
     });
-    return NextResponse.redirect(new URL(`${errorPath}?error=1`, request.url), { status: 303 });
+    return redirectWithError(request, errorPath);
   }
 
   recordLoginResult(rateLimitKey, true);
