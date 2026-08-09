@@ -313,6 +313,16 @@ try {
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("first encrypted version");
   await page.getByRole("button", { name: "Save version" }).last().click();
   await page.getByText("Note saved. It will sync automatically.").waitFor();
+  await page.getByRole("button", { name: "Check now" }).click();
+  await page.getByText("Device status updated.").waitFor();
+  await page.waitForTimeout(150);
+  const relayAfterFirstSave = relayEnvelopes.length;
+  await page.getByRole("button", { name: "Save version" }).last().click();
+  await page.waitForFunction(() => !Array.from(document.querySelectorAll("button")).find((button) => button.textContent === "Save version")?.disabled);
+  await page.getByRole("button", { name: "Check now" }).click();
+  await page.waitForTimeout(150);
+  assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 1);
+  assert.equal(relayEnvelopes.length, relayAfterFirstSave);
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("second encrypted version");
   await page.getByRole("button", { name: "Save version" }).last().click();
   await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 2);
@@ -502,7 +512,8 @@ try {
     await page.waitForTimeout(250);
   }
   assert.equal(recoveredBody, "iPhone later branch wins while Windows stays in history");
-  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length >= 3);
+  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 2);
+  assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 2);
   const recoveryHistory = await page.getByLabel("Version history").innerText();
   assert.match(recoveryHistory, /Windows offline branch kept in history/);
   assert.match(recoveryHistory, /iPhone later branch wins while Windows stays in history/);
@@ -539,6 +550,14 @@ try {
     if (recoverySettled) break;
   }
   assert.equal(recoverySettled, true);
+  const settledRelayCount = relayEnvelopes.length;
+  for (let repeat = 0; repeat < 3; repeat += 1) {
+    await page.getByRole("button", { name: "Check now" }).click();
+    await page.waitForTimeout(100);
+    await applePage.getByRole("button", { name: "Check now" }).click();
+    await page.waitForTimeout(100);
+  }
+  assert.equal(relayEnvelopes.length, settledRelayCount);
   await applePage.getByRole("tab", { name: "Notes" }).click();
   await applePage.getByText("Offline continuity note", { exact: true }).click();
   assert.equal(await applePage.getByRole("textbox", { name: "Note", exact: true }).inputValue(), "iPhone later branch wins while Windows stays in history");
@@ -575,8 +594,8 @@ try {
   await page.getByText("Offline continuity note", { exact: true }).click();
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("third encrypted version saved offline");
   await page.getByRole("button", { name: "Save version" }).last().click();
-  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 4);
-  assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 4);
+  await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 3);
+  assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 3);
   assert.deepEqual(unexpectedFailures, []);
 
   await context.setOffline(false);

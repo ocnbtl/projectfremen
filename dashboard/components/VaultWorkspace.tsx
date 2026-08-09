@@ -856,7 +856,7 @@ export default function VaultWorkspace() {
           <section className={styles.panel}>
             <p className={styles.eyebrow}>Version history</p>
             <h2>Try a note</h2>
-            <p>Every save creates a version you can return to. Changes to different fields merge automatically. If the same field changes on two devices, the newest one wins and the other stays in history.</p>
+            <p>History adds a version only when the content changes. Edits to different fields merge automatically. If the same field changes on two devices, the newest value stays on top and the other copy stays available.</p>
             <textarea value={journal} onChange={(event) => setJournal(event.target.value)} rows={8} placeholder="Write here, save, then keep editing to create history…" />
             <div className={styles.buttonRow}><button disabled={busy} onClick={saveJournal}>Save version</button><span>{historyCount ? `${historyCount} saved version${historyCount === 1 ? "" : "s"}` : "No versions saved yet"}</span></div>
           </section>
@@ -881,7 +881,7 @@ export default function VaultWorkspace() {
 
           <section className={`${styles.panel} ${styles.objectWorkspace}`}>
             <div className={styles.workspaceHeader}>
-              <div><p className={styles.eyebrow}>Saved on this device</p><h2>All records and version history</h2><p>Browse every saved record. Restoring an older version makes a new latest copy; nothing in history is removed.</p></div>
+              <div><p className={styles.eyebrow}>Saved on this device</p><h2>All records and version history</h2><p>Browse every saved record. History shows real content changes, not background sync activity. Restoring an older version makes a new latest copy.</p></div>
               {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={newObject}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
             </div>
             <label className={styles.recordSearch}>Search records<input type="search" value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} placeholder="Search titles, names, and saved details" /></label>

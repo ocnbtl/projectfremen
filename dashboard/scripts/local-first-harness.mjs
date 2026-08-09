@@ -38,9 +38,10 @@ function snapshot(objectId, objectKind, versionId, deviceId, wallMs, fields, bas
 }
 
 try {
-  for (const moduleName of ["types", "hlc", "merge", "crypto", "relay-store"]) await compile(moduleName);
+  for (const moduleName of ["types", "hlc", "merge", "crypto", "relay-store", "semantic-history"]) await compile(moduleName);
   const { assessClockHealth, compareHlc, tickHlc } = await import(pathToFileURL(path.join(outputRoot, "hlc.mjs")));
   const { mergeVaultSnapshots, threeWayMergeText } = await import(pathToFileURL(path.join(outputRoot, "merge.mjs")));
+  const { deterministicMergeVersionId, meaningfulVaultHistory } = await import(pathToFileURL(path.join(outputRoot, "semantic-history.mjs")));
   const {
     createVaultKeyEnvelope,
     decryptVaultChange,
@@ -66,6 +67,37 @@ try {
   assert.equal(merged.snapshot.fields.email, "new@example.com");
   assert.equal(merged.snapshot.fields.phone, "222");
   assert.equal(merged.conflicts.length, 0);
+
+  const repeatedSnapshots = Array.from({ length: 50 }, (_, index) => snapshot(
+    objectId,
+    "note",
+    `repeat-${index + 1}`,
+    `device-${index % 4}`,
+    4_000 + index,
+    {
+      title: "Vault journal",
+      body: "unchanged",
+      __unigentamosCanonicalBaseV1: { versionId: `base-${index}`, fields: { title: "Vault journal" } }
+    }
+  ));
+  const collapsed = meaningfulVaultHistory(repeatedSnapshots);
+  assert.equal(collapsed.length, 1);
+  assert.equal(collapsed[0].versionId, "repeat-1");
+
+  const changedBack = meaningfulVaultHistory([
+    snapshot(objectId, "note", "state-a-1", "device-a", 5_000, { body: "A" }),
+    snapshot(objectId, "note", "state-b", "device-a", 6_000, { body: "B" }),
+    snapshot(objectId, "note", "state-a-2", "device-a", 7_000, { body: "A" })
+  ]);
+  assert.deepEqual(changedBack.map((item) => item.versionId), ["state-a-2", "state-b", "state-a-1"]);
+
+  const deterministicMerge = mergeVaultSnapshots(base, local, remote).snapshot;
+  const mergeId = await deterministicMergeVersionId(deterministicMerge, [local.versionId, remote.versionId]);
+  assert.equal(
+    mergeId,
+    await deterministicMergeVersionId(deterministicMerge, [remote.versionId, local.versionId, remote.versionId])
+  );
+  assert.match(mergeId, /^[0-9a-f]{8}-[0-9a-f]{4}-5[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
 
   const overlap = mergeVaultSnapshots(
     snapshot(objectId, "note", "base-2", "device-a", 1_000, { title: "Original" }),

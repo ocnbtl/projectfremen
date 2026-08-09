@@ -16,6 +16,7 @@ import {
 import { assessClockHealth, compareHlc, receiveHlc, tickHlc } from "./hlc";
 import { BrowserVaultStore, type RejectedInboxRow } from "./indexed-db";
 import { mergeVaultSnapshots } from "./merge";
+import { deterministicMergeVersionId, meaningfulVaultHistory, snapshotsEquivalent } from "./semantic-history";
 import {
   VAULT_PROTOCOL_VERSION,
   type EncryptedChangeEnvelope,
@@ -135,12 +136,6 @@ function stableValue(value: VaultFieldValue): VaultFieldValue {
 
 function fieldsEqual(left: Record<string, VaultFieldValue>, right: Record<string, VaultFieldValue>): boolean {
   return JSON.stringify(stableValue(left)) === JSON.stringify(stableValue(right));
-}
-
-function snapshotsEquivalent(left: VaultObjectSnapshot, right: VaultObjectSnapshot): boolean {
-  return left.objectKind === right.objectKind
-    && left.tombstone === right.tombstone
-    && fieldsEqual(withoutCanonicalBase(left.fields), withoutCanonicalBase(right.fields));
 }
 
 function normalizedDeviceName(value: string, fallback: string): string {
@@ -455,8 +450,7 @@ export class BrowserVaultEngine {
       const envelope = row.envelope as EncryptedChangeEnvelope | undefined;
       return envelope ? snapshotFromChange(await decryptVaultChange(envelope, session.key)) : null;
     }));
-    return snapshots.filter((snapshot): snapshot is VaultObjectSnapshot => Boolean(snapshot))
-      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    return meaningfulVaultHistory(snapshots.filter((snapshot): snapshot is VaultObjectSnapshot => Boolean(snapshot)));
   }
 
   async restoreVersion(objectId: string, versionId: string): Promise<VaultObjectSnapshot> {
@@ -518,10 +512,17 @@ export class BrowserVaultEngine {
     const session = this.requireSession();
     const objectId = input.objectId || crypto.randomUUID();
     const previous = await this.readObject(objectId);
+    const fields = { ...(previous?.fields || {}), ...input.fields };
+    const tombstone = input.tombstone ?? previous?.tombstone ?? false;
+    if (previous && snapshotsEquivalent(previous, {
+      ...previous,
+      objectKind: input.objectKind,
+      fields,
+      tombstone
+    })) return previous;
     const metadata = await session.store.metadata();
     if (!metadata) throw new Error("Local vault metadata is missing");
     const hlc = tickHlc(metadata.lastClock, session.deviceId, await this.correctedWallMs());
-    const fields = { ...(previous?.fields || {}), ...input.fields };
     const fieldClocks = { ...(previous?.fieldClocks || {}) };
     for (const field of Object.keys(input.fields)) fieldClocks[field] = hlc;
     const change: VaultChange = {
@@ -534,7 +535,7 @@ export class BrowserVaultEngine {
       ...(previous ? { baseVersionId: previous.versionId } : {}),
       fields,
       fieldClocks,
-      ...(input.tombstone !== undefined ? { tombstone: input.tombstone } : {}),
+      ...(tombstone ? { tombstone: true } : {}),
       createdAt: new Date(hlc.wallMs).toISOString()
     };
     const envelope = await encryptVaultChange(change, session.vaultId, session.key, session.keyVersion);
@@ -756,34 +757,74 @@ export class BrowserVaultEngine {
       };
       const merged = mergeVaultSnapshots(base, local, remote);
       const hlc = receiveHlc(local.hlc, remote.hlc, session.deviceId, metadata?.clockHealth?.adjustedWallMs || Date.now());
-      const mergeChange: VaultChange = {
-        protocolVersion: VAULT_PROTOCOL_VERSION,
-        changeId: merged.snapshot.versionId,
-        objectId: remote.objectId,
-        objectKind: remote.objectKind,
-        deviceId: session.deviceId,
-        hlc,
-        baseVersionId: local.versionId,
-        fields: merged.snapshot.fields,
-        fieldClocks: merged.snapshot.fieldClocks,
-        tombstone: merged.snapshot.tombstone,
-        createdAt: new Date(hlc.wallMs).toISOString()
-      };
-      applied = snapshotFromChange(mergeChange);
-      appliedEnvelope = await encryptVaultChange(mergeChange, session.vaultId, session.key, session.keyVersion);
-      appliedParentVersionIds = Array.from(new Set([local.versionId, remote.versionId]));
-      await session.store.queue(appliedEnvelope);
-      for (const [index, conflict] of merged.conflicts.entries()) {
-        await session.store.putConflict({
-          objectId: remote.objectId,
-          conflictId: `${mergeChange.changeId}-conflict-${index}`,
-          field: conflict.field,
-          winner: conflict.winner,
-          reason: conflict.reason,
-          remoteEnvelope: envelope,
-          resolvedEnvelope: appliedEnvelope,
-          createdAt: mergeChange.createdAt
+      const parentVersionIds = Array.from(new Set([local.versionId, remote.versionId]));
+      const resolvedAt = new Date(hlc.wallMs).toISOString();
+      if (snapshotsEquivalent(merged.snapshot, local)) {
+        const localEnvelope = (await session.store.object(local.objectId))?.envelope;
+        if (!localEnvelope) throw new Error("Local encrypted version is missing");
+        for (const [index, conflict] of merged.conflicts.entries()) {
+          await session.store.putConflict({
+            objectId: remote.objectId,
+            conflictId: `${local.versionId}-${remote.versionId}-conflict-${index}`,
+            field: conflict.field,
+            winner: conflict.winner,
+            reason: conflict.reason,
+            remoteEnvelope: envelope,
+            resolvedEnvelope: localEnvelope,
+            createdAt: resolvedAt
+          });
+        }
+        await this.mirrorEnvelopes([envelope]);
+        const latestMetadata = await session.store.metadata();
+        await session.store.updateMetadata({
+          lastSequence: Math.max(latestMetadata?.lastSequence || 0, envelope.sequence),
+          lastClock: receiveHlc(latestMetadata?.lastClock || null, remote.hlc, session.deviceId, latestMetadata?.clockHealth?.adjustedWallMs || Date.now())
         });
+        return;
+      }
+      if (snapshotsEquivalent(merged.snapshot, remote)) {
+        for (const [index, conflict] of merged.conflicts.entries()) {
+          await session.store.putConflict({
+            objectId: remote.objectId,
+            conflictId: `${remote.versionId}-${local.versionId}-conflict-${index}`,
+            field: conflict.field,
+            winner: conflict.winner,
+            reason: conflict.reason,
+            remoteEnvelope: envelope,
+            resolvedEnvelope: envelope,
+            createdAt: resolvedAt
+          });
+        }
+      } else {
+        const mergeChange: VaultChange = {
+          protocolVersion: VAULT_PROTOCOL_VERSION,
+          changeId: await deterministicMergeVersionId(merged.snapshot, parentVersionIds),
+          objectId: remote.objectId,
+          objectKind: remote.objectKind,
+          deviceId: session.deviceId,
+          hlc,
+          baseVersionId: local.versionId,
+          fields: merged.snapshot.fields,
+          fieldClocks: merged.snapshot.fieldClocks,
+          tombstone: merged.snapshot.tombstone,
+          createdAt: resolvedAt
+        };
+        applied = snapshotFromChange(mergeChange);
+        appliedEnvelope = await encryptVaultChange(mergeChange, session.vaultId, session.key, session.keyVersion);
+        appliedParentVersionIds = parentVersionIds;
+        await session.store.queue(appliedEnvelope);
+        for (const [index, conflict] of merged.conflicts.entries()) {
+          await session.store.putConflict({
+            objectId: remote.objectId,
+            conflictId: `${mergeChange.changeId}-conflict-${index}`,
+            field: conflict.field,
+            winner: conflict.winner,
+            reason: conflict.reason,
+            remoteEnvelope: envelope,
+            resolvedEnvelope: appliedEnvelope,
+            createdAt: mergeChange.createdAt
+          });
+        }
       }
     }
     if (applied.versionId !== remote.versionId) {
