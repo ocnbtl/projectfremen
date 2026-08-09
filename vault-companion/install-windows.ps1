@@ -5,6 +5,7 @@ param(
   [ValidateRange(1, 1024)][int]$MaxRecordStorageGiB = 32,
   [ValidateRange(1, 10000000)][int]$MaxHistoryVersions = 2000000,
   [ValidateRange(1, 100)][int]$MaxBackups = 3,
+  [ValidateRange(1, 365)][int]$AutoBackupDays = 7,
   [switch]$DoNotStart
 )
 
@@ -107,6 +108,7 @@ if ($resolvedBackup) {
   maxRecordStorageBytes = [int64]$MaxRecordStorageGiB * 1GB
   maxHistoryVersions = $MaxHistoryVersions
   maxBackups = $MaxBackups
+  autoBackupDays = $AutoBackupDays
   setupCode = $setupCode
   installedAt = (Get-Date).ToUniversalTime().ToString("o")
 } | ConvertTo-Json | Set-Content -LiteralPath $configPath -Encoding UTF8
@@ -120,6 +122,7 @@ $env:UNIGENTAMOS_MAX_MEDIA_LIBRARY_BYTES = [string]$config.maxMediaLibraryBytes
 $env:UNIGENTAMOS_MAX_RECORD_STORAGE_BYTES = [string]$config.maxRecordStorageBytes
 $env:UNIGENTAMOS_MAX_HISTORY_VERSIONS = [string]$config.maxHistoryVersions
 $env:UNIGENTAMOS_MAX_BACKUPS = [string]$config.maxBackups
+$env:UNIGENTAMOS_VAULT_AUTO_BACKUP_MS = [string]([int64]$config.autoBackupDays * 86400000)
 if ($config.backupDirectory) {
   $env:UNIGENTAMOS_VAULT_BACKUP_DIR = [string]$config.backupDirectory
 }
@@ -162,6 +165,7 @@ if (-not $DoNotStart) {
 Write-Host "Unigentamos Vault Companion installed for $currentUser."
 Write-Host "It runs invisibly at sign-in and listens only on 127.0.0.1:43127."
 Write-Host "Limits: $MaxMediaLibraryGiB GiB media, $MaxRecordStorageGiB GiB record history, $MaxHistoryVersions versions, $MaxBackups backup sets."
+Write-Host "Automatic encrypted backup cadence: every $AutoBackupDays day(s) while the vault is unlocked."
 Write-Host "Find pairing and status anytime: Start menu > Unigentamos Vault Companion."
 if (-not $existing) {
   Write-Host "One-time desktop pairing code: $setupCode"

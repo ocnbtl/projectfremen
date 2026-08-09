@@ -24,8 +24,11 @@ import {
   type EncryptedVaultDeviceStatus,
   type SequencedChangeEnvelope,
   type VaultChange,
+  type VaultCompactionResult,
+  type VaultCompanionStatus,
   type VaultDeviceKind,
   type VaultDeviceStatusSnapshot,
+  type VaultRelayHealth,
   type VaultFieldValue,
   type VaultBackupRestorePreview,
   type VaultBackupSummary,
@@ -46,6 +49,9 @@ type VaultSession = {
 const CANONICAL_BASE_FIELD = "__unigentamosCanonicalBaseV1";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEVICE_STATUS_HEARTBEAT_MS = 30_000;
+const RELAY_COMPACTION_INTERVAL_MS = 6 * 60 * 60_000;
+const RELAY_COMPACTION_MIN_ROWS = 512;
+const MAX_COMPACTION_CHANGE_IDS = 50_000;
 const MEDIA_CHUNK_SIZE = 1_500_000;
 const MAX_MEDIA_FILE_BYTES = 256 * 1024 * 1024;
 export const VAULT_ONLINE_SIGN_IN_MESSAGE = "Sign in to Unigentamos in this browser to sync your Vault.";
@@ -204,6 +210,9 @@ export class BrowserVaultEngine {
   private deviceStatusSnapshot: VaultDeviceStatusSnapshot | null = null;
   private lastDeviceStatusError: string | null = null;
   private lastDeviceHeartbeatAt = 0;
+  private lastCompactionAttemptAt = 0;
+  private lastCompactionResult: VaultCompactionResult | null = null;
+  private lastCompactionError: string | null = null;
   private onlineAuthorizationRequired = false;
 
   isUnlocked(): boolean {
@@ -214,10 +223,11 @@ export class BrowserVaultEngine {
     const store = await BrowserVaultStore.open();
     try {
       const metadata = await store.metadata();
-      const [diagnostics, rejected, localCompanion] = await Promise.all([
+      const [diagnostics, rejected, localCompanion, storage] = await Promise.all([
         store.diagnostics(),
         store.rejectedInbox(),
-        this.companionStatus()
+        this.companionStatus(),
+        store.storageHealth()
       ]);
       return {
         configured: Boolean(metadata),
@@ -237,11 +247,21 @@ export class BrowserVaultEngine {
           snapshot: this.deviceStatusSnapshot,
           lastError: this.lastDeviceStatusError
         },
+        maintenance: {
+          lastCompactionResult: this.lastCompactionResult,
+          lastCompactionError: this.lastCompactionError
+        },
+        storage,
         localCompanion
       };
     } finally {
       store.close();
     }
+  }
+
+  async protectLocalStorage(): Promise<boolean> {
+    const session = this.requireSession();
+    return session.store.requestPersistentStorage();
   }
 
   async initialize(password: string, deviceName: string): Promise<void> {
@@ -335,6 +355,7 @@ export class BrowserVaultEngine {
         keyVersion: metadata.keyVersion,
         key
       };
+      await store.requestPersistentStorage().catch(() => false);
     } catch (error) {
       store.close();
       throw error;
@@ -373,6 +394,9 @@ export class BrowserVaultEngine {
     this.deviceStatusSnapshot = null;
     this.lastDeviceStatusError = null;
     this.lastDeviceHeartbeatAt = 0;
+    this.lastCompactionAttemptAt = 0;
+    this.lastCompactionResult = null;
+    this.lastCompactionError = null;
     this.session?.store.close();
     this.session = null;
   }
@@ -917,6 +941,7 @@ export class BrowserVaultEngine {
       if (syncChanged) window.dispatchEvent(new Event("unigentamos-vault-data-changed"));
       try {
         await this.reportDeviceStatus(syncChanged);
+        await this.maybeCompactRelay();
       } catch (error) {
         this.lastDeviceStatusError = error instanceof Error ? error.message : "Device sync status is unavailable";
       }
@@ -968,9 +993,10 @@ export class BrowserVaultEngine {
       ok?: boolean;
       relayHeadSequence?: number;
       devices?: EncryptedVaultDeviceStatus[];
+      relayHealth?: VaultRelayHealth;
       error?: string;
     };
-    if (!response.ok || !payload.ok || !Number.isSafeInteger(payload.relayHeadSequence) || !Array.isArray(payload.devices)) {
+    if (!response.ok || !payload.ok || !Number.isSafeInteger(payload.relayHeadSequence) || !Array.isArray(payload.devices) || !payload.relayHealth) {
       throw this.vaultRequestError(response, payload.error, "Device sync status is unavailable");
     }
     this.markVaultRequestAuthorized();
@@ -995,6 +1021,7 @@ export class BrowserVaultEngine {
     this.deviceStatusSnapshot = {
       relayHeadSequence: payload.relayHeadSequence as number,
       devices,
+      relayHealth: payload.relayHealth,
       refreshedAt: new Date().toISOString()
     };
     this.lastDeviceStatusError = unreadable
@@ -1006,6 +1033,114 @@ export class BrowserVaultEngine {
   async refreshDeviceStatuses(): Promise<void> {
     if (!this.session) throw new Error("Unlock the local vault first");
     await this.reportDeviceStatus(true);
+  }
+
+  async retireDevice(targetDeviceId: string): Promise<void> {
+    const session = this.requireSession();
+    if (!UUID.test(targetDeviceId)) throw new Error("That Vault device is invalid");
+    if (targetDeviceId === session.deviceId) throw new Error("This device cannot remove itself");
+    const response = await fetch("/api/vault/devices", {
+      method: "DELETE",
+      headers: buildJsonHeadersWithCsrf(),
+      body: JSON.stringify({
+        vaultId: session.vaultId,
+        actorDeviceId: session.deviceId,
+        targetDeviceId
+      })
+    });
+    const payload = await response.json() as { ok?: boolean; error?: string };
+    if (!response.ok || !payload.ok) throw this.vaultRequestError(response, payload.error, "Vault device could not be removed");
+    this.markVaultRequestAuthorized();
+    await this.reportDeviceStatus(true);
+  }
+
+  private async compactionKeepChangeIds(): Promise<string[]> {
+    const session = this.requireSession();
+    const rows = await session.store.allVersions();
+    if (rows.length > 100_000) throw new Error("Vault history is too large for browser cleanup. Create and check a desktop backup first.");
+    const snapshots = await Promise.all(rows.map(async (row) => {
+      const envelope = row.envelope as EncryptedChangeEnvelope | undefined;
+      return envelope ? snapshotFromChange(await decryptVaultChange(envelope, session.key)) : null;
+    }));
+    const byObject = new Map<string, VaultObjectSnapshot[]>();
+    for (const snapshot of snapshots) {
+      if (!snapshot) continue;
+      const group = byObject.get(snapshot.objectId) || [];
+      group.push(snapshot);
+      byObject.set(snapshot.objectId, group);
+    }
+    const keep = new Set<string>();
+    for (const group of byObject.values()) {
+      for (const snapshot of meaningfulVaultHistory(group)) keep.add(snapshot.versionId);
+    }
+    for (const current of await session.store.objects()) keep.add(current.versionId);
+    if (keep.size > MAX_COMPACTION_CHANGE_IDS) {
+      throw new Error("Meaningful Vault history is too large for safe relay cleanup. The encrypted desktop archive remains intact.");
+    }
+    return Array.from(keep).sort();
+  }
+
+  private async compactRelay(): Promise<VaultCompactionResult> {
+    if (!this.companionCapability) throw new Error("Relay cleanup runs from the Windows master so complete history stays protected.");
+    const session = this.requireSession();
+    const keepChangeIds = await this.compactionKeepChangeIds();
+    const response = await fetch("/api/vault/compact", {
+      method: "POST",
+      headers: buildJsonHeadersWithCsrf(),
+      body: JSON.stringify({
+        vaultId: session.vaultId,
+        actorDeviceId: session.deviceId,
+        keepChangeIds
+      })
+    });
+    const payload = await response.json() as Partial<VaultCompactionResult> & { ok?: boolean; error?: string };
+    if (
+      !response.ok
+      || !payload.ok
+      || !Number.isSafeInteger(payload.safeSequence)
+      || !Number.isSafeInteger(payload.deletedChanges)
+      || !Number.isSafeInteger(payload.retainedChanges)
+      || !Number.isSafeInteger(payload.activeDevices)
+      || !payload.relayHealth
+      || !["compacted", "nothing_to_compact", "devices_not_caught_up", "no_active_devices"].includes(String(payload.outcome))
+    ) {
+      throw this.vaultRequestError(response, payload.error, "Encrypted relay cleanup failed");
+    }
+    this.markVaultRequestAuthorized();
+    const result = payload as VaultCompactionResult & { ok: true };
+    this.lastCompactionAttemptAt = Date.now();
+    this.lastCompactionResult = result;
+    this.lastCompactionError = null;
+    if (this.deviceStatusSnapshot) {
+      this.deviceStatusSnapshot = {
+        ...this.deviceStatusSnapshot,
+        relayHealth: result.relayHealth,
+        refreshedAt: new Date().toISOString()
+      };
+    }
+    return result;
+  }
+
+  private async maybeCompactRelay(): Promise<void> {
+    if (!this.companionCapability || Date.now() - this.lastCompactionAttemptAt < RELAY_COMPACTION_INTERVAL_MS) return;
+    const health = this.deviceStatusSnapshot?.relayHealth;
+    if (!health || health.relayRows < RELAY_COMPACTION_MIN_ROWS) return;
+    this.lastCompactionAttemptAt = Date.now();
+    try {
+      await this.compactRelay();
+    } catch (error) {
+      this.lastCompactionError = error instanceof Error ? error.message : "Encrypted relay cleanup failed";
+    }
+  }
+
+  async cleanupRelayNow(): Promise<VaultCompactionResult> {
+    this.lastCompactionAttemptAt = Date.now();
+    try {
+      return await this.compactRelay();
+    } catch (error) {
+      this.lastCompactionError = error instanceof Error ? error.message : "Encrypted relay cleanup failed";
+      throw error;
+    }
   }
 
   private async mirrorEnvelopes(envelopes: readonly EncryptedChangeEnvelope[]): Promise<void> {
@@ -1378,18 +1513,28 @@ export class BrowserVaultEngine {
     this.syncTimer = null;
   }
 
-  async companionStatus(): Promise<{ available: boolean; version?: string; configured?: boolean; unlocked?: boolean; pairingRequired?: boolean }> {
+  async companionStatus(): Promise<VaultCompanionStatus> {
     try {
       const response = await fetch("http://127.0.0.1:43127/health", { mode: "cors", cache: "no-store", signal: AbortSignal.timeout(2_500) });
       if (!response.ok) return { available: false };
       const payload = await response.json() as { version?: string; configured?: boolean; unlocked?: boolean; pairingRequired?: boolean };
-      return {
+      const basic: VaultCompanionStatus = {
         available: true,
         ...(payload.version ? { version: payload.version } : {}),
         configured: Boolean(payload.configured),
         unlocked: Boolean(payload.unlocked),
         pairingRequired: Boolean(payload.pairingRequired)
       };
+      if (!this.companionCapability) return basic;
+      const statusResponse = await fetch("http://127.0.0.1:43127/v1/status", {
+        mode: "cors",
+        cache: "no-store",
+        headers: { Authorization: `Bearer ${this.companionCapability}` },
+        signal: AbortSignal.timeout(2_500)
+      });
+      if (!statusResponse.ok) return basic;
+      const statusPayload = await statusResponse.json() as { status?: { backup?: VaultCompanionStatus["backup"] } };
+      return { ...basic, ...(statusPayload.status?.backup ? { backup: statusPayload.status.backup } : {}) };
     } catch {
       return { available: false };
     }

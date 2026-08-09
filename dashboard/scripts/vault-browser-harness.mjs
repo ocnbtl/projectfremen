@@ -143,6 +143,7 @@ let rejectMediaUploads = false;
 let companion;
 let application;
 let browser;
+let page;
 
 function jsonResponse(route, body) {
   return route.fulfill({
@@ -154,10 +155,23 @@ function jsonResponse(route, body) {
 }
 
 function deviceStatusPayload() {
+  const devices = [...deviceStatuses.values()].sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt));
+  const activeDevices = devices.filter((device) => device.lifecycle === "active");
   return {
     ok: true,
     relayHeadSequence: relayEnvelopes.at(-1)?.sequence || 0,
-    devices: [...deviceStatuses.values()].sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt)),
+    devices,
+    relayHealth: {
+      relayRows: relayEnvelopes.length,
+      relayBytes: relayEnvelopes.reduce((total, envelope) => total + Number(envelope.byteLength || 0), 0),
+      rowLimit: 200_000,
+      byteLimit: 201_326_592,
+      activeDevices: activeDevices.length,
+      retiredDevices: devices.length - activeDevices.length,
+      safeCompactionSequence: activeDevices.length ? Math.min(...activeDevices.map((device) => device.acknowledgedSequence)) : 0,
+      lastCompactedAt: null,
+      lastDeletedChanges: 0
+    },
     serverTime: new Date().toISOString()
   };
 }
@@ -217,14 +231,35 @@ async function mockVaultRuntime(context, { requireAdminSession = false, companio
       deviceStatuses.set(key, {
         deviceId: input.deviceId,
         descriptor: input.descriptor,
+        lifecycle: existing?.lifecycle || "active",
+        retiredAt: existing?.retiredAt || null,
         acknowledgedSequence,
         pendingChanges: input.pendingChanges,
         blockedChanges: input.blockedChanges,
         lastSeenAt: now,
         lastSyncedAt: current ? now : existing?.lastSyncedAt || null
       });
+    } else if (request.method() === "DELETE") {
+      const input = request.postDataJSON();
+      const key = `${input.vaultId}:${input.targetDeviceId}`;
+      const existing = deviceStatuses.get(key);
+      if (existing) deviceStatuses.set(key, { ...existing, lifecycle: "retired", retiredAt: new Date().toISOString() });
     }
     return jsonResponse(route, deviceStatusPayload());
+  });
+  await context.route("**/api/vault/compact", async (route) => {
+    if (await rejectUnauthorizedVaultRequest(context, route, requireAdminSession)) return;
+    const payload = deviceStatusPayload();
+    return jsonResponse(route, {
+      ok: true,
+      safeSequence: payload.relayHealth.safeCompactionSequence,
+      deletedChanges: 0,
+      retainedChanges: relayEnvelopes.length,
+      activeDevices: payload.relayHealth.activeDevices,
+      outcome: "nothing_to_compact",
+      relayHealth: payload.relayHealth,
+      serverTime: new Date().toISOString()
+    });
   });
   await context.route("**/api/vault/media*", async (route) => {
     if (await rejectUnauthorizedVaultRequest(context, route, requireAdminSession)) return;
@@ -279,7 +314,7 @@ try {
   browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
   await mockVaultRuntime(context);
-  const page = await context.newPage();
+  page = await context.newPage();
   const unexpectedFailures = [];
   page.on("response", (response) => {
     const pathname = new URL(response.url()).pathname;
@@ -306,7 +341,7 @@ try {
   await page.screenshot({ path: path.join(artifactRoot, "vault-onboarding-desktop.png"), fullPage: true });
   await master.getByRole("button", { name: "Create my vault" }).click();
   await page.getByText("Your Windows vault is ready.").waitFor();
-  await page.getByRole("heading", { name: "Your devices" }).waitFor();
+  await page.getByText("Your devices", { exact: true }).waitFor();
 
   await page.getByRole("tab", { name: "Notes" }).click();
   await page.getByLabel("Title").fill("Offline continuity note");
@@ -604,6 +639,7 @@ try {
 } catch (error) {
   console.error("[vault-browser] application output:\n", application?.output() || "");
   console.error("[vault-browser] companion output:\n", companion?.output() || "");
+  console.error("[vault-browser] page output:\n", await page?.locator("body").innerText().catch(() => "unavailable"));
   throw error;
 } finally {
   await browser?.close().catch(() => undefined);

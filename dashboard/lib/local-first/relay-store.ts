@@ -5,13 +5,18 @@ import type {
   EncryptedVaultMediaChunk,
   EncryptedVaultDeviceDescriptor,
   EncryptedVaultDeviceStatus,
-  SequencedChangeEnvelope
+  SequencedChangeEnvelope,
+  VaultCompactionResult,
+  VaultRelayHealth
 } from "./types";
 
 const MAX_ENVELOPE_BYTES = 1_100_000;
 const MAX_BATCH_ENVELOPES = 100;
 const MAX_DEVICE_DESCRIPTOR_BYTES = 16_384;
 const MAX_PENDING_CHANGES = 1_000_000;
+const MAX_COMPACTION_CHANGE_IDS = 50_000;
+const RELAY_ROW_LIMIT = 200_000;
+const RELAY_BYTE_LIMIT = 201_326_592;
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
 const SHA256 = /^[0-9a-f]{64}$/i;
@@ -232,8 +237,14 @@ export function validateEncryptedDeviceDescriptor(
   return { descriptorVersion: 1, vaultId, deviceId, keyVersion, iv, ciphertext, aadHash, byteLength };
 }
 
+function nullableTimestamp(value: unknown, field: string): string | null {
+  return value === null || value === undefined ? null : text(value, field, 80);
+}
+
 function deviceStatusFromRow(row: Record<string, unknown>, vaultId: string): EncryptedVaultDeviceStatus {
   const deviceId = text(row.device_id, "deviceId", 36, UUID);
+  const lifecycle = text(row.lifecycle, "lifecycle", 16);
+  if (lifecycle !== "active" && lifecycle !== "retired") throw new Error("Device lifecycle is invalid");
   return {
     deviceId,
     descriptor: validateEncryptedDeviceDescriptor({
@@ -246,22 +257,54 @@ function deviceStatusFromRow(row: Record<string, unknown>, vaultId: string): Enc
       aadHash: row.descriptor_aad_hash,
       byteLength: row.descriptor_byte_length
     }, vaultId, deviceId),
+    lifecycle,
+    retiredAt: nullableTimestamp(row.retired_at, "retiredAt"),
     acknowledgedSequence: integer(row.acknowledged_sequence, "acknowledgedSequence", 0, Number.MAX_SAFE_INTEGER),
     pendingChanges: integer(row.pending_changes, "pendingChanges", 0, MAX_PENDING_CHANGES),
     blockedChanges: integer(row.blocked_changes, "blockedChanges", 0, MAX_PENDING_CHANGES),
     lastSeenAt: text(row.last_seen_at, "lastSeenAt", 80),
-    lastSyncedAt: row.last_synced_at === null ? null : text(row.last_synced_at, "lastSyncedAt", 80)
+    lastSyncedAt: nullableTimestamp(row.last_synced_at, "lastSyncedAt")
   };
+}
+
+function relayHealthFromRow(row: Record<string, unknown>): VaultRelayHealth {
+  return {
+    relayRows: integer(row.relay_rows, "relayRows", 0, RELAY_ROW_LIMIT),
+    relayBytes: integer(row.relay_bytes, "relayBytes", 0, RELAY_BYTE_LIMIT),
+    rowLimit: RELAY_ROW_LIMIT,
+    byteLimit: RELAY_BYTE_LIMIT,
+    activeDevices: integer(row.active_devices, "activeDevices", 0, 64),
+    retiredDevices: integer(row.retired_devices, "retiredDevices", 0, 64),
+    safeCompactionSequence: integer(row.safe_compaction_sequence, "safeCompactionSequence", 0, Number.MAX_SAFE_INTEGER),
+    lastCompactedAt: nullableTimestamp(row.last_compacted_at, "lastCompactedAt"),
+    lastDeletedChanges: integer(row.last_deleted_changes, "lastDeletedChanges", 0, RELAY_ROW_LIMIT)
+  };
+}
+
+export async function getVaultRelayHealth(vaultIdValue: unknown): Promise<VaultRelayHealth> {
+  const vaultId = validateVaultId(vaultIdValue);
+  const supabase = config();
+  const response = await fetch(`${supabase.url}/rest/v1/rpc/vault_sync_relay_health`, {
+    method: "POST",
+    headers: headers(supabase),
+    body: JSON.stringify({ p_vault_id: vaultId }),
+    cache: "no-store"
+  });
+  if (!response.ok) throw new Error(`Encrypted relay health check failed (${response.status})`);
+  const rows = await response.json() as Array<Record<string, unknown>>;
+  if (!Array.isArray(rows) || rows.length !== 1) throw new Error("Encrypted relay health returned an invalid response");
+  return relayHealthFromRow(rows[0]);
 }
 
 export async function listVaultDeviceStatuses(vaultIdValue: unknown): Promise<{
   relayHeadSequence: number;
   devices: EncryptedVaultDeviceStatus[];
+  relayHealth: VaultRelayHealth;
 }> {
   const vaultId = validateVaultId(vaultIdValue);
   const supabase = config();
   const deviceQuery = new URLSearchParams({
-    select: "vault_id,device_id,descriptor_version,key_version,descriptor_iv,descriptor_ciphertext,descriptor_aad_hash,descriptor_byte_length,acknowledged_sequence,pending_changes,blocked_changes,last_seen_at,last_synced_at",
+    select: "vault_id,device_id,descriptor_version,key_version,descriptor_iv,descriptor_ciphertext,descriptor_aad_hash,descriptor_byte_length,lifecycle,retired_at,acknowledged_sequence,pending_changes,blocked_changes,last_seen_at,last_synced_at",
     vault_id: `eq.${vaultId}`,
     order: "last_seen_at.desc",
     limit: "64"
@@ -272,9 +315,10 @@ export async function listVaultDeviceStatuses(vaultIdValue: unknown): Promise<{
     order: "sequence.desc",
     limit: "1"
   });
-  const [devicesResponse, headResponse] = await Promise.all([
+  const [devicesResponse, headResponse, relayHealth] = await Promise.all([
     fetch(`${supabase.url}/rest/v1/vault_sync_devices?${deviceQuery.toString()}`, { headers: headers(supabase), cache: "no-store" }),
-    fetch(`${supabase.url}/rest/v1/vault_sync_changes?${headQuery.toString()}`, { headers: headers(supabase), cache: "no-store" })
+    fetch(`${supabase.url}/rest/v1/vault_sync_changes?${headQuery.toString()}`, { headers: headers(supabase), cache: "no-store" }),
+    getVaultRelayHealth(vaultId)
   ]);
   if (!devicesResponse.ok || !headResponse.ok) throw new Error("Encrypted device status relay is unavailable");
   const rows = await devicesResponse.json() as Array<Record<string, unknown>>;
@@ -283,12 +327,13 @@ export async function listVaultDeviceStatuses(vaultIdValue: unknown): Promise<{
   const relayHeadSequence = headRows.length
     ? integer(headRows[0].sequence, "relayHeadSequence", 0, Number.MAX_SAFE_INTEGER)
     : 0;
-  return { relayHeadSequence, devices: rows.map((row) => deviceStatusFromRow(row, vaultId)) };
+  return { relayHeadSequence, devices: rows.map((row) => deviceStatusFromRow(row, vaultId)), relayHealth };
 }
 
 export async function recordVaultDeviceStatus(inputValue: unknown): Promise<{
   relayHeadSequence: number;
   devices: EncryptedVaultDeviceStatus[];
+  relayHealth: VaultRelayHealth;
 }> {
   const input = record(inputValue, "Device status");
   const vaultId = validateVaultId(input.vaultId);
@@ -326,6 +371,79 @@ export async function recordVaultDeviceStatus(inputValue: unknown): Promise<{
   return listVaultDeviceStatuses(vaultId);
 }
 
+export async function retireVaultDevice(inputValue: unknown): Promise<{
+  relayHeadSequence: number;
+  devices: EncryptedVaultDeviceStatus[];
+  relayHealth: VaultRelayHealth;
+}> {
+  const input = record(inputValue, "Device retirement");
+  const vaultId = validateVaultId(input.vaultId);
+  const actorDeviceId = text(input.actorDeviceId, "actorDeviceId", 36, UUID);
+  const targetDeviceId = text(input.targetDeviceId, "targetDeviceId", 36, UUID);
+  if (actorDeviceId === targetDeviceId) throw new Error("The current device cannot remove itself");
+  const supabase = config();
+  const response = await fetch(`${supabase.url}/rest/v1/rpc/retire_vault_sync_device`, {
+    method: "POST",
+    headers: headers(supabase),
+    body: JSON.stringify({
+      p_vault_id: vaultId,
+      p_actor_device_id: actorDeviceId,
+      p_target_device_id: targetDeviceId
+    }),
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null) as { code?: unknown; message?: unknown } | null;
+    const message = typeof failure?.message === "string" ? failure.message : "Vault device could not be removed";
+    const status = failure?.code === "28000" ? 403 : failure?.code === "P0002" ? 404 : 400;
+    throw Object.assign(new Error(message), { status });
+  }
+  return listVaultDeviceStatuses(vaultId);
+}
+
+export async function compactVaultRelay(inputValue: unknown): Promise<VaultCompactionResult> {
+  const input = record(inputValue, "Relay compaction");
+  const vaultId = validateVaultId(input.vaultId);
+  const actorDeviceId = text(input.actorDeviceId, "actorDeviceId", 36, UUID);
+  if (!Array.isArray(input.keepChangeIds) || input.keepChangeIds.length > MAX_COMPACTION_CHANGE_IDS) {
+    throw new Error(`keepChangeIds must contain 0-${MAX_COMPACTION_CHANGE_IDS} items`);
+  }
+  const keepChangeIds = Array.from(new Set(input.keepChangeIds.map((value) => text(value, "keepChangeId", 36, UUID))));
+  const supabase = config();
+  const response = await fetch(`${supabase.url}/rest/v1/rpc/compact_vault_sync_relay`, {
+    method: "POST",
+    headers: headers(supabase),
+    body: JSON.stringify({
+      p_vault_id: vaultId,
+      p_actor_device_id: actorDeviceId,
+      p_keep_change_ids: keepChangeIds,
+      p_recovery_window: 256
+    }),
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null) as { code?: unknown; message?: unknown } | null;
+    const message = typeof failure?.message === "string" ? failure.message : "Encrypted relay cleanup failed";
+    const status = failure?.code === "28000" ? 403 : failure?.code === "54000" ? 507 : 400;
+    throw Object.assign(new Error(message), { status });
+  }
+  const rows = await response.json() as Array<Record<string, unknown>>;
+  if (!Array.isArray(rows) || rows.length !== 1) throw new Error("Encrypted relay cleanup returned an invalid response");
+  const row = rows[0];
+  const outcome = text(row.outcome, "outcome", 40);
+  if (!["compacted", "nothing_to_compact", "devices_not_caught_up", "no_active_devices"].includes(outcome)) {
+    throw new Error("Encrypted relay cleanup outcome is invalid");
+  }
+  return {
+    safeSequence: integer(row.safe_sequence, "safeSequence", 0, Number.MAX_SAFE_INTEGER),
+    deletedChanges: integer(row.deleted_changes, "deletedChanges", 0, RELAY_ROW_LIMIT),
+    retainedChanges: integer(row.retained_changes, "retainedChanges", 0, RELAY_ROW_LIMIT),
+    activeDevices: integer(row.active_devices, "activeDevices", 0, 64),
+    outcome: outcome as VaultCompactionResult["outcome"],
+    relayHealth: await getVaultRelayHealth(vaultId)
+  };
+}
+
 export async function pushEncryptedChanges(vaultIdValue: unknown, values: unknown): Promise<string[]> {
   const vaultId = validateVaultId(vaultIdValue);
   if (!Array.isArray(values) || values.length < 1 || values.length > MAX_BATCH_ENVELOPES) {
@@ -356,6 +474,12 @@ export async function pushEncryptedChanges(vaultIdValue: unknown, values: unknow
       throw Object.assign(
         new Error("Encrypted sync relay storage limit reached; local changes remain safely queued on this device"),
         { status: 507 }
+      );
+    }
+    if (failure?.code === "28000") {
+      throw Object.assign(
+        new Error("This browser was removed from Vault sync. Connect it again as a new device before saving more changes."),
+        { status: 403 }
       );
     }
     throw new Error(`Encrypted sync relay write failed (${response.status})`);

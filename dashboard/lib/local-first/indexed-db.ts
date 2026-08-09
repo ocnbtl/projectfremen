@@ -3,6 +3,7 @@
 import type {
   ClockHealth,
   EncryptedChangeEnvelope,
+  VaultBrowserStorageHealth,
   EncryptedVaultMediaChunk,
   HybridLogicalClock,
   SequencedChangeEnvelope,
@@ -125,6 +126,28 @@ export class BrowserVaultStore {
   async requestPersistentStorage(): Promise<boolean> {
     if (!navigator.storage?.persist) return false;
     return navigator.storage.persist();
+  }
+
+  async storageHealth(): Promise<VaultBrowserStorageHealth> {
+    const storage = navigator.storage as Partial<Pick<StorageManager, "persist" | "persisted" | "estimate">> | undefined;
+    const persistenceSupported = typeof storage?.persist === "function" && typeof storage.persisted === "function";
+    let persisted = false;
+    let usageBytes: number | null = null;
+    let quotaBytes: number | null = null;
+    try {
+      persisted = typeof storage?.persisted === "function" ? Boolean(await storage.persisted()) : false;
+    } catch {
+      persisted = false;
+    }
+    try {
+      const estimate = typeof storage?.estimate === "function" ? await storage.estimate() : undefined;
+      usageBytes = Number.isFinite(estimate?.usage) ? Number(estimate?.usage) : null;
+      quotaBytes = Number.isFinite(estimate?.quota) ? Number(estimate?.quota) : null;
+    } catch {
+      usageBytes = null;
+      quotaBytes = null;
+    }
+    return { persistenceSupported, persisted, usageBytes, quotaBytes };
   }
 
   async diagnostics(): Promise<{ objects: number; versions: number; outbox: number; desktopOutbox: number; inbox: number; conflicts: number; media: number; blockedChanges: number }> {
@@ -305,6 +328,11 @@ export class BrowserVaultStore {
   async versions(objectId: string): Promise<Array<Record<string, unknown>>> {
     const transaction = this.database.transaction("versions", "readonly");
     return requestResult(transaction.objectStore("versions").index("objectId").getAll(objectId)) as Promise<Array<Record<string, unknown>>>;
+  }
+
+  async allVersions(): Promise<Array<Record<string, unknown>>> {
+    const transaction = this.database.transaction("versions", "readonly");
+    return requestResult(transaction.objectStore("versions").getAll()) as Promise<Array<Record<string, unknown>>>;
   }
 
   async putConflict(row: Record<string, unknown> & { conflictId: string }): Promise<void> {

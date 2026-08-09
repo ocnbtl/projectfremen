@@ -67,6 +67,7 @@ test("companion setup, authorization, unlock, and encrypted backup", { timeout: 
   try {
     const health = await waitForHealth(port);
     assert.equal(health.configured, false);
+    assert.equal(health.version, "0.3.0");
     const origin = "http://localhost:3000";
     const preflight = await fetch(`http://127.0.0.1:${port}/health`, {
       method: "OPTIONS",
@@ -113,6 +114,16 @@ test("companion setup, authorization, unlock, and encrypted backup", { timeout: 
       headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
     });
     assert.equal(status.status, 200);
+    const initialStatus = await status.json();
+    assert.deepEqual(initialStatus.status.backup, {
+      destination: "custom-folder",
+      count: 0,
+      limit: 1,
+      lastCreatedAt: null,
+      lastVerifiedAt: null,
+      automaticEveryDays: 7,
+      lastAutomaticError: null
+    });
 
     const password = "correct horse battery staple";
     const rawVaultKey = unwrapRecovery(password, setupBody.recoveryPackage.keyEnvelope);
@@ -224,6 +235,9 @@ test("companion setup, authorization, unlock, and encrypted backup", { timeout: 
     }).then((response) => response.json());
     assert.deepEqual(populatedStatus.status.counts, { objects: 1, versions: 2, media: 1 });
     assert.equal(populatedStatus.status.storage.limits.backups, 1);
+    assert.equal(populatedStatus.status.backup.destination, "custom-folder");
+    assert.equal(populatedStatus.status.backup.count, 0);
+    assert.equal(populatedStatus.status.backup.automaticEveryDays, 7);
 
     const backup = await fetch(`http://127.0.0.1:${port}/v1/backups`, {
       method: "POST",
@@ -246,6 +260,12 @@ test("companion setup, authorization, unlock, and encrypted backup", { timeout: 
       headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
     });
     assert.equal(verifiedBackup.status, 200);
+    const checkedStatus = await fetch(`http://127.0.0.1:${port}/v1/status`, {
+      headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }
+    }).then((response) => response.json());
+    assert.equal(checkedStatus.status.backup.count, 1);
+    assert.ok(Number.isFinite(Date.parse(checkedStatus.status.backup.lastCreatedAt)));
+    assert.ok(Number.isFinite(Date.parse(checkedStatus.status.backup.lastVerifiedAt)));
     const backupLimit = await fetch(`http://127.0.0.1:${port}/v1/backups`, {
       method: "POST",
       headers: { Origin: origin, Authorization: `Bearer ${setupBody.capability}` }

@@ -554,6 +554,35 @@
 .deviceCard dd { margin: 0; overflow-wrap: anywhere; color: #28483e; font-size: 12px; font-variant-numeric: tabular-nums; }
 .deviceEmpty { display: grid; gap: 4px; border: 1px dashed rgba(31, 90, 73, .35); border-radius: 12px; padding: 20px; color: #36564b; background: #f2f7f5; }
 .deviceEmpty span { color: var(--vault-muted); font-size: 13px; }
+.deviceActions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+  border-top: 1px solid var(--vault-border);
+  padding-top: 12px;
+}
+.deviceActions > span { width: 100%; color: #6b4811; font-size: 12px; line-height: 1.45; }
+.deviceActions button { min-height: 36px; padding: 7px 10px; font-size: 12px; }
+
+.healthPanel { display: grid; width: 100%; box-sizing: border-box; gap: 20px; }
+.healthHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; }
+.healthHeader > div { max-width: 760px; }
+.healthHeader p { margin: 0; }
+.healthOverall { flex: none; border-radius: 999px; padding: 7px 10px; color: #245a47; background: var(--vault-mint); font-size: 11px; font-weight: 850; }
+.healthGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--vault-border); border-radius: 13px; background: #f8faf9; }
+.healthCard { display: flex; min-width: 0; min-height: 230px; flex-direction: column; align-items: flex-start; padding: 20px; background: #fff; }
+.healthCard + .healthCard { border-left: 1px solid var(--vault-border); }
+.healthCard > div:first-child { display: flex; align-items: center; gap: 10px; }
+.healthCard > p { flex: 1; margin: 16px 0 8px; font-size: 13px; line-height: 1.55; }
+.healthCard > small { margin: 0; }
+.healthCard > button { margin-top: 16px; }
+.healthIcon { display: grid; width: 28px; height: 28px; place-items: center; border-radius: 50%; color: #fff; background: var(--vault-accent); font-size: 12px; font-weight: 850; }
+.healthWarning,
+.healthHint { display: block; margin-top: 10px; font-size: 12px; line-height: 1.45; }
+.healthWarning { border-radius: 8px; padding: 9px 10px; color: #6b4811; background: #fff3d8; }
+.healthHint { color: #60746d; }
 .unlock { width: min(560px, calc(100% - 36px)); box-sizing: border-box; }
 .unlockDeviceHint { display: grid; gap: 4px; margin-top: 20px; border-radius: 11px; padding: 14px; color: #35584d; background: var(--vault-mint); }
 .unlockDeviceHint span { font-size: 13px; line-height: 1.5; }
@@ -627,6 +656,9 @@
   .grid,
   .devicePicker { grid-template-columns: 1fr; }
   .objectGrid { grid-template-columns: 1fr; }
+  .healthGrid { grid-template-columns: 1fr; }
+  .healthCard { min-height: 0; }
+  .healthCard + .healthCard { border-top: 1px solid var(--vault-border); border-left: 0; }
   .deviceList { grid-template-columns: 1fr; }
   .deviceCard:nth-child(odd) { border-right: 0; }
   .deviceCard:nth-child(n + 2) { border-top: 1px solid var(--vault-border); }
@@ -659,6 +691,7 @@
   .syncSignIn .signInButton { width: 100%; }
   .syncRecovery button { width: 100%; }
   .devicesHeader { grid-template-columns: 1fr; align-items: stretch; gap: 14px; }
+  .healthHeader { align-items: flex-start; flex-direction: column; gap: 12px; }
   .devicesHeader button { width: 100%; }
   .deviceCardTop { align-items: flex-start; }
   .deviceCard dl { grid-template-columns: 1fr 1fr; }

@@ -86,9 +86,13 @@ export type EncryptedVaultDeviceDescriptor = {
   byteLength: number;
 };
 
+export type VaultDeviceLifecycle = "active" | "retired";
+
 export type EncryptedVaultDeviceStatus = {
   deviceId: string;
   descriptor: EncryptedVaultDeviceDescriptor;
+  lifecycle: VaultDeviceLifecycle;
+  retiredAt: string | null;
   acknowledgedSequence: number;
   pendingChanges: number;
   blockedChanges: number;
@@ -100,10 +104,58 @@ export type VaultDeviceStatus = Omit<EncryptedVaultDeviceStatus, "descriptor"> &
   descriptor: VaultDeviceDescriptor;
 };
 
+export type VaultRelayHealth = {
+  relayRows: number;
+  relayBytes: number;
+  rowLimit: number;
+  byteLimit: number;
+  activeDevices: number;
+  retiredDevices: number;
+  safeCompactionSequence: number;
+  lastCompactedAt: string | null;
+  lastDeletedChanges: number;
+};
+
 export type VaultDeviceStatusSnapshot = {
   relayHeadSequence: number;
   devices: VaultDeviceStatus[];
+  relayHealth: VaultRelayHealth;
   refreshedAt: string;
+};
+
+export type VaultCompactionResult = {
+  safeSequence: number;
+  deletedChanges: number;
+  retainedChanges: number;
+  activeDevices: number;
+  outcome: "compacted" | "nothing_to_compact" | "devices_not_caught_up" | "no_active_devices";
+  relayHealth: VaultRelayHealth;
+};
+
+export type VaultBrowserStorageHealth = {
+  persistenceSupported: boolean;
+  persisted: boolean;
+  usageBytes: number | null;
+  quotaBytes: number | null;
+};
+
+export type VaultCompanionBackupHealth = {
+  destination: "vault-folder" | "custom-folder" | "separate-drive";
+  count: number;
+  limit: number;
+  lastCreatedAt: string | null;
+  lastVerifiedAt: string | null;
+  automaticEveryDays: number;
+  lastAutomaticError: string | null;
+};
+
+export type VaultCompanionStatus = {
+  available: boolean;
+  version?: string;
+  configured?: boolean;
+  unlocked?: boolean;
+  pairingRequired?: boolean;
+  backup?: VaultCompanionBackupHealth;
 };
 
 export type VaultKeyEnvelope = {

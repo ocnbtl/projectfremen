@@ -1,6 +1,6 @@
 # Unigentamos Vault Companion
 
-The companion is the Windows master-device storage service behind the website UI. It binds only to `127.0.0.1:43127`, keeps the unwrapped vault key in memory only while unlocked, stores encrypted records in SQLite, stores media as authenticated encrypted files, and creates encrypted local backups.
+The companion is the Windows master-device storage service behind the website UI. It binds only to `127.0.0.1:43127`, keeps the unwrapped vault key in memory only while unlocked, stores encrypted records in SQLite, stores media as authenticated encrypted files, and creates signed, verified encrypted backups on a configurable schedule.
 
 Requirements: Windows and Node.js 24.15 or newer. Install the invisible per-user startup task from PowerShell:
 
@@ -17,10 +17,10 @@ When an external SSD is available, configure it as the encrypted backup destinat
 The defaults reserve room on the master computer instead of allowing an unexpected upload or backup loop to fill the disk: 400 GiB of encrypted media, 32 GiB or 2,000,000 encrypted record versions, and three backup sets in the configured backup directory. They can be changed deliberately during installation:
 
 ```powershell
-.\install-windows.ps1 -BackupDirectory "E:\Unigentamos Backups" -MaxMediaLibraryGiB 800 -MaxRecordStorageGiB 64 -MaxHistoryVersions 4000000 -MaxBackups 5
+.\install-windows.ps1 -BackupDirectory "E:\Unigentamos Backups" -MaxMediaLibraryGiB 800 -MaxRecordStorageGiB 64 -MaxHistoryVersions 4000000 -MaxBackups 5 -AutoBackupDays 7
 ```
 
-When the backup-set limit is reached, move an older, restore-tested backup folder out of the configured backup directory before creating another. The companion notices the move and frees the slot; it never automatically deletes a backup.
+While the Vault is unlocked, the companion checks hourly and creates a signed, verified backup when the configured cadence is due; the default is every seven days. When the backup-set limit is reached, move an older, restore-tested backup folder out of the configured backup directory before creating another. The companion notices the move and frees the slot; it never automatically deletes a backup. The Vault health panel shows the destination, last checked backup, cadence, and remaining slots.
 
 The installer prints the one-time six-digit pairing code and adds **Unigentamos Vault Companion** to the Windows Start menu. Open that Start-menu item whenever you need to see the local pairing/status page, or visit `http://127.0.0.1:43127/` directly. Then open `https://unigentamos.com/vault`, choose **Windows desktop**, and use **Check this desktop** if the browser asks for local-network permission. Development can still use `npm.cmd start` from this directory, where the pairing code is printed in the terminal.
 

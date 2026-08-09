@@ -12,11 +12,11 @@ import {
 } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { cp, mkdir, readFile, readdir, rename, rm, stat, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { dirname, isAbsolute, join, parse, relative, resolve } from "node:path";
 import process from "node:process";
 import { DatabaseSync, backup as backupDatabase } from "node:sqlite";
 
-const VERSION = "0.2.0";
+const VERSION = "0.3.0";
 const HOST = "127.0.0.1";
 
 function integerEnv(name, fallback, minimum, maximum) {
@@ -42,6 +42,7 @@ const MAX_RECORD_STORAGE_BYTES = integerEnv("UNIGENTAMOS_MAX_RECORD_STORAGE_BYTE
 const MAX_HISTORY_VERSIONS = integerEnv("UNIGENTAMOS_MAX_HISTORY_VERSIONS", 2_000_000, 1, 10_000_000);
 const MAX_BACKUPS = integerEnv("UNIGENTAMOS_MAX_BACKUPS", 3, 1, 100);
 const AUTO_LOCK_MS = integerEnv("UNIGENTAMOS_VAULT_AUTO_LOCK_MS", 30 * 60_000, 60_000, 24 * 60 * 60_000);
+const AUTO_BACKUP_MS = integerEnv("UNIGENTAMOS_VAULT_AUTO_BACKUP_MS", 7 * 24 * 60 * 60_000, 60 * 60_000, 365 * 24 * 60 * 60_000);
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const SHA256 = /^[0-9a-f]{64}$/i;
 const BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
@@ -144,6 +145,8 @@ database.enableDefensive(true);
 let vaultKey = null;
 let capabilityToken = null;
 let lastAuthorizedAt = 0;
+let automaticBackupRunning = false;
+let lastAutomaticBackupError = null;
 let failedUnlocks = [];
 
 function config() {
@@ -509,6 +512,13 @@ function storeEnvelopes(envelopes) {
   return accepted;
 }
 
+function backupDestination() {
+  if (!process.env.UNIGENTAMOS_VAULT_BACKUP_DIR) return "vault-folder";
+  return parse(BACKUP_ROOT).root.toLocaleLowerCase() === parse(ROOT).root.toLocaleLowerCase()
+    ? "custom-folder"
+    : "separate-drive";
+}
+
 function currentStatus() {
   const current = config();
   const counts = database.prepare(`
@@ -521,6 +531,10 @@ function currentStatus() {
       coalesce((select sum(length(iv) + length(tag) + length(ciphertext)) from encrypted_envelopes), 0)
         + coalesce((select sum(length(iv) + length(tag) + length(ciphertext)) from encrypted_versions), 0)
         + coalesce((select sum(length(iv) + length(tag) + length(ciphertext)) from encrypted_objects), 0) as record_bytes
+  `).get();
+  const backupHealth = database.prepare(`
+    select max(created_at) as last_created_at, max(verified_at) as last_verified_at
+    from backup_log
   `).get();
   return {
     configured: Boolean(current),
@@ -539,6 +553,15 @@ function currentStatus() {
         mediaBytes: MAX_MEDIA_LIBRARY_BYTES,
         backups: MAX_BACKUPS
       }
+    },
+    backup: {
+      destination: backupDestination(),
+      count: Number(counts.backups),
+      limit: MAX_BACKUPS,
+      lastCreatedAt: backupHealth.last_created_at || null,
+      lastVerifiedAt: backupHealth.last_verified_at || null,
+      automaticEveryDays: Math.max(1, Math.round(AUTO_BACKUP_MS / (24 * 60 * 60_000))),
+      lastAutomaticError: lastAutomaticBackupError
     },
     autoLockMinutes: Math.round(AUTO_LOCK_MS / 60_000)
   };
@@ -570,6 +593,7 @@ async function setup(request) {
     keyEnvelope: browserKeyEnvelope(password, vaultKey, 1),
     createdAt
   };
+  void maybeCreateScheduledBackup();
   return { capability: issueCapability(), recoveryPackage, status: currentStatus() };
 }
 
@@ -595,6 +619,7 @@ async function unlock(request) {
     passwordKey.fill(0);
   }
   failedUnlocks = [];
+  void maybeCreateScheduledBackup();
   return {
     capability: issueCapability(),
     recoveryPackage: {
@@ -856,6 +881,29 @@ async function createBackup() {
   };
 }
 
+async function maybeCreateScheduledBackup() {
+  if (!vaultKey || automaticBackupRunning) return;
+  const current = config();
+  if (!current) return;
+  const latest = database.prepare("select created_at from backup_log order by created_at desc limit 1").get();
+  const baseline = Date.parse(latest?.created_at || current.created_at);
+  if (Number.isFinite(baseline) && Date.now() - baseline < AUTO_BACKUP_MS) return;
+  automaticBackupRunning = true;
+  try {
+    const backupCount = await activeBackupCount();
+    if (backupCount >= MAX_BACKUPS) {
+      lastAutomaticBackupError = "Backup limit reached. Move an older checked backup to safe storage, then make a new one.";
+      return;
+    }
+    await createBackup();
+    lastAutomaticBackupError = null;
+  } catch (error) {
+    lastAutomaticBackupError = error instanceof Error ? error.message : "Automatic encrypted backup failed";
+  } finally {
+    automaticBackupRunning = false;
+  }
+}
+
 async function listBackups() {
   await activeBackupCount();
   const rows = database.prepare("select id, verified_at, manifest_hash from backup_log order by created_at desc").all();
@@ -1098,6 +1146,11 @@ const autoLock = setInterval(() => {
   if (vaultKey && Date.now() - lastAuthorizedAt > AUTO_LOCK_MS) lockVault();
 }, 30_000);
 autoLock.unref();
+
+const automaticBackup = setInterval(() => {
+  void maybeCreateScheduledBackup();
+}, 60 * 60_000);
+automaticBackup.unref();
 
 for (const signal of ["SIGINT", "SIGTERM"]) {
   process.on(signal, () => {

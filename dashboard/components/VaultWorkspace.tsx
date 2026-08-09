@@ -25,7 +25,7 @@ type SetupTarget = "windows" | "apple";
 
 const COMPANION_HELPER_URL = "http://127.0.0.1:43127/";
 const MAX_RECOVERY_FILE_BYTES = 256 * 1024;
-const VAULT_RELEASE_NOTE = "history-media-backup-v1";
+const VAULT_RELEASE_NOTE = "durability-health-v2";
 const RECORD_TABS: Array<{ value: VaultObjectKind | "all"; label: string }> = [
   { value: "all", label: "All" },
   { value: "note", label: "Notes" },
@@ -180,6 +180,7 @@ export default function VaultWorkspace() {
   const [restorePreview, setRestorePreview] = useState<VaultBackupRestorePreview | null>(null);
   const [restoreConfirmation, setRestoreConfirmation] = useState("");
   const [showReleaseNote, setShowReleaseNote] = useState(false);
+  const [retireArmedDeviceId, setRetireArmedDeviceId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
     const next = await browserVault.status();
@@ -461,6 +462,38 @@ export default function VaultWorkspace() {
     });
   }
 
+  async function protectStorage() {
+    await run(async () => {
+      const persisted = await browserVault.protectLocalStorage();
+      setMessage(persisted
+        ? "This browser will keep your Vault data available offline."
+        : "This browser manages offline storage automatically. Keep some free space on this device.");
+    });
+  }
+
+  async function cleanupRelay() {
+    await run(async () => {
+      const result = await browserVault.cleanupRelayNow();
+      await browserVault.refreshDeviceStatuses();
+      setMessage(result.outcome === "compacted"
+        ? `Encrypted sync storage cleaned up. ${result.deletedChanges.toLocaleString()} redundant update${result.deletedChanges === 1 ? " was" : "s were"} removed; your meaningful history is still available.`
+        : result.outcome === "devices_not_caught_up"
+          ? "Cleanup is waiting until every active device is caught up. Nothing was removed."
+          : "Sync storage is already tidy. Nothing needed to be removed.");
+    });
+  }
+
+  async function retireDevice(deviceId: string) {
+    if (retireArmedDeviceId !== deviceId) {
+      setRetireArmedDeviceId(deviceId);
+      return;
+    }
+    await run(async () => {
+      await browserVault.retireDevice(deviceId);
+      setRetireArmedDeviceId(null);
+      setMessage("Old device removed from sync. Its local copy was not erased.");
+    });
+  }
   async function repairSyncIssues() {
     await run(async () => {
       const result = await browserVault.repairSyncIssues();
@@ -541,10 +574,17 @@ export default function VaultWorkspace() {
 
   const deviceSnapshot = status?.devices.snapshot;
   const registeredDevices = deviceSnapshot?.devices || [];
+  const activeDevices = registeredDevices.filter((device) => device.lifecycle === "active");
   const currentDevices = deviceSnapshot
-    ? registeredDevices.filter((device) => deviceSyncState(device, deviceSnapshot.relayHeadSequence).current).length
+    ? activeDevices.filter((device) => deviceSyncState(device, deviceSnapshot.relayHeadSequence).current).length
     : 0;
-  const allDevicesCurrent = registeredDevices.length > 0 && currentDevices === registeredDevices.length;
+  const allDevicesCurrent = activeDevices.length > 0 && currentDevices === activeDevices.length;
+  const relayHealth = deviceSnapshot?.relayHealth;
+  const storageHealth = status?.storage;
+  const backupHealth = status?.localCompanion.backup;
+  const backupDestinationLabel = backupHealth?.destination === "separate-drive" ? "Separate drive"
+    : backupHealth?.destination === "custom-folder" ? "Another folder on this PC"
+      : "Same PC as the Vault";
   const onlineAuthorizationRequired = Boolean(status?.sync.authorizationRequired);
   const syncIssues = status?.sync.issues || [];
   const clock = status?.metadata?.clockHealth;
@@ -576,7 +616,7 @@ export default function VaultWorkspace() {
       : status?.sync.state === "offline" ? "Offline · your work is safe" : online ? "Checking for changes" : "Offline · your work is safe";
   const deviceCountLabel = !status?.unlocked ? "Unlock to check"
     : onlineAuthorizationRequired ? "Sign in to connect"
-      : deviceSnapshot ? `${registeredDevices.length} connected` : "Checking";
+      : deviceSnapshot ? `${activeDevices.length} connected` : "Checking";
   const clockLabel = clock?.state === "healthy" ? "Checked" : clock?.orderingSafe ? "Corrected" : clock ? "Check needed" : "Checking";
   const cards = useMemo(() => [
     ["Vault", stateLabel],
@@ -599,7 +639,7 @@ export default function VaultWorkspace() {
       {message && <p className={styles.notice} role="status">{message}</p>}
 
       {status?.configured && showReleaseNote && <aside className={styles.releaseNote} aria-label="What is new">
-        <div><strong>Your history, files, and backups are ready.</strong><span>Open any record to browse or restore an older version. Media stays encrypted and downloads only when you open it.</span></div>
+        <div><strong>Your Vault now looks after its own storage.</strong><span>It protects offline browser data, keeps encrypted sync storage tidy after every active device catches up, and checks weekly Windows backups.</span></div>
         <button type="button" onClick={dismissReleaseNote}>Got it</button>
       </aside>}
 
@@ -769,15 +809,15 @@ export default function VaultWorkspace() {
             <div className={styles.devicesHeader}>
               <div>
                 <p className={styles.eyebrow}>Your devices</p>
-                <h2 id="devices-sync-title">{allDevicesCurrent ? "Everything is up to date" : deviceSnapshot ? `${currentDevices} of ${registeredDevices.length} devices are up to date` : "Checking your devices…"}</h2>
+                <h2 id="devices-sync-title">{allDevicesCurrent ? "Everything is up to date" : deviceSnapshot ? `${currentDevices} of ${activeDevices.length} devices are up to date` : "Checking your devices…"}</h2>
                 <p>Keep the Vault open and unlocked on any device that needs to catch up.</p>
               </div>
               <button disabled={busy || !online} onClick={refreshDevices}>Check now</button>
             </div>
             {status.devices.lastError && <p className={styles.deviceError} role="status">We could not check your devices. Your saved work is safe. Try again.</p>}
-            {deviceSnapshot && registeredDevices.length > 0 ? (
+            {deviceSnapshot && activeDevices.length > 0 ? (
               <div className={styles.deviceList} role="list" aria-label="Connected vault devices">
-                {registeredDevices.map((device) => {
+                {activeDevices.map((device) => {
                   const deviceState = deviceSyncState(device, deviceSnapshot.relayHeadSequence);
                   const isThisDevice = device.deviceId === status.metadata?.deviceId;
                   const deviceToneClass = {
@@ -801,6 +841,13 @@ export default function VaultWorkspace() {
                         <div><dt>Last up to date</dt><dd>{relativeTime(device.lastSyncedAt)}</dd></div>
                         <div><dt>Changes received</dt><dd>{device.acknowledgedSequence.toLocaleString()} of {deviceSnapshot.relayHeadSequence.toLocaleString()}</dd></div>
                       </dl>
+                      {!isThisDevice && <div className={styles.deviceActions}>
+                        {retireArmedDeviceId === device.deviceId ? <>
+                          <span>Remove it from sync? Its saved local copy stays on that device.</span>
+                          <button disabled={busy || !online} onClick={() => void retireDevice(device.deviceId)}>Yes, remove it</button>
+                          <button className={styles.quietButton} onClick={() => setRetireArmedDeviceId(null)}>Cancel</button>
+                        </> : <button className={styles.quietButton} onClick={() => void retireDevice(device.deviceId)}>Remove old device</button>}
+                      </div>}
                     </article>
                   );
                 })}
@@ -811,8 +858,44 @@ export default function VaultWorkspace() {
                 <span>Open the Vault once on each device. It will appear here when it syncs.</span>
               </div>
             )}
-            <small>Each browser or Home Screen app counts as its own device. Sync runs while that Vault is open and unlocked.</small>
+            <small>Each browser or Home Screen app counts as its own device. Sync runs while that Vault is open and unlocked.{relayHealth?.retiredDevices ? ` ${relayHealth.retiredDevices} old device${relayHealth.retiredDevices === 1 ? " has" : "s have"} been removed from sync.` : ""}</small>
           </section>}
+
+          <section className={`${styles.panel} ${styles.healthPanel}`} aria-labelledby="vault-health-title">
+            <div className={styles.healthHeader}>
+              <div><p className={styles.eyebrow}>Vault health</p><h2 id="vault-health-title">Storage and recovery</h2><p>Simple checks that keep the Vault reliable as it grows.</p></div>
+              <span className={styles.healthOverall}>{storageHealth?.persisted && (!backupHealth || backupHealth.lastVerifiedAt) ? "Looking good" : "A few setup items remain"}</span>
+            </div>
+            <div className={styles.healthGrid}>
+              <article className={styles.healthCard}>
+                <div><span className={styles.healthIcon} aria-hidden="true">1</span><strong>Offline on this device</strong></div>
+                <p>{storageHealth?.persisted
+                  ? "Protected. This browser should keep the Vault available when you are offline."
+                  : storageHealth?.persistenceSupported
+                    ? "Ask this browser to protect your offline Vault data from automatic cleanup."
+                    : "This browser manages offline storage itself. Keep free space on the device."}</p>
+                {storageHealth?.usageBytes !== null && storageHealth?.usageBytes !== undefined && <small>{formatBytes(storageHealth.usageBytes)} used{storageHealth.quotaBytes ? ` of ${formatBytes(storageHealth.quotaBytes)} available` : " on this device"}</small>}
+                {storageHealth?.persistenceSupported && !storageHealth.persisted && <button disabled={busy} onClick={protectStorage}>Protect offline data</button>}
+              </article>
+              <article className={styles.healthCard}>
+                <div><span className={styles.healthIcon} aria-hidden="true">2</span><strong>Encrypted sync storage</strong></div>
+                <p>{relayHealth
+                  ? `${relayHealth.relayRows.toLocaleString()} encrypted update${relayHealth.relayRows === 1 ? "" : "s"}. Cleanup waits until every active device is caught up.`
+                  : "Unlock and sync to check the encrypted relay."}</p>
+                {relayHealth && <small>{formatBytes(relayHealth.relayBytes)} used{relayHealth.lastCompactedAt ? ` · last cleaned ${relativeTime(relayHealth.lastCompactedAt)}` : " · no cleanup needed yet"}</small>}
+                {status.localCompanion.unlocked && relayHealth && <button disabled={busy || !online} onClick={cleanupRelay}>Clean up now</button>}
+              </article>
+              <article className={styles.healthCard}>
+                <div><span className={styles.healthIcon} aria-hidden="true">3</span><strong>Windows backup</strong></div>
+                <p>{backupHealth
+                  ? `${backupDestinationLabel}. A checked encrypted backup is scheduled every ${backupHealth.automaticEveryDays} day${backupHealth.automaticEveryDays === 1 ? "" : "s"} while Windows is unlocked.`
+                  : "Open and unlock the Windows Vault to check backups."}</p>
+                {backupHealth && <small>{backupHealth.lastVerifiedAt ? `Last checked ${relativeTime(backupHealth.lastVerifiedAt)}` : "No checked PC backup yet"} · {backupHealth.count} of {backupHealth.limit} slots used</small>}
+                {backupHealth?.lastAutomaticError && <span className={styles.healthWarning}>{backupHealth.lastAutomaticError}</span>}
+                {backupHealth && backupHealth.destination !== "separate-drive" && <span className={styles.healthHint}>For protection if this PC fails, choose an external drive for the backup folder.</span>}
+              </article>
+            </div>
+          </section>
 
           <section className={styles.grid}>
             <article className={styles.panel}>

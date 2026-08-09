@@ -104,3 +104,11 @@ This is an implementation ledger, not a completeness claim. “Verified” means
 - Native Media persistence topology, binary storage, retention, source confirmation, ownership, accessibility/OCR, rights confirmation, review completion, lifecycle, versions, derivatives, replacement, native links, usage, and AI execution remain intentionally unavailable.
 - External Docs sync and Sentry sync are excluded from the default isolated regression because they require third-party network actions.
 - The current isolated regression completes 131 checks with only the two documented external Docs/Sentry sync skips.
+
+## 2026-08-09 vault durability checkpoint
+
+- The encrypted relay now has acknowledgement-gated semantic compaction. Cleanup is serialized per vault, runs only after every active device has caught up with no queued or blocked changes, preserves the first envelope, a 256-envelope recovery window, every meaningful local version, and every current object version, and writes a server-only receipt.
+- Vault devices now have an explicit active or retired lifecycle. Removing an old device is a two-step action, cannot remove the current device, does not remotely erase the retired device, prevents the retired browser from resuming relay writes, and keeps retired devices out of the compaction safety cursor.
+- The Vault health panel reports per-browser offline-storage protection and approximate usage, encrypted relay rows and bytes, cleanup state, Windows backup destination, last verified backup, schedule, capacity, and actionable warnings in direct language.
+- The Windows companion now schedules signed, verified encrypted backups every seven days by default while unlocked. It never silently deletes an older recovery set when the configured limit is full, and the installer exposes `-AutoBackupDays` for an intentional cadence change.
+- The implementation retains the existing authenticated session, CSRF, RLS, encrypted-envelope, optimistic merge, conflict-history, bounded-media, and additive-restore boundaries. The rollout is additive and does not mutate production user records or connect to payments, banks, or paid providers.
