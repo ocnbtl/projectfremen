@@ -1,6 +1,7 @@
 "use client";
 
 import { buildJsonHeadersWithCsrf } from "../../client-csrf";
+import { mirrorCanonicalRecord } from "../../local-first/domain-mirror";
 import type { MutationError, MutationErrorCode } from "../../native-objects/mutation-result";
 import type {
   CaptureProcessingPreview,
@@ -324,6 +325,7 @@ export function createPersonalOpsRepository(
         cache: "no-store"
       });
       if (!result.ok) return result;
+      if (isObjectForFamily(result.data.item, family)) await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as unknown as Record<string, unknown>);
       return isObjectForFamily(result.data.item, family)
         ? { ok: true, data: result.data.item }
         : failure("unknown", "The Personal Ops response did not include the requested object");
@@ -340,6 +342,7 @@ export function createPersonalOpsRepository(
         return failure("unknown", "The created Personal Ops object was missing from the response");
       }
       const mapping = isLegacyMapping(result.data.mapping) ? result.data.mapping : undefined;
+      await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as Record<string, unknown>);
       return {
         ok: true,
         data: {
@@ -360,6 +363,7 @@ export function createPersonalOpsRepository(
         body: JSON.stringify({ family, id, expectedUpdatedAt, patch })
       });
       if (!result.ok) return result;
+      if (isObjectForFamily(result.data.item, family)) await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as unknown as Record<string, unknown>);
       return isObjectForFamily(result.data.item, family)
         ? {
             ok: true,
@@ -391,6 +395,7 @@ export function createPersonalOpsRepository(
         { cache: "no-store" }
       );
       if (!result.ok) return result;
+      if (isSecondaryObjectForFamily(result.data.item, family)) await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as unknown as Record<string, unknown>);
       return isSecondaryObjectForFamily(result.data.item, family)
         ? { ok: true, data: result.data.item }
         : failure("unknown", "The Personal Ops response did not include the requested secondary object");
@@ -406,6 +411,7 @@ export function createPersonalOpsRepository(
       if (!isSecondaryObjectForFamily(result.data.item, family) || result.data.created !== true) {
         return failure("unknown", "The created Personal Ops secondary object was missing from the response");
       }
+      await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as unknown as Record<string, unknown>);
       return {
         ok: true,
         data: { item: result.data.item, created: true },
@@ -422,6 +428,7 @@ export function createPersonalOpsRepository(
         body: JSON.stringify({ secondaryFamily: family, id, patch, expectedUpdatedAt })
       });
       if (!result.ok) return result;
+      if (isSecondaryObjectForFamily(result.data.item, family)) await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as unknown as Record<string, unknown>);
       return isSecondaryObjectForFamily(result.data.item, family)
         ? {
             ok: true,

@@ -1,4 +1,4 @@
-import { readJsonFile, writeJsonFile } from "./file-store";
+import { mutateJsonFile, readJsonFile } from "./file-store";
 import { getPersonalSystemDomain } from "./personal-systems";
 
 export type PersonalRecordClass =
@@ -780,7 +780,10 @@ export function getRecordsForDomain(records: PersonalRecord[], domain: string): 
   return records.filter((record) => record.domain === domain);
 }
 
-export async function createPersonalRecord(input: PersonalRecordInput): Promise<PersonalRecord[]> {
+export async function createPersonalRecord(
+  input: PersonalRecordInput,
+  options: { requestedId?: string } = {}
+): Promise<PersonalRecord[]> {
   const domain = input.domain.trim();
   if (!isAllowedDomain(domain)) {
     throw new Error("Invalid personal domain");
@@ -798,8 +801,12 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
   const stage = pickStage(input.stage);
   const relations = normalizeRelations(input.relations);
   const profile = normalizeContactProfile(input.profile);
+  const requestedId = options.requestedId?.trim();
+  if (requestedId && !/^personal-[0-9a-f-]{36}$/i.test(requestedId)) {
+    throw new Error("Invalid requested personal record id");
+  }
   const nextRecord: PersonalRecord = {
-    id: `personal-${crypto.randomUUID()}`,
+    id: requestedId || `personal-${crypto.randomUUID()}`,
     domain,
     title,
     className: pickClass(input.className || input.kind),
@@ -833,16 +840,23 @@ export async function createPersonalRecord(input: PersonalRecordInput): Promise<
   };
   nextRecord.growth = calculateGrowth(nextRecord);
 
-  const next = applyReciprocalRelations([nextRecord, ...(await readPersonalRecords())], nextRecord.id);
-  await writeJsonFile(FILE_NAME, next);
-  return next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return mutateJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>, PersonalRecord[]>(FILE_NAME, [], (stored) => {
+    const existing = stored.map(normalizeRecord).filter((record) => isAllowedDomain(record.domain));
+    if (existing.some((record) => record.id === nextRecord.id)) {
+      return { value: stored, result: existing.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), changed: false };
+    }
+    const next = applyReciprocalRelations([nextRecord, ...existing], nextRecord.id);
+    return { value: next, result: next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
+  });
 }
 
 export async function updatePersonalRecord(
   id: string,
-  patch: PersonalRecordPatch
+  patch: PersonalRecordPatch,
+  options: { expectedUpdatedAt?: string } = {}
 ): Promise<PersonalRecord[]> {
-  const existing = await readPersonalRecords();
+  return mutateJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>, PersonalRecord[]>(FILE_NAME, [], (stored) => {
+  const existing = stored.map(normalizeRecord).filter((record) => isAllowedDomain(record.domain));
   const idx = existing.findIndex((record) => record.id === id);
   if (idx === -1) {
     throw new Error("Record not found");
@@ -851,6 +865,9 @@ export async function updatePersonalRecord(
   const now = new Date().toISOString();
   const next = [...existing];
   const current = next[idx];
+  if (options.expectedUpdatedAt && current.updatedAt !== options.expectedUpdatedAt) {
+    throw new Error("This record changed after it was opened. Refresh before saving so newer work is not overwritten.");
+  }
   const time = mergeTimePatch(current.time, patch.time);
   const profilePatch = normalizeContactProfilePatch(patch.profile);
   for (const profileUrl of [profilePatch?.website, profilePatch?.linkedin]) {
@@ -881,6 +898,6 @@ export async function updatePersonalRecord(
     updatedAt: now
   };
 
-  await writeJsonFile(FILE_NAME, next);
-  return next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return { value: next, result: next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
+  });
 }

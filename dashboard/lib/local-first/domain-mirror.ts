@@ -2,35 +2,21 @@
 
 import type { PersonalRecord } from "../personal-records-store";
 import { browserVault, deterministicVaultObjectId } from "./browser-engine";
+import { canonicalVaultFields, objectKindForPersonalCollection, type CanonicalModule } from "./canonical-record";
 import type { VaultFieldValue, VaultObjectKind } from "./types";
 
-export function flattenVaultFields(value: unknown): Record<string, VaultFieldValue> {
-  const source = JSON.parse(JSON.stringify(value)) as Record<string, VaultFieldValue>;
-  const flattened: Record<string, VaultFieldValue> = {};
-  const visit = (prefix: string, current: VaultFieldValue) => {
-    if (current && typeof current === "object" && !Array.isArray(current)) {
-      for (const [key, nested] of Object.entries(current)) visit(prefix ? `${prefix}.${key}` : key, nested);
-    } else if (prefix) {
-      flattened[prefix] = current;
-    }
-  };
-  for (const [key, current] of Object.entries(source)) visit(key, current);
-  return flattened;
-}
-
 function personalKind(record: PersonalRecord): VaultObjectKind {
-  if (record.className === "person" || record.className === "org") return "contact";
-  if (record.className === "resource") return "resource";
-  if (record.className === "file") return "media";
-  if (record.className === "note") return "note";
-  return "other";
+  return objectKindForPersonalCollection(record.className);
 }
 
-export async function mirrorVaultRecord(canonicalId: string, objectKind: VaultObjectKind, value: unknown): Promise<boolean> {
+export async function mirrorVaultRecord(
+  canonicalId: string,
+  objectKind: VaultObjectKind,
+  fields: Record<string, VaultFieldValue>
+): Promise<boolean> {
   if (!browserVault.isUnlocked()) return false;
   try {
     const objectId = await deterministicVaultObjectId(canonicalId);
-    const fields = flattenVaultFields(value);
     const result = await browserVault.mirrorCanonicalObject({ objectId, objectKind, fields });
     return result.changed;
   } catch (error) {
@@ -42,10 +28,21 @@ export async function mirrorVaultRecord(canonicalId: string, objectKind: VaultOb
 }
 
 export async function mirrorPersonalRecord(record: PersonalRecord): Promise<boolean> {
+  return mirrorCanonicalRecord("personal-records", record.className, personalKind(record), record as unknown as Record<string, unknown>);
+}
+
+export async function mirrorCanonicalRecord(
+  module: CanonicalModule,
+  collection: string,
+  objectKind: VaultObjectKind,
+  record: Record<string, unknown>
+): Promise<boolean> {
+  const id = typeof record.id === "string" ? record.id : "";
+  if (!id) return false;
   return mirrorVaultRecord(
-    `personal-records:${record.className}:${record.id}`,
-    personalKind(record),
-    { sourceModule: "personal-records", ...record }
+    `${module}:${collection}:${id}`,
+    objectKind,
+    canonicalVaultFields({ module, collection, record })
   );
 }
 
@@ -65,9 +62,5 @@ export async function mirrorFinanceRecord(kind: unknown, record: Record<string, 
   const id = typeof record.id === "string" ? record.id : "";
   const collection = typeof kind === "string" ? FINANCE_COLLECTIONS[kind] : undefined;
   if (!id || !collection) return false;
-  return mirrorVaultRecord(`finance:${collection}:${id}`, "finance", {
-    sourceModule: "finance",
-    sourceCollection: collection,
-    ...record
-  });
+  return mirrorCanonicalRecord("finance", collection, "finance", record);
 }

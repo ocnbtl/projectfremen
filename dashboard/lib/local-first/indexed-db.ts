@@ -25,6 +25,7 @@ export type VaultMetadata = {
   lastSequence: number;
   lastClock: HybridLogicalClock | null;
   clockHealth: ClockHealth | null;
+  acknowledgedCanonicalCommandIds?: string[];
   createdAt: string;
   updatedAt: string;
 };

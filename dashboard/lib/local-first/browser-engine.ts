@@ -18,6 +18,15 @@ import { BrowserVaultStore, type RejectedInboxRow } from "./indexed-db";
 import { mergeVaultSnapshots } from "./merge";
 import { deterministicMergeVersionId, meaningfulVaultHistory, snapshotsEquivalent } from "./semantic-history";
 import {
+  canonicalMetadata,
+  pendingCanonicalCommands,
+  pendingCommandField,
+  readCanonicalMetadata,
+  VAULT_CANONICAL_RECORD_FIELD,
+  VAULT_PENDING_COMMAND_PREFIX,
+  type VaultPendingCanonicalCommand
+} from "./canonical-record";
+import {
   VAULT_PROTOCOL_VERSION,
   type EncryptedChangeEnvelope,
   type EncryptedVaultMediaChunk,
@@ -49,6 +58,7 @@ type VaultSession = {
 const CANONICAL_BASE_FIELD = "__unigentamosCanonicalBaseV1";
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DEVICE_STATUS_HEARTBEAT_MS = 30_000;
+const DEVICE_STATUS_REFRESH_MS = 5_000;
 const RELAY_COMPACTION_INTERVAL_MS = 6 * 60 * 60_000;
 const RELAY_COMPACTION_MIN_ROWS = 512;
 const MAX_COMPACTION_CHANGE_IDS = 50_000;
@@ -439,7 +449,9 @@ export class BrowserVaultEngine {
       try {
         const response = await fetch("/api/vault/time", { cache: "no-store" });
         if (response.ok) {
-          const health = assessClockHealth(Date.now(), response.headers.get("date"));
+          const payload = await response.json().catch(() => null) as { serverTime?: unknown } | null;
+          const preciseServerTime = typeof payload?.serverTime === "string" ? payload.serverTime : response.headers.get("date");
+          const health = assessClockHealth(Date.now(), preciseServerTime);
           await session.store.updateMetadata({ clockHealth: health });
           return health.adjustedWallMs;
         }
@@ -487,6 +499,9 @@ export class BrowserVaultEngine {
     if (!metadata) throw new Error("Local vault metadata is missing");
     const hlc = tickHlc(metadata.lastClock, session.deviceId, await this.correctedWallMs());
     const restoredFields = cloneFields(target.fields);
+    for (const field of Object.keys(restoredFields)) {
+      if (field.startsWith(VAULT_PENDING_COMMAND_PREFIX)) delete restoredFields[field];
+    }
     const allFields = new Set([...Object.keys(current.fields), ...Object.keys(restoredFields)]);
     const change: VaultChange = {
       protocolVersion: VAULT_PROTOCOL_VERSION,
@@ -523,6 +538,11 @@ export class BrowserVaultEngine {
     await session.store.queue(envelope);
     await session.store.updateMetadata({ lastClock: hlc });
     await this.mirrorEnvelopes([envelope]);
+    const restoredMetadata = readCanonicalMetadata(snapshot.fields);
+    if (restoredMetadata?.editableFields.length) {
+      const patch = Object.fromEntries(restoredMetadata.editableFields.map(({ key }) => [key, restoredFields[key] ?? ""]));
+      return this.saveCanonicalFields(snapshot, patch, current, { force: true });
+    }
     void this.syncOnce().catch(() => undefined);
     return snapshot;
   }
@@ -538,7 +558,8 @@ export class BrowserVaultEngine {
     const previous = await this.readObject(objectId);
     const fields = { ...(previous?.fields || {}), ...input.fields };
     const tombstone = input.tombstone ?? previous?.tombstone ?? false;
-    if (previous && snapshotsEquivalent(previous, {
+    const changesOperationalState = Object.keys(input.fields).some((field) => field.startsWith(VAULT_PENDING_COMMAND_PREFIX));
+    if (previous && !changesOperationalState && snapshotsEquivalent(previous, {
       ...previous,
       objectKind: input.objectKind,
       fields,
@@ -714,6 +735,102 @@ export class BrowserVaultEngine {
     await this.mirrorEnvelopes([remoteEnvelope, mergedEnvelope]);
     void this.syncOnce().catch(() => undefined);
     return { snapshot, changed: true };
+  }
+
+  async saveCanonicalFields(
+    snapshot: VaultObjectSnapshot,
+    patch: Record<string, VaultFieldValue>,
+    baseSnapshot: VaultObjectSnapshot = snapshot,
+    options: { force?: boolean } = {}
+  ): Promise<VaultObjectSnapshot> {
+    const metadata = readCanonicalMetadata(snapshot.fields);
+    if (!metadata) throw new Error("This item is not linked to a module record");
+    const allowed = new Set(metadata.editableFields.map((field) => field.key));
+    if (!Object.keys(patch).length || Object.keys(patch).some((field) => !allowed.has(field))) {
+      throw new Error("This change includes a field that is not editable in the Vault");
+    }
+    if (!options.force && Object.entries(patch).every(([field, value]) => fieldsEqual({ value }, { value: snapshot.fields[field] ?? null }))) return snapshot;
+    const base = canonicalBase(baseSnapshot)?.fields || baseSnapshot.fields;
+    const baseMetadata = readCanonicalMetadata(baseSnapshot.fields) || metadata;
+    const commandId = crypto.randomUUID();
+    const queuedAt = new Date(await this.correctedWallMs()).toISOString();
+    const command: VaultPendingCanonicalCommand = {
+      format: "unigentamos-canonical-command-v1",
+      commandId,
+      operation: "update",
+      canonicalId: metadata.canonicalId,
+      baseUpdatedAt: baseMetadata.sourceUpdatedAt,
+      baseFields: Object.fromEntries(metadata.editableFields.map(({ key }) => [key, base[key] ?? null])),
+      patch: cloneFields(patch),
+      queuedAt
+    };
+    return this.saveObject({
+      objectId: snapshot.objectId,
+      objectKind: snapshot.objectKind,
+      fields: { ...patch, [pendingCommandField(commandId)]: command as unknown as VaultFieldValue }
+    });
+  }
+
+  async createCanonicalPersonalRecord(
+    collection: "note" | "person" | "org" | "resource",
+    objectKind: "note" | "contact" | "resource",
+    patch: Record<string, VaultFieldValue>
+  ): Promise<VaultObjectSnapshot> {
+    const recordId = `personal-${crypto.randomUUID()}`;
+    const canonicalId = `personal-records:${collection}:${recordId}`;
+    const objectId = await deterministicVaultObjectId(canonicalId);
+    const queuedAt = new Date(await this.correctedWallMs()).toISOString();
+    const commandId = crypto.randomUUID();
+    const command: VaultPendingCanonicalCommand = {
+      format: "unigentamos-canonical-command-v1", commandId, operation: "create", canonicalId,
+      baseUpdatedAt: null, baseFields: {}, patch: cloneFields(patch), queuedAt
+    };
+    return this.saveObject({
+      objectId,
+      objectKind,
+      fields: {
+        sourceModule: "personal-records", sourceCollection: collection, id: recordId, className: collection,
+        ...patch, updatedAt: queuedAt,
+        [VAULT_CANONICAL_RECORD_FIELD]: canonicalMetadata({ module: "personal-records", collection, recordId }) as unknown as VaultFieldValue,
+        [pendingCommandField(commandId)]: command as unknown as VaultFieldValue
+      }
+    });
+  }
+
+  private async reconcileCanonicalCommands(): Promise<number> {
+    const session = this.requireSession();
+    const objects = await this.listObjects();
+    const metadata = await session.store.metadata();
+    const acknowledged = new Set(metadata?.acknowledgedCanonicalCommandIds || []);
+    let completed = 0;
+    for (const snapshot of objects) {
+      for (const { field, command } of pendingCanonicalCommands(snapshot)) {
+        if (acknowledged.has(command.commandId)) {
+          await this.saveObject({ objectId: snapshot.objectId, objectKind: snapshot.objectKind, fields: { [field]: null } });
+          continue;
+        }
+        const response = await fetch("/api/vault/records", {
+          method: "POST",
+          headers: buildJsonHeadersWithCsrf(),
+          body: JSON.stringify({ command })
+        });
+        const payload = await response.json() as {
+          ok?: boolean; error?: string; objectKind?: VaultObjectKind; fields?: Record<string, VaultFieldValue>
+        };
+        if (!response.ok || !payload.ok || !payload.objectKind || !payload.fields) {
+          throw this.vaultRequestError(response, payload.error, "A saved module change could not be applied");
+        }
+        this.markVaultRequestAuthorized();
+        acknowledged.add(command.commandId);
+        await session.store.updateMetadata({
+          acknowledgedCanonicalCommandIds: [...acknowledged].slice(-2_048)
+        });
+        await this.saveObject({ objectId: snapshot.objectId, objectKind: snapshot.objectKind, fields: { [field]: null } });
+        await this.mirrorCanonicalObject({ objectId: snapshot.objectId, objectKind: payload.objectKind, fields: payload.fields });
+        completed += 1;
+      }
+    }
+    return completed;
   }
 
   private async version(objectId: string, versionId: string): Promise<VaultObjectSnapshot | null> {
@@ -894,18 +1011,18 @@ export class BrowserVaultEngine {
           headers: buildJsonHeadersWithCsrf(),
           body: JSON.stringify({ vaultId: session.vaultId, envelopes: outbox })
         });
-        const payload = await response.json() as { ok?: boolean; acceptedChangeIds?: string[]; error?: string };
+        const payload = await response.json() as { ok?: boolean; acceptedChangeIds?: string[]; error?: string; serverTime?: string };
         if (!response.ok || !payload.ok) throw this.vaultRequestError(response, payload.error, "Vault push failed");
         this.markVaultRequestAuthorized();
         await session.store.acknowledge(payload.acceptedChangeIds || []);
-        await this.recordClockHealth(response.headers.get("date"));
+        await this.recordClockHealth(payload.serverTime || response.headers.get("date"));
       }
       const metadata = await session.store.metadata();
       const response = await fetch(`/api/vault/sync?vaultId=${encodeURIComponent(session.vaultId)}&since=${metadata?.lastSequence || 0}`, { cache: "no-store" });
-      const payload = await response.json() as { ok?: boolean; envelopes?: SequencedChangeEnvelope[]; error?: string };
+      const payload = await response.json() as { ok?: boolean; envelopes?: SequencedChangeEnvelope[]; error?: string; serverTime?: string };
       if (!response.ok || !payload.ok) throw this.vaultRequestError(response, payload.error, "Vault pull failed");
       this.markVaultRequestAuthorized();
-      await this.recordClockHealth(response.headers.get("date"));
+      await this.recordClockHealth(payload.serverTime || response.headers.get("date"));
       const previouslyRejected = await session.store.rejectedInbox(500);
       const incoming = (payload.envelopes || []).filter((item) => item.deviceId !== session.deviceId);
       syncChanged ||= incoming.length > 0;
@@ -932,6 +1049,8 @@ export class BrowserVaultEngine {
       }
       const highestSequence = Math.max(metadata?.lastSequence || 0, ...(payload.envelopes || []).map((item) => item.sequence));
       await session.store.updateMetadata({ lastSequence: highestSequence });
+      const reconciledRecords = await this.reconcileCanonicalCommands();
+      syncChanged ||= reconciledRecords > 0;
       const remainingRejected = await session.store.rejectedInbox(500);
       this.lastSyncError = remainingRejected.length
         ? `${remainingRejected.length} saved change${remainingRejected.length === 1 ? " needs" : "s need"} a safe retry`
@@ -953,6 +1072,16 @@ export class BrowserVaultEngine {
     }
   }
 
+  async syncUntilSettled(maxRounds = 8): Promise<void> {
+    for (let round = 0; round < maxRounds; round += 1) {
+      await this.syncOnce();
+      if (!this.session) return;
+      if (!this.syncing && (await this.session.store.outbox()).length === 0) return;
+      await new Promise((resolve) => window.setTimeout(resolve, 100));
+    }
+    await this.syncOnce();
+  }
+
   async repairSyncIssues(): Promise<{ repaired: number; remaining: number }> {
     if (!this.session) throw new Error("Unlock the local vault first");
     if (!navigator.onLine) throw new Error("Connect to the internet, then try the safe repair again.");
@@ -965,30 +1094,37 @@ export class BrowserVaultEngine {
 
   private async reportDeviceStatus(force = false): Promise<void> {
     const now = Date.now();
-    if (!force && now - this.lastDeviceHeartbeatAt < DEVICE_STATUS_HEARTBEAT_MS) return;
+    const heartbeatDue = force || now - this.lastDeviceHeartbeatAt >= DEVICE_STATUS_HEARTBEAT_MS;
+    const snapshotAge = this.deviceStatusSnapshot ? now - Date.parse(this.deviceStatusSnapshot.refreshedAt) : Number.POSITIVE_INFINITY;
+    if (!heartbeatDue && snapshotAge < DEVICE_STATUS_REFRESH_MS) return;
     const session = this.requireSession();
     const metadata = await session.store.metadata();
     if (!metadata) throw new Error("Local vault metadata is missing");
-    const diagnostics = await session.store.diagnostics();
-    const descriptor = await encryptVaultDeviceDescriptor({
-      format: "unigentamos-vault-device-v1",
-      vaultId: session.vaultId,
-      deviceId: session.deviceId,
-      deviceName: normalizedDeviceName(metadata.deviceName, "Browser device"),
-      deviceKind: currentDeviceKind()
-    }, session.key, session.keyVersion);
-    const response = await fetch("/api/vault/devices", {
-      method: "POST",
-      headers: buildJsonHeadersWithCsrf(),
-      body: JSON.stringify({
+    let response: Response;
+    if (heartbeatDue) {
+      const diagnostics = await session.store.diagnostics();
+      const descriptor = await encryptVaultDeviceDescriptor({
+        format: "unigentamos-vault-device-v1",
         vaultId: session.vaultId,
         deviceId: session.deviceId,
-        descriptor,
-        acknowledgedSequence: metadata.lastSequence,
-        pendingChanges: diagnostics.outbox,
-        blockedChanges: diagnostics.blockedChanges
-      })
-    });
+        deviceName: normalizedDeviceName(metadata.deviceName, "Browser device"),
+        deviceKind: currentDeviceKind()
+      }, session.key, session.keyVersion);
+      response = await fetch("/api/vault/devices", {
+        method: "POST",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({
+          vaultId: session.vaultId,
+          deviceId: session.deviceId,
+          descriptor,
+          acknowledgedSequence: metadata.lastSequence,
+          pendingChanges: diagnostics.outbox,
+          blockedChanges: diagnostics.blockedChanges
+        })
+      });
+    } else {
+      response = await fetch("/api/vault/devices?vaultId=" + encodeURIComponent(session.vaultId), { cache: "no-store" });
+    }
     const payload = await response.json() as {
       ok?: boolean;
       relayHeadSequence?: number;
@@ -1027,7 +1163,7 @@ export class BrowserVaultEngine {
     this.lastDeviceStatusError = unreadable
       ? `${unreadable} encrypted device descriptor${unreadable === 1 ? " is" : "s are"} unreadable`
       : null;
-    this.lastDeviceHeartbeatAt = now;
+    if (heartbeatDue) this.lastDeviceHeartbeatAt = now;
   }
 
   async refreshDeviceStatuses(): Promise<void> {

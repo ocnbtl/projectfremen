@@ -1,6 +1,7 @@
 "use client";
 
 import { buildJsonHeadersWithCsrf } from "../../client-csrf";
+import { mirrorCanonicalRecord } from "../../local-first/domain-mirror";
 import type { MutationError, MutationErrorCode, MutationResult } from "../../native-objects/mutation-result";
 import type {
   ReviewLegacyMapping,
@@ -206,6 +207,7 @@ export function createReviewsRepository(options: ReviewsRepositoryOptions = {}):
       });
       if (!result.ok) return result;
       const payload = mutationPayload(result.data);
+      if (payload) await mirrorCanonicalRecord("reviews", "runs", "review", payload.item as unknown as Record<string, unknown>);
       return payload
         ? {
             ok: true,
@@ -226,6 +228,7 @@ export function createReviewsRepository(options: ReviewsRepositoryOptions = {}):
       if (!payload || !isMapping(result.data.mapping) || typeof result.data.created !== "boolean") {
         return failure("unknown", "The converted ReviewRun was missing from the response");
       }
+      await mirrorCanonicalRecord("reviews", "runs", "review", payload.item as unknown as Record<string, unknown>);
       return {
         ok: true,
         data: { ...payload, mapping: result.data.mapping, created: result.data.created },
@@ -241,6 +244,7 @@ export function createReviewsRepository(options: ReviewsRepositoryOptions = {}):
       });
       if (!result.ok) return result;
       const payload = mutationPayload(result.data);
+      if (payload) await mirrorCanonicalRecord("reviews", "runs", "review", payload.item as unknown as Record<string, unknown>);
       return payload
         ? {
             ok: true,

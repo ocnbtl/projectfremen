@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   browserVault,
   deterministicVaultObjectId,
@@ -17,6 +17,7 @@ import type {
   VaultObjectSnapshot,
   VaultRecoveryPackage
 } from "../lib/local-first/types";
+import { readCanonicalMetadata } from "../lib/local-first/canonical-record";
 import styles from "./VaultWorkspace.module.css";
 
 type VaultStatus = Awaited<ReturnType<typeof browserVault.status>>;
@@ -181,6 +182,7 @@ export default function VaultWorkspace() {
   const [restoreConfirmation, setRestoreConfirmation] = useState("");
   const [showReleaseNote, setShowReleaseNote] = useState(false);
   const [retireArmedDeviceId, setRetireArmedDeviceId] = useState<string | null>(null);
+  const workspaceRefreshStarted = useRef(false);
 
   const refresh = useCallback(async () => {
     const next = await browserVault.status();
@@ -198,7 +200,7 @@ export default function VaultWorkspace() {
     setSetupTarget(suggested.target);
     setDeviceName(suggested.name);
     setOnline(navigator.onLine);
-    refresh().then(() => setMessage("")).catch(() => setMessage("We could not check this device. Try again."));
+    refresh().then(() => setMessage((current) => current === "Checking this device…" ? "" : current)).catch(() => setMessage("We could not check this device. Try again."));
     const handleOnline = () => { setOnline(navigator.onLine); void browserVault.syncOnce().finally(refresh); };
     const handleVaultDataChanged = () => { void Promise.all([loadObjects(), refresh()]); };
     window.addEventListener("online", handleOnline);
@@ -275,9 +277,9 @@ export default function VaultWorkspace() {
     setShowReleaseNote(false);
   }
 
-  async function run(action: () => Promise<void>) {
+  async function run(action: () => Promise<void>, options: { clearMessage?: boolean } = {}) {
     setBusy(true);
-    setMessage("");
+    if (options.clearMessage !== false) setMessage("");
     try {
       await action();
       await refresh();
@@ -344,11 +346,12 @@ export default function VaultWorkspace() {
     });
   }
 
-  async function importWorkspace() {
+  async function importWorkspace(quiet = false) {
     await run(async () => {
       const response = await fetch("/api/vault/bootstrap", { cache: "no-store" });
       const payload = await response.json() as { ok?: boolean; objects?: BootstrapObject[]; error?: string };
-      if (!response.ok || !payload.ok || !payload.objects) throw new Error(payload.error || "We could not add your workspace. Try again.");
+      if (response.status === 401) throw new Error(VAULT_ONLINE_SIGN_IN_MESSAGE);
+      if (!response.ok || !payload.ok || !payload.objects) throw new Error(payload.error || "We could not refresh your workspace. Try again.");
       let changed = 0;
       for (const item of payload.objects) {
         const objectId = await deterministicVaultObjectId(item.canonicalId);
@@ -358,12 +361,12 @@ export default function VaultWorkspace() {
           fields: item.fields
         });
         if (mirrored.changed) changed += 1;
-        if (changed % 10 === 0) setMessage(`Adding ${changed} items to the Vault…`);
+        if (!quiet && changed > 0 && changed % 10 === 0) setMessage(`Adding ${changed} items to the Vault…`);
       }
-      await browserVault.syncOnce();
+      await browserVault.syncUntilSettled();
       await loadObjects();
-      setMessage(changed ? `Added ${changed} new or changed items to the Vault.` : "Your Vault already has the latest workspace data.");
-    });
+      if (!quiet) setMessage(changed ? `Updated ${changed} item${changed === 1 ? "" : "s"} from your workspace.` : "Your Vault already has the latest workspace data.");
+    }, { clearMessage: !quiet });
   }
 
   async function createBackup() {
@@ -456,7 +459,7 @@ export default function VaultWorkspace() {
 
   async function refreshDevices() {
     await run(async () => {
-      await browserVault.syncOnce();
+      await browserVault.syncUntilSettled();
       await browserVault.refreshDeviceStatuses();
       setMessage("Device status updated.");
     });
@@ -504,6 +507,14 @@ export default function VaultWorkspace() {
     });
   }
 
+  useEffect(() => {
+    if (!status?.unlocked || !online || workspaceRefreshStarted.current) return;
+    workspaceRefreshStarted.current = true;
+    void importWorkspace(true).catch(() => { workspaceRefreshStarted.current = false; });
+    // The workspace refresh intentionally runs once per unlocked page session.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [online, status?.unlocked]);
+
   function stringField(snapshot: VaultObjectSnapshot, field: string): string {
     const value = snapshot.fields[field];
     return typeof value === "string" ? value : "";
@@ -511,14 +522,17 @@ export default function VaultWorkspace() {
 
   async function selectObject(snapshot: VaultObjectSnapshot) {
     setSelectedObjectId(snapshot.objectId);
-    setObjectDraft({
-      title: stringField(snapshot, "title") || stringField(snapshot, "name") || stringField(snapshot, "fullName") || "Untitled",
-      body: stringField(snapshot, "body") || stringField(snapshot, "description"),
-      email: stringField(snapshot, "profile.email") || stringField(snapshot, "profile.primaryEmail"),
-      phone: stringField(snapshot, "profile.phone") || stringField(snapshot, "profile.primaryPhone"),
-      location: stringField(snapshot, "profile.livesIn"),
-      url: stringField(snapshot, "url")
-    });
+    const metadata = readCanonicalMetadata(snapshot.fields);
+    setObjectDraft(metadata?.editableFields.length
+      ? Object.fromEntries(metadata.editableFields.map(({ key }) => [key, stringField(snapshot, key)]))
+      : {
+          title: stringField(snapshot, "title") || stringField(snapshot, "name") || stringField(snapshot, "fullName") || "Untitled",
+          body: stringField(snapshot, "body") || stringField(snapshot, "description"),
+          email: stringField(snapshot, "profile.primaryEmail"),
+          phone: stringField(snapshot, "profile.phoneNumber"),
+          location: stringField(snapshot, "profile.livesIn"),
+          url: stringField(snapshot, "url")
+        });
     const history = await browserVault.history(snapshot.objectId);
     setObjectHistory(history);
     setSelectedVersionId(history[0]?.versionId || null);
@@ -535,29 +549,38 @@ export default function VaultWorkspace() {
 
   async function saveLocalObject() {
     await run(async () => {
-      const editingKind = selectedObjectId ? objects.find((item) => item.objectId === selectedObjectId)?.objectKind : activeKind;
-      if (editingKind !== "note" && editingKind !== "contact" && editingKind !== "resource") throw new Error("Notes, contacts, and resources can be edited here. Other records are read-only in the Vault.");
-      if (!objectDraft.title.trim()) throw new Error("Title or name is required");
-      const fields: Record<string, VaultFieldValue> = {
-        title: objectDraft.title.trim(),
-        body: objectDraft.body || "",
-        sourceModule: "vault"
-      };
-      if (editingKind === "contact") {
-        fields["profile.primaryEmail"] = objectDraft.email || "";
-        fields["profile.primaryPhone"] = objectDraft.phone || "";
-        fields["profile.livesIn"] = objectDraft.location || "";
+      const selected = selectedObjectId ? objects.find((item) => item.objectId === selectedObjectId) : null;
+      const editingKind = selected?.objectKind || activeKind;
+      let saved: VaultObjectSnapshot;
+      if (selected) {
+        const metadata = readCanonicalMetadata(selected.fields);
+        if (metadata?.editableFields.length) {
+          const patch = Object.fromEntries(metadata.editableFields.map(({ key }) => [key, objectDraft[key] || ""]));
+          if (!String(patch[metadata.editableFields[0].key] || "").trim()) throw new Error("The first field is required");
+          saved = await browserVault.saveCanonicalFields(selected, patch);
+        } else {
+          if (editingKind !== "note" && editingKind !== "contact" && editingKind !== "resource") throw new Error("Open the full module view to change this item.");
+          if (!objectDraft.title.trim()) throw new Error("Title or name is required");
+          saved = await browserVault.saveObject({ objectId: selected.objectId, objectKind: editingKind, fields: { title: objectDraft.title.trim(), body: objectDraft.body || "" } });
+        }
+      } else {
+        if (editingKind !== "note" && editingKind !== "contact" && editingKind !== "resource") throw new Error("Choose Notes, Contacts, or Resources to add a record here.");
+        if (!objectDraft.title.trim()) throw new Error("Title or name is required");
+        const fields: Record<string, VaultFieldValue> = { title: objectDraft.title.trim(), body: objectDraft.body || "" };
+        if (editingKind === "contact") {
+          fields["profile.primaryEmail"] = objectDraft.email || "";
+          fields["profile.phoneNumber"] = objectDraft.phone || "";
+          fields["profile.livesIn"] = objectDraft.location || "";
+        }
+        if (editingKind === "resource") fields.url = objectDraft.url || "";
+        saved = await browserVault.createCanonicalPersonalRecord(
+          editingKind === "contact" ? "person" : editingKind, editingKind, fields
+        );
       }
-      if (editingKind === "resource") fields.url = objectDraft.url || "";
-      const saved = await browserVault.saveObject({
-        ...(selectedObjectId ? { objectId: selectedObjectId } : {}),
-        objectKind: editingKind,
-        fields
-      });
       setSelectedObjectId(saved.objectId);
       setObjectHistory(await browserVault.history(saved.objectId));
       await loadObjects();
-      setMessage(`${recordKindLabel(editingKind)} saved. It will sync automatically.`);
+      setMessage(online ? "Saved. The full module will update automatically." : "Saved on this device. It will update the full module when you reconnect.");
     });
   }
 
@@ -596,7 +619,9 @@ export default function VaultWorkspace() {
   }), [activeKind, objects, recordQuery]);
   const selectedObject = objects.find((item) => item.objectId === selectedObjectId) || null;
   const editorKind = selectedObject?.objectKind || activeKind;
-  const canEditRecord = editorKind === "note" || editorKind === "contact" || editorKind === "resource";
+  const selectedCanonical = selectedObject ? readCanonicalMetadata(selectedObject.fields) : null;
+  const editorFields = selectedCanonical?.editableFields || [];
+  const canEditRecord = Boolean(editorFields.length) || editorKind === "note" || editorKind === "contact" || editorKind === "resource";
   const selectedVersion = objectHistory.find((item) => item.versionId === selectedVersionId) || null;
   const selectedVersionFields = selectedVersion
     ? Object.fromEntries(Object.entries(selectedVersion.fields).filter(([field]) => !field.startsWith("__unigentamos")))
@@ -902,7 +927,7 @@ export default function VaultWorkspace() {
               <p className={styles.eyebrow}>Bring in your current data</p>
               <h2>Add your Unigentamos workspace</h2>
               <p>Copy your existing notes, people, resources, projects, and other records into the Vault. Nothing in your current workspace is changed or deleted.</p>
-              <button disabled={busy || !online} onClick={importWorkspace}>Add current workspace</button>
+              <button disabled={busy || !online} onClick={() => void importWorkspace()}>Refresh workspace</button>
               <small>Finance CSV previews are skipped. Raw CSV files are never saved.</small>
             </article>
             <article className={styles.panel}>
@@ -964,7 +989,7 @@ export default function VaultWorkspace() {
 
           <section className={`${styles.panel} ${styles.objectWorkspace}`}>
             <div className={styles.workspaceHeader}>
-              <div><p className={styles.eyebrow}>Saved on this device</p><h2>All records and version history</h2><p>Browse every saved record. History shows real content changes, not background sync activity. Restoring an older version makes a new latest copy.</p></div>
+              <div><p className={styles.eyebrow}>Offline command center</p><h2>Your records, in one place</h2><p>These are the same records used by Notes, People, Resources, Projects, Reviews, Personal, and Finance. Safe fields can be changed here offline; specialized actions stay in their full module.</p></div>
               {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={newObject}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
             </div>
             <label className={styles.recordSearch}>Search records<input type="search" value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} placeholder="Search titles, names, and saved details" /></label>
@@ -985,15 +1010,14 @@ export default function VaultWorkspace() {
               </aside>
               <div className={styles.objectEditor}>
                 {canEditRecord ? <>
-                <label>{editorKind === "contact" ? "Name" : "Title"}<input value={objectDraft.title || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, title: event.target.value }))} /></label>
-                {editorKind === "contact" && <div className={styles.fieldGrid}>
-                  <label>Email<input type="email" value={objectDraft.email || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, email: event.target.value }))} /></label>
-                  <label>Phone<input value={objectDraft.phone || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, phone: event.target.value }))} /></label>
-                  <label>Location<input value={objectDraft.location || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, location: event.target.value }))} /></label>
-                </div>}
-                {editorKind === "resource" && <label>URL<input type="url" value={objectDraft.url || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, url: event.target.value }))} /></label>}
-                <label>{editorKind === "note" ? "Note" : "Context"}<textarea rows={10} value={objectDraft.body || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, body: event.target.value }))} /></label>
-                <div className={styles.buttonRow}><button disabled={busy} onClick={saveLocalObject}>Save version</button><span>{status.sync.state === "synced" ? "Up to date" : "Saved here · will sync when connected"}</span></div>
+                {editorFields.length ? editorFields.map((field) => <label key={field.key}>{field.label}{field.control === "textarea"
+                  ? <textarea rows={field.key === "body" || field.key.includes("summary") ? 10 : 6} value={objectDraft[field.key] || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.value }))} />
+                  : <input type={field.control} value={objectDraft[field.key] || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.value }))} />}</label>) : <>
+                  <label>{editorKind === "contact" ? "Name" : "Title"}<input value={objectDraft.title || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, title: event.target.value }))} /></label>
+                  <label>{editorKind === "note" ? "Note" : "Context"}<textarea rows={10} value={objectDraft.body || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, body: event.target.value }))} /></label>
+                </>}
+                <div className={styles.buttonRow}><button disabled={busy} onClick={saveLocalObject}>Save</button><span>{online ? "Saved here, then synced to its module" : "Saved here · syncs when you reconnect"}</span></div>
+                {selectedCanonical && <Link href={selectedCanonical.route}>Open full {recordKindLabel(selectedObject!.objectKind).toLowerCase()} view →</Link>}
                 </> : selectedObject ? <div className={styles.readOnlyRecord}>
                   <span className={styles.recordType}>{recordKindLabel(selectedObject.objectKind)}</span>
                   <h3>{stringField(selectedObject, "title") || stringField(selectedObject, "name") || "Untitled"}</h3>

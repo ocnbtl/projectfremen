@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../../lib/admin-session";
+import {
+  canonicalVaultFields,
+  objectKindForPersonalCollection,
+  type CanonicalModule
+} from "../../../../lib/local-first/canonical-record";
+import type { VaultObjectKind } from "../../../../lib/local-first/types";
 import { readFinanceState } from "../../../../lib/modules/finance/store";
 import { readPersonalOpsState } from "../../../../lib/modules/personal-ops/store";
 import { readProjectsState } from "../../../../lib/modules/projects/store";
 import { readReviewsState } from "../../../../lib/modules/reviews/store";
-import type { VaultFieldValue, VaultObjectKind } from "../../../../lib/local-first/types";
 import { readPersonalRecords } from "../../../../lib/personal-records-store";
 
 export const runtime = "nodejs";
@@ -13,45 +18,35 @@ export const dynamic = "force-dynamic";
 type BootstrapObject = {
   canonicalId: string;
   objectKind: VaultObjectKind;
-  fields: Record<string, VaultFieldValue>;
+  fields: ReturnType<typeof canonicalVaultFields>;
 };
 
-function jsonRecord(value: unknown): Record<string, VaultFieldValue> {
-  const source = JSON.parse(JSON.stringify(value)) as Record<string, VaultFieldValue>;
-  const flattened: Record<string, VaultFieldValue> = {};
-  const visit = (prefix: string, current: VaultFieldValue) => {
-    if (current && typeof current === "object" && !Array.isArray(current)) {
-      for (const [key, nested] of Object.entries(current)) visit(prefix ? `${prefix}.${key}` : key, nested);
-      return;
-    }
-    if (prefix) flattened[prefix] = current;
-  };
-  for (const [key, current] of Object.entries(source)) visit(key, current);
-  return flattened;
-}
+const COLLECTIONS = {
+  "personal-ops": ["goals", "decisions", "obligations", "followUps", "routines", "captures", "templates"],
+  projects: ["projects", "milestones", "blockers", "links"],
+  reviews: ["runs"],
+  finance: ["accounts", "transactions", "transfers", "savingsMovements", "bills", "budgets", "closePeriods", "rules", "importBatches"]
+} as const satisfies Record<Exclude<CanonicalModule, "personal-records">, readonly string[]>;
 
-function collectState(prefix: string, objectKind: VaultObjectKind, state: Record<string, unknown>, excluded: ReadonlySet<string> = new Set()): BootstrapObject[] {
+function collectState(
+  module: Exclude<CanonicalModule, "personal-records">,
+  objectKind: VaultObjectKind,
+  state: Record<string, unknown>,
+  collections: readonly string[]
+): BootstrapObject[] {
   const objects: BootstrapObject[] = [];
-  for (const [collection, value] of Object.entries(state)) {
-    if (excluded.has(collection)) continue;
-    if (Array.isArray(value)) {
-      for (const [index, row] of value.entries()) {
-        if (!row || typeof row !== "object" || Array.isArray(row)) continue;
-        const record = row as Record<string, unknown>;
-        const sourceId = typeof record.id === "string" && record.id ? record.id : String(index);
-        objects.push({
-          canonicalId: `${prefix}:${collection}:${sourceId}`,
-          objectKind,
-          fields: { sourceModule: prefix, sourceCollection: collection, ...jsonRecord(record) }
-        });
-      }
-      continue;
-    }
-    if (value && typeof value === "object") {
+  for (const collection of collections) {
+    const value = state[collection];
+    if (!Array.isArray(value)) continue;
+    for (const row of value) {
+      if (!row || typeof row !== "object" || Array.isArray(row)) continue;
+      const record = row as Record<string, unknown>;
+      const recordId = typeof record.id === "string" ? record.id : "";
+      if (!recordId) continue;
       objects.push({
-        canonicalId: `${prefix}:${collection}`,
+        canonicalId: `${module}:${collection}:${recordId}`,
         objectKind,
-        fields: { sourceModule: prefix, sourceCollection: collection, ...jsonRecord(value) }
+        fields: canonicalVaultFields({ module, collection, record })
       });
     }
   }
@@ -72,24 +67,25 @@ export async function GET() {
     ]);
     const personalObjects: BootstrapObject[] = personalRecords.map((record) => ({
       canonicalId: `personal-records:${record.className}:${record.id}`,
-      objectKind: record.className === "person" || record.className === "org" ? "contact"
-        : record.className === "resource" ? "resource"
-          : record.className === "file" ? "media"
-            : record.className === "note" ? "note" : "other",
-      fields: { sourceModule: "personal-records", ...jsonRecord(record) }
+      objectKind: objectKindForPersonalCollection(record.className),
+      fields: canonicalVaultFields({
+        module: "personal-records",
+        collection: record.className,
+        record: record as unknown as Record<string, unknown>
+      })
     }));
     const objects = [
       ...personalObjects,
-      ...collectState("personal-ops", "personal_ops", personalOps as unknown as Record<string, unknown>),
-      ...collectState("projects", "project", projects as unknown as Record<string, unknown>),
-      ...collectState("reviews", "review", reviews as unknown as Record<string, unknown>),
-      ...collectState("finance", "finance", finance as unknown as Record<string, unknown>, new Set(["importPreviews"]))
+      ...collectState("personal-ops", "personal_ops", personalOps as unknown as Record<string, unknown>, COLLECTIONS["personal-ops"]),
+      ...collectState("projects", "project", projects as unknown as Record<string, unknown>, COLLECTIONS.projects),
+      ...collectState("reviews", "review", reviews as unknown as Record<string, unknown>, COLLECTIONS.reviews),
+      ...collectState("finance", "finance", finance as unknown as Record<string, unknown>, COLLECTIONS.finance)
     ];
     return NextResponse.json({ ok: true, objects, generatedAt: new Date().toISOString() }, {
       headers: { "Cache-Control": "no-store, private", Date: new Date().toUTCString() }
     });
   } catch {
-    return NextResponse.json({ ok: false, error: "Encrypted vault bootstrap is unavailable" }, {
+    return NextResponse.json({ ok: false, error: "Encrypted vault workspace is unavailable" }, {
       status: 503,
       headers: { "Cache-Control": "no-store, private" }
     });

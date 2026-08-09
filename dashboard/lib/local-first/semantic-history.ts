@@ -1,4 +1,5 @@
 import { compareHlc } from "./hlc";
+import { VAULT_CANONICAL_RECORD_FIELD } from "./canonical-record";
 import type { VaultFieldValue, VaultObjectSnapshot } from "./types";
 
 
@@ -13,9 +14,14 @@ function stableValue(value: VaultFieldValue): VaultFieldValue {
 }
 
 function visibleFields(fields: Record<string, VaultFieldValue>): Record<string, VaultFieldValue> {
-  return Object.fromEntries(
-    Object.entries(fields).filter(([field]) => !field.startsWith("__unigentamos"))
-  );
+  const metadata = fields[VAULT_CANONICAL_RECORD_FIELD];
+  if (metadata && typeof metadata === "object" && !Array.isArray(metadata) && Array.isArray(metadata.editableFields)) {
+    const editable = new Set(metadata.editableFields.flatMap((field) =>
+      field && typeof field === "object" && !Array.isArray(field) && typeof field.key === "string" ? [field.key] : []
+    ));
+    if (editable.size) return Object.fromEntries(Object.entries(fields).filter(([field]) => editable.has(field)));
+  }
+  return Object.fromEntries(Object.entries(fields).filter(([field]) => !field.startsWith("__unigentamos")));
 }
 
 export function snapshotsEquivalent(left: VaultObjectSnapshot, right: VaultObjectSnapshot): boolean {

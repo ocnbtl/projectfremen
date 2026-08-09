@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 import type { ModuleId } from "../lib/native-objects/types";
 import AppTopNav from "./admin-shell/AppTopNav";
 import SharedAIDock from "./admin-shell/SharedAIDock";
+import OfflineVaultBridge from "./OfflineVaultBridge";
 
 type SidebarItem = {
   label: string;
@@ -148,6 +149,7 @@ export default function AdminChrome({
   return (
     <>
       <AppTopNav showCommandSearch={showCommandSearch} />
+      <OfflineVaultBridge />
       {showPageSidebar && (
         <AdminPageSidebar
           title={sidebarTitle}

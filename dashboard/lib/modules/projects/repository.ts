@@ -1,6 +1,7 @@
 "use client";
 
 import { buildJsonHeadersWithCsrf } from "../../client-csrf";
+import { mirrorCanonicalRecord } from "../../local-first/domain-mirror";
 import type { AuditEvent } from "../../native-objects/audit";
 import type { MutationError, MutationErrorCode } from "../../native-objects/mutation-result";
 import type {
@@ -322,7 +323,9 @@ export function createProjectsRepository(
         body: JSON.stringify({ operation: "promote_legacy", input })
       });
       if (!result.ok) return forwardFailure<ProjectsCreateResult<"projects">>(result);
-      return createResult(result.data, "projects");
+      const parsed = createResult(result.data, "projects");
+      if (parsed.ok) await mirrorCanonicalRecord("projects", "projects", "project", parsed.data.item as unknown as Record<string, unknown>);
+      return parsed;
     },
 
     async create(family, input) {
@@ -332,7 +335,9 @@ export function createProjectsRepository(
         body: JSON.stringify({ operation: "create", family, input })
       });
       if (!result.ok) return forwardFailure<ProjectsCreateResult<typeof family>>(result);
-      return createResult(result.data, family);
+      const parsed = createResult(result.data, family);
+      if (parsed.ok) await mirrorCanonicalRecord("projects", family, "project", parsed.data.item as unknown as Record<string, unknown>);
+      return parsed;
     },
 
     async update(family, id, patch, expectedUpdatedAt) {
@@ -342,7 +347,9 @@ export function createProjectsRepository(
         body: JSON.stringify({ family, id, patch, expectedUpdatedAt })
       });
       if (!result.ok) return forwardFailure<ProjectsUpdateResult<typeof family>>(result);
-      return updateResult(result.data, family);
+      const parsed = updateResult(result.data, family);
+      if (parsed.ok) await mirrorCanonicalRecord("projects", family, "project", parsed.data.item as unknown as Record<string, unknown>);
+      return parsed;
     }
   };
 }

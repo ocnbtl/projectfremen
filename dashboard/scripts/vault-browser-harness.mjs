@@ -139,6 +139,8 @@ const artifactRoot = path.join(dashboardRoot, "output", "playwright");
 const relayEnvelopes = [];
 const mediaChunks = new Map();
 const deviceStatuses = new Map();
+const canonicalRecords = new Map();
+const canonicalCommandAttempts = new Map();
 let rejectMediaUploads = false;
 let companion;
 let application;
@@ -261,6 +263,42 @@ async function mockVaultRuntime(context, { requireAdminSession = false, companio
       serverTime: new Date().toISOString()
     });
   });
+  await context.route("**/api/vault/records", async (route) => {
+    if (await rejectUnauthorizedVaultRequest(context, route, requireAdminSession)) return;
+    const { command } = route.request().postDataJSON();
+    const [module, collection, ...recordParts] = command.canonicalId.split(":");
+    const recordId = recordParts.join(":");
+    const priorRecord = canonicalRecords.get(command.canonicalId);
+    canonicalCommandAttempts.set(command.commandId, (canonicalCommandAttempts.get(command.commandId) || 0) + 1);
+    const commandIsNewest = !priorRecord || Date.parse(command.queuedAt) >= Date.parse(priorRecord.commandAt);
+    const now = commandIsNewest ? command.queuedAt : priorRecord.commandAt;
+    const editableFields = collection === "person" || collection === "org"
+      ? [
+          { key: "title", label: "Name", control: "text" },
+          { key: "profile.primaryEmail", label: "Email", control: "email" },
+          { key: "profile.phoneNumber", label: "Phone", control: "tel" },
+          { key: "profile.livesIn", label: "Location", control: "text" },
+          { key: "body", label: "Context", control: "textarea" }
+        ]
+      : collection === "resource"
+        ? [{ key: "title", label: "Title", control: "text" }, { key: "url", label: "URL", control: "url" }, { key: "body", label: "Context", control: "textarea" }]
+        : [{ key: "title", label: "Title", control: "text" }, { key: "body", label: "Note", control: "textarea" }];
+    const fields = commandIsNewest ? {
+      ...(priorRecord?.fields || {}), sourceModule: module, sourceCollection: collection, id: recordId, className: collection,
+      ...command.patch, updatedAt: now,
+      __unigentamosCanonicalRecordV1: {
+        format: "unigentamos-canonical-record-v1", canonicalId: command.canonicalId, module, collection, recordId,
+        sourceUpdatedAt: now, route: collection === "note" ? `/admin/notes/${recordId}` : "/admin/personal", editableFields
+      }
+    } : priorRecord.fields;
+    if (commandIsNewest) canonicalRecords.set(command.canonicalId, { fields, commandAt: now });
+    const result = { ok: true, canonicalId: command.canonicalId, objectKind: collection === "note" ? "note" : collection === "resource" ? "resource" : "contact", fields, mergedFields: [], keptNewerFields: [] };
+    return jsonResponse(route, result);
+  });
+  await context.route("**/api/vault/bootstrap", async (route) => {
+    if (await rejectUnauthorizedVaultRequest(context, route, requireAdminSession)) return;
+    return jsonResponse(route, { ok: true, objects: [], generatedAt: new Date().toISOString() });
+  });
   await context.route("**/api/vault/media*", async (route) => {
     if (await rejectUnauthorizedVaultRequest(context, route, requireAdminSession)) return;
     const request = route.request();
@@ -346,20 +384,20 @@ try {
   await page.getByRole("tab", { name: "Notes" }).click();
   await page.getByLabel("Title").fill("Offline continuity note");
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("first encrypted version");
-  await page.getByRole("button", { name: "Save version" }).last().click();
-  await page.getByText("Note saved. It will sync automatically.").waitFor();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText("Saved. The full module will update automatically.").waitFor();
   await page.getByRole("button", { name: "Check now" }).click();
   await page.getByText("Device status updated.").waitFor();
   await page.waitForTimeout(150);
   const relayAfterFirstSave = relayEnvelopes.length;
-  await page.getByRole("button", { name: "Save version" }).last().click();
-  await page.waitForFunction(() => !Array.from(document.querySelectorAll("button")).find((button) => button.textContent === "Save version")?.disabled);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.waitForFunction(() => !Array.from(document.querySelectorAll("button")).find((button) => button.textContent === "Save")?.disabled);
   await page.getByRole("button", { name: "Check now" }).click();
   await page.waitForTimeout(150);
   assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 1);
   assert.equal(relayEnvelopes.length, relayAfterFirstSave);
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("second encrypted version");
-  await page.getByRole("button", { name: "Save version" }).last().click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 2);
   assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 2);
   await page.getByLabel("Version history").locator(":scope > button").nth(1).click();
@@ -368,6 +406,9 @@ try {
   await page.getByText("That saved version is now the latest.", { exact: false }).waitFor();
   assert.equal(await page.getByRole("textbox", { name: "Note", exact: true }).inputValue(), "first encrypted version");
   assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 3);
+  await page.getByRole("button", { name: "Check now" }).click();
+  await page.getByText("Device status updated.").waitFor();
+  assert.equal([...canonicalRecords.values()].find((record) => record.fields.title === "Offline continuity note")?.fields.body, "first encrypted version");
 
   await page.getByRole("button", { name: "Back up this PC" }).click();
   await page.getByText("Backup created and checked.", { exact: false }).waitFor();
@@ -488,8 +529,8 @@ try {
   await page.getByRole("tab", { name: "Notes" }).click();
   await page.getByText("Offline continuity note", { exact: true }).click();
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("Windows offline branch kept in history");
-  await page.getByRole("button", { name: "Save version" }).last().click();
-  await page.getByText("Note saved. It will sync automatically.").waitFor();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText("Saved on this device. It will update the full module when you reconnect.").waitFor();
   const removedBaseVersions = await page.evaluate(async () => {
     const database = await new Promise((resolve, reject) => {
       const request = indexedDB.open("unigentamos-vault-v1", 2);
@@ -529,8 +570,8 @@ try {
   await applePage.getByText("Offline continuity note", { exact: true }).click();
   await applePage.waitForTimeout(50);
   await applePage.getByRole("textbox", { name: "Note", exact: true }).fill("iPhone later branch wins while Windows stays in history");
-  await applePage.getByRole("button", { name: "Save version" }).last().click();
-  await applePage.getByText("Note saved. It will sync automatically.").waitFor();
+  await applePage.getByRole("button", { name: "Save", exact: true }).click();
+  await applePage.getByText("Saved. The full module will update automatically.").waitFor();
   await applePage.getByRole("button", { name: "Check now" }).click();
   await applePage.getByText("Device status updated.").waitFor();
 
@@ -628,9 +669,11 @@ try {
 
   await page.getByText("Offline continuity note", { exact: true }).click();
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("third encrypted version saved offline");
-  await page.getByRole("button", { name: "Save version" }).last().click();
+  await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 3);
   assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 3);
+  // One canonical receipt per joined browser: Windows, sign-in recovery Mac, and iPhone.
+  assert.ok([...canonicalCommandAttempts.values()].every((attempts) => attempts <= 3));
   assert.deepEqual(unexpectedFailures, []);
 
   await context.setOffline(false);

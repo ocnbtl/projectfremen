@@ -1,4 +1,4 @@
-const CACHE_VERSION = "unigentamos-static-v7";
+const CACHE_VERSION = "unigentamos-static-v8";
 const PUBLIC_SHELL = ["/offline", "/unigentamos-logo.svg"];
 
 async function installOfflineShell() {
@@ -54,7 +54,8 @@ self.addEventListener("fetch", (event) => {
         }
         return response;
       } catch {
-        return await caches.match(url.pathname === "/vault" ? "/vault" : "/offline")
+        const moduleRoute = url.pathname.startsWith("/admin/");
+        return await caches.match(url.pathname === "/vault" || moduleRoute ? "/vault" : "/offline")
           || new Response("Unigentamos is offline.", { status: 503, headers: { "Content-Type": "text/plain" } });
       }
     })());

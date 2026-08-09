@@ -19,7 +19,8 @@ async function compile(name) {
     fileName: `${name}.ts`
   }).outputText;
   output = output.replaceAll('from "./types"', 'from "./types.mjs"')
-    .replaceAll('from "./hlc"', 'from "./hlc.mjs"');
+    .replaceAll('from "./hlc"', 'from "./hlc.mjs"')
+    .replaceAll('from "./canonical-record"', 'from "./canonical-record.mjs"');
   await writeFile(path.join(outputRoot, `${name}.mjs`), output);
 }
 
@@ -38,10 +39,11 @@ function snapshot(objectId, objectKind, versionId, deviceId, wallMs, fields, bas
 }
 
 try {
-  for (const moduleName of ["types", "hlc", "merge", "crypto", "relay-store", "semantic-history"]) await compile(moduleName);
+  for (const moduleName of ["types", "hlc", "merge", "crypto", "relay-store", "semantic-history", "canonical-record"]) await compile(moduleName);
   const { assessClockHealth, compareHlc, tickHlc } = await import(pathToFileURL(path.join(outputRoot, "hlc.mjs")));
   const { mergeVaultSnapshots, threeWayMergeText } = await import(pathToFileURL(path.join(outputRoot, "merge.mjs")));
   const { deterministicMergeVersionId, meaningfulVaultHistory } = await import(pathToFileURL(path.join(outputRoot, "semantic-history.mjs")));
+  const { canonicalMetadata, editableFieldsFor, pendingCanonicalCommands, pendingCommandField } = await import(pathToFileURL(path.join(outputRoot, "canonical-record.mjs")));
   const {
     createVaultKeyEnvelope,
     decryptVaultChange,
@@ -55,6 +57,19 @@ try {
     unlockVaultKey
   } = await import(pathToFileURL(path.join(outputRoot, "crypto.mjs")));
   const { validateEncryptedDeviceDescriptor, validateEncryptedEnvelope, validateEncryptedMediaChunk } = await import(pathToFileURL(path.join(outputRoot, "relay-store.mjs")));
+
+  const canonical = canonicalMetadata({ module: "projects", collection: "projects", recordId: "project-1", sourceUpdatedAt: "2026-08-09T12:00:00.000Z" });
+  assert.equal(canonical.canonicalId, "projects:projects:project-1");
+  assert.equal(canonical.route, "/admin/projects/project-1");
+  assert.deepEqual(editableFieldsFor("finance", "transfers"), []);
+  assert.deepEqual(editableFieldsFor("finance", "accounts").map((field) => field.key), ["name", "institution"]);
+  const commandId = crypto.randomUUID();
+  const commandField = pendingCommandField(commandId);
+  const commandSnapshot = snapshot(crypto.randomUUID(), "note", crypto.randomUUID(), "device-a", 900, {
+    title: "Offline note",
+    [commandField]: { format: "unigentamos-canonical-command-v1", commandId, operation: "update", canonicalId: "personal-records:note:personal-1", baseUpdatedAt: null, baseFields: { title: "Before" }, patch: { title: "After" }, queuedAt: "2026-08-09T12:00:00.000Z" }
+  });
+  assert.equal(pendingCanonicalCommands(commandSnapshot).length, 1);
 
   const text = threeWayMergeText("alpha\nbeta\ngamma", "ALPHA\nbeta\ngamma", "alpha\nbeta\nGAMMA");
   assert.deepEqual(text, { value: "ALPHA\nbeta\nGAMMA", conflict: false });
@@ -274,9 +289,10 @@ try {
   assert.match(mediaRoute, /isCsrfRequestValid/i);
   assert.match(mediaRoute, /MAX_REQUEST_BYTES = 2_500_000/i);
   const serviceWorker = await readFile("public/sw.js", "utf8");
-  assert.match(serviceWorker, /unigentamos-static-v7/i);
+  assert.match(serviceWorker, /unigentamos-static-v8/i);
   assert.match(serviceWorker, /event\.data\?\.type === "SKIP_WAITING"/i);
   assert.match(serviceWorker, /cache\.put\("\/vault", response\.clone\(\)\)/i);
+  assert.match(serviceWorker, /url\.pathname\.startsWith\("\/admin\/"\)/i);
   const serviceWorkerRegistration = await readFile("components/ServiceWorkerRegistration.tsx", "utf8");
   assert.match(serviceWorkerRegistration, /updateViaCache: "none"/i);
   assert.match(serviceWorkerRegistration, /next\.update\(\)/i);
@@ -292,6 +308,20 @@ try {
   assert.match(vaultWorkspace, /Remove old device/i);
   assert.match(vaultWorkspace, /Its saved local copy stays on that device/i);
   assert.match(vaultWorkspace, /For protection if this PC fails/i);
+  assert.match(vaultWorkspace, /Offline command center/i);
+  assert.match(vaultWorkspace, /same records used by Notes, People, Resources, Projects, Reviews, Personal, and Finance/i);
+  assert.match(vaultWorkspace, /saveCanonicalFields/i);
+  assert.match(browserEngine, /changesOperationalState/i);
+  assert.match(browserEngine, /force: true/i);
+  const canonicalRoute = await readFile("app/api/vault/records/route.ts", "utf8");
+  assert.match(canonicalRoute, /hasAdminSession/i);
+  assert.match(canonicalRoute, /isCsrfRequestValid/i);
+  assert.match(canonicalRoute, /MAX_BODY_BYTES = 128 \* 1024/i);
+  const canonicalServer = await readFile("lib/local-first/canonical-record-server.ts", "utf8");
+  assert.match(canonicalServer, /editableFieldsFor/i);
+  assert.match(canonicalServer, /threeWayMergeText/i);
+  assert.match(canonicalServer, /expectedUpdatedAt/i);
+  assert.doesNotMatch(canonicalServer, /mark_paid|complete_close|confirm_import|paymentEvidenceRef/i);
   const companionSource = await readFile("../vault-companion/src/server.mjs", "utf8");
   assert.match(companionSource, /const VERSION = "0\.3\.0"/i);
   assert.match(companionSource, /UNIGENTAMOS_VAULT_AUTO_BACKUP_MS/i);
@@ -299,7 +329,7 @@ try {
   assert.match(companionSource, /Backup limit reached\. Move an older checked backup/i);
   assert.match(companionSource, /destination: backupDestination\(\)/i);
 
-  console.log("[pass] local-first merge, clock correction, conflict retention, storage health, conservative compaction, device lifecycle, backup scheduling, natural copy, app updating, and encryption checks passed");
+  console.log("[pass] canonical offline editing, safe field allowlists, local-first merge, restore reconciliation, clock correction, encrypted sync, storage health, device lifecycle, and backup checks passed");
 } finally {
   await rm(outputRoot, { recursive: true, force: true });
 }

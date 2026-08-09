@@ -9250,7 +9250,7 @@ async function main() {
     const serviceWorker = await requestText(server.baseUrl, cookieJar, "/sw.js");
     assert(
       serviceWorker.response.ok &&
-        serviceWorker.body.includes("unigentamos-static-v7") &&
+        serviceWorker.body.includes("unigentamos-static-v8") &&
         serviceWorker.body.includes('url.pathname.startsWith("/api/")') &&
         serviceWorker.body.includes('html.matchAll(/(?:src|href)=') &&
         serviceWorker.body.includes('event.data?.type === "SKIP_WAITING"') &&
@@ -9330,7 +9330,13 @@ async function main() {
       body: JSON.stringify({ vaultId: crypto.randomUUID() })
     });
     assert(unauthenticatedDeviceStatus.response.status === 401, "Device status write checked CSRF or content before authentication");
-    pass("Unauthenticated vault time, bootstrap, relay, and device-status APIs are blocked");
+    const unauthenticatedCanonicalWrite = await requestJson(server.baseUrl, cookieJar, "/api/vault/records", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": "unauthenticated" },
+      body: JSON.stringify({ command: {} })
+    });
+    assert(unauthenticatedCanonicalWrite.response.status === 401, "Canonical Vault write checked content before authentication");
+    pass("Unauthenticated vault time, bootstrap, relay, device-status, and canonical-record APIs are blocked");
 
     const unauthPersonal = await requestText(server.baseUrl, cookieJar, "/admin/personal");
     assert(
@@ -9488,6 +9494,18 @@ async function main() {
       body: JSON.stringify({ vaultId: crypto.randomUUID(), envelopes: [] })
     });
     assert(vaultPushWithoutCsrf.response.status === 403, "Vault relay push accepted a request without CSRF proof");
+    const canonicalWriteWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/vault/records", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ command: {} })
+    });
+    assert(canonicalWriteWithoutCsrf.response.status === 403, "Canonical Vault write accepted a request without CSRF proof");
+    const canonicalWriteInvalid = await requestJson(server.baseUrl, cookieJar, "/api/vault/records", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ command: {} })
+    });
+    assert(canonicalWriteInvalid.response.status === 400, "Canonical Vault write did not reject an invalid bounded command");
     const vaultPushInvalidBatch = await requestJson(server.baseUrl, cookieJar, "/api/vault/sync", {
       method: "POST",
       headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
@@ -9506,7 +9524,7 @@ async function main() {
       body: JSON.stringify({ vaultId: crypto.randomUUID() })
     });
     assert(vaultDeviceStatusInvalidBody.response.status === 400, "Vault device status did not validate its bounded encrypted descriptor before configuration access");
-    pass("Authenticated vault time/bootstrap, relay, and device-status CSRF/input boundaries work");
+    pass("Authenticated vault time/bootstrap, relay, device-status, and canonical-record CSRF/input boundaries work");
 
     logStep("Checking protected pages and locked navigation");
     const adminHome = await requestText(server.baseUrl, cookieJar, `/admin?run=${encodeURIComponent(testRunId)}`);
