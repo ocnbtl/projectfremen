@@ -139,6 +139,29 @@ export type VaultBrowserStorageHealth = {
   quotaBytes: number | null;
 };
 
+export type VaultMediaCacheRetentionDays = 7 | 30 | 90 | null;
+
+export type VaultMediaCacheHealth = {
+  retentionDays: VaultMediaCacheRetentionDays;
+  cachedChunks: number;
+  cachedBytes: number;
+  pendingUploadChunks: number;
+  orphanedChunks: number;
+  orphanedBytes: number;
+  reclaimableChunks: number;
+  reclaimableBytes: number;
+  capacityState: "healthy" | "warning" | "critical" | "unknown";
+  lastCleanedAt: string | null;
+};
+
+export type VaultMediaCleanupResult = {
+  deletedChunks: number;
+  reclaimedBytes: number;
+  protectedPendingChunks: number;
+  reason: "cleaned" | "nothing_to_clean";
+  completedAt: string;
+};
+
 export type VaultCompanionBackupHealth = {
   destination: "vault-folder" | "custom-folder" | "separate-drive";
   count: number;

@@ -21,7 +21,8 @@ function commandFrom(value: unknown): VaultPendingCanonicalCommand | null {
     command.format !== "unigentamos-canonical-command-v1"
     || typeof command.commandId !== "string"
     || typeof command.canonicalId !== "string"
-    || !["create", "update"].includes(String(command.operation))
+    || !["create", "update", "owner_action"].includes(String(command.operation))
+    || command.operation === "owner_action" && (!isRecord(command.ownerAction) || !["archive", "restore", "link", "finance_action"].includes(String(command.ownerAction.name)))
     || typeof command.queuedAt !== "string"
     || !Number.isFinite(Date.parse(command.queuedAt))
     || !isRecord(command.baseFields)

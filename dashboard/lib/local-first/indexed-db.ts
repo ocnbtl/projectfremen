@@ -8,6 +8,7 @@ import type {
   HybridLogicalClock,
   SequencedChangeEnvelope,
   VaultKeyEnvelope,
+  VaultMediaCacheRetentionDays,
   VaultObjectKind
 } from "./types";
 
@@ -26,6 +27,8 @@ export type VaultMetadata = {
   lastClock: HybridLogicalClock | null;
   clockHealth: ClockHealth | null;
   acknowledgedCanonicalCommandIds?: string[];
+  mediaCacheRetentionDays?: VaultMediaCacheRetentionDays;
+  lastMediaCleanupAt?: string | null;
   createdAt: string;
   updatedAt: string;
 };
@@ -48,6 +51,7 @@ export type StoredMediaChunk = {
   packet: EncryptedVaultMediaChunk;
   uploaded: boolean;
   cachedAt: string;
+  lastAccessedAt?: string;
 };
 
 function requestResult<Result>(request: IDBRequest<Result>): Promise<Result> {
@@ -365,6 +369,29 @@ export class BrowserVaultStore {
     const transaction = this.database.transaction("media", "readonly");
     const rows = await requestResult(transaction.objectStore("media").getAll()) as StoredMediaChunk[];
     return rows.filter((row) => row.mediaId === mediaId).sort((left, right) => left.chunkIndex - right.chunkIndex);
+  }
+
+  async allMediaChunks(): Promise<StoredMediaChunk[]> {
+    const transaction = this.database.transaction("media", "readonly");
+    return requestResult(transaction.objectStore("media").getAll()) as Promise<StoredMediaChunk[]>;
+  }
+
+  async touchMediaChunk(mediaId: string, chunkIndex: number): Promise<void> {
+    const transaction = this.database.transaction("media", "readwrite");
+    const store = transaction.objectStore("media");
+    const key = `${mediaId}:${chunkIndex}`;
+    const row = await requestResult(store.get(key)) as StoredMediaChunk | undefined;
+    if (row) store.put({ ...row, lastAccessedAt: new Date().toISOString() });
+    await transactionDone(transaction);
+  }
+
+  async deleteMediaChunks(digests: readonly string[]): Promise<void> {
+    if (!digests.length) return;
+    const transaction = this.database.transaction("media", "readwrite");
+    const store = transaction.objectStore("media");
+    for (const digest of digests) store.delete(digest);
+    await transactionDone(transaction);
+    notify("media-cache-changed", { deleted: digests.length });
   }
 
   async markMediaChunkUploaded(mediaId: string, chunkIndex: number): Promise<void> {

@@ -497,6 +497,53 @@ try {
   const appleMediaDownload = await appleMediaDownloadPromise;
   assert.equal((await readFile(await appleMediaDownload.path())).toString(), "private media that must be encrypted in transit");
 
+  const agedDownloadedChunks = await applePage.evaluate(async () => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("unigentamos-vault-v1", 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const transaction = database.transaction("media", "readwrite");
+    const store = transaction.objectStore("media");
+    const rows = await new Promise((resolve, reject) => {
+      const request = store.getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    for (const row of rows) store.put({ ...row, uploaded: true, lastAccessedAt: "2020-01-01T00:00:00.000Z" });
+    await new Promise((resolve, reject) => {
+      transaction.oncomplete = resolve;
+      transaction.onerror = () => reject(transaction.error);
+      transaction.onabort = () => reject(transaction.error);
+    });
+    database.close();
+    return rows.length;
+  });
+  assert.ok(agedDownloadedChunks > 0);
+  await applePage.getByLabel("Keep unused downloads").selectOption("7");
+  await applePage.getByText("Downloaded files unused for 7 days", { exact: false }).waitFor();
+  await applePage.getByRole("button", { name: "Clean up downloads" }).click();
+  await applePage.getByText("Freed", { exact: false }).waitFor();
+  const cachedAfterCleanup = await applePage.evaluate(async () => {
+    const database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open("unigentamos-vault-v1", 2);
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    const rows = await new Promise((resolve, reject) => {
+      const request = database.transaction("media", "readonly").objectStore("media").getAll();
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    database.close();
+    return rows.length;
+  });
+  assert.equal(cachedAfterCleanup, 0);
+  const redownloadPromise = applePage.waitForEvent("download");
+  await applePage.getByRole("button", { name: "Open file" }).click();
+  const redownload = await redownloadPromise;
+  assert.equal((await readFile(await redownload.path())).toString(), "private media that must be encrypted in transit");
+
   const appleOriginFixture = path.join(tempRoot, "added-from-iphone.txt");
   await writeFile(appleOriginFixture, "encrypted on iPhone and promoted to the Windows master when opened");
   await applePage.locator('input[type="file"]').last().setInputFiles(appleOriginFixture);
@@ -678,7 +725,7 @@ try {
 
   await context.setOffline(false);
   await context.close();
-  console.log("[pass] guided setup, friendly sign-in recovery, append-only restore, encrypted on-demand media, verified backup, cross-device sync, missing-base safe merge recovery, blocked-inbox retry, offline reload, and offline save passed");
+  console.log("[pass] guided setup, friendly sign-in recovery, append-only restore, encrypted on-demand media cleanup and redownload, verified backup, cross-device sync, missing-base safe merge recovery, blocked-inbox retry, offline reload, and offline save passed");
 } catch (error) {
   console.error("[vault-browser] application output:\n", application?.output() || "");
   console.error("[vault-browser] companion output:\n", companion?.output() || "");

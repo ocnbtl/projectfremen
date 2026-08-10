@@ -13,6 +13,7 @@ import type {
   VaultBackupRestorePreview,
   VaultBackupSummary,
   VaultFieldValue,
+  VaultMediaCacheRetentionDays,
   VaultObjectKind,
   VaultObjectSnapshot,
   VaultRecoveryPackage
@@ -26,7 +27,7 @@ type SetupTarget = "windows" | "apple";
 
 const COMPANION_HELPER_URL = "http://127.0.0.1:43127/";
 const MAX_RECOVERY_FILE_BYTES = 256 * 1024;
-const VAULT_RELEASE_NOTE = "durability-health-v2";
+const VAULT_RELEASE_NOTE = "offline-actions-media-v3";
 const RECORD_TABS: Array<{ value: VaultObjectKind | "all"; label: string }> = [
   { value: "all", label: "All" },
   { value: "note", label: "Notes" },
@@ -182,6 +183,9 @@ export default function VaultWorkspace() {
   const [restoreConfirmation, setRestoreConfirmation] = useState("");
   const [showReleaseNote, setShowReleaseNote] = useState(false);
   const [retireArmedDeviceId, setRetireArmedDeviceId] = useState<string | null>(null);
+  const [actionReason, setActionReason] = useState("");
+  const [relationshipTargetId, setRelationshipTargetId] = useState("");
+  const [actionArmed, setActionArmed] = useState<string | null>(null);
   const workspaceRefreshStarted = useRef(false);
 
   const refresh = useCallback(async () => {
@@ -474,6 +478,24 @@ export default function VaultWorkspace() {
     });
   }
 
+  async function setMediaRetention(retentionDays: VaultMediaCacheRetentionDays) {
+    await run(async () => {
+      await browserVault.setMediaCacheRetention(retentionDays);
+      setMessage(retentionDays === null
+        ? "Downloaded files will stay on this device until you clean them up."
+        : "Downloaded files unused for " + retentionDays + " days can be cleaned up automatically.");
+    });
+  }
+
+  async function cleanupMedia() {
+    await run(async () => {
+      const result = await browserVault.cleanupMediaCache();
+      setMessage(result.deletedChunks
+        ? "Freed " + formatBytes(result.reclaimedBytes) + " from this device. Original encrypted files are still safe on Windows."
+        : "Downloaded media is already tidy. Nothing was removed.");
+    });
+  }
+
   async function cleanupRelay() {
     await run(async () => {
       const result = await browserVault.cleanupRelayNow();
@@ -537,6 +559,9 @@ export default function VaultWorkspace() {
     setObjectHistory(history);
     setSelectedVersionId(history[0]?.versionId || null);
     setRestoreArmed(false);
+    setActionReason("");
+    setRelationshipTargetId("");
+    setActionArmed(null);
   }
 
   function newObject() {
@@ -545,6 +570,46 @@ export default function VaultWorkspace() {
     setObjectHistory([]);
     setSelectedVersionId(null);
     setRestoreArmed(false);
+    setActionReason("");
+    setRelationshipTargetId("");
+    setActionArmed(null);
+  }
+
+  async function queueOwnerAction(ownerAction: Parameters<typeof browserVault.queueCanonicalOwnerAction>[1], success: string) {
+    if (!selectedObject) return;
+    await run(async () => {
+      const queued = await browserVault.queueCanonicalOwnerAction(selectedObject, ownerAction);
+      if (online) await browserVault.syncUntilSettled();
+      const next = (await browserVault.listObjects()).find((item) => item.objectId === queued.objectId) || queued;
+      setObjects(await browserVault.listObjects());
+      await selectObject(next);
+      setActionArmed(null);
+      setMessage(online ? success : success + " It will reach the full module when you reconnect.");
+    });
+  }
+
+  async function queueLifecycleAction(action: "archive" | "restore") {
+    if (action === "archive" && !actionReason.trim()) {
+      setMessage("Add a short reason before archiving this record.");
+      return;
+    }
+    if (actionArmed !== action) {
+      setActionArmed(action);
+      return;
+    }
+    await queueOwnerAction(action === "archive" ? { name: "archive", reason: actionReason.trim() } : { name: "restore" }, action === "archive" ? "Archived safely." : "Restored safely.");
+  }
+
+  async function queueRelationship() {
+    if (!relationshipTarget) {
+      setMessage("Choose a record to connect first.");
+      return;
+    }
+    await queueOwnerAction({ name: "link", target: { canonicalId: relationshipTargetId, label: relationshipTarget.label }, relationship: "reference" }, "Connected to " + relationshipTarget.label + ".");
+  }
+
+  async function queueFinanceAction(action: string, input: Record<string, VaultFieldValue>, success: string) {
+    await queueOwnerAction({ name: "finance_action", action, input }, success);
   }
 
   async function saveLocalObject() {
@@ -604,6 +669,7 @@ export default function VaultWorkspace() {
   const allDevicesCurrent = activeDevices.length > 0 && currentDevices === activeDevices.length;
   const relayHealth = deviceSnapshot?.relayHealth;
   const storageHealth = status?.storage;
+  const mediaCache = status?.mediaCache;
   const backupHealth = status?.localCompanion.backup;
   const backupDestinationLabel = backupHealth?.destination === "separate-drive" ? "Separate drive"
     : backupHealth?.destination === "custom-folder" ? "Another folder on this PC"
@@ -621,6 +687,34 @@ export default function VaultWorkspace() {
   const editorKind = selectedObject?.objectKind || activeKind;
   const selectedCanonical = selectedObject ? readCanonicalMetadata(selectedObject.fields) : null;
   const editorFields = selectedCanonical?.editableFields || [];
+  const selectedArchived = Boolean(selectedObject?.fields.archivedAt)
+    || selectedObject?.fields.lifecycle === "archived"
+    || selectedObject?.fields.state === "archived"
+    || selectedObject?.fields.linkState === "removed";
+  const supportsLifecycle = Boolean(selectedCanonical && (
+    selectedCanonical.module === "projects"
+    || selectedCanonical.module === "personal-ops"
+    || selectedCanonical.module === "reviews"
+    || selectedCanonical.module === "finance" && !["transfers", "savingsMovements"].includes(selectedCanonical.collection)
+  ));
+  const supportsRelationship = Boolean(selectedCanonical && (
+    selectedCanonical.module === "personal-ops"
+    || selectedCanonical.module === "reviews"
+    || selectedCanonical.module === "projects" && selectedCanonical.collection !== "links"
+    || selectedCanonical.module === "personal-records" && selectedCanonical.collection === "note"
+  ));
+  const relationshipTargets = objects.flatMap((item) => {
+    const metadata = readCanonicalMetadata(item.fields);
+    if (!metadata || item.objectId === selectedObjectId || metadata.module === "finance") return [];
+    if (Boolean(item.fields.archivedAt) || item.fields.lifecycle === "archived" || item.fields.state === "archived" || item.fields.linkState === "removed") return [];
+    if (selectedCanonical?.module === "personal-records" && selectedCanonical.collection === "note" && !["resource", "media"].includes(item.objectKind)) return [];
+    return [{ canonicalId: metadata.canonicalId, label: stringField(item, "title") || stringField(item, "name") || "Untitled", kind: recordKindLabel(item.objectKind) }];
+  });
+  const relationshipTarget = relationshipTargets.find((item) => item.canonicalId === relationshipTargetId) || null;
+  const closeChecks = selectedCanonical?.module === "finance" && selectedCanonical.collection === "closePeriods" && Array.isArray(selectedObject?.fields.checks)
+    ? selectedObject.fields.checks.filter((item): item is Record<string, VaultFieldValue> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
+    : [];
+  const nextOpenCloseCheck = closeChecks.find((item) => item.required === true && item.resolution === "open") || null;
   const canEditRecord = Boolean(editorFields.length) || editorKind === "note" || editorKind === "contact" || editorKind === "resource";
   const selectedVersion = objectHistory.find((item) => item.versionId === selectedVersionId) || null;
   const selectedVersionFields = selectedVersion
@@ -664,7 +758,7 @@ export default function VaultWorkspace() {
       {message && <p className={styles.notice} role="status">{message}</p>}
 
       {status?.configured && showReleaseNote && <aside className={styles.releaseNote} aria-label="What is new">
-        <div><strong>Your Vault now looks after its own storage.</strong><span>It protects offline browser data, keeps encrypted sync storage tidy after every active device catches up, and checks weekly Windows backups.</span></div>
+        <div><strong>Your Vault can now do more while you are offline.</strong><span>Connect and archive records, record safe Finance actions, and control how long downloaded media stays on each device.</span></div>
         <button type="button" onClick={dismissReleaseNote}>Got it</button>
       </aside>}
 
@@ -911,13 +1005,26 @@ export default function VaultWorkspace() {
                 {status.localCompanion.unlocked && relayHealth && <button disabled={busy || !online} onClick={cleanupRelay}>Clean up now</button>}
               </article>
               <article className={styles.healthCard}>
-                <div><span className={styles.healthIcon} aria-hidden="true">3</span><strong>Windows backup</strong></div>
+                <div><span className={styles.healthIcon} aria-hidden="true">3</span><strong>Downloaded media</strong></div>
+                <p>{mediaCache
+                  ? mediaCache.capacityState === "critical" ? "This device is nearly full. Clean up downloaded copies now."
+                    : mediaCache.capacityState === "warning" ? "Storage is getting tight. Older downloaded copies are ready to clean up."
+                      : "Downloaded copies are healthy. Originals stay encrypted on Windows."
+                  : "Unlock the Vault to check downloaded files on this device."}</p>
+                {mediaCache && <small>{formatBytes(mediaCache.cachedBytes)} downloaded{mediaCache.reclaimableBytes ? " · " + formatBytes(mediaCache.reclaimableBytes) + " ready to clean" : " · nothing ready to clean"}</small>}
+                {mediaCache && <div className={styles.retentionControls}>
+                  <label>Keep unused downloads<select value={mediaCache.retentionDays === null ? "keep" : String(mediaCache.retentionDays)} onChange={(event) => void setMediaRetention(event.target.value === "keep" ? null : Number(event.target.value) as VaultMediaCacheRetentionDays)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="keep">Until I clean up</option></select></label>
+                  <button disabled={busy || mediaCache.reclaimableChunks === 0} onClick={cleanupMedia}>Clean up downloads</button>
+                </div>}
+              </article>
+              <article className={styles.healthCard}>
+                <div><span className={styles.healthIcon} aria-hidden="true">4</span><strong>Windows backup</strong></div>
                 <p>{backupHealth
                   ? `${backupDestinationLabel}. A checked encrypted backup is scheduled every ${backupHealth.automaticEveryDays} day${backupHealth.automaticEveryDays === 1 ? "" : "s"} while Windows is unlocked.`
                   : "Open and unlock the Windows Vault to check backups."}</p>
                 {backupHealth && <small>{backupHealth.lastVerifiedAt ? `Last checked ${relativeTime(backupHealth.lastVerifiedAt)}` : "No checked PC backup yet"} · {backupHealth.count} of {backupHealth.limit} slots used</small>}
                 {backupHealth?.lastAutomaticError && <span className={styles.healthWarning}>{backupHealth.lastAutomaticError}</span>}
-                {backupHealth && backupHealth.destination !== "separate-drive" && <span className={styles.healthHint}>For protection if this PC fails, choose an external drive for the backup folder.</span>}
+                {backupHealth && backupHealth.destination !== "separate-drive" && <span className={styles.healthHint}>Using this PC for now. You can add another drive later without changing how backups work.</span>}
               </article>
             </div>
           </section>
@@ -1031,6 +1138,41 @@ export default function VaultWorkspace() {
                     {humanFields(selectedObject.fields).map(([field, value]) => <div key={field}><dt>{field}</dt><dd>{value}</dd></div>)}
                   </dl>}
                 </div> : <div className={styles.editorEmpty}><strong>Choose a record</strong><span>Select an item to see its details and full history.</span></div>}
+
+                {selectedCanonical && (supportsRelationship || supportsLifecycle || selectedCanonical.module === "finance") && <section className={styles.ownerActions} aria-label="Record actions">
+                  <div><span className={styles.recordType}>Works offline</span><h3>Record actions</h3><p>These are saved here first, then applied once to the same record in its full module.</p></div>
+
+                  {supportsRelationship && <div className={styles.actionGroup}>
+                    <strong>Connect another record</strong>
+                    <div className={styles.actionRow}>
+                      <select aria-label="Record to connect" value={relationshipTargetId} onChange={(event) => setRelationshipTargetId(event.target.value)}><option value="">Choose a record</option>{relationshipTargets.map((item) => <option value={item.canonicalId} key={item.canonicalId}>{item.label} · {item.kind}</option>)}</select>
+                      <button disabled={busy || !relationshipTargetId} onClick={queueRelationship}>Connect</button>
+                    </div>
+                  </div>}
+
+                  {selectedCanonical.module === "finance" && <div className={styles.actionGroup}>
+                    <strong>Finance action</strong>
+                    {selectedCanonical.collection === "transactions" && selectedObject?.fields.reviewed !== true && <button disabled={busy} onClick={() => void queueFinanceAction("review_transaction", {}, "Transaction marked reviewed.")}>Mark reviewed</button>}
+                    {selectedCanonical.collection === "bills" && selectedObject?.fields.status !== "paid" && <>
+                      <select aria-label="Payment evidence" value={relationshipTargetId} onChange={(event) => setRelationshipTargetId(event.target.value)}><option value="">Evidence record (optional with a note)</option>{relationshipTargets.map((item) => <option value={item.canonicalId} key={item.canonicalId}>{item.label} · {item.kind}</option>)}</select>
+                      <label>Evidence note or exception reason<textarea rows={3} value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="For example: receipt filed in paper records" /></label>
+                      <button disabled={busy || (!relationshipTargetId && !actionReason.trim())} onClick={() => void queueFinanceAction("mark_paid", { ...(relationshipTargetId ? { evidenceCanonicalId: relationshipTargetId } : {}), ...(actionReason.trim() ? { exceptionReason: actionReason.trim() } : {}) }, "Bill marked paid in the ledger. No payment was sent.")}>Mark paid in ledger</button>
+                    </>}
+                    {selectedCanonical.collection === "closePeriods" && nextOpenCloseCheck && <>
+                      <label>Evidence note<textarea rows={3} value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="What confirms this check is complete?" /></label>
+                      <button disabled={busy || !actionReason.trim()} onClick={() => void queueFinanceAction("resolve_close_check", { checkId: String(nextOpenCloseCheck.id || ""), resolution: "complete", reason: actionReason.trim() }, "Completed " + String(nextOpenCloseCheck.label || "next close check") + ".")}>Complete next check</button>
+                    </>}
+                    {selectedCanonical.collection === "closePeriods" && !nextOpenCloseCheck && selectedObject?.fields.status !== "closed" && <button disabled={busy} onClick={() => void queueFinanceAction("complete_close", {}, "Finance close completed.")}>Complete close</button>}
+                    {selectedCanonical.collection === "closePeriods" && selectedObject?.fields.status === "closed" && <><label>Reason to reopen<textarea rows={3} value={actionReason} onChange={(event) => setActionReason(event.target.value)} /></label><button disabled={busy || !actionReason.trim()} onClick={() => void queueFinanceAction("reopen_close", { reason: actionReason.trim() }, "Finance close reopened.")}>Reopen close</button></>}
+                    {selectedCanonical.collection === "rules" && <button disabled={busy} onClick={() => void queueFinanceAction("test_rule", {}, "Rule test recorded.")}>Run saved rule test</button>}
+                    {["accounts", "budgets", "transfers", "savingsMovements"].includes(selectedCanonical.collection) && <small>Use the full Finance view for balance-changing or immutable ledger actions.</small>}
+                  </div>}
+
+                  {supportsLifecycle && <div className={styles.actionGroup}>
+                    {!selectedArchived && <label>Archive reason<textarea rows={3} value={actionReason} onChange={(event) => { setActionReason(event.target.value); setActionArmed(null); }} placeholder="Why is this no longer active?" /></label>}
+                    {actionArmed === (selectedArchived ? "restore" : "archive") ? <div className={styles.confirmAction}><span>{selectedArchived ? "Restore this record to its owner module?" : "Archive this record? You can restore it later."}</span><button disabled={busy} onClick={() => void queueLifecycleAction(selectedArchived ? "restore" : "archive")}>Yes, {selectedArchived ? "restore" : "archive"}</button><button className={styles.quietButton} onClick={() => setActionArmed(null)}>Cancel</button></div> : <button className={styles.quietButton} disabled={busy || (!selectedArchived && !actionReason.trim())} onClick={() => void queueLifecycleAction(selectedArchived ? "restore" : "archive")}>{selectedArchived ? "Restore record" : "Archive record"}</button>}
+                  </div>}
+                </section>}
               </div>
               <aside className={styles.historyList} aria-label="Version history">
                 <div className={styles.historyHeading}><h3>Version history</h3>{objectHistory.length > 0 && <span>{objectHistory.length} saved</span>}</div>

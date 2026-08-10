@@ -1088,7 +1088,7 @@ function applyGenericUpdate(kind: FinanceRecordKind, before: FinanceRecord, fiel
 
 export async function updateFinanceRecord(
   rawInput: unknown,
-  options: { actorId?: string }
+  options: { actorId?: string; idempotencyKey?: string }
 ): Promise<FinanceMutationResult> {
   return mutateFinanceState(async (state) => {
     if (!isRecord(rawInput)) validation("input must be an object", "input");
@@ -1100,6 +1100,17 @@ export async function updateFinanceRecord(
     const action = oneOf(rawInput.action, "action", [
       "update", "archive", "restore", "mark_paid", "resolve_close_check", "complete_close", "reopen_close", "test_rule"
     ] as const);
+    const actorId = options.actorId || "admin";
+    const idempotency = options.idempotencyKey ? {
+      key: requiredText(options.idempotencyKey, "idempotencyKey", 240),
+      actorId,
+      operation: `update:${kind}:${action}`,
+      requestHash: idempotencyRequestHash(actorId, `update:${kind}:${action}`, rawInput)
+    } : undefined;
+    if (idempotency) {
+      const prior = existingIdempotentResult(state, idempotency.key, idempotency);
+      if (prior) return { state, result: prior, changed: false };
+    }
     const before = collectionItem(state, kind, id);
     if (before.updatedAt !== expectedUpdatedAt) {
       throw new FinanceStoreError("stale", "This Finance record changed after it was loaded. Refresh before retrying.", { status: 409 });
@@ -1127,7 +1138,6 @@ export async function updateFinanceRecord(
         { status: 409 }
       );
     }
-    const actorId = options.actorId || "admin";
     const now = monotonicTimestamp(before.updatedAt);
     let item = clone(before);
     let auditAction = `finance.${kind}.updated`;
@@ -1233,7 +1243,7 @@ export async function updateFinanceRecord(
       auditAction = "finance.rule.test_recorded";
     }
 
-    const appended = appendMutation(state, item, kind, auditAction, actorId, now, before);
+    const appended = appendMutation(state, item, kind, auditAction, actorId, now, before, idempotency);
     const nextState = { ...replaceRecord(state, kind, item), ...appended.stateFields };
     return { state: nextState, result: { state: nextState, item, created: false, auditEvent: appended.auditEvent } };
   });

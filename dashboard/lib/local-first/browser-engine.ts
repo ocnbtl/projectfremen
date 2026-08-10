@@ -24,6 +24,7 @@ import {
   readCanonicalMetadata,
   VAULT_CANONICAL_RECORD_FIELD,
   VAULT_PENDING_COMMAND_PREFIX,
+  type VaultCanonicalOwnerAction,
   type VaultPendingCanonicalCommand
 } from "./canonical-record";
 import {
@@ -41,6 +42,9 @@ import {
   type VaultFieldValue,
   type VaultBackupRestorePreview,
   type VaultBackupSummary,
+  type VaultMediaCacheHealth,
+  type VaultMediaCacheRetentionDays,
+  type VaultMediaCleanupResult,
   type VaultMediaManifest,
   type VaultObjectKind,
   type VaultObjectSnapshot,
@@ -64,6 +68,9 @@ const RELAY_COMPACTION_MIN_ROWS = 512;
 const MAX_COMPACTION_CHANGE_IDS = 50_000;
 const MEDIA_CHUNK_SIZE = 1_500_000;
 const MAX_MEDIA_FILE_BYTES = 256 * 1024 * 1024;
+const MEDIA_CACHE_HEALTH_TTL_MS = 30_000;
+const MEDIA_CACHE_AUTO_CLEANUP_MS = 24 * 60 * 60_000;
+const DEFAULT_MEDIA_CACHE_RETENTION_DAYS: VaultMediaCacheRetentionDays = 30;
 export const VAULT_ONLINE_SIGN_IN_MESSAGE = "Sign in to Unigentamos in this browser to sync your Vault.";
 
 export type VaultSyncIssue = {
@@ -223,6 +230,8 @@ export class BrowserVaultEngine {
   private lastCompactionAttemptAt = 0;
   private lastCompactionResult: VaultCompactionResult | null = null;
   private lastCompactionError: string | null = null;
+  private mediaCacheHealthSnapshot: VaultMediaCacheHealth | null = null;
+  private lastMediaCacheHealthAt = 0;
   private onlineAuthorizationRequired = false;
 
   isUnlocked(): boolean {
@@ -239,6 +248,9 @@ export class BrowserVaultEngine {
         this.companionStatus(),
         store.storageHealth()
       ]);
+      const mediaCache = metadata && this.session
+        ? await this.readMediaCacheHealth(store, storage)
+        : null;
       return {
         configured: Boolean(metadata),
         unlocked: Boolean(this.session),
@@ -262,6 +274,7 @@ export class BrowserVaultEngine {
           lastCompactionError: this.lastCompactionError
         },
         storage,
+        mediaCache,
         localCompanion
       };
     } finally {
@@ -771,6 +784,32 @@ export class BrowserVaultEngine {
     });
   }
 
+  async queueCanonicalOwnerAction(
+    snapshot: VaultObjectSnapshot,
+    ownerAction: VaultCanonicalOwnerAction
+  ): Promise<VaultObjectSnapshot> {
+    const metadata = readCanonicalMetadata(snapshot.fields);
+    if (!metadata) throw new Error("This item is not linked to a module record");
+    const commandId = crypto.randomUUID();
+    const queuedAt = new Date(await this.correctedWallMs()).toISOString();
+    const command: VaultPendingCanonicalCommand = {
+      format: "unigentamos-canonical-command-v1",
+      commandId,
+      operation: "owner_action",
+      canonicalId: metadata.canonicalId,
+      baseUpdatedAt: metadata.sourceUpdatedAt,
+      baseFields: {},
+      patch: {},
+      ownerAction,
+      queuedAt
+    };
+    return this.saveObject({
+      objectId: snapshot.objectId,
+      objectKind: snapshot.objectKind,
+      fields: { [pendingCommandField(commandId)]: command as unknown as VaultFieldValue }
+    });
+  }
+
   async createCanonicalPersonalRecord(
     collection: "note" | "person" | "org" | "resource",
     objectKind: "note" | "contact" | "resource",
@@ -815,9 +854,9 @@ export class BrowserVaultEngine {
           body: JSON.stringify({ command })
         });
         const payload = await response.json() as {
-          ok?: boolean; error?: string; objectKind?: VaultObjectKind; fields?: Record<string, VaultFieldValue>
+          ok?: boolean; error?: string; canonicalId?: string; objectKind?: VaultObjectKind; fields?: Record<string, VaultFieldValue>
         };
-        if (!response.ok || !payload.ok || !payload.objectKind || !payload.fields) {
+        if (!response.ok || !payload.ok || !payload.canonicalId || !payload.objectKind || !payload.fields) {
           throw this.vaultRequestError(response, payload.error, "A saved module change could not be applied");
         }
         this.markVaultRequestAuthorized();
@@ -826,7 +865,11 @@ export class BrowserVaultEngine {
           acknowledgedCanonicalCommandIds: [...acknowledged].slice(-2_048)
         });
         await this.saveObject({ objectId: snapshot.objectId, objectKind: snapshot.objectKind, fields: { [field]: null } });
-        await this.mirrorCanonicalObject({ objectId: snapshot.objectId, objectKind: payload.objectKind, fields: payload.fields });
+        const canonicalObjectId = await deterministicVaultObjectId(payload.canonicalId);
+        await this.mirrorCanonicalObject({ objectId: canonicalObjectId, objectKind: payload.objectKind, fields: payload.fields });
+        if (canonicalObjectId !== snapshot.objectId) {
+          await this.saveObject({ objectId: snapshot.objectId, objectKind: snapshot.objectKind, fields: {}, tombstone: true });
+        }
         completed += 1;
       }
     }
@@ -1056,6 +1099,7 @@ export class BrowserVaultEngine {
         ? `${remainingRejected.length} saved change${remainingRejected.length === 1 ? " needs" : "s need"} a safe retry`
         : null;
       await this.syncPendingMedia();
+      await this.maybeCleanMediaCache();
       this.lastSyncedAt = new Date().toISOString();
       if (syncChanged) window.dispatchEvent(new Event("unigentamos-vault-data-changed"));
       try {
@@ -1347,6 +1391,101 @@ export class BrowserVaultEngine {
     }
   }
 
+  private async readMediaCacheHealth(
+    store: BrowserVaultStore,
+    storage: { usageBytes: number | null; quotaBytes: number | null }
+  ): Promise<VaultMediaCacheHealth> {
+    if (this.mediaCacheHealthSnapshot && Date.now() - this.lastMediaCacheHealthAt < MEDIA_CACHE_HEALTH_TTL_MS) {
+      return this.mediaCacheHealthSnapshot;
+    }
+    const [metadata, chunks, media] = await Promise.all([
+      store.metadata(),
+      store.allMediaChunks(),
+      this.listObjects(["media"])
+    ]);
+    const activeMediaIds = new Set(media.map(mediaManifestFromSnapshot).filter((item): item is VaultMediaManifest => Boolean(item)).map((item) => item.mediaId));
+    const retentionDays = metadata?.mediaCacheRetentionDays === undefined
+      ? DEFAULT_MEDIA_CACHE_RETENTION_DAYS
+      : metadata.mediaCacheRetentionDays;
+    const cutoff = retentionDays === null ? Number.NEGATIVE_INFINITY : Date.now() - retentionDays * 86_400_000;
+    const orphaned = chunks.filter((row) => row.uploaded && !activeMediaIds.has(row.mediaId));
+    const reclaimable = chunks.filter((row) => row.uploaded && (
+      !activeMediaIds.has(row.mediaId)
+      || retentionDays !== null && Date.parse(row.lastAccessedAt || row.cachedAt) < cutoff
+    ));
+    const ratio = storage.usageBytes !== null && storage.quotaBytes
+      ? storage.usageBytes / storage.quotaBytes
+      : null;
+    const remaining = storage.usageBytes !== null && storage.quotaBytes !== null
+      ? storage.quotaBytes - storage.usageBytes
+      : null;
+    const capacityState = ratio === null ? "unknown"
+      : ratio >= 0.9 || remaining !== null && remaining < 250 * 1024 * 1024 ? "critical"
+        : ratio >= 0.75 || remaining !== null && remaining < 1024 * 1024 * 1024 ? "warning"
+          : "healthy";
+    const health: VaultMediaCacheHealth = {
+      retentionDays,
+      cachedChunks: chunks.length,
+      cachedBytes: chunks.reduce((total, row) => total + row.packet.byteLength, 0),
+      pendingUploadChunks: chunks.filter((row) => !row.uploaded).length,
+      orphanedChunks: orphaned.length,
+      orphanedBytes: orphaned.reduce((total, row) => total + row.packet.byteLength, 0),
+      reclaimableChunks: reclaimable.length,
+      reclaimableBytes: reclaimable.reduce((total, row) => total + row.packet.byteLength, 0),
+      capacityState,
+      lastCleanedAt: metadata?.lastMediaCleanupAt || null
+    };
+    this.mediaCacheHealthSnapshot = health;
+    this.lastMediaCacheHealthAt = Date.now();
+    return health;
+  }
+
+  async setMediaCacheRetention(retentionDays: VaultMediaCacheRetentionDays): Promise<void> {
+    if (![7, 30, 90, null].includes(retentionDays)) throw new Error("Media retention choice is invalid");
+    const session = this.requireSession();
+    await session.store.updateMetadata({ mediaCacheRetentionDays: retentionDays });
+    this.mediaCacheHealthSnapshot = null;
+    this.lastMediaCacheHealthAt = 0;
+  }
+
+  async cleanupMediaCache(): Promise<VaultMediaCleanupResult> {
+    const session = this.requireSession();
+    const [metadata, chunks, media] = await Promise.all([
+      session.store.metadata(),
+      session.store.allMediaChunks(),
+      this.listObjects(["media"])
+    ]);
+    const activeMediaIds = new Set(media.map(mediaManifestFromSnapshot).filter((item): item is VaultMediaManifest => Boolean(item)).map((item) => item.mediaId));
+    const retentionDays = metadata?.mediaCacheRetentionDays === undefined
+      ? DEFAULT_MEDIA_CACHE_RETENTION_DAYS
+      : metadata.mediaCacheRetentionDays;
+    const cutoff = retentionDays === null ? Number.NEGATIVE_INFINITY : Date.now() - retentionDays * 86_400_000;
+    const removable = chunks.filter((row) => row.uploaded && (
+      !activeMediaIds.has(row.mediaId)
+      || retentionDays !== null && Date.parse(row.lastAccessedAt || row.cachedAt) < cutoff
+    ));
+    await session.store.deleteMediaChunks(removable.map((row) => row.digest));
+    const completedAt = new Date().toISOString();
+    await session.store.updateMetadata({ lastMediaCleanupAt: completedAt });
+    this.mediaCacheHealthSnapshot = null;
+    this.lastMediaCacheHealthAt = 0;
+    return {
+      deletedChunks: removable.length,
+      reclaimedBytes: removable.reduce((total, row) => total + row.packet.byteLength, 0),
+      protectedPendingChunks: chunks.filter((row) => !row.uploaded).length,
+      reason: removable.length ? "cleaned" : "nothing_to_clean",
+      completedAt
+    };
+  }
+
+  private async maybeCleanMediaCache(): Promise<void> {
+    const session = this.requireSession();
+    const metadata = await session.store.metadata();
+    const last = metadata?.lastMediaCleanupAt ? Date.parse(metadata.lastMediaCleanupAt) : 0;
+    if (Number.isFinite(last) && Date.now() - last < MEDIA_CACHE_AUTO_CLEANUP_MS) return;
+    await this.cleanupMediaCache();
+  }
+
   async addMedia(file: File, onProgress?: (phase: "reading" | "encrypting" | "uploading" | "saving", completed: number, total: number) => void): Promise<{ snapshot: VaultObjectSnapshot; cloudCached: boolean; desktopStored: boolean }> {
     const session = this.requireSession();
     if (!(file instanceof File) || file.size < 1) throw new Error("Choose a file to add");
@@ -1449,6 +1588,8 @@ export class BrowserVaultEngine {
         this.lastSyncError = error instanceof Error ? error.message : "Encrypted file sync will retry";
       }
     }
+    this.mediaCacheHealthSnapshot = null;
+    this.lastMediaCacheHealthAt = 0;
     return { snapshot, cloudCached, desktopStored };
   }
 
@@ -1479,10 +1620,12 @@ export class BrowserVaultEngine {
           throw new Error("Encrypted media does not match its saved details");
         }
         await session.store.putMediaChunk(payload.chunk, true);
+        this.mediaCacheHealthSnapshot = null;
         stored = await session.store.mediaChunk(manifest.mediaId, index);
       }
       if (!stored) throw new Error("Encrypted media cache failed");
       plaintext.push(await decryptVaultMediaChunk(stored.packet, session.key));
+      await session.store.touchMediaChunk(manifest.mediaId, index);
       onProgress?.(index + 1, manifest.totalChunks);
     }
     const blob = new Blob(plaintext, { type: manifest.mimeType });

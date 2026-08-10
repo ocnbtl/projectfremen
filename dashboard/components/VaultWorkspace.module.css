@@ -571,9 +571,11 @@
 .healthHeader > div { max-width: 760px; }
 .healthHeader p { margin: 0; }
 .healthOverall { flex: none; border-radius: 999px; padding: 7px 10px; color: #245a47; background: var(--vault-mint); font-size: 11px; font-weight: 850; }
-.healthGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--vault-border); border-radius: 13px; background: #f8faf9; }
+.healthGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); overflow: hidden; border: 1px solid var(--vault-border); border-radius: 13px; background: #f8faf9; }
 .healthCard { display: flex; min-width: 0; min-height: 230px; flex-direction: column; align-items: flex-start; padding: 20px; background: #fff; }
-.healthCard + .healthCard { border-left: 1px solid var(--vault-border); }
+.healthCard + .healthCard { border-left: 0; }
+.healthCard:nth-child(even) { border-left: 1px solid var(--vault-border); }
+.healthCard:nth-child(n + 3) { border-top: 1px solid var(--vault-border); }
 .healthCard > div:first-child { display: flex; align-items: center; gap: 10px; }
 .healthCard > p { flex: 1; margin: 16px 0 8px; font-size: 13px; line-height: 1.55; }
 .healthCard > small { margin: 0; }
@@ -628,6 +630,22 @@
 .historyHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; }
 .historyList > button { display: grid; width: 100%; min-height: 0; gap: 5px; border: 0; border-bottom: 1px solid #dce5e1; border-radius: 0; padding: 10px 8px; color: #244139; background: transparent; text-align: left; }
 .historyList > button[data-selected="true"] { color: white; background: #2b6654; }
+.retentionControls { display: grid; gap: 10px; margin-top: auto; }
+.retentionControls label { display: grid; gap: 6px; font-size: 12px; color: var(--vault-muted); }
+.retentionControls select,
+.ownerActions select { min-height: 42px; width: 100%; border: 1px solid var(--vault-border); border-radius: 8px; padding: 0 10px; color: var(--vault-ink); background: #fff; font: inherit; }
+.ownerActions { display: grid; gap: 16px; margin-top: 22px; border-top: 1px solid var(--vault-border); padding-top: 20px; }
+.ownerActions > div:first-child { display: grid; gap: 5px; }
+.ownerActions h3,
+.ownerActions p { margin: 0; }
+.actionGroup { display: grid; gap: 10px; border: 1px solid var(--vault-border); border-radius: 11px; padding: 14px; background: #f8faf9; }
+.actionGroup > strong { font-size: 13px; color: var(--vault-ink); }
+.actionGroup label { display: grid; gap: 6px; margin: 0; font-size: 12px; color: var(--vault-muted); }
+.actionGroup textarea { min-height: 76px; }
+.actionRow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: end; }
+.confirmAction { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center; }
+.confirmAction span { font-size: 13px; color: var(--vault-copy); }
+
 .versionPreview { display: grid; gap: 10px; margin-top: 14px; border-top: 1px solid var(--vault-border); padding-top: 14px; }
 .versionPreview > div:first-child { display: grid; gap: 4px; }
 .versionPreview p { margin: 0; padding: 0; }
@@ -657,6 +675,8 @@
   .devicePicker { grid-template-columns: 1fr; }
   .objectGrid { grid-template-columns: 1fr; }
   .healthGrid { grid-template-columns: 1fr; }
+  .healthCard:nth-child(even) { border-left: 0; }
+  .healthCard:nth-child(n + 2) { border-top: 1px solid var(--vault-border); }
   .healthCard { min-height: 0; }
   .healthCard + .healthCard { border-top: 1px solid var(--vault-border); border-left: 0; }
   .deviceList { grid-template-columns: 1fr; }
@@ -699,6 +719,8 @@
   .inlineActions button { flex: 1; }
   .restorePanel dl { grid-template-columns: 1fr; }
   .workspaceHeader { align-items: stretch; flex-direction: column; }
+  .actionRow,
+  .confirmAction { grid-template-columns: 1fr; }
   .statusGrid,
   .metrics { grid-template-columns: 1fr 1fr; }
   .statusGrid strong { overflow-wrap: anywhere; }

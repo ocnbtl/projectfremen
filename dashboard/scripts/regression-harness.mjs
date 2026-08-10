@@ -814,6 +814,32 @@ async function checkNativeFinanceLifecycle(baseUrl, cookieJar) {
     amount: 80, direction: "expense", category: "Office", entityScope: "business", status: "cleared", reviewed: true
   }, `${testRunId}-finance-expense`);
   assert(income.response.ok && expense.response.ok, "Finance manual transactions did not persist");
+
+  const vaultReviewCandidate = await create({
+    kind: "transaction", occurredOn: "2026-08-02", merchant: "Vault review fixture", accountId: operatingId,
+    amount: 21, direction: "expense", category: "Operations", entityScope: "business", status: "cleared", reviewed: false
+  }, testRunId + "-finance-vault-review");
+  assert(vaultReviewCandidate.response.ok && vaultReviewCandidate.payload.item.reviewed === false, "Finance did not create the Vault review fixture");
+  const vaultReviewCommand = {
+    format: "unigentamos-canonical-command-v1",
+    commandId: crypto.randomUUID(),
+    operation: "owner_action",
+    canonicalId: "finance:transactions:" + vaultReviewCandidate.payload.item.id,
+    baseUpdatedAt: vaultReviewCandidate.payload.item.updatedAt,
+    baseFields: {},
+    patch: {},
+    ownerAction: { name: "finance_action", action: "review_transaction", input: {} },
+    queuedAt: new Date().toISOString()
+  };
+  const reviewedViaVault = await requestJson(baseUrl, cookieJar, "/api/vault/records", {
+    method: "POST", headers: jsonHeaders, body: JSON.stringify({ command: vaultReviewCommand })
+  });
+  assert(reviewedViaVault.response.ok && reviewedViaVault.payload.fields.reviewed === true, "Vault owner action did not review the canonical Finance transaction");
+  const reviewedViaVaultReplay = await requestJson(baseUrl, cookieJar, "/api/vault/records", {
+    method: "POST", headers: jsonHeaders, body: JSON.stringify({ command: vaultReviewCommand })
+  });
+  assert(reviewedViaVaultReplay.response.ok && reviewedViaVaultReplay.payload.fields.reviewed === true, "Vault Finance owner action was not idempotent on replay");
+
   const forgedManualTransfer = await create({
     kind: "transaction", occurredOn: "2026-08-02", merchant: "Forged transfer", accountId: operatingId,
     amount: 1, direction: "transfer", category: "Transfer", entityScope: "business"
@@ -1121,6 +1147,9 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
       await command.waitFor();
       const text = await command.innerText();
       assert(text.includes(`${accounts} accounts · ${pending} pending`), `Command Center ${viewport.label} did not derive the current Finance module count`);
+      assert(text.toLowerCase().includes("attention horizon") && text.toLowerCase().includes("live worklist"), `Command Center ${viewport.label} omitted the detailed attention horizon`);
+      assert(await command.locator(".command-attention-summary > div").count() === 4, `Command Center ${viewport.label} did not render total/now/next/watch summaries`);
+      assert(await command.locator(".command-attention-row").count() >= pending, `Command Center ${viewport.label} omitted Finance owner records from its live worklist`);
       for (const forbidden of ["AI suggestions", "Sync checks", "Media queued", "Across live project lanes", "12 Active goals"]) {
         assert(!text.includes(forbidden), `Command Center ${viewport.label} retained invented copy: ${forbidden}`);
       }
@@ -9921,7 +9950,7 @@ async function main() {
     pass("Hydrated Finance routes pass canonical URL, failed-input recovery, rule-test, and four-viewport checks");
 
     await checkCommandCenterBrowserState(server.baseUrl, cookieJar, nativeFinanceState);
-    pass("Command Center derives native module state and passes four-viewport read-through checks without invented counts");
+    pass("Command Center derives a record-level now/next/watch worklist and passes four-viewport read-through checks without invented counts");
 
     if (false) {
     const financePage = await requestText(server.baseUrl, cookieJar, "/admin/finance");

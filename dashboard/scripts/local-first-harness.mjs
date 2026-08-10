@@ -70,6 +70,22 @@ try {
     [commandField]: { format: "unigentamos-canonical-command-v1", commandId, operation: "update", canonicalId: "personal-records:note:personal-1", baseUpdatedAt: null, baseFields: { title: "Before" }, patch: { title: "After" }, queuedAt: "2026-08-09T12:00:00.000Z" }
   });
   assert.equal(pendingCanonicalCommands(commandSnapshot).length, 1);
+  const ownerCommandId = crypto.randomUUID();
+  const ownerCommand = {
+    format: "unigentamos-canonical-command-v1",
+    commandId: ownerCommandId,
+    operation: "owner_action",
+    canonicalId: "finance:transactions:transaction-1",
+    baseUpdatedAt: "2026-08-09T12:00:00.000Z",
+    baseFields: {},
+    patch: {},
+    ownerAction: { name: "finance_action", action: "review_transaction", input: {} },
+    queuedAt: "2026-08-09T12:01:00.000Z"
+  };
+  const ownerSnapshot = snapshot(crypto.randomUUID(), "finance", crypto.randomUUID(), "device-a", 901, {
+    [pendingCommandField(ownerCommandId)]: ownerCommand
+  });
+  assert.deepEqual(pendingCanonicalCommands(ownerSnapshot).map((item) => item.command), [ownerCommand]);
 
   const text = threeWayMergeText("alpha\nbeta\ngamma", "ALPHA\nbeta\ngamma", "alpha\nbeta\nGAMMA");
   assert.deepEqual(text, { value: "ALPHA\nbeta\nGAMMA", conflict: false });
@@ -273,6 +289,8 @@ try {
   const browserStore = await readFile("lib/local-first/indexed-db.ts", "utf8");
   assert.match(browserStore, /requestPersistentStorage/i);
   assert.match(browserStore, /storageHealth/i);
+  assert.match(browserStore, /lastAccessedAt/i);
+  assert.match(browserStore, /deleteMediaChunks/i);
   assert.match(browserStore, /navigator\.storage/i);
   const browserEngine = await readFile("lib/local-first/browser-engine.ts", "utf8");
   assert.match(browserEngine, /meaningfulVaultHistory/i);
@@ -280,6 +298,9 @@ try {
   assert.match(browserEngine, /Relay cleanup runs from the Windows master/i);
   assert.match(browserEngine, /cleanupRelayNow/i);
   assert.match(browserEngine, /retireDevice/i);
+  assert.match(browserEngine, /queueCanonicalOwnerAction/i);
+  assert.match(browserEngine, /cleanupMediaCache/i);
+  assert.match(browserEngine, /pendingUploadChunks/i);
   const mediaMigration = await readFile("supabase/migrations/20260807170000_add_encrypted_media_relay_bucket.sql", "utf8");
   assert.match(mediaMigration, /vault-media-relay/i);
   assert.match(mediaMigration, /false/i);
@@ -307,7 +328,12 @@ try {
   assert.match(vaultWorkspace, /Cleanup waits until every active device is caught up/i);
   assert.match(vaultWorkspace, /Remove old device/i);
   assert.match(vaultWorkspace, /Its saved local copy stays on that device/i);
-  assert.match(vaultWorkspace, /For protection if this PC fails/i);
+  assert.match(vaultWorkspace, /Using this PC for now/i);
+  assert.match(vaultWorkspace, /Downloaded media/i);
+  assert.match(vaultWorkspace, /Clean up downloads/i);
+  assert.match(vaultWorkspace, /Record actions/i);
+  assert.match(vaultWorkspace, /Mark paid in ledger/i);
+  assert.match(vaultWorkspace, /No payment was sent/i);
   assert.match(vaultWorkspace, /Offline command center/i);
   assert.match(vaultWorkspace, /same records used by Notes, People, Resources, Projects, Reviews, Personal, and Finance/i);
   assert.match(vaultWorkspace, /saveCanonicalFields/i);
@@ -321,7 +347,18 @@ try {
   assert.match(canonicalServer, /editableFieldsFor/i);
   assert.match(canonicalServer, /threeWayMergeText/i);
   assert.match(canonicalServer, /expectedUpdatedAt/i);
-  assert.doesNotMatch(canonicalServer, /mark_paid|complete_close|confirm_import|paymentEvidenceRef/i);
+  assert.match(canonicalServer, /owner_action/i);
+  assert.match(canonicalServer, /review_transaction/i);
+  assert.match(canonicalServer, /paymentEvidenceRef = await canonicalNativeRef/i);
+  assert.match(canonicalServer, /idempotencyKey: command.commandId/i);
+  assert.doesNotMatch(canonicalServer, /confirm_import|execute_payment|bank_transfer/i);
+  const commandCenter = await readFile("app/admin/page.tsx", "utf8");
+  assert.match(commandCenter, /Attention horizon/i);
+  assert.match(commandCenter, /openProjectBlockers.map/i);
+  assert.match(commandCenter, /pendingTransactions.map/i);
+  assert.match(commandCenter, /dueBills.map/i);
+  assert.match(commandCenter, /openFollowUps.map/i);
+  assert.match(commandCenter, /Nothing is copied here/i);
   const companionSource = await readFile("../vault-companion/src/server.mjs", "utf8");
   assert.match(companionSource, /const VERSION = "0\.3\.0"/i);
   assert.match(companionSource, /UNIGENTAMOS_VAULT_AUTO_BACKUP_MS/i);
@@ -329,7 +366,7 @@ try {
   assert.match(companionSource, /Backup limit reached\. Move an older checked backup/i);
   assert.match(companionSource, /destination: backupDestination\(\)/i);
 
-  console.log("[pass] canonical offline editing, safe field allowlists, local-first merge, restore reconciliation, clock correction, encrypted sync, storage health, device lifecycle, and backup checks passed");
+  console.log("[pass] canonical offline editing and owner actions, safe field allowlists, local-first merge, restore reconciliation, clock correction, encrypted sync, media retention, device lifecycle, Command Center derivation, and backup checks passed");
 } finally {
   await rm(outputRoot, { recursive: true, force: true });
 }

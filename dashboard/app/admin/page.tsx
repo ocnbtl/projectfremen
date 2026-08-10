@@ -20,7 +20,8 @@ const ENTITY_THEME_BY_SLUG: Record<string, "fremen" | "iceflake" | "pint"> = {
 };
 
 type ReviewRow = { name: string; when: string; href: string };
-type AttentionItem = { title: string; detail: string; href: string; tone: string };
+type AttentionPriority = "now" | "next" | "watch";
+type AttentionItem = { id: string; title: string; detail: string; owner: string; when: string; action: string; href: string; tone: string; priority: AttentionPriority; sortAt: string };
 type ActivityItem = { label: string; detail: string; href: string; at: string };
 
 function getReviewRows(now: Date): ReviewRow[] {
@@ -39,6 +40,34 @@ function formatActivityTime(value: string): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "Time unavailable";
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(date);
+}
+
+function dueLabel(value: string | undefined, now: Date): string {
+  if (!value) return "No due date";
+  const due = new Date(value.length === 10 ? value + "T23:59:59" : value);
+  if (Number.isNaN(due.getTime())) return "Date needs review";
+  const days = Math.ceil((due.getTime() - now.getTime()) / 86_400_000);
+  if (days < 0) return "Overdue by " + Math.abs(days) + " day" + (Math.abs(days) === 1 ? "" : "s");
+  if (days === 0) return "Due today";
+  if (days === 1) return "Due tomorrow";
+  return "Due " + new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" }).format(due);
+}
+
+function priorityForDate(value: string | undefined, now: Date, fallback: AttentionPriority): AttentionPriority {
+  if (!value) return fallback;
+  const due = new Date(value.length === 10 ? value + "T23:59:59" : value);
+  if (Number.isNaN(due.getTime())) return fallback;
+  const days = Math.ceil((due.getTime() - now.getTime()) / 86_400_000);
+  return days <= 1 ? "now" : days <= 7 ? "next" : fallback;
+}
+
+function shortDetail(value: string | undefined, fallback: string): string {
+  const normalized = (value || "").trim();
+  return normalized ? normalized.slice(0, 220) : fallback;
+}
+
+function money(value: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Math.abs(value));
 }
 
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ welcome?: string }> }) {
@@ -81,14 +110,118 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const currentClose = finance?.closePeriods.filter((item) => !item.archivedAt).sort((left, right) => right.period.localeCompare(left.period))[0];
   const openCloseChecks = currentClose?.checks.filter((item) => item.required && item.resolution === "open") || [];
 
-  const attention: AttentionItem[] = [
-    ...(openProjectBlockers.length ? [{ title: `${openProjectBlockers.length} open project blocker${openProjectBlockers.length === 1 ? "" : "s"}`, detail: "Owned by Projects; resolution state is unchanged here.", href: "/admin/projects/blockers", tone: "crimson" }] : []),
-    ...(openDecisions.length ? [{ title: `${openDecisions.length} open decision${openDecisions.length === 1 ? "" : "s"}`, detail: "Canonical decisions remain in Personal Ops.", href: "/admin/personal/decisions", tone: "violet" }] : []),
-    ...(openObligations.length ? [{ title: `${openObligations.length} open obligation${openObligations.length === 1 ? "" : "s"}`, detail: "Evidence and completion criteria stay with their owner records.", href: "/admin/personal/obligations", tone: "orange" }] : []),
-    ...(pendingTransactions.length ? [{ title: `${pendingTransactions.length} Finance transaction${pendingTransactions.length === 1 ? "" : "s"} need review`, detail: "Pending or unreconciled ledger facts.", href: "/admin/finance/transactions?filter=unreviewed", tone: "yellow" }] : []),
-    ...(dueBills.length ? [{ title: `${dueBills.length} bill${dueBills.length === 1 ? "" : "s"} due or overdue`, detail: "Payment state requires evidence or an explicit exception.", href: "/admin/finance/bills", tone: "crimson" }] : []),
-    ...(openCloseChecks.length ? [{ title: `${openCloseChecks.length} monthly close check${openCloseChecks.length === 1 ? "" : "s"} open`, detail: `${currentClose?.period} remains open until every named check resolves.`, href: "/admin/finance/monthly-review", tone: "blue" }] : []),
-    ...(currentReviews.length ? [{ title: `${currentReviews.length} current review run${currentReviews.length === 1 ? "" : "s"}`, detail: "Review completion remains gated in Reviews.", href: "/admin/reviews/weekly", tone: "green" }] : [])
+  const now = new Date();
+  const projectNames = new Map((projects?.projects || []).map((item) => [item.id, item.name]));
+  const attentionCandidates: AttentionItem[] = [
+    ...openProjectBlockers.map((item) => ({
+      id: "project-blocker:" + item.id,
+      title: item.title,
+      detail: shortDetail(item.condition, "This blocker needs a resolution or carry-forward decision."),
+      owner: "Projects · " + (projectNames.get(item.projectId) || "Project"),
+      when: dueLabel(item.dueAt, now),
+      action: "Resolve blocker",
+      href: "/admin/projects/blockers",
+      tone: "crimson",
+      priority: item.severity === "critical" || item.severity === "high" ? "now" : priorityForDate(item.dueAt, now, item.severity === "medium" ? "next" : "watch"),
+      sortAt: item.dueAt || item.updatedAt
+    } as AttentionItem)),
+    ...openDecisions.map((item) => ({
+      id: "decision:" + item.id,
+      title: item.title,
+      detail: shortDetail(item.question, "This decision is still open."),
+      owner: "Personal Ops · Decisions",
+      when: dueLabel(item.revisitAt || item.dueAt, now),
+      action: "Make or defer decision",
+      href: "/admin/personal/decisions",
+      tone: "violet",
+      priority: item.risk === "critical" || item.risk === "high" ? "now" : priorityForDate(item.revisitAt || item.dueAt, now, "next"),
+      sortAt: item.revisitAt || item.dueAt || item.updatedAt
+    } as AttentionItem)),
+    ...openObligations.map((item) => ({
+      id: "obligation:" + item.id,
+      title: item.title,
+      detail: shortDetail(item.consequence, "This commitment still needs completion evidence."),
+      owner: "Personal Ops · Obligations",
+      when: dueLabel(item.dueAt, now),
+      action: "Review commitment",
+      href: "/admin/personal/obligations",
+      tone: "orange",
+      priority: item.obligationState === "blocked" || item.priority === "critical" ? "now" : priorityForDate(item.dueAt, now, item.priority === "high" ? "next" : "watch"),
+      sortAt: item.dueAt || item.updatedAt
+    } as AttentionItem)),
+    ...openFollowUps.map((item) => ({
+      id: "follow-up:" + item.id,
+      title: item.title,
+      detail: shortDetail(item.context, "This follow-up is still open."),
+      owner: "Personal Ops · Follow-ups",
+      when: dueLabel(item.deferredUntil || item.dueAt, now),
+      action: "Open follow-up",
+      href: "/admin/personal/follow-ups",
+      tone: "green",
+      priority: priorityForDate(item.deferredUntil || item.dueAt, now, item.priority === "critical" || item.priority === "high" ? "next" : "watch"),
+      sortAt: item.deferredUntil || item.dueAt || item.updatedAt
+    } as AttentionItem)),
+    ...pendingTransactions.map((item) => ({
+      id: "finance-transaction:" + item.id,
+      title: item.merchant || "Unlabeled transaction",
+      detail: money(item.amount) + " · " + item.category + (item.status === "pending" ? " · pending" : " · ready for review"),
+      owner: "Finance · Transactions",
+      when: "Recorded " + item.occurredOn,
+      action: "Review ledger entry",
+      href: "/admin/finance/transactions?filter=unreviewed",
+      tone: "yellow",
+      priority: item.status === "pending" ? "next" : "watch",
+      sortAt: item.occurredOn
+    } as AttentionItem)),
+    ...dueBills.map((item) => ({
+      id: "finance-bill:" + item.id,
+      title: item.name,
+      detail: money(item.amount) + " · " + item.category + (item.autopay ? " · autopay recorded" : ""),
+      owner: "Finance · Bills",
+      when: dueLabel(item.dueDate, now),
+      action: "Review bill status",
+      href: "/admin/finance/bills",
+      tone: "crimson",
+      priority: item.status === "overdue" ? "now" : priorityForDate(item.dueDate, now, "next"),
+      sortAt: item.dueDate
+    } as AttentionItem)),
+    ...openCloseChecks.map((item) => ({
+      id: "finance-close:" + currentClose?.id + ":" + item.id,
+      title: item.label,
+      detail: "Required for the " + (currentClose?.period || "current") + " Finance close.",
+      owner: "Finance · Monthly close",
+      when: "Before close can finish",
+      action: "Resolve close check",
+      href: "/admin/finance/monthly-review",
+      tone: "blue",
+      priority: "next",
+      sortAt: currentClose?.updatedAt || ""
+    } as AttentionItem)),
+    ...currentReviews.map((item) => {
+      const openRequired = item.checklist.filter((check) => check.required && !["complete", "waived", "carried_forward"].includes(check.state)).length;
+      return {
+        id: "review:" + item.id,
+        title: item.title,
+        detail: openRequired ? openRequired + " required check" + (openRequired === 1 ? " remains." : "s remain.") : "Ready for final review and completion.",
+        owner: "Reviews · " + item.cadence,
+        when: dueLabel(item.dueAt, now),
+        action: "Continue review",
+        href: "/admin/reviews/" + encodeURIComponent(item.cadence) + "?run=" + encodeURIComponent(item.id),
+        tone: "green",
+        priority: priorityForDate(item.dueAt, now, openRequired ? "next" : "watch"),
+        sortAt: item.dueAt || item.updatedAt
+      } as AttentionItem;
+    })
+  ];
+  const priorityOrder: Record<AttentionPriority, number> = { now: 0, next: 1, watch: 2 };
+  const attentionTotal = attentionCandidates.length;
+  const attention = attentionCandidates
+    .sort((left, right) => priorityOrder[left.priority] - priorityOrder[right.priority] || left.sortAt.localeCompare(right.sortAt))
+    .slice(0, 36);
+  const attentionGroups: Array<{ key: AttentionPriority; label: string; note: string }> = [
+    { key: "now", label: "Now", note: "Overdue, blocked, or high-risk" },
+    { key: "next", label: "Next", note: "Due soon or awaiting review" },
+    { key: "watch", label: "Watch", note: "Open, but not urgent yet" }
   ];
 
   const modules = [
@@ -118,13 +251,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   ].filter((item) => !Number.isNaN(Date.parse(item.at))).sort((left, right) => right.at.localeCompare(left.at)).slice(0, 6);
 
   const unavailableCount = modules.filter((item) => !item.available).length;
-  const metrics = [
-    { label: "Active goals", value: String(activeGoals), detail: "Saved Current Goals", tone: "green" },
-    { label: "Needs attention", value: String(attention.length), detail: "Derived owner queues", tone: "crimson" },
-    { label: "Active projects", value: projects ? String(activeProjects.length) : "—", detail: projects ? `${openProjectBlockers.length} open blockers` : "Source unavailable", tone: "blue" },
-    { label: "Finance review", value: finance ? String(pendingTransactions.length + dueBills.length + openCloseChecks.length) : "—", detail: finance ? "Pending facts and checks" : "Source unavailable", tone: "orange" },
-    { label: "Unavailable sources", value: String(unavailableCount), detail: "Never inferred or backfilled", tone: "violet" }
-  ];
+  const attentionCounts = Object.fromEntries(attentionGroups.map((group) => [group.key, attentionCandidates.filter((item) => item.priority === group.key).length])) as Record<AttentionPriority, number>;
 
   return (
     <main className="admin-shell admin-home-shell admin-chrome-main">
@@ -134,7 +261,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         sidebarSummary="A read-through of canonical module state. Changes belong in each owner module."
         sidebarItems={[
           { label: "Active goals", value: String(activeGoals) },
-          { label: "Attention", value: String(attention.length) },
+          { label: "Attention", value: String(attentionTotal) },
           { label: "Unavailable", value: String(unavailableCount) }
         ]}
         sidebarActions={[
@@ -155,15 +282,30 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <section className="command-center-grid" aria-label="Command Center">
         <div className="command-center-primary">
           <section className="command-hero">
-            <div><p className="command-kicker">Command Center</p><h1>What needs attention</h1><p>Counts are derived from current owner records. This page routes work; it does not duplicate or silently change module state.</p></div>
-            <div className="command-hero-actions" aria-label="Primary command actions"><Link href="/admin/projects">Open Projects</Link><Link href="/admin/personal">Open Personal Ops</Link></div>
+            <div><p className="command-kicker">Command Center</p><h1>What needs attention</h1><p>Your live operating desk, built from the same records used in every module. Nothing is copied here: each item opens its owner record so work stays consistent online, offline, and across devices.</p></div>
+            <div className="command-hero-actions" aria-label="Primary command actions"><Link href="/vault">Open Vault</Link><Link href="/admin/finance">Open Finance</Link><Link href="/admin/projects">Open Projects</Link></div>
           </section>
 
-          <section className="command-metric-grid" aria-label="Command metrics">{metrics.map((metric, index) => <article className={`command-metric command-tone-${metric.tone}`} key={metric.label}><span>{index + 1}</span><strong>{metric.value}</strong><p>{metric.label}</p><small>{metric.detail}</small></article>)}</section>
+          <section className="command-attention-summary" aria-label="Attention horizon">
+            <div><span>Attention horizon</span><strong>{attentionTotal}</strong><small>live owner records</small></div>
+            {attentionGroups.map((group) => <div className={"command-priority-" + group.key} key={group.key}><span>{group.label}</span><strong>{attentionCounts[group.key]}</strong><small>{group.note}</small></div>)}
+          </section>
 
           <section className="command-panel command-attention-panel" aria-label="Current attention">
-            <div className="command-section-title"><h2>Current attention</h2><span>{attention.length} derived</span></div>
-            {attention.length ? <div className="command-focus-list">{attention.map((item) => <Link href={item.href} className={`command-attention-link command-tone-${item.tone}`} key={`${item.href}:${item.title}`}><span>Owner route</span><strong>{item.title}</strong><p>{item.detail}</p></Link>)}</div> : <div className="command-empty-state"><strong>No current attention items</strong><p>Every connected queue currently resolves to zero. Open a module to create or review work.</p></div>}
+            <div className="command-section-title"><div><p className="command-kicker-small">Live worklist</p><h2>Current attention</h2></div><span>{attentionTotal} records</span></div>
+            {attention.length ? <div className="command-horizon">
+              {attentionGroups.map((group) => {
+                const items = attention.filter((item) => item.priority === group.key);
+                return items.length ? <section className="command-horizon-group" key={group.key} aria-labelledby={"attention-" + group.key}>
+                  <header><div><span className={"command-priority-dot command-priority-" + group.key} /><h3 id={"attention-" + group.key}>{group.label}</h3></div><p>{group.note}</p><strong>{attentionCounts[group.key]}</strong></header>
+                  <div className="command-attention-list">{items.map((item) => <Link href={item.href} className={"command-attention-row command-priority-" + item.priority + " command-tone-" + item.tone} key={item.id}>
+                    <div className="command-attention-meta"><span>{item.owner}</span><time>{item.when}</time></div>
+                    <strong>{item.title}</strong><p>{item.detail}</p><small>{item.action} →</small>
+                  </Link>)}</div>
+                </section> : null;
+              })}
+              {attentionTotal > attention.length && <p className="command-overflow-note">Showing the first {attention.length} items. Open the owner modules for the full queues.</p>}
+            </div> : <div className="command-empty-state"><strong>Nothing needs attention right now</strong><p>Connected owner queues are clear. New work will appear here automatically.</p></div>}
           </section>
 
           <section className="command-lanes" aria-label="Module source state">{modules.map((module) => <article className={`command-lane command-tone-${module.tone}`} key={module.name}><div className="command-section-title"><h2>{module.name}</h2><span>{module.available ? "Connected" : "Unavailable"}</span></div><div className="command-lane-list"><Link href={module.href}><strong>{module.value}</strong><p>{module.available ? "Open the canonical owner module" : "No values inferred while this source is unavailable"}</p></Link></div></article>)}</section>

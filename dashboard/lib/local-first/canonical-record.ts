@@ -26,13 +26,25 @@ export type VaultCanonicalRecordMetadata = {
 export type VaultPendingCanonicalCommand = {
   format: "unigentamos-canonical-command-v1";
   commandId: string;
-  operation: "create" | "update";
+  operation: "create" | "update" | "owner_action";
   canonicalId: string;
   baseUpdatedAt: string | null;
   baseFields: Record<string, VaultFieldValue>;
   patch: Record<string, VaultFieldValue>;
+  ownerAction?: VaultCanonicalOwnerAction;
   queuedAt: string;
 };
+
+export type VaultCanonicalTarget = {
+  canonicalId: string;
+  label: string;
+};
+
+export type VaultCanonicalOwnerAction =
+  | { name: "archive"; reason: string }
+  | { name: "restore" }
+  | { name: "link"; target: VaultCanonicalTarget; relationship?: string }
+  | { name: "finance_action"; action: string; input: Record<string, VaultFieldValue> };
 
 const FIELD = (key: string, label: string, control: VaultEditorControl = "text"): VaultEditableField => ({ key, label, control });
 
@@ -179,9 +191,10 @@ export function pendingCanonicalCommands(snapshot: VaultObjectSnapshot): Array<{
       candidate.format !== "unigentamos-canonical-command-v1"
       || typeof candidate.commandId !== "string"
       || typeof candidate.canonicalId !== "string"
-      || (candidate.operation !== "create" && candidate.operation !== "update")
+      || !["create", "update", "owner_action"].includes(String(candidate.operation))
       || !candidate.patch || typeof candidate.patch !== "object" || Array.isArray(candidate.patch)
       || !candidate.baseFields || typeof candidate.baseFields !== "object" || Array.isArray(candidate.baseFields)
+      || candidate.operation === "owner_action" && (!candidate.ownerAction || typeof candidate.ownerAction !== "object" || Array.isArray(candidate.ownerAction))
     ) continue;
     commands.push({ field, command: candidate as VaultPendingCanonicalCommand, clock: snapshot.fieldClocks[field] || snapshot.hlc });
   }
