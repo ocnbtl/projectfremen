@@ -9,6 +9,12 @@ const nextConfig: NextConfig = {
   // Next.js builder active without changing application runtime behavior.
   adapterPath: "",
   outputFileTracingRoot: workspaceRoot,
+  // Runtime state may live outside the deployment bundle. Package only the
+  // checked-in seed/fallback data instead of tracing an arbitrary writable
+  // directory back through the whole repository.
+  outputFileTracingIncludes: {
+    "/*": ["./data/**/*"]
+  },
   turbopack: {
     root: workspaceRoot
   },

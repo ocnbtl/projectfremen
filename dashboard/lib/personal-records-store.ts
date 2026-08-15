@@ -94,6 +94,7 @@ export type PersonalContactProfile = {
   context?: string;
   birthday?: string;
   phoneNumber?: string;
+  phoneCountryCode?: string;
   primaryEmail?: string;
   workEmail?: string;
   universityEmail?: string;
@@ -115,6 +116,9 @@ export type PersonalContactProfile = {
   notes?: string;
   linkedin?: string;
   website?: string;
+  instagram?: string;
+  tiktok?: string;
+  x?: string;
   partner?: string;
   children: string[];
   interactions: string[];
@@ -285,6 +289,7 @@ const CONTACT_PROFILE_TEXT_KEYS = [
   "context",
   "birthday",
   "phoneNumber",
+  "phoneCountryCode",
   "primaryEmail",
   "workEmail",
   "universityEmail",
@@ -305,6 +310,9 @@ const CONTACT_PROFILE_TEXT_KEYS = [
   "notes",
   "linkedin",
   "website",
+  "instagram",
+  "tiktok",
+  "x",
   "partner"
 ] as const;
 

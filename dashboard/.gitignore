@@ -6,3 +6,4 @@ data/audit-log.json
 data/exports/
 output/
 debug.log
+.vercel

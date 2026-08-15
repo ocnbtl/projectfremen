@@ -3124,6 +3124,114 @@ body.people-ai-panel-open .local-ai-widget {
   font-weight: 900;
 }
 
+/* Dense, consistent People editor controls. Profile tabs keep one stable pane. */
+.people-capture-form,
+.people-profile-form {
+  gap: 8px;
+}
+
+.people-profile-panel {
+  padding: 18px;
+}
+
+.people-profile-tabs {
+  top: -18px;
+}
+
+.people-capture-grid,
+.people-profile-field-grid {
+  gap: 8px;
+}
+
+.people-profile-section {
+  gap: 8px;
+  padding: 10px;
+}
+
+.people-overview-grid,
+.people-linked-workspace {
+  gap: 10px;
+}
+
+.people-overview-grid article,
+.people-linked-workspace article,
+.people-add-card {
+  gap: 8px;
+  padding: 10px;
+}
+
+.people-group-picker,
+.people-social-fields {
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  padding: 9px 10px;
+}
+
+.people-group-picker legend,
+.people-social-fields legend {
+  padding: 0 4px;
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.people-group-picker > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.people-group-picker label {
+  display: inline-flex;
+  grid-template-columns: none;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  border-radius: 999px;
+  padding: 0 8px;
+  color: var(--text-strong);
+  background: var(--surface-panel-soft);
+  font-size: 11px;
+}
+
+.people-group-picker input {
+  width: 14px;
+  min-height: 14px;
+  margin: 0;
+  accent-color: var(--accent-green);
+}
+
+.people-group-picker small {
+  display: block;
+  margin-top: 7px;
+  color: var(--text-subtle);
+  font-size: 10px;
+}
+
+.people-social-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.people-advanced-properties {
+  border-top: 1px solid var(--border-soft);
+  padding-top: 8px;
+}
+
+.people-advanced-properties summary {
+  cursor: pointer;
+  color: var(--text-subtle);
+  font-size: 12px;
+  font-weight: 850;
+}
+
+.people-advanced-properties label {
+  max-width: 260px;
+  margin-top: 8px;
+}
+
 @media (max-width: 1280px) {
   .people-redesign-shell {
     grid-template-columns: 220px minmax(380px, 0.95fr) minmax(460px, 1fr);

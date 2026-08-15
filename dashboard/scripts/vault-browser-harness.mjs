@@ -384,20 +384,20 @@ try {
   await page.getByRole("tab", { name: "Notes" }).click();
   await page.getByLabel("Title").fill("Offline continuity note");
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("first encrypted version");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByText("Unsaved changes").waitFor();
+  await page.getByRole("button", { name: "Create record", exact: true }).click();
   await page.getByText("Saved. The full module will update automatically.").waitFor();
   await page.getByRole("button", { name: "Check now" }).click();
   await page.getByText("Device status updated.").waitFor();
   await page.waitForTimeout(150);
   const relayAfterFirstSave = relayEnvelopes.length;
-  await page.getByRole("button", { name: "Save", exact: true }).click();
-  await page.waitForFunction(() => !Array.from(document.querySelectorAll("button")).find((button) => button.textContent === "Save")?.disabled);
+  assert.equal(await page.getByRole("button", { name: "Save changes", exact: true }).isDisabled(), true);
   await page.getByRole("button", { name: "Check now" }).click();
   await page.waitForTimeout(150);
   assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 1);
   assert.equal(relayEnvelopes.length, relayAfterFirstSave);
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("second encrypted version");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 2);
   assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 2);
   await page.getByLabel("Version history").locator(":scope > button").nth(1).click();
@@ -405,10 +405,25 @@ try {
   await page.getByRole("button", { name: "Yes, restore it" }).click();
   await page.getByText("That saved version is now the latest.", { exact: false }).waitFor();
   assert.equal(await page.getByRole("textbox", { name: "Note", exact: true }).inputValue(), "first encrypted version");
-  assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 3);
+  assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 4);
   await page.getByRole("button", { name: "Check now" }).click();
   await page.getByText("Device status updated.").waitFor();
   assert.equal([...canonicalRecords.values()].find((record) => record.fields.title === "Offline continuity note")?.fields.body, "first encrypted version");
+
+  await page.getByRole("tab", { name: "Resources" }).click();
+  await page.getByLabel("Title").fill("Continuity guide");
+  await page.getByLabel("URL").fill("https://example.test/continuity");
+  await page.getByRole("button", { name: "Create record", exact: true }).click();
+  await page.getByText("Saved. The full module will update automatically.").waitFor();
+  await page.getByRole("tab", { name: "Notes" }).click();
+  await page.getByText("Offline continuity note", { exact: true }).click();
+  await page.getByLabel("Find a record").fill("Continuity guide");
+  await page.getByRole("option", { name: /Continuity guide/ }).click();
+  await page.getByLabel("How are they connected?").selectOption("source");
+  await page.getByRole("button", { name: "Connect records" }).click();
+  await page.getByText("Connected to Continuity guide.").waitFor();
+  await page.screenshot({ path: path.join(artifactRoot, "vault-record-workbench-desktop.png"), fullPage: true });
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
 
   await page.getByRole("button", { name: "Back up this PC" }).click();
   await page.getByText("Backup created and checked.", { exact: false }).waitFor();
@@ -576,7 +591,7 @@ try {
   await page.getByRole("tab", { name: "Notes" }).click();
   await page.getByText("Offline continuity note", { exact: true }).click();
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("Windows offline branch kept in history");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page.getByText("Saved on this device. It will update the full module when you reconnect.").waitFor();
   const removedBaseVersions = await page.evaluate(async () => {
     const database = await new Promise((resolve, reject) => {
@@ -617,7 +632,7 @@ try {
   await applePage.getByText("Offline continuity note", { exact: true }).click();
   await applePage.waitForTimeout(50);
   await applePage.getByRole("textbox", { name: "Note", exact: true }).fill("iPhone later branch wins while Windows stays in history");
-  await applePage.getByRole("button", { name: "Save", exact: true }).click();
+  await applePage.getByRole("button", { name: "Save changes", exact: true }).click();
   await applePage.getByText("Saved. The full module will update automatically.").waitFor();
   await applePage.getByRole("button", { name: "Check now" }).click();
   await applePage.getByText("Device status updated.").waitFor();
@@ -716,7 +731,7 @@ try {
 
   await page.getByText("Offline continuity note", { exact: true }).click();
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("third encrypted version saved offline");
-  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await page.waitForFunction(() => document.querySelectorAll('[aria-label="Version history"] > button').length === 3);
   assert.equal(await page.getByLabel("Version history").locator(":scope > button").count(), 3);
   // One canonical receipt per joined browser: Windows, sign-in recovery Mac, and iPhone.

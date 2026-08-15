@@ -39,11 +39,18 @@ function snapshot(objectId, objectKind, versionId, deviceId, wallMs, fields, bas
 }
 
 try {
-  for (const moduleName of ["types", "hlc", "merge", "crypto", "relay-store", "semantic-history", "canonical-record"]) await compile(moduleName);
+  for (const moduleName of ["types", "hlc", "merge", "crypto", "relay-store", "semantic-history", "canonical-record", "vault-record-tools"]) await compile(moduleName);
   const { assessClockHealth, compareHlc, tickHlc } = await import(pathToFileURL(path.join(outputRoot, "hlc.mjs")));
   const { mergeVaultSnapshots, threeWayMergeText } = await import(pathToFileURL(path.join(outputRoot, "merge.mjs")));
   const { deterministicMergeVersionId, meaningfulVaultHistory } = await import(pathToFileURL(path.join(outputRoot, "semantic-history.mjs")));
-  const { canonicalMetadata, editableFieldsFor, pendingCanonicalCommands, pendingCommandField } = await import(pathToFileURL(path.join(outputRoot, "canonical-record.mjs")));
+  const {
+    VAULT_CANONICAL_RECORD_FIELD,
+    canonicalMetadata,
+    editableFieldsFor,
+    pendingCanonicalCommands,
+    pendingCommandField
+  } = await import(pathToFileURL(path.join(outputRoot, "canonical-record.mjs")));
+  const { buildVaultSearchIndex, findVaultRelationshipTargets, searchVaultRecords, vaultRelationshipsFor } = await import(pathToFileURL(path.join(outputRoot, "vault-record-tools.mjs")));
   const {
     createVaultKeyEnvelope,
     decryptVaultChange,
@@ -62,7 +69,16 @@ try {
   assert.equal(canonical.canonicalId, "projects:projects:project-1");
   assert.equal(canonical.route, "/admin/projects/project-1");
   assert.deepEqual(editableFieldsFor("finance", "transfers"), []);
-  assert.deepEqual(editableFieldsFor("finance", "accounts").map((field) => field.key), ["name", "institution"]);
+  assert.deepEqual(editableFieldsFor("finance", "accounts").map((field) => field.key), ["name", "institution", "kind", "mask", "entityScope"]);
+  const financeTransactionFields = editableFieldsFor("finance", "transactions");
+  assert.equal(financeTransactionFields.find((field) => field.key === "amount")?.control, "number");
+  assert.equal(financeTransactionFields.find((field) => field.key === "occurredOn")?.control, "date");
+  assert.deepEqual(financeTransactionFields.find((field) => field.key === "entityScope")?.options?.map((option) => option.value), ["personal", "business"]);
+  const contactFields = editableFieldsFor("personal-records", "person");
+  assert.equal(contactFields.find((field) => field.key === "profile.nextContact")?.control, "date");
+  assert.equal(contactFields.find((field) => field.key === "profile.notes")?.group, "Details");
+  assert.equal(contactFields.find((field) => field.key === "subjects")?.control, "tags");
+  assert.equal(contactFields.find((field) => field.key === "profile.instagram")?.control, "url");
   const commandId = crypto.randomUUID();
   const commandField = pendingCommandField(commandId);
   const commandSnapshot = snapshot(crypto.randomUUID(), "note", crypto.randomUUID(), "device-a", 900, {
@@ -86,6 +102,26 @@ try {
     [pendingCommandField(ownerCommandId)]: ownerCommand
   });
   assert.deepEqual(pendingCanonicalCommands(ownerSnapshot).map((item) => item.command), [ownerCommand]);
+
+  const relationshipProject = snapshot("project-object", "project", "project-version", "device-a", 902, {
+    name: "Project Lighthouse",
+    [VAULT_CANONICAL_RECORD_FIELD]: canonicalMetadata({ module: "projects", collection: "projects", recordId: "project-1" }),
+    sourceRefs: [{ module: "resources", objectType: "resource", objectId: "resource-1", label: "Research brief" }]
+  });
+  const relationshipResource = snapshot("resource-object", "resource", "resource-version", "device-a", 903, {
+    title: "Research brief",
+    body: "Evidence for Lighthouse",
+    [VAULT_CANONICAL_RECORD_FIELD]: canonicalMetadata({ module: "personal-records", collection: "resource", recordId: "resource-1" })
+  });
+  assert.deepEqual(findVaultRelationshipTargets(relationshipProject, [relationshipResource], "brief").map((item) => item.canonicalId), ["personal-records:resource:resource-1"]);
+  const projectRelationships = vaultRelationshipsFor(relationshipProject, [relationshipProject, relationshipResource]);
+  assert.equal(projectRelationships.length, 1);
+  assert.equal(projectRelationships[0].target?.label, "Research brief");
+  assert.equal(projectRelationships[0].direction, "outgoing");
+  const searchIndex = buildVaultSearchIndex([relationshipProject, relationshipResource]);
+  assert.deepEqual(searchVaultRecords(searchIndex, "lighthouse", "all").map((item) => item.objectId), ["project-object", "resource-object"]);
+  assert.deepEqual(searchVaultRecords(searchIndex, "evidence brief", "resource").map((item) => item.objectId), ["resource-object"]);
+  assert.deepEqual(searchVaultRecords(searchIndex, "evidence brief", "project"), []);
 
   const text = threeWayMergeText("alpha\nbeta\ngamma", "ALPHA\nbeta\ngamma", "alpha\nbeta\nGAMMA");
   assert.deepEqual(text, { value: "ALPHA\nbeta\nGAMMA", conflict: false });
@@ -332,11 +368,25 @@ try {
   assert.match(vaultWorkspace, /Downloaded media/i);
   assert.match(vaultWorkspace, /Clean up downloads/i);
   assert.match(vaultWorkspace, /Record actions/i);
+  assert.match(vaultWorkspace, /Unsaved changes/i);
+  assert.match(vaultWorkspace, /Search and connect/i);
+  assert.match(vaultWorkspace, /Connected records/i);
+  assert.match(vaultWorkspace, /Nothing here is a duplicate/i);
+  assert.match(vaultWorkspace, /editorPatch/i);
+  assert.match(vaultWorkspace, /vaultRelationshipsFor/i);
   assert.match(vaultWorkspace, /Mark paid in ledger/i);
   assert.match(vaultWorkspace, /No payment was sent/i);
   assert.match(vaultWorkspace, /Offline command center/i);
   assert.match(vaultWorkspace, /same records used by Notes, People, Resources, Projects, Reviews, Personal, and Finance/i);
   assert.match(vaultWorkspace, /saveCanonicalFields/i);
+  assert.match(vaultWorkspace, /Saved searches updated across your Vault devices/i);
+  assert.match(vaultWorkspace, /buildVaultSearchIndex/i);
+  assert.match(vaultWorkspace, /Load more/i);
+  assert.match(vaultWorkspace, /Preview here/i);
+  assert.match(vaultWorkspace, /queueLinkManagement/i);
+  const vaultBootstrap = await readFile("app/api/vault/bootstrap/route.ts", "utf8");
+  assert.match(vaultBootstrap, /readNoteLinksState/i);
+  assert.match(vaultBootstrap, /VAULT_CANONICAL_RELATIONSHIPS_FIELD/i);
   assert.match(browserEngine, /changesOperationalState/i);
   assert.match(browserEngine, /force: true/i);
   const canonicalRoute = await readFile("app/api/vault/records/route.ts", "utf8");
@@ -351,7 +401,22 @@ try {
   assert.match(canonicalServer, /review_transaction/i);
   assert.match(canonicalServer, /paymentEvidenceRef = await canonicalNativeRef/i);
   assert.match(canonicalServer, /idempotencyKey: command.commandId/i);
+  assert.match(canonicalServer, /applyManageLinkAction/i);
   assert.doesNotMatch(canonicalServer, /confirm_import|execute_payment|bank_transfer/i);
+  const peopleWorkspace = await readFile("components/PeopleWorkspace.tsx", "utf8");
+  assert.match(peopleWorkspace, /const \[groups, setGroups\]/i);
+  assert.match(peopleWorkspace, /Columbus, Ohio, USA/i);
+  assert.match(peopleWorkspace, /normalizePhoneForStorage/i);
+  assert.match(peopleWorkspace, /Website & social profiles/i);
+  assert.match(peopleWorkspace, /people-location-suggestions/i);
+  const personalRecordsStore = await readFile("lib/personal-records-store.ts", "utf8");
+  assert.match(personalRecordsStore, /phoneCountryCode/i);
+  assert.match(personalRecordsStore, /instagram/i);
+  assert.match(personalRecordsStore, /tiktok/i);
+  const fileStore = await readFile("lib/file-store.ts", "utf8");
+  assert.match(fileStore, /turbopackIgnore: true/i);
+  const nextConfig = await readFile("next.config.ts", "utf8");
+  assert.match(nextConfig, /outputFileTracingIncludes/i);
   const commandCenter = await readFile("app/admin/page.tsx", "utf8");
   assert.match(commandCenter, /Attention horizon/i);
   assert.match(commandCenter, /openProjectBlockers.map/i);
@@ -366,7 +431,7 @@ try {
   assert.match(companionSource, /Backup limit reached\. Move an older checked backup/i);
   assert.match(companionSource, /destination: backupDestination\(\)/i);
 
-  console.log("[pass] canonical offline editing and owner actions, safe field allowlists, local-first merge, restore reconciliation, clock correction, encrypted sync, media retention, device lifecycle, Command Center derivation, and backup checks passed");
+  console.log("[pass] canonical offline editing, richer field controls, searchable cross-module relationships, owner actions, safe field allowlists, local-first merge, restore reconciliation, clock correction, encrypted sync, media retention, device lifecycle, Command Center derivation, and backup checks passed");
 } finally {
   await rm(outputRoot, { recursive: true, force: true });
 }

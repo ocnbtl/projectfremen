@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ADMIN_NAV_ITEMS } from "../../lib/admin-navigation";
@@ -27,6 +27,7 @@ export default function AppTopNav({
   className
 }: AppTopNavProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
@@ -34,7 +35,7 @@ export default function AppTopNav({
   const mobileNavRef = useRef<HTMLDivElement>(null);
   const mobileNavTriggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const searchAvailable = Boolean(onCommandSearch);
+  const searchAvailable = true;
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -92,10 +93,9 @@ export default function AppTopNav({
   function submitCommandSearch(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const query = commandQuery.trim();
-    if (!query || !onCommandSearch) {
-      return;
-    }
-    onCommandSearch(query);
+    if (!query) return;
+    if (onCommandSearch) onCommandSearch(query);
+    else router.push(`/vault?search=${encodeURIComponent(query)}&focus=search`);
   }
 
   const activeNavItem = ADMIN_NAV_ITEMS.find((item) => {
@@ -153,6 +153,9 @@ export default function AppTopNav({
               </Link>
             );
           })}
+          <Link href="/vault?focus=search" onClick={() => setMobileNavOpen(false)}>
+            Search all records
+          </Link>
         </nav>
       </div>
 
@@ -245,8 +248,7 @@ export default function AppTopNav({
               aria-label="Search notes, files, people, reviews"
               aria-describedby={!searchAvailable ? "app-command-search-status" : undefined}
               placeholder="Search notes, files, people, reviews"
-              disabled={!searchAvailable}
-              title={!searchAvailable ? commandSearchDisabledReason : undefined}
+              title="Search the encrypted offline Vault"
             />
             <kbd aria-hidden="true">⌘K</kbd>
             {!searchAvailable && (

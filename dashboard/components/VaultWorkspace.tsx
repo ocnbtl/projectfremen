@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 import {
   browserVault,
   deterministicVaultObjectId,
@@ -18,16 +18,28 @@ import type {
   VaultObjectSnapshot,
   VaultRecoveryPackage
 } from "../lib/local-first/types";
-import { readCanonicalMetadata } from "../lib/local-first/canonical-record";
+import { readCanonicalMetadata, type VaultEditableField } from "../lib/local-first/canonical-record";
+import {
+  findVaultRelationshipTargets,
+  buildVaultSearchIndex,
+  searchVaultRecords,
+  vaultRecordLabel,
+  vaultRecordOption,
+  vaultRelationshipsFor
+} from "../lib/local-first/vault-record-tools";
 import styles from "./VaultWorkspace.module.css";
 
 type VaultStatus = Awaited<ReturnType<typeof browserVault.status>>;
 type BootstrapObject = { canonicalId: string; objectKind: VaultObjectKind; fields: Record<string, VaultFieldValue> };
 type SetupTarget = "windows" | "apple";
+type EditorDraftValue = string | boolean;
+type SavedVaultSearch = { id: string; label: string; query: string; kind: VaultObjectKind | "all" };
+type MediaPreview = { url: string; mimeType: string; fileName: string };
 
 const COMPANION_HELPER_URL = "http://127.0.0.1:43127/";
 const MAX_RECOVERY_FILE_BYTES = 256 * 1024;
-const VAULT_RELEASE_NOTE = "offline-actions-media-v3";
+const VAULT_RELEASE_NOTE = "offline-command-center-v5";
+const RECORD_PAGE_SIZE = 80;
 const RECORD_TABS: Array<{ value: VaultObjectKind | "all"; label: string }> = [
   { value: "all", label: "All" },
   { value: "note", label: "Notes" },
@@ -85,6 +97,83 @@ function humanFields(fields: Record<string, VaultFieldValue>): Array<[string, st
     .filter(([field, value]) => !field.startsWith("__unigentamos") && !["mediaManifest", "mediaState", "sourceModule"].includes(field) && value !== "")
     .slice(0, 24)
     .map(([field, value]) => [humanFieldName(field), humanFieldValue(value)]);
+}
+
+const EDITOR_GROUPS: VaultEditableField["group"][] = ["Essentials", "Details", "Planning", "Classification"];
+
+function draftValueForField(fields: Record<string, VaultFieldValue>, field: VaultEditableField): EditorDraftValue {
+  const value = fields[field.key];
+  if (field.control === "checkbox") return value === true;
+  if (field.control === "tags") return Array.isArray(value)
+    ? value.filter((item) => typeof item === "string" || typeof item === "number").join(", ")
+    : "";
+  if (field.control === "date" && typeof value === "string") return value.slice(0, 10);
+  if (field.control === "month" && typeof value === "string") return value.slice(0, 7);
+  return typeof value === "string" || typeof value === "number" ? String(value) : "";
+}
+
+function editorDraft(fields: Record<string, VaultFieldValue>, editableFields: readonly VaultEditableField[]): Record<string, EditorDraftValue> {
+  return Object.fromEntries(editableFields.map((field) => [field.key, draftValueForField(fields, field)]));
+}
+
+function draftText(draft: Record<string, EditorDraftValue>, key: string): string {
+  const value = draft[key];
+  return typeof value === "string" ? value : "";
+}
+
+function draftValueForSave(field: VaultEditableField, draft: EditorDraftValue | undefined): VaultFieldValue {
+  if (field.control === "checkbox") return draft === true;
+  const value = typeof draft === "string" ? draft : "";
+  if (field.control === "number") {
+    const number = Number(value);
+    if (!value.trim() || !Number.isFinite(number)) throw new Error(`${field.label} must be a number`);
+    return number;
+  }
+  if (field.control === "tags") {
+    return Array.from(new Set(value.split(/[,\n]/).map((item) => item.trim()).filter(Boolean)));
+  }
+  return value;
+}
+
+function editorIsDirty(draft: Record<string, EditorDraftValue>, baseline: Record<string, EditorDraftValue>): boolean {
+  const keys = new Set([...Object.keys(draft), ...Object.keys(baseline)]);
+  return Array.from(keys).some((key) => draft[key] !== baseline[key]);
+}
+
+function editorPatch(
+  fields: readonly VaultEditableField[],
+  draft: Record<string, EditorDraftValue>,
+  baseline: Record<string, EditorDraftValue>
+): Record<string, VaultFieldValue> {
+  const patch: Record<string, VaultFieldValue> = {};
+  for (const field of fields) {
+    if (draft[field.key] === baseline[field.key]) continue;
+    const value = draftValueForSave(field, draft[field.key]);
+    if (field.required && typeof value === "string" && !value.trim()) throw new Error(`${field.label} is required`);
+    patch[field.key] = value;
+  }
+  return patch;
+}
+
+function relationshipLabel(value: string): string {
+  return value.replaceAll("_", " ").replace(/Refs?$/i, "").replace(/^./, (letter) => letter.toUpperCase());
+}
+
+function readSavedSearches(snapshot: VaultObjectSnapshot | undefined): SavedVaultSearch[] {
+  const value = snapshot?.fields.savedSearches;
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is SavedVaultSearch => Boolean(
+    item && typeof item === "object" && !Array.isArray(item)
+    && typeof item.id === "string"
+    && typeof item.label === "string"
+    && typeof item.query === "string"
+    && typeof item.kind === "string"
+    && RECORD_TABS.some((tab) => tab.value === item.kind)
+  )).slice(0, 24);
+}
+
+function canPreviewMedia(mimeType: string): boolean {
+  return /^(image|audio|video|text)\//.test(mimeType) || mimeType === "application/pdf";
 }
 
 function suggestedDevice(): { target: SetupTarget; name: string } {
@@ -155,7 +244,15 @@ function deviceSyncState(device: VaultDeviceStatus, relayHeadSequence: number): 
   };
 }
 
-export default function VaultWorkspace() {
+export default function VaultWorkspace({
+  initialSearch = "",
+  initialKind = "all",
+  focusSearch = false
+}: {
+  initialSearch?: string;
+  initialKind?: VaultObjectKind | "all";
+  focusSearch?: boolean;
+}) {
   const [status, setStatus] = useState<VaultStatus | null>(null);
   const [password, setPassword] = useState("");
   const [deviceName, setDeviceName] = useState("Windows desktop");
@@ -171,13 +268,16 @@ export default function VaultWorkspace() {
   const [journalId, setJournalId] = useState<string | null>(null);
   const [historyCount, setHistoryCount] = useState(0);
   const [objects, setObjects] = useState<VaultObjectSnapshot[]>([]);
-  const [activeKind, setActiveKind] = useState<VaultObjectKind | "all">("all");
+  const [activeKind, setActiveKind] = useState<VaultObjectKind | "all">(initialKind);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
-  const [objectDraft, setObjectDraft] = useState<Record<string, string>>({ title: "", body: "" });
+  const [objectDraft, setObjectDraft] = useState<Record<string, EditorDraftValue>>({ title: "", body: "" });
+  const [objectDraftBaseline, setObjectDraftBaseline] = useState<Record<string, EditorDraftValue>>({ title: "", body: "" });
   const [objectHistory, setObjectHistory] = useState<VaultObjectSnapshot[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [restoreArmed, setRestoreArmed] = useState(false);
-  const [recordQuery, setRecordQuery] = useState("");
+  const [recordQuery, setRecordQuery] = useState(initialSearch);
+  const deferredRecordQuery = useDeferredValue(recordQuery);
+  const [recordResultLimit, setRecordResultLimit] = useState(RECORD_PAGE_SIZE);
   const [backups, setBackups] = useState<VaultBackupSummary[]>([]);
   const [restorePreview, setRestorePreview] = useState<VaultBackupRestorePreview | null>(null);
   const [restoreConfirmation, setRestoreConfirmation] = useState("");
@@ -185,8 +285,16 @@ export default function VaultWorkspace() {
   const [retireArmedDeviceId, setRetireArmedDeviceId] = useState<string | null>(null);
   const [actionReason, setActionReason] = useState("");
   const [relationshipTargetId, setRelationshipTargetId] = useState("");
+  const [relationshipQuery, setRelationshipQuery] = useState("");
+  const [relationshipKind, setRelationshipKind] = useState("reference");
+  const [connectionEditId, setConnectionEditId] = useState<string | null>(null);
+  const [connectionEditKind, setConnectionEditKind] = useState("reference");
+  const [connectionEditReason, setConnectionEditReason] = useState("");
   const [actionArmed, setActionArmed] = useState<string | null>(null);
+  const [mediaPreview, setMediaPreview] = useState<MediaPreview | null>(null);
   const workspaceRefreshStarted = useRef(false);
+  const recordSearchRef = useRef<HTMLInputElement>(null);
+  const hasUnsavedRecordChanges = editorIsDirty(objectDraft, objectDraftBaseline);
 
   const refresh = useCallback(async () => {
     const next = await browserVault.status();
@@ -218,6 +326,29 @@ export default function VaultWorkspace() {
       window.removeEventListener("unigentamos-vault-data-changed", handleVaultDataChanged);
     };
   }, [loadObjects, refresh]);
+
+  useEffect(() => {
+    const protectDraft = (event: BeforeUnloadEvent) => {
+      if (!hasUnsavedRecordChanges) return;
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", protectDraft);
+    return () => window.removeEventListener("beforeunload", protectDraft);
+  }, [hasUnsavedRecordChanges]);
+
+  useEffect(() => {
+    setRecordResultLimit(RECORD_PAGE_SIZE);
+  }, [activeKind, deferredRecordQuery]);
+
+  useEffect(() => {
+    if (!focusSearch) return;
+    window.requestAnimationFrame(() => recordSearchRef.current?.focus());
+  }, [focusSearch]);
+
+  useEffect(() => () => {
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview.url);
+  }, [mediaPreview]);
 
   function chooseSetupTarget(target: SetupTarget) {
     setSetupTarget(target);
@@ -461,6 +592,52 @@ export default function VaultWorkspace() {
     });
   }
 
+  async function previewMedia(snapshot: VaultObjectSnapshot) {
+    await run(async () => {
+      const opened = await browserVault.openMedia(snapshot, (completed, total) => setMessage(`Preparing preview ${completed} of ${total}â€¦`));
+      const url = URL.createObjectURL(opened.blob);
+      setMediaPreview({ url, mimeType: opened.blob.type || "application/octet-stream", fileName: opened.fileName });
+      setMessage(`${opened.fileName} is open locally. Its decrypted preview was not uploaded.`);
+    });
+  }
+
+  async function persistSavedSearches(searches: SavedVaultSearch[]) {
+    await run(async () => {
+      const objectId = savedSearchObject?.objectId || await deterministicVaultObjectId("vault:saved-searches:v1");
+      await browserVault.saveObject({
+        objectId,
+        objectKind: "settings",
+        fields: {
+          title: "Saved searches",
+          settingsKind: "saved-searches",
+          savedSearches: searches as unknown as VaultFieldValue
+        }
+      });
+      await loadObjects();
+      setMessage("Saved searches updated across your Vault devices.");
+    });
+  }
+
+  async function saveCurrentSearch() {
+    const query = recordQuery.trim();
+    if (!query) {
+      setMessage("Type something to search before saving it.");
+      recordSearchRef.current?.focus();
+      return;
+    }
+    if (savedSearches.some((item) => item.query.toLocaleLowerCase() === query.toLocaleLowerCase() && item.kind === activeKind)) {
+      setMessage("That search is already saved.");
+      return;
+    }
+    const kindLabel = RECORD_TABS.find((tab) => tab.value === activeKind)?.label || "All";
+    await persistSavedSearches([...savedSearches, {
+      id: crypto.randomUUID(),
+      label: `${query} · ${kindLabel}`,
+      query,
+      kind: activeKind
+    }].slice(-24));
+  }
+
   async function refreshDevices() {
     await run(async () => {
       await browserVault.syncUntilSettled();
@@ -542,11 +719,18 @@ export default function VaultWorkspace() {
     return typeof value === "string" ? value : "";
   }
 
-  async function selectObject(snapshot: VaultObjectSnapshot) {
+  async function selectObject(snapshot: VaultObjectSnapshot, skipDiscardCheck = false): Promise<boolean> {
+    if (
+      !skipDiscardCheck
+      && snapshot.objectId !== selectedObjectId
+      && hasUnsavedRecordChanges
+      && !window.confirm("Discard the unsaved changes to this record?")
+    ) return false;
+    setMediaPreview(null);
     setSelectedObjectId(snapshot.objectId);
     const metadata = readCanonicalMetadata(snapshot.fields);
-    setObjectDraft(metadata?.editableFields.length
-      ? Object.fromEntries(metadata.editableFields.map(({ key }) => [key, stringField(snapshot, key)]))
+    const nextDraft = metadata?.editableFields.length
+      ? editorDraft(snapshot.fields, metadata.editableFields)
       : {
           title: stringField(snapshot, "title") || stringField(snapshot, "name") || stringField(snapshot, "fullName") || "Untitled",
           body: stringField(snapshot, "body") || stringField(snapshot, "description"),
@@ -554,25 +738,43 @@ export default function VaultWorkspace() {
           phone: stringField(snapshot, "profile.phoneNumber"),
           location: stringField(snapshot, "profile.livesIn"),
           url: stringField(snapshot, "url")
-        });
+        };
+    setObjectDraft(nextDraft);
+    setObjectDraftBaseline(nextDraft);
     const history = await browserVault.history(snapshot.objectId);
     setObjectHistory(history);
     setSelectedVersionId(history[0]?.versionId || null);
     setRestoreArmed(false);
     setActionReason("");
     setRelationshipTargetId("");
+    setRelationshipQuery("");
+    setRelationshipKind("reference");
+    setConnectionEditId(null);
+    setConnectionEditKind("reference");
+    setConnectionEditReason("");
     setActionArmed(null);
+    return true;
   }
 
-  function newObject() {
+  function newObject(): boolean {
+    if (hasUnsavedRecordChanges && !window.confirm("Discard the unsaved changes to this record?")) return false;
+    setMediaPreview(null);
     setSelectedObjectId(null);
-    setObjectDraft({ title: "", body: "", email: "", phone: "", location: "", url: "" });
+    const nextDraft = { title: "", body: "", email: "", phone: "", location: "", url: "" };
+    setObjectDraft(nextDraft);
+    setObjectDraftBaseline(nextDraft);
     setObjectHistory([]);
     setSelectedVersionId(null);
     setRestoreArmed(false);
     setActionReason("");
     setRelationshipTargetId("");
+    setRelationshipQuery("");
+    setRelationshipKind("reference");
+    setConnectionEditId(null);
+    setConnectionEditKind("reference");
+    setConnectionEditReason("");
     setActionArmed(null);
+    return true;
   }
 
   async function queueOwnerAction(ownerAction: Parameters<typeof browserVault.queueCanonicalOwnerAction>[1], success: string) {
@@ -605,7 +807,29 @@ export default function VaultWorkspace() {
       setMessage("Choose a record to connect first.");
       return;
     }
-    await queueOwnerAction({ name: "link", target: { canonicalId: relationshipTargetId, label: relationshipTarget.label }, relationship: "reference" }, "Connected to " + relationshipTarget.label + ".");
+    await queueOwnerAction({ name: "link", target: { canonicalId: relationshipTargetId, label: relationshipTarget.label }, relationship: relationshipKind }, "Connected to " + relationshipTarget.label + ".");
+  }
+
+  async function queueLinkManagement(action: "unlink" | "relabel" | "repair", linkId: string) {
+    const target = action === "repair" ? relationshipTarget : null;
+    if (action === "repair" && !target) {
+      setMessage("Choose the replacement record in Search and connect first.");
+      return;
+    }
+    if ((action === "unlink" || action === "repair") && !connectionEditReason.trim()) {
+      setMessage(`Add a short ${action === "unlink" ? "unlink" : "repair"} reason first.`);
+      return;
+    }
+    await queueOwnerAction({
+      name: "manage_link",
+      linkId,
+      action,
+      ...(action === "relabel" ? { relationship: connectionEditKind } : {}),
+      ...(target ? { target: { canonicalId: target.canonicalId, label: target.label } } : {}),
+      ...(connectionEditReason.trim() ? { reason: connectionEditReason.trim() } : {})
+    }, action === "unlink" ? "Link removed without deleting either record." : action === "repair" ? "Link repaired." : "Link label updated.");
+    setConnectionEditId(null);
+    setConnectionEditReason("");
   }
 
   async function queueFinanceAction(action: string, input: Record<string, VaultFieldValue>, success: string) {
@@ -620,28 +844,44 @@ export default function VaultWorkspace() {
       if (selected) {
         const metadata = readCanonicalMetadata(selected.fields);
         if (metadata?.editableFields.length) {
-          const patch = Object.fromEntries(metadata.editableFields.map(({ key }) => [key, objectDraft[key] || ""]));
-          if (!String(patch[metadata.editableFields[0].key] || "").trim()) throw new Error("The first field is required");
+          const patch = editorPatch(metadata.editableFields, objectDraft, objectDraftBaseline);
+          if (!Object.keys(patch).length) {
+            setMessage("No changes to save.");
+            return;
+          }
           saved = await browserVault.saveCanonicalFields(selected, patch);
         } else {
           if (editingKind !== "note" && editingKind !== "contact" && editingKind !== "resource") throw new Error("Open the full module view to change this item.");
-          if (!objectDraft.title.trim()) throw new Error("Title or name is required");
-          saved = await browserVault.saveObject({ objectId: selected.objectId, objectKind: editingKind, fields: { title: objectDraft.title.trim(), body: objectDraft.body || "" } });
+          if (!draftText(objectDraft, "title").trim()) throw new Error("Title or name is required");
+          saved = await browserVault.saveObject({
+            objectId: selected.objectId,
+            objectKind: editingKind,
+            fields: { title: draftText(objectDraft, "title").trim(), body: draftText(objectDraft, "body") }
+          });
         }
       } else {
         if (editingKind !== "note" && editingKind !== "contact" && editingKind !== "resource") throw new Error("Choose Notes, Contacts, or Resources to add a record here.");
-        if (!objectDraft.title.trim()) throw new Error("Title or name is required");
-        const fields: Record<string, VaultFieldValue> = { title: objectDraft.title.trim(), body: objectDraft.body || "" };
+        if (!draftText(objectDraft, "title").trim()) throw new Error("Title or name is required");
+        const fields: Record<string, VaultFieldValue> = {
+          title: draftText(objectDraft, "title").trim(),
+          body: draftText(objectDraft, "body")
+        };
         if (editingKind === "contact") {
-          fields["profile.primaryEmail"] = objectDraft.email || "";
-          fields["profile.phoneNumber"] = objectDraft.phone || "";
-          fields["profile.livesIn"] = objectDraft.location || "";
+          fields["profile.primaryEmail"] = draftText(objectDraft, "email");
+          fields["profile.phoneNumber"] = draftText(objectDraft, "phone");
+          fields["profile.livesIn"] = draftText(objectDraft, "location");
         }
-        if (editingKind === "resource") fields.url = objectDraft.url || "";
+        if (editingKind === "resource") fields.url = draftText(objectDraft, "url");
         saved = await browserVault.createCanonicalPersonalRecord(
           editingKind === "contact" ? "person" : editingKind, editingKind, fields
         );
       }
+      const savedMetadata = readCanonicalMetadata(saved.fields);
+      const nextDraft = savedMetadata?.editableFields.length
+        ? editorDraft(saved.fields, savedMetadata.editableFields)
+        : objectDraft;
+      setObjectDraft(nextDraft);
+      setObjectDraftBaseline(nextDraft);
       setSelectedObjectId(saved.objectId);
       setObjectHistory(await browserVault.history(saved.objectId));
       await loadObjects();
@@ -654,7 +894,7 @@ export default function VaultWorkspace() {
     await run(async () => {
       const restored = await browserVault.restoreVersion(selectedObjectId, selectedVersionId);
       await loadObjects();
-      await selectObject(restored);
+      await selectObject(restored, true);
       setRestoreArmed(false);
       setMessage("That saved version is now the latest. Every later version is still in history.");
     });
@@ -677,12 +917,14 @@ export default function VaultWorkspace() {
   const onlineAuthorizationRequired = Boolean(status?.sync.authorizationRequired);
   const syncIssues = status?.sync.issues || [];
   const clock = status?.metadata?.clockHealth;
-  const filteredObjects = useMemo(() => objects.filter((item) => {
-    if (activeKind !== "all" && item.objectKind !== activeKind) return false;
-    if (!recordQuery.trim()) return true;
-    const haystack = JSON.stringify(item.fields).toLocaleLowerCase();
-    return haystack.includes(recordQuery.trim().toLocaleLowerCase());
-  }), [activeKind, objects, recordQuery]);
+  const savedSearchObject = objects.find((item) => item.objectKind === "settings" && item.fields.settingsKind === "saved-searches");
+  const savedSearches = readSavedSearches(savedSearchObject);
+  const recordSearchIndex = useMemo(() => buildVaultSearchIndex(objects), [objects]);
+  const filteredObjects = useMemo(
+    () => searchVaultRecords(recordSearchIndex, deferredRecordQuery, activeKind),
+    [activeKind, deferredRecordQuery, recordSearchIndex]
+  );
+  const visibleObjects = filteredObjects.slice(0, recordResultLimit);
   const selectedObject = objects.find((item) => item.objectId === selectedObjectId) || null;
   const editorKind = selectedObject?.objectKind || activeKind;
   const selectedCanonical = selectedObject ? readCanonicalMetadata(selectedObject.fields) : null;
@@ -703,14 +945,25 @@ export default function VaultWorkspace() {
     || selectedCanonical.module === "projects" && selectedCanonical.collection !== "links"
     || selectedCanonical.module === "personal-records" && selectedCanonical.collection === "note"
   ));
-  const relationshipTargets = objects.flatMap((item) => {
+  const eligibleRelationshipObjects = objects.filter((item) => {
     const metadata = readCanonicalMetadata(item.fields);
-    if (!metadata || item.objectId === selectedObjectId || metadata.module === "finance") return [];
-    if (Boolean(item.fields.archivedAt) || item.fields.lifecycle === "archived" || item.fields.state === "archived" || item.fields.linkState === "removed") return [];
-    if (selectedCanonical?.module === "personal-records" && selectedCanonical.collection === "note" && !["resource", "media"].includes(item.objectKind)) return [];
-    return [{ canonicalId: metadata.canonicalId, label: stringField(item, "title") || stringField(item, "name") || "Untitled", kind: recordKindLabel(item.objectKind) }];
+    if (!metadata || item.objectId === selectedObjectId || metadata.module === "finance") return false;
+    if (Boolean(item.fields.archivedAt) || item.fields.lifecycle === "archived" || item.fields.state === "archived" || item.fields.linkState === "removed") return false;
+    if (selectedCanonical?.module === "personal-records" && selectedCanonical.collection === "note" && !["resource", "media"].includes(item.objectKind)) return false;
+    return true;
   });
-  const relationshipTarget = relationshipTargets.find((item) => item.canonicalId === relationshipTargetId) || null;
+  const allRelationshipTargets = findVaultRelationshipTargets(selectedObject, eligibleRelationshipObjects, "", Math.max(eligibleRelationshipObjects.length, 1));
+  const relationshipTargets = findVaultRelationshipTargets(selectedObject, eligibleRelationshipObjects, relationshipQuery, 16);
+  const relationshipTarget = allRelationshipTargets.find((item) => item.canonicalId === relationshipTargetId) || null;
+  const relatedRecords = selectedObject ? vaultRelationshipsFor(selectedObject, objects) : [];
+  const editorGroups = EDITOR_GROUPS
+    .map((group) => ({ group, fields: editorFields.filter((field) => (field.group || "Details") === group) }))
+    .filter((group) => group.fields.length);
+  const selectedRecordOption = selectedObject ? vaultRecordOption(selectedObject) : null;
+  const relationshipKindOptions = selectedCanonical?.module === "personal-records" && selectedCanonical.collection === "note"
+    ? ["reference", "source", "supporting_media", "attachment", "context"]
+    : selectedCanonical?.module === "reviews" ? ["context", "evidence", "decision_support", "follow_up"] : ["reference"];
+  const showRecordPicker = Boolean(supportsRelationship || selectedCanonical?.module === "finance" && ["bills", "closePeriods"].includes(selectedCanonical.collection));
   const closeChecks = selectedCanonical?.module === "finance" && selectedCanonical.collection === "closePeriods" && Array.isArray(selectedObject?.fields.checks)
     ? selectedObject.fields.checks.filter((item): item is Record<string, VaultFieldValue> => Boolean(item && typeof item === "object" && !Array.isArray(item)))
     : [];
@@ -737,6 +990,12 @@ export default function VaultWorkspace() {
     : onlineAuthorizationRequired ? "Sign in to connect"
       : deviceSnapshot ? `${activeDevices.length} connected` : "Checking";
   const clockLabel = clock?.state === "healthy" ? "Checked" : clock?.orderingSafe ? "Corrected" : clock ? "Check needed" : "Checking";
+  const queuedChanges = (status?.diagnostics.outbox || 0) + (status?.diagnostics.desktopOutbox || 0);
+  const syncDetail = onlineAuthorizationRequired ? "Sign in before this device can exchange encrypted changes."
+    : syncIssues.length ? "Your changes are safe here. Open the sync details below to retry them."
+      : queuedChanges ? `${queuedChanges} encrypted change${queuedChanges === 1 ? " is" : "s are"} waiting to upload.`
+        : status?.sync.lastSyncedAt ? `Last checked ${relativeTime(status.sync.lastSyncedAt)}.`
+          : "Waiting for the first sync check.";
   const cards = useMemo(() => [
     ["Vault", stateLabel],
     ["Sync", networkLabel],
@@ -758,7 +1017,7 @@ export default function VaultWorkspace() {
       {message && <p className={styles.notice} role="status">{message}</p>}
 
       {status?.configured && showReleaseNote && <aside className={styles.releaseNote} aria-label="What is new">
-        <div><strong>Your Vault can now do more while you are offline.</strong><span>Connect and archive records, record safe Finance actions, and control how long downloaded media stays on each device.</span></div>
+        <div><strong>Your records are easier to work with here.</strong><span>Edit more of each record, search across modules when connecting work, and see what is already connected—all without creating a second copy.</span></div>
         <button type="button" onClick={dismissReleaseNote}>Got it</button>
       </aside>}
 
@@ -1097,41 +1356,125 @@ export default function VaultWorkspace() {
           <section className={`${styles.panel} ${styles.objectWorkspace}`}>
             <div className={styles.workspaceHeader}>
               <div><p className={styles.eyebrow}>Offline command center</p><h2>Your records, in one place</h2><p>These are the same records used by Notes, People, Resources, Projects, Reviews, Personal, and Finance. Safe fields can be changed here offline; specialized actions stay in their full module.</p></div>
-              {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={newObject}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
+              {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={() => { void newObject(); }}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
             </div>
-            <label className={styles.recordSearch}>Search records<input type="search" value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} placeholder="Search titles, names, and saved details" /></label>
+            <div className={styles.workspaceSync} data-attention={onlineAuthorizationRequired || syncIssues.length > 0 || undefined}>
+              <div><strong>{networkLabel}</strong><span>{syncDetail}</span></div>
+              <button className={styles.quietButton} disabled={busy || !online} onClick={refreshDevices}>Sync now</button>
+            </div>
+            <div className={styles.searchRow}>
+              <label className={styles.recordSearch}>Search all records<input ref={recordSearchRef} type="search" value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} placeholder="People, notes, projects, files, finance..." /></label>
+              <button className={styles.quietButton} disabled={busy || !recordQuery.trim()} onClick={() => void saveCurrentSearch()}>Save search</button>
+            </div>
+            {savedSearches.length > 0 && <div className={styles.savedSearches} aria-label="Saved Vault searches">
+              <span>Saved searches</span>
+              {savedSearches.map((search) => <span className={styles.savedSearch} key={search.id}>
+                <button type="button" onClick={() => { setActiveKind(search.kind); setRecordQuery(search.query); }}>{search.label}</button>
+                <button type="button" aria-label={`Delete saved search ${search.label}`} onClick={() => void persistSavedSearches(savedSearches.filter((item) => item.id !== search.id))}>×</button>
+              </span>)}
+            </div>}
             <div className={styles.kindTabs} role="tablist" aria-label="Vault object kinds">
               {RECORD_TABS.map((tab) => (
-                <button key={tab.value} role="tab" aria-selected={activeKind === tab.value} onClick={() => { setActiveKind(tab.value); newObject(); }}>{tab.label}</button>
+                <button key={tab.value} role="tab" aria-selected={activeKind === tab.value} onClick={() => { if (newObject()) setActiveKind(tab.value); }}>{tab.label}</button>
               ))}
             </div>
             <div className={styles.objectGrid}>
               <aside className={styles.objectList} aria-label="Saved records">
-                {filteredObjects.map((item) => (
+                {visibleObjects.map((item) => (
                   <button key={item.objectId} data-selected={selectedObjectId === item.objectId} onClick={() => void selectObject(item)}>
                     <strong>{stringField(item, "title") || stringField(item, "name") || "Untitled"}</strong>
                     <span>{recordKindLabel(item.objectKind)} · {new Date(item.updatedAt).toLocaleString()}</span>
                   </button>
                 ))}
                 {!filteredObjects.length && <p>No matching records on this device yet.</p>}
+                {visibleObjects.length < filteredObjects.length && <button className={styles.loadMore} type="button" onClick={() => setRecordResultLimit((current) => current + RECORD_PAGE_SIZE)}>
+                  Load more · {filteredObjects.length - visibleObjects.length} remaining
+                </button>}
               </aside>
               <div className={styles.objectEditor}>
                 {canEditRecord ? <>
-                {editorFields.length ? editorFields.map((field) => <label key={field.key}>{field.label}{field.control === "textarea"
-                  ? <textarea rows={field.key === "body" || field.key.includes("summary") ? 10 : 6} value={objectDraft[field.key] || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.value }))} />
-                  : <input type={field.control} value={objectDraft[field.key] || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.value }))} />}</label>) : <>
-                  <label>{editorKind === "contact" ? "Name" : "Title"}<input value={objectDraft.title || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, title: event.target.value }))} /></label>
-                  <label>{editorKind === "note" ? "Note" : "Context"}<textarea rows={10} value={objectDraft.body || ""} onChange={(event) => setObjectDraft((current) => ({ ...current, body: event.target.value }))} /></label>
-                </>}
-                <div className={styles.buttonRow}><button disabled={busy} onClick={saveLocalObject}>Save</button><span>{online ? "Saved here, then synced to its module" : "Saved here · syncs when you reconnect"}</span></div>
-                {selectedCanonical && <Link href={selectedCanonical.route}>Open full {recordKindLabel(selectedObject!.objectKind).toLowerCase()} view →</Link>}
+                  <div className={styles.recordEditorHeader}>
+                    <div>
+                      <span className={styles.recordType}>{selectedRecordOption ? `${selectedRecordOption.moduleLabel} / ${recordKindLabel(selectedRecordOption.kind)}` : `New ${recordKindLabel(editorKind as VaultObjectKind)}`}</span>
+                      <strong>{selectedRecordOption?.label || "Start a new record"}</strong>
+                    </div>
+                    {(selectedObject || hasUnsavedRecordChanges) && <span className={hasUnsavedRecordChanges ? styles.draftChanged : styles.draftCurrent}>{hasUnsavedRecordChanges ? "Unsaved changes" : "Saved"}</span>}
+                  </div>
+
+                  {editorFields.length ? <div className={styles.editorSections}>
+                    {editorGroups.map(({ group, fields }) => <fieldset className={styles.editorSection} key={group}>
+                      <legend>{group}</legend>
+                      <div className={styles.editorFieldGrid}>
+                        {fields.map((field) => {
+                          const value = objectDraft[field.key];
+                          if (field.control === "checkbox") return <label className={styles.checkboxField} key={field.key}>
+                            <input type="checkbox" checked={value === true} onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.checked }))} />
+                            <span><strong>{field.label}</strong>{field.help && <small>{field.help}</small>}</span>
+                          </label>;
+                          return <label className={styles.editorField} key={field.key}>
+                            <span>{field.label}{field.required && <em>Required</em>}</span>
+                            {field.control === "textarea" ? <textarea
+                              rows={field.key === "body" || field.key.includes("summary") ? 10 : 5}
+                              value={typeof value === "string" ? value : ""}
+                              onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.value }))}
+                            /> : field.control === "select" ? <select
+                              value={typeof value === "string" ? value : ""}
+                              onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.value }))}
+                            >
+                              <option value="">{field.required ? "Choose one" : "Not set"}</option>
+                              {(field.options || []).map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+                            </select> : <input
+                              type={field.control === "tags" ? "text" : field.control}
+                              step={field.control === "number" ? field.step : undefined}
+                              value={typeof value === "string" ? value : ""}
+                              placeholder={field.control === "tags" ? "Separate with commas" : undefined}
+                              onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.value }))}
+                            />}
+                            {field.help && <small>{field.help}</small>}
+                          </label>;
+                        })}
+                      </div>
+                    </fieldset>)}
+                  </div> : <div className={styles.editorSections}>
+                    <fieldset className={styles.editorSection}>
+                      <legend>Essentials</legend>
+                      <div className={styles.editorFieldGrid}>
+                        <label className={styles.editorField}><span>{editorKind === "contact" ? "Name" : "Title"}<em>Required</em></span><input value={draftText(objectDraft, "title")} onChange={(event) => setObjectDraft((current) => ({ ...current, title: event.target.value }))} /></label>
+                        {editorKind === "contact" && <label className={styles.editorField}><span>Email</span><input type="email" value={draftText(objectDraft, "email")} onChange={(event) => setObjectDraft((current) => ({ ...current, email: event.target.value }))} /></label>}
+                        {editorKind === "resource" && <label className={styles.editorField}><span>URL</span><input type="url" value={draftText(objectDraft, "url")} onChange={(event) => setObjectDraft((current) => ({ ...current, url: event.target.value }))} /></label>}
+                      </div>
+                    </fieldset>
+                    <fieldset className={styles.editorSection}>
+                      <legend>Details</legend>
+                      <label className={styles.editorField}><span>{editorKind === "note" ? "Note" : "Context"}</span><textarea rows={10} value={draftText(objectDraft, "body")} onChange={(event) => setObjectDraft((current) => ({ ...current, body: event.target.value }))} /></label>
+                    </fieldset>
+                  </div>}
+
+                  <div className={styles.editorSaveBar}>
+                    <div><button disabled={busy || (Boolean(selectedObject) && !hasUnsavedRecordChanges)} onClick={saveLocalObject}>{selectedObject ? "Save changes" : "Create record"}</button>{selectedObject && <button className={styles.quietButton} disabled={busy || !hasUnsavedRecordChanges} onClick={() => setObjectDraft(objectDraftBaseline)}>Reset</button>}</div>
+                    <span>{online ? "Saves here, then syncs to the owner module." : "Saves here now and syncs when you reconnect."}</span>
+                  </div>
+                  {selectedCanonical && <Link href={selectedCanonical.route}>Open full {recordKindLabel(selectedObject!.objectKind).toLowerCase()} view &rarr;</Link>}
                 </> : selectedObject ? <div className={styles.readOnlyRecord}>
                   <span className={styles.recordType}>{recordKindLabel(selectedObject.objectKind)}</span>
                   <h3>{stringField(selectedObject, "title") || stringField(selectedObject, "name") || "Untitled"}</h3>
                   <p>This record is read-only here. You can still browse and restore every saved version.</p>
-                  {selectedObject.objectKind === "media" && <button disabled={busy} onClick={() => void openMedia(selectedObject)}>Open file</button>}
+                  {selectedObject.objectKind === "media" && <div className={styles.mediaActions}>
+                    {selectedMediaManifest && canPreviewMedia(String(selectedMediaManifest.mimeType || "")) && <button disabled={busy} onClick={() => void previewMedia(selectedObject)}>Preview here</button>}
+                    <button className={styles.quietButton} disabled={busy} onClick={() => void openMedia(selectedObject)}>Open file</button>
+                  </div>}
+                  {mediaPreview && selectedObject.objectKind === "media" && <div className={styles.mediaPreview}>
+                    <div><strong>{mediaPreview.fileName}</strong><button className={styles.quietButton} type="button" onClick={() => setMediaPreview(null)}>Close</button></div>
+                    {mediaPreview.mimeType.startsWith("image/") ? <img src={mediaPreview.url} alt={mediaPreview.fileName} />
+                      : mediaPreview.mimeType.startsWith("audio/") ? <audio controls src={mediaPreview.url} />
+                        : mediaPreview.mimeType.startsWith("video/") ? <video controls src={mediaPreview.url} />
+                          : <iframe src={mediaPreview.url} title={`Preview of ${mediaPreview.fileName}`} />}
+                  </div>}
                   {selectedMediaManifest ? <dl className={styles.recordFields}>
+                    <div><dt>File name</dt><dd>{String(selectedMediaManifest.fileName || "")}</dd></div>
+                    <div><dt>Type</dt><dd>{String(selectedMediaManifest.mimeType || "Unknown")}</dd></div>
                     <div><dt>File size</dt><dd>{formatBytes(Number(selectedMediaManifest.byteLength || 0))}</dd></div>
+                    <div><dt>Encrypted pieces</dt><dd>{Number(selectedMediaManifest.totalChunks || 0).toLocaleString()}</dd></div>
                     <div><dt>Added</dt><dd>{new Date(String(selectedMediaManifest.createdAt)).toLocaleString()}</dd></div>
                     <div><dt>Availability</dt><dd>Encrypted · downloads when opened</dd></div>
                   </dl> : <dl className={styles.recordFields}>
@@ -1139,28 +1482,80 @@ export default function VaultWorkspace() {
                   </dl>}
                 </div> : <div className={styles.editorEmpty}><strong>Choose a record</strong><span>Select an item to see its details and full history.</span></div>}
 
-                {selectedCanonical && (supportsRelationship || supportsLifecycle || selectedCanonical.module === "finance") && <section className={styles.ownerActions} aria-label="Record actions">
+                {selectedCanonical && <section className={styles.connectionsPanel} aria-label="Connected records">
+                  <div>
+                    <span className={styles.recordType}>Record spine</span>
+                    <h3>Connected records</h3>
+                    <p>Direct links to the notes, people, projects, resources, reviews, or evidence that belong with this record. Nothing here is a duplicate.</p>
+                  </div>
+                  {relatedRecords.length ? <div className={styles.connectionList}>
+                    {relatedRecords.map((relationship) => {
+                      const canManage = selectedCanonical.module === "personal-records"
+                        && selectedCanonical.collection === "note"
+                        && relationship.direction === "outgoing"
+                        && relationship.status === "saved";
+                      const editingConnection = connectionEditId === relationship.id;
+                      return <article className={styles.connectionRow} key={relationship.id}>
+                        <div>
+                          <strong>{relationship.target?.label || relationship.targetLabel}</strong>
+                          <span>{relationship.direction === "incoming" ? "Linked from" : "Links to"} {relationship.target?.moduleLabel || "another module"} / {relationshipLabel(relationship.relationship)}{relationship.status === "waiting" ? " / Waiting to sync" : relationship.target ? "" : " / Missing on this device"}</span>
+                          {editingConnection && <div className={styles.connectionEditor}>
+                            <label>Link label<select value={connectionEditKind} onChange={(event) => setConnectionEditKind(event.target.value)}>{relationshipKindOptions.map((kind) => <option value={kind} key={kind}>{relationshipLabel(kind)}</option>)}</select></label>
+                            <label>Reason for removal or repair<input value={connectionEditReason} onChange={(event) => setConnectionEditReason(event.target.value)} placeholder="Short audit note" /></label>
+                            <div>
+                              <button type="button" onClick={() => void queueLinkManagement("relabel", relationship.id)}>Save label</button>
+                              <button className={styles.quietButton} type="button" onClick={() => void queueLinkManagement("unlink", relationship.id)}>Unlink</button>
+                              {relationship.healthState && ["stale", "broken"].includes(relationship.healthState) && <button className={styles.quietButton} type="button" onClick={() => void queueLinkManagement("repair", relationship.id)}>Repair with selected record</button>}
+                              <button className={styles.quietButton} type="button" onClick={() => setConnectionEditId(null)}>Cancel</button>
+                            </div>
+                          </div>}
+                        </div>
+                        <div className={styles.connectionActions}>
+                          {relationship.target && <>
+                            <button className={styles.quietButton} type="button" onClick={() => { const target = objects.find((item) => item.objectId === relationship.target?.objectId); if (target) void selectObject(target); }}>View here</button>
+                            <Link href={relationship.target.route}>Open module</Link>
+                          </>}
+                          {canManage && <button className={styles.quietButton} type="button" onClick={() => { setConnectionEditId(editingConnection ? null : relationship.id); setConnectionEditKind(relationship.relationship); setConnectionEditReason(""); }}>Manage</button>}
+                        </div>
+                      </article>;
+                    })}
+                  </div> : <p className={styles.connectionEmpty}>No connected records yet. Use search below when this work depends on something stored elsewhere.</p>}
+                </section>}
+
+                {selectedCanonical && (showRecordPicker || supportsLifecycle || selectedCanonical.module === "finance") && <section className={styles.ownerActions} aria-label="Record actions">
                   <div><span className={styles.recordType}>Works offline</span><h3>Record actions</h3><p>These are saved here first, then applied once to the same record in its full module.</p></div>
 
-                  {supportsRelationship && <div className={styles.actionGroup}>
-                    <strong>Connect another record</strong>
-                    <div className={styles.actionRow}>
-                      <select aria-label="Record to connect" value={relationshipTargetId} onChange={(event) => setRelationshipTargetId(event.target.value)}><option value="">Choose a record</option>{relationshipTargets.map((item) => <option value={item.canonicalId} key={item.canonicalId}>{item.label} · {item.kind}</option>)}</select>
-                      <button disabled={busy || !relationshipTargetId} onClick={queueRelationship}>Connect</button>
+                  {showRecordPicker && <div className={styles.actionGroup}>
+                    <strong>{supportsRelationship ? "Search and connect" : "Find supporting evidence"}</strong>
+                    <p>Search the records already stored on this device. Connecting them creates a pointer, not another copy.</p>
+                    <label>Find a record<input type="search" value={relationshipQuery} onChange={(event) => setRelationshipQuery(event.target.value)} placeholder="Search notes, people, projects, resources..." /></label>
+                    <div className={styles.relationshipResults} role="listbox" aria-label="Records you can connect">
+                      {relationshipTargets.map((item) => <button
+                        className={styles.relationshipResult}
+                        type="button"
+                        role="option"
+                        aria-selected={relationshipTargetId === item.canonicalId}
+                        key={item.canonicalId}
+                        onClick={() => setRelationshipTargetId(item.canonicalId)}
+                      ><strong>{item.label}</strong><span>{item.moduleLabel} / {recordKindLabel(item.kind)}</span></button>)}
+                      {!relationshipTargets.length && <span className={styles.relationshipEmpty}>No matching records are stored on this device.</span>}
                     </div>
+                    {relationshipTarget && <div className={styles.selectedRelationship}><span>Selected</span><strong>{relationshipTarget.label}</strong><button className={styles.quietButton} type="button" onClick={() => setRelationshipTargetId("")}>Clear</button></div>}
+                    {supportsRelationship && relationshipKindOptions.length > 1 && <label>How are they connected?<select value={relationshipKind} onChange={(event) => setRelationshipKind(event.target.value)}>{relationshipKindOptions.map((kind) => <option value={kind} key={kind}>{relationshipLabel(kind)}</option>)}</select></label>}
+                    {supportsRelationship && <button disabled={busy || !relationshipTargetId} onClick={queueRelationship}>Connect records</button>}
                   </div>}
 
                   {selectedCanonical.module === "finance" && <div className={styles.actionGroup}>
                     <strong>Finance action</strong>
                     {selectedCanonical.collection === "transactions" && selectedObject?.fields.reviewed !== true && <button disabled={busy} onClick={() => void queueFinanceAction("review_transaction", {}, "Transaction marked reviewed.")}>Mark reviewed</button>}
                     {selectedCanonical.collection === "bills" && selectedObject?.fields.status !== "paid" && <>
-                      <select aria-label="Payment evidence" value={relationshipTargetId} onChange={(event) => setRelationshipTargetId(event.target.value)}><option value="">Evidence record (optional with a note)</option>{relationshipTargets.map((item) => <option value={item.canonicalId} key={item.canonicalId}>{item.label} · {item.kind}</option>)}</select>
+                      {relationshipTarget && <small>Evidence: {relationshipTarget.label}</small>}
                       <label>Evidence note or exception reason<textarea rows={3} value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="For example: receipt filed in paper records" /></label>
                       <button disabled={busy || (!relationshipTargetId && !actionReason.trim())} onClick={() => void queueFinanceAction("mark_paid", { ...(relationshipTargetId ? { evidenceCanonicalId: relationshipTargetId } : {}), ...(actionReason.trim() ? { exceptionReason: actionReason.trim() } : {}) }, "Bill marked paid in the ledger. No payment was sent.")}>Mark paid in ledger</button>
                     </>}
                     {selectedCanonical.collection === "closePeriods" && nextOpenCloseCheck && <>
                       <label>Evidence note<textarea rows={3} value={actionReason} onChange={(event) => setActionReason(event.target.value)} placeholder="What confirms this check is complete?" /></label>
-                      <button disabled={busy || !actionReason.trim()} onClick={() => void queueFinanceAction("resolve_close_check", { checkId: String(nextOpenCloseCheck.id || ""), resolution: "complete", reason: actionReason.trim() }, "Completed " + String(nextOpenCloseCheck.label || "next close check") + ".")}>Complete next check</button>
+                      <button disabled={busy || !actionReason.trim()} onClick={() => void queueFinanceAction("resolve_close_check", { checkId: String(nextOpenCloseCheck.id || ""), resolution: "complete", reason: actionReason.trim(), ...(relationshipTargetId ? { evidenceCanonicalId: relationshipTargetId } : {}) }, "Completed " + String(nextOpenCloseCheck.label || "next close check") + ".")}>Complete next check</button>
                     </>}
                     {selectedCanonical.collection === "closePeriods" && !nextOpenCloseCheck && selectedObject?.fields.status !== "closed" && <button disabled={busy} onClick={() => void queueFinanceAction("complete_close", {}, "Finance close completed.")}>Complete close</button>}
                     {selectedCanonical.collection === "closePeriods" && selectedObject?.fields.status === "closed" && <><label>Reason to reopen<textarea rows={3} value={actionReason} onChange={(event) => setActionReason(event.target.value)} /></label><button disabled={busy || !actionReason.trim()} onClick={() => void queueFinanceAction("reopen_close", { reason: actionReason.trim() }, "Finance close reopened.")}>Reopen close</button></>}

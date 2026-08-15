@@ -105,6 +105,7 @@ type ContactProfileDraft = {
   context: string;
   birthday: string;
   phoneNumber: string;
+  phoneCountryCode: string;
   primaryEmail: string;
   workEmail: string;
   universityEmail: string;
@@ -126,6 +127,9 @@ type ContactProfileDraft = {
   notes: string;
   linkedin: string;
   website: string;
+  instagram: string;
+  tiktok: string;
+  x: string;
   partner: string;
   children: string;
   interactions: string;
@@ -168,6 +172,29 @@ const GROUP_OPTIONS = [
   "University",
   "Partner",
   "Client"
+];
+
+const COMMON_LOCATIONS = [
+  "Columbus, Ohio, USA",
+  "Cincinnati, Ohio, USA",
+  "Cleveland, Ohio, USA",
+  "Dayton, Ohio, USA",
+  "New York, New York, USA",
+  "Los Angeles, California, USA",
+  "Chicago, Illinois, USA",
+  "Houston, Texas, USA",
+  "Philadelphia, Pennsylvania, USA",
+  "Phoenix, Arizona, USA",
+  "San Antonio, Texas, USA",
+  "San Diego, California, USA",
+  "Dallas, Texas, USA",
+  "Austin, Texas, USA",
+  "San Francisco, California, USA",
+  "Seattle, Washington, USA",
+  "Boston, Massachusetts, USA",
+  "Washington, District of Columbia, USA",
+  "Atlanta, Georgia, USA",
+  "Miami, Florida, USA"
 ];
 
 const CADENCE_OPTIONS = [
@@ -270,11 +297,15 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
     tone: "blue",
     fields: [
       { key: "phoneNumber", label: "Phone number", type: "tel" },
+      { key: "phoneCountryCode", label: "Default country code", placeholder: "+1" },
       { key: "primaryEmail", label: "Primary email", type: "email" },
       { key: "workEmail", label: "Work email", type: "email" },
       { key: "universityEmail", label: "University email", type: "email" },
       { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/in/..." },
-      { key: "website", label: "Website", type: "url", placeholder: "https://..." }
+      { key: "website", label: "Website", type: "url", placeholder: "https://..." },
+      { key: "instagram", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
+      { key: "tiktok", label: "TikTok", type: "url", placeholder: "https://tiktok.com/@..." },
+      { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." }
     ]
   },
   {
@@ -332,6 +363,7 @@ const EMPTY_PROFILE_DRAFT: ContactProfileDraft = {
   context: "",
   birthday: "",
   phoneNumber: "",
+  phoneCountryCode: "+1",
   primaryEmail: "",
   workEmail: "",
   universityEmail: "",
@@ -353,6 +385,9 @@ const EMPTY_PROFILE_DRAFT: ContactProfileDraft = {
   notes: "",
   linkedin: "",
   website: "",
+  instagram: "",
+  tiktok: "",
+  x: "",
   partner: "",
   children: "",
   interactions: "",
@@ -382,6 +417,37 @@ function formatDate(value?: string) {
     month: "short",
     day: "numeric"
   }).format(date);
+}
+
+function normalizedCountryCode(value: string): string {
+  const digits = value.replace(/\D/g, "").slice(0, 4);
+  return digits ? `+${digits}` : "+1";
+}
+
+function normalizePhoneForStorage(value: string, countryCode = "+1"): string {
+  const clean = value.trim();
+  if (!clean) return "";
+  const digits = clean.replace(/\D/g, "");
+  if (!digits) return "";
+  if (clean.startsWith("+")) return `+${digits}`;
+  const code = normalizedCountryCode(countryCode).replace(/\D/g, "");
+  if (digits.length === 10) return `+${code}${digits}`;
+  if (code === "1" && digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
+  return `+${code}${digits}`;
+}
+
+function formatPhone(value: string, countryCode = "+1"): string {
+  const canonical = normalizePhoneForStorage(value, countryCode);
+  const digits = canonical.replace(/\D/g, "");
+  if (digits.length === 11 && digits.startsWith("1")) {
+    return `+1 ${digits.slice(1, 4)}-${digits.slice(4, 7)}-${digits.slice(7)}`;
+  }
+  const codeDigits = normalizedCountryCode(countryCode).replace(/\D/g, "");
+  if (digits.startsWith(codeDigits) && digits.length > codeDigits.length) {
+    const local = digits.slice(codeDigits.length);
+    return `+${codeDigits} ${local.replace(/(\d{3})(?=\d)/g, "$1 ").trim()}`;
+  }
+  return canonical;
 }
 
 function formatFullDate(value?: string) {
@@ -508,6 +574,7 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     context: profile?.context || record.body || "",
     birthday: profile?.birthday || "",
     phoneNumber: profile?.phoneNumber || "",
+    phoneCountryCode: profile?.phoneCountryCode || "+1",
     primaryEmail: profile?.primaryEmail || "",
     workEmail: profile?.workEmail || "",
     universityEmail: profile?.universityEmail || "",
@@ -529,6 +596,9 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     notes: profile?.notes || "",
     linkedin: profile?.linkedin || "",
     website: profile?.website || record.url || "",
+    instagram: profile?.instagram || "",
+    tiktok: profile?.tiktok || "",
+    x: profile?.x || "",
     partner: profile?.partner || "",
     children: joinList(profile?.children),
     interactions: joinTextEntries(profile?.interactions),
@@ -539,6 +609,8 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
 function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile {
   return {
     ...draft,
+    phoneCountryCode: normalizedCountryCode(draft.phoneCountryCode),
+    phoneNumber: normalizePhoneForStorage(draft.phoneNumber, draft.phoneCountryCode),
     associatedPeople: splitList(draft.associatedPeople),
     children: splitList(draft.children),
     interactions: splitTextEntries(draft.interactions),
@@ -759,11 +831,12 @@ export default function PeopleWorkspace({
   const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(() => new Set());
   const [name, setName] = useState("");
   const [className, setClassName] = useState<Extract<PersonalRecordClass, "person" | "org">>("person");
-  const [group, setGroup] = useState("Collaborator");
+  const [groups, setGroups] = useState<string[]>(["Collaborator"]);
   const [status, setStatus] = useState<PersonalRecordStatus>("active");
   const [quickContext, setQuickContext] = useState("");
   const [quickEmail, setQuickEmail] = useState("");
   const [quickPhone, setQuickPhone] = useState("");
+  const [quickPhoneCountryCode, setQuickPhoneCountryCode] = useState("+1");
   const [quickLocation, setQuickLocation] = useState("");
   const [quickOccupation, setQuickOccupation] = useState("");
   const [quickEmployer, setQuickEmployer] = useState("");
@@ -772,7 +845,12 @@ export default function PeopleWorkspace({
   const [nextContact, setNextContact] = useState("");
   const [cadence, setCadence] = useState("P1M");
   const [referenceUrl, setReferenceUrl] = useState("");
+  const [quickInstagram, setQuickInstagram] = useState("");
+  const [quickTikTok, setQuickTikTok] = useState("");
+  const [quickX, setQuickX] = useState("");
+  const [quickLinkedIn, setQuickLinkedIn] = useState("");
   const [profileDraft, setProfileDraft] = useState<ContactProfileDraft>({ ...EMPTY_PROFILE_DRAFT });
+  const [profileGroups, setProfileGroups] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [error, setError] = useState("");
@@ -976,11 +1054,17 @@ export default function PeopleWorkspace({
     return sortPeople(matches, sortMode);
   }, [activeFilter, activeSidebarView, people, query, sortMode, starredIds]);
 
+  const locationSuggestions = useMemo(() => Array.from(new Set([
+    ...people.map((record) => record.profile?.livesIn || "").filter(Boolean),
+    ...COMMON_LOCATIONS
+  ])).sort((left, right) => left.localeCompare(right)), [people]);
+
   const selectedPerson = useMemo(() => {
     return people.find((record) => record.id === selectedId) || visiblePeople[0];
   }, [people, selectedId, visiblePeople]);
   useEffect(() => {
     setProfileDraft(getProfile(selectedPerson));
+    setProfileGroups(selectedPerson?.subjects || []);
   }, [selectedPerson?.id]);
 
   const stats = useMemo(() => {
@@ -1023,8 +1107,7 @@ export default function PeopleWorkspace({
   const shellClassName = [
     "people-redesign-shell",
     filteringActive ? "is-filtering" : "",
-    `is-mobile-${mobileSurface}`,
-    detailMode !== "profile" ? `is-mode-${detailMode}` : ""
+    `is-mobile-${mobileSurface}`
   ].filter(Boolean).join(" ");
   const activeSidebarItem = PEOPLE_SIDEBAR_SECTIONS.flatMap((section) => section.items).find((item) => item.id === activeSidebarView);
   const activeViewLabel = activeSidebarItem?.label || "All People";
@@ -1051,7 +1134,7 @@ export default function PeopleWorkspace({
     ...selectedMemories
   ].slice(0, 5);
   const selectedTags = [
-    fallbackPerson ? getPrimaryGroup(fallbackPerson) : "",
+    ...(fallbackPerson?.subjects || []).slice(0, 3),
     ...(selectedPerson?.projects || []).slice(0, 2),
     getPriorityLabel(selectedPerson)
   ].filter(Boolean);
@@ -1066,14 +1149,23 @@ export default function PeopleWorkspace({
     quickProjects,
     lastContact,
     nextContact,
-    referenceUrl
+    referenceUrl,
+    quickInstagram,
+    quickTikTok,
+    quickX,
+    quickLinkedIn
   ].some((value) => value.trim().length > 0)
     || className !== "person"
-    || group !== "Collaborator"
+    || groups.length !== 1
+    || groups[0] !== "Collaborator"
+    || quickPhoneCountryCode !== "+1"
     || status !== "active"
     || cadence !== "P1M";
   const profileFormDirty = Boolean(
-    selectedPerson && JSON.stringify(profileDraft) !== JSON.stringify(getProfile(selectedPerson))
+    selectedPerson && (
+      JSON.stringify(profileDraft) !== JSON.stringify(getProfile(selectedPerson))
+      || JSON.stringify(profileGroups) !== JSON.stringify(selectedPerson.subjects)
+    )
   );
   const editorDirty = addingPerson ? addFormDirty : detailMode === "edit" && profileFormDirty;
 
@@ -1285,10 +1377,12 @@ export default function PeopleWorkspace({
     if (!selectedPerson) return false;
     const profile = buildProfilePayload(nextDraft);
     const previousProfileSources = new Set(
-      [selectedProfile.website, selectedProfile.linkedin].filter((value): value is string => Boolean(value))
+      [selectedProfile.website, selectedProfile.linkedin, selectedProfile.instagram, selectedProfile.tiktok, selectedProfile.x]
+        .filter((value): value is string => Boolean(value))
     );
     const preservedSources = selectedPerson.externalSources.filter((source) => !previousProfileSources.has(source));
-    const profileSources = [profile.website, profile.linkedin].filter((value): value is string => Boolean(value));
+    const profileSources = [profile.website, profile.linkedin, profile.instagram, profile.tiktok, profile.x]
+      .filter((value): value is string => Boolean(value));
     return patchPerson(selectedPerson.id, {
       title: profile.fullName || selectedPerson.title,
       body: profile.context,
@@ -1299,6 +1393,7 @@ export default function PeopleWorkspace({
         nextReview: profile.nextContact || undefined,
         reviewCadence: profile.contactCadence || undefined
       },
+      subjects: profileGroups,
       profile
     });
   }
@@ -1397,7 +1492,8 @@ export default function PeopleWorkspace({
       ...EMPTY_PROFILE_DRAFT,
       fullName: name,
       context: quickContext,
-      phoneNumber: quickPhone,
+      phoneNumber: normalizePhoneForStorage(quickPhone, quickPhoneCountryCode),
+      phoneCountryCode: normalizedCountryCode(quickPhoneCountryCode),
       primaryEmail: quickEmail,
       primaryOccupation: quickOccupation,
       primaryEmployer: quickEmployer,
@@ -1405,7 +1501,11 @@ export default function PeopleWorkspace({
       lastContact,
       nextContact,
       contactCadence: cadence,
-      website: referenceUrl
+      website: referenceUrl,
+      instagram: quickInstagram,
+      tiktok: quickTikTok,
+      x: quickX,
+      linkedin: quickLinkedIn
     });
 
     const legacyInput = peopleCreateInputToLegacy({
@@ -1420,9 +1520,9 @@ export default function PeopleWorkspace({
         nextReview: nextContact
       },
       areas: ["Relationships"],
-      subjects: [group],
+      subjects: groups,
       projects: splitList(quickProjects),
-      externalSources: referenceUrl ? [referenceUrl] : [],
+      externalSources: [referenceUrl, quickInstagram, quickTikTok, quickX, quickLinkedIn].filter(Boolean),
       sourceUrl: referenceUrl
     });
 
@@ -1452,11 +1552,12 @@ export default function PeopleWorkspace({
       setActiveView("overview");
       setName("");
       setClassName("person");
-      setGroup("Collaborator");
+      setGroups(["Collaborator"]);
       setStatus("active");
       setQuickContext("");
       setQuickEmail("");
       setQuickPhone("");
+      setQuickPhoneCountryCode("+1");
       setQuickLocation("");
       setQuickOccupation("");
       setQuickEmployer("");
@@ -1465,6 +1566,10 @@ export default function PeopleWorkspace({
       setNextContact("");
       setCadence("P1M");
       setReferenceUrl("");
+      setQuickInstagram("");
+      setQuickTikTok("");
+      setQuickX("");
+      setQuickLinkedIn("");
       if (createdPerson) {
         await mirrorPersonalRecord(createdPerson);
         await releaseDirtyHistoryGuard();
@@ -1486,6 +1591,7 @@ export default function PeopleWorkspace({
       body?: string;
       url?: string;
       projects?: string[];
+      subjects?: string[];
       externalSources?: string[];
       time?: {
         lastReview?: string;
@@ -1502,6 +1608,7 @@ export default function PeopleWorkspace({
       context: patch.body,
       sourceUrl: patch.url,
       projects: patch.projects,
+      subjects: patch.subjects,
       externalSources: patch.externalSources,
       time: patch.time,
       profile: patch.profile,
@@ -1527,7 +1634,10 @@ export default function PeopleWorkspace({
       if (updatedPerson) await mirrorPersonalRecord(updatedPerson);
       setPeople(nextPeople);
       setSelectedId(id);
-      if (updatedPerson) setProfileDraft(getProfile(updatedPerson));
+      if (updatedPerson) {
+        setProfileDraft(getProfile(updatedPerson));
+        setProfileGroups(updatedPerson.subjects);
+      }
       return true;
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to reach the People store. Your draft is still here.");
@@ -1610,6 +1720,7 @@ export default function PeopleWorkspace({
       return;
     }
     setProfileDraft(getProfile(selectedPerson));
+    setProfileGroups(selectedPerson.subjects);
     setDetailMode("profile");
     setActiveView(editorReturnView);
     router.replace(destination || `${getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id })}?tab=${editorReturnView}`);
@@ -1625,6 +1736,18 @@ export default function PeopleWorkspace({
 
   function updateProfileDraft(key: keyof ContactProfileDraft, value: string) {
     setProfileDraft((current) => ({ ...current, [key]: value }));
+  }
+
+  function toggleGroup(option: string) {
+    setGroups((current) => current.includes(option)
+      ? current.filter((item) => item !== option)
+      : [...current, option]);
+  }
+
+  function toggleProfileGroup(option: string) {
+    setProfileGroups((current) => current.includes(option)
+      ? current.filter((item) => item !== option)
+      : [...current, option]);
   }
 
   function renderAddPersonForm(extraClass = "") {
@@ -1647,16 +1770,18 @@ export default function PeopleWorkspace({
               <option value="org">Organization</option>
             </select>
           </label>
-          <label>
-            Group
-            <select value={group} onChange={(event) => setGroup(event.target.value)}>
-              {GROUP_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
-            </select>
-          </label>
+          <fieldset className="people-group-picker">
+            <legend>Groups</legend>
+            <div>{GROUP_OPTIONS.map((option) => <label key={option}>
+              <input type="checkbox" checked={groups.includes(option)} onChange={() => toggleGroup(option)} />
+              <span>{option}</span>
+            </label>)}</div>
+            <small>Choose every group that fits.</small>
+          </fieldset>
         </div>
         <div className="people-capture-grid">
           <label>Primary email<input type="email" value={quickEmail} onChange={(event) => setQuickEmail(event.target.value)} /></label>
-          <label>Phone<input type="tel" value={quickPhone} onChange={(event) => setQuickPhone(event.target.value)} /></label>
+          <label>Phone<input type="tel" inputMode="tel" value={quickPhone} onChange={(event) => setQuickPhone(event.target.value)} onBlur={() => setQuickPhone(formatPhone(quickPhone, quickPhoneCountryCode))} placeholder="6147963848" /></label>
         </div>
         <div className="people-capture-grid">
           <label>Occupation<input value={quickOccupation} onChange={(event) => setQuickOccupation(event.target.value)} /></label>
@@ -1671,14 +1796,30 @@ export default function PeopleWorkspace({
           <label>Cadence<select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
         </div>
         <div className="people-capture-grid">
-          <label>Lives in<input value={quickLocation} onChange={(event) => setQuickLocation(event.target.value)} /></label>
+          <label>Lives in<input list="people-location-suggestions" value={quickLocation} onChange={(event) => setQuickLocation(event.target.value)} placeholder="Start typing a city" /></label>
           <label>Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} /></label>
         </div>
         <div className="people-capture-grid">
           <label>Last contact<input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} /></label>
           <label>Next contact<input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></label>
         </div>
-        <label>Website or profile<input value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
+        <fieldset className="people-social-fields">
+          <legend>Website & social profiles</legend>
+          <div className="people-capture-grid">
+            <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
+            <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(event.target.value)} placeholder="https://instagram.com/..." /></label>
+            <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(event.target.value)} placeholder="https://tiktok.com/@..." /></label>
+            <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(event.target.value)} placeholder="https://x.com/..." /></label>
+            <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(event.target.value)} placeholder="https://linkedin.com/in/..." /></label>
+          </div>
+        </fieldset>
+        <details className="people-advanced-properties">
+          <summary>Advanced properties</summary>
+          <label>Default phone country code<input inputMode="tel" value={quickPhoneCountryCode} onChange={(event) => setQuickPhoneCountryCode(normalizedCountryCode(event.target.value))} placeholder="+1" /></label>
+        </details>
+        <datalist id="people-location-suggestions">
+          {locationSuggestions.map((location) => <option value={location} key={location} />)}
+        </datalist>
         {error && <p className="personal-record-error">{error}</p>}
       </form>
     );
@@ -2061,6 +2202,14 @@ export default function PeopleWorkspace({
                     <strong>Edit Profile</strong>
                     <button type="submit" disabled={profileSaving}>{profileSaving ? "Saving..." : "Save"}</button>
                   </div>
+                  <fieldset className="people-group-picker people-profile-group-picker">
+                    <legend>Groups</legend>
+                    <div>{GROUP_OPTIONS.map((option) => <label key={option}>
+                      <input type="checkbox" checked={profileGroups.includes(option)} onChange={() => toggleProfileGroup(option)} />
+                      <span>{option}</span>
+                    </label>)}</div>
+                    <small>A person can belong to several groups without creating another contact.</small>
+                  </fieldset>
                   {PROFILE_SECTIONS.map((section) => (
                     <section className={`people-profile-section module-ref-tone-${section.tone}`} key={section.title}>
                       <h4>{section.title}</h4>
@@ -2078,8 +2227,12 @@ export default function PeopleWorkspace({
                             ) : (
                               <input
                                 type={field.type || "text"}
+                                list={field.key === "livesIn" ? "people-location-suggestions" : undefined}
                                 value={profileDraft[field.key]}
                                 onChange={(event) => updateProfileDraft(field.key, event.target.value)}
+                                onBlur={field.key === "phoneNumber"
+                                  ? () => updateProfileDraft("phoneNumber", formatPhone(profileDraft.phoneNumber, profileDraft.phoneCountryCode))
+                                  : undefined}
                                 placeholder={field.placeholder}
                               />
                             )}
@@ -2089,6 +2242,9 @@ export default function PeopleWorkspace({
                     </section>
                   ))}
                 </form>
+                <datalist id="people-location-suggestions">
+                  {locationSuggestions.map((location) => <option value={location} key={location} />)}
+                </datalist>
               </div>
             ) : detailMode === "timeline" ? (
               <section className="people-timeline-panel">
@@ -2371,8 +2527,11 @@ export default function PeopleWorkspace({
                   {[
                     ["Email", selectedProfile.primaryEmail || selectedProfile.workEmail],
                     ["Work", [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer].filter(Boolean).join(" at ")],
-                    ["Mobile", selectedProfile.phoneNumber],
+                    ["Mobile", formatPhone(selectedProfile.phoneNumber, selectedProfile.phoneCountryCode)],
                     ["LinkedIn", selectedProfile.linkedin],
+                    ["Instagram", selectedProfile.instagram],
+                    ["TikTok", selectedProfile.tiktok],
+                    ["X", selectedProfile.x],
                     ["Website", selectedProfile.website]
                   ].map(([label, value]) => (
                     <div className="people-info-row" key={label}>

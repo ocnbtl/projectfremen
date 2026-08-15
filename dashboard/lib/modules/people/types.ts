@@ -25,6 +25,7 @@ export type PeopleContactProfile = {
   context?: string;
   birthday?: string;
   phoneNumber?: string;
+  phoneCountryCode?: string;
   primaryEmail?: string;
   workEmail?: string;
   universityEmail?: string;
@@ -46,6 +47,9 @@ export type PeopleContactProfile = {
   notes?: string;
   linkedin?: string;
   website?: string;
+  instagram?: string;
+  tiktok?: string;
+  x?: string;
   partner?: string;
   children: string[];
   interactions: string[];

@@ -20,7 +20,7 @@ import {
 import type { PersonalOpsFamily, PersonalOpsSecondaryFamily } from "../modules/personal-ops/types";
 import { readReviewRun, updateReviewRun } from "../modules/reviews/store";
 import { readFinanceState, updateFinanceRecord } from "../modules/finance/store";
-import { createNoteLink } from "../modules/notes/links-store";
+import { createNoteLink, readNoteLink, updateNoteLink } from "../modules/notes/links-store";
 import { createNativeObjectRef } from "../native-objects/routes";
 import type { ModuleId, NativeObjectRef } from "../native-objects/types";
 
@@ -317,6 +317,42 @@ async function applyLinkAction(
   throw new Error("This record type does not have an owner-native relationship action in the Vault");
 }
 
+async function applyManageLinkAction(
+  module: CanonicalModule,
+  collection: string,
+  recordId: string,
+  current: Record<string, unknown>,
+  action: Extract<VaultCanonicalOwnerAction, { name: "manage_link" }>
+): Promise<Record<string, unknown>> {
+  if (module !== "personal-records" || collection !== "note") {
+    throw new Error("Link management is currently available for Notes-owned links");
+  }
+  const link = await readNoteLink(action.linkId);
+  if (!link || link.noteRef.objectId !== recordId) throw new Error("That Note link no longer belongs to this record");
+  if (action.action === "unlink") {
+    await updateNoteLink(link.id, {
+      action: "remove",
+      reason: requiredActionText(action.reason, "Unlink reason")
+    }, { expectedUpdatedAt: link.updatedAt, actorId: "admin" });
+    return current;
+  }
+  if (action.action === "relabel") {
+    await updateNoteLink(link.id, {
+      action: "change_relationship",
+      relationship: requiredActionText(action.relationship, "Relationship")
+    }, { expectedUpdatedAt: link.updatedAt, actorId: "admin" });
+    return current;
+  }
+  if (!action.target) throw new Error("Choose a replacement record before repairing this link");
+  const targetRef = await canonicalNativeRef(action.target.canonicalId);
+  await updateNoteLink(link.id, {
+    action: "repair",
+    targetRef,
+    reason: requiredActionText(action.reason, "Repair reason")
+  }, { expectedUpdatedAt: link.updatedAt, actorId: "admin" });
+  return current;
+}
+
 async function applyOwnerAction(
   command: VaultPendingCanonicalCommand,
   module: CanonicalModule,
@@ -328,6 +364,7 @@ async function applyOwnerAction(
   if (!action) throw new Error("The owner action is missing");
   if (action.name === "archive" || action.name === "restore") return applyLifecycleAction(command, module, collection, recordId, current, action);
   if (action.name === "link") return applyLinkAction(module, collection, recordId, current, action);
+  if (action.name === "manage_link") return applyManageLinkAction(module, collection, recordId, current, action);
   if (action.name === "finance_action") {
     if (module !== "finance" || !FINANCE_KIND[collection]) throw new Error("This action is not owned by Finance");
     if (!["review_transaction", "mark_paid", "resolve_close_check", "complete_close", "reopen_close", "test_rule"].includes(action.action)) {

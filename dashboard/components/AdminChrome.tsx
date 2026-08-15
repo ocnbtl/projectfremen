@@ -140,7 +140,6 @@ export default function AdminChrome({
   sidebarItems,
   sidebarActions,
   sidebarChildren,
-  showCommandSearch,
   showPageSidebar = true,
   showLocalAi = true
 }: AdminChromeProps) {
@@ -148,7 +147,7 @@ export default function AdminChrome({
 
   return (
     <>
-      <AppTopNav showCommandSearch={showCommandSearch} />
+      <AppTopNav showCommandSearch />
       <OfflineVaultBridge />
       {showPageSidebar && (
         <AdminPageSidebar
@@ -166,19 +165,24 @@ export default function AdminChrome({
         }
 
         .admin-command-search {
-          position: absolute;
-          top: calc(100% + 16px);
-          right: clamp(12px, 4vw, 44px);
+          position: static;
           display: flex;
           align-items: center;
           gap: 10px;
-          width: min(420px, calc(100vw - 360px));
-          min-height: 44px;
-          padding: 0 14px;
+          width: clamp(210px, 21vw, 300px);
+          min-height: 36px;
+          padding: 0 11px;
           border: 1px solid #bfd2db;
           border-radius: 8px;
-          background: rgba(255, 255, 255, 0.94);
-          box-shadow: 0 12px 26px rgba(16, 32, 38, 0.1);
+          background: rgba(255, 255, 255, 0.9);
+          box-shadow: none;
+        }
+
+        .app-top-nav__utilities {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          min-width: 0;
         }
 
         .admin-command-search span {

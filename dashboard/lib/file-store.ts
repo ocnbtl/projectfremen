@@ -2,7 +2,7 @@ import { constants as fsConstants } from "node:fs";
 import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-const STATIC_DATA_DIR = path.join(process.cwd(), "data");
+const STATIC_DATA_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), "data");
 const FALLBACK_DATA_DIR = path.join("/tmp", "project-fremen-data");
 const REQUIRE_PERSISTENT_DATA =
   process.env.FREMEN_REQUIRE_PERSISTENT_DATA?.trim().toLowerCase() === "true";
@@ -34,8 +34,8 @@ let supabaseConfigWarningShown = false;
 
 async function canWriteDirectory(dir: string): Promise<boolean> {
   try {
-    await mkdir(dir, { recursive: true });
-    await access(dir, fsConstants.W_OK);
+    await mkdir(/* turbopackIgnore: true */ dir, { recursive: true });
+    await access(/* turbopackIgnore: true */ dir, fsConstants.W_OK);
     return true;
   } catch {
     return false;
@@ -45,7 +45,7 @@ async function canWriteDirectory(dir: string): Promise<boolean> {
 async function resolveDataDirectory(): Promise<string> {
   const configured = process.env.FREMEN_DATA_DIR?.trim();
   if (configured) {
-    await mkdir(configured, { recursive: true });
+    await mkdir(/* turbopackIgnore: true */ configured, { recursive: true });
     return configured;
   }
 
@@ -66,7 +66,7 @@ async function resolveDataDirectory(): Promise<string> {
     );
   }
 
-  await mkdir(FALLBACK_DATA_DIR, { recursive: true });
+  await mkdir(/* turbopackIgnore: true */ FALLBACK_DATA_DIR, { recursive: true });
   return FALLBACK_DATA_DIR;
 }
 
@@ -124,7 +124,7 @@ async function withWriteLock<Result>(fileName: string, task: () => Promise<Resul
 
 async function tryReadJsonFile<T>(filePath: string): Promise<T | null> {
   try {
-    const raw = await readFile(filePath, "utf8");
+    const raw = await readFile(/* turbopackIgnore: true */ filePath, "utf8");
     return JSON.parse(raw) as T;
   } catch {
     return null;
@@ -243,14 +243,14 @@ async function readJsonFileUnlocked<T>(fileName: string, fallback: T): Promise<T
   if (supabase) {
     const value = await readJsonFromSupabase<T>(fileName, supabase);
     if (value !== null) return value;
-    return (await tryReadJsonFile<T>(path.join(STATIC_DATA_DIR, fileName))) ?? fallback;
+    return (await tryReadJsonFile<T>(path.join(/* turbopackIgnore: true */ process.cwd(), "data", fileName))) ?? fallback;
   }
 
   const dataDir = await getDataDirectory();
-  const preferredValue = await tryReadJsonFile<T>(path.join(dataDir, fileName));
+  const preferredValue = await tryReadJsonFile<T>(path.join(/* turbopackIgnore: true */ dataDir, fileName));
   if (preferredValue !== null) return preferredValue;
   if (dataDir !== STATIC_DATA_DIR) {
-    return (await tryReadJsonFile<T>(path.join(STATIC_DATA_DIR, fileName))) ?? fallback;
+    return (await tryReadJsonFile<T>(path.join(/* turbopackIgnore: true */ process.cwd(), "data", fileName))) ?? fallback;
   }
   return fallback;
 }
@@ -268,7 +268,7 @@ export async function readJsonFile<T>(fileName: string, fallback: T): Promise<T>
       return value;
     }
 
-    const staticPath = path.join(STATIC_DATA_DIR, fileName);
+    const staticPath = path.join(/* turbopackIgnore: true */ process.cwd(), "data", fileName);
     const staticValue = await tryReadJsonFile<T>(staticPath);
     if (staticValue !== null) {
       await writeJsonToSupabase(fileName, staticValue, supabase);
@@ -279,14 +279,14 @@ export async function readJsonFile<T>(fileName: string, fallback: T): Promise<T>
   }
 
   const dataDir = await getDataDirectory();
-  const preferredPath = path.join(dataDir, fileName);
+  const preferredPath = path.join(/* turbopackIgnore: true */ dataDir, fileName);
   const preferredValue = await tryReadJsonFile<T>(preferredPath);
   if (preferredValue !== null) {
     return preferredValue;
   }
 
   if (dataDir !== STATIC_DATA_DIR) {
-    const staticPath = path.join(STATIC_DATA_DIR, fileName);
+    const staticPath = path.join(/* turbopackIgnore: true */ process.cwd(), "data", fileName);
     const staticValue = await tryReadJsonFile<T>(staticPath);
     if (staticValue !== null) {
       try {
@@ -310,11 +310,11 @@ export async function writeJsonFile<T>(fileName: string, value: T): Promise<void
     }
 
     const dataDir = await getDataDirectory();
-    await mkdir(dataDir, { recursive: true });
-    const filePath = path.join(dataDir, fileName);
+    await mkdir(/* turbopackIgnore: true */ dataDir, { recursive: true });
+    const filePath = path.join(/* turbopackIgnore: true */ dataDir, fileName);
     const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    await writeFile(tmpPath, JSON.stringify(value, null, 2) + "\n", "utf8");
-    await rename(tmpPath, filePath);
+    await writeFile(/* turbopackIgnore: true */ tmpPath, JSON.stringify(value, null, 2) + "\n", "utf8");
+    await rename(/* turbopackIgnore: true */ tmpPath, filePath);
   });
 }
 
@@ -337,11 +337,11 @@ export async function mutateJsonFile<T, Result>(
       const outcome = await mutate(current);
       if (outcome.changed !== false) {
         const dataDir = await getDataDirectory();
-        await mkdir(dataDir, { recursive: true });
-        const filePath = path.join(dataDir, fileName);
+        await mkdir(/* turbopackIgnore: true */ dataDir, { recursive: true });
+        const filePath = path.join(/* turbopackIgnore: true */ dataDir, fileName);
         const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-        await writeFile(tmpPath, JSON.stringify(outcome.value, null, 2) + "\n", "utf8");
-        await rename(tmpPath, filePath);
+        await writeFile(/* turbopackIgnore: true */ tmpPath, JSON.stringify(outcome.value, null, 2) + "\n", "utf8");
+        await rename(/* turbopackIgnore: true */ tmpPath, filePath);
       }
       return outcome.result;
     }
@@ -349,7 +349,7 @@ export async function mutateJsonFile<T, Result>(
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       const record = await readJsonRecordFromSupabase<T>(fileName, supabase);
       const current = record?.value
-        ?? (await tryReadJsonFile<T>(path.join(STATIC_DATA_DIR, fileName)))
+        ?? (await tryReadJsonFile<T>(path.join(/* turbopackIgnore: true */ process.cwd(), "data", fileName)))
         ?? fallback;
       const outcome = await mutate(current);
       if (outcome.changed === false) return outcome.result;
@@ -370,5 +370,5 @@ export async function isEphemeralDataDirActive(): Promise<boolean> {
     return false;
   }
   const dataDir = await getDataDirectory();
-  return path.resolve(dataDir).startsWith(path.resolve(FALLBACK_DATA_DIR));
+  return path.resolve(/* turbopackIgnore: true */ dataDir).startsWith(path.resolve(/* turbopackIgnore: true */ FALLBACK_DATA_DIR));
 }
