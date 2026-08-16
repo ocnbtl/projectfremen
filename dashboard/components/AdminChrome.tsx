@@ -140,6 +140,7 @@ export default function AdminChrome({
   sidebarItems,
   sidebarActions,
   sidebarChildren,
+  showCommandSearch = true,
   showPageSidebar = true,
   showLocalAi = true
 }: AdminChromeProps) {
@@ -147,7 +148,7 @@ export default function AdminChrome({
 
   return (
     <>
-      <AppTopNav showCommandSearch />
+      <AppTopNav showCommandSearch={showCommandSearch} />
       <OfflineVaultBridge />
       {showPageSidebar && (
         <AdminPageSidebar
@@ -160,16 +161,12 @@ export default function AdminChrome({
         </AdminPageSidebar>
       )}
       <style>{`
-        .admin-global-topnav {
-          width: min(1220px, calc(100vw - 32px));
-        }
-
         .admin-command-search {
           position: static;
           display: flex;
           align-items: center;
           gap: 10px;
-          width: clamp(210px, 21vw, 300px);
+          width: clamp(220px, 20vw, 300px);
           min-height: 36px;
           padding: 0 11px;
           border: 1px solid #bfd2db;
@@ -214,7 +211,7 @@ export default function AdminChrome({
         }
 
         .admin-chrome-main {
-          padding-top: 132px !important;
+          padding-top: var(--app-content-offset) !important;
         }
 
         .people-module-shell.admin-chrome-main {
@@ -223,7 +220,7 @@ export default function AdminChrome({
           min-height: 100dvh;
           margin-left: calc(50% - 50vw);
           margin-right: calc(50% - 50vw);
-          padding: 56px 0 0 !important;
+          padding: var(--app-content-offset) 0 0 !important;
           overflow: hidden;
         }
 
@@ -233,7 +230,7 @@ export default function AdminChrome({
           min-height: 100dvh;
           margin-left: calc(50% - 50vw);
           margin-right: calc(50% - 50vw);
-          padding: 68px 0 0 !important;
+          padding: var(--app-content-offset) 0 0 !important;
           overflow: hidden;
         }
 
@@ -357,31 +354,22 @@ export default function AdminChrome({
           align-items: start;
         }
 
-        @media (max-width: 900px) {
-          .admin-global-topnav {
-            align-items: flex-start;
-            border-radius: 24px;
-          }
-
-          .admin-global-links {
-            overflow-x: auto;
-          }
-
+        @media (max-width: 1399px) {
           .admin-command-search {
             display: none;
           }
 
           .admin-chrome-main {
-            padding-top: 88px !important;
+            padding-top: var(--app-content-offset) !important;
           }
 
           .people-module-shell.admin-chrome-main {
-            padding-top: 72px !important;
+            padding-top: var(--app-content-offset) !important;
             overflow: visible;
           }
 
           .native-module-shell.admin-chrome-main {
-            padding-top: 68px !important;
+            padding-top: var(--app-content-offset) !important;
             overflow: hidden;
           }
 

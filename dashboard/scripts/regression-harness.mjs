@@ -1053,13 +1053,19 @@ async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
         const actionBar = document.querySelector(".finance-native-action-bar");
         const dock = document.querySelector('[aria-label="Open AI assistant"]');
         const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        const dockRect = dock instanceof HTMLElement ? dock.getBoundingClientRect() : null;
+        const dataCells = Array.from(document.querySelectorAll("[data-finance-transaction-id] strong, [data-finance-transaction-id] span"))
+          .filter((element) => element instanceof HTMLElement && window.getComputedStyle(element).display !== "none")
+          .map((element) => element.getBoundingClientRect());
         return {
           overflow: document.documentElement.scrollWidth > window.innerWidth,
-          dockOverlap: actionBar instanceof HTMLElement && dock instanceof HTMLElement ? intersects(actionBar.getBoundingClientRect(), dock.getBoundingClientRect()) : false
+          dockOverlap: actionBar instanceof HTMLElement && dockRect ? intersects(actionBar.getBoundingClientRect(), dockRect) : false,
+          dockDataOverlap: Boolean(dockRect && dataCells.some((rect) => intersects(rect, dockRect)))
         };
       });
       assert(!diagnostics.overflow, `Finance ${viewport.label} has horizontal overflow`);
       assert(!diagnostics.dockOverlap, `Finance ${viewport.label} action bar overlaps the AI dock`);
+      assert(!diagnostics.dockDataOverlap, `Finance ${viewport.label} ledger data overlaps the AI dock`);
       await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}-transactions.png`), fullPage: true });
       if (viewport.width === 390) {
         const undersized = await page.locator("button:visible, a[href]:visible, input:visible, select:visible").evaluateAll((elements) => elements.map((element) => {
@@ -1145,6 +1151,7 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
       await page.getByRole("heading", { level: 1, name: "What needs attention" }).waitFor();
       const command = page.locator(".command-center-grid");
       await command.waitFor();
+      assert(await page.locator('[aria-label="Open AI assistant"]').count() === 0, `Command Center ${viewport.label} reintroduced the floating AI control`);
       const text = await command.innerText();
       assert(text.includes(`${accounts} accounts · ${pending} pending`), `Command Center ${viewport.label} did not derive the current Finance module count`);
       assert(text.toLowerCase().includes("attention horizon") && text.toLowerCase().includes("live worklist"), `Command Center ${viewport.label} omitted the detailed attention horizon`);
@@ -1155,15 +1162,53 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
       }
       const diagnostics = await page.evaluate(() => {
         const commandElement = document.querySelector(".command-center-grid");
+        const topNav = document.querySelector(".admin-global-topnav");
+        const brand = document.querySelector(".app-top-nav__brand");
+        const desktopLinks = document.querySelector(".app-top-nav__links");
+        const mobileNavigation = document.querySelector(".app-top-nav__mobile-navigation");
+        const utilities = document.querySelector(".app-top-nav__utilities");
         const dock = document.querySelector('[aria-label="Open AI assistant"]');
         const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
+        const visibleRect = (element) => element instanceof HTMLElement && window.getComputedStyle(element).display !== "none"
+          ? element.getBoundingClientRect()
+          : null;
+        const commandRect = visibleRect(commandElement);
+        const topNavRect = visibleRect(topNav);
+        const brandRect = visibleRect(brand);
+        const desktopLinksRect = visibleRect(desktopLinks);
+        const mobileNavigationRect = visibleRect(mobileNavigation);
+        const utilitiesRect = visibleRect(utilities);
+        const centerRect = desktopLinksRect || mobileNavigationRect;
+        const dockRect = visibleRect(dock);
+        const protectedActions = commandElement instanceof HTMLElement
+          ? Array.from(commandElement.querySelectorAll("a[href], button")).map((element) => ({
+              label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 45) || "unlabeled action",
+              rect: visibleRect(element)
+            })).filter((item) => item.rect)
+          : [];
+        const dockOverlapActions = dockRect
+          ? protectedActions.filter((item) => intersects(item.rect, dockRect)).map((item) => item.label)
+          : [];
         return {
           overflow: document.documentElement.scrollWidth > window.innerWidth,
-          dockOverlap: commandElement instanceof HTMLElement && dock instanceof HTMLElement ? intersects(commandElement.getBoundingClientRect(), dock.getBoundingClientRect()) : false
+          dockOverlapActions,
+          headerOverlapsContent: Boolean(topNavRect && commandRect && intersects(topNavRect, commandRect)),
+          headerChildrenOverlap: Boolean(
+            brandRect && centerRect && intersects(brandRect, centerRect)
+            || centerRect && utilitiesRect && intersects(centerRect, utilitiesRect)
+            || brandRect && utilitiesRect && intersects(brandRect, utilitiesRect)
+          ),
+          headerOutsideViewport: Boolean(topNavRect && (topNavRect.left < 0 || topNavRect.right > window.innerWidth)),
+          commandWidthRatio: commandRect ? commandRect.width / window.innerWidth : 0
         };
       });
+      await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}.png`), fullPage: true });
       assert(!diagnostics.overflow, `Command Center ${viewport.label} has horizontal overflow`);
-      assert(!diagnostics.dockOverlap, `Command Center ${viewport.label} is obscured by the AI launcher`);
+      assert(diagnostics.dockOverlapActions.length === 0, `Command Center ${viewport.label} has actions obscured by the AI launcher: ${JSON.stringify(diagnostics)}`);
+      assert(!diagnostics.headerOverlapsContent, `Command Center ${viewport.label} header overlaps page content`);
+      assert(!diagnostics.headerChildrenOverlap, `Command Center ${viewport.label} header controls overlap one another`);
+      assert(!diagnostics.headerOutsideViewport, `Command Center ${viewport.label} header extends outside the viewport`);
+      assert(diagnostics.commandWidthRatio >= (viewport.width <= 390 ? 0.84 : 0.9), `Command Center ${viewport.label} leaves excessive unused page width: ${JSON.stringify(diagnostics)}`);
       if (viewport.width === 390) {
         const undersized = await command.locator("button:visible, a[href]:visible").evaluateAll((elements) => elements.map((element) => {
           const rect = element.getBoundingClientRect();
@@ -1171,7 +1216,6 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
         }).filter((item) => item.width > 0 && item.height > 0 && (item.width < 44 || item.height < 44)));
         assert(undersized.length === 0, `Command Center mobile targets below 44px: ${JSON.stringify(undersized)}`);
       }
-      await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}.png`), fullPage: true });
       await context.close();
     }
   } finally {
@@ -9558,7 +9602,7 @@ async function main() {
     logStep("Checking protected pages and locked navigation");
     const adminHome = await requestText(server.baseUrl, cookieJar, `/admin?run=${encodeURIComponent(testRunId)}`);
     assert(adminHome.response.ok, `Admin home failed: ${describeStatus(adminHome.response)}`);
-    for (const expected of ["Projects", "Blacktube", "Fremen", "Iceflake", "Pacific", "Pint", "Notes", "People", "Media", "Resources", "Finance", "Current Goals", "Weekly", "Monthly", "AI"]) {
+    for (const expected of ["Projects", "Blacktube", "Fremen", "Iceflake", "Pacific", "Pint", "Notes", "People", "Media", "Resources", "Finance", "Current Goals", "Weekly", "Monthly"]) {
       assert(adminHome.body.includes(expected), `Admin home missing expected text: ${expected}`);
     }
     assert(adminHome.body.includes("Personal Ops"), "Admin home missing Personal Ops entry point");

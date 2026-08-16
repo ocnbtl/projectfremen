@@ -26,6 +26,9 @@
   --accent-blue: #0d2d42;
   --accent-green: #174d36;
   --accent-brown: #4d342a;
+  --app-header-height: 60px;
+  --app-content-offset: 76px;
+  --app-page-gutter: clamp(16px, 2.2vw, 32px);
 }
 
 * {
@@ -91,10 +94,11 @@ a {
   top: 12px;
   left: 50%;
   z-index: 80;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   justify-content: space-between;
-  width: min(980px, calc(100vw - 32px));
+  width: min(1680px, calc(100vw - 32px));
   min-height: 48px;
   padding: 6px 8px 6px 10px;
   border: 1px solid rgba(191, 210, 219, 0.78);
@@ -135,7 +139,7 @@ a {
 .admin-global-links {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  justify-content: center;
   gap: 4px;
   min-width: 0;
 }
@@ -684,7 +688,7 @@ a {
 }
 
 .admin-chrome-main {
-  padding-top: 76px !important;
+  padding-top: var(--app-content-offset) !important;
 }
 
 @media (min-width: 1180px) {
@@ -3129,11 +3133,9 @@ select {
   opacity: 0.5;
 }
 
-@media (max-width: 860px) {
+@media (max-width: 1399px) {
   .admin-global-topnav {
-    top: 8px;
-    width: calc(100vw - 16px);
-    border-radius: 18px;
+    grid-template-columns: auto minmax(180px, 1fr) auto;
   }
 
   .admin-global-brand {
@@ -3145,10 +3147,6 @@ select {
   .personal-preview-toggle {
     min-width: 44px;
     min-height: 44px;
-  }
-
-  .admin-global-brand strong {
-    display: none;
   }
 
   .app-top-nav__links {
@@ -3188,7 +3186,7 @@ select {
   }
 
   .admin-chrome-main {
-    padding-top: 132px !important;
+    padding-top: var(--app-content-offset) !important;
   }
 
   .local-ai-widget {
@@ -3303,6 +3301,33 @@ select {
 
   .review-editor-actions {
     justify-content: flex-start;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --app-content-offset: 72px;
+  }
+
+  .admin-global-topnav {
+    top: 8px;
+    grid-template-columns: auto minmax(120px, 1fr) auto;
+    width: calc(100vw - 16px);
+    border-radius: 18px;
+  }
+
+  .admin-global-brand strong {
+    display: none;
+  }
+}
+
+@media (max-width: 460px) {
+  .admin-global-topnav {
+    grid-template-columns: 44px minmax(0, 1fr) 44px;
+  }
+
+  .personal-preview-toggle > span:last-child {
+    display: none;
   }
 }
 

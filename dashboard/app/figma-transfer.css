@@ -7303,3 +7303,493 @@ html[data-admin-preview="mobile"] .command-horizon-group > header { grid-templat
 html[data-admin-preview="mobile"] .command-horizon-group > header > p { grid-column: 1 / -1; grid-row: 2; }
 html[data-admin-preview="mobile"] .command-attention-meta { align-items: flex-start; flex-direction: column; gap: 3px; }
 html[data-admin-preview="mobile"] .command-attention-meta time { text-align: left; }
+
+/* Shared workbench convergence: Command Center, Finance, and Personal Ops. */
+.command-center-shell.admin-chrome-main {
+  width: 100vw;
+  max-width: none;
+  margin-inline: calc(50% - 50vw);
+  padding: var(--app-content-offset) var(--app-page-gutter) 64px !important;
+  background: var(--shell-bg);
+  color: var(--text-strong);
+}
+
+.command-center-grid {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 340px);
+  gap: 20px;
+  width: min(1920px, 100%);
+  margin: 0 auto;
+}
+
+.command-center-primary,
+.command-center-rail {
+  gap: 16px;
+}
+
+.command-hero,
+.command-panel,
+.command-lane,
+.command-attention-summary,
+.command-rail-note {
+  border-color: var(--border);
+  border-radius: 12px;
+  background: var(--panel-bg);
+  box-shadow: none;
+}
+
+.command-hero {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 0;
+  align-items: center;
+  padding: 20px 22px;
+  border-top: 3px solid var(--brand);
+  background:
+    linear-gradient(120deg, color-mix(in srgb, var(--brand-soft) 62%, transparent), transparent 52%),
+    var(--panel-bg);
+}
+
+.command-kicker {
+  margin-bottom: 5px;
+  color: var(--brand);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+}
+
+.command-hero h1 {
+  max-width: none;
+  color: var(--text-strong);
+  font-family: var(--font-heading);
+  font-size: clamp(30px, 3vw, 42px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.command-hero p:not(.command-kicker) {
+  max-width: 720px;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.command-hero-actions {
+  flex-direction: row;
+  min-width: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.command-hero-actions a {
+  min-height: 40px;
+  border-radius: 7px;
+}
+
+.command-hero-actions a:first-child {
+  border-color: var(--action-primary);
+  background: var(--action-primary);
+}
+
+.command-panel,
+.command-lane {
+  padding: 16px;
+}
+
+.command-section-title {
+  margin-bottom: 10px;
+}
+
+.command-section-title h2 {
+  font-family: var(--font-heading);
+  font-size: 18px;
+  letter-spacing: -0.015em;
+}
+
+.command-attention-panel {
+  border-left: 1px solid var(--border);
+}
+
+.command-attention-panel > .command-section-title {
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.command-horizon {
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.command-horizon-group {
+  min-width: 0;
+  gap: 8px;
+}
+
+.command-horizon-group > header {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.command-horizon-group > header > p {
+  grid-column: 1 / -1;
+  grid-row: 2;
+}
+
+.command-attention-list {
+  border-radius: 9px;
+}
+
+.command-attention-row {
+  min-height: 94px;
+  padding: 12px;
+}
+
+.command-attention-row > strong {
+  font-size: 14px;
+}
+
+.command-attention-row p {
+  font-size: 12px;
+}
+
+.command-attention-meta {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.command-attention-meta time {
+  text-align: left;
+}
+
+.command-lanes {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.command-lane {
+  padding: 12px;
+}
+
+.command-lane-list a,
+.command-review-list a,
+.command-health {
+  border-radius: 7px;
+  background: var(--panel-bg-subtle);
+}
+
+.command-center-rail {
+  position: sticky;
+  top: var(--app-content-offset);
+  align-self: start;
+}
+
+.command-attention-summary {
+  grid-template-columns: 1fr;
+}
+
+.command-attention-summary > div {
+  grid-template-columns: minmax(0, 1fr) auto;
+  min-height: 74px;
+  align-items: center;
+  align-content: center;
+  gap: 2px 12px;
+  padding: 12px 14px;
+  border-top: 1px solid var(--border);
+  border-left: 3px solid currentColor;
+}
+
+.command-attention-summary > div:first-child {
+  min-height: 88px;
+  border-top: 0;
+  background: color-mix(in srgb, var(--brand-soft) 58%, var(--panel-bg));
+}
+
+.command-attention-summary > div + div {
+  border-top: 1px solid var(--border);
+}
+
+.command-attention-summary strong {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-family: var(--font-mono);
+  font-size: 26px;
+}
+
+.command-attention-summary small {
+  grid-column: 1;
+}
+
+.command-rail-note {
+  padding: 14px 16px;
+  border-style: dashed;
+}
+
+.command-rail-note strong,
+.command-rail-note p {
+  display: block;
+  margin: 0;
+}
+
+.command-goals-panel .admin-plain-section,
+.command-goals-panel .admin-plain-section h2,
+.command-goals-panel .admin-plain-list {
+  margin: 0;
+}
+
+.command-goals-panel .admin-plain-section h2 {
+  margin-bottom: 10px;
+  color: var(--text-strong);
+  font-family: var(--font-heading);
+  font-size: 18px;
+  letter-spacing: -0.015em;
+}
+
+.command-goals-panel .admin-goal-text,
+.command-goals-panel .admin-goals-list .admin-goal-item.is-done .admin-goal-text {
+  color: var(--text);
+}
+
+.command-goals-panel .admin-goal-toggle,
+.command-goals-panel .admin-goal-toggle.is-done {
+  border-color: var(--border-strong);
+  background: var(--panel-bg-subtle);
+  color: var(--text-strong);
+}
+
+.command-goals-panel .admin-goal-toggle:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+.command-rail-note strong {
+  font-family: var(--font-heading);
+  font-size: 14px;
+}
+
+.command-rail-note p {
+  margin-top: 5px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.module-ref-shell,
+.finance-workspace-shell,
+.personal-ops-module-shell {
+  background: var(--shell-bg);
+  color: var(--text-strong);
+}
+
+.module-ref-shell.admin-chrome-main,
+.finance-workspace-shell.admin-chrome-main,
+.personal-ops-module-shell.admin-chrome-main {
+  padding-top: var(--app-content-offset) !important;
+}
+
+.module-ref-header,
+.module-ref-content,
+.notes-operating-strip,
+.people-operating-strip {
+  width: min(1680px, calc(100% - (2 * var(--app-page-gutter))));
+  margin-inline: auto;
+}
+
+.module-ref-header,
+.module-ref-panel,
+.module-ref-detail,
+.module-ref-stat,
+.module-ref-mini-card,
+.module-ref-lane,
+.module-ref-tile,
+.module-ref-live-panel {
+  border-color: var(--border);
+  border-radius: 12px;
+  box-shadow: none;
+}
+
+.module-ref-header {
+  padding: 20px 22px;
+}
+
+.module-ref-shell h1 {
+  font-family: var(--font-heading);
+  font-size: clamp(30px, 3vw, 42px);
+  line-height: 1.02;
+  letter-spacing: -0.035em;
+}
+
+.module-ref-kicker {
+  color: var(--brand);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.11em;
+}
+
+.finance-module-shell,
+.finance-module-shell.has-context,
+.finance-module-shell.has-rail,
+.finance-module-shell.has-context.has-rail {
+  height: calc(100dvh - var(--app-content-offset));
+  background: var(--shell-bg);
+}
+
+.finance-module-shell .finance-main-workspace {
+  padding: 24px var(--app-page-gutter) 104px;
+  background: var(--shell-bg);
+}
+
+@media (min-width: 761px) {
+  .finance-module-shell .finance-main-workspace {
+    padding-right: max(88px, var(--app-page-gutter));
+  }
+
+  .finance-module-shell .shared-ai-dock__launcher {
+    width: 52px;
+    min-width: 52px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .finance-module-shell .shared-ai-dock__launcher-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+
+.finance-main-workspace > .finance-panel,
+.finance-main-workspace > .finance-overview-grid,
+.finance-main-workspace > .finance-two-col,
+.finance-main-workspace > .finance-budget-grid,
+.finance-dataset-notice,
+.finance-workspace-header,
+.finance-native-action-bar {
+  width: min(1380px, 100%);
+}
+
+.finance-workspace-header h1 {
+  color: var(--text-strong);
+  font-family: var(--font-heading);
+  font-size: 28px;
+  letter-spacing: -0.03em;
+}
+
+.finance-workspace-header p,
+.finance-panel-heading span,
+.finance-muted {
+  color: var(--text-muted);
+}
+
+.finance-sidebar,
+.finance-context-rail,
+.finance-module-shell > .inspector-rail {
+  border-color: var(--border);
+  background: var(--panel-bg-subtle);
+}
+
+.finance-sidebar-nav button:hover,
+.finance-sidebar-section button:hover,
+.finance-sidebar-nav button.is-active,
+.finance-sidebar-section button.is-active {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+@media (max-width: 1180px) {
+  .command-center-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .command-center-rail {
+    position: static;
+    grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+    align-items: start;
+  }
+
+  .command-rail-note {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 760px) {
+  .command-center-shell.admin-chrome-main {
+    padding-top: var(--app-content-offset) !important;
+  }
+
+  .command-hero,
+  .command-bottom-grid,
+  .command-lanes,
+  .command-horizon,
+  .command-center-rail {
+    grid-template-columns: 1fr;
+  }
+
+  .command-hero {
+    align-items: start;
+    padding: 18px;
+  }
+
+  .command-hero h1,
+  .module-ref-shell h1 {
+    font-size: clamp(28px, 9vw, 38px);
+  }
+
+  .command-hero-actions {
+    justify-content: flex-start;
+  }
+
+  .command-hero-actions a {
+    flex: 1 1 140px;
+  }
+
+  .command-center-grid button,
+  .command-center-grid a[href] {
+    min-height: 44px;
+  }
+
+  .command-rail-note {
+    grid-column: auto;
+  }
+
+  .module-ref-header,
+  .module-ref-content,
+  .notes-operating-strip,
+  .people-operating-strip {
+    width: calc(100% - (2 * var(--app-page-gutter)));
+  }
+
+  .finance-module-shell,
+  .finance-module-shell.has-context,
+  .finance-module-shell.has-rail,
+  .finance-module-shell.has-context.has-rail,
+  .finance-module-shell:not([data-has-inspector="true"]) {
+    min-height: calc(100dvh - var(--app-content-offset));
+  }
+
+  .finance-module-shell > .module-sidebar {
+    inset-block-start: var(--app-content-offset);
+  }
+
+  .finance-module-shell > .inspector-rail,
+  .finance-module-shell > .finance-context-rail,
+  .finance-module-shell > .finance-right-rail {
+    top: var(--app-content-offset);
+  }
+
+  .finance-mobile-menu,
+  html[data-admin-preview="mobile"] .finance-mobile-menu,
+  .finance-inspector-toggle {
+    top: calc(var(--app-content-offset) + 8px);
+  }
+}
+
+html[data-admin-preview="mobile"] .command-hero h1,
+html[data-admin-preview="mobile"] .module-ref-shell h1 {
+  font-size: clamp(28px, 9vw, 38px);
+}

@@ -254,9 +254,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const attentionCounts = Object.fromEntries(attentionGroups.map((group) => [group.key, attentionCandidates.filter((item) => item.priority === group.key).length])) as Record<AttentionPriority, number>;
 
   return (
-    <main className="admin-shell admin-home-shell admin-chrome-main">
+    <main className="admin-shell admin-home-shell command-center-shell admin-chrome-main">
       <AdminChrome
         showCommandSearch={false}
+        showPageSidebar={false}
+        showLocalAi={false}
         sidebarTitle="Command Center"
         sidebarSummary="A read-through of canonical module state. Changes belong in each owner module."
         sidebarItems={[
@@ -282,13 +284,8 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <section className="command-center-grid" aria-label="Command Center">
         <div className="command-center-primary">
           <section className="command-hero">
-            <div><p className="command-kicker">Command Center</p><h1>What needs attention</h1><p>Your live operating desk, built from the same records used in every module. Nothing is copied here: each item opens its owner record so work stays consistent online, offline, and across devices.</p></div>
-            <div className="command-hero-actions" aria-label="Primary command actions"><Link href="/vault">Open Vault</Link><Link href="/admin/finance">Open Finance</Link><Link href="/admin/projects">Open Projects</Link></div>
-          </section>
-
-          <section className="command-attention-summary" aria-label="Attention horizon">
-            <div><span>Attention horizon</span><strong>{attentionTotal}</strong><small>live owner records</small></div>
-            {attentionGroups.map((group) => <div className={"command-priority-" + group.key} key={group.key}><span>{group.label}</span><strong>{attentionCounts[group.key]}</strong><small>{group.note}</small></div>)}
+            <div><p className="command-kicker">Command Center</p><h1>What needs attention</h1><p>Decisions, follow-ups, and checks from the records you already use—organized into one clear worklist.</p></div>
+            <div className="command-hero-actions" aria-label="Primary command actions"><Link href="/vault">Open Vault</Link><Link href="/admin/notes">Capture a note</Link></div>
           </section>
 
           <section className="command-panel command-attention-panel" aria-label="Current attention">
@@ -317,9 +314,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
 
         <aside className="command-center-rail">
-          <section className="command-ai-panel"><p>Private AI dock</p><h2>Visible-context help</h2><span>The assistant can explain the current page and suggest next steps. It does not silently mutate owner records.</span><div><small>Boundary</small><strong>No queued suggestion count is invented here.</strong></div></section>
-          <section className="command-panel"><div className="command-section-title"><h2>Ownership</h2><span>Native</span></div><div className="command-color-map"><span className="command-swatch command-swatch-0">Goals</span><span className="command-swatch command-swatch-1">Reviews</span><span className="command-swatch command-swatch-2">Projects</span><span className="command-swatch command-swatch-3">Personal Ops</span><span className="command-swatch command-swatch-4">Records</span><span className="command-swatch command-swatch-5">Finance</span></div></section>
+          <section className="command-attention-summary" aria-label="Attention horizon">
+            <div><span>Attention horizon</span><strong>{attentionTotal}</strong><small>from live owner records</small></div>
+            {attentionGroups.map((group) => <div className={"command-priority-" + group.key} key={group.key}><span>{group.label}</span><strong>{attentionCounts[group.key]}</strong><small>{group.note}</small></div>)}
+          </section>
           <section className="command-panel"><div className="command-section-title"><h2>Module sources</h2><span>{modules.length - unavailableCount}/{modules.length}</span></div><div className="command-health-list">{modules.map((module) => <Link className={`command-health command-tone-${module.tone}`} href={module.href} key={module.name}><span /><strong>{module.name}</strong><small>{module.available ? "Connected" : "Unavailable"}</small></Link>)}</div></section>
+          <section className="command-panel command-goals-panel"><CurrentGoalsPanel initialItems={goalItems} /></section>
+          <section className="command-rail-note"><strong>One record, every view</strong><p>Nothing is copied here. Opening an item takes you to its owner module, and the Vault stays on the same underlying record.</p></section>
         </aside>
       </section>
       {playIntro && <span className="command-intro-flag" aria-hidden="true" />}
