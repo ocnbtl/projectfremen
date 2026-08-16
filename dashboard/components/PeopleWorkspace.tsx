@@ -1,7 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import { mirrorPersonalRecord } from "../lib/local-first/domain-mirror";
 import {
@@ -16,7 +16,10 @@ import { getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/rout
 import { parsePeopleUrlState, serializePeopleUrlState } from "../lib/native-objects/url-state";
 import type {
   PersonalContactProfile,
+  PersonalEducationEntry,
+  PersonalLocationEntry,
   PersonalMemoryEntry,
+  PersonalOccupationEntry,
   PersonalRecord,
   PersonalRecordClass,
   PersonalRecordStatus
@@ -140,9 +143,15 @@ type ContactProfileDraft = {
   children: string;
   interactions: string;
   memories: PersonalMemoryEntry[];
+  education: PersonalEducationEntry[];
+  occupations: PersonalOccupationEntry[];
+  locations: PersonalLocationEntry[];
 };
 
-type ContactProfileTextKey = Exclude<keyof ContactProfileDraft, "memories">;
+type ContactProfileTextKey = Exclude<
+  keyof ContactProfileDraft,
+  "memories" | "education" | "occupations" | "locations"
+>;
 
 type ProfileField = {
   key: ContactProfileTextKey;
@@ -172,14 +181,16 @@ const FILTERS: Array<{ id: PeopleFilter; label: string; tone: string }> = [
 
 const GROUP_OPTIONS = [
   "Family",
-  "Collaborator",
   "Friend",
+  "Colleague / Coworker",
+  "Collaborator",
   "Vendor",
   "Advisor",
   "Community",
   "University",
   "Partner",
-  "Client"
+  "Client",
+  "Other"
 ];
 
 const COMMON_LOCATIONS = [
@@ -206,6 +217,8 @@ const COMMON_LOCATIONS = [
 ];
 
 const CADENCE_OPTIONS = [
+  { label: "Not set", value: "" },
+  { label: "No cadence", value: "NONE" },
   { label: "Weekly", value: "P1W" },
   { label: "Every 2 weeks", value: "P2W" },
   { label: "Monthly", value: "P1M" },
@@ -317,23 +330,9 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
     ]
   },
   {
-    title: "Career and school",
-    tone: "violet",
-    fields: [
-      { key: "primaryOccupation", label: "Primary occupation" },
-      { key: "primaryEmployer", label: "Primary employer" },
-      { key: "secondaryOccupation", label: "Secondary occupation" },
-      { key: "secondaryEmployer", label: "Secondary employer" },
-      { key: "pastOccupation", label: "Past occupation" },
-      { key: "pastEmployer", label: "Past employer" },
-      { key: "universityAffiliation", label: "University affiliation" }
-    ]
-  },
-  {
     title: "Place and relationships",
     tone: "teal",
     fields: [
-      { key: "livesIn", label: "Lives in" },
       { key: "comesFrom", label: "Comes from" },
       { key: "associatedPeople", label: "Associated people", placeholder: "Comma-separated names or note links" },
       { key: "partner", label: "Partner" },
@@ -346,7 +345,7 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
     fields: [
       { key: "lastContact", label: "Last contact", type: "date" },
       { key: "nextContact", label: "Next contact", type: "date" },
-      { key: "contactCadence", label: "Contact cadence", placeholder: "P1M, P2W, P3M" }
+      { key: "contactCadence", label: "Contact cadence" }
     ]
   },
   {
@@ -398,7 +397,10 @@ const EMPTY_PROFILE_DRAFT: ContactProfileDraft = {
   partner: "",
   children: "",
   interactions: "",
-  memories: []
+  memories: [],
+  education: [],
+  occupations: [],
+  locations: []
 };
 
 function labelize(value: string) {
@@ -512,6 +514,73 @@ function newMemoryEntry(input: {
   };
 }
 
+function newEducationEntry(input: Partial<PersonalEducationEntry> = {}): PersonalEducationEntry {
+  return {
+    id: input.id || `education-${crypto.randomUUID()}`,
+    institution: input.institution || "",
+    degree: input.degree,
+    fieldOfStudy: input.fieldOfStudy
+  };
+}
+
+function newOccupationEntry(input: Partial<PersonalOccupationEntry> = {}): PersonalOccupationEntry {
+  return {
+    id: input.id || `occupation-${crypto.randomUUID()}`,
+    title: input.title || "",
+    employer: input.employer,
+    status: input.status || "current"
+  };
+}
+
+function newLocationEntry(input: Partial<PersonalLocationEntry> = {}): PersonalLocationEntry {
+  return {
+    id: input.id || `location-${crypto.randomUUID()}`,
+    label: input.label,
+    location: input.location,
+    address: input.address
+  };
+}
+
+function cleanEducationEntries(entries: PersonalEducationEntry[]): PersonalEducationEntry[] {
+  return entries
+    .map((entry) => ({
+      ...entry,
+      institution: entry.institution.trim(),
+      degree: entry.degree?.trim() || undefined,
+      fieldOfStudy: entry.fieldOfStudy?.trim() || undefined
+    }))
+    .filter((entry) => entry.institution || entry.degree || entry.fieldOfStudy);
+}
+
+function cleanOccupationEntries(entries: PersonalOccupationEntry[]): PersonalOccupationEntry[] {
+  return entries
+    .map((entry) => ({
+      ...entry,
+      title: entry.title.trim(),
+      employer: entry.employer?.trim() || undefined
+    }))
+    .filter((entry) => entry.title || entry.employer);
+}
+
+function cleanLocationEntries(entries: PersonalLocationEntry[]): PersonalLocationEntry[] {
+  return entries
+    .map((entry) => ({
+      ...entry,
+      label: entry.label?.trim() || undefined,
+      location: entry.location?.trim() || undefined,
+      address: entry.address?.trim() || undefined
+    }))
+    .filter((entry) => entry.location || entry.address);
+}
+
+function updateEntry<T extends { id: string }>(entries: T[], id: string, patch: Partial<T>): T[] {
+  return entries.map((entry) => entry.id === id ? { ...entry, ...patch } : entry);
+}
+
+function removeEntry<T extends { id: string }>(entries: T[], id: string): T[] {
+  return entries.filter((entry) => entry.id !== id);
+}
+
 function interactionOccurredOn(value: string): string | undefined {
   const match = value.match(/^(\d{4}-\d{2}-\d{2})(?:\s|$|•)/);
   return match?.[1];
@@ -548,6 +617,7 @@ function isThisWeek(record: PersonalRecord) {
 
 function isDormant(record: PersonalRecord) {
   if (record.status === "inactive") return true;
+  if (record.time.reviewCadence?.toUpperCase() === "NONE") return false;
   if (!record.time.lastReview && !record.time.nextReview) return true;
   const last = record.time.lastReview ? parseDisplayDate(record.time.lastReview) : null;
   if (!last || Number.isNaN(last.getTime())) return false;
@@ -587,9 +657,11 @@ function getSearchText(record: PersonalRecord) {
     record.url || "",
     profile
       ? Object.entries(profile)
-          .flatMap(([key, value]) => key === "memories" && Array.isArray(value)
-            ? value.map((memory) => typeof memory === "object" && memory ? String(memory.text || "") : "")
-            : Array.isArray(value) ? value.map(String) : String(value || ""))
+          .flatMap(([, value]) => Array.isArray(value)
+            ? value.flatMap((item) => item && typeof item === "object"
+              ? Object.values(item).map((entry) => String(entry || ""))
+              : String(item || ""))
+            : String(value || ""))
           .join(" ")
       : ""
   ]
@@ -602,7 +674,7 @@ function getPrimaryGroup(record: PersonalRecord) {
 }
 
 function getCadenceLabel(value?: string) {
-  if (!value) return "No cadence";
+  if (!value) return "Not set";
   return CADENCE_OPTIONS.find((option) => option.value === value)?.label || value;
 }
 
@@ -616,6 +688,29 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
   }
 
   const profile = record.profile;
+  const education = profile?.education?.length
+    ? profile.education.map((entry) => ({ ...entry }))
+    : profile?.universityAffiliation
+      ? [newEducationEntry({ id: "legacy-education-primary", institution: profile.universityAffiliation })]
+      : [];
+  const occupations = profile?.occupations?.length
+    ? profile.occupations.map((entry) => ({ ...entry }))
+    : [
+        profile?.primaryOccupation || profile?.primaryEmployer
+          ? newOccupationEntry({ id: "legacy-occupation-primary", title: profile.primaryOccupation || "", employer: profile.primaryEmployer, status: "current" })
+          : null,
+        profile?.secondaryOccupation || profile?.secondaryEmployer
+          ? newOccupationEntry({ id: "legacy-occupation-secondary", title: profile.secondaryOccupation || "", employer: profile.secondaryEmployer, status: "current" })
+          : null,
+        profile?.pastOccupation || profile?.pastEmployer
+          ? newOccupationEntry({ id: "legacy-occupation-past", title: profile.pastOccupation || "", employer: profile.pastEmployer, status: "past" })
+          : null
+      ].filter((entry): entry is PersonalOccupationEntry => Boolean(entry));
+  const locations = profile?.locations?.length
+    ? profile.locations.map((entry) => ({ ...entry }))
+    : profile?.livesIn || profile?.address
+      ? [newLocationEntry({ id: "legacy-location-primary", label: "Primary home", location: profile.livesIn, address: profile.address })]
+      : [];
   return {
     fullName: profile?.fullName || record.title,
     firstName: profile?.firstName || "",
@@ -653,11 +748,19 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     partner: profile?.partner || "",
     children: joinList(profile?.children),
     interactions: joinTextEntries(profile?.interactions),
-    memories: (profile?.memories || []).map((memory) => ({ ...memory }))
+    memories: (profile?.memories || []).map((memory) => ({ ...memory })),
+    education,
+    occupations,
+    locations
   };
 }
 
 function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile {
+  const education = cleanEducationEntries(draft.education);
+  const occupations = cleanOccupationEntries(draft.occupations);
+  const locations = cleanLocationEntries(draft.locations);
+  const currentJobs = occupations.filter((entry) => entry.status === "current");
+  const pastJobs = occupations.filter((entry) => entry.status === "past");
   return {
     ...draft,
     phoneCountryCode: normalizedCountryCode(draft.phoneCountryCode),
@@ -665,7 +768,19 @@ function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile
     associatedPeople: splitList(draft.associatedPeople),
     children: splitList(draft.children),
     interactions: splitTextEntries(draft.interactions),
-    memories: draft.memories.map((memory) => ({ ...memory, text: memory.text.trim() })).filter((memory) => memory.text)
+    memories: draft.memories.map((memory) => ({ ...memory, text: memory.text.trim() })).filter((memory) => memory.text),
+    education,
+    occupations,
+    locations,
+    universityAffiliation: education[0]?.institution || "",
+    primaryOccupation: currentJobs[0]?.title || "",
+    primaryEmployer: currentJobs[0]?.employer || "",
+    secondaryOccupation: currentJobs[1]?.title || "",
+    secondaryEmployer: currentJobs[1]?.employer || "",
+    pastOccupation: pastJobs[0]?.title || "",
+    pastEmployer: pastJobs[0]?.employer || "",
+    livesIn: locations[0]?.location || "",
+    address: locations[0]?.address || ""
   };
 }
 
@@ -699,7 +814,9 @@ function getPriorityLabel(record?: PersonalRecord) {
 }
 
 function getNextContactLabel(record?: PersonalRecord) {
-  if (!record?.time.nextReview) return "No follow-up";
+  if (!record?.time.nextReview) {
+    return record?.time.reviewCadence?.toUpperCase() === "NONE" ? "No cadence" : "No follow-up";
+  }
   const days = daysUntil(record.time.nextReview);
   if (days === null) return formatDate(record.time.nextReview);
   if (days < 0) return `${Math.abs(days)}d overdue`;
@@ -813,7 +930,7 @@ function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView, sta
   if (view === "relationship-map") return record.relations.related.length > 0 || getProfile(record).associatedPeople.length > 0;
   if (view === "family") return hasGroupLike(record, ["family", "parent", "sibling", "child"]);
   if (view === "close-friends") return hasGroupLike(record, ["close friend", "friend"]);
-  if (view === "business") return hasGroupLike(record, ["business", "collaborator", "partner", "client", "work"]);
+  if (view === "business") return hasGroupLike(record, ["business", "collaborator", "colleague", "coworker", "partner", "client", "work"]);
   if (view === "advisors-mentors") return hasGroupLike(record, ["advisor", "mentor"]);
   if (view === "neighbors") return hasGroupLike(record, ["neighbor"]);
   if (view === "health-wellness") return hasGroupLike(record, ["health", "wellness", "doctor", "therapy", "trainer"]);
@@ -840,6 +957,108 @@ function sortPeople(records: PersonalRecord[], sortMode: PeopleSortMode) {
     }
     return getLastName(left).localeCompare(getLastName(right));
   });
+}
+
+function EducationEntriesEditor({
+  entries,
+  onChange,
+  onAdd,
+  onRemove
+}: {
+  entries: PersonalEducationEntry[];
+  onChange: (id: string, patch: Partial<PersonalEducationEntry>) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <section className="people-repeatable-section module-ref-tone-violet" data-people-education-editor>
+      <header className="people-repeatable-heading">
+        <div><h4>University & education</h4><p>Add another only when there is another school or degree.</p></div>
+        <button type="button" onClick={onAdd}>Add university</button>
+      </header>
+      {entries.length > 0 ? entries.map((entry, index) => (
+        <article className="people-repeatable-entry" data-education-entry={entry.id} key={entry.id}>
+          <div className="people-repeatable-entry-heading">
+            <strong>University {index + 1}</strong>
+            <button type="button" onClick={() => onRemove(entry.id)} aria-label={`Remove university ${index + 1}`}>Remove</button>
+          </div>
+          <div className="people-repeatable-fields people-repeatable-fields-education">
+            <label>University<input value={entry.institution} onChange={(event) => onChange(entry.id, { institution: event.target.value })} placeholder="Ohio State University" /></label>
+            <label>Degree<input value={entry.degree || ""} onChange={(event) => onChange(entry.id, { degree: event.target.value })} placeholder="Bachelor’s, Master’s, PhD..." /></label>
+            <label>Field of study<input value={entry.fieldOfStudy || ""} onChange={(event) => onChange(entry.id, { fieldOfStudy: event.target.value })} placeholder="Economics, design, engineering..." /></label>
+          </div>
+        </article>
+      )) : <p className="people-repeatable-empty">No university added.</p>}
+    </section>
+  );
+}
+
+function OccupationEntriesEditor({
+  entries,
+  onChange,
+  onAdd,
+  onRemove
+}: {
+  entries: PersonalOccupationEntry[];
+  onChange: (id: string, patch: Partial<PersonalOccupationEntry>) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <section className="people-repeatable-section module-ref-tone-blue" data-people-occupation-editor>
+      <header className="people-repeatable-heading">
+        <div><h4>Jobs & occupations</h4><p>Keep current and past work together without squeezing it into one field.</p></div>
+        <button type="button" onClick={onAdd}>Add job</button>
+      </header>
+      {entries.length > 0 ? entries.map((entry, index) => (
+        <article className="people-repeatable-entry" data-occupation-entry={entry.id} key={entry.id}>
+          <div className="people-repeatable-entry-heading">
+            <strong>Job {index + 1}</strong>
+            <button type="button" onClick={() => onRemove(entry.id)} aria-label={`Remove job ${index + 1}`}>Remove</button>
+          </div>
+          <div className="people-repeatable-fields people-repeatable-fields-job">
+            <label>Occupation or title<input value={entry.title} onChange={(event) => onChange(entry.id, { title: event.target.value })} placeholder="Product designer" /></label>
+            <label>Employer<input value={entry.employer || ""} onChange={(event) => onChange(entry.id, { employer: event.target.value })} placeholder="Company or organization" /></label>
+            <label>When<select value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></select></label>
+          </div>
+        </article>
+      )) : <p className="people-repeatable-empty">No jobs added.</p>}
+    </section>
+  );
+}
+
+function LocationEntriesEditor({
+  entries,
+  onChange,
+  onAdd,
+  onRemove
+}: {
+  entries: PersonalLocationEntry[];
+  onChange: (id: string, patch: Partial<PersonalLocationEntry>) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <section className="people-repeatable-section module-ref-tone-green" data-people-location-editor>
+      <header className="people-repeatable-heading">
+        <div><h4>Homes & locations</h4><p>Save a city, a full address, or both. Add another place only when needed.</p></div>
+        <button type="button" onClick={onAdd}>Add location</button>
+      </header>
+      {entries.length > 0 ? entries.map((entry, index) => (
+        <article className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
+          <div className="people-repeatable-entry-heading">
+            <strong>{entry.label?.trim() || `Location ${index + 1}`}</strong>
+            <button type="button" onClick={() => onRemove(entry.id)} aria-label={`Remove location ${index + 1}`}>Remove</button>
+          </div>
+          <div className="people-repeatable-fields people-repeatable-fields-location">
+            <label>Label<input value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={index === 0 ? "Primary home" : "Second home"} /></label>
+            <label>City / region<input list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing a city" /></label>
+            <label className="is-wide">Street address<textarea value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={2} /></label>
+          </div>
+        </article>
+      )) : <p className="people-repeatable-empty">No location added.</p>}
+    </section>
+  );
 }
 
 export default function PeopleWorkspace({
@@ -888,9 +1107,13 @@ export default function PeopleWorkspace({
   const [quickEmail, setQuickEmail] = useState("");
   const [quickPhone, setQuickPhone] = useState("");
   const [quickPhoneCountryCode, setQuickPhoneCountryCode] = useState("+1");
-  const [quickLocation, setQuickLocation] = useState("");
-  const [quickOccupation, setQuickOccupation] = useState("");
-  const [quickEmployer, setQuickEmployer] = useState("");
+  const [quickEducation, setQuickEducation] = useState<PersonalEducationEntry[]>([]);
+  const [quickOccupations, setQuickOccupations] = useState<PersonalOccupationEntry[]>([
+    newOccupationEntry({ id: "new-contact-job-1" })
+  ]);
+  const [quickLocations, setQuickLocations] = useState<PersonalLocationEntry[]>([
+    newLocationEntry({ id: "new-contact-location-1", label: "Primary home" })
+  ]);
   const [quickProjects, setQuickProjects] = useState("");
   const [lastContact, setLastContact] = useState("");
   const [nextContact, setNextContact] = useState("");
@@ -1112,6 +1335,7 @@ export default function PeopleWorkspace({
 
   const locationSuggestions = useMemo(() => Array.from(new Set([
     ...people.map((record) => record.profile?.livesIn || "").filter(Boolean),
+    ...people.flatMap((record) => (record.profile?.locations || []).map((entry) => entry.location || "").filter(Boolean)),
     ...COMMON_LOCATIONS
   ])).sort((left, right) => left.localeCompare(right)), [people]);
 
@@ -1210,9 +1434,6 @@ export default function PeopleWorkspace({
     quickContext,
     quickEmail,
     quickPhone,
-    quickLocation,
-    quickOccupation,
-    quickEmployer,
     quickProjects,
     lastContact,
     nextContact,
@@ -1222,6 +1443,9 @@ export default function PeopleWorkspace({
     quickX,
     quickLinkedIn
   ].some((value) => value.trim().length > 0)
+    || cleanEducationEntries(quickEducation).length > 0
+    || cleanOccupationEntries(quickOccupations).length > 0
+    || cleanLocationEntries(quickLocations).length > 0
     || className !== "person"
     || groups.length !== 1
     || groups[0] !== "Collaborator"
@@ -1610,9 +1834,9 @@ export default function PeopleWorkspace({
       phoneNumber: normalizePhoneForStorage(quickPhone, quickPhoneCountryCode),
       phoneCountryCode: normalizedCountryCode(quickPhoneCountryCode),
       primaryEmail: quickEmail,
-      primaryOccupation: quickOccupation,
-      primaryEmployer: quickEmployer,
-      livesIn: quickLocation,
+      education: quickEducation,
+      occupations: quickOccupations,
+      locations: quickLocations,
       lastContact,
       nextContact,
       contactCadence: cadence,
@@ -1673,9 +1897,9 @@ export default function PeopleWorkspace({
       setQuickEmail("");
       setQuickPhone("");
       setQuickPhoneCountryCode("+1");
-      setQuickLocation("");
-      setQuickOccupation("");
-      setQuickEmployer("");
+      setQuickEducation([]);
+      setQuickOccupations([newOccupationEntry({ id: "new-contact-job-1" })]);
+      setQuickLocations([newLocationEntry({ id: "new-contact-location-1", label: "Primary home" })]);
       setQuickProjects("");
       setLastContact("");
       setNextContact("");
@@ -1688,7 +1912,7 @@ export default function PeopleWorkspace({
       if (createdPerson) {
         await mirrorPersonalRecord(createdPerson);
         await releaseDirtyHistoryGuard();
-        router.replace(`${getNativeObjectRoute({ module: "people", objectType: "person", objectId: createdPerson.id })}?tab=overview`);
+        router.replace(`${getNativeObjectRoute({ module: "people", objectType: createdPerson.className === "org" ? "organization" : "person", objectId: createdPerson.id })}?tab=overview`);
       }
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to reach the People store. Your draft is still here.");
@@ -1853,6 +2077,18 @@ export default function PeopleWorkspace({
     setProfileDraft((current) => ({ ...current, [key]: value }));
   }
 
+  function updateProfileEducation(id: string, patch: Partial<PersonalEducationEntry>) {
+    setProfileDraft((current) => ({ ...current, education: updateEntry(current.education, id, patch) }));
+  }
+
+  function updateProfileOccupation(id: string, patch: Partial<PersonalOccupationEntry>) {
+    setProfileDraft((current) => ({ ...current, occupations: updateEntry(current.occupations, id, patch) }));
+  }
+
+  function updateProfileLocation(id: string, patch: Partial<PersonalLocationEntry>) {
+    setProfileDraft((current) => ({ ...current, locations: updateEntry(current.locations, id, patch) }));
+  }
+
   function toggleGroup(option: string) {
     setGroups((current) => current.includes(option)
       ? current.filter((item) => item !== option)
@@ -1870,15 +2106,15 @@ export default function PeopleWorkspace({
       <form className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
         <div className="people-edit-toolbar">
           <button type="button" onClick={requestCancelEditor}>Cancel</button>
-          <strong>New Person</strong>
+          <strong>{className === "org" ? "New Organization" : "New Person"}</strong>
           <button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
         </div>
         <label>
           Full name
           <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Person or organization" required />
         </label>
-        <div className="people-capture-grid">
-          <label>
+        <div className="people-capture-classification">
+          <label className="people-type-field">
             Type
             <select value={className} onChange={(event) => setClassName(event.target.value as "person" | "org")}>
               <option value="person">Person</option>
@@ -1898,22 +2134,33 @@ export default function PeopleWorkspace({
           <label>Primary email<input type="email" value={quickEmail} onChange={(event) => setQuickEmail(event.target.value)} /></label>
           <label>Phone<input type="tel" inputMode="tel" value={quickPhone} onChange={(event) => setQuickPhone(event.target.value)} onBlur={() => setQuickPhone(formatPhone(quickPhone, quickPhoneCountryCode))} placeholder="6147963848" /></label>
         </div>
-        <div className="people-capture-grid">
-          <label>Occupation<input value={quickOccupation} onChange={(event) => setQuickOccupation(event.target.value)} /></label>
-          <label>Employer<input value={quickEmployer} onChange={(event) => setQuickEmployer(event.target.value)} /></label>
-        </div>
         <label>
           Relationship context
           <textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={4} />
         </label>
+        <OccupationEntriesEditor
+          entries={quickOccupations}
+          onChange={(id, patch) => setQuickOccupations((current) => updateEntry(current, id, patch))}
+          onAdd={() => setQuickOccupations((current) => [...current, newOccupationEntry()])}
+          onRemove={(id) => setQuickOccupations((current) => removeEntry(current, id))}
+        />
+        <EducationEntriesEditor
+          entries={quickEducation}
+          onChange={(id, patch) => setQuickEducation((current) => updateEntry(current, id, patch))}
+          onAdd={() => setQuickEducation((current) => [...current, newEducationEntry()])}
+          onRemove={(id) => setQuickEducation((current) => removeEntry(current, id))}
+        />
+        <LocationEntriesEditor
+          entries={quickLocations}
+          onChange={(id, patch) => setQuickLocations((current) => updateEntry(current, id, patch))}
+          onAdd={() => setQuickLocations((current) => [...current, newLocationEntry({ label: current.length === 0 ? "Primary home" : "" })])}
+          onRemove={(id) => setQuickLocations((current) => removeEntry(current, id))}
+        />
         <div className="people-capture-grid">
           <label>Status<select value={status} onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}><option value="active">Active</option><option value="next">Next</option><option value="idea">Loose tie</option><option value="inactive">Dormant</option></select></label>
-          <label>Cadence<select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+          <label>Cadence<select data-people-cadence-select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
         </div>
-        <div className="people-capture-grid">
-          <label>Lives in<input list="people-location-suggestions" value={quickLocation} onChange={(event) => setQuickLocation(event.target.value)} placeholder="Start typing a city" /></label>
-          <label>Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} /></label>
-        </div>
+        <label>Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
         <div className="people-capture-grid">
           <label>Last contact<input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} /></label>
           <label>Next contact<input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></label>
@@ -2326,13 +2573,22 @@ export default function PeopleWorkspace({
                     <small>A person can belong to several groups without creating another contact.</small>
                   </fieldset>
                   {PROFILE_SECTIONS.map((section) => (
-                    <section className={`people-profile-section module-ref-tone-${section.tone}`} key={section.title}>
+                    <Fragment key={section.title}>
+                    <section className={`people-profile-section module-ref-tone-${section.tone}`}>
                       <h4>{section.title}</h4>
                       <div className="people-profile-field-grid">
                         {section.fields.map((field) => (
                           <label className={field.type === "textarea" ? "is-wide" : ""} key={field.key}>
                             {field.label}
-                            {field.type === "textarea" ? (
+                            {field.key === "contactCadence" ? (
+                              <select
+                                data-people-cadence-select
+                                value={profileDraft.contactCadence}
+                                onChange={(event) => updateProfileDraft("contactCadence", event.target.value)}
+                              >
+                                {CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+                              </select>
+                            ) : field.type === "textarea" ? (
                               <textarea
                                 value={profileDraft[field.key]}
                                 onChange={(event) => updateProfileDraft(field.key, event.target.value)}
@@ -2405,6 +2661,32 @@ export default function PeopleWorkspace({
                         </div>
                       )}
                     </section>
+                    {section.title === "Communication" && (
+                      <>
+                        <OccupationEntriesEditor
+                          entries={profileDraft.occupations}
+                          onChange={updateProfileOccupation}
+                          onAdd={() => setProfileDraft((current) => ({ ...current, occupations: [...current.occupations, newOccupationEntry()] }))}
+                          onRemove={(id) => setProfileDraft((current) => ({ ...current, occupations: removeEntry(current.occupations, id) }))}
+                        />
+                        <EducationEntriesEditor
+                          entries={profileDraft.education}
+                          onChange={updateProfileEducation}
+                          onAdd={() => setProfileDraft((current) => ({ ...current, education: [...current.education, newEducationEntry()] }))}
+                          onRemove={(id) => setProfileDraft((current) => ({ ...current, education: removeEntry(current.education, id) }))}
+                        />
+                        <LocationEntriesEditor
+                          entries={profileDraft.locations}
+                          onChange={updateProfileLocation}
+                          onAdd={() => setProfileDraft((current) => ({
+                            ...current,
+                            locations: [...current.locations, newLocationEntry({ label: current.locations.length === 0 ? "Primary home" : "" })]
+                          }))}
+                          onRemove={(id) => setProfileDraft((current) => ({ ...current, locations: removeEntry(current.locations, id) }))}
+                        />
+                      </>
+                    )}
+                    </Fragment>
                   ))}
                 </form>
                 <datalist id="people-location-suggestions">

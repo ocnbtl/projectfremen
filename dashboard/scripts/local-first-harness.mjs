@@ -79,6 +79,7 @@ try {
   assert.equal(contactFields.find((field) => field.key === "profile.notes")?.group, "Details");
   assert.equal(contactFields.find((field) => field.key === "subjects")?.control, "tags");
   assert.equal(contactFields.find((field) => field.key === "profile.instagram")?.control, "url");
+  assert.equal(contactFields.find((field) => field.key === "profile.address")?.control, "textarea");
   const commandId = crypto.randomUUID();
   const commandField = pendingCommandField(commandId);
   const commandSnapshot = snapshot(crypto.randomUUID(), "note", crypto.randomUUID(), "device-a", 900, {
@@ -409,10 +410,18 @@ try {
   assert.match(peopleWorkspace, /normalizePhoneForStorage/i);
   assert.match(peopleWorkspace, /Website & social profiles/i);
   assert.match(peopleWorkspace, /people-location-suggestions/i);
+  assert.match(peopleWorkspace, /Colleague \/ Coworker/i);
+  assert.match(peopleWorkspace, /No cadence/i);
+  assert.match(peopleWorkspace, /Add university/i);
+  assert.match(peopleWorkspace, /Add job/i);
+  assert.match(peopleWorkspace, /Add location/i);
   const personalRecordsStore = await readFile("lib/personal-records-store.ts", "utf8");
   assert.match(personalRecordsStore, /phoneCountryCode/i);
   assert.match(personalRecordsStore, /instagram/i);
   assert.match(personalRecordsStore, /tiktok/i);
+  assert.match(personalRecordsStore, /normalizeEducationEntries/i);
+  assert.match(personalRecordsStore, /normalizeOccupationEntries/i);
+  assert.match(personalRecordsStore, /normalizeLocationEntries/i);
   const fileStore = await readFile("lib/file-store.ts", "utf8");
   assert.match(fileStore, /turbopackIgnore: true/i);
   const nextConfig = await readFile("next.config.ts", "utf8");

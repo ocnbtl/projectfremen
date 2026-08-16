@@ -26,6 +26,8 @@ export function derivePeopleCadenceState(person: PeopleRecord, now = new Date())
 
   const next = parseDate(person.profile.nextContact || person.time.nextReview);
   const last = parseDate(person.profile.lastContact || person.time.lastReview);
+  const cadence = (person.profile.contactCadence || person.time.reviewCadence || "").toUpperCase();
+  if (cadence === "NONE" && !next) return "paused";
   if (!next) return last ? "unknown" : "dormant";
 
   const days = Math.ceil((next.getTime() - now.getTime()) / 86400000);
@@ -38,6 +40,8 @@ export function peopleRecordToDirectoryItem(
   person: PeopleRecord,
   now = new Date()
 ): PeopleDirectoryItem {
+  const currentJob = person.profile.occupations.find((entry) => entry.status === "current");
+  const primaryLocation = person.profile.locations[0];
   return {
     id: person.id,
     fullName: person.fullName,
@@ -48,9 +52,9 @@ export function peopleRecordToDirectoryItem(
     relationshipLabel: person.subjects[0] || person.profile.context || "Relationship",
     primaryEmail: person.profile.primaryEmail,
     phoneNumber: person.profile.phoneNumber,
-    location: person.profile.livesIn,
-    occupation: person.profile.primaryOccupation,
-    employer: person.profile.primaryEmployer,
+    location: primaryLocation?.location || person.profile.livesIn,
+    occupation: currentJob?.title || person.profile.primaryOccupation,
+    employer: currentJob?.employer || person.profile.primaryEmployer,
     lastContactAt: person.profile.lastContact || person.time.lastReview,
     nextFollowUpAt: person.profile.nextContact || person.time.nextReview,
     projects: [...person.projects],
@@ -69,6 +73,10 @@ function searchableText(person: PeopleRecord): string {
     person.profile.primaryOccupation,
     person.profile.primaryEmployer,
     person.profile.livesIn,
+    person.profile.address,
+    ...person.profile.education.flatMap((entry) => [entry.institution, entry.degree, entry.fieldOfStudy]),
+    ...person.profile.occupations.flatMap((entry) => [entry.title, entry.employer]),
+    ...person.profile.locations.flatMap((entry) => [entry.label, entry.location, entry.address]),
     ...person.subjects,
     ...person.projects
   ]

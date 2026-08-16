@@ -2644,7 +2644,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-edit-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  grid-template-columns: minmax(0, 1fr);
   gap: 12px;
   align-items: start;
 }
@@ -3305,9 +3305,20 @@ body.people-ai-panel-open .local-ai-widget {
   font-weight: 850;
 }
 
+.people-capture-classification {
+  display: grid;
+  grid-template-columns: minmax(132px, 168px) minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+}
+
+.people-type-field {
+  align-self: start;
+}
+
 .people-group-picker > div {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(124px, 1fr));
   gap: 6px;
 }
 
@@ -3317,11 +3328,18 @@ body.people-ai-panel-open .local-ai-widget {
   align-items: center;
   gap: 5px;
   min-height: 30px;
-  border-radius: 999px;
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 7px;
   padding: 0 8px;
   color: var(--text-strong);
   background: var(--surface-panel-soft);
   font-size: 11px;
+}
+
+.people-group-picker label:has(input:checked) {
+  border-color: color-mix(in srgb, var(--accent-green) 35%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent-green) 9%, var(--surface-panel));
 }
 
 .people-group-picker input {
@@ -3341,6 +3359,97 @@ body.people-ai-panel-open .local-ai-widget {
 .people-social-fields {
   display: grid;
   gap: 8px;
+}
+
+.people-repeatable-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid currentColor;
+  border-radius: 8px;
+  background: var(--surface-panel-soft);
+}
+
+.people-repeatable-heading,
+.people-repeatable-entry-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.people-repeatable-heading h4,
+.people-repeatable-heading p,
+.people-repeatable-entry-heading strong,
+.people-repeatable-empty {
+  margin: 0;
+}
+
+.people-repeatable-heading h4 {
+  color: var(--text-strong);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.people-repeatable-heading p,
+.people-repeatable-empty {
+  margin-top: 2px;
+  color: var(--text-subtle);
+  font-size: 10px;
+  line-height: 1.4;
+}
+
+.people-repeatable-heading button,
+.people-repeatable-entry-heading button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 30px;
+  border-color: var(--border);
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.people-repeatable-heading button:hover,
+.people-repeatable-entry-heading button:hover {
+  border-color: var(--accent-green);
+  background: var(--surface-panel-soft);
+}
+
+.people-repeatable-entry {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.people-repeatable-entry-heading strong {
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.people-repeatable-fields {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.people-repeatable-fields-location {
+  grid-template-columns: minmax(120px, 0.55fr) minmax(180px, 1fr);
+}
+
+.people-repeatable-fields .is-wide {
+  grid-column: 1 / -1;
+}
+
+.people-repeatable-fields textarea {
+  min-height: 70px;
 }
 
 .people-advanced-properties {
@@ -3574,8 +3683,10 @@ body.people-ai-panel-open .local-ai-widget {
   .people-cadence-grid,
   .people-linked-workspace,
   .people-cadence-pair,
+  .people-capture-classification,
   .people-capture-grid,
   .people-profile-field-grid,
+  .people-repeatable-fields,
   .people-notes-grid,
   .people-relationships-grid,
   .people-utility-grid,
@@ -3590,6 +3701,24 @@ body.people-ai-panel-open .local-ai-widget {
   .people-timeline-memory button,
   .people-memory-properties button,
   .people-memory-actions button {
+    min-height: 44px;
+  }
+
+  .people-repeatable-heading button,
+  .people-repeatable-entry-heading button {
+    min-height: 44px;
+  }
+
+  .people-repeatable-heading button {
+    width: 100%;
+  }
+
+  .people-repeatable-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .people-group-picker label {
     min-height: 44px;
   }
 
@@ -3753,8 +3882,10 @@ html[data-admin-preview="mobile"] .people-edit-layout,
 html[data-admin-preview="mobile"] .people-cadence-grid,
 html[data-admin-preview="mobile"] .people-linked-workspace,
 html[data-admin-preview="mobile"] .people-cadence-pair,
+html[data-admin-preview="mobile"] .people-capture-classification,
 html[data-admin-preview="mobile"] .people-capture-grid,
 html[data-admin-preview="mobile"] .people-profile-field-grid,
+html[data-admin-preview="mobile"] .people-repeatable-fields,
 html[data-admin-preview="mobile"] .people-notes-grid,
 html[data-admin-preview="mobile"] .people-relationships-grid,
 html[data-admin-preview="mobile"] .people-utility-grid,
@@ -3769,6 +3900,24 @@ html[data-admin-preview="mobile"] .people-memory-card button,
 html[data-admin-preview="mobile"] .people-timeline-memory button,
 html[data-admin-preview="mobile"] .people-memory-properties button,
 html[data-admin-preview="mobile"] .people-memory-actions button {
+  min-height: 44px;
+}
+
+html[data-admin-preview="mobile"] .people-repeatable-heading button,
+html[data-admin-preview="mobile"] .people-repeatable-entry-heading button {
+  min-height: 44px;
+}
+
+html[data-admin-preview="mobile"] .people-repeatable-heading button {
+  width: 100%;
+}
+
+html[data-admin-preview="mobile"] .people-repeatable-heading {
+  align-items: stretch;
+  flex-direction: column;
+}
+
+html[data-admin-preview="mobile"] .people-group-picker label {
   min-height: 44px;
 }
 

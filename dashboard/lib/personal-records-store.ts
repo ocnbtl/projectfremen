@@ -94,6 +94,27 @@ export type PersonalMemoryEntry = {
   createdAt?: string;
 };
 
+export type PersonalEducationEntry = {
+  id: string;
+  institution: string;
+  degree?: string;
+  fieldOfStudy?: string;
+};
+
+export type PersonalOccupationEntry = {
+  id: string;
+  title: string;
+  employer?: string;
+  status: "current" | "past";
+};
+
+export type PersonalLocationEntry = {
+  id: string;
+  label?: string;
+  location?: string;
+  address?: string;
+};
+
 export type PersonalContactProfile = {
   fullName?: string;
   firstName?: string;
@@ -115,6 +136,7 @@ export type PersonalContactProfile = {
   pastEmployer?: string;
   universityAffiliation?: string;
   livesIn?: string;
+  address?: string;
   comesFrom?: string;
   associatedPeople: string[];
   lastContact?: string;
@@ -132,6 +154,9 @@ export type PersonalContactProfile = {
   children: string[];
   interactions: string[];
   memories: PersonalMemoryEntry[];
+  education: PersonalEducationEntry[];
+  occupations: PersonalOccupationEntry[];
+  locations: PersonalLocationEntry[];
 };
 
 export type PersonalRecord = {
@@ -310,6 +335,7 @@ const CONTACT_PROFILE_TEXT_KEYS = [
   "pastEmployer",
   "universityAffiliation",
   "livesIn",
+  "address",
   "comesFrom",
   "lastContact",
   "nextContact",
@@ -444,7 +470,228 @@ function normalizeMemoryEntries(value: unknown, strict = false): PersonalMemoryE
   return entries;
 }
 
-function normalizeContactProfile(input: unknown, strictMemories = false): PersonalContactProfile | undefined {
+function deterministicProfileEntryId(prefix: string, value: string, index: number): string {
+  let hash = 2166136261;
+  for (let offset = 0; offset < value.length; offset += 1) {
+    hash ^= value.charCodeAt(offset);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `${prefix}-${index}-${(hash >>> 0).toString(36)}`;
+}
+
+function profileEntryText(
+  value: unknown,
+  maximum: number,
+  strict: boolean,
+  label: string
+): string {
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string") {
+    if (strict) throw new Error(`${label} must be text`);
+    return "";
+  }
+  const clean = value.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
+  if (strict && clean.length > maximum) throw new Error(`${label} must be ${maximum.toLocaleString()} characters or fewer`);
+  return clean.slice(0, maximum);
+}
+
+function profileEntryId(
+  prefix: string,
+  rawId: unknown,
+  basis: string,
+  index: number,
+  ids: Set<string>,
+  strict: boolean
+): string {
+  let id = typeof rawId === "string" && MEMORY_ID.test(rawId.trim())
+    ? rawId.trim()
+    : deterministicProfileEntryId(prefix, basis, index);
+  if (ids.has(id)) {
+    if (strict) throw new Error(`Each ${prefix} entry needs a unique id`);
+    id = deterministicProfileEntryId(prefix, `${basis}:${id}`, index);
+  }
+  ids.add(id);
+  return id;
+}
+
+function normalizeEducationEntries(value: unknown, strict = false): PersonalEducationEntry[] {
+  if (!Array.isArray(value)) {
+    if (strict && value !== undefined) throw new Error("Education must be a list");
+    return [];
+  }
+  if (strict && value.length > 16) throw new Error("A profile can store up to 16 education entries");
+
+  const entries: PersonalEducationEntry[] = [];
+  const ids = new Set<string>();
+  for (const [index, item] of value.slice(0, 16).entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      if (strict) throw new Error(`Education entry ${index + 1} is invalid`);
+      continue;
+    }
+    const raw = item as Record<string, unknown>;
+    const institution = profileEntryText(raw.institution, 240, strict, `Education entry ${index + 1} university`);
+    const degree = profileEntryText(raw.degree, 240, strict, `Education entry ${index + 1} degree`);
+    const fieldOfStudy = profileEntryText(raw.fieldOfStudy, 240, strict, `Education entry ${index + 1} field of study`);
+    if (!institution && !degree && !fieldOfStudy) {
+      if (strict) throw new Error(`Education entry ${index + 1} needs a university, degree, or field of study`);
+      continue;
+    }
+    entries.push({
+      id: profileEntryId("education", raw.id, `${institution}:${degree}:${fieldOfStudy}`, index, ids, strict),
+      institution,
+      degree: degree || undefined,
+      fieldOfStudy: fieldOfStudy || undefined
+    });
+  }
+  return entries;
+}
+
+function normalizeOccupationEntries(value: unknown, strict = false): PersonalOccupationEntry[] {
+  if (!Array.isArray(value)) {
+    if (strict && value !== undefined) throw new Error("Jobs must be a list");
+    return [];
+  }
+  if (strict && value.length > 24) throw new Error("A profile can store up to 24 jobs");
+
+  const entries: PersonalOccupationEntry[] = [];
+  const ids = new Set<string>();
+  for (const [index, item] of value.slice(0, 24).entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      if (strict) throw new Error(`Job ${index + 1} is invalid`);
+      continue;
+    }
+    const raw = item as Record<string, unknown>;
+    const title = profileEntryText(raw.title, 240, strict, `Job ${index + 1} title`);
+    const employer = profileEntryText(raw.employer, 240, strict, `Job ${index + 1} employer`);
+    if (!title && !employer) {
+      if (strict) throw new Error(`Job ${index + 1} needs a title or employer`);
+      continue;
+    }
+    const rawStatus = typeof raw.status === "string" ? raw.status.trim().toLowerCase() : "current";
+    if (strict && rawStatus !== "current" && rawStatus !== "past") throw new Error(`Job ${index + 1} status is invalid`);
+    const status = rawStatus === "past" ? "past" : "current";
+    entries.push({
+      id: profileEntryId("occupation", raw.id, `${title}:${employer}:${status}`, index, ids, strict),
+      title,
+      employer: employer || undefined,
+      status
+    });
+  }
+  return entries;
+}
+
+function normalizeLocationEntries(value: unknown, strict = false): PersonalLocationEntry[] {
+  if (!Array.isArray(value)) {
+    if (strict && value !== undefined) throw new Error("Locations must be a list");
+    return [];
+  }
+  if (strict && value.length > 16) throw new Error("A profile can store up to 16 locations");
+
+  const entries: PersonalLocationEntry[] = [];
+  const ids = new Set<string>();
+  for (const [index, item] of value.slice(0, 16).entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      if (strict) throw new Error(`Location ${index + 1} is invalid`);
+      continue;
+    }
+    const raw = item as Record<string, unknown>;
+    const label = profileEntryText(raw.label, 80, strict, `Location ${index + 1} label`);
+    const location = profileEntryText(raw.location, 320, strict, `Location ${index + 1} city or region`);
+    const address = profileEntryText(raw.address, 1000, strict, `Location ${index + 1} address`);
+    if (!location && !address) {
+      if (strict) throw new Error(`Location ${index + 1} needs a city, region, or street address`);
+      continue;
+    }
+    entries.push({
+      id: profileEntryId("location", raw.id, `${label}:${location}:${address}`, index, ids, strict),
+      label: label || undefined,
+      location: location || undefined,
+      address: address || undefined
+    });
+  }
+  return entries;
+}
+
+function reconcileContactProfileCollections(profile: PersonalContactProfile): PersonalContactProfile {
+  const education = profile.education.map((entry) => ({ ...entry }));
+  const occupations = profile.occupations.map((entry) => ({ ...entry }));
+  const locations = profile.locations.map((entry) => ({ ...entry }));
+
+  if (profile.universityAffiliation) {
+    if (education.length > 0) education[0] = { ...education[0], institution: profile.universityAffiliation };
+    else education.push({
+      id: deterministicProfileEntryId("education", profile.universityAffiliation, 0),
+      institution: profile.universityAffiliation
+    });
+  }
+
+  const currentJobs = occupations.filter((entry) => entry.status === "current");
+  const pastJobs = occupations.filter((entry) => entry.status === "past");
+  if (profile.primaryOccupation || profile.primaryEmployer) {
+    const replacement: PersonalOccupationEntry = {
+      id: currentJobs[0]?.id || deterministicProfileEntryId("occupation", `${profile.primaryOccupation || ""}:${profile.primaryEmployer || ""}:current`, 0),
+      title: profile.primaryOccupation || currentJobs[0]?.title || "",
+      employer: profile.primaryEmployer || currentJobs[0]?.employer,
+      status: "current"
+    };
+    const index = currentJobs[0] ? occupations.findIndex((entry) => entry.id === currentJobs[0].id) : -1;
+    if (index >= 0) occupations[index] = replacement;
+    else occupations.unshift(replacement);
+  }
+  if (profile.secondaryOccupation || profile.secondaryEmployer) {
+    const replacement: PersonalOccupationEntry = {
+      id: currentJobs[1]?.id || deterministicProfileEntryId("occupation", `${profile.secondaryOccupation || ""}:${profile.secondaryEmployer || ""}:current`, 1),
+      title: profile.secondaryOccupation || currentJobs[1]?.title || "",
+      employer: profile.secondaryEmployer || currentJobs[1]?.employer,
+      status: "current"
+    };
+    const index = currentJobs[1] ? occupations.findIndex((entry) => entry.id === currentJobs[1].id) : -1;
+    if (index >= 0) occupations[index] = replacement;
+    else occupations.push(replacement);
+  }
+  if (profile.pastOccupation || profile.pastEmployer) {
+    const replacement: PersonalOccupationEntry = {
+      id: pastJobs[0]?.id || deterministicProfileEntryId("occupation", `${profile.pastOccupation || ""}:${profile.pastEmployer || ""}:past`, 0),
+      title: profile.pastOccupation || pastJobs[0]?.title || "",
+      employer: profile.pastEmployer || pastJobs[0]?.employer,
+      status: "past"
+    };
+    const index = pastJobs[0] ? occupations.findIndex((entry) => entry.id === pastJobs[0].id) : -1;
+    if (index >= 0) occupations[index] = replacement;
+    else occupations.push(replacement);
+  }
+
+  if (profile.livesIn || profile.address) {
+    const replacement: PersonalLocationEntry = {
+      id: locations[0]?.id || deterministicProfileEntryId("location", `${profile.livesIn || ""}:${profile.address || ""}`, 0),
+      label: locations[0]?.label || "Primary home",
+      location: profile.livesIn || locations[0]?.location,
+      address: profile.address || locations[0]?.address
+    };
+    if (locations.length > 0) locations[0] = replacement;
+    else locations.push(replacement);
+  }
+
+  const resolvedCurrentJobs = occupations.filter((entry) => entry.status === "current");
+  const resolvedPastJobs = occupations.filter((entry) => entry.status === "past");
+  return {
+    ...profile,
+    universityAffiliation: profile.universityAffiliation || education[0]?.institution,
+    primaryOccupation: profile.primaryOccupation || resolvedCurrentJobs[0]?.title,
+    primaryEmployer: profile.primaryEmployer || resolvedCurrentJobs[0]?.employer,
+    secondaryOccupation: profile.secondaryOccupation || resolvedCurrentJobs[1]?.title,
+    secondaryEmployer: profile.secondaryEmployer || resolvedCurrentJobs[1]?.employer,
+    pastOccupation: profile.pastOccupation || resolvedPastJobs[0]?.title,
+    pastEmployer: profile.pastEmployer || resolvedPastJobs[0]?.employer,
+    livesIn: profile.livesIn || locations[0]?.location,
+    address: profile.address || locations[0]?.address,
+    education,
+    occupations,
+    locations
+  };
+}
+
+function normalizeContactProfile(input: unknown, strictEntries = false): PersonalContactProfile | undefined {
   if (!input || typeof input !== "object") {
     return undefined;
   }
@@ -454,7 +701,10 @@ function normalizeContactProfile(input: unknown, strictMemories = false): Person
     associatedPeople: splitProfileList(raw.associatedPeople),
     children: splitProfileList(raw.children),
     interactions: splitProfileList(raw.interactions),
-    memories: normalizeMemoryEntries(raw.memories, strictMemories)
+    memories: normalizeMemoryEntries(raw.memories, strictEntries),
+    education: normalizeEducationEntries(raw.education, strictEntries),
+    occupations: normalizeOccupationEntries(raw.occupations, strictEntries),
+    locations: normalizeLocationEntries(raw.locations, strictEntries)
   };
 
   for (const key of CONTACT_PROFILE_TEXT_KEYS) {
@@ -464,7 +714,7 @@ function normalizeContactProfile(input: unknown, strictMemories = false): Person
     }
   }
 
-  return profile;
+  return reconcileContactProfileCollections(profile);
 }
 
 function normalizeContactProfilePatch(input: unknown): Partial<PersonalContactProfile> | undefined {
@@ -498,6 +748,15 @@ function normalizeContactProfilePatch(input: unknown): Partial<PersonalContactPr
   if (Object.prototype.hasOwnProperty.call(raw, "memories")) {
     patch.memories = normalizeMemoryEntries(raw.memories, true);
   }
+  if (Object.prototype.hasOwnProperty.call(raw, "education")) {
+    patch.education = normalizeEducationEntries(raw.education, true);
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, "occupations")) {
+    patch.occupations = normalizeOccupationEntries(raw.occupations, true);
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, "locations")) {
+    patch.locations = normalizeLocationEntries(raw.locations, true);
+  }
 
   return Object.keys(patch).length > 0 ? patch : undefined;
 }
@@ -509,14 +768,112 @@ function mergeContactProfile(
   if (!patch) {
     return current;
   }
-  return {
+  const has = (key: keyof PersonalContactProfile) => Object.prototype.hasOwnProperty.call(patch, key);
+  const education = (patch.education ?? current?.education ?? []).map((entry) => ({ ...entry }));
+  const occupations = (patch.occupations ?? current?.occupations ?? []).map((entry) => ({ ...entry }));
+  const locations = (patch.locations ?? current?.locations ?? []).map((entry) => ({ ...entry }));
+
+  let universityAffiliation = has("universityAffiliation")
+    ? patch.universityAffiliation
+    : patch.education
+      ? education[0]?.institution
+      : current?.universityAffiliation;
+  if (!patch.education && has("universityAffiliation")) {
+    if (universityAffiliation) {
+      if (education.length > 0) education[0] = { ...education[0], institution: universityAffiliation };
+      else education.push({ id: deterministicProfileEntryId("education", universityAffiliation, 0), institution: universityAffiliation });
+    } else if (education[0]) {
+      education[0] = { ...education[0], institution: "" };
+      if (!education[0].degree && !education[0].fieldOfStudy) education.shift();
+    }
+  }
+
+  const projectedJobs = (status: PersonalOccupationEntry["status"]) => occupations
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => entry.status === status);
+  const updateProjectedJob = (
+    status: PersonalOccupationEntry["status"],
+    position: number,
+    title: string | undefined,
+    employer: string | undefined
+  ) => {
+    const projected = projectedJobs(status)[position];
+    if (!title && !employer) {
+      if (projected) occupations.splice(projected.index, 1);
+      return;
+    }
+    const replacement: PersonalOccupationEntry = {
+      id: projected?.entry.id || deterministicProfileEntryId("occupation", `${title || ""}:${employer || ""}:${status}`, position),
+      title: title || "",
+      employer,
+      status
+    };
+    if (projected) occupations[projected.index] = replacement;
+    else occupations.push(replacement);
+  };
+
+  let primaryOccupation = has("primaryOccupation") ? patch.primaryOccupation : current?.primaryOccupation;
+  let primaryEmployer = has("primaryEmployer") ? patch.primaryEmployer : current?.primaryEmployer;
+  let secondaryOccupation = has("secondaryOccupation") ? patch.secondaryOccupation : current?.secondaryOccupation;
+  let secondaryEmployer = has("secondaryEmployer") ? patch.secondaryEmployer : current?.secondaryEmployer;
+  let pastOccupation = has("pastOccupation") ? patch.pastOccupation : current?.pastOccupation;
+  let pastEmployer = has("pastEmployer") ? patch.pastEmployer : current?.pastEmployer;
+  if (patch.occupations) {
+    const currentJobs = occupations.filter((entry) => entry.status === "current");
+    const pastJobs = occupations.filter((entry) => entry.status === "past");
+    if (!has("primaryOccupation")) primaryOccupation = currentJobs[0]?.title;
+    if (!has("primaryEmployer")) primaryEmployer = currentJobs[0]?.employer;
+    if (!has("secondaryOccupation")) secondaryOccupation = currentJobs[1]?.title;
+    if (!has("secondaryEmployer")) secondaryEmployer = currentJobs[1]?.employer;
+    if (!has("pastOccupation")) pastOccupation = pastJobs[0]?.title;
+    if (!has("pastEmployer")) pastEmployer = pastJobs[0]?.employer;
+  } else {
+    if (has("primaryOccupation") || has("primaryEmployer")) updateProjectedJob("current", 0, primaryOccupation, primaryEmployer);
+    if (has("secondaryOccupation") || has("secondaryEmployer")) updateProjectedJob("current", 1, secondaryOccupation, secondaryEmployer);
+    if (has("pastOccupation") || has("pastEmployer")) updateProjectedJob("past", 0, pastOccupation, pastEmployer);
+  }
+
+  let livesIn = has("livesIn") ? patch.livesIn : current?.livesIn;
+  let address = has("address") ? patch.address : current?.address;
+  if (patch.locations) {
+    if (!has("livesIn")) livesIn = locations[0]?.location;
+    if (!has("address")) address = locations[0]?.address;
+  } else if (has("livesIn") || has("address")) {
+    if (livesIn || address) {
+      const first = locations[0];
+      const replacement: PersonalLocationEntry = {
+        id: first?.id || deterministicProfileEntryId("location", `${livesIn || ""}:${address || ""}`, 0),
+        label: first?.label || "Primary home",
+        location: livesIn,
+        address
+      };
+      if (first) locations[0] = replacement;
+      else locations.push(replacement);
+    } else if (locations.length > 0) {
+      locations.shift();
+    }
+  }
+
+  return reconcileContactProfileCollections({
     ...current,
     ...patch,
+    universityAffiliation,
+    primaryOccupation,
+    primaryEmployer,
+    secondaryOccupation,
+    secondaryEmployer,
+    pastOccupation,
+    pastEmployer,
+    livesIn,
+    address,
     associatedPeople: patch.associatedPeople ?? current?.associatedPeople ?? [],
     children: patch.children ?? current?.children ?? [],
     interactions: patch.interactions ?? current?.interactions ?? [],
-    memories: patch.memories ?? current?.memories ?? []
-  };
+    memories: patch.memories ?? current?.memories ?? [],
+    education,
+    occupations,
+    locations
+  });
 }
 
 function sanitizeTitle(value: string): string {
@@ -783,7 +1140,11 @@ function mergeTimePatch(
   const lastReviewChanged = Object.prototype.hasOwnProperty.call(raw, "lastReview");
   const nextReviewProvided = Object.prototype.hasOwnProperty.call(raw, "nextReview");
   if ((cadenceChanged || lastReviewChanged) && !nextReviewProvided) {
-    next.nextReview = calculateNextReview(next.lastReview, next.reviewCadence) || next.nextReview;
+    if (cadenceChanged && next.reviewCadence === "NONE") {
+      next.nextReview = undefined;
+    } else {
+      next.nextReview = calculateNextReview(next.lastReview, next.reviewCadence) || next.nextReview;
+    }
   }
   return next;
 }

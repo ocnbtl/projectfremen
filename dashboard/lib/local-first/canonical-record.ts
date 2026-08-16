@@ -91,6 +91,7 @@ export function editableFieldsFor(module: CanonicalModule, collection: string): 
       FIELD("profile.phoneNumber", "Phone", "tel", { group: "Essentials" }),
       FIELD("profile.phoneCountryCode", "Phone country code", "text", { group: "Classification", help: "Defaults to +1 unless this contact uses another country code." }),
       FIELD("profile.livesIn", "Location", "text", { group: "Essentials" }),
+      FIELD("profile.address", "Primary address", "textarea", { group: "Essentials", help: "The full address for the primary location. Additional locations remain available in People." }),
       FIELD("profile.primaryOccupation", "Occupation", "text", { group: "Details" }),
       FIELD("profile.primaryEmployer", "Employer", "text", { group: "Details" }),
       FIELD("profile.website", "Website", "url", { group: "Details" }),

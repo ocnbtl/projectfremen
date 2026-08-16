@@ -5576,9 +5576,77 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
           await propertyMemories.locator('input[type="date"]').count() === expectedMemoryIds.length,
         `Properties did not render one text and date editor per memory at ${viewport.label}`
       );
+      const propertyGroups = await page.locator(".people-profile-group-picker label").allTextContents();
+      assert(
+        propertyGroups.some((label) => label.includes("Colleague / Coworker")) && propertyGroups.some((label) => label.includes("Other")),
+        `Properties omitted the Colleague / Coworker or Other group at ${viewport.label}`
+      );
+      const propertyCadence = page.locator("[data-people-cadence-select]");
+      assert(
+        await propertyCadence.inputValue() === "NONE" &&
+          (await propertyCadence.locator("option").allTextContents()).includes("No cadence"),
+        `Properties did not expose the persisted No cadence choice at ${viewport.label}`
+      );
+      assert(
+        await page.locator("[data-education-entry]").count() === 2 &&
+          await page.locator("[data-occupation-entry]").count() === 3 &&
+          await page.locator("[data-location-entry]").count() === 2,
+        `Properties did not render every repeatable university, job, and location at ${viewport.label}`
+      );
+      assert(
+        await page.locator('[data-location-entry="location-regression-1"] textarea').inputValue() === "123 Test Street, Columbus, Ohio 43215, USA",
+        `Properties did not expose the primary street address at ${viewport.label}`
+      );
       await assertNoOverflow(page, `People memory Properties ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-memory-properties-${viewport.label}.png`),
+        fullPage: true
+      });
+
+      await page.goto(`${baseUrl}/admin/people/new`, { waitUntil: "networkidle" });
+      const classification = page.locator(".people-capture-classification");
+      await classification.waitFor();
+      const typeRect = await classification.locator(".people-type-field").boundingBox();
+      const groupRect = await classification.locator(".people-group-picker").boundingBox();
+      assert(typeRect && groupRect, `New People classification controls were not measurable at ${viewport.label}`);
+      if (viewport.label !== "mobile") {
+        assert(typeRect.width < groupRect.width, `New People Type control still consumes more space than Groups at ${viewport.label}`);
+      }
+      const typeSelect = classification.locator(".people-type-field select");
+      await typeSelect.selectOption("org");
+      assert(await page.locator(".people-edit-toolbar strong").textContent() === "New Organization", `New People did not reflect Organization type at ${viewport.label}`);
+      await typeSelect.selectOption("person");
+      const createGroups = await classification.locator(".people-group-picker label").allTextContents();
+      assert(
+        createGroups.some((label) => label.includes("Colleague / Coworker")) && createGroups.some((label) => label.includes("Other")),
+        `New People omitted the Colleague / Coworker or Other group at ${viewport.label}`
+      );
+      const createCadenceOptions = await page.locator("[data-people-cadence-select] option").allTextContents();
+      assert(createCadenceOptions.includes("No cadence"), `New People omitted No cadence at ${viewport.label}`);
+      assert(
+        await page.locator("[data-education-entry]").count() === 0 &&
+          await page.locator("[data-occupation-entry]").count() === 1 &&
+          await page.locator("[data-location-entry]").count() === 1,
+        `New People did not start with one compact job/location and no university at ${viewport.label}`
+      );
+      await page.getByRole("button", { name: "Add university" }).click();
+      await page.getByRole("button", { name: "Add job" }).click();
+      await page.getByRole("button", { name: "Add location" }).click();
+      assert(
+        await page.locator("[data-education-entry]").count() === 1 &&
+          await page.locator("[data-occupation-entry]").count() === 2 &&
+          await page.locator("[data-location-entry]").count() === 2,
+        `New People repeatable Add controls failed at ${viewport.label}`
+      );
+      if (viewport.label === "mobile") {
+        const groupHeights = await classification.locator(".people-group-picker label").evaluateAll((elements) =>
+          elements.map((element) => element.getBoundingClientRect().height)
+        );
+        assert(groupHeights.every((height) => height >= 44), `New People mobile group targets fell below 44px: ${JSON.stringify(groupHeights)}`);
+      }
+      await assertNoOverflow(page, `New People structured profile ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-profile-fields-${viewport.label}.png`),
         fullPage: true
       });
       await context.close();
@@ -12634,11 +12702,25 @@ async function main() {
         id: createdPerson.id,
         expectedUpdatedAt: createdPerson.updatedAt,
         title: updatedPersonTitle,
-        subjects: ["Advisor"],
-        time: { lastReview: "2026-07-14", reviewCadence: "P1M" },
+        subjects: ["Advisor", "Colleague / Coworker", "Other"],
+        time: { lastReview: "2026-07-14", reviewCadence: "NONE" },
         profile: {
           fullName: updatedPersonTitle,
           primaryEmail: "regression-person@example.com",
+          contactCadence: "NONE",
+          education: [
+            { id: "education-regression-1", institution: "Ohio State University", degree: "Bachelor of Arts", fieldOfStudy: "Economics" },
+            { id: "education-regression-2", institution: "Columbus College of Art & Design", degree: "Certificate", fieldOfStudy: "Interaction design" }
+          ],
+          occupations: [
+            { id: "occupation-regression-1", title: "Product designer", employer: "Regression Studio", status: "current" },
+            { id: "occupation-regression-2", title: "Research advisor", employer: "Example Lab", status: "current" },
+            { id: "occupation-regression-3", title: "Design intern", employer: "Archive Works", status: "past" }
+          ],
+          locations: [
+            { id: "location-regression-1", label: "Primary home", location: "Columbus, Ohio, USA", address: "123 Test Street, Columbus, Ohio 43215, USA" },
+            { id: "location-regression-2", label: "Second home", location: "Cincinnati, Ohio, USA", address: "456 Example Avenue, Cincinnati, Ohio 45202, USA" }
+          ],
           interactions: ["2026-07-14 • Meeting • Regression persistence check"],
           memories: [
             {
@@ -12668,12 +12750,37 @@ async function main() {
     assert(persistedPerson?.profile?.primaryEmail === "regression-person@example.com", "People profile update did not persist");
     assert(persistedPerson?.profile?.interactions?.length === 1, "People interaction history did not persist");
     assert(
+      persistedPerson?.subjects?.includes("Colleague / Coworker") && persistedPerson.subjects.includes("Other"),
+      "People colleague/coworker and Other groups did not persist"
+    );
+    assert(
+      persistedPerson?.time?.reviewCadence === "NONE" && !persistedPerson.time.nextReview,
+      "People No cadence did not persist or clear the old automatically calculated follow-up"
+    );
+    assert(
+      persistedPerson?.profile?.education?.length === 2 &&
+        persistedPerson.profile.education[1].fieldOfStudy === "Interaction design",
+      "People repeatable university and degree history did not persist"
+    );
+    assert(
+      persistedPerson?.profile?.occupations?.length === 3 &&
+        persistedPerson.profile.primaryOccupation === "Product designer" &&
+        persistedPerson.profile.secondaryEmployer === "Example Lab" &&
+        persistedPerson.profile.pastOccupation === "Design intern",
+      "People repeatable jobs did not persist with compatible primary, secondary, and past projections"
+    );
+    assert(
+      persistedPerson?.profile?.locations?.length === 2 &&
+        persistedPerson.profile.livesIn === "Columbus, Ohio, USA" &&
+        persistedPerson.profile.address === "123 Test Street, Columbus, Ohio 43215, USA",
+      "People repeatable locations and primary address did not persist"
+    );
+    assert(
       persistedPerson?.profile?.memories?.length === 2 &&
         persistedPerson.profile.memories[0].id === "memory-regression-older" &&
         persistedPerson.profile.memories[1].occurredOn === "2026-08-10",
       "People dated memory entries did not persist with stable identity and input order"
     );
-    assert(persistedPerson?.time?.nextReview, "People cadence update did not calculate the next review");
 
     const rejectStalePersonMemory = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
       method: "PATCH",
@@ -12690,6 +12797,23 @@ async function main() {
     assert(
       rejectStalePersonMemory.response.status === 409 && !rejectStalePersonMemory.payload?.ok,
       "People memory update accepted a stale record version"
+    );
+
+    const rejectInvalidPersonLocation = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: createdPerson.id,
+        expectedUpdatedAt: persistedPerson.updatedAt,
+        profile: { locations: [{ id: "location-invalid", label: "Missing place and address" }] }
+      })
+    });
+    assert(
+      rejectInvalidPersonLocation.response.status === 400 && !rejectInvalidPersonLocation.payload?.ok,
+      "People PATCH accepted a location without a place or address"
     );
 
     const clearPersonUrls = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
@@ -12734,7 +12858,7 @@ async function main() {
       createdPerson.id,
       ["memory-regression-newer", "memory-regression-older"]
     );
-    pass("People memories keep stable dates, reject stale saves, and render editable newest-first Notes and Timeline views across desktop, tablet, and mobile");
+    pass("People profiles preserve dated memories, Colleague/Other groups, No cadence, and repeatable universities, jobs, locations, and addresses across desktop, tablet, and mobile");
     pass("People create/update/clear/reload/direct-route flow works through the Personal Records adapter");
 
     const peopleBridgeFollowUpTitle = `${testRunId}-people-status-bridge`;
