@@ -2713,6 +2713,8 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-section-toolbar button,
 .people-memory-actions button,
 .people-memory-card button,
+.people-timeline-memory button,
+.people-memory-properties button,
 .people-relation-form button,
 .people-ai-suggestion {
   min-height: 32px;
@@ -2814,6 +2816,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 }
 
 .people-memory-composer textarea,
+.people-memory-composer input[type="date"],
 .people-memory-composer select,
 .people-relation-form input,
 .people-relation-form select {
@@ -2831,6 +2834,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 }
 
 .people-memory-composer select,
+.people-memory-composer input[type="date"],
 .people-relation-form input,
 .people-relation-form select {
   min-height: 36px;
@@ -2877,6 +2881,130 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   color: var(--text-body);
   line-height: 1.45;
 }
+
+.people-memory-card-heading,
+.people-memory-property-entry-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.people-memory-card-heading time {
+  color: var(--text-subtle);
+  font-family: "Inconsolata Variable", monospace;
+  font-size: 12px;
+  font-weight: 750;
+}
+
+.people-memory-card-heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.people-memory-card-heading button,
+.people-timeline-memory .people-memory-card-heading button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.people-memory-inline-editor {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 180px);
+  gap: 8px !important;
+}
+
+.people-memory-inline-editor label,
+.people-memory-property-entry label {
+  display: grid;
+  gap: 5px;
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.people-memory-inline-editor textarea,
+.people-memory-inline-editor input,
+.people-memory-property-entry textarea,
+.people-memory-property-entry input {
+  width: 100%;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  font: inherit;
+}
+
+.people-memory-inline-editor textarea,
+.people-memory-property-entry textarea {
+  resize: vertical;
+}
+
+.people-memory-inline-editor > div {
+  display: flex;
+  grid-column: 1 / -1;
+  gap: 6px;
+}
+
+.people-memory-properties {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.people-memory-properties-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.people-memory-properties-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.people-memory-properties-heading strong,
+.people-memory-property-entry-heading strong {
+  color: var(--text-strong);
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
+.people-memory-properties-heading span,
+.people-memory-properties-empty {
+  margin: 0;
+  color: var(--text-subtle);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.people-memory-property-entry {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(140px, 180px);
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel-soft);
+}
+
+.people-memory-property-entry-heading {
+  grid-column: 1 / -1;
+}
+
+.people-memory-property-entry-heading > div {
+  display: flex;
+  gap: 6px;
+}
+
 
 .people-memory-card > div {
   display: flex;
@@ -3452,8 +3580,22 @@ body.people-ai-panel-open .local-ai-widget {
   .people-relationships-grid,
   .people-utility-grid,
   .people-relation-spokes,
+  .people-memory-property-entry,
+  .people-memory-inline-editor,
   .people-directory-list.is-grid {
     grid-template-columns: 1fr;
+  }
+
+  .people-memory-card button,
+  .people-timeline-memory button,
+  .people-memory-properties button,
+  .people-memory-actions button {
+    min-height: 44px;
+  }
+
+  .people-memory-properties-heading {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .people-overview-grid article:nth-child(4),
@@ -3617,8 +3759,22 @@ html[data-admin-preview="mobile"] .people-notes-grid,
 html[data-admin-preview="mobile"] .people-relationships-grid,
 html[data-admin-preview="mobile"] .people-utility-grid,
 html[data-admin-preview="mobile"] .people-relation-spokes,
+html[data-admin-preview="mobile"] .people-memory-property-entry,
+html[data-admin-preview="mobile"] .people-memory-inline-editor,
 html[data-admin-preview="mobile"] .people-directory-list.is-grid {
   grid-template-columns: 1fr;
+}
+
+html[data-admin-preview="mobile"] .people-memory-card button,
+html[data-admin-preview="mobile"] .people-timeline-memory button,
+html[data-admin-preview="mobile"] .people-memory-properties button,
+html[data-admin-preview="mobile"] .people-memory-actions button {
+  min-height: 44px;
+}
+
+html[data-admin-preview="mobile"] .people-memory-properties-heading {
+  align-items: stretch;
+  flex-direction: column;
 }
 
 html[data-admin-preview="mobile"] .people-overview-grid article:nth-child(4),

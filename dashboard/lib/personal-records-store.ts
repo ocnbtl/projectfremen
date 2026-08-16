@@ -85,6 +85,15 @@ export type PersonalRecordTime = {
   processedOn?: string;
 };
 
+export type PersonalMemoryEntry = {
+  id: string;
+  text: string;
+  occurredOn?: string;
+  category?: string;
+  pinned: boolean;
+  createdAt?: string;
+};
+
 export type PersonalContactProfile = {
   fullName?: string;
   firstName?: string;
@@ -122,7 +131,7 @@ export type PersonalContactProfile = {
   partner?: string;
   children: string[];
   interactions: string[];
-  memories: string[];
+  memories: PersonalMemoryEntry[];
 };
 
 export type PersonalRecord = {
@@ -316,7 +325,7 @@ const CONTACT_PROFILE_TEXT_KEYS = [
   "partner"
 ] as const;
 
-const CONTACT_PROFILE_LIST_KEYS = ["associatedPeople", "children", "interactions", "memories"] as const;
+const CONTACT_PROFILE_LIST_KEYS = ["associatedPeople", "children", "interactions"] as const;
 const PERSONAL_RECORD_TIME_KEYS = [
   "startDate",
   "startTime",
@@ -340,7 +349,102 @@ function splitProfileList(value: unknown): string[] {
   return [];
 }
 
-function normalizeContactProfile(input: unknown): PersonalContactProfile | undefined {
+const MEMORY_DATE = /^(\d{4})-(\d{2})-(\d{2})$/;
+const MEMORY_ID = /^[a-zA-Z0-9._:-]{1,128}$/;
+
+function isValidMemoryDate(value: string): boolean {
+  const match = value.match(MEMORY_DATE);
+  if (!match) return false;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day;
+}
+
+function deterministicMemoryId(value: string, index: number): string {
+  let hash = 2166136261;
+  for (let offset = 0; offset < value.length; offset += 1) {
+    hash ^= value.charCodeAt(offset);
+    hash = Math.imul(hash, 16777619);
+  }
+  return `legacy-memory-${index}-${(hash >>> 0).toString(36)}`;
+}
+
+function legacyMemoryEntry(value: string, index: number): PersonalMemoryEntry | null {
+  const clean = value.trim();
+  if (!clean) return null;
+  const marked = clean.match(/^(Pinned|Saved)\s+([^:]{1,64}):\s*(.+)$/i);
+  return {
+    id: deterministicMemoryId(clean, index),
+    text: marked?.[3]?.trim() || clean,
+    category: marked?.[2]?.trim() || undefined,
+    pinned: marked ? marked[1].toLowerCase() === "pinned" : true
+  };
+}
+
+function normalizeMemoryEntries(value: unknown, strict = false): PersonalMemoryEntry[] {
+  if (typeof value === "string") {
+    value = value.split(/[\n,]+/).map((item) => item.trim()).filter(Boolean);
+  }
+  if (!Array.isArray(value)) {
+    if (strict && value !== undefined) throw new Error("Memories must be a list");
+    return [];
+  }
+  if (strict && value.length > 80) throw new Error("A profile can store up to 80 memories");
+
+  const entries: PersonalMemoryEntry[] = [];
+  const ids = new Set<string>();
+  for (const [index, item] of value.slice(0, 80).entries()) {
+    if (typeof item === "string") {
+      const legacy = legacyMemoryEntry(item, index);
+      if (legacy) entries.push(legacy);
+      continue;
+    }
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      if (strict) throw new Error(`Memory ${index + 1} is invalid`);
+      continue;
+    }
+    const raw = item as Record<string, unknown>;
+    const text = typeof raw.text === "string" ? raw.text.trim() : "";
+    if (!text) {
+      if (strict) throw new Error(`Memory ${index + 1} needs text`);
+      continue;
+    }
+    if (text.length > 8000) throw new Error(`Memory ${index + 1} must be 8,000 characters or fewer`);
+
+    let id = typeof raw.id === "string" && MEMORY_ID.test(raw.id.trim())
+      ? raw.id.trim()
+      : deterministicMemoryId(text, index);
+    if (ids.has(id)) {
+      if (strict) throw new Error("Each memory needs a unique id");
+      id = deterministicMemoryId(`${text}:${id}`, index);
+    }
+    ids.add(id);
+
+    const occurredOn = typeof raw.occurredOn === "string" ? raw.occurredOn.trim() : "";
+    if (strict && occurredOn && !isValidMemoryDate(occurredOn)) {
+      throw new Error(`Memory ${index + 1} needs a valid date`);
+    }
+    const category = typeof raw.category === "string"
+      ? raw.category.replace(/[\u0000-\u001f\u007f]/g, " ").trim().slice(0, 64)
+      : "";
+    const createdAt = typeof raw.createdAt === "string" && !Number.isNaN(Date.parse(raw.createdAt))
+      ? raw.createdAt
+      : undefined;
+    entries.push({
+      id,
+      text,
+      occurredOn: occurredOn && isValidMemoryDate(occurredOn) ? occurredOn : undefined,
+      category: category || undefined,
+      pinned: typeof raw.pinned === "boolean" ? raw.pinned : true,
+      createdAt
+    });
+  }
+  return entries;
+}
+
+function normalizeContactProfile(input: unknown, strictMemories = false): PersonalContactProfile | undefined {
   if (!input || typeof input !== "object") {
     return undefined;
   }
@@ -350,7 +454,7 @@ function normalizeContactProfile(input: unknown): PersonalContactProfile | undef
     associatedPeople: splitProfileList(raw.associatedPeople),
     children: splitProfileList(raw.children),
     interactions: splitProfileList(raw.interactions),
-    memories: splitProfileList(raw.memories)
+    memories: normalizeMemoryEntries(raw.memories, strictMemories)
   };
 
   for (const key of CONTACT_PROFILE_TEXT_KEYS) {
@@ -389,6 +493,10 @@ function normalizeContactProfilePatch(input: unknown): Partial<PersonalContactPr
     if (typeof value === "string" || Array.isArray(value)) {
       patch[key] = splitProfileList(value);
     }
+  }
+
+  if (Object.prototype.hasOwnProperty.call(raw, "memories")) {
+    patch.memories = normalizeMemoryEntries(raw.memories, true);
   }
 
   return Object.keys(patch).length > 0 ? patch : undefined;
@@ -808,7 +916,7 @@ export async function createPersonalRecord(
   const meta = buildCreatedMeta(now);
   const stage = pickStage(input.stage);
   const relations = normalizeRelations(input.relations);
-  const profile = normalizeContactProfile(input.profile);
+  const profile = normalizeContactProfile(input.profile, true);
   const requestedId = options.requestedId?.trim();
   if (requestedId && !/^personal-[0-9a-f-]{36}$/i.test(requestedId)) {
     throw new Error("Invalid requested personal record id");

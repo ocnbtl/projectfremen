@@ -105,6 +105,7 @@ export async function PATCH(request: Request) {
     if (!id) {
       return NextResponse.json({ ok: false, error: "Record id is required" }, { status: 400 });
     }
+    const expectedUpdatedAt = typeof body.expectedUpdatedAt === "string" ? body.expectedUpdatedAt.trim() : "";
     const items = await updatePersonalRecord(id, {
       title: typeof body.title === "string" ? body.title : undefined,
       status: typeof body.status === "string" ? body.status : undefined,
@@ -123,7 +124,7 @@ export async function PATCH(request: Request) {
         typeof body.profile === "object" && body.profile && !Array.isArray(body.profile)
           ? body.profile
           : undefined
-    });
+    }, expectedUpdatedAt ? { expectedUpdatedAt } : undefined);
 
     const updated = items.find((item) => item.id === id);
     await appendAuditEvent({
@@ -138,9 +139,10 @@ export async function PATCH(request: Request) {
 
     return NextResponse.json({ ok: true, items });
   } catch (error) {
+    const message = error instanceof Error ? error.message : "Failed to update record";
     return NextResponse.json(
-      { ok: false, error: error instanceof Error ? error.message : "Failed to update record" },
-      { status: 400 }
+      { ok: false, error: message },
+      { status: message.startsWith("This record changed after it was opened") ? 409 : 400 }
     );
   }
 }

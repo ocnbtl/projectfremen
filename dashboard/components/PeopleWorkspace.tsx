@@ -8,6 +8,7 @@ import {
   buildFollowUpCreationRoute,
   type FollowUpSourceRef
 } from "../lib/modules/personal-ops/follow-up-links";
+import { memoryCategoryLabel, sortPeopleMemories } from "../lib/modules/people/memories";
 import { peopleCreateInputToLegacy, peopleUpdateInputToLegacy } from "../lib/modules/people/legacy-adapter";
 import type { PersonalOpsFollowUp } from "../lib/modules/personal-ops/types";
 import type { ProjectsState } from "../lib/modules/projects/types";
@@ -15,6 +16,7 @@ import { getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/rout
 import { parsePeopleUrlState, serializePeopleUrlState } from "../lib/native-objects/url-state";
 import type {
   PersonalContactProfile,
+  PersonalMemoryEntry,
   PersonalRecord,
   PersonalRecordClass,
   PersonalRecordStatus
@@ -77,6 +79,10 @@ type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up" | "prior
 type PeopleListMode = "list" | "compact" | "grid";
 type InteractionKind = "call" | "message" | "email" | "meeting" | "note" | "milestone";
 
+type PeopleTimelineItem =
+  | { kind: "memory"; id: string; date?: string; memory: PersonalMemoryEntry }
+  | { kind: "interaction"; id: string; date?: string; text: string };
+
 type MemoryCategory =
   | "personal_context"
   | "preferences"
@@ -133,11 +139,13 @@ type ContactProfileDraft = {
   partner: string;
   children: string;
   interactions: string;
-  memories: string;
+  memories: PersonalMemoryEntry[];
 };
 
+type ContactProfileTextKey = Exclude<keyof ContactProfileDraft, "memories">;
+
 type ProfileField = {
-  key: keyof ContactProfileDraft;
+  key: ContactProfileTextKey;
   label: string;
   type?: "date" | "email" | "tel" | "url" | "textarea";
   placeholder?: string;
@@ -348,8 +356,7 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
       { key: "interestingFact", label: "Interesting fact", type: "textarea" },
       { key: "lifeDream", label: "Life dream", type: "textarea" },
       { key: "notes", label: "Notes", type: "textarea" },
-      { key: "interactions", label: "Interactions", type: "textarea", placeholder: "Comma-separated interaction notes or links" },
-      { key: "memories", label: "Memories", type: "textarea", placeholder: "Comma-separated memories or moments" }
+      { key: "interactions", label: "Interactions", type: "textarea", placeholder: "One interaction per line" }
     ]
   }
 ];
@@ -391,7 +398,7 @@ const EMPTY_PROFILE_DRAFT: ContactProfileDraft = {
   partner: "",
   children: "",
   interactions: "",
-  memories: ""
+  memories: []
 };
 
 function labelize(value: string) {
@@ -484,6 +491,44 @@ function joinTextEntries(values?: string[]) {
   return values && values.length > 0 ? values.join("\n") : "";
 }
 
+function todayDateInputValue() {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+}
+
+function newMemoryEntry(input: {
+  text?: string;
+  occurredOn?: string;
+  category?: string;
+  pinned?: boolean;
+} = {}): PersonalMemoryEntry {
+  return {
+    id: `memory-${crypto.randomUUID()}`,
+    text: input.text || "",
+    occurredOn: input.occurredOn || todayDateInputValue(),
+    category: input.category,
+    pinned: input.pinned ?? true,
+    createdAt: new Date().toISOString()
+  };
+}
+
+function interactionOccurredOn(value: string): string | undefined {
+  const match = value.match(/^(\d{4}-\d{2}-\d{2})(?:\s|$|•)/);
+  return match?.[1];
+}
+
+function sortTimelineItems(items: PeopleTimelineItem[]): PeopleTimelineItem[] {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort((left, right) => {
+      const rightDate = right.item.date ? Date.parse(`${right.item.date}T12:00:00.000Z`) : Number.NEGATIVE_INFINITY;
+      const leftDate = left.item.date ? Date.parse(`${left.item.date}T12:00:00.000Z`) : Number.NEGATIVE_INFINITY;
+      if (rightDate !== leftDate) return rightDate - leftDate;
+      return left.index - right.index;
+    })
+    .map(({ item }) => item);
+}
+
 function daysUntil(value?: string) {
   if (!value) return null;
   const date = parseDisplayDate(value);
@@ -540,7 +585,13 @@ function getSearchText(record: PersonalRecord) {
     record.projects.join(" "),
     record.externalSources.join(" "),
     record.url || "",
-    profile ? Object.values(profile).flat().join(" ") : ""
+    profile
+      ? Object.entries(profile)
+          .flatMap(([key, value]) => key === "memories" && Array.isArray(value)
+            ? value.map((memory) => typeof memory === "object" && memory ? String(memory.text || "") : "")
+            : Array.isArray(value) ? value.map(String) : String(value || ""))
+          .join(" ")
+      : ""
   ]
     .join(" ")
     .toLowerCase();
@@ -602,7 +653,7 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     partner: profile?.partner || "",
     children: joinList(profile?.children),
     interactions: joinTextEntries(profile?.interactions),
-    memories: joinTextEntries(profile?.memories)
+    memories: (profile?.memories || []).map((memory) => ({ ...memory }))
   };
 }
 
@@ -614,13 +665,13 @@ function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile
     associatedPeople: splitList(draft.associatedPeople),
     children: splitList(draft.children),
     interactions: splitTextEntries(draft.interactions),
-    memories: splitTextEntries(draft.memories)
+    memories: draft.memories.map((memory) => ({ ...memory, text: memory.text.trim() })).filter((memory) => memory.text)
   };
 }
 
 function countProfileFields(record: PersonalRecord) {
   const profile = getProfile(record);
-  return Object.values(profile).filter((value) => value.trim()).length;
+  return Object.values(profile).filter((value) => Array.isArray(value) ? value.length > 0 : value.trim()).length;
 }
 
 function profileSummary(record: PersonalRecord) {
@@ -864,8 +915,13 @@ export default function PeopleWorkspace({
   const [utilityNotice, setUtilityNotice] = useState("");
   const [memoryCategory, setMemoryCategory] = useState<MemoryCategory>("personal_context");
   const [memoryDraft, setMemoryDraft] = useState("");
+  const [memoryDate, setMemoryDate] = useState(todayDateInputValue);
   const [memoryPinned, setMemoryPinned] = useState(true);
   const [memorySaving, setMemorySaving] = useState(false);
+  const [editingMemoryId, setEditingMemoryId] = useState("");
+  const [editingMemoryText, setEditingMemoryText] = useState("");
+  const [editingMemoryDate, setEditingMemoryDate] = useState("");
+  const [memoryEditSaving, setMemoryEditSaving] = useState(false);
   const [relationshipDraft, setRelationshipDraft] = useState("");
   const [relationshipType, setRelationshipType] = useState("collaborator");
   const [relationshipSaving, setRelationshipSaving] = useState(false);
@@ -1065,6 +1121,7 @@ export default function PeopleWorkspace({
   useEffect(() => {
     setProfileDraft(getProfile(selectedPerson));
     setProfileGroups(selectedPerson?.subjects || []);
+    setEditingMemoryId("");
   }, [selectedPerson?.id]);
 
   const stats = useMemo(() => {
@@ -1115,7 +1172,7 @@ export default function PeopleWorkspace({
     ? utilityNotice || `${activeViewLabel} is a read-only People utility in this checkpoint. Stored-data actions remain disabled until matching backend support exists.`
     : utilityNotice;
   const profileGaps = selectedPerson ? getProfileGaps(selectedPerson) : [];
-  const selectedMemories = splitTextEntries(selectedProfile.memories);
+  const selectedMemories = sortPeopleMemories(selectedProfile.memories);
   const selectedInteractions = splitTextEntries(selectedProfile.interactions);
   const selectedChildren = splitList(selectedProfile.children);
   const associatedPeople = splitList(selectedProfile.associatedPeople);
@@ -1129,10 +1186,20 @@ export default function PeopleWorkspace({
     ["Next follow-up", selectedPerson ? getNextContactLabel(selectedPerson) : "-"],
     ["Added", selectedPerson ? formatFullDate(selectedPerson.createdAt) : "-"]
   ];
-  const timelineItems = [
-    ...selectedInteractions,
-    ...selectedMemories
-  ].slice(0, 5);
+  const timelineItems = sortTimelineItems([
+    ...selectedInteractions.map((text, index): PeopleTimelineItem => ({
+      kind: "interaction",
+      id: `interaction-${index}-${text}`,
+      date: interactionOccurredOn(text),
+      text
+    })),
+    ...selectedMemories.map((memory): PeopleTimelineItem => ({
+      kind: "memory",
+      id: memory.id,
+      date: memory.occurredOn,
+      memory
+    }))
+  ]).slice(0, 20);
   const selectedTags = [
     ...(fallbackPerson?.subjects || []).slice(0, 3),
     ...(selectedPerson?.projects || []).slice(0, 2),
@@ -1401,24 +1468,72 @@ export default function PeopleWorkspace({
   async function saveMemory() {
     if (!selectedPerson || !memoryDraft.trim()) return;
     setMemorySaving(true);
-    const categoryLabel = MEMORY_CATEGORIES.find((category) => category.id === memoryCategory)?.label || "Memory";
-    const currentMemories = splitTextEntries(selectedProfile.memories);
-    const currentNotes = selectedProfile.notes ? `${selectedProfile.notes}\n` : "";
-    const marker = memoryPinned ? "Pinned" : "Saved";
-    const entry = `${marker} ${categoryLabel}: ${memoryDraft.trim()}`;
+    const entry = newMemoryEntry({
+      text: memoryDraft.trim(),
+      occurredOn: memoryDate,
+      category: memoryCategory,
+      pinned: memoryPinned
+    });
     const saved = await saveProfileDraft({
       ...selectedProfile,
-      memories: joinTextEntries([...currentMemories, entry]),
-      notes: `${currentNotes}${entry}`.trim()
+      memories: [...selectedProfile.memories, entry]
     });
     setMemorySaving(false);
     if (saved) {
       setMemoryDraft("");
+      setMemoryDate(todayDateInputValue());
       setMemoryPinned(true);
       setActiveView("notes");
       setDetailMode("profile");
       setActionNotice("Memory saved to this profile.");
     }
+  }
+
+  function startMemoryEdit(memory: PersonalMemoryEntry) {
+    setEditingMemoryId(memory.id);
+    setEditingMemoryText(memory.text);
+    setEditingMemoryDate(memory.occurredOn || "");
+    setActionNotice("");
+  }
+
+  function cancelMemoryEdit() {
+    setEditingMemoryId("");
+    setEditingMemoryText("");
+    setEditingMemoryDate("");
+  }
+
+  async function saveMemoryEdit() {
+    if (!selectedPerson || !editingMemoryId || !editingMemoryText.trim()) return;
+    setMemoryEditSaving(true);
+    const memories = selectedProfile.memories.map((memory) => memory.id === editingMemoryId
+      ? { ...memory, text: editingMemoryText.trim(), occurredOn: editingMemoryDate || undefined }
+      : memory);
+    const saved = await saveProfileDraft({ ...selectedProfile, memories });
+    setMemoryEditSaving(false);
+    if (saved) {
+      cancelMemoryEdit();
+      setActionNotice("Memory updated. Notes and Timeline have been reordered by date.");
+    }
+  }
+
+  function updateProfileMemory(id: string, patch: Partial<Pick<PersonalMemoryEntry, "text" | "occurredOn">>) {
+    setProfileDraft((current) => ({
+      ...current,
+      memories: current.memories.map((memory) => memory.id === id ? { ...memory, ...patch } : memory)
+    }));
+  }
+
+  function addProfileMemory() {
+    const memory = newMemoryEntry();
+    setProfileDraft((current) => ({ ...current, memories: [...current.memories, memory] }));
+    window.setTimeout(() => document.getElementById(`people-property-memory-${memory.id}`)?.focus(), 0);
+  }
+
+  function removeProfileMemory(id: string) {
+    setProfileDraft((current) => ({
+      ...current,
+      memories: current.memories.filter((memory) => memory.id !== id)
+    }));
   }
 
   async function saveRelationship() {
@@ -1618,7 +1733,7 @@ export default function PeopleWorkspace({
       const response = await fetch("/api/personal/records", {
         method: "PATCH",
         headers: buildJsonHeadersWithCsrf(),
-        body: JSON.stringify({ id, ...legacyPatch })
+        body: JSON.stringify({ id, expectedUpdatedAt: selectedPerson?.id === id ? selectedPerson.updatedAt : undefined, ...legacyPatch })
       });
       const payload = (await response
         .json()
@@ -1734,7 +1849,7 @@ export default function PeopleWorkspace({
     discardEditorChanges();
   }
 
-  function updateProfileDraft(key: keyof ContactProfileDraft, value: string) {
+  function updateProfileDraft(key: ContactProfileTextKey, value: string) {
     setProfileDraft((current) => ({ ...current, [key]: value }));
   }
 
@@ -2239,6 +2354,56 @@ export default function PeopleWorkspace({
                           </label>
                         ))}
                       </div>
+                      {section.title === "Memory" && (
+                        <div className="people-memory-properties" aria-label="Dated memories">
+                          <div className="people-memory-properties-heading">
+                            <div>
+                              <strong>Memories</strong>
+                              <span>Each memory keeps its own date. Notes and Timeline show the newest first.</span>
+                            </div>
+                            <button type="button" onClick={addProfileMemory}>Add memory</button>
+                          </div>
+                          {profileDraft.memories.length > 0 ? profileDraft.memories.map((memory, index) => (
+                            <article className="people-memory-property-entry" data-memory-editor-id={memory.id} key={memory.id}>
+                              <div className="people-memory-property-entry-heading">
+                                <strong>Memory {index + 1}</strong>
+                                <div>
+                                  <button
+                                    type="button"
+                                    onClick={() => document.getElementById(`people-property-memory-${memory.id}`)?.focus()}
+                                    aria-label={`Edit memory ${index + 1}`}
+                                  >
+                                    Edit
+                                  </button>
+                                  <button type="button" onClick={() => removeProfileMemory(memory.id)}>
+                                    Remove
+                                  </button>
+                                </div>
+                              </div>
+                              <label>
+                                Memory
+                                <textarea
+                                  id={`people-property-memory-${memory.id}`}
+                                  value={memory.text}
+                                  onChange={(event) => updateProfileMemory(memory.id, { text: event.target.value })}
+                                  placeholder="What happened, what mattered, or what you want to remember..."
+                                  rows={3}
+                                />
+                              </label>
+                              <label>
+                                Date
+                                <input
+                                  type="date"
+                                  value={memory.occurredOn || ""}
+                                  onChange={(event) => updateProfileMemory(memory.id, { occurredOn: event.target.value || undefined })}
+                                />
+                              </label>
+                            </article>
+                          )) : (
+                            <p className="people-memory-properties-empty">No memories yet. Add one when there is a moment you want to keep.</p>
+                          )}
+                        </div>
+                      )}
                     </section>
                   ))}
                 </form>
@@ -2283,11 +2448,40 @@ export default function PeopleWorkspace({
                   <button type="button" onClick={() => selectProfileView("notes")}>Add Memory / Note</button>
                 </div>
                 <div className="people-timeline-list">
-                  {timelineItems.length > 0 ? timelineItems.map((item, index) => (
-                    <article key={`${item}-${index}`}>
-                      <span>{formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</span>
-                      <strong>{item}</strong>
-                      {selectedProfile.context && <p>{selectedProfile.context}</p>}
+                  {timelineItems.length > 0 ? timelineItems.map((item) => item.kind === "memory" ? (
+                    <article className="people-timeline-memory" data-memory-id={item.memory.id} data-memory-date={item.memory.occurredOn || ""} key={`memory-${item.id}`}>
+                      {editingMemoryId === item.memory.id ? (
+                        <div className="people-memory-inline-editor">
+                          <label>
+                            Memory
+                            <textarea value={editingMemoryText} onChange={(event) => setEditingMemoryText(event.target.value)} rows={3} />
+                          </label>
+                          <label>
+                            Date
+                            <input type="date" value={editingMemoryDate} onChange={(event) => setEditingMemoryDate(event.target.value)} />
+                          </label>
+                          <div>
+                            <button type="button" onClick={() => void saveMemoryEdit()} disabled={memoryEditSaving || !editingMemoryText.trim()}>
+                              {memoryEditSaving ? "Saving..." : "Save"}
+                            </button>
+                            <button type="button" onClick={cancelMemoryEdit} disabled={memoryEditSaving}>Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="people-memory-card-heading">
+                            <span>{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
+                            <button type="button" onClick={() => startMemoryEdit(item.memory)}>Edit</button>
+                          </div>
+                          <strong>{item.memory.text}</strong>
+                          <p>{memoryCategoryLabel(item.memory.category)}</p>
+                        </>
+                      )}
+                    </article>
+                  ) : (
+                    <article key={item.id}>
+                      <span>{item.date ? formatFullDate(item.date) : formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</span>
+                      <strong>{item.text}</strong>
                     </article>
                   )) : (
                     <div className="notes-empty-state">
@@ -2357,6 +2551,10 @@ export default function PeopleWorkspace({
                           ))}
                         </select>
                       </label>
+                      <label>
+                        Date
+                        <input type="date" value={memoryDate} onChange={(event) => setMemoryDate(event.target.value)} />
+                      </label>
                       <label className="people-check-row">
                         <input type="checkbox" checked={memoryPinned} onChange={(event) => setMemoryPinned(event.target.checked)} />
                         Pin as memory
@@ -2377,18 +2575,46 @@ export default function PeopleWorkspace({
                   </section>
 
                   <section className="people-memory-list">
-                    <h4>Pinned memories</h4>
-                    {(selectedMemories.length ? selectedMemories : ["No pinned memories yet. Add context you want surfaced before the next conversation."]).map((item, index) => (
-                      <article className="people-memory-card" key={`${item}-${index}`}>
-                        <span>{item.includes(":") ? item.split(":")[0] : "Memory"}</span>
-                        <p>{item.includes(":") ? item.split(":").slice(1).join(":").trim() : item}</p>
-                        <div>
-                          <button type="button" disabled aria-describedby="people-unavailable-actions" title="Per-memory pin mutations are not connected">Pin unavailable</button>
-                          <button type="button" disabled aria-describedby="people-unavailable-actions" title="Per-memory editing is not connected">Edit unavailable</button>
-                          <button type="button" disabled aria-describedby="people-unavailable-actions" title="Archive needs an auditable memory record">Archive unavailable</button>
-                        </div>
+                    <h4>Memories · newest first</h4>
+                    {selectedMemories.length ? selectedMemories.map((memory) => (
+                      <article className="people-memory-card" data-memory-id={memory.id} data-memory-date={memory.occurredOn || ""} key={memory.id}>
+                        {editingMemoryId === memory.id ? (
+                          <div className="people-memory-inline-editor">
+                            <label>
+                              Memory
+                              <textarea value={editingMemoryText} onChange={(event) => setEditingMemoryText(event.target.value)} rows={3} />
+                            </label>
+                            <label>
+                              Date
+                              <input type="date" value={editingMemoryDate} onChange={(event) => setEditingMemoryDate(event.target.value)} />
+                            </label>
+                            <div>
+                              <button type="button" onClick={() => void saveMemoryEdit()} disabled={memoryEditSaving || !editingMemoryText.trim()}>
+                                {memoryEditSaving ? "Saving..." : "Save"}
+                              </button>
+                              <button type="button" onClick={cancelMemoryEdit} disabled={memoryEditSaving}>Cancel</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="people-memory-card-heading">
+                              <span>{memoryCategoryLabel(memory.category)}</span>
+                              <div className="people-memory-card-heading-actions">
+                                <time dateTime={memory.occurredOn}>{memory.occurredOn ? formatFullDate(memory.occurredOn) : "Date not set"}</time>
+                                <button type="button" onClick={() => startMemoryEdit(memory)}>Edit</button>
+                              </div>
+                            </div>
+                            <p>{memory.text}</p>
+                            {!memory.pinned && <span>Saved note</span>}
+                          </>
+                        )}
                       </article>
-                    ))}
+                    )) : (
+                      <div className="notes-empty-state">
+                        <h3>No memories yet</h3>
+                        <p>Add a dated moment or piece of context you want to remember later.</p>
+                      </div>
+                    )}
                   </section>
 
                   <section className="people-memory-list">

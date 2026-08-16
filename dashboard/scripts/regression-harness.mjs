@@ -5482,6 +5482,112 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
   }
 }
 
+async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expectedMemoryIds) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "people-memory-checkpoint");
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function contextFor(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  async function assertNoOverflow(page, label) {
+    const dimensions = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(dimensions.scrollWidth <= dimensions.innerWidth, `${label} overflowed horizontally: ${JSON.stringify(dimensions)}`);
+  }
+
+  try {
+    for (const viewport of [
+      { label: "desktop", width: 1440, height: 900 },
+      { label: "tablet", width: 1024, height: 768 },
+      { label: "mobile", width: 390, height: 844 }
+    ]) {
+      const context = await contextFor({ width: viewport.width, height: viewport.height });
+      const page = await context.newPage();
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=notes`, { waitUntil: "networkidle" });
+      const notesMemories = page.locator(".people-memory-list [data-memory-id]");
+      await notesMemories.first().waitFor();
+      assert(
+        JSON.stringify(await notesMemories.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-memory-id")))) === JSON.stringify(expectedMemoryIds),
+        `Notes & Memories did not sort memories newest first at ${viewport.label}`
+      );
+      assert(
+        await notesMemories.getByRole("button", { name: "Edit" }).count() === expectedMemoryIds.length,
+        `Notes & Memories omitted a per-memory Edit action at ${viewport.label}`
+      );
+      if (viewport.label === "desktop") {
+        await notesMemories.first().getByRole("button", { name: "Edit" }).click();
+        assert(
+          await notesMemories.first().locator('input[type="date"]').inputValue() === "2026-08-10" &&
+            await notesMemories.first().locator("textarea").inputValue() === "Newer regression memory",
+          "Notes & Memories Edit did not expose the selected memory text and date"
+        );
+        await notesMemories.first().getByRole("button", { name: "Cancel" }).click();
+      }
+      await assertNoOverflow(page, `People memory Notes ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-memory-notes-${viewport.label}.png`),
+        fullPage: true
+      });
+
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=timeline`, { waitUntil: "networkidle" });
+      const timelineMemories = page.locator(".people-timeline-list [data-memory-id]");
+      await timelineMemories.first().waitFor();
+      assert(
+        JSON.stringify(await timelineMemories.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-memory-id")))) === JSON.stringify(expectedMemoryIds),
+        `Timeline did not keep memories in recency order at ${viewport.label}`
+      );
+      assert(
+        await timelineMemories.getByRole("button", { name: "Edit" }).count() === expectedMemoryIds.length,
+        `Timeline omitted a per-memory Edit action at ${viewport.label}`
+      );
+      await assertNoOverflow(page, `People memory Timeline ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-memory-timeline-${viewport.label}.png`),
+        fullPage: true
+      });
+
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
+      const propertyMemories = page.locator("[data-memory-editor-id]");
+      await propertyMemories.first().waitFor();
+      assert(
+        await propertyMemories.count() === expectedMemoryIds.length &&
+          await propertyMemories.locator("textarea").count() === expectedMemoryIds.length &&
+          await propertyMemories.locator('input[type="date"]').count() === expectedMemoryIds.length,
+        `Properties did not render one text and date editor per memory at ${viewport.label}`
+      );
+      await assertNoOverflow(page, `People memory Properties ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-memory-properties-${viewport.label}.png`),
+        fullPage: true
+      });
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
 async function checkPeopleFollowUpBridgeBrowserState(
   baseUrl,
   cookieJar,
@@ -12526,13 +12632,32 @@ async function main() {
       },
       body: JSON.stringify({
         id: createdPerson.id,
+        expectedUpdatedAt: createdPerson.updatedAt,
         title: updatedPersonTitle,
         subjects: ["Advisor"],
         time: { lastReview: "2026-07-14", reviewCadence: "P1M" },
         profile: {
           fullName: updatedPersonTitle,
           primaryEmail: "regression-person@example.com",
-          interactions: ["2026-07-14 • Meeting • Regression persistence check"]
+          interactions: ["2026-07-14 • Meeting • Regression persistence check"],
+          memories: [
+            {
+              id: "memory-regression-older",
+              text: "Older regression memory",
+              occurredOn: "2024-03-02",
+              category: "shared_history",
+              pinned: true,
+              createdAt: "2026-08-15T12:00:00.000Z"
+            },
+            {
+              id: "memory-regression-newer",
+              text: "Newer regression memory",
+              occurredOn: "2026-08-10",
+              category: "personal_context",
+              pinned: true,
+              createdAt: "2026-08-15T12:01:00.000Z"
+            }
+          ]
         }
       })
     });
@@ -12542,7 +12667,30 @@ async function main() {
     assert(persistedPerson?.createdAt === createdPerson.createdAt, "People update changed the original createdAt provenance");
     assert(persistedPerson?.profile?.primaryEmail === "regression-person@example.com", "People profile update did not persist");
     assert(persistedPerson?.profile?.interactions?.length === 1, "People interaction history did not persist");
+    assert(
+      persistedPerson?.profile?.memories?.length === 2 &&
+        persistedPerson.profile.memories[0].id === "memory-regression-older" &&
+        persistedPerson.profile.memories[1].occurredOn === "2026-08-10",
+      "People dated memory entries did not persist with stable identity and input order"
+    );
     assert(persistedPerson?.time?.nextReview, "People cadence update did not calculate the next review");
+
+    const rejectStalePersonMemory = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: createdPerson.id,
+        expectedUpdatedAt: createdPerson.updatedAt,
+        profile: { memories: [{ id: "stale-memory", text: "Stale overwrite", pinned: true }] }
+      })
+    });
+    assert(
+      rejectStalePersonMemory.response.status === 409 && !rejectStalePersonMemory.payload?.ok,
+      "People memory update accepted a stale record version"
+    );
 
     const clearPersonUrls = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
       method: "PATCH",
@@ -12552,6 +12700,7 @@ async function main() {
       },
       body: JSON.stringify({
         id: createdPerson.id,
+        expectedUpdatedAt: persistedPerson.updatedAt,
         url: "",
         externalSources: [],
         profile: { website: "", linkedin: "" }
@@ -12569,7 +12718,7 @@ async function main() {
         "content-type": "application/json",
         "x-csrf-token": csrfToken
       },
-      body: JSON.stringify({ id: createdPerson.id, url: "javascript:alert(1)" })
+      body: JSON.stringify({ id: createdPerson.id, expectedUpdatedAt: personWithClearedUrls.updatedAt, url: "javascript:alert(1)" })
     });
     assert(rejectInvalidPersonUrl.response.status === 400 && !rejectInvalidPersonUrl.payload?.ok, "People PATCH accepted a non-http(s) URL");
 
@@ -12579,6 +12728,13 @@ async function main() {
     const personEditPage = await requestText(server.baseUrl, cookieJar, `/admin/people/${createdPerson.id}/edit`);
     assert(personEditPage.response.ok, `People edit route failed: ${describeStatus(personEditPage.response)}`);
     assert(personEditPage.body.includes("Edit Profile"), "People edit route missing explicit editor state");
+    await checkPeopleMemoryBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdPerson.id,
+      ["memory-regression-newer", "memory-regression-older"]
+    );
+    pass("People memories keep stable dates, reject stale saves, and render editable newest-first Notes and Timeline views across desktop, tablet, and mobile");
     pass("People create/update/clear/reload/direct-route flow works through the Personal Records adapter");
 
     const peopleBridgeFollowUpTitle = `${testRunId}-people-status-bridge`;

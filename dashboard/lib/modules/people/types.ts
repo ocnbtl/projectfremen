@@ -1,5 +1,8 @@
 import type { MutationError, MutationResult } from "../../native-objects/mutation-result";
 import type { CadenceState, NativeObjectRef } from "../../native-objects/types";
+import type { PersonalMemoryEntry } from "../../personal-records-store";
+
+export type PeopleMemoryEntry = PersonalMemoryEntry;
 
 export type PeopleRecordType = "person" | "organization";
 
@@ -53,7 +56,7 @@ export type PeopleContactProfile = {
   partner?: string;
   children: string[];
   interactions: string[];
-  memories: string[];
+  memories: PeopleMemoryEntry[];
 };
 
 export type PeopleTime = {

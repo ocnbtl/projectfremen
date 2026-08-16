@@ -34,7 +34,7 @@ function copyProfile(profile?: PersonalContactProfile): PeopleContactProfile {
     associatedPeople: [...(profile?.associatedPeople || [])],
     children: [...(profile?.children || [])],
     interactions: [...(profile?.interactions || [])],
-    memories: [...(profile?.memories || [])]
+    memories: (profile?.memories || []).map((memory) => ({ ...memory }))
   };
 }
 
