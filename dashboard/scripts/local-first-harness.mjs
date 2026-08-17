@@ -410,7 +410,11 @@ try {
   assert.match(peopleWorkspace, /normalizePhoneForStorage/i);
   assert.match(peopleWorkspace, /Website & social profiles/i);
   assert.match(peopleWorkspace, /people-location-suggestions/i);
-  assert.match(peopleWorkspace, /Colleague \/ Coworker/i);
+  assert.match(
+    peopleWorkspace,
+    /const GROUP_OPTIONS = \[\s*"Acquaintance",\s*"Advisor",\s*"Client",\s*"Collaborator",\s*"Colleague",\s*"Community",\s*"Family",\s*"Friend",\s*"Partner",\s*"University",\s*"Vendor",\s*"Other"\s*\]/i
+  );
+  assert.doesNotMatch(peopleWorkspace, /Colleague \/ Coworker/i);
   assert.match(peopleWorkspace, /No cadence/i);
   assert.match(peopleWorkspace, /Add university/i);
   assert.match(peopleWorkspace, /Add job/i);

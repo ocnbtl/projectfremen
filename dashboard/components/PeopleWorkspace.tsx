@@ -180,16 +180,17 @@ const FILTERS: Array<{ id: PeopleFilter; label: string; tone: string }> = [
 ];
 
 const GROUP_OPTIONS = [
+  "Acquaintance",
+  "Advisor",
+  "Client",
+  "Collaborator",
+  "Colleague",
+  "Community",
   "Family",
   "Friend",
-  "Colleague / Coworker",
-  "Collaborator",
-  "Vendor",
-  "Advisor",
-  "Community",
-  "University",
   "Partner",
-  "Client",
+  "University",
+  "Vendor",
   "Other"
 ];
 

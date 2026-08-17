@@ -1001,6 +1001,20 @@ function sanitizeList(values: string[] | undefined, limit = 24): string[] {
   return next.slice(0, limit);
 }
 
+function sanitizeSubjectsForClass(
+  values: string[] | undefined,
+  className: PersonalRecordClass
+): string[] {
+  const subjects = sanitizeList(values);
+  if (className !== "person" && className !== "org") {
+    return subjects;
+  }
+
+  return sanitizeList(subjects.map((subject) =>
+    subject.toLowerCase() === "colleague / coworker" ? "Colleague" : subject
+  ));
+}
+
 function sanitizeRecordIds(values: string[] | undefined): string[] {
   return sanitizeList(values, 80);
 }
@@ -1228,7 +1242,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     body,
     url: typeof raw.url === "string" && raw.url.trim() ? raw.url.trim() : undefined,
     areas: sanitizeList(raw.areas as string[] | undefined),
-    subjects: sanitizeList(raw.subjects as string[] | undefined),
+    subjects: sanitizeSubjectsForClass(raw.subjects as string[] | undefined, className),
     projects: sanitizeList(raw.projects as string[] | undefined),
     intents: sanitizeList(raw.intents as string[] | undefined).filter((item) =>
       PERSONAL_RECORD_INTENTS.includes(item as PersonalRecordIntent)
@@ -1282,11 +1296,12 @@ export async function createPersonalRecord(
   if (requestedId && !/^personal-[0-9a-f-]{36}$/i.test(requestedId)) {
     throw new Error("Invalid requested personal record id");
   }
+  const className = pickClass(input.className || input.kind);
   const nextRecord: PersonalRecord = {
     id: requestedId || `personal-${crypto.randomUUID()}`,
     domain,
     title,
-    className: pickClass(input.className || input.kind),
+    className,
     knowledgeShape: pickKnowledgeShape(input.knowledgeShape),
     privacy: pickPrivacy(input.privacy),
     stage,
@@ -1295,7 +1310,7 @@ export async function createPersonalRecord(
     body: input.body?.trim() || "",
     url,
     areas: sanitizeList(input.areas),
-    subjects: sanitizeList(input.subjects),
+    subjects: sanitizeSubjectsForClass(input.subjects, className),
     projects: sanitizeList(input.projects),
     intents: sanitizeList(input.intents).filter((item) =>
       PERSONAL_RECORD_INTENTS.includes(item as PersonalRecordIntent)
@@ -1362,7 +1377,9 @@ export async function updatePersonalRecord(
     body: typeof patch.body === "string" ? patch.body.trim() : current.body,
     url,
     areas: Array.isArray(patch.areas) ? sanitizeList(patch.areas) : current.areas,
-    subjects: Array.isArray(patch.subjects) ? sanitizeList(patch.subjects) : current.subjects,
+    subjects: Array.isArray(patch.subjects)
+      ? sanitizeSubjectsForClass(patch.subjects, current.className)
+      : current.subjects,
     projects: Array.isArray(patch.projects) ? sanitizeList(patch.projects) : current.projects,
     externalSources: Array.isArray(patch.externalSources)
       ? sanitizeList(patch.externalSources)

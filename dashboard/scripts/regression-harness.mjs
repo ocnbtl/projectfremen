@@ -5483,6 +5483,20 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
 }
 
 async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expectedMemoryIds) {
+  const expectedGroupOptions = [
+    "Acquaintance",
+    "Advisor",
+    "Client",
+    "Collaborator",
+    "Colleague",
+    "Community",
+    "Family",
+    "Friend",
+    "Partner",
+    "University",
+    "Vendor",
+    "Other"
+  ];
   const { chromium } = await import("@playwright/test");
   const browser = await chromium.launch({ headless: true });
   const screenshotDir = path.join(dashboardDir, "output", "playwright", "people-memory-checkpoint");
@@ -5576,10 +5590,11 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
           await propertyMemories.locator('input[type="date"]').count() === expectedMemoryIds.length,
         `Properties did not render one text and date editor per memory at ${viewport.label}`
       );
-      const propertyGroups = await page.locator(".people-profile-group-picker label").allTextContents();
+      const propertyGroups = (await page.locator(".people-profile-group-picker label").allTextContents())
+        .map((label) => label.trim());
       assert(
-        propertyGroups.some((label) => label.includes("Colleague / Coworker")) && propertyGroups.some((label) => label.includes("Other")),
-        `Properties omitted the Colleague / Coworker or Other group at ${viewport.label}`
+        JSON.stringify(propertyGroups) === JSON.stringify(expectedGroupOptions),
+        `Properties did not render alphabetized People groups with Other last at ${viewport.label}: ${JSON.stringify(propertyGroups)}`
       );
       const propertyCadence = page.locator("[data-people-cadence-select]");
       assert(
@@ -5616,10 +5631,11 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
       await typeSelect.selectOption("org");
       assert(await page.locator(".people-edit-toolbar strong").textContent() === "New Organization", `New People did not reflect Organization type at ${viewport.label}`);
       await typeSelect.selectOption("person");
-      const createGroups = await classification.locator(".people-group-picker label").allTextContents();
+      const createGroups = (await classification.locator(".people-group-picker label").allTextContents())
+        .map((label) => label.trim());
       assert(
-        createGroups.some((label) => label.includes("Colleague / Coworker")) && createGroups.some((label) => label.includes("Other")),
-        `New People omitted the Colleague / Coworker or Other group at ${viewport.label}`
+        JSON.stringify(createGroups) === JSON.stringify(expectedGroupOptions),
+        `New People did not render alphabetized People groups with Other last at ${viewport.label}: ${JSON.stringify(createGroups)}`
       );
       const createCadenceOptions = await page.locator("[data-people-cadence-select] option").allTextContents();
       assert(createCadenceOptions.includes("No cadence"), `New People omitted No cadence at ${viewport.label}`);
@@ -12702,7 +12718,7 @@ async function main() {
         id: createdPerson.id,
         expectedUpdatedAt: createdPerson.updatedAt,
         title: updatedPersonTitle,
-        subjects: ["Advisor", "Colleague / Coworker", "Other"],
+        subjects: ["Advisor", "Colleague / Coworker", "Acquaintance", "Other"],
         time: { lastReview: "2026-07-14", reviewCadence: "NONE" },
         profile: {
           fullName: updatedPersonTitle,
@@ -12750,8 +12766,11 @@ async function main() {
     assert(persistedPerson?.profile?.primaryEmail === "regression-person@example.com", "People profile update did not persist");
     assert(persistedPerson?.profile?.interactions?.length === 1, "People interaction history did not persist");
     assert(
-      persistedPerson?.subjects?.includes("Colleague / Coworker") && persistedPerson.subjects.includes("Other"),
-      "People colleague/coworker and Other groups did not persist"
+      persistedPerson?.subjects?.includes("Colleague") &&
+        persistedPerson.subjects.includes("Acquaintance") &&
+        persistedPerson.subjects.includes("Other") &&
+        !persistedPerson.subjects.includes("Colleague / Coworker"),
+      "People groups did not normalize legacy Colleague / Coworker values or persist Acquaintance and Other"
     );
     assert(
       persistedPerson?.time?.reviewCadence === "NONE" && !persistedPerson.time.nextReview,
@@ -12858,7 +12877,7 @@ async function main() {
       createdPerson.id,
       ["memory-regression-newer", "memory-regression-older"]
     );
-    pass("People profiles preserve dated memories, Colleague/Other groups, No cadence, and repeatable universities, jobs, locations, and addresses across desktop, tablet, and mobile");
+    pass("People profiles preserve dated memories, alphabetized groups with Acquaintance and Other, No cadence, and repeatable universities, jobs, locations, and addresses across desktop, tablet, and mobile");
     pass("People create/update/clear/reload/direct-route flow works through the Personal Records adapter");
 
     const peopleBridgeFollowUpTitle = `${testRunId}-people-status-bridge`;
