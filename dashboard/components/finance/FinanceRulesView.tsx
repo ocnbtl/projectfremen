@@ -15,7 +15,7 @@ import {
 } from "./FinancePrimitives";
 import styles from "./FinanceRules.module.css";
 
-const RULE_MUTATION_REASON = "Use the Finance action bar to create a persistent controlled rule. High-impact outcomes still require confirmation.";
+const RULE_MUTATION_REASON = "Create a rule with New rule. Every suggested change still requires confirmation.";
 const SAVED_VIEW_REASON = "Saved-view persistence remains an open product decision. This filter state is already preserved in the URL.";
 
 const FILTERS: ReadonlyArray<{ id: FinanceFilter; label: string }> = [

@@ -165,6 +165,8 @@ export interface FinanceImportMapping {
   date: string;
   description: string;
   amount: string;
+  debit?: string;
+  credit?: string;
   direction?: string;
   category?: string;
   memo?: string;

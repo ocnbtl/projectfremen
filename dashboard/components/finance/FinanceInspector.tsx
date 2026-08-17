@@ -15,11 +15,12 @@ import type { FinanceBillsViewModel } from "../../lib/modules/finance/bills-view
 import type { FinanceBudgetsViewModel } from "../../lib/modules/finance/budgets-view-model";
 import type { FinanceMonthlyReviewViewModel } from "../../lib/modules/finance/monthly-review-view-model";
 import type { FinanceTransactionsViewModel } from "../../lib/modules/finance/transactions-view-model";
-import type { FinanceAuditEvent, FinanceState } from "../../lib/modules/finance/native-types";
+import type { FinanceAuditEvent, FinanceRecordKind, FinanceState } from "../../lib/modules/finance/native-types";
 import type { FinanceLinkedContext, FinanceTransaction } from "../../lib/modules/finance/types";
 import type { FinanceTab } from "../../lib/native-objects/url-state";
 import { createNativeObjectRef, getModuleRoute, getModuleViewRoute } from "../../lib/native-objects/routes";
 import { Chip, Icon, money } from "./FinancePrimitives";
+import type { FinanceOperation } from "./FinanceMutationDialog";
 import styles from "./FinanceOperational.module.css";
 
 const TRANSACTION_TABS: readonly DetailTab[] = [
@@ -113,6 +114,16 @@ function CloseButton({ onClose }: { onClose: () => void }) {
   return <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance inspector"><Icon name="X" /></button>;
 }
 
+type OperationSelection = { kind: FinanceRecordKind; id: string };
+
+function WorkbenchActions({ children }: { children: React.ReactNode }) {
+  return <div className={styles.inspectorActions}>{children}</div>;
+}
+
+function WorkbenchAction({ children, primary = false, onClick }: { children: React.ReactNode; primary?: boolean; onClick: () => void }) {
+  return <button type="button" className={`finance-action ${primary ? "is-primary" : ""}`} onClick={onClick}>{children}</button>;
+}
+
 function TransactionProperties({ transaction }: { transaction: FinanceTransaction }) {
   const values: Array<[string, string]> = [
     ["Transaction ID", transaction.id],
@@ -163,6 +174,7 @@ type FinanceInspectorProps = {
   decisionsError: string;
   decisionsLoading: boolean;
   onRefreshDecisions: () => void;
+  onOperation: (operation: FinanceOperation, selection: OperationSelection) => void;
   activeTab: FinanceTab;
   onTabChange: (tab: FinanceTab) => void;
   onClose: () => void;
@@ -184,6 +196,7 @@ export default function FinanceInspector({
   decisionsError,
   decisionsLoading,
   onRefreshDecisions,
+  onOperation,
   activeTab,
   onTabChange,
   onClose,
@@ -210,6 +223,20 @@ export default function FinanceInspector({
   const objectKind = accountRow ? "account" : transaction ? "transaction" : billRow ? "bill" : budgetRow ? "budget" : "close_period";
   const selectedCloseCheck = reviewRow ? closePeriod?.checks.find((check) => check.id === reviewRow.item.id) || null : null;
   const nativeAuditEvents = financeState.auditEvents.filter((event) => event.objectType === objectKind && event.objectId === (closePeriod?.id || objectId));
+  const accountSelection = accountRow ? { kind: "account" as const, id: accountRow.account.id } : null;
+  const transactionSelection = transaction ? { kind: "transaction" as const, id: transaction.id } : null;
+  const billSelection = billRow ? { kind: "bill" as const, id: billRow.bill.id } : null;
+  const budgetSelection = budgetRow ? { kind: "budget" as const, id: budgetRow.budget.id } : null;
+  const closeSelection = closePeriod ? { kind: "close_period" as const, id: closePeriod.id } : null;
+  const accountUnreconciled = accountRow
+    ? financeState.transactions.filter((item) => !item.archivedAt && item.accountId === accountRow.account.id && (!item.reviewed || item.status === "pending"))
+    : [];
+  const accountTransfers = accountRow
+    ? financeState.transfers.filter((item) => !item.archivedAt && (item.fromAccountId === accountRow.account.id || item.toAccountId === accountRow.account.id))
+    : [];
+  const accountImports = accountRow
+    ? financeState.importBatches.filter((item) => item.accountId === accountRow.account.id).slice().reverse()
+    : [];
 
   const objectTitle = accountRow?.account.name
     || transaction?.merchant
@@ -269,10 +296,29 @@ export default function FinanceInspector({
         />
       )}
       actions={<CloseButton onClose={onClose} />}
-      footer={<div className={styles.inspectorFooter}><p>Use the Finance action bar above the route to mutate the selected record. This inspector preserves URL-restorable context and audit visibility.</p></div>}
+      footer={<div className={styles.inspectorFooter}>
+        {accountSelection && <WorkbenchActions>
+          <WorkbenchAction onClick={() => onOperation("edit", accountSelection)}>Edit account</WorkbenchAction>
+          <WorkbenchAction onClick={() => onOperation("balance", accountSelection)}>Update balance</WorkbenchAction>
+          <WorkbenchAction onClick={() => onOperation("transaction", accountSelection)}>Add transaction</WorkbenchAction>
+          <WorkbenchAction primary onClick={() => onOperation("import", accountSelection)}>Import CSV</WorkbenchAction>
+          <WorkbenchAction onClick={() => onOperation("archive", accountSelection)}>Archive</WorkbenchAction>
+        </WorkbenchActions>}
+        {transactionSelection && <WorkbenchActions>
+          <WorkbenchAction onClick={() => onOperation("edit", transactionSelection)}>Edit transaction</WorkbenchAction>
+          <WorkbenchAction primary onClick={() => onOperation("transaction_review", transactionSelection)}>Mark reconciled</WorkbenchAction>
+          <WorkbenchAction onClick={() => onOperation("archive", transactionSelection)}>Archive</WorkbenchAction>
+        </WorkbenchActions>}
+        {billSelection && <WorkbenchActions>
+          <WorkbenchAction onClick={() => onOperation("edit", billSelection)}>Edit bill</WorkbenchAction>
+          <WorkbenchAction primary onClick={() => onOperation("payment", billSelection)}>Record payment</WorkbenchAction>
+          <WorkbenchAction onClick={() => onOperation("archive", billSelection)}>Archive</WorkbenchAction>
+        </WorkbenchActions>}
+        {budgetSelection && <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("edit", budgetSelection)}>Edit budget</WorkbenchAction><WorkbenchAction onClick={() => onOperation("archive", budgetSelection)}>Archive</WorkbenchAction></WorkbenchActions>}
+        {closeSelection && <WorkbenchActions><WorkbenchAction onClick={() => onOperation("close_check", closeSelection)}>Update check</WorkbenchAction><WorkbenchAction primary onClick={() => onOperation(closePeriod?.status === "closed" ? "reopen_close" : "complete_close", closeSelection)}>{closePeriod?.status === "closed" ? "Reopen month" : "Complete month"}</WorkbenchAction></WorkbenchActions>}
+      </div>}
       className={`finance-right-rail ${mobileOpen ? "is-mobile-open" : ""}`}
       ariaLabel={`${objectTitle} Finance inspector`}
-      readOnly
       overlay={overlay}
       overlayOpen={overlayOpen}
       onRequestClose={onClose}
@@ -362,6 +408,7 @@ export default function FinanceInspector({
           </DetailTabPanel>
 
           <DetailTabPanel tabsId="finance-object-tabs" tabId="transactions" active={safeTab === "transactions"} className={styles.inspectorPanel}>
+            <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("transaction", accountSelection!)}>Add transaction</WorkbenchAction><WorkbenchAction onClick={() => onOperation("import", accountSelection!)}>Import CSV</WorkbenchAction></WorkbenchActions>
             {accountRow.activity.transactions.length ? (
               <div className={styles.compactList}>
                 {accountRow.activity.transactions.map((item) => (
@@ -374,21 +421,32 @@ export default function FinanceInspector({
             ) : <SystemState variant="empty" title="No account transactions" description="No current transaction references this account." />}
           </DetailTabPanel>
 
-          {(["reconcile", "transfers", "imports"] as const).map((tab) => (
-            <DetailTabPanel tabsId="finance-object-tabs" tabId={tab} active={safeTab === tab} key={tab}>
-              <SystemState
-                variant="read_only"
-                title={`${tab[0].toUpperCase()}${tab.slice(1)} is available from the route action bar`}
-                description={tab === "transfers"
-                  ? "Paired transfers retain source and destination IDs and remain excluded from income and spending."
-                  : tab === "imports"
-                    ? "CSV preview, mapping, exact-source deduplication, counts, provenance, and explicit confirmation are persistent and auditable."
-                    : "Record a balance snapshot or reconcile selected ledger facts without inferring a new balance."}
-              />
-            </DetailTabPanel>
-          ))}
+          <DetailTabPanel tabsId="finance-object-tabs" tabId="reconcile" active={safeTab === "reconcile"} className={styles.inspectorPanel}>
+            <WorkbenchActions><WorkbenchAction onClick={() => onOperation("balance", accountSelection!)}>Update balance</WorkbenchAction></WorkbenchActions>
+            {accountUnreconciled.length ? <div className={styles.compactList}>{accountUnreconciled.map((item) => <article className={styles.workbenchRow} key={item.id}>
+              <span><strong>{item.merchant}</strong><small>{item.occurredOn} · {item.category || "Uncategorized"}</small></span>
+              <span>{money(item.direction === "expense" ? -item.amount : item.amount, { sign: true, cents: true })}</span>
+              <button type="button" onClick={() => onOperation("transaction_review", { kind: "transaction", id: item.id })}>Mark reconciled</button>
+            </article>)}</div> : <SystemState variant="empty" title="Everything is reconciled" description="This account has no pending or unreviewed transactions." />}
+          </DetailTabPanel>
+
+          <DetailTabPanel tabsId="finance-object-tabs" tabId="transfers" active={safeTab === "transfers"} className={styles.inspectorPanel}>
+            <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("transfer", accountSelection!)}>New transfer</WorkbenchAction><WorkbenchAction onClick={() => onOperation("savings", accountSelection!)}>Savings movement</WorkbenchAction></WorkbenchActions>
+            {accountTransfers.length ? <div className={styles.compactList}>{accountTransfers.map((item) => {
+              const outgoing = item.fromAccountId === accountRow.account.id;
+              const peerId = outgoing ? item.toAccountId : item.fromAccountId;
+              const peer = financeState.accounts.find((account) => account.id === peerId)?.name || "Unavailable account";
+              return <article className={styles.compactRow} key={item.id}><span><strong>{outgoing ? `To ${peer}` : `From ${peer}`}</strong><small>{item.occurredOn} · {item.memo || "Transfer"}</small></span><span>{money(outgoing ? -item.amount : item.amount, { sign: true, cents: true })}</span></article>;
+            })}</div> : <SystemState variant="empty" title="No transfers yet" description="Record a transfer here and Finance will create the linked ledger pair." />}
+          </DetailTabPanel>
+
+          <DetailTabPanel tabsId="finance-object-tabs" tabId="imports" active={safeTab === "imports"} className={styles.inspectorPanel}>
+            <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("import", accountSelection!)}>Import CSV</WorkbenchAction></WorkbenchActions>
+            {accountImports.length ? <div className={styles.compactList}>{accountImports.map((item) => <article className={styles.compactRow} key={item.id}><span><strong>{item.sourceFilename}</strong><small>{new Date(item.confirmedAt).toLocaleString()} · {item.counts.unreconciled} imported for review · {item.counts.rejected} skipped</small></span><span>{item.rows.length} rows</span></article>)}</div> : <SystemState variant="empty" title="No CSV imports yet" description="Choose a bank export to preview and import its transactions." />}
+          </DetailTabPanel>
 
           <DetailTabPanel tabsId="finance-object-tabs" tabId="properties" active={safeTab === "properties"}>
+            <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("edit", accountSelection!)}>Edit account</WorkbenchAction></WorkbenchActions>
             <div className={styles.factGrid}>
               <div><span>Account ID</span><strong>{accountRow.account.id}</strong></div>
               <div><span>Name</span><strong>{accountRow.account.name}</strong></div>

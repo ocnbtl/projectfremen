@@ -216,28 +216,11 @@ function HeaderAction({
       }}
       aria-disabled={disabled || undefined}
       title={title}
-      aria-describedby={disabled ? "finance-preview-status" : undefined}
       style={disabled ? { borderColor: "#dedee2", background: "#f4f4f5", color: "#71717a", cursor: "not-allowed" } : undefined}
     >
       <Icon name={icon} />
       {children}
     </button>
-  );
-}
-
-function NativeDatasetNotice({ state, error }: { state: FinanceState; error: string }) {
-  const recordCount = state.accounts.length + state.transactions.length + state.bills.length + state.budgets.length + state.closePeriods.length + state.rules.length;
-  return (
-    <section id="finance-preview-status" className="finance-dataset-notice" aria-label="Finance data source status">
-      <IconTile hue={error ? "crimson" : "green"} icon="Wallet" />
-      <div>
-        <strong>{error ? "Finance unavailable" : "Native Finance · persistent and auditable"}</strong>
-        <span>{error || (recordCount === 0
-          ? "No Finance records exist yet. Add an account or begin a monthly close; sample records are never promoted into this store."
-          : `${recordCount} current native record${recordCount === 1 ? "" : "s"}. Balances remain explicit facts; transfers, imports, close resolutions, and rule changes retain audit history.`)}</span>
-      </div>
-      <Chip hue={error ? "crimson" : "green"} dot>{error ? "UNAVAILABLE" : "CONNECTED"}</Chip>
-    </section>
   );
 }
 
@@ -544,7 +527,6 @@ function FinanceSidebar({
           ]
         }
       ]}
-      footer={<p className="finance-sidebar-footnote">Manual facts and confirmed CSV imports only. Finance never connects to a bank or executes payments.</p>}
     />
   );
 }
@@ -668,19 +650,14 @@ function NativeActionBar({
   const actions: React.ReactNode[] = [];
   if (view === "accounts") actions.push(
     <HeaderAction key="account" icon="Plus" onClick={() => onOperation("account")}>Add account</HeaderAction>,
-    <HeaderAction key="balance" icon="Check" disabled={!hasSelection} title={!hasSelection ? "Select an account first." : undefined} onClick={() => onOperation("balance")}>Balance snapshot</HeaderAction>,
-    <HeaderAction key="transfer" icon="Send" disabled={!hasAccounts} onClick={() => onOperation("transfer")}>Transfer</HeaderAction>,
-    <HeaderAction key="savings" icon="Trending" disabled={!hasAccounts} onClick={() => onOperation("savings")}>Savings</HeaderAction>,
     <HeaderAction key="import" icon="Link" primary disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
   );
   if (view === "transactions") actions.push(
     <HeaderAction key="transaction" icon="Plus" primary disabled={!hasAccounts} onClick={() => onOperation("transaction")}>Record</HeaderAction>,
-    <HeaderAction key="review" icon="Check" disabled={!hasSelection} title={!hasSelection ? "Select a transaction first." : undefined} onClick={() => onOperation("transaction_review")}>Reconcile</HeaderAction>,
     <HeaderAction key="import" icon="Link" disabled={!hasAccounts} onClick={() => onOperation("import")}>Import CSV</HeaderAction>
   );
   if (view === "bills") actions.push(
-    <HeaderAction key="bill" icon="Plus" primary disabled={!hasAccounts} onClick={() => onOperation("bill")}>Add bill</HeaderAction>,
-    <HeaderAction key="payment" icon="Check" disabled={!hasSelection} title={!hasSelection ? "Select a bill first." : undefined} onClick={() => onOperation("payment")}>Record payment</HeaderAction>
+    <HeaderAction key="bill" icon="Plus" primary disabled={!hasAccounts} onClick={() => onOperation("bill")}>Add bill</HeaderAction>
   );
   if (view === "budgets") actions.push(<HeaderAction key="budget" icon="Plus" primary onClick={() => onOperation("budget")}>New budget</HeaderAction>);
   if (view === "review") {
@@ -692,7 +669,7 @@ function NativeActionBar({
     if (closeStatus === "closed") actions.push(<HeaderAction key="reopen" icon="Calendar" onClick={() => onOperation("reopen_close")}>Reopen close</HeaderAction>);
   }
   if (view === "rules") actions.push(<HeaderAction key="rule" icon="Plus" primary onClick={() => onOperation("rule")}>New rule</HeaderAction>);
-  if (hasSelection && !["overview", "review"].includes(view)) actions.push(
+  if (hasSelection && view === "rules") actions.push(
     <HeaderAction key="archive" icon="X" onClick={() => onOperation("archive")}>Archive selected</HeaderAction>
   );
   if (!actions.length) return null;
@@ -741,7 +718,7 @@ function ModalShell({ modal, onClose }: { modal: ModalKind; onClose: () => void 
   }, [modal]);
   if (!modal) return null;
   const content: Record<Exclude<ModalKind, null>, { title: string; body: string; fields: string[] }> = {
-    record: { title: "Record from the route action bar", body: "Use the native Record transaction action. Failed saves preserve the current form until you retry or cancel.", fields: ["Type", "Amount", "Linked context"] },
+    record: { title: "Record a transaction", body: "Add the transaction details here. Your form stays in place if saving fails, so you can retry.", fields: ["Type", "Amount", "Linked context"] },
     filter: { title: "Finance filters", body: "Search, URL-restorable filters, and Smart Views operate on current native records.", fields: ["Status", "Account", "Category"] },
     account: { title: "Add an account", body: "Use the native Add account action. Labels and masks are display-only; immutable IDs own relationships.", fields: ["Account name", "Institution", "Type"] },
     category: { title: "Create a budget", body: "Use New budget to create a category cap for a specific month and entity scope.", fields: ["Category", "Monthly cap", "Period"] },
@@ -1299,6 +1276,10 @@ export default function FinanceWorkspace({
                 decisionsError={decisionsError}
                 decisionsLoading={decisionsLoading}
                 onRefreshDecisions={() => void refreshDecisions()}
+                onOperation={(nextOperation, selection) => {
+                  setOperationTarget(selection);
+                  setOperation(nextOperation);
+                }}
                 activeTab={tab}
                 onTabChange={(nextTab) => {
                   setTab(nextTab);
@@ -1376,7 +1357,7 @@ export default function FinanceWorkspace({
       )}
       {inspectorOpen && <button type="button" className="finance-inspector-scrim" onClick={closeInspector} aria-label="Close Finance context" />}
       <div className="finance-main-workspace">
-        <NativeDatasetNotice state={financeState} error={financeError} />
+        {financeError && <div className="finance-notice is-error" role="alert"><Swatch hue="crimson" /><span className="finance-notice__message">{financeError}</span></div>}
         <ArchivedFinanceRecords
           state={financeState}
           onRestore={(selection) => { setOperationTarget(selection); setOperation("restore"); }}

@@ -6,14 +6,14 @@ import { createFinanceRepository } from "../../lib/modules/finance/repository";
 import { Icon } from "./FinancePrimitives";
 
 export type FinanceOperation =
-  | "account" | "balance" | "transaction" | "transaction_review" | "import"
+  | "account" | "edit" | "balance" | "transaction" | "transaction_review" | "import"
   | "transfer" | "savings" | "bill" | "payment" | "budget" | "close"
   | "close_check" | "complete_close" | "reopen_close" | "rule" | "archive" | "restore";
 
 type Selection = { kind: FinanceRecordKind; id: string } | null;
 
 const TITLES: Record<FinanceOperation, string> = {
-  account: "Add account", balance: "Record balance snapshot", transaction: "Record transaction",
+  account: "Add account", edit: "Edit Finance record", balance: "Record balance snapshot", transaction: "Record transaction",
   transaction_review: "Reconcile transaction", import: "Import bank CSV", transfer: "Record paired transfer",
   savings: "Record savings movement", bill: "Add bill or subscription", payment: "Record bill payment",
   budget: "Create monthly budget", close: "Start monthly close", close_check: "Resolve close check",
@@ -54,25 +54,100 @@ function AccountOptions({ state }: { state: FinanceState }) {
   return <>{state.accounts.filter((item) => !item.archivedAt).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.entityScope}</option>)}</>;
 }
 
-function Fields({ operation, state, record }: { operation: FinanceOperation; state: FinanceState; record: Record<string, unknown> | null }) {
+function csvHeaders(text: string): string[] {
+  const headers: string[] = [];
+  let field = "";
+  let quoted = false;
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    if (char === '"') {
+      if (quoted && text[index + 1] === '"') { field += '"'; index += 1; }
+      else quoted = !quoted;
+    } else if (char === "," && !quoted) {
+      headers.push(field.trim()); field = "";
+    } else if ((char === "\n" || char === "\r") && !quoted) {
+      headers.push(field.trim());
+      break;
+    } else field += char;
+  }
+  if (!headers.length && field.trim()) headers.push(field.trim());
+  return headers.filter(Boolean).slice(0, 100);
+}
+
+function MappingSelect({ label, name, headers }: { label: string; name: string; headers: readonly string[] }) {
+  return <Select label={label} name={name} defaultValue=""><option value="">Auto-detect</option>{headers.map((header) => <option key={`${name}:${header}`} value={header}>{header}</option>)}</Select>;
+}
+
+function EditFields({ state, selection, record }: { state: FinanceState; selection: Selection; record: Record<string, unknown> }) {
+  if (selection?.kind === "account") return <>
+    <Field label="Account name" name="name" defaultValue={String(record.name || "")} required maxLength={160} />
+    <Select label="Type" name="kind" defaultValue={String(record.kind || "Checking")}>{["Checking", "Savings", "Credit", "Brokerage", "Cash", "Business"].map((item) => <option key={item}>{item}</option>)}</Select>
+    <Field label="Institution" name="institution" defaultValue={String(record.institution || "")} maxLength={160} />
+    <Field label="Last four digits" name="mask" defaultValue={String(record.mask || "")} maxLength={4} inputMode="numeric" />
+    <Field label={record.kind === "Credit" ? "Amount owed" : "Current balance"} name="currentBalance" type="number" step="0.01" defaultValue={String(record.kind === "Credit" ? Math.abs(Number(record.currentBalance || 0)) : record.currentBalance ?? 0)} required />
+    <Field label="Balance as of" name="balanceAsOf" type="date" defaultValue={String(record.balanceAsOf || today())} required />
+    <Select label="Entity" name="entityScope" defaultValue={String(record.entityScope || "personal")}><option value="personal">Personal</option><option value="business">Business</option></Select>
+  </>;
+  if (selection?.kind === "transaction") return <>
+    <Field label="Date" name="occurredOn" type="date" defaultValue={String(record.occurredOn || today())} required />
+    <Field label="Merchant or source" name="merchant" defaultValue={String(record.merchant || "")} required maxLength={240} />
+    <Select label="Account" name="accountId" defaultValue={String(record.accountId || "")}><AccountOptions state={state} /></Select>
+    <Select label="Direction" name="direction" defaultValue={String(record.direction || "expense")}><option value="expense">Expense</option><option value="income">Income</option></Select>
+    <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" defaultValue={String(record.amount || "")} required />
+    <Field label="Category" name="category" defaultValue={String(record.category || "Uncategorized")} maxLength={160} />
+    <Field label="Memo" name="memo" defaultValue={String(record.memo || "")} maxLength={1000} />
+    <Select label="Status" name="status" defaultValue={String(record.status || "pending")}><option value="pending">Needs review</option><option value="cleared">Cleared</option></Select>
+    <Select label="Entity" name="entityScope" defaultValue={String(record.entityScope || "personal")}><option value="personal">Personal</option><option value="business">Business</option></Select>
+    <label><span>Reviewed</span><input name="reviewed" type="checkbox" defaultChecked={Boolean(record.reviewed)} /></label>
+  </>;
+  if (selection?.kind === "bill") return <>
+    <Field label="Bill or subscription" name="name" defaultValue={String(record.name || "")} required maxLength={240} />
+    <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" defaultValue={String(record.amount || "")} required />
+    <Field label="Due date" name="dueDate" type="date" defaultValue={String(record.dueDate || today())} required />
+    <Select label="Account" name="accountId" defaultValue={String(record.accountId || "")}><AccountOptions state={state} /></Select>
+    <Field label="Category" name="category" defaultValue={String(record.category || "Uncategorized")} maxLength={160} />
+    <Select label="Status" name="status" defaultValue={String(record.status || "scheduled")}><option value="scheduled">Scheduled</option><option value="soon">Soon</option><option value="due">Due</option><option value="overdue">Overdue</option></Select>
+    <Select label="Repeats" name="recurring" defaultValue={String(record.recurring || "")}><option value="">One-time</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option></Select>
+    <Select label="Entity" name="entityScope" defaultValue={String(record.entityScope || "personal")}><option value="personal">Personal</option><option value="business">Business</option></Select>
+    <label><span>Autopay</span><input name="autopay" type="checkbox" defaultChecked={Boolean(record.autopay)} /></label>
+  </>;
+  if (selection?.kind === "budget") return <>
+    <Field label="Month" name="period" type="month" defaultValue={String(record.period || month())} required />
+    <Field label="Category" name="category" defaultValue={String(record.category || "")} required maxLength={160} />
+    <Field label="Monthly limit" name="limit" type="number" min="0" step="0.01" defaultValue={String(record.limit ?? "")} required />
+    <Select label="Entity" name="entityScope" defaultValue={String(record.entityScope || "personal")}><option value="personal">Personal</option><option value="business">Business</option></Select>
+  </>;
+  return <p>This record is managed through its specialized Finance workflow.</p>;
+}
+
+function Fields({ operation, state, record, selection, importHeaders, onImportFile }: {
+  operation: FinanceOperation;
+  state: FinanceState;
+  record: Record<string, unknown> | null;
+  selection: Selection;
+  importHeaders: readonly string[];
+  onImportFile: (file: File | null) => void;
+}) {
+  if (operation === "edit" && record) return <EditFields state={state} selection={selection} record={record} />;
   if (operation === "account") return <>
     <Field label="Account name" name="name" required maxLength={160} />
     <Select label="Type" name="accountKind" defaultValue="Checking">{["Checking", "Savings", "Credit", "Brokerage", "Cash", "Business"].map((item) => <option key={item}>{item}</option>)}</Select>
     <Field label="Institution (optional)" name="institution" maxLength={160} />
     <Field label="Display mask (last four only)" name="mask" maxLength={4} inputMode="numeric" />
-    <Field label="Current balance" name="currentBalance" type="number" step="0.01" defaultValue="0" required />
+    <Field label="Balance or amount owed" name="currentBalance" type="number" step="0.01" defaultValue="0" required />
     <Field label="Balance as of" name="balanceAsOf" type="date" defaultValue={today()} required />
     <Select label="Entity scope" name="entityScope" defaultValue="personal"><option value="personal">Personal</option><option value="business">Business</option></Select>
+    <p>For a credit card, enter the amount owed as a positive number. Finance subtracts it from net worth automatically.</p>
   </>;
   if (operation === "balance") return <>
-    <Field label="Balance" name="currentBalance" type="number" step="0.01" defaultValue={String(record?.currentBalance ?? 0)} required />
+    <Field label={record?.kind === "Credit" ? "Amount owed" : "Balance"} name="currentBalance" type="number" step="0.01" defaultValue={String(record?.kind === "Credit" ? Math.abs(Number(record.currentBalance || 0)) : record?.currentBalance ?? 0)} required />
     <Field label="Balance as of" name="balanceAsOf" type="date" defaultValue={today()} required />
     <Select label="Source" name="balanceSource" defaultValue="manual"><option value="manual">Manual snapshot</option><option value="imported">Imported statement fact</option></Select>
   </>;
   if (operation === "transaction") return <>
     <Field label="Date" name="occurredOn" type="date" defaultValue={today()} required />
     <Field label="Merchant or source" name="merchant" required maxLength={240} />
-    <Select label="Account" name="accountId"><AccountOptions state={state} /></Select>
+    <Select label="Account" name="accountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}><AccountOptions state={state} /></Select>
     <Select label="Direction" name="direction" defaultValue="expense"><option value="expense">Expense</option><option value="income">Income</option></Select>
     <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" required />
     <Field label="Category" name="category" defaultValue="Uncategorized" maxLength={160} />
@@ -81,15 +156,25 @@ function Fields({ operation, state, record }: { operation: FinanceOperation; sta
   </>;
   if (operation === "transaction_review") return <p>This records review and clears pending status. It does not alter the explicit account balance snapshot.</p>;
   if (operation === "import") return <>
-    <Select label="Destination account" name="accountId"><AccountOptions state={state} /></Select>
+    <Select label="Destination account" name="accountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}><AccountOptions state={state} /></Select>
     <Select label="Entity scope" name="entityScope" defaultValue="personal"><option value="personal">Personal</option><option value="business">Business</option></Select>
-    <Field label="Bank-export CSV" name="csv" type="file" accept=".csv,text/csv" required />
-    <p>Preview validates and classifies rows before confirmation. Raw CSV content is not retained.</p>
+    <label><span>Choose your bank CSV</span><input name="csv" type="file" accept=".csv,text/csv" required onChange={(event) => onImportFile(event.currentTarget.files?.[0] || null)} /></label>
+    {importHeaders.length > 0 && <details className="finance-import-mapping"><summary>Check column matching</summary><div>
+      <MappingSelect label="Date" name="mappingDate" headers={importHeaders} />
+      <MappingSelect label="Description" name="mappingDescription" headers={importHeaders} />
+      <MappingSelect label="Amount" name="mappingAmount" headers={importHeaders} />
+      <MappingSelect label="Debit (if separate)" name="mappingDebit" headers={importHeaders} />
+      <MappingSelect label="Credit (if separate)" name="mappingCredit" headers={importHeaders} />
+      <MappingSelect label="Debit / credit type" name="mappingDirection" headers={importHeaders} />
+      <MappingSelect label="Category" name="mappingCategory" headers={importHeaders} />
+      <MappingSelect label="Memo" name="mappingMemo" headers={importHeaders} />
+    </div></details>}
+    <p>Finance previews everything first. Valid uncategorized rows are imported as “Needs review”; the original CSV itself is not stored.</p>
   </>;
   if (operation === "transfer" || operation === "savings") return <>
     <Field label="Date" name="occurredOn" type="date" defaultValue={today()} required />
     {operation === "savings" && <Select label="Direction" name="direction" defaultValue="to_savings"><option value="to_savings">To savings</option><option value="from_savings">From savings</option></Select>}
-    <Select label="From account" name="fromAccountId"><AccountOptions state={state} /></Select>
+    <Select label="From account" name="fromAccountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}><AccountOptions state={state} /></Select>
     <Select label="To account" name="toAccountId"><AccountOptions state={state} /></Select>
     <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" required />
     {operation === "savings" && <Field label="Existing transfer ID (optional)" name="transferId" maxLength={240} />}
@@ -168,6 +253,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<FinanceImportPreview | null>(null);
+  const [importHeaders, setImportHeaders] = useState<string[]>([]);
   const record = selectedRecord(state, selection);
 
   useEffect(() => {
@@ -175,8 +261,14 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
   }, [operation]);
 
   useEffect(() => {
+    if (!operation) return;
+    setError("");
+    setPreview(null);
+    setImportHeaders([]);
+  }, [operation]);
+
+  useEffect(() => {
     if (!operation || !dialogRef.current) return;
-    setError(""); setPreview(null);
     const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const controls = () => Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button:not([disabled]), input:not([disabled]), select:not([disabled])") || []);
     controls()[0]?.focus();
@@ -200,10 +292,27 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
     if (operation === "import") {
       const file = form.get("csv");
       if (!(file instanceof File) || !file.size) { setError("Choose a CSV file."); setBusy(false); return; }
-      const outcome = await repository.previewImport({ accountId: value(form, "accountId"), entityScope: value(form, "entityScope"), sourceFilename: file.name, csvText: await file.text() });
+      if (file.size > 5_000_000) { setError("Choose a CSV smaller than 5 MB."); setBusy(false); return; }
+      const mapping = {
+        date: value(form, "mappingDate"),
+        description: value(form, "mappingDescription"),
+        amount: value(form, "mappingAmount"),
+        debit: value(form, "mappingDebit"),
+        credit: value(form, "mappingCredit"),
+        direction: value(form, "mappingDirection"),
+        category: value(form, "mappingCategory"),
+        memo: value(form, "mappingMemo")
+      };
+      const outcome = await repository.previewImport({ accountId: value(form, "accountId"), entityScope: value(form, "entityScope"), sourceFilename: file.name, csvText: await file.text(), mapping });
       setBusy(false); if (!outcome.ok) { setError(outcome.error.message); return; } setPreview(outcome.data); return;
     }
-    if (operation === "transaction_review" && selection && record) {
+    if (operation === "edit" && selection && record) {
+      const fields: Record<string, unknown> = {};
+      for (const [name, item] of form.entries()) if (!(item instanceof File)) fields[name] = item;
+      if (selection.kind === "transaction") fields.reviewed = form.has("reviewed");
+      if (selection.kind === "bill") fields.autopay = form.has("autopay");
+      result = await repository.patch({ kind: selection.kind, id: selection.id, expectedUpdatedAt: record.updatedAt, action: "update", fields });
+    } else if (operation === "transaction_review" && selection && record) {
       result = await repository.patch({ kind: selection.kind, id: selection.id, expectedUpdatedAt: record.updatedAt, action: "update", fields: { reviewed: true, status: "cleared" } });
     } else if (operation === "payment" && selection && record) {
       const evidenceObjectId = value(form, "evidenceObjectId");
@@ -262,13 +371,14 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
 
   const confirm = async () => {
     if (!preview) return; setBusy(true); setError("");
+    const importableRows = preview.rows.filter((row) => row.status !== "rejected");
     const result = await repository.confirmImport({
       previewId: preview.previewId,
-      selectedFingerprints: preview.rows.filter((row) => row.status === "accepted").map((row) => row.fingerprint)
+      selectedFingerprints: importableRows.map((row) => row.fingerprint)
     }, idempotencyKeyRef.current);
     setBusy(false); if (!result.ok) { setError(result.error.message); return; }
     idempotencyKeyRef.current = "";
-    onState(result.data.state, `${preview.counts.accepted} accepted CSV row${preview.counts.accepted === 1 ? "" : "s"} imported; ambiguous and rejected results retained in the batch audit.`); onClose();
+    onState(result.data.state, `${importableRows.length} transaction${importableRows.length === 1 ? "" : "s"} imported. ${preview.counts.ambiguous} still need categorization; ${preview.counts.rejected} invalid or duplicate row${preview.counts.rejected === 1 ? " was" : "s were"} skipped.`); onClose();
   };
 
   const needsAccount = ["transaction", "import", "transfer", "savings", "bill"].includes(operation);
@@ -278,12 +388,18 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
       <h2 id="finance-mutation-title">{TITLES[operation]}</h2>
       {error && <p className="finance-form-error" role="alert">{error}</p>}
       {preview ? <div className="finance-import-preview">
-        <p><strong>{preview.sourceFilename}</strong> is ready for confirmation.</p>
-        <dl><div><dt>Accepted</dt><dd>{preview.counts.accepted}</dd></div><div><dt>Ambiguous</dt><dd>{preview.counts.ambiguous}</dd></div><div><dt>Rejected</dt><dd>{preview.counts.rejected}</dd></div><div><dt>Unreconciled after import</dt><dd>{preview.counts.accepted}</dd></div></dl>
-        <p>Only accepted rows are confirmed. Ambiguous and rejected results remain in the batch audit; they create no transaction.</p>
-        <div className="finance-modal-actions"><button type="button" className="finance-action" onClick={() => setPreview(null)} disabled={busy}>Back</button><button type="button" className="finance-action is-primary" onClick={() => void confirm()} disabled={busy}>{busy ? "Confirming…" : preview.counts.accepted ? "Confirm accepted rows" : "Record import results"}</button></div>
+        <p><strong>{preview.sourceFilename}</strong> is ready.</p>
+        <dl><div><dt>Ready to import</dt><dd>{preview.counts.accepted + preview.counts.ambiguous}</dd></div><div><dt>Needs category</dt><dd>{preview.counts.ambiguous}</dd></div><div><dt>Skipped</dt><dd>{preview.counts.rejected}</dd></div><div><dt>Needs review after import</dt><dd>{preview.counts.accepted + preview.counts.ambiguous}</dd></div></dl>
+        <div className="finance-import-preview__rows" aria-label="CSV preview rows">{preview.rows.slice(0, 8).map((row) => <div key={`${row.rowNumber}:${row.fingerprint}`} data-status={row.status}><span>{row.occurredOn || `Row ${row.rowNumber}`}</span><strong>{row.merchant || row.reason || "Unreadable row"}</strong><span>{row.amount === undefined ? "Skipped" : `$${row.amount.toFixed(2)}`}</span><small>{row.status === "ambiguous" ? "Needs category" : row.status === "rejected" ? "Skipped" : "Ready"}</small></div>)}</div>
+        <p>Ready rows become transactions immediately. Uncategorized rows stay visible as “Needs review,” so you can categorize and reconcile them later.</p>
+        <div className="finance-modal-actions"><button type="button" className="finance-action" onClick={() => setPreview(null)} disabled={busy}>Back</button><button type="button" className="finance-action is-primary" onClick={() => void confirm()} disabled={busy}>{busy ? "Importing…" : preview.counts.accepted + preview.counts.ambiguous ? `Import ${preview.counts.accepted + preview.counts.ambiguous} transactions` : "Save skipped-row record"}</button></div>
       </div> : <form onSubmit={(event) => void submit(event)}>
-        <div><Fields operation={operation} state={state} record={record} /></div>
+        <div><Fields operation={operation} state={state} record={record} selection={selection} importHeaders={importHeaders} onImportFile={(file) => {
+          setError("");
+          if (!file) { setImportHeaders([]); return; }
+          if (file.size > 5_000_000) { setImportHeaders([]); setError("Choose a CSV smaller than 5 MB."); return; }
+          void file.text().then((text) => setImportHeaders(csvHeaders(text))).catch(() => setError("This CSV could not be read."));
+        }} /></div>
         <div className="finance-modal-actions"><button type="button" className="finance-action" onClick={onClose} disabled={busy}>Cancel</button><button type="submit" className="finance-action is-primary" disabled={busy || (needsAccount && state.accounts.filter((item) => !item.archivedAt).length === 0)}>{busy ? "Saving…" : operation === "import" ? "Preview CSV" : "Save"}</button></div>
       </form>}
     </section>

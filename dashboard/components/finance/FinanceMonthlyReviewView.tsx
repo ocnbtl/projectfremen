@@ -25,7 +25,7 @@ import {
 } from "./FinancePrimitives";
 import styles from "./FinanceOperational.module.css";
 
-const WRITE_REASON = "Use the Finance action bar to resolve the selected check with evidence, a reasoned waiver, or a canonical carry-forward owner.";
+const WRITE_REASON = "Select a check, then use Update check in its detail panel.";
 
 function closeDecisionSource(item: { id: string; label: string }) {
   return createNativeObjectRef({
@@ -71,7 +71,7 @@ export default function FinanceMonthlyReviewView({
     : [];
   const closeReason = overallOpen > 0
     ? `Complete Close remains blocked while ${overallOpen} required checklist item${overallOpen === 1 ? " is" : "s are"} open.`
-    : "Use the Finance action bar to complete the audited close.";
+    : "Resolve the remaining checks before completing the month.";
 
   return (
     <>

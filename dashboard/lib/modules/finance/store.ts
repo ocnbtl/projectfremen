@@ -754,9 +754,11 @@ function normalizeHeader(value: string): string {
 function inferMapping(headers: string[]): FinanceImportMapping {
   const find = (...names: string[]) => headers.find((header) => names.includes(normalizeHeader(header))) || "";
   return {
-    date: find("date", "posted_date", "transaction_date"),
-    description: find("description", "merchant", "name", "payee"),
+    date: find("date", "posted_date", "posting_date", "transaction_date", "effective_date"),
+    description: find("description", "transaction_description", "merchant", "name", "payee", "details"),
     amount: find("amount", "transaction_amount"),
+    debit: find("debit", "debits", "withdrawal", "withdrawals"),
+    credit: find("credit", "credits", "deposit", "deposits"),
     direction: find("direction", "type", "debit_credit"),
     category: find("category"),
     memo: find("memo", "notes")
@@ -809,12 +811,14 @@ export async function previewFinanceCsv(
     date: optionalText(mappingValue.date, "mapping.date", 120) || inferred.date,
     description: optionalText(mappingValue.description, "mapping.description", 120) || inferred.description,
     amount: optionalText(mappingValue.amount, "mapping.amount", 120) || inferred.amount,
+    debit: optionalText(mappingValue.debit, "mapping.debit", 120) || inferred.debit,
+    credit: optionalText(mappingValue.credit, "mapping.credit", 120) || inferred.credit,
     direction: optionalText(mappingValue.direction, "mapping.direction", 120) || inferred.direction,
     category: optionalText(mappingValue.category, "mapping.category", 120) || inferred.category,
     memo: optionalText(mappingValue.memo, "mapping.memo", 120) || inferred.memo
     };
-    if (!mapping.date || !mapping.description || !mapping.amount) {
-      validation("Map date, description, and amount columns before previewing", "mapping");
+    if (!mapping.date || !mapping.description || (!mapping.amount && !mapping.debit && !mapping.credit)) {
+      validation("Map date, description, and either amount or debit/credit columns before previewing", "mapping");
     }
     const headerIndex = new Map(headers.map((header, index) => [normalizeHeader(header), index]));
     const priorFingerprints = new Set(state.transactions.map((item) => item.source.sourceRowFingerprint).filter(Boolean));
@@ -823,11 +827,22 @@ export async function previewFinanceCsv(
     const rawDate = mappedCell(row, headerIndex, mapping.date);
     const merchant = mappedCell(row, headerIndex, mapping.description);
     const rawAmount = mappedCell(row, headerIndex, mapping.amount);
+    const rawDebit = mappedCell(row, headerIndex, mapping.debit);
+    const rawCredit = mappedCell(row, headerIndex, mapping.credit);
     const occurredOn = parseImportDate(rawDate);
-    const signedAmount = parseImportAmount(rawAmount);
+    const amountValue = parseImportAmount(rawAmount);
+    const debitValue = parseImportAmount(rawDebit);
+    const creditValue = parseImportAmount(rawCredit);
+    const signedAmount = amountValue !== null
+      ? amountValue
+      : debitValue !== null
+        ? -Math.abs(debitValue)
+        : creditValue !== null
+          ? Math.abs(creditValue)
+          : null;
     const directionCell = mappedCell(row, headerIndex, mapping.direction).toLowerCase();
     const fingerprint = createHash("sha256")
-      .update(`${account.id}|${occurredOn || rawDate}|${merchant.toLowerCase()}|${signedAmount ?? rawAmount}`)
+      .update(`${account.id}|${occurredOn || rawDate}|${merchant.toLowerCase()}|${signedAmount ?? `${rawAmount}|${rawDebit}|${rawCredit}`}`)
       .digest("hex");
     const base = { rowNumber: index + 2, fingerprint };
     if (!occurredOn || !merchant || signedAmount === null) {
@@ -840,6 +855,9 @@ export async function previewFinanceCsv(
     let rowDirection: "income" | "expense";
     if (directionCell.includes("credit") || directionCell.includes("income")) rowDirection = "income";
     else if (directionCell.includes("debit") || directionCell.includes("expense")) rowDirection = "expense";
+    else if (debitValue !== null) rowDirection = "expense";
+    else if (creditValue !== null) rowDirection = "income";
+    else if (account.kind === "Credit") rowDirection = signedAmount < 0 ? "income" : "expense";
     else rowDirection = signedAmount < 0 ? "expense" : "income";
     const category = mappedCell(row, headerIndex, mapping.category) || "Uncategorized";
     const status = category === "Uncategorized" ? "ambiguous" as const : "accepted" as const;
@@ -925,22 +943,22 @@ export async function confirmFinanceImport(
     const selected = new Set(
       Array.isArray(rawInput.selectedFingerprints)
         ? rawInput.selectedFingerprints.filter((value): value is string => typeof value === "string")
-        : rows.filter((row) => row.status === "accepted").map((row) => row.fingerprint)
+        : rows.filter((row) => row.status !== "rejected").map((row) => row.fingerprint)
     );
     const previewFingerprints = new Set(rows.map((row) => row.fingerprint));
     if ([...selected].some((fingerprint) => !previewFingerprints.has(fingerprint))) {
       validation("selectedFingerprints contains a row outside the server-held preview", "selectedFingerprints");
     }
-    const acceptedFingerprints = new Set(rows.filter((row) => row.status === "accepted").map((row) => row.fingerprint));
-    if ([...selected].some((fingerprint) => !acceptedFingerprints.has(fingerprint))) {
-      validation("selectedFingerprints may contain only accepted preview rows", "selectedFingerprints");
+    const importableFingerprints = new Set(rows.filter((row) => row.status !== "rejected").map((row) => row.fingerprint));
+    if ([...selected].some((fingerprint) => !importableFingerprints.has(fingerprint))) {
+      validation("selectedFingerprints may contain only importable preview rows", "selectedFingerprints");
     }
     const priorFingerprints = new Set(state.transactions.map((item) => item.source.sourceRowFingerprint).filter(Boolean));
     const importBatchId = `finance-import-${crypto.randomUUID()}`;
     const transactions: FinanceTransactionRecord[] = [];
     for (const row of rows) {
       if (!selected.has(row.fingerprint)) continue;
-      if (row.status !== "accepted") continue;
+      if (row.status === "rejected") continue;
       if (!row.occurredOn || !row.merchant || !row.amount || !row.direction || priorFingerprints.has(row.fingerprint)) continue;
       transactions.push(createTransaction({
         occurredOn: row.occurredOn,
@@ -1016,7 +1034,7 @@ function replaceRecord(state: FinanceState, kind: FinanceRecordKind, item: Finan
   return { ...state, rules: replace(state.rules) };
 }
 
-function applyGenericUpdate(kind: FinanceRecordKind, before: FinanceRecord, fields: Record<string, unknown>, now: string): FinanceRecord {
+function applyGenericUpdate(kind: FinanceRecordKind, before: FinanceRecord, fields: Record<string, unknown>, now: string, state: FinanceState): FinanceRecord {
   if (kind === "account") {
     const item = clone(before as FinanceAccountRecord);
     if (fields.name !== undefined) item.name = requiredText(fields.name, "fields.name", 160);
@@ -1035,6 +1053,7 @@ function applyGenericUpdate(kind: FinanceRecordKind, before: FinanceRecord, fiel
     if (fields.occurredOn !== undefined) item.occurredOn = dateValue(fields.occurredOn, "fields.occurredOn");
     if (fields.merchant !== undefined) item.merchant = requiredText(fields.merchant, "fields.merchant", 240);
     if (fields.category !== undefined) item.category = requiredText(fields.category, "fields.category", 160);
+    if (fields.accountId !== undefined) item.accountId = requireActiveAccount(state, fields.accountId, "fields.accountId").id;
     if (fields.amount !== undefined) item.amount = positiveNumber(fields.amount, "fields.amount");
     if (fields.direction !== undefined) {
       item.direction = oneOf(fields.direction, "fields.direction", ["income", "expense"] as const);
@@ -1052,6 +1071,7 @@ function applyGenericUpdate(kind: FinanceRecordKind, before: FinanceRecord, fiel
     if (fields.amount !== undefined) item.amount = positiveNumber(fields.amount, "fields.amount");
     if (fields.dueDate !== undefined) item.dueDate = dateValue(fields.dueDate, "fields.dueDate");
     if (fields.category !== undefined) item.category = requiredText(fields.category, "fields.category", 160);
+    if (fields.accountId !== undefined) item.accountId = requireActiveAccount(state, fields.accountId, "fields.accountId").id;
     if (fields.status !== undefined && fields.status !== "paid") item.status = billStatus(fields.status);
     if (fields.recurring !== undefined) item.recurring = cadence(fields.recurring);
     if (fields.autopay !== undefined) item.autopay = booleanValue(fields.autopay);
@@ -1157,7 +1177,7 @@ export async function updateFinanceRecord(
       auditAction = `finance.${kind}.restored`;
     } else if (action === "update") {
       if (!isRecord(rawInput.fields)) validation("fields must be an object", "fields");
-      item = applyGenericUpdate(kind, before, rawInput.fields, now);
+      item = applyGenericUpdate(kind, before, rawInput.fields, now, state);
     } else if (action === "mark_paid") {
       if (kind !== "bill") validation("mark_paid only supports bills", "action");
       const bill = clone(before as FinanceBillRecord);

@@ -794,6 +794,12 @@ async function checkNativeFinanceLifecycle(baseUrl, cookieJar) {
   assert(savings.response.ok, "Finance did not create the second account");
   const savingsId = savings.payload.item.id;
 
+  const credit = await create({
+    kind: "account", accountKind: "Credit", name: "Regression credit card", currentBalance: 1400,
+    balanceAsOf: "2026-08-01", balanceSource: "manual", entityScope: "personal"
+  }, `${testRunId}-finance-account-credit`);
+  assert(credit.response.ok && credit.payload.item.currentBalance === 1400, "Finance did not retain a plainly entered positive amount owed");
+
   const balanceUpdate = await patchRecord({
     kind: "account", id: operatingId, expectedUpdatedAt: operatingInitialUpdatedAt, action: "update",
     fields: { currentBalance: 2750, balanceAsOf: "2026-08-02", balanceSource: "manual" }
@@ -880,23 +886,36 @@ async function checkNativeFinanceLifecycle(baseUrl, cookieJar) {
   });
   assert(preview.response.ok, "Finance CSV preview failed");
   assert(preview.payload.preview.counts.accepted === 1 && preview.payload.preview.counts.ambiguous === 1 && preview.payload.preview.counts.rejected === 1, "Finance CSV preview did not classify accepted, ambiguous, and rejected rows");
-  const ambiguousFingerprint = preview.payload.preview.rows.find((row) => row.status === "ambiguous").fingerprint;
-  const ambiguousImport = await create({
-    previewId: preview.payload.preview.previewId,
-    selectedFingerprints: [ambiguousFingerprint]
-  }, `${testRunId}-finance-import-ambiguous`, "confirm_import");
-  assert(ambiguousImport.response.status === 400, "Finance accepted an ambiguous import row outside the accepted-only server policy");
   const importInput = {
     previewId: preview.payload.preview.previewId,
-    selectedFingerprints: preview.payload.preview.rows.filter((row) => row.status === "accepted").map((row) => row.fingerprint)
+    selectedFingerprints: preview.payload.preview.rows.filter((row) => row.status !== "rejected").map((row) => row.fingerprint)
   };
   const imported = await create(importInput, `${testRunId}-finance-import`, "confirm_import");
   assert(imported.response.ok && imported.payload.item.counts.ambiguous === 1 && imported.payload.item.counts.rejected === 1, "Finance import did not retain review results");
-  assert(imported.payload.state.transactions.some((item) => item.source.importBatchId === imported.payload.item.id && item.status === "pending"), "Finance import did not create pending review facts");
+  const importedRows = imported.payload.state.transactions.filter((item) => item.source.importBatchId === imported.payload.item.id);
+  assert(importedRows.length === 2 && importedRows.every((item) => item.status === "pending" && !item.reviewed), "Finance import did not create every valid row as a pending review fact");
+  assert(importedRows.some((item) => item.category === "Uncategorized"), "Finance import discarded a valid uncategorized bank row instead of retaining it for review");
   const importReplay = await create(importInput, `${testRunId}-finance-import`, "confirm_import");
   assert(importReplay.response.ok && importReplay.payload.created === false, "Finance import idempotency replay failed");
   const duplicateImport = await create(importInput, `${testRunId}-finance-import-duplicate`, "confirm_import");
   assert(duplicateImport.response.status === 409, "Finance accepted the same CSV twice for one account");
+
+  const splitAmountCsv = [
+    "Transaction Date,Posted Date,Card No.,Description,Category,Debit,Credit",
+    "2026-08-05,2026-08-06,1234,Coffee shop,Dining,8.75,",
+    "2026-08-06,2026-08-07,1234,Statement credit,Adjustment,,12.00"
+  ].join("\n");
+  const splitPreview = await requestJson(baseUrl, cookieJar, "/api/finance", {
+    method: "POST", headers: jsonHeaders,
+    body: JSON.stringify({ operation: "preview_import", input: { accountId: operatingId, entityScope: "personal", sourceFilename: "card-export.csv", csvText: splitAmountCsv } })
+  });
+  assert(splitPreview.response.ok && splitPreview.payload.preview.counts.accepted === 2, "Finance did not infer common separate Debit and Credit CSV columns");
+  const splitImport = await create({
+    previewId: splitPreview.payload.preview.previewId,
+    selectedFingerprints: splitPreview.payload.preview.rows.map((row) => row.fingerprint)
+  }, `${testRunId}-finance-import-split-columns`, "confirm_import");
+  const splitRows = splitImport.payload.state.transactions.filter((item) => item.source.importBatchId === splitImport.payload.item.id);
+  assert(splitImport.response.ok && splitRows.some((item) => item.direction === "expense") && splitRows.some((item) => item.direction === "income"), "Finance did not preserve debit and credit direction during import");
 
   const bill = await create({
     kind: "bill", name: "Studio internet", amount: 95, dueDate: "2026-08-10", accountId: operatingId,
@@ -998,7 +1017,7 @@ async function checkNativeFinanceLifecycle(baseUrl, cookieJar) {
   assert(restored.response.ok && !restored.payload.item.archivedAt, "Finance restore recreated or lost the archived record");
 
   const reloaded = await requestJson(baseUrl, cookieJar, "/api/finance");
-  assert(reloaded.response.ok && reloaded.payload.state.accounts.length === 4, "Finance state did not survive a repository reload");
+  assert(reloaded.response.ok && reloaded.payload.state.accounts.length === 5, "Finance state did not survive a repository reload");
   assert(reloaded.payload.state.transactions.filter((item) => item.direction === "transfer").length === 2, "Finance paired transfers were lost or misclassified");
   assert(reloaded.payload.state.importBatches[0].rows.every((row) => !("raw" in row) && !("csvText" in row)), "Finance import batch retained raw CSV fields");
   assert(reloaded.payload.state.importPreviews.length === 0, "Finance retained a consumed import preview");
@@ -1074,7 +1093,56 @@ async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
         }).filter((item) => item.width > 0 && item.height > 0 && (item.width < 44 || item.height < 44)));
         assert(undersized.length === 0, `Finance mobile targets below 44px: ${JSON.stringify(undersized)}`);
       }
+      await page.goto(`${baseUrl}/admin/finance/accounts?query=${encodeURIComponent("Regression credit card")}`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { level: 1, name: "Accounts & Cashflow" }).waitFor();
+      const creditRow = page.locator("[data-finance-account-id]").filter({ hasText: "Regression credit card" });
+      await creditRow.waitFor();
+      assert((await creditRow.innerText()).includes("-$1,400.00"), `Finance ${viewport.label} did not display a positive credit-card amount as a liability`);
+      await creditRow.click();
+      const inspector = page.locator("#finance-inspector");
+      await inspector.waitFor();
+      const workbenchDiagnostics = await page.evaluate(() => {
+        const rail = document.querySelector("#finance-inspector");
+        const actionBar = document.querySelector(".finance-native-action-bar");
+        const buttons = actionBar ? Array.from(actionBar.querySelectorAll("button")) : [];
+        const railRect = rail instanceof HTMLElement ? rail.getBoundingClientRect() : null;
+        const actionRect = actionBar instanceof HTMLElement ? actionBar.getBoundingClientRect() : null;
+        return {
+          railRatio: railRect ? railRect.width / window.innerWidth : 0,
+          actionHeight: actionRect?.height || 0,
+          actionButtonHeights: buttons.map((button) => button.getBoundingClientRect().height),
+          text: document.body.innerText
+        };
+      });
+      assert(workbenchDiagnostics.railRatio >= (viewport.width <= 390 ? 0.95 : 0.48), `Finance ${viewport.label} inspector is not a half-width workbench: ${JSON.stringify(workbenchDiagnostics)}`);
+      assert(!workbenchDiagnostics.text.includes("Native Finance · persistent and auditable") && !workbenchDiagnostics.text.includes("Manual facts and confirmed CSV imports only"), `Finance ${viewport.label} retained removed technical status copy`);
+      if (viewport.width >= 768) {
+        assert(workbenchDiagnostics.actionHeight <= 48 && workbenchDiagnostics.actionButtonHeights.every((height) => height <= 32), `Finance ${viewport.label} action bar is still oversized: ${JSON.stringify(workbenchDiagnostics)}`);
+      }
       if (viewport.width === 1440) {
+        await inspector.getByRole("button", { name: "Import CSV", exact: true }).click();
+        const importDialog = page.getByRole("dialog", { name: "Import bank CSV" });
+        await importDialog.getByLabel("Choose your bank CSV").setInputFiles({
+          name: "synthetic-checking.csv",
+          mimeType: "text/csv",
+          buffer: Buffer.from([
+            "Posting Date,Description,Amount",
+            "2026-08-10,Synthetic grocery,-24.15",
+            "2026-08-11,Synthetic refund,9.40"
+          ].join("\n"), "utf8")
+        });
+        const [previewResponse] = await Promise.all([
+          page.waitForResponse((response) => new URL(response.url()).pathname === "/api/finance" && response.request().method() === "POST"),
+          importDialog.getByRole("button", { name: "Preview CSV", exact: true }).click()
+        ]);
+        assert(previewResponse.ok(), `Finance CSV browser preview returned ${previewResponse.status()}: ${await previewResponse.text()}`);
+        await importDialog.getByText("Ready to import").waitFor();
+        assert(await importDialog.getByText("Needs category").count() >= 1, "Finance CSV preview did not flag uncategorized bank rows for review");
+        await importDialog.getByRole("button", { name: "Import 2 transactions", exact: true }).click();
+        await importDialog.waitFor({ state: "detached" });
+        await page.getByRole("tab", { name: "Imports", exact: true }).click();
+        await inspector.getByText("synthetic-checking.csv", { exact: true }).waitFor();
+        assert((await inspector.innerText()).includes("2 imported for review"), "Finance account workbench did not show the completed CSV import");
         await page.goto(`${baseUrl}/admin/finance`, { waitUntil: "networkidle" });
         await page.getByRole("button", { name: "Add account" }).click();
         await page.getByLabel("Account name").fill("Operating");
@@ -10160,7 +10228,7 @@ async function main() {
     pass("Resources directory loads through the external-source adapter");
 
     const nativeFinanceState = await checkNativeFinanceLifecycle(server.baseUrl, cookieJar);
-    assert(nativeFinanceState.accounts.length === 4 && nativeFinanceState.rules.length === 1, "Native Finance lifecycle returned incomplete persisted state");
+    assert(nativeFinanceState.accounts.length === 5 && nativeFinanceState.rules.length === 1, "Native Finance lifecycle returned incomplete persisted state");
     pass("Finance API enforces auth, CSRF, idempotency, concurrency, evidence gates, paired transfers, imports, close checks, rules, audit, and archive/restore");
 
     const nativeFinanceRoutes = [
@@ -10175,7 +10243,7 @@ async function main() {
     for (const [pathname, heading, marker] of nativeFinanceRoutes) {
       const route = await requestText(server.baseUrl, cookieJar, pathname);
       assert(route.response.ok && route.body.includes(`<h1>${heading}</h1>`) && route.body.includes(marker), `Native Finance route failed: ${pathname}`);
-      assert(route.body.includes("Native Finance") && route.body.includes("CONNECTED"), `Native Finance route omitted its connected source disclosure: ${pathname}`);
+      assert(!route.body.includes("Native Finance · persistent and auditable") && !route.body.includes("current native records") && !route.body.includes("Manual facts and confirmed CSV imports only"), `Native Finance route retained removed technical status copy: ${pathname}`);
       assert(!route.body.includes("Fixture dataset") && !route.body.includes("read-only preview") && !route.body.includes("NOT CONNECTED"), `Native Finance route retained a fixture/read-only claim: ${pathname}`);
     }
     pass("Canonical Finance routes render persisted native records without fixture claims");
@@ -10183,7 +10251,9 @@ async function main() {
     await checkNativeFinanceBrowserState(server.baseUrl, cookieJar);
     pass("Hydrated Finance routes pass canonical URL, failed-input recovery, rule-test, and four-viewport checks");
 
-    await checkCommandCenterBrowserState(server.baseUrl, cookieJar, nativeFinanceState);
+    const financeAfterBrowserChecks = await requestJson(server.baseUrl, cookieJar, "/api/finance");
+    assert(financeAfterBrowserChecks.response.ok, "Finance state could not be refreshed after the isolated browser import");
+    await checkCommandCenterBrowserState(server.baseUrl, cookieJar, financeAfterBrowserChecks.payload.state);
     pass("Command Center derives a record-level now/next/watch worklist and passes four-viewport read-through checks without invented counts");
 
     if (false) {

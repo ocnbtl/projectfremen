@@ -56,18 +56,25 @@ function monthLabel(period: string): string {
   });
 }
 
+export function financeAccountSignedBalance(kind: FinanceAccount["kind"], balance: number): number {
+  return kind === "Credit" ? -Math.abs(balance) : balance;
+}
+
 function accountRows(state: FinanceState): FinanceAccount[] {
-  return active(state.accounts).map((item, index) => ({
-    id: item.id,
-    name: item.name,
-    kind: item.kind,
-    inst: item.institution || "Manual",
-    mask: item.mask || "—",
-    balance: item.currentBalance,
-    delta30: 0,
-    hue: hue(index),
-    spark: [item.currentBalance, item.currentBalance]
-  }));
+  return active(state.accounts).map((item, index) => {
+    const balance = financeAccountSignedBalance(item.kind, item.currentBalance);
+    return {
+      id: item.id,
+      name: item.name,
+      kind: item.kind,
+      inst: item.institution || "Manual",
+      mask: item.mask || "—",
+      balance,
+      delta30: 0,
+      hue: hue(index),
+      spark: [balance, balance]
+    };
+  });
 }
 
 function transactionRows(state: FinanceState): FinanceTransaction[] {
