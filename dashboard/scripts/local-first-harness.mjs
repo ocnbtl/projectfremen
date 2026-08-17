@@ -419,6 +419,8 @@ try {
   assert.match(peopleWorkspace, /Add university/i);
   assert.match(peopleWorkspace, /Add job/i);
   assert.match(peopleWorkspace, /Add location/i);
+  assert.match(peopleWorkspace, /<option value="catch-up">Catch-up<\/option>/i);
+  assert.doesNotMatch(peopleWorkspace, /Meaningful interaction/i);
   const personalRecordsStore = await readFile("lib/personal-records-store.ts", "utf8");
   assert.match(personalRecordsStore, /phoneCountryCode/i);
   assert.match(personalRecordsStore, /instagram/i);

@@ -5643,11 +5643,78 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         await timelineMemories.getByRole("button", { name: "Edit" }).count() === expectedMemoryIds.length,
         `Timeline omitted a per-memory Edit action at ${viewport.label}`
       );
+      const timelineInteraction = page.locator(".people-timeline-interaction").first();
+      await timelineInteraction.waitFor();
+      assert(
+        await timelineInteraction.locator(".people-timeline-entry-title").textContent() === "Regression persistence check",
+        `Timeline did not separate the interaction title at ${viewport.label}`
+      );
+      assert(
+        !(await timelineInteraction.textContent()).includes("2026-07-14"),
+        `Timeline repeated the raw interaction date at ${viewport.label}`
+      );
+      const interactionType = await timelineInteraction.locator(".people-timeline-kind").textContent();
+      assert(interactionType === "Meeting", `Timeline lost the interaction type at ${viewport.label}`);
+      const interactionTypography = await timelineInteraction.evaluate((element) => {
+        const title = element.querySelector(".people-timeline-entry-title");
+        const body = element.querySelector(".people-timeline-entry-body");
+        return {
+          titleSize: title ? Number.parseFloat(getComputedStyle(title).fontSize) : 0,
+          bodySize: body ? Number.parseFloat(getComputedStyle(body).fontSize) : 0
+        };
+      });
+      assert(
+        interactionTypography.titleSize > interactionTypography.bodySize && interactionTypography.bodySize > 0,
+        `Timeline title/body hierarchy was not visible at ${viewport.label}: ${JSON.stringify(interactionTypography)}`
+      );
       await assertNoOverflow(page, `People memory Timeline ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-memory-timeline-${viewport.label}.png`),
         fullPage: true
       });
+
+      await page.getByRole("button", { name: "Log Interaction" }).first().click();
+      const interactionDialog = page.getByRole("dialog", { name: new RegExp(`Log interaction with`, "i") });
+      await interactionDialog.waitFor();
+      assert(
+        (await interactionDialog.locator('select option').allTextContents()).includes("Catch-up"),
+        `Interaction composer omitted Catch-up at ${viewport.label}`
+      );
+      assert(
+        !(await interactionDialog.textContent()).includes("Meaningful interaction"),
+        `Interaction composer retained the removed eyebrow at ${viewport.label}`
+      );
+      await interactionDialog.locator("select").selectOption("catch-up");
+      await interactionDialog.getByLabel("Title").fill("Quick catch-up");
+      assert(
+        await interactionDialog.locator("select").inputValue() === "catch-up",
+        `Interaction composer did not accept Catch-up at ${viewport.label}`
+      );
+      const dialogActions = await interactionDialog.locator(".people-dialog-action").evaluateAll((elements) =>
+        elements.map((element) => {
+          const rect = element.getBoundingClientRect();
+          const style = getComputedStyle(element);
+          return {
+            width: rect.width,
+            height: rect.height,
+            radius: Number.parseFloat(style.borderRadius),
+            background: style.backgroundColor
+          };
+        })
+      );
+      assert(
+        dialogActions.length === 2 && dialogActions.every((action) => action.height >= (viewport.label === "mobile" ? 44 : 36) && action.radius >= 7),
+        `Interaction composer actions did not use the current control system at ${viewport.label}: ${JSON.stringify(dialogActions)}`
+      );
+      assert(
+        dialogActions[0].background !== dialogActions[1].background,
+        `Interaction composer did not distinguish its primary action at ${viewport.label}: ${JSON.stringify(dialogActions)}`
+      );
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-interaction-dialog-${viewport.label}.png`),
+        fullPage: true
+      });
+      await interactionDialog.getByRole("button", { name: "Close interaction composer" }).click();
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
       const propertyMemories = page.locator("[data-memory-editor-id]");
@@ -12807,7 +12874,7 @@ async function main() {
             { id: "location-regression-1", label: "Primary home", location: "Columbus, Ohio, USA", address: "123 Test Street, Columbus, Ohio 43215, USA" },
             { id: "location-regression-2", label: "Second home", location: "Cincinnati, Ohio, USA", address: "456 Example Avenue, Cincinnati, Ohio 45202, USA" }
           ],
-          interactions: ["2026-07-14 • Meeting • Regression persistence check"],
+          interactions: ["2026-07-14 • Meeting • Regression persistence check • Talked about project planning"],
           memories: [
             {
               id: "memory-regression-older",

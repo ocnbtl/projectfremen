@@ -80,11 +80,18 @@ type PeopleSidebarView =
   | "customize";
 type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up" | "priority";
 type PeopleListMode = "list" | "compact" | "grid";
-type InteractionKind = "call" | "message" | "email" | "meeting" | "note" | "milestone";
+type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "note" | "milestone";
+
+type PeopleTimelineInteraction = {
+  date?: string;
+  kind?: string;
+  title: string;
+  summary?: string;
+};
 
 type PeopleTimelineItem =
   | { kind: "memory"; id: string; date?: string; memory: PersonalMemoryEntry }
-  | { kind: "interaction"; id: string; date?: string; text: string };
+  | { kind: "interaction"; id: string; date?: string; interaction: PeopleTimelineInteraction };
 
 type MemoryCategory =
   | "personal_context"
@@ -585,6 +592,30 @@ function removeEntry<T extends { id: string }>(entries: T[], id: string): T[] {
 function interactionOccurredOn(value: string): string | undefined {
   const match = value.match(/^(\d{4}-\d{2}-\d{2})(?:\s|$|•)/);
   return match?.[1];
+}
+
+const INTERACTION_KIND_LABELS = new Set([
+  "call",
+  "message",
+  "email",
+  "meeting",
+  "catch-up",
+  "catch up",
+  "note",
+  "milestone"
+]);
+
+function parseTimelineInteraction(value: string): PeopleTimelineInteraction {
+  const parts = value
+    .split(/\s+[•·]\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const date = parts[0]?.match(/^\d{4}-\d{2}-\d{2}$/) ? parts.shift() : undefined;
+  const possibleKind = parts[0]?.toLocaleLowerCase();
+  const kind = possibleKind && INTERACTION_KIND_LABELS.has(possibleKind) ? parts.shift() : undefined;
+  const title = parts.shift() || value.replace(/^(\d{4}-\d{2}-\d{2})(?:\s+[•·]\s+)?/, "").trim() || "Interaction";
+  const summary = parts.length > 0 ? parts.join(" • ") : undefined;
+  return { date, kind, title, summary };
 }
 
 function sortTimelineItems(items: PeopleTimelineItem[]): PeopleTimelineItem[] {
@@ -1412,12 +1443,15 @@ export default function PeopleWorkspace({
     ["Added", selectedPerson ? formatFullDate(selectedPerson.createdAt) : "-"]
   ];
   const timelineItems = sortTimelineItems([
-    ...selectedInteractions.map((text, index): PeopleTimelineItem => ({
-      kind: "interaction",
-      id: `interaction-${index}-${text}`,
-      date: interactionOccurredOn(text),
-      text
-    })),
+    ...selectedInteractions.map((text, index): PeopleTimelineItem => {
+      const interaction = parseTimelineInteraction(text);
+      return {
+        kind: "interaction",
+        id: `interaction-${index}-${text}`,
+        date: interaction.date || interactionOccurredOn(text),
+        interaction
+      };
+    }),
     ...selectedMemories.map((memory): PeopleTimelineItem => ({
       kind: "memory",
       id: memory.id,
@@ -1797,7 +1831,7 @@ export default function PeopleWorkspace({
     event.preventDefault();
     if (!selectedPerson || !interactionDate || !interactionTitle.trim()) return;
     setInteractionSaving(true);
-    const kindLabel = labelize(interactionKind);
+    const kindLabel = interactionKind === "catch-up" ? "Catch-up" : labelize(interactionKind);
     const entry = [interactionDate, kindLabel, interactionTitle.trim(), interactionSummary.trim()]
       .filter(Boolean)
       .join(" • ");
@@ -2756,15 +2790,19 @@ export default function PeopleWorkspace({
                             <span>{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
                             <button type="button" onClick={() => startMemoryEdit(item.memory)}>Edit</button>
                           </div>
-                          <strong>{item.memory.text}</strong>
-                          <p>{memoryCategoryLabel(item.memory.category)}</p>
+                          <strong className="people-timeline-entry-title">{item.memory.text}</strong>
+                          <p className="people-timeline-entry-body">{memoryCategoryLabel(item.memory.category)}</p>
                         </>
                       )}
                     </article>
                   ) : (
-                    <article key={item.id}>
-                      <span>{item.date ? formatFullDate(item.date) : formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</span>
-                      <strong>{item.text}</strong>
+                    <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
+                      <div className="people-timeline-entry-meta">
+                        <span>{item.date ? formatFullDate(item.date) : formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</span>
+                        {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind}</span>}
+                      </div>
+                      <strong className="people-timeline-entry-title">{item.interaction.title}</strong>
+                      {item.interaction.summary && <p className="people-timeline-entry-body">{item.interaction.summary}</p>}
                     </article>
                   )) : (
                     <div className="notes-empty-state">
@@ -3170,11 +3208,8 @@ export default function PeopleWorkspace({
         <div className="people-dialog-backdrop" role="presentation">
           <form ref={interactionDialogRef} className="people-interaction-dialog" role="dialog" aria-modal="true" aria-labelledby="log-interaction-title" onSubmit={saveInteraction}>
             <header>
-              <div>
-                <span>Meaningful interaction</span>
-                <h2 id="log-interaction-title">Log interaction with {selectedPerson.title}</h2>
-              </div>
-              <button type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}>x</button>
+              <h2 id="log-interaction-title">Log interaction with {selectedPerson.title}</h2>
+              <button className="people-dialog-close" type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}><span aria-hidden="true">×</span></button>
             </header>
             <div className="people-interaction-fields">
               <label>
@@ -3184,6 +3219,7 @@ export default function PeopleWorkspace({
                   <option value="message">Message</option>
                   <option value="email">Email</option>
                   <option value="meeting">Meeting</option>
+                  <option value="catch-up">Catch-up</option>
                   <option value="note">Note</option>
                   <option value="milestone">Milestone</option>
                 </select>
@@ -3206,10 +3242,10 @@ export default function PeopleWorkspace({
               </label>
             </div>
             {error && <p className="personal-record-error">{error}</p>}
-            <footer>
-              <button type="button" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}>Cancel</button>
-              <button type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate}>
-                {interactionSaving ? "Saving..." : "Save Interaction"}
+            <footer className="people-dialog-actions">
+              <button className="people-dialog-action" type="button" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}>Cancel</button>
+              <button className="people-dialog-action is-primary" type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate}>
+                {interactionSaving ? "Saving..." : "Save interaction"}
               </button>
             </footer>
           </form>

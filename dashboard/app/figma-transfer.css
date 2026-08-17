@@ -2684,19 +2684,49 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   gap: 8px;
 }
 
-.people-timeline-list span {
+.people-timeline-list > article > span,
+.people-memory-card-heading > span,
+.people-timeline-entry-meta > span:first-child {
   color: #60747c;
   font-size: 11px;
   font-weight: 900;
 }
 
-.people-timeline-list strong {
+.people-timeline-entry-title {
   color: #102026;
+  font-size: 15px;
+  font-weight: 850;
+  line-height: 1.35;
+  text-wrap: pretty;
 }
 
-.people-timeline-list p {
+.people-timeline-entry-body {
   margin: 0;
   color: #415862;
+  font-size: 12px;
+  line-height: 1.5;
+  text-wrap: pretty;
+}
+
+.people-timeline-entry-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.people-timeline-kind {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--surface-panel-soft);
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.02em;
 }
 
 .people-linked-workspace article span {
@@ -7004,22 +7034,40 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
 
 .people-interaction-dialog > header,
 .people-interaction-dialog > footer {
+  position: sticky;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  background: var(--panel-bg);
 }
 
-.people-interaction-dialog h2,
-.people-interaction-dialog header span {
+.people-interaction-dialog > header {
+  top: 0;
+}
+
+.people-interaction-dialog > footer {
+  bottom: 0;
+  border-top: 1px solid var(--border);
+}
+
+.people-interaction-dialog h2 {
   margin: 0;
+  color: var(--text-strong);
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 19px;
+  font-weight: 760;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  text-wrap: balance;
 }
 
 .people-interaction-fields {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
-  border-block: 1px solid var(--border);
+  border-top: 1px solid var(--border);
 }
 
 .people-interaction-fields label {
@@ -7041,7 +7089,89 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: 7px;
+  background: var(--panel-bg-subtle);
+  color: var(--text-strong);
+  transition: border-color 160ms cubic-bezier(0.23, 1, 0.32, 1), box-shadow 160ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.people-interaction-fields input:focus-visible,
+.people-interaction-fields select:focus-visible,
+.people-interaction-fields textarea:focus-visible {
+  border-color: var(--action-primary);
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--action-primary) 18%, transparent);
+}
+
+.people-dialog-close,
+.people-dialog-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
   background: var(--panel-bg);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+  transition: background-color 140ms cubic-bezier(0.23, 1, 0.32, 1), border-color 140ms cubic-bezier(0.23, 1, 0.32, 1), transform 120ms cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.people-dialog-close {
+  flex: 0 0 36px;
+  width: 36px;
+  padding: 0;
+  font-size: 21px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.people-dialog-action:hover,
+.people-dialog-close:hover {
+  border-color: var(--text-subtle);
+  background: var(--surface-row-hover);
+}
+
+.people-dialog-action:active,
+.people-dialog-close:active {
+  transform: scale(0.97);
+}
+
+.people-dialog-action:focus-visible,
+.people-dialog-close:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--action-primary) 52%, transparent);
+  outline-offset: 2px;
+}
+
+.people-dialog-action.is-primary {
+  border-color: var(--action-primary);
+  background: var(--action-primary);
+  color: #ffffff;
+}
+
+.people-dialog-action:disabled,
+.people-dialog-close:disabled {
+  border-color: var(--border);
+  background: var(--panel-bg-subtle);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  transform: none;
+}
+
+.people-dialog-actions {
+  justify-content: flex-end !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .people-dialog-close,
+  .people-dialog-action,
+  .people-interaction-fields input,
+  .people-interaction-fields select,
+  .people-interaction-fields textarea {
+    transition: none;
+  }
 }
 
 .people-mobile-actionbar {
