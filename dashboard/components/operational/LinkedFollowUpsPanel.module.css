@@ -14,6 +14,11 @@
   border-radius: 8px;
 }
 
+.panel[data-presentation="rail"] {
+  align-content: start;
+  background: var(--surface-panel-soft, #f7fafb);
+}
+
 .header,
 .actions,
 .summary {
@@ -150,6 +155,19 @@
 .row[data-follow-up-state="complete"] .state {
   background: #e9edf0;
   color: #53636a;
+}
+
+.panel[data-presentation="rail"] .row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  padding: 8px;
+}
+
+.panel[data-presentation="rail"] .ownerLink {
+  display: none;
+}
+
+.panel[data-presentation="rail"] .summary {
+  font-weight: 750;
 }
 
 .empty {

@@ -87,6 +87,7 @@ type ContactMethod = {
   id: ContactMethodId;
   label: string;
   value: string;
+  available: boolean;
   href?: string;
   actionLabel?: string;
 };
@@ -749,6 +750,21 @@ function getCadenceLabel(value?: string) {
 
 function displayList(values: string[], fallback = "-") {
   return values.length > 0 ? values.join(", ") : fallback;
+}
+
+function educationSummary(entries: PersonalEducationEntry[], fallback: string) {
+  const summaries = entries
+    .filter((entry) => entry.institution.trim())
+    .map((entry) => {
+      const study = [entry.degree, entry.fieldOfStudy].filter(Boolean).join(" · ");
+      return study ? `${entry.institution} — ${study}` : entry.institution;
+    });
+  if (summaries.length === 0) return fallback;
+  return summaries.length === 1 ? summaries[0] : `${summaries[0]} +${summaries.length - 1} more`;
+}
+
+function relationshipName(value: string) {
+  return value.replace(/\s+\([^)]*\)\s*$/, "").trim();
 }
 
 function getProfile(record?: PersonalRecord): ContactProfileDraft {
@@ -1456,11 +1472,12 @@ export default function PeopleWorkspace({
     { id: "tiktok", label: "TikTok", value: selectedProfile.tiktok },
     { id: "x", label: "X", value: selectedProfile.x },
     { id: "linkedin", label: "LinkedIn", value: selectedProfile.linkedin }
-  ] satisfies ContactMethod[]).filter((method) => Boolean(method.value)).map((method) => ({
+  ] satisfies Array<Omit<ContactMethod, "available">>).map((method) => ({
     ...method,
+    available: Boolean(method.value),
     ...contactMethodHref(method.id, method.value)
   }));
-  const expandedContact = selectedContactMethods.find((method) => method.id === expandedContactMethod);
+  const expandedContact = selectedContactMethods.find((method) => method.available && method.id === expandedContactMethod);
   const fallbackPerson = selectedPerson || visiblePeople[0];
   const activeFilterCount = (activeFilter === "all" ? 0 : 1) + (query.trim() ? 1 : 0);
   const filteringActive = detailMode === "profile" && activeFilterCount > 0;
@@ -1484,10 +1501,18 @@ export default function PeopleWorkspace({
   const selectedInteractions = splitTextEntries(selectedProfile.interactions);
   const selectedChildren = splitList(selectedProfile.children);
   const associatedPeople = splitList(selectedProfile.associatedPeople);
-  const relatedRecordLabels = selectedPerson
-    ? selectedPerson.relations.related.map((id) => people.find((record) => record.id === id)?.title || id)
-    : [];
-  const connectionItems = Array.from(new Set([...associatedPeople, ...relatedRecordLabels]));
+  const relationshipConnections = Array.from(new Map([
+    ...associatedPeople.map((label) => {
+      const name = relationshipName(label);
+      const target = people.find((record) => record.title.localeCompare(name, undefined, { sensitivity: "base" }) === 0);
+      return [name.toLowerCase(), { label, target }] as const;
+    }),
+    ...(selectedPerson?.relations.related || []).map((id) => {
+      const target = people.find((record) => record.id === id);
+      return [(target?.title || id).toLowerCase(), { label: target?.title || id, target }] as const;
+    })
+  ]).values());
+  const connectionItems = relationshipConnections.map((connection) => connection.label);
   const importantDates = [
     ["Birthday", selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "Not recorded"],
     ["Last contact", selectedPerson ? formatFullDate(selectedPerson.time.lastReview || selectedProfile.lastContact || selectedPerson.updatedAt) : "-"],
@@ -2782,29 +2807,6 @@ export default function PeopleWorkspace({
               </div>
             ) : detailMode === "timeline" ? (
               <section className="people-timeline-panel">
-                <div className="people-cadence-grid">
-                  {[
-                    ["Last contact", formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt), "green"],
-                    ["Next follow-up", getNextContactLabel(selectedPerson), "blue"],
-                    ["Cadence", getCadenceLabel(selectedPerson.time.reviewCadence), "brown"],
-                    ["Relationship health", getPriorityLabel(selectedPerson) === "High" ? "Needs attention" : "Strong", "green"]
-                  ].map(([label, value, tone]) => (
-                    <article className={`module-ref-tone-${tone}`} key={label}>
-                      <span>{label}</span>
-                      <strong>{value}</strong>
-                    </article>
-                  ))}
-                </div>
-                <LinkedFollowUpsPanel
-                  source={peopleFollowUpSource(selectedPerson)}
-                  followUps={followUps}
-                  loading={followUpsLoading}
-                  error={followUpsError}
-                  onRefresh={() => void refreshLinkedFollowUps()}
-                  createHref={followUpCreationRoute(selectedPerson)}
-                  limit={3}
-                  title="Relationship follow-through"
-                />
                 <div className="people-timeline-actions">
                   <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
                   <button
@@ -2816,68 +2818,129 @@ export default function PeopleWorkspace({
                   </button>
                   <button type="button" onClick={() => selectProfileView("notes")}>Add Memory / Note</button>
                 </div>
-                <div className="people-timeline-list">
-                  {timelineItems.length > 0 ? timelineItems.map((item) => item.kind === "memory" ? (
-                    <article className="people-timeline-memory" data-memory-id={item.memory.id} data-memory-date={item.memory.occurredOn || ""} key={`memory-${item.id}`}>
-                      {editingMemoryId === item.memory.id ? (
-                        <div className="people-memory-inline-editor">
-                          <label>
-                            Memory
-                            <textarea value={editingMemoryText} onChange={(event) => setEditingMemoryText(event.target.value)} rows={3} />
-                          </label>
-                          <label>
-                            Date
-                            <input type="date" value={editingMemoryDate} onChange={(event) => setEditingMemoryDate(event.target.value)} />
-                          </label>
-                          <div>
-                            <button type="button" onClick={() => void saveMemoryEdit()} disabled={memoryEditSaving || !editingMemoryText.trim()}>
-                              {memoryEditSaving ? "Saving..." : "Save"}
-                            </button>
-                            <button type="button" onClick={cancelMemoryEdit} disabled={memoryEditSaving}>Cancel</button>
-                          </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="people-memory-card-heading">
-                            <span>{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
-                            <button type="button" onClick={() => startMemoryEdit(item.memory)}>Edit</button>
-                          </div>
-                          <strong className="people-timeline-entry-title">{item.memory.text}</strong>
-                          <p className="people-timeline-entry-body">{memoryCategoryLabel(item.memory.category)}</p>
-                        </>
-                      )}
-                    </article>
-                  ) : (
-                    <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
-                      <div className="people-timeline-entry-meta">
-                        <span>{item.date ? formatFullDate(item.date) : formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</span>
-                        {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind}</span>}
+                <div className="people-timeline-layout">
+                  <section className="people-timeline-stream" aria-label={`${selectedPerson.title} relationship history`}>
+                    <header>
+                      <div>
+                        <h3>Memories & interactions</h3>
+                        <span>{timelineItems.length} saved {timelineItems.length === 1 ? "entry" : "entries"}</span>
                       </div>
-                      <strong className="people-timeline-entry-title">{item.interaction.title}</strong>
-                      {item.interaction.summary && <p className="people-timeline-entry-body">{item.interaction.summary}</p>}
-                    </article>
-                  )) : (
-                    <div className="notes-empty-state">
-                      <h3>No interactions yet</h3>
-                      <p>Log a call, email, meeting, message, or meaningful memory to build relationship history.</p>
+                    </header>
+                    <div className="people-timeline-list">
+                      {timelineItems.length > 0 ? timelineItems.map((item) => item.kind === "memory" ? (
+                        <article className="people-timeline-memory" data-memory-id={item.memory.id} data-memory-date={item.memory.occurredOn || ""} key={`memory-${item.id}`}>
+                          {editingMemoryId === item.memory.id ? (
+                            <div className="people-memory-inline-editor">
+                              <label>
+                                Memory
+                                <textarea value={editingMemoryText} onChange={(event) => setEditingMemoryText(event.target.value)} rows={3} />
+                              </label>
+                              <label>
+                                Date
+                                <input type="date" value={editingMemoryDate} onChange={(event) => setEditingMemoryDate(event.target.value)} />
+                              </label>
+                              <div>
+                                <button type="button" onClick={() => void saveMemoryEdit()} disabled={memoryEditSaving || !editingMemoryText.trim()}>
+                                  {memoryEditSaving ? "Saving..." : "Save"}
+                                </button>
+                                <button type="button" onClick={cancelMemoryEdit} disabled={memoryEditSaving}>Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <>
+                              <div className="people-memory-card-heading">
+                                <span>{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
+                                <button type="button" onClick={() => startMemoryEdit(item.memory)}>Edit</button>
+                              </div>
+                              <strong className="people-timeline-entry-title">{item.memory.text}</strong>
+                              <p className="people-timeline-entry-body">{memoryCategoryLabel(item.memory.category)}</p>
+                            </>
+                          )}
+                        </article>
+                      ) : (
+                        <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
+                          <div className="people-timeline-entry-meta">
+                            <span>{item.date ? formatFullDate(item.date) : formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</span>
+                            {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind}</span>}
+                          </div>
+                          <strong className="people-timeline-entry-title">{item.interaction.title}</strong>
+                          {item.interaction.summary && <p className="people-timeline-entry-body">{item.interaction.summary}</p>}
+                        </article>
+                      )) : (
+                        <div className="notes-empty-state">
+                          <h3>No interactions yet</h3>
+                          <p>Log a call, email, meeting, message, or memory to start the history.</p>
+                        </div>
+                      )}
                     </div>
-                  )}
+                  </section>
+                  <aside className="people-timeline-side" aria-label="Follow-ups and relationship rhythm">
+                    <LinkedFollowUpsPanel
+                      source={peopleFollowUpSource(selectedPerson)}
+                      followUps={followUps}
+                      loading={followUpsLoading}
+                      error={followUpsError}
+                      onRefresh={() => void refreshLinkedFollowUps()}
+                      createHref={followUpCreationRoute(selectedPerson)}
+                      limit={3}
+                      compact
+                      presentation="rail"
+                      showBoundary={false}
+                      title="Follow-ups"
+                    />
+                    <section className="people-relationship-rhythm">
+                      <h3>Relationship rhythm</h3>
+                      {[
+                        ["Last contact", formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)],
+                        ["Next follow-up", getNextContactLabel(selectedPerson)],
+                        ["Cadence", getCadenceLabel(selectedPerson.time.reviewCadence)],
+                        ["Health", getPriorityLabel(selectedPerson) === "High" ? "Needs attention" : "Strong"]
+                      ].map(([label, value]) => (
+                        <div key={label}>
+                          <span>{label}</span>
+                          <strong>{value}</strong>
+                        </div>
+                      ))}
+                    </section>
+                  </aside>
                 </div>
               </section>
             ) : detailMode === "workspace" ? (
               <section className="people-linked-workspace">
                 <article>
-                  <h3>Notes</h3>
-                  {selectedProfile.notes ? selectedProfile.notes.split("\n").filter(Boolean).map((item) => <span key={item}>{item}</span>) : <span>No authored Notes linked.</span>}
-                  <button type="button" onClick={() => selectProfileView("notes")}>Open Notes & Memories</button>
+                  <header className="people-linked-card-header">
+                    <div><h3>Notes & memories</h3><span>{selectedMemories.length + selectedInteractions.length} timeline entries</span></div>
+                    <button type="button" onClick={() => selectProfileView("notes")}>Open</button>
+                  </header>
+                  {selectedProfile.notes
+                    ? selectedProfile.notes.split("\n").filter(Boolean).slice(0, 3).map((item) => <span key={item}>{item}</span>)
+                    : <span>No profile notes yet.</span>}
                 </article>
                 <article>
-                  <h3>Files & Media</h3>
-                  <span>No Media files linked.</span>
-                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="The Media picker is not connected in this slice">Link Existing unavailable</button>
+                  <header className="people-linked-card-header">
+                    <div><h3>Files & media</h3><span>Browse this person’s media context</span></div>
+                    <a href={`${getModuleRoute("media")}?query=${encodeURIComponent(selectedPerson.title)}`}>Search Media</a>
+                  </header>
+                  <span>No directly linked Media files are visible on this profile.</span>
                 </article>
                 <article>
-                  <h3>Projects</h3>
+                  <header className="people-linked-card-header">
+                    <div><h3>Projects</h3><span>Current involvement</span></div>
+                    <div className="people-linked-card-tools">
+                      <button
+                        type="button"
+                        onClick={() => void refreshProjects()}
+                        disabled={projectsLoading}
+                        aria-label={`Refresh Projects involvement for ${selectedPerson.title}`}
+                      >
+                        {projectsLoading ? "Checking…" : "Check"}
+                      </button>
+                      <details className="people-inline-info">
+                        <summary aria-label="About project links">i</summary>
+                        <p>Projects keeps roles and project status. People keeps identity, contact history, and cadence.</p>
+                      </details>
+                    </div>
+                  </header>
                   <LinkedProjectsPanel
                     personId={selectedPerson.id}
                     personLabel={selectedPerson.title}
@@ -2889,13 +2952,16 @@ export default function PeopleWorkspace({
                     legacyProjectLabels={selectedPerson.projects}
                     limit={3}
                     compact
-                    title="Projects-owned involvement"
+                    showHeader={false}
+                    showBoundary={false}
                   />
                 </article>
                 <article>
-                  <h3>Resources</h3>
+                  <header className="people-linked-card-header">
+                    <div><h3>Resources</h3><span>Sources and saved references</span></div>
+                    <a href={`${getModuleRoute("resources")}?query=${encodeURIComponent(selectedPerson.title)}`}>Search Resources</a>
+                  </header>
                   {selectedPerson.externalSources.length ? selectedPerson.externalSources.map((item) => <a href={`${getModuleRoute("resources")}?query=${encodeURIComponent(item)}`} key={item}>{item}</a>) : <span>No Resources linked.</span>}
-                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="The Resources object picker is not connected in this slice">Add Resource unavailable</button>
                 </article>
               </section>
             ) : activeView === "notes" ? (
@@ -3028,25 +3094,11 @@ export default function PeopleWorkspace({
                     <h3>Relationships</h3>
                     <span>{connectionItems.length} linked people and context markers</span>
                   </div>
-                  <button type="button" onClick={() => document.querySelector<HTMLInputElement>(".people-relation-form input")?.focus()}>
-                    Add Relationship
-                  </button>
                 </div>
 
                 {actionNotice && <p className="people-notice">{actionNotice}</p>}
 
                 <div className="people-relationships-grid">
-                  <LinkedProjectsPanel
-                    personId={selectedPerson.id}
-                    personLabel={selectedPerson.title}
-                    objectType={selectedPerson.className === "org" ? "organization" : "person"}
-                    state={projectsState}
-                    loading={projectsLoading}
-                    error={projectsError}
-                    onRefresh={() => void refreshProjects()}
-                    legacyProjectLabels={selectedPerson.projects}
-                    title="Shared project context"
-                  />
                   <section className="people-relation-map">
                     <h4>Relationship map</h4>
                     <div className="people-relation-node is-center">
@@ -3054,17 +3106,27 @@ export default function PeopleWorkspace({
                       <span>{selectedProfile.nickname || getPrimaryGroup(selectedPerson)}</span>
                     </div>
                     <div className="people-relation-spokes">
-                      {(connectionItems.length ? connectionItems : ["No associated people yet"]).slice(0, 8).map((item) => (
-                        <button type="button" className="people-relation-node" key={item} onClick={() => setActionNotice(`${item} is linked as context. Opening linked profiles will come with cross-record relation support.`)}>
-                          <strong>{item}</strong>
-                          <span>Associated</span>
+                      {connectionItems.length ? relationshipConnections.slice(0, 8).map((connection) => connection.target ? (
+                        <button type="button" className="people-relation-node" key={connection.label} onClick={() => selectPerson(connection.target!)}>
+                          <strong>{connection.label}</strong>
+                          <span>Open profile</span>
                         </button>
-                      ))}
+                      ) : (
+                        <div className="people-relation-node" key={connection.label}>
+                          <strong>{connection.label}</strong>
+                          <span>Saved context</span>
+                        </div>
+                      )) : (
+                        <div className="people-relation-node">
+                          <strong>No associated people yet</strong>
+                          <span>Add the first relationship beside the map.</span>
+                        </div>
+                      )}
                     </div>
                   </section>
 
                   <section className="people-relation-form module-ref-tone-purple">
-                    <h4>Add contextual link</h4>
+                    <h4>Add relationship</h4>
                     <label>
                       Person or context
                       <input value={relationshipDraft} onChange={(event) => setRelationshipDraft(event.target.value)} placeholder="Name, family member, collaborator, introduced by..." />
@@ -3103,13 +3165,7 @@ export default function PeopleWorkspace({
                   </section>
 
                   <section className="people-relation-list">
-                    <h4>Shared workspace context</h4>
-                    {(selectedPerson.projects.length ? selectedPerson.projects : ["No shared projects linked yet"]).map((project) => (
-                      <article key={project}>
-                        <span>Project</span>
-                        <strong>{project}</strong>
-                      </article>
-                    ))}
+                    <h4>Recent context</h4>
                     {(selectedInteractions.length ? selectedInteractions : ["No relationship timeline entries yet"]).slice(0, 4).map((item) => (
                       <article key={item}>
                         <span>Timeline</span>
@@ -3117,57 +3173,78 @@ export default function PeopleWorkspace({
                       </article>
                     ))}
                   </section>
+
+                  <section className="people-relationship-projects">
+                    <header className="people-linked-card-header">
+                      <div><h4>Shared projects</h4><span>Current involvement</span></div>
+                      <button
+                        type="button"
+                        onClick={() => void refreshProjects()}
+                        disabled={projectsLoading}
+                        aria-label={`Refresh Projects involvement for ${selectedPerson.title}`}
+                      >
+                        {projectsLoading ? "Checking…" : "Check"}
+                      </button>
+                    </header>
+                    <LinkedProjectsPanel
+                      personId={selectedPerson.id}
+                      personLabel={selectedPerson.title}
+                      objectType={selectedPerson.className === "org" ? "organization" : "person"}
+                      state={projectsState}
+                      loading={projectsLoading}
+                      error={projectsError}
+                      onRefresh={() => void refreshProjects()}
+                      legacyProjectLabels={selectedPerson.projects}
+                      limit={3}
+                      compact
+                      showHeader={false}
+                      showBoundary={false}
+                    />
+                  </section>
                 </div>
               </section>
             ) : (
               <section className="people-overview-grid">
-                <article data-people-overview-card="contact">
-                  <h3>Contact</h3>
-                  {selectedContactMethods.length ? (
-                    <>
-                      <div className="people-contact-methods-compact" aria-label="Contact methods">
-                        {selectedContactMethods.map((method) => (
-                          <button
-                            type="button"
-                            key={method.id}
-                            data-contact-method={method.id}
-                            className={expandedContactMethod === method.id ? "is-active" : ""}
-                            onClick={() => setExpandedContactMethod((current) => current === method.id ? null : method.id)}
-                            aria-label={`${expandedContactMethod === method.id ? "Hide" : "Show"} ${method.label}`}
-                            aria-expanded={expandedContactMethod === method.id}
-                            title={method.label}
-                          >
-                            <ContactMethodIcon id={method.id} />
-                          </button>
-                        ))}
-                      </div>
-                      {expandedContact && (
-                        <div className="people-contact-disclosure" data-contact-disclosure={expandedContact.id}>
-                          <span>{expandedContact.label}</span>
-                          <strong>{expandedContact.value}</strong>
-                          {expandedContact.href && (
-                            <a href={expandedContact.href} target={expandedContact.href.startsWith("http") ? "_blank" : undefined} rel={expandedContact.href.startsWith("http") ? "noreferrer" : undefined}>
-                              {expandedContact.actionLabel}
-                            </a>
-                          )}
-                        </div>
+                <section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">
+                  <div className="people-contact-methods-compact">
+                    {selectedContactMethods.map((method) => (
+                      <button
+                        type="button"
+                        key={method.id}
+                        data-contact-method={method.id}
+                        data-available={method.available || undefined}
+                        className={expandedContactMethod === method.id ? "is-active" : ""}
+                        onClick={() => setExpandedContactMethod((current) => current === method.id ? null : method.id)}
+                        aria-label={method.available ? `${expandedContactMethod === method.id ? "Hide" : "Show"} ${method.label}` : `${method.label} not added`}
+                        aria-expanded={method.available ? expandedContactMethod === method.id : undefined}
+                        title={method.available ? method.label : `${method.label} not added`}
+                        disabled={!method.available}
+                      >
+                        <ContactMethodIcon id={method.id} />
+                      </button>
+                    ))}
+                  </div>
+                  {expandedContact && (
+                    <div className="people-contact-disclosure" data-contact-disclosure={expandedContact.id}>
+                      <span>{expandedContact.label}</span>
+                      <strong>{expandedContact.value}</strong>
+                      {expandedContact.href && (
+                        <a href={expandedContact.href} target={expandedContact.href.startsWith("http") ? "_blank" : undefined} rel={expandedContact.href.startsWith("http") ? "noreferrer" : undefined}>
+                          {expandedContact.actionLabel}
+                        </a>
                       )}
-                    </>
-                  ) : <p className="people-contact-empty">No contact details recorded yet.</p>}
-                  {[selectedProfile.primaryOccupation, selectedProfile.primaryEmployer].some(Boolean) && (
-                    <div className="people-contact-work">
-                      <span>Work</span>
-                      <strong>{[selectedProfile.primaryOccupation, selectedProfile.primaryEmployer].filter(Boolean).join(" at ")}</strong>
                     </div>
                   )}
-                </article>
-                <article data-people-overview-card="quick-info">
-                  <h3>Quick Info</h3>
+                </section>
+                <article className="people-overview-facts" data-people-overview-card="quick-info">
+                  <h3 className="people-visually-hidden">Profile details</h3>
                   {[
                     ["Birthday", selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "-"],
                     ["Location", selectedProfile.livesIn],
                     ["Hometown", selectedProfile.comesFrom],
                     ["Occupation", selectedProfile.primaryOccupation],
+                    ["Employer", selectedProfile.primaryEmployer],
+                    ["University", educationSummary(selectedProfile.education, selectedProfile.universityAffiliation)],
                     ["Partner", selectedProfile.partner],
                     ["Children", selectedProfile.children]
                   ].map(([label, value]) => (

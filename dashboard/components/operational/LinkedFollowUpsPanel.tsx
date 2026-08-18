@@ -46,6 +46,7 @@ export default function LinkedFollowUpsPanel({
   createHref,
   limit = 3,
   compact = false,
+  presentation = "default",
   showHeader = true,
   showBoundary = true,
   hideWhenEmpty = false,
@@ -61,6 +62,7 @@ export default function LinkedFollowUpsPanel({
   createHref?: string;
   limit?: number;
   compact?: boolean;
+  presentation?: "default" | "rail";
   showHeader?: boolean;
   showBoundary?: boolean;
   hideWhenEmpty?: boolean;
@@ -82,13 +84,14 @@ export default function LinkedFollowUpsPanel({
       data-source-object-id={source.objectId}
       data-people-follow-up-bridge={source.module === "people" ? source.objectId : undefined}
       data-compact={compact || undefined}
+      data-presentation={presentation}
       data-wide={wide || undefined}
       aria-live="polite"
     >
       {showHeader && (
         <header className={styles.header}>
           <div className={styles.heading}>
-            <span>Personal Ops owner</span>
+            <span>{presentation === "rail" ? "Linked to this person" : "Personal Ops owner"}</span>
             <strong>{title}</strong>
           </div>
           <button
@@ -98,7 +101,7 @@ export default function LinkedFollowUpsPanel({
             disabled={loading}
             aria-label={`Refresh linked Follow-ups for ${source.label}`}
           >
-            {loading ? "Refreshing…" : "Refresh status"}
+            {loading ? "Checking…" : presentation === "rail" ? "Check" : "Refresh status"}
           </button>
         </header>
       )}
@@ -139,7 +142,9 @@ export default function LinkedFollowUpsPanel({
         <p className={styles.empty}>
           {error
             ? "Current linked Follow-up status is unavailable. Retry before creating new work."
-            : "No Personal Ops Follow-up uses this exact source."}
+            : presentation === "rail"
+              ? "No follow-ups for this person."
+              : "No Personal Ops Follow-up uses this exact source."}
         </p>
       )}
 

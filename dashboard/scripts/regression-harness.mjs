@@ -5635,6 +5635,13 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         await overview.getByRole("heading", { name: "Cadence", exact: true }).count() === 0,
         `People Overview retained the duplicate Cadence card at ${viewport.label}`
       );
+      const contactButtons = overview.locator("[data-contact-method]");
+      assert(
+        await contactButtons.count() === 7 &&
+          await overview.locator("[data-contact-method]:disabled").count() > 0 &&
+          await overview.locator('[data-contact-method="tiktok"]:disabled').count() === 1,
+        `People Overview did not keep every contact method visible with unavailable methods disabled at ${viewport.label}`
+      );
       const emailButton = overview.getByRole("button", { name: "Show Email" });
       await emailButton.click();
       const emailDisclosure = overview.locator('[data-contact-disclosure="email"]');
@@ -5653,10 +5660,16 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         ]);
         assert(gridRect && contactRect && quickRect && aboutRect, `People Overview cards were not measurable at ${viewport.label}`);
         assert(
-          Math.abs(contactRect.y - quickRect.y) <= 2 && aboutRect.y > contactRect.y && aboutRect.width >= gridRect.width - 2,
-          `People Overview did not keep Contact and Quick Info together with About below at ${viewport.label}`
+          contactRect.y < quickRect.y && quickRect.y < aboutRect.y && contactRect.width >= gridRect.width - 2 && quickRect.width >= gridRect.width - 2,
+          `People Overview did not lead with the compact contact rail and full-width fact list at ${viewport.label}`
         );
       }
+      assert(
+        (await overview.locator('[data-people-overview-card="quick-info"]').innerText()).includes("Regression Studio") &&
+          (await overview.locator('[data-people-overview-card="quick-info"]').innerText()).includes("Ohio State University") &&
+          !(await overview.locator('[data-people-overview-card="contact"]').innerText()).includes("Work"),
+        `People Overview did not move employer and university into the fact list without duplicate work copy at ${viewport.label}`
+      );
       await assertNoOverflow(page, `People Overview ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-overview-${viewport.label}.png`),
@@ -5683,6 +5696,18 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         );
         await notesMemories.first().getByRole("button", { name: "Cancel" }).click();
       }
+      const memoryComposer = page.locator(".people-memory-composer");
+      const memoryDateInput = memoryComposer.locator('input[type="date"]');
+      const [memoryComposerRect, memoryDateRect] = await Promise.all([
+        memoryComposer.boundingBox(),
+        memoryDateInput.boundingBox()
+      ]);
+      assert(
+        memoryComposerRect && memoryDateRect &&
+          memoryDateRect.x >= memoryComposerRect.x &&
+          memoryDateRect.x + memoryDateRect.width <= memoryComposerRect.x + memoryComposerRect.width + 1,
+        `Notes & Memories date control overflowed its composer at ${viewport.label}`
+      );
       await assertNoOverflow(page, `People memory Notes ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-memory-notes-${viewport.label}.png`),
@@ -5724,6 +5749,23 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         interactionTypography.titleSize > interactionTypography.bodySize && interactionTypography.bodySize > 0,
         `Timeline title/body hierarchy was not visible at ${viewport.label}: ${JSON.stringify(interactionTypography)}`
       );
+      const timelineActionWidths = await page.locator(".people-timeline-actions button").evaluateAll((elements) =>
+        elements.map((element) => element.getBoundingClientRect().width)
+      );
+      assert(
+        timelineActionWidths.length === 3 && timelineActionWidths.every((width) => width < 190),
+        `Timeline actions remained oversized at ${viewport.label}: ${JSON.stringify(timelineActionWidths)}`
+      );
+      if (viewport.label !== "mobile") {
+        const [streamRect, sideRect] = await Promise.all([
+          page.locator(".people-timeline-stream").boundingBox(),
+          page.locator(".people-timeline-side").boundingBox()
+        ]);
+        assert(
+          streamRect && sideRect && streamRect.x < sideRect.x && streamRect.y === sideRect.y,
+          `Timeline did not place history first with the compact follow-up rail beside it at ${viewport.label}`
+        );
+      }
       await assertNoOverflow(page, `People memory Timeline ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-memory-timeline-${viewport.label}.png`),
@@ -5772,6 +5814,35 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         fullPage: true
       });
       await interactionDialog.getByRole("button", { name: "Close interaction composer" }).click();
+
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=relations`, { waitUntil: "networkidle" });
+      assert(
+        await page.getByRole("heading", { name: "Add relationship", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "Add contextual link", exact: true }).count() === 0 &&
+          await page.getByRole("button", { name: "Add Relationship", exact: true }).count() === 0,
+        `Relationships retained duplicate add-relationship controls at ${viewport.label}`
+      );
+      await assertNoOverflow(page, `People Relationships ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-relationships-${viewport.label}.png`),
+        fullPage: true
+      });
+
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=files`, { waitUntil: "networkidle" });
+      const mediaSearch = page.getByRole("link", { name: "Search Media" });
+      const resourceSearch = page.getByRole("link", { name: "Search Resources" });
+      const profileTitle = (await page.locator(".people-profile-header h2").textContent())?.trim() || "";
+      assert(
+        (await mediaSearch.getAttribute("href"))?.includes(`/admin/media?query=${encodeURIComponent(profileTitle)}`) &&
+          (await resourceSearch.getAttribute("href"))?.includes(`/admin/resources?query=${encodeURIComponent(profileTitle)}`) &&
+          !(await page.locator(".people-linked-workspace").innerText()).includes("unavailable"),
+        `Files & Links retained dead-end controls instead of real owner-module routes at ${viewport.label}`
+      );
+      await assertNoOverflow(page, `People Files & Links ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-files-links-${viewport.label}.png`),
+        fullPage: true
+      });
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
       const propertyMemories = page.locator("[data-memory-editor-id]");
@@ -5967,8 +6038,8 @@ async function checkPeopleFollowUpBridgeBrowserState(
     assert(
       (await row.innerText()).includes(followUp.title) &&
         (await row.innerText()).includes("Scheduled") &&
-        (await bridge.innerText()).includes("Personal Ops owner"),
-      "People did not render the linked Follow-up title, current state, and native owner"
+        (await bridge.innerText()).includes("Linked to this person"),
+      "People did not render the linked Follow-up title, current state, and person-specific rail context"
     );
 
     const updatedFollowUp = await requestJson(baseUrl, cookieJar, "/api/personal/ops", {

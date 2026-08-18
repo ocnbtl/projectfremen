@@ -2541,8 +2541,19 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-linked-workspace {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.people-overview-contact-strip {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 12px;
+  align-items: center;
+  min-width: 0;
+  padding: 2px 0 10px;
+  border-bottom: 1px solid var(--border-soft);
 }
 
 .people-overview-grid article,
@@ -2570,6 +2581,24 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-overview-about {
   grid-column: 1 / -1;
+}
+
+.people-overview-facts {
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px 18px !important;
+}
+
+.people-visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
 }
 
 .people-overview-grid h3,
@@ -2618,15 +2647,19 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-contact-methods-compact {
   display: flex;
-  flex-wrap: wrap;
-  gap: 7px;
+  flex-wrap: nowrap;
+  gap: 6px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 2px;
 }
 
 .people-contact-methods-compact button {
   display: grid;
-  width: 34px;
-  min-width: 34px;
-  min-height: 34px;
+  flex: 0 0 40px;
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
   padding: 0;
   place-items: center;
   border: 1px solid var(--border-soft);
@@ -2640,6 +2673,19 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   border-color: var(--text-strong);
   background: #e7f4ed;
   color: #174d36;
+}
+
+.people-contact-methods-compact button:focus-visible {
+  outline: 3px solid rgba(41, 106, 127, 0.22);
+  outline-offset: 2px;
+}
+
+.people-contact-methods-compact button:disabled {
+  border-color: color-mix(in srgb, var(--border-soft) 72%, transparent);
+  background: var(--surface-panel-soft);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  opacity: 0.46;
 }
 
 .people-contact-methods-compact svg {
@@ -2668,6 +2714,11 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   border: 1px solid var(--border-soft);
   border-radius: 7px;
   background: var(--surface-panel);
+}
+
+.people-overview-contact-strip .people-contact-disclosure {
+  max-width: 520px;
+  padding-block: 7px;
 }
 
 .people-contact-disclosure span {
@@ -2761,7 +2812,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-timeline-panel {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .people-cadence-grid {
@@ -2773,6 +2824,86 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 .people-timeline-actions {
   justify-content: flex-start;
   flex-wrap: wrap;
+}
+
+.people-timeline-actions button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 36px;
+  padding-inline: 12px;
+}
+
+.people-timeline-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.65fr) minmax(220px, 0.7fr);
+  gap: 12px;
+  align-items: start;
+  min-width: 0;
+}
+
+.people-timeline-stream,
+.people-timeline-side,
+.people-relationship-rhythm {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.people-timeline-stream > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.people-timeline-stream > header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.people-timeline-stream > header span {
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.people-timeline-side {
+  align-content: start;
+}
+
+.people-relationship-rhythm {
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel-soft);
+}
+
+.people-relationship-rhythm h3 {
+  padding-bottom: 2px;
+}
+
+.people-relationship-rhythm > div {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 8px;
+  align-items: baseline;
+  padding-top: 7px;
+  border-top: 1px solid color-mix(in srgb, var(--border-soft) 72%, transparent);
+}
+
+.people-relationship-rhythm span {
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.people-relationship-rhythm strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: right;
 }
 
 .people-timeline-list {
@@ -2825,7 +2956,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   letter-spacing: 0.02em;
 }
 
-.people-linked-workspace article span {
+.people-linked-workspace article > span {
   display: block;
   padding: 9px;
   border: 1px solid #e0e8ec;
@@ -2833,6 +2964,103 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   color: #243d47;
   font-size: 12px;
   font-weight: 850;
+}
+
+.people-linked-card-header,
+.people-linked-card-header > div,
+.people-linked-card-tools {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+
+.people-linked-card-header {
+  justify-content: space-between;
+}
+
+.people-linked-card-header > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.people-linked-card-header > div:first-child > span {
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.people-linked-card-header > a,
+.people-linked-card-header > button,
+.people-linked-card-tools > button {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  width: auto;
+  min-height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 900;
+  text-decoration: none;
+}
+
+.people-linked-card-header > a:hover,
+.people-linked-card-header > button:hover:not(:disabled),
+.people-linked-card-tools > button:hover:not(:disabled) {
+  background: var(--surface-panel-soft);
+}
+
+.people-linked-card-header > a:focus-visible,
+.people-linked-card-header > button:focus-visible,
+.people-linked-card-tools > button:focus-visible,
+.people-inline-info summary:focus-visible {
+  outline: 3px solid rgba(41, 106, 127, 0.22);
+  outline-offset: 2px;
+}
+
+.people-inline-info {
+  position: relative;
+}
+
+.people-inline-info summary {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--text-subtle);
+  font-size: 12px;
+  font-weight: 900;
+  cursor: pointer;
+  list-style: none;
+}
+
+.people-inline-info summary::-webkit-details-marker {
+  display: none;
+}
+
+.people-inline-info p {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 8;
+  width: min(260px, 70vw);
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-floating);
+  color: var(--text-body);
+  font-size: 11px;
+  line-height: 1.45;
 }
 
 .people-linked-workspace article button,
@@ -2952,6 +3180,8 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   border-radius: 8px;
   background: var(--surface-panel);
   color: var(--text-strong);
+  box-sizing: border-box;
+  max-width: 100%;
 }
 
 .people-memory-composer textarea {
@@ -2967,7 +3197,14 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   padding: 0 9px;
 }
 
-.people-memory-controls,
+.people-memory-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(150px, 0.72fr) auto;
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
 .people-memory-actions {
   display: flex;
   flex-wrap: wrap;
@@ -2983,6 +3220,14 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   color: var(--text-subtle);
   font-size: 11px;
   font-weight: 900;
+}
+
+.people-memory-controls label:not(.people-check-row) {
+  overflow: hidden;
+}
+
+.people-memory-controls input[type="date"] {
+  inline-size: 100%;
 }
 
 .people-check-row {
@@ -3156,6 +3401,24 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-relation-map {
   grid-row: span 2;
+}
+
+.people-relationship-projects {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel-soft);
+}
+
+.people-relationship-projects h4 {
+  margin: 0;
+  color: var(--text-strong);
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 14px;
 }
 
 .people-relation-node {
@@ -3808,6 +4071,7 @@ body.people-ai-panel-open .local-ai-widget {
   .people-edit-layout,
   .people-cadence-grid,
   .people-linked-workspace,
+  .people-timeline-layout,
   .people-cadence-pair,
   .people-capture-classification,
   .people-capture-grid,
@@ -3821,6 +4085,27 @@ body.people-ai-panel-open .local-ai-widget {
   .people-memory-inline-editor,
   .people-directory-list.is-grid {
     grid-template-columns: 1fr;
+  }
+
+  .people-overview-contact-strip,
+  .people-memory-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .people-linked-card-header {
+    align-items: flex-start;
+  }
+
+  .people-linked-card-header > a,
+  .people-linked-card-header > button,
+  .people-linked-card-tools > button,
+  .people-inline-info summary {
+    min-height: 44px;
+  }
+
+  .people-inline-info summary {
+    width: 44px;
+    height: 44px;
   }
 
   .people-memory-card button,
@@ -4012,6 +4297,7 @@ html[data-admin-preview="mobile"] .people-overview-grid,
 html[data-admin-preview="mobile"] .people-edit-layout,
 html[data-admin-preview="mobile"] .people-cadence-grid,
 html[data-admin-preview="mobile"] .people-linked-workspace,
+html[data-admin-preview="mobile"] .people-timeline-layout,
 html[data-admin-preview="mobile"] .people-cadence-pair,
 html[data-admin-preview="mobile"] .people-capture-classification,
 html[data-admin-preview="mobile"] .people-capture-grid,
@@ -4025,6 +4311,27 @@ html[data-admin-preview="mobile"] .people-memory-property-entry,
 html[data-admin-preview="mobile"] .people-memory-inline-editor,
 html[data-admin-preview="mobile"] .people-directory-list.is-grid {
   grid-template-columns: 1fr;
+}
+
+html[data-admin-preview="mobile"] .people-overview-contact-strip,
+html[data-admin-preview="mobile"] .people-memory-controls {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+html[data-admin-preview="mobile"] .people-linked-card-header {
+  align-items: flex-start;
+}
+
+html[data-admin-preview="mobile"] .people-linked-card-header > a,
+html[data-admin-preview="mobile"] .people-linked-card-header > button,
+html[data-admin-preview="mobile"] .people-linked-card-tools > button,
+html[data-admin-preview="mobile"] .people-inline-info summary {
+  min-height: 44px;
+}
+
+html[data-admin-preview="mobile"] .people-inline-info summary {
+  width: 44px;
+  height: 44px;
 }
 
 html[data-admin-preview="mobile"] .people-memory-card button,

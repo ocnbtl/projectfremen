@@ -29,6 +29,7 @@ type LinkedProjectsPanelProps = {
   compact?: boolean;
   manageLifecycle?: boolean;
   manageHealth?: boolean;
+  showHeader?: boolean;
   showBoundary?: boolean;
   title?: string;
   ownerTab?: "people" | "notes-decisions" | "files-links";
@@ -87,6 +88,7 @@ export default function LinkedProjectsPanel({
   compact = false,
   manageLifecycle = false,
   manageHealth = false,
+  showHeader = true,
   showBoundary = true,
   title = "Project involvement",
   ownerTab,
@@ -256,25 +258,27 @@ export default function LinkedProjectsPanel({
         data-compact={compact || undefined}
         aria-live="polite"
       >
-        <header className={styles.header}>
-          <div className={styles.heading}>
-            <span>Projects-owned references</span>
-            <strong>{title}</strong>
-          </div>
-          <button
-            type="button"
-            className={styles.refresh}
-            onClick={() => void onRefresh()}
-            disabled={loading || mutationBusy}
-            aria-label={
-              sourceIdentity.module === "people"
-                ? `Refresh Projects involvement for ${displaySourceLabel}`
-                : `Refresh Projects associations for ${displaySourceLabel}`
-            }
-          >
-            {loading ? "Refreshing…" : "Refresh status"}
-          </button>
-        </header>
+        {showHeader && (
+          <header className={styles.header}>
+            <div className={styles.heading}>
+              <span>Projects-owned references</span>
+              <strong>{title}</strong>
+            </div>
+            <button
+              type="button"
+              className={styles.refresh}
+              onClick={() => void onRefresh()}
+              disabled={loading || mutationBusy}
+              aria-label={
+                sourceIdentity.module === "people"
+                  ? `Refresh Projects involvement for ${displaySourceLabel}`
+                  : `Refresh Projects associations for ${displaySourceLabel}`
+              }
+            >
+              {loading ? "Refreshing…" : "Refresh status"}
+            </button>
+          </header>
+        )}
 
         {error && <p className={styles.error} role="alert">{error}</p>}
         {mutationNotice && <p className={styles.notice} role="status">{mutationNotice}</p>}
