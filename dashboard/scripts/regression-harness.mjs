@@ -5475,6 +5475,22 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
         await dialog.getByLabel("Due date").inputValue() === "2026-08-12",
         `Personal Ops ${viewport.label} shifted the date-only People handoff`
       );
+      for (const label of ["Title", "Description", "Status", "Due date", "Priority", "Outcome (optional)"]) {
+        assert(
+          await dialog.getByLabel(label).count() === 1,
+          `Personal Ops ${viewport.label} simplified Follow-up form omitted ${label}`
+        );
+      }
+      for (const removedLabel of ["Health", "Review state", "Cadence", "Cadence rule", "Current state", "Context", "Completion criterion", "Follow-up type"]) {
+        assert(
+          await dialog.getByLabel(removedLabel, { exact: true }).count() === 0,
+          `Personal Ops ${viewport.label} retained redundant Follow-up field ${removedLabel}`
+        );
+      }
+      assert(
+        await dialog.getByLabel("Description").inputValue() === `Reconnect with ${sourceLabel}.`,
+        `Personal Ops ${viewport.label} did not place People handoff context in the Description field`
+      );
 
       const createButton = dialog.getByRole("button", { name: "Create Follow-up" });
       assert(
@@ -5606,6 +5622,47 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
     ]) {
       const context = await contextFor({ width: viewport.width, height: viewport.height });
       const page = await context.newPage();
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=overview`, { waitUntil: "networkidle" });
+      const overview = page.locator(".people-overview-grid");
+      await overview.waitFor();
+      const overviewCards = overview.locator(":scope > [data-people-overview-card]");
+      assert(
+        JSON.stringify(await overviewCards.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-people-overview-card")))) ===
+          JSON.stringify(["contact", "quick-info", "about", "projects", "connections"]),
+        `People Overview card hierarchy drifted at ${viewport.label}`
+      );
+      assert(
+        await overview.getByRole("heading", { name: "Cadence", exact: true }).count() === 0,
+        `People Overview retained the duplicate Cadence card at ${viewport.label}`
+      );
+      const emailButton = overview.getByRole("button", { name: "Show Email" });
+      await emailButton.click();
+      const emailDisclosure = overview.locator('[data-contact-disclosure="email"]');
+      await emailDisclosure.waitFor();
+      assert(
+        (await emailDisclosure.textContent()).includes("regression-person@example.com") &&
+          await emailDisclosure.getByRole("link", { name: "Email" }).getAttribute("href") === "mailto:regression-person@example.com",
+        `People Overview contact disclosure failed at ${viewport.label}`
+      );
+      if (viewport.label !== "mobile") {
+        const [gridRect, contactRect, quickRect, aboutRect] = await Promise.all([
+          overview.boundingBox(),
+          overview.locator('[data-people-overview-card="contact"]').boundingBox(),
+          overview.locator('[data-people-overview-card="quick-info"]').boundingBox(),
+          overview.locator('[data-people-overview-card="about"]').boundingBox()
+        ]);
+        assert(gridRect && contactRect && quickRect && aboutRect, `People Overview cards were not measurable at ${viewport.label}`);
+        assert(
+          Math.abs(contactRect.y - quickRect.y) <= 2 && aboutRect.y > contactRect.y && aboutRect.width >= gridRect.width - 2,
+          `People Overview did not keep Contact and Quick Info together with About below at ${viewport.label}`
+        );
+      }
+      await assertNoOverflow(page, `People Overview ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-overview-${viewport.label}.png`),
+        fullPage: true
+      });
+
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=notes`, { waitUntil: "networkidle" });
       const notesMemories = page.locator(".people-memory-list [data-memory-id]");
       await notesMemories.first().waitFor();
@@ -5959,7 +6016,12 @@ async function checkPeopleFollowUpBridgeBrowserState(
       await page.getByText(followUp.title, { exact: true }).count() >= 1,
       "People Follow-up owner link did not open the canonical Personal Ops object"
     );
-    await page.goBack({ waitUntil: "networkidle" });
+    await page.goBack({ waitUntil: "domcontentloaded" });
+    await page.waitForURL((url) =>
+      url.pathname === `/admin/people/${person.id}` &&
+      url.searchParams.get("tab") === "timeline"
+    );
+    await page.locator(`[data-people-follow-up-id="${followUp.id}"]`).waitFor();
     const backUrl = new URL(page.url());
     assert(
       backUrl.pathname === `/admin/people/${person.id}` &&
@@ -5967,7 +6029,11 @@ async function checkPeopleFollowUpBridgeBrowserState(
         await page.locator(`[data-people-follow-up-id="${followUp.id}"]`).count() === 1,
       "Browser Back did not restore the People profile, Timeline tab, and linked Follow-up"
     );
-    await page.goForward({ waitUntil: "networkidle" });
+    await page.goForward({ waitUntil: "domcontentloaded" });
+    await page.waitForURL((url) =>
+      url.pathname === "/admin/personal/follow-ups" &&
+      url.searchParams.get("selected") === followUp.id
+    );
     const forwardUrl = new URL(page.url());
     assert(
       forwardUrl.pathname === "/admin/personal/follow-ups" &&
@@ -11652,7 +11718,7 @@ async function main() {
     );
     pass("Source-aware Follow-up creation blocks duplicate spam and audits explicit separate work");
 
-    const rejectOutcomeLessFollowUp = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
+    const completeOutcomeLessFollowUp = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
@@ -11666,35 +11732,13 @@ async function main() {
       })
     });
     assert(
-      rejectOutcomeLessFollowUp.response.status === 400 &&
-        rejectOutcomeLessFollowUp.payload?.code === "validation" &&
-        rejectOutcomeLessFollowUp.payload?.fieldErrors?.outcome,
-      `People-linked Follow-up completed without an outcome: ${JSON.stringify(rejectOutcomeLessFollowUp.payload)}`
+      completeOutcomeLessFollowUp.response.ok &&
+        completeOutcomeLessFollowUp.payload?.item?.followUpState === "complete" &&
+        completeOutcomeLessFollowUp.payload?.item?.lifecycle === "complete" &&
+        !completeOutcomeLessFollowUp.payload?.item?.outcome,
+      `Optional-outcome Follow-up completion failed: ${JSON.stringify(completeOutcomeLessFollowUp.payload)}`
     );
-
-    const completeNativeFollowUp = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
-      method: "PATCH",
-      headers: {
-        "content-type": "application/json",
-        "x-csrf-token": csrfToken
-      },
-      body: JSON.stringify({
-        family: "followUps",
-        id: nativeFollowUp.id,
-        expectedUpdatedAt: nativeFollowUp.updatedAt,
-        patch: {
-          followUpState: "complete",
-          outcome: "The People-linked follow-up outcome was recorded explicitly."
-        }
-      })
-    });
-    assert(
-      completeNativeFollowUp.response.ok &&
-        completeNativeFollowUp.payload?.item?.followUpState === "complete" &&
-        completeNativeFollowUp.payload?.item?.lifecycle === "complete",
-      `Outcome-gated Follow-up completion failed: ${JSON.stringify(completeNativeFollowUp.payload)}`
-    );
-    pass("High-priority People-linked Follow-up completion requires an explicit outcome");
+    pass("High-priority People-linked Follow-up completion keeps outcomes optional while preserving explicit status and history");
 
     const archiveNativeGoal = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
       method: "PATCH",

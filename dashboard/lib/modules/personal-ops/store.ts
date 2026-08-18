@@ -859,19 +859,6 @@ function validateFollowUp(item: PersonalOpsFollowUp): void {
     if (!item.deferReason) validation("A defer reason is required", "deferReason");
     if (!item.deferredUntil) validation("A new date is required when deferring", "deferredUntil");
   }
-  if (item.followUpState !== "complete") return;
-  const outcomeRequired =
-    item.priority === "high" ||
-    item.priority === "critical" ||
-    [...item.sourceRefs, ...item.linkedRefs].some(
-      (ref) => ref.module === "people" || ref.module === "reviews"
-    );
-  if (outcomeRequired && !item.outcome) {
-    validation(
-      "An outcome is required to complete a high-priority, People-linked, or Review-linked follow-up",
-      "outcome"
-    );
-  }
 }
 
 function sameNativeObjectIdentity(left: NativeObjectRef, right: NativeObjectRef): boolean {

@@ -81,6 +81,15 @@ type PeopleSidebarView =
 type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up" | "priority";
 type PeopleListMode = "list" | "compact" | "grid";
 type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "note" | "milestone";
+type ContactMethodId = "email" | "phone" | "website" | "instagram" | "tiktok" | "x" | "linkedin";
+
+type ContactMethod = {
+  id: ContactMethodId;
+  label: string;
+  value: string;
+  href?: string;
+  actionLabel?: string;
+};
 
 type PeopleTimelineInteraction = {
   date?: string;
@@ -88,6 +97,34 @@ type PeopleTimelineInteraction = {
   title: string;
   summary?: string;
 };
+
+function ContactMethodIcon({ id }: { id: ContactMethodId }) {
+  if (id === "linkedin") return <span aria-hidden="true">in</span>;
+  if (id === "x") return <span aria-hidden="true">X</span>;
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      {id === "email" && <><path d="M3.5 6.5h17v11h-17z" /><path d="m4 7 8 6 8-6" /></>}
+      {id === "phone" && <path d="M7 3.5 4.5 6c.8 6.8 6.7 12.7 13.5 13.5l2.5-2.5-4-3-2 2c-2.7-1.1-5.4-3.8-6.5-6.5l2-2z" />}
+      {id === "website" && <><circle cx="12" cy="12" r="8.5" /><path d="M3.7 12h16.6M12 3.5c2.2 2.3 3.2 5.1 3.2 8.5s-1 6.2-3.2 8.5C9.8 18.2 8.8 15.4 8.8 12S9.8 5.8 12 3.5Z" /></>}
+      {id === "instagram" && <><rect x="4" y="4" width="16" height="16" rx="4" /><circle cx="12" cy="12" r="3.5" /><circle cx="17.2" cy="6.8" r=".7" /></>}
+      {id === "tiktok" && <><path d="M14.5 4v10.2a4 4 0 1 1-3-3.9" /><path d="M14.5 4c.7 2.5 2.2 4 4.5 4.4" /></>}
+    </svg>
+  );
+}
+
+function contactMethodHref(id: ContactMethodId, value: string): { href?: string; actionLabel?: string } {
+  const trimmed = value.trim();
+  if (!trimmed) return {};
+  if (id === "email") return { href: `mailto:${trimmed}`, actionLabel: "Email" };
+  if (id === "phone") return { href: `tel:${trimmed.replace(/[^\d+]/g, "")}`, actionLabel: "Call" };
+  if (/^https?:\/\//i.test(trimmed)) return { href: trimmed, actionLabel: "Open" };
+  if (/^www\./i.test(trimmed)) return { href: `https://${trimmed}`, actionLabel: "Open" };
+  const username = trimmed.replace(/^@/, "");
+  if (id === "instagram") return { href: `https://instagram.com/${username}`, actionLabel: "Open" };
+  if (id === "tiktok") return { href: `https://tiktok.com/@${username}`, actionLabel: "Open" };
+  if (id === "x") return { href: `https://x.com/${username}`, actionLabel: "Open" };
+  return {};
+}
 
 type PeopleTimelineItem =
   | { kind: "memory"; id: string; date?: string; memory: PersonalMemoryEntry }
@@ -1167,6 +1204,7 @@ export default function PeopleWorkspace({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [expandedContactMethod, setExpandedContactMethod] = useState<ContactMethodId | null>(null);
   const [utilityNotice, setUtilityNotice] = useState("");
   const [memoryCategory, setMemoryCategory] = useState<MemoryCategory>("personal_context");
   const [memoryDraft, setMemoryDraft] = useState("");
@@ -1378,6 +1416,7 @@ export default function PeopleWorkspace({
     setProfileDraft(getProfile(selectedPerson));
     setProfileGroups(selectedPerson?.subjects || []);
     setEditingMemoryId("");
+    setExpandedContactMethod(null);
   }, [selectedPerson?.id]);
 
   const stats = useMemo(() => {
@@ -1409,6 +1448,19 @@ export default function PeopleWorkspace({
   }, [people, starredIds]);
 
   const selectedProfile = getProfile(selectedPerson);
+  const selectedContactMethods: ContactMethod[] = ([
+    { id: "email", label: "Email", value: selectedProfile.primaryEmail || selectedProfile.workEmail },
+    { id: "phone", label: "Phone", value: formatPhone(selectedProfile.phoneNumber, selectedProfile.phoneCountryCode) },
+    { id: "website", label: "Website", value: selectedProfile.website },
+    { id: "instagram", label: "Instagram", value: selectedProfile.instagram },
+    { id: "tiktok", label: "TikTok", value: selectedProfile.tiktok },
+    { id: "x", label: "X", value: selectedProfile.x },
+    { id: "linkedin", label: "LinkedIn", value: selectedProfile.linkedin }
+  ] satisfies ContactMethod[]).filter((method) => Boolean(method.value)).map((method) => ({
+    ...method,
+    ...contactMethodHref(method.id, method.value)
+  }));
+  const expandedContact = selectedContactMethods.find((method) => method.id === expandedContactMethod);
   const fallbackPerson = selectedPerson || visiblePeople[0];
   const activeFilterCount = (activeFilter === "all" ? 0 : 1) + (query.trim() ? 1 : 0);
   const filteringActive = detailMode === "profile" && activeFilterCount > 0;
@@ -3069,54 +3121,47 @@ export default function PeopleWorkspace({
               </section>
             ) : (
               <section className="people-overview-grid">
-                <article>
+                <article data-people-overview-card="contact">
                   <h3>Contact</h3>
-                  {[
-                    ["Email", selectedProfile.primaryEmail || selectedProfile.workEmail],
-                    ["Work", [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer].filter(Boolean).join(" at ")],
-                    ["Mobile", formatPhone(selectedProfile.phoneNumber, selectedProfile.phoneCountryCode)],
-                    ["LinkedIn", selectedProfile.linkedin],
-                    ["Instagram", selectedProfile.instagram],
-                    ["TikTok", selectedProfile.tiktok],
-                    ["X", selectedProfile.x],
-                    ["Website", selectedProfile.website]
-                  ].map(([label, value]) => (
-                    <div className="people-info-row" key={label}>
-                      <strong>{label}</strong>
-                      <span>{value || "-"}</span>
+                  {selectedContactMethods.length ? (
+                    <>
+                      <div className="people-contact-methods-compact" aria-label="Contact methods">
+                        {selectedContactMethods.map((method) => (
+                          <button
+                            type="button"
+                            key={method.id}
+                            data-contact-method={method.id}
+                            className={expandedContactMethod === method.id ? "is-active" : ""}
+                            onClick={() => setExpandedContactMethod((current) => current === method.id ? null : method.id)}
+                            aria-label={`${expandedContactMethod === method.id ? "Hide" : "Show"} ${method.label}`}
+                            aria-expanded={expandedContactMethod === method.id}
+                            title={method.label}
+                          >
+                            <ContactMethodIcon id={method.id} />
+                          </button>
+                        ))}
+                      </div>
+                      {expandedContact && (
+                        <div className="people-contact-disclosure" data-contact-disclosure={expandedContact.id}>
+                          <span>{expandedContact.label}</span>
+                          <strong>{expandedContact.value}</strong>
+                          {expandedContact.href && (
+                            <a href={expandedContact.href} target={expandedContact.href.startsWith("http") ? "_blank" : undefined} rel={expandedContact.href.startsWith("http") ? "noreferrer" : undefined}>
+                              {expandedContact.actionLabel}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : <p className="people-contact-empty">No contact details recorded yet.</p>}
+                  {[selectedProfile.primaryOccupation, selectedProfile.primaryEmployer].some(Boolean) && (
+                    <div className="people-contact-work">
+                      <span>Work</span>
+                      <strong>{[selectedProfile.primaryOccupation, selectedProfile.primaryEmployer].filter(Boolean).join(" at ")}</strong>
                     </div>
-                  ))}
+                  )}
                 </article>
-                <article>
-                  <h3>Cadence</h3>
-                  <div className="people-cadence-pair">
-                    <div><span>Last contact</span><strong>{formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</strong></div>
-                    <div><span>Next follow-up</span><strong>{getNextContactLabel(selectedPerson)}</strong></div>
-                    <div><span>Streak</span><strong>{splitTextEntries(selectedProfile.interactions).length} interactions</strong></div>
-                    <div><span>Priority</span><strong>{getPriorityLabel(selectedPerson)}</strong></div>
-                  </div>
-                  <LinkedFollowUpsPanel
-                    source={peopleFollowUpSource(selectedPerson)}
-                    followUps={followUps}
-                    loading={followUpsLoading}
-                    error={followUpsError}
-                    onRefresh={() => void refreshLinkedFollowUps()}
-                    createHref={followUpCreationRoute(selectedPerson)}
-                    limit={1}
-                    compact
-                    title="Relationship follow-through"
-                  />
-                  <div className="people-cadence-actions">
-                    <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
-                    <button
-                      type="button"
-                      onClick={() => router.push(followUpCreationRoute(selectedPerson))}
-                    >
-                      Schedule Follow-up
-                    </button>
-                  </div>
-                </article>
-                <article>
+                <article data-people-overview-card="quick-info">
                   <h3>Quick Info</h3>
                   {[
                     ["Birthday", selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "-"],
@@ -3132,11 +3177,11 @@ export default function PeopleWorkspace({
                     </div>
                   ))}
                 </article>
-                <article>
+                <article className="people-overview-about" data-people-overview-card="about">
                   <h3>About {selectedPerson.title.split(" ")[0]}</h3>
                   <p>{selectedProfile.context || selectedPerson.body || "No relationship context recorded yet."}</p>
                 </article>
-                <article>
+                <article data-people-overview-card="projects">
                   <LinkedProjectsPanel
                     personId={selectedPerson.id}
                     personLabel={selectedPerson.title}
@@ -3151,7 +3196,7 @@ export default function PeopleWorkspace({
                     showBoundary={false}
                   />
                 </article>
-                <article>
+                <article data-people-overview-card="connections">
                   <h3>Key Connections</h3>
                   <div className="people-connection-row">
                     {connectionItems.length > 0

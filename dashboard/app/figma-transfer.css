@@ -2533,7 +2533,12 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   color: var(--text-strong);
 }
 
-.people-overview-grid,
+.people-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
 .people-linked-workspace {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2563,9 +2568,8 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   background: var(--surface-panel-soft);
 }
 
-.people-overview-grid article:nth-child(4),
-.people-overview-grid article:nth-child(5) {
-  grid-column: span 2;
+.people-overview-about {
+  grid-column: 1 / -1;
 }
 
 .people-overview-grid h3,
@@ -2610,6 +2614,98 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   color: var(--text-strong);
   font-size: 13px;
   font-weight: 850;
+}
+
+.people-contact-methods-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.people-contact-methods-compact button {
+  display: grid;
+  width: 34px;
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--text-body);
+}
+
+.people-contact-methods-compact button:hover,
+.people-contact-methods-compact button.is-active {
+  border-color: var(--text-strong);
+  background: #e7f4ed;
+  color: #174d36;
+}
+
+.people-contact-methods-compact svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.people-contact-methods-compact button > span {
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+}
+
+.people-contact-disclosure {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  align-items: center;
+  padding: 9px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+}
+
+.people-contact-disclosure span {
+  grid-column: 1 / -1;
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.people-contact-disclosure strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.people-contact-disclosure a {
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.people-contact-work {
+  display: grid;
+  gap: 3px;
+  padding-top: 2px;
+}
+
+.people-contact-work span,
+.people-contact-empty {
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.people-contact-work strong {
+  color: var(--text-strong);
+  font-size: 12px;
 }
 
 .people-cadence-pair {
@@ -3730,8 +3826,14 @@ body.people-ai-panel-open .local-ai-widget {
   .people-memory-card button,
   .people-timeline-memory button,
   .people-memory-properties button,
-  .people-memory-actions button {
+  .people-memory-actions button,
+  .people-contact-methods-compact button {
     min-height: 44px;
+  }
+
+  .people-contact-methods-compact button {
+    width: 44px;
+    min-width: 44px;
   }
 
   .people-repeatable-heading button,
@@ -3757,8 +3859,7 @@ body.people-ai-panel-open .local-ai-widget {
     flex-direction: column;
   }
 
-  .people-overview-grid article:nth-child(4),
-  .people-overview-grid article:nth-child(5) {
+  .people-overview-about {
     grid-column: auto;
   }
 
@@ -3929,8 +4030,14 @@ html[data-admin-preview="mobile"] .people-directory-list.is-grid {
 html[data-admin-preview="mobile"] .people-memory-card button,
 html[data-admin-preview="mobile"] .people-timeline-memory button,
 html[data-admin-preview="mobile"] .people-memory-properties button,
-html[data-admin-preview="mobile"] .people-memory-actions button {
+html[data-admin-preview="mobile"] .people-memory-actions button,
+html[data-admin-preview="mobile"] .people-contact-methods-compact button {
   min-height: 44px;
+}
+
+html[data-admin-preview="mobile"] .people-contact-methods-compact button {
+  width: 44px;
+  min-width: 44px;
 }
 
 html[data-admin-preview="mobile"] .people-repeatable-heading button,
@@ -3956,8 +4063,7 @@ html[data-admin-preview="mobile"] .people-memory-properties-heading {
   flex-direction: column;
 }
 
-html[data-admin-preview="mobile"] .people-overview-grid article:nth-child(4),
-html[data-admin-preview="mobile"] .people-overview-grid article:nth-child(5) {
+html[data-admin-preview="mobile"] .people-overview-about {
   grid-column: auto;
 }
 

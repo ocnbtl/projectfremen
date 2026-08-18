@@ -272,6 +272,18 @@ function toIsoDate(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toISOString();
 }
 
+function followUpTiming(state: FormDraft["followUpState"], dueAt: string): FormDraft["cadence"] {
+  if (state === "deferred") return "paused";
+  if (state === "complete") return "current";
+  if (!dueAt) return "dormant";
+  const due = new Date(`${dueAt}T23:59:59`);
+  if (Number.isNaN(due.getTime())) return "dormant";
+  const now = new Date();
+  if (due.getTime() < now.getTime()) return "overdue";
+  if (due.getTime() <= now.getTime() + 7 * 86_400_000) return "due_soon";
+  return "current";
+}
+
 function formatDate(value?: string, fallback = "No date") {
   if (!value) return fallback;
   const date = new Date(value);
@@ -323,7 +335,7 @@ function summaryForItem(item: PersonalOpsListItem) {
   if (item.objectType === "goal") return item.outcome;
   if (item.objectType === "decision") return item.finalDecision || item.question;
   if (item.objectType === "obligation") return item.consequence;
-  return item.context || item.description || "No context recorded";
+  return item.description || item.context || "No description recorded";
 }
 
 function typeLabel(item: PersonalOpsListItem) {
@@ -372,7 +384,7 @@ function defaultDraft(family: PersonalOpsFamily, item?: PersonalOpsObject, sourc
   return {
     title: item?.title || sourceLabel || "",
     domain: item?.domain || "Personal Admin",
-    description: item?.description || "",
+    description: item?.description || (item?.objectType === "follow_up" ? item.context : ""),
     dueAt: toLocalDate(item?.dueAt),
     priority: item?.priority || "medium",
     health: item?.health || "unknown",
@@ -412,7 +424,7 @@ function defaultDraft(family: PersonalOpsFamily, item?: PersonalOpsObject, sourc
     obligationState: item?.objectType === "obligation" ? item.obligationState : "open",
     followUpType: item?.objectType === "follow_up" ? item.followUpType : family === "followUps" ? "other" : "decision_follow_up",
     followUpState: item?.objectType === "follow_up" ? item.followUpState : "open",
-    context: item?.objectType === "follow_up" ? item.context : sourceLabel ? `Continue from ${sourceLabel}.` : "",
+    context: item?.objectType === "follow_up" ? item.context : "",
     followUpOutcome: item?.objectType === "follow_up" ? item.outcome || "" : "",
     deferredUntil: item?.objectType === "follow_up" ? toLocalDate(item.deferredUntil) : "",
     createLinkedFollowUp: family === "decisions" && Boolean(sourceLabel),
@@ -499,10 +511,12 @@ function createInput(form: OpenForm, draft: FormDraft): PersonalOpsCreateInputBy
   }
   const input: FollowUpCreateInput = {
     ...common,
+    cadence: followUpTiming(draft.followUpState, draft.dueAt),
+    cadenceRule: undefined,
     followUpType: draft.followUpType,
     allowSourceDuplicate: draft.allowSourceDuplicate,
     followUpState: draft.followUpState,
-    context: draft.context,
+    context: draft.context || undefined,
     outcome: draft.followUpOutcome || undefined,
     deferReason: draft.deferReason || undefined,
     deferredUntil: toIsoDate(draft.deferredUntil),
@@ -569,6 +583,8 @@ function updateInput(form: OpenForm, draft: FormDraft): PersonalOpsUpdateInputBy
   }
   return {
     ...common,
+    cadence: followUpTiming(draft.followUpState, draft.dueAt),
+    cadenceRule: form.item?.cadenceRule,
     followUpType: draft.followUpType,
     followUpState: draft.followUpState,
     context: draft.context,
@@ -726,7 +742,7 @@ function ObjectForm({
                   <strong id="personal-ops-source-duplicate-title">
                     {sourceDuplicates.length} active {sourceDuplicates.length === 1 ? "follow-up already uses" : "follow-ups already use"} this {sourceOwner} source
                   </strong>
-                  <p>Open existing work first, or confirm that this follow-up has a separate outcome.</p>
+                  <p>Open the existing item first, or confirm that this is genuinely separate work.</p>
                 </div>
                 <ul>
                   {sourceDuplicates.map((item) => (
@@ -757,56 +773,100 @@ function ObjectForm({
             <Field label="Title" full>
               <input value={draft.title} onChange={(event) => update("title", event.target.value)} required maxLength={240} />
             </Field>
-            <Field label="Domain">
-              <select value={draft.domain} onChange={(event) => update("domain", event.target.value)}>
-                {PERSONAL_OPS_DOMAIN_LABELS.map((domain) => <option key={domain}>{domain}</option>)}
-              </select>
-            </Field>
-            <Field label="Due date">
-              <input type="date" value={draft.dueAt} onChange={(event) => update("dueAt", event.target.value)} />
-            </Field>
-            <Field label="Priority">
-              <select value={draft.priority} onChange={(event) => update("priority", event.target.value as FormDraft["priority"])}>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </Field>
-            <Field label="Health">
-              <select value={draft.health} onChange={(event) => update("health", event.target.value as FormDraft["health"])}>
-                <option value="unknown">Unknown</option>
-                <option value="healthy">Healthy</option>
-                <option value="attention">Needs attention</option>
-                <option value="blocked">Blocked</option>
-                <option value="stale">Stale</option>
-              </select>
-            </Field>
-            <Field label="Review state">
-              <select value={draft.review} onChange={(event) => update("review", event.target.value as FormDraft["review"])}>
-                <option value="not_reviewed">Not reviewed</option>
-                <option value="needs_review">Needs review</option>
-                <option value="in_review">In review</option>
-                <option value="reviewed">Reviewed</option>
-                <option value="not_required">Not required</option>
-                <option value="waived">Waived</option>
-              </select>
-            </Field>
-            <Field label="Cadence">
-              <select value={draft.cadence} onChange={(event) => update("cadence", event.target.value as FormDraft["cadence"])}>
-                <option value="dormant">No cadence</option>
-                <option value="current">Current</option>
-                <option value="due_soon">Due soon</option>
-                <option value="overdue">Overdue</option>
-                <option value="paused">Paused</option>
-              </select>
-            </Field>
-            <Field label="Cadence rule" full hint="Plain-language reminder only; automatic creation is not enabled.">
-              <input value={draft.cadenceRule} onChange={(event) => update("cadenceRule", event.target.value)} placeholder="Example: review every Friday" />
-            </Field>
-            <Field label="Description" full>
-              <textarea value={draft.description} onChange={(event) => update("description", event.target.value)} />
-            </Field>
+            {form.family === "followUps" ? (
+              <>
+                <Field label="Description" full hint="Add the useful detail or reminder in one place.">
+                  <textarea value={draft.description} onChange={(event) => update("description", event.target.value)} />
+                </Field>
+                <Field label="Status">
+                  <select value={draft.followUpState} onChange={(event) => update("followUpState", event.target.value as FormDraft["followUpState"])}>
+                    <option value="open">Open</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="waiting">Waiting</option>
+                    <option value="deferred">Deferred</option>
+                    <option value="complete">Complete</option>
+                    <option value="carried_forward">Carried forward</option>
+                  </select>
+                </Field>
+                <Field label="Due date">
+                  <input type="date" value={draft.dueAt} onChange={(event) => update("dueAt", event.target.value)} />
+                </Field>
+                <Field label="Priority">
+                  <select value={draft.priority} onChange={(event) => update("priority", event.target.value as FormDraft["priority"])}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </Field>
+                <Field label="Outcome (optional)" full hint="Add the result now or after the follow-up. You can complete it without one.">
+                  <textarea value={draft.followUpOutcome} onChange={(event) => update("followUpOutcome", event.target.value)} />
+                </Field>
+                {draft.followUpState === "deferred" && (
+                  <>
+                    <Field label="Why defer?" full>
+                      <textarea value={draft.deferReason} onChange={(event) => update("deferReason", event.target.value)} required />
+                    </Field>
+                    <Field label="New date">
+                      <input type="date" value={draft.deferredUntil} onChange={(event) => update("deferredUntil", event.target.value)} required />
+                    </Field>
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                <Field label="Domain">
+                  <select value={draft.domain} onChange={(event) => update("domain", event.target.value)}>
+                    {PERSONAL_OPS_DOMAIN_LABELS.map((domain) => <option key={domain}>{domain}</option>)}
+                  </select>
+                </Field>
+                <Field label="Due date">
+                  <input type="date" value={draft.dueAt} onChange={(event) => update("dueAt", event.target.value)} />
+                </Field>
+                <Field label="Priority">
+                  <select value={draft.priority} onChange={(event) => update("priority", event.target.value as FormDraft["priority"])}>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="critical">Critical</option>
+                  </select>
+                </Field>
+                <Field label="Health">
+                  <select value={draft.health} onChange={(event) => update("health", event.target.value as FormDraft["health"])}>
+                    <option value="unknown">Unknown</option>
+                    <option value="healthy">Healthy</option>
+                    <option value="attention">Needs attention</option>
+                    <option value="blocked">Blocked</option>
+                    <option value="stale">Stale</option>
+                  </select>
+                </Field>
+                <Field label="Review state">
+                  <select value={draft.review} onChange={(event) => update("review", event.target.value as FormDraft["review"])}>
+                    <option value="not_reviewed">Not reviewed</option>
+                    <option value="needs_review">Needs review</option>
+                    <option value="in_review">In review</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="not_required">Not required</option>
+                    <option value="waived">Waived</option>
+                  </select>
+                </Field>
+                <Field label="Cadence">
+                  <select value={draft.cadence} onChange={(event) => update("cadence", event.target.value as FormDraft["cadence"])}>
+                    <option value="dormant">No cadence</option>
+                    <option value="current">Current</option>
+                    <option value="due_soon">Due soon</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="paused">Paused</option>
+                  </select>
+                </Field>
+                <Field label="Cadence rule" full hint="Plain-language reminder only; automatic creation is not enabled.">
+                  <input value={draft.cadenceRule} onChange={(event) => update("cadenceRule", event.target.value)} placeholder="Example: review every Friday" />
+                </Field>
+                <Field label="Description" full>
+                  <textarea value={draft.description} onChange={(event) => update("description", event.target.value)} />
+                </Field>
+              </>
+            )}
 
             {form.family === "goals" && (
               <>
@@ -908,52 +968,6 @@ function ObjectForm({
               </>
             )}
 
-            {form.family === "followUps" && (
-              <>
-                <Field label="Follow-up type">
-                  <select value={draft.followUpType} onChange={(event) => update("followUpType", event.target.value as FormDraft["followUpType"])}>
-                    <option value="person_check_in">Person check-in</option>
-                    <option value="decision_follow_up">Decision follow-up</option>
-                    <option value="project_follow_up">Project follow-up</option>
-                    <option value="review_carry_forward">Review carry-forward</option>
-                    <option value="finance_action">Finance action</option>
-                    <option value="obligation_follow_up">Obligation follow-up</option>
-                    <option value="goal_check_in">Goal check-in</option>
-                    <option value="waiting_response">Waiting response</option>
-                    <option value="other">Other</option>
-                  </select>
-                </Field>
-                <Field label="Current state">
-                  <select value={draft.followUpState} onChange={(event) => update("followUpState", event.target.value as FormDraft["followUpState"])}>
-                    <option value="open">Open</option>
-                    <option value="scheduled">Scheduled</option>
-                    <option value="waiting">Waiting</option>
-                    <option value="deferred">Deferred</option>
-                    <option value="complete">Complete</option>
-                    <option value="carried_forward">Carried forward</option>
-                  </select>
-                </Field>
-                <Field label="Context" full>
-                  <textarea value={draft.context} onChange={(event) => update("context", event.target.value)} />
-                </Field>
-                <Field label="Completion criterion" full>
-                  <textarea value={draft.completionCriteria} onChange={(event) => update("completionCriteria", event.target.value)} />
-                </Field>
-                <Field label="Outcome" full hint="Required for high-priority, People-linked, or Reviews-linked completion.">
-                  <textarea value={draft.followUpOutcome} onChange={(event) => update("followUpOutcome", event.target.value)} required={draft.followUpState === "complete" && (draft.priority === "high" || draft.priority === "critical" || form.sourceRef?.module === "people")} />
-                </Field>
-                {draft.followUpState === "deferred" && (
-                  <>
-                    <Field label="Why defer?" full>
-                      <textarea value={draft.deferReason} onChange={(event) => update("deferReason", event.target.value)} required />
-                    </Field>
-                    <Field label="New date">
-                      <input type="date" value={draft.deferredUntil} onChange={(event) => update("deferredUntil", event.target.value)} required />
-                    </Field>
-                  </>
-                )}
-              </>
-            )}
           </div>
           {error && <p className={styles.error} role="alert">{error}</p>}
           {notice && <p className={styles.notice} role="status">{notice}</p>}
@@ -1131,7 +1145,7 @@ export default function PersonalOpsWorkspace({
       nextDraft.followUpType = "person_check_in";
       nextDraft.domain = "Relationships";
       nextDraft.title = sourceLabel ? `Check in with ${sourceLabel}` : "Relationship check-in";
-      nextDraft.context = `Reconnect with ${sourceLabel || "this person"} and record the outcome.`;
+      nextDraft.description = `Reconnect with ${sourceLabel || "this person"}.`;
     }
     setOpenForm(form);
     setDraft(nextDraft);
@@ -1423,9 +1437,7 @@ export default function PersonalOpsWorkspace({
         ? "Add both the final decision and rationale first."
         : selectedNative.objectType === "obligation" && (selectedNative.requiredEvidence.some((item) => item.required && item.state === "missing") || selectedNative.completionCriteria.length === 0 || selectedNative.completionCriteria.some((item) => !item.satisfied))
           ? "Receive required evidence and satisfy every completion criterion first."
-          : selectedNative.objectType === "follow_up" && (selectedNative.priority === "high" || selectedNative.priority === "critical" || [...selectedNative.sourceRefs, ...selectedNative.linkedRefs].some((ref) => ref.module === "people" || ref.module === "reviews")) && !selectedNative.outcome
-            ? "Record an outcome before completing this follow-up."
-            : ""
+          : ""
     : "";
 
   return (
@@ -1587,7 +1599,7 @@ export default function PersonalOpsWorkspace({
               </div>
               <div className={styles.chipRow}>
                 <PersonalOpsStatusChip tone={toneForState(stateLabel(selectedItem))}>{cleanLabel(stateLabel(selectedItem))}</PersonalOpsStatusChip>
-                {selectedItem.source === "native" && <PersonalOpsStatusChip tone={toneForState(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>}
+                {selectedItem.source === "native" && selectedItem.objectType !== "follow_up" && <PersonalOpsStatusChip tone={toneForState(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>}
                 {selectedItem.source === "legacy-goal" && <PersonalOpsStatusChip tone="attention">Existing Current Goals</PersonalOpsStatusChip>}
               </div>
               <div className={styles.inspectorTabs}>
@@ -1610,7 +1622,12 @@ export default function PersonalOpsWorkspace({
                 </div>
               ) : (
                 <>
-                  <PersonalOpsStateGrid items={[
+                  <PersonalOpsStateGrid items={selectedItem.objectType === "follow_up" ? [
+                    { id: "status", label: "Status", value: cleanLabel(selectedItem.followUpState), tone: toneForState(selectedItem.followUpState) },
+                    { id: "due", label: "Due", value: formatDate(selectedItem.dueAt) },
+                    { id: "priority", label: "Priority", value: cleanLabel(selectedItem.priority), tone: toneForState(selectedItem.priority) },
+                    { id: "timing", label: "Timing", value: cleanLabel(selectedItem.cadence), tone: toneForState(selectedItem.cadence) }
+                  ] : [
                     { id: "lifecycle", label: "Lifecycle", value: cleanLabel(selectedItem.lifecycle), tone: toneForState(selectedItem.lifecycle) },
                     { id: "health", label: "Health", value: cleanLabel(selectedItem.health), tone: toneForState(selectedItem.health) },
                     { id: "review", label: "Review", value: cleanLabel(selectedItem.review), tone: toneForState(selectedItem.review) },
@@ -1619,10 +1636,10 @@ export default function PersonalOpsWorkspace({
                   <div className={styles.panelGrid}>
                     {urlState.tab === "overview" && (
                       <>
-                        <PersonalOpsPanel title={selectedItem.objectType === "goal" ? "Outcome" : selectedItem.objectType === "decision" ? "Question" : selectedItem.objectType === "obligation" ? "Consequence" : "Context"} wide>
+                        <PersonalOpsPanel title={selectedItem.objectType === "goal" ? "Outcome" : selectedItem.objectType === "decision" ? "Question" : selectedItem.objectType === "obligation" ? "Consequence" : "Description"} wide>
                           <p>{selectedItem.objectType === "decision" ? selectedItem.question : summaryForItem(selectedItem)}</p>
                         </PersonalOpsPanel>
-                        {selectedItem.description && <PersonalOpsPanel title="Description" wide><p>{selectedItem.description}</p></PersonalOpsPanel>}
+                        {selectedItem.description && selectedItem.objectType !== "follow_up" && <PersonalOpsPanel title="Description" wide><p>{selectedItem.description}</p></PersonalOpsPanel>}
                         <PersonalOpsPanel title="Next safe action" wide>
                           <p>{completionDisabledReason || (selectedItem.lifecycle === "complete" ? "This object is complete; archive it when it should leave active history." : "Completion requirements are satisfied. Review the object, then complete it explicitly.")}</p>
                         </PersonalOpsPanel>
@@ -1660,7 +1677,7 @@ export default function PersonalOpsWorkspace({
 
                     {urlState.tab === "details" && selectedItem.objectType === "follow_up" && (
                       <>
-                        <PersonalOpsPanel title="Outcome" wide><p>{selectedItem.outcome || "No outcome recorded yet."}</p></PersonalOpsPanel>
+                        <PersonalOpsPanel title="Outcome" wide><p>{selectedItem.outcome || "No outcome recorded. This is optional."}</p></PersonalOpsPanel>
                         <PersonalOpsPanel title="Completion criterion"><p>{selectedItem.completionCriteria || "No criterion recorded."}</p></PersonalOpsPanel>
                         <PersonalOpsPanel title="Follow-up type"><p>{cleanLabel(selectedItem.followUpType)}</p></PersonalOpsPanel>
                       </>
@@ -1682,7 +1699,7 @@ export default function PersonalOpsWorkspace({
 
                     {urlState.tab === "properties" && (
                       <PersonalOpsPanel title="Properties" wide>
-                        <dl><dt>ID</dt><dd className={styles.mono}>{selectedItem.id}</dd><dt>Owner</dt><dd>{selectedItem.owner}</dd><dt>Created</dt><dd className={styles.mono}>{formatTimestamp(selectedItem.createdAt)}</dd><dt>Updated</dt><dd className={styles.mono}>{formatTimestamp(selectedItem.updatedAt)}</dd>{selectedItem.cadenceRule && <><dt>Cadence rule</dt><dd>{selectedItem.cadenceRule} (manual)</dd></>}</dl>
+                        <dl><dt>ID</dt><dd className={styles.mono}>{selectedItem.id}</dd><dt>Owner</dt><dd>{selectedItem.owner}</dd><dt>Created</dt><dd className={styles.mono}>{formatTimestamp(selectedItem.createdAt)}</dd><dt>Updated</dt><dd className={styles.mono}>{formatTimestamp(selectedItem.updatedAt)}</dd>{selectedItem.objectType !== "follow_up" && selectedItem.cadenceRule && <><dt>Cadence rule</dt><dd>{selectedItem.cadenceRule} (manual)</dd></>}</dl>
                       </PersonalOpsPanel>
                     )}
                   </div>
@@ -1733,7 +1750,7 @@ export default function PersonalOpsWorkspace({
         onOpenChange={(open) => { if (!open && !busy) setPendingAction(null); }}
         onConfirm={confirmPendingAction}
         title={pendingAction?.type === "discard" ? "Discard unsaved changes?" : pendingAction?.type === "archive" ? "Archive this object?" : pendingAction?.type === "restore" ? "Restore this object?" : "Complete this object?"}
-        description={pendingAction?.type === "archive" ? "Archiving is reversible and preserves links, history, and provenance." : pendingAction?.type === "complete" ? "This records a native completion event after object-specific requirements pass." : undefined}
+        description={pendingAction?.type === "archive" ? "Archiving is reversible and preserves links, history, and provenance." : pendingAction?.type === "complete" ? pendingAction.item.objectType === "follow_up" ? "This marks the follow-up complete and keeps its history. An outcome is optional." : "This records a native completion event after object-specific requirements pass." : undefined}
         consequences={pendingAction?.type === "discard" ? ["The current form input will be lost."] : pendingAction?.type === "archive" ? ["The object leaves active views.", "No linked object is deleted."] : undefined}
         confirmLabel={pendingAction?.type === "discard" ? "Discard changes" : pendingAction?.type === "archive" ? "Archive" : pendingAction?.type === "restore" ? "Restore" : "Complete"}
         tone={pendingAction?.type === "discard" || pendingAction?.type === "archive" ? "danger" : "default"}
