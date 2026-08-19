@@ -72,7 +72,6 @@ type PeopleSidebarView =
   | "health-wellness"
   | "all-lists"
   | "no-contact-90"
-  | "high-priority"
   | "birthdays-month"
   | "new-people"
   | "profile-gaps"
@@ -81,7 +80,7 @@ type PeopleSidebarView =
   | "duplicates"
   | "recently-deleted"
   | "customize";
-type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up" | "priority";
+type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up";
 type PeopleListMode = "list" | "compact" | "grid";
 type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "note" | "milestone";
 type ContactMethodId = "email" | "phone" | "website" | "instagram" | "tiktok" | "x" | "linkedin";
@@ -338,7 +337,6 @@ const PEOPLE_SIDEBAR_SECTIONS: Array<{ title: string; items: SidebarItemConfig[]
     title: "Smart views",
     items: [
       { id: "no-contact-90", label: "No Contact > 90 Days", tone: "brown" },
-      { id: "high-priority", label: "High Priority", tone: "crimson" },
       { id: "birthdays-month", label: "Birthdays This Month", tone: "orange" },
       { id: "new-people", label: "New People", tone: "green" },
       { id: "profile-gaps", label: "Profile Gaps", tone: "blue" },
@@ -1040,11 +1038,12 @@ function getInitials(record?: PersonalRecord) {
   return `${words[0].slice(0, 1)}${words[words.length - 1].slice(0, 1)}`.toUpperCase();
 }
 
-function getPriorityLabel(record?: PersonalRecord) {
-  if (!record) return "Normal";
-  if (isDue(record) || record.status === "blocked") return "High";
-  if (record.status === "active" || record.projects.length > 0) return "Medium";
-  return "Normal";
+function getRelationshipHealth(record?: PersonalRecord) {
+  if (!record) return "Unknown";
+  if (isDormant(record)) return "Dormant";
+  if (isDue(record) || record.status === "blocked") return "Needs attention";
+  if (!getLastContactValue(record)) return "Not enough history";
+  return "On track";
 }
 
 function getNextContactLabel(record?: PersonalRecord) {
@@ -1152,15 +1151,15 @@ function hasGroupLike(record: PersonalRecord, terms: string[]) {
   return terms.some((term) => haystack.includes(term));
 }
 
-function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView, starredIds: Set<string>) {
+function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView) {
   if (view === "all") return true;
-  if (view === "starred") return starredIds.has(record.id);
+  if (view === "starred") return record.starred === true;
   if (view === "recent") return isRecentContact(record);
   if (view === "upcoming") {
     const days = daysUntil(record.time.nextReview);
     return days !== null && days >= 0 && days <= 30;
   }
-  if (view === "attention") return isDue(record) || getPriorityLabel(record) === "High" || getProfileGaps(record).length > 1;
+  if (view === "attention") return isDue(record) || record.status === "blocked" || getProfileGaps(record).length > 1;
   if (view === "relationship-map") return record.relations.related.length > 0 || getProfile(record).associatedPeople.length > 0;
   if (view === "family") return hasGroupLike(record, ["family", "parent", "sibling", "child"]);
   if (view === "close-friends") return hasGroupLike(record, ["close friend", "friend"]);
@@ -1169,7 +1168,6 @@ function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView, sta
   if (view === "neighbors") return hasGroupLike(record, ["neighbor"]);
   if (view === "health-wellness") return hasGroupLike(record, ["health", "wellness", "doctor", "therapy", "trainer"]);
   if (view === "no-contact-90") return isNoContact90(record);
-  if (view === "high-priority") return getPriorityLabel(record) === "High";
   if (view === "birthdays-month") return isBirthdayThisMonth(record);
   if (view === "new-people") return isNewPerson(record);
   if (view === "profile-gaps") return getProfileGaps(record).length > 0;
@@ -1185,10 +1183,6 @@ function sortPeople(records: PersonalRecord[], sortMode: PeopleSortMode) {
     }
     if (sortMode === "next-follow-up") {
       return (new Date(left.time.nextReview || "9999-12-31").getTime()) - (new Date(right.time.nextReview || "9999-12-31").getTime());
-    }
-    if (sortMode === "priority") {
-      const priorityRank: Record<string, number> = { High: 0, Medium: 1, Normal: 2 };
-      return priorityRank[getPriorityLabel(left)] - priorityRank[getPriorityLabel(right)];
     }
     return getLastName(left).localeCompare(getLastName(right));
   });
@@ -1463,9 +1457,6 @@ export default function PeopleWorkspace({
   const [activeSidebarView, setActiveSidebarView] = useState<PeopleSidebarView>(initialUrlState.sidebar);
   const [sortMode, setSortMode] = useState<PeopleSortMode>(initialUrlState.sort);
   const [listMode, setListMode] = useState<PeopleListMode>(initialUrlState.view);
-  // Star storage is an open product decision. Do not overload lifecycle `next`
-  // or pretend this client-only preference is durable.
-  const [starredIds] = useState<Set<string>>(() => new Set());
   const [selectedId, setSelectedId] = useState(initialSelectedId || initialUrlState.person || initialPeople[0]?.id || "");
   const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(() => new Set());
   const [name, setName] = useState("");
@@ -1507,6 +1498,8 @@ export default function PeopleWorkspace({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState("");
+  const [lifecycleSaving, setLifecycleSaving] = useState<"" | "star" | "delete" | "restore">("");
   const [expandedContactMethod, setExpandedContactMethod] = useState<ContactMethodId | null>(null);
   const [utilityNotice, setUtilityNotice] = useState("");
   const [memoryCategory, setMemoryCategory] = useState<MemoryCategory>("personal_context");
@@ -1691,30 +1684,36 @@ export default function PeopleWorkspace({
     }
   }
 
+  const activePeople = useMemo(() => people.filter((record) => !record.archivedAt), [people]);
+  const archivedPeople = useMemo(
+    () => people.filter((record) => Boolean(record.archivedAt)).sort((left, right) => (right.archivedAt || "").localeCompare(left.archivedAt || "")),
+    [people]
+  );
   const visiblePeople = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
     const utilityViews: PeopleSidebarView[] = ["all-lists", "import-export", "duplicates", "recently-deleted", "customize"];
     if (utilityViews.includes(activeSidebarView)) {
       return [];
     }
-    const matches = people.filter((record) => {
-      if (!matchesSidebarView(record, activeSidebarView, starredIds)) return false;
+    const matches = activePeople.filter((record) => {
+      if (!matchesSidebarView(record, activeSidebarView)) return false;
       if (!matchesFilter(record, activeFilter)) return false;
       if (!normalizedQuery) return true;
       return getSearchText(record).includes(normalizedQuery);
     });
     return sortPeople(matches, sortMode);
-  }, [activeFilter, activeSidebarView, people, query, sortMode, starredIds]);
+  }, [activeFilter, activePeople, activeSidebarView, query, sortMode]);
 
   const locationSuggestions = useMemo(() => Array.from(new Set([
-    ...people.map((record) => record.profile?.livesIn || "").filter(Boolean),
-    ...people.flatMap((record) => (record.profile?.locations || []).map((entry) => entry.location || "").filter(Boolean)),
+    ...activePeople.map((record) => record.profile?.livesIn || "").filter(Boolean),
+    ...activePeople.flatMap((record) => (record.profile?.locations || []).map((entry) => entry.location || "").filter(Boolean)),
     ...COMMON_LOCATIONS
-  ])).sort((left, right) => left.localeCompare(right)), [people]);
+  ])).sort((left, right) => left.localeCompare(right)), [activePeople]);
 
   const selectedPerson = useMemo(() => {
-    return people.find((record) => record.id === selectedId) || visiblePeople[0];
-  }, [people, selectedId, visiblePeople]);
+    return activePeople.find((record) => record.id === selectedId) || visiblePeople[0];
+  }, [activePeople, selectedId, visiblePeople]);
+  const deleteTarget = useMemo(() => people.find((record) => record.id === deleteTargetId), [deleteTargetId, people]);
   useEffect(() => {
     setProfileDraft(getProfile(selectedPerson));
     setProfileGroups(selectedPerson?.subjects || []);
@@ -1723,21 +1722,20 @@ export default function PeopleWorkspace({
   }, [selectedPerson?.id]);
 
   const stats = useMemo(() => {
-    const countFor = (view: PeopleSidebarView) => people.filter((record) => matchesSidebarView(record, view, starredIds)).length;
+    const countFor = (view: PeopleSidebarView) => activePeople.filter((record) => matchesSidebarView(record, view)).length;
     return {
-      total: people.length,
-      due: people.filter(isDue).length,
-      week: people.filter(isThisWeek).length,
-      dormant: people.filter(isDormant).length,
-      strongTies: people.filter((record) => record.status === "active" || record.projects.length > 0).length,
-      completeProfiles: people.filter((record) => countProfileFields(record) >= 8).length,
-      starred: starredIds.size,
+      total: activePeople.length,
+      due: activePeople.filter(isDue).length,
+      week: activePeople.filter(isThisWeek).length,
+      dormant: activePeople.filter(isDormant).length,
+      strongTies: activePeople.filter((record) => record.status === "active" || record.projects.length > 0).length,
+      completeProfiles: activePeople.filter((record) => countProfileFields(record) >= 8).length,
+      starred: activePeople.filter((record) => record.starred === true).length,
       recent: countFor("recent"),
       upcoming: countFor("upcoming"),
       attention: countFor("attention"),
       relationshipMap: countFor("relationship-map"),
       noContact90: countFor("no-contact-90"),
-      highPriority: countFor("high-priority"),
       birthdaysMonth: countFor("birthdays-month"),
       newPeople: countFor("new-people"),
       profileGaps: countFor("profile-gaps"),
@@ -1748,7 +1746,7 @@ export default function PeopleWorkspace({
       neighbors: countFor("neighbors"),
       healthWellness: countFor("health-wellness")
     };
-  }, [people, starredIds]);
+  }, [activePeople]);
 
   const selectedProfile = getProfile(selectedPerson);
   const emailContactDetails = selectedProfile.emails.map((entry) => ({
@@ -1793,7 +1791,7 @@ export default function PeopleWorkspace({
   ].filter(Boolean).join(" ");
   const activeSidebarItem = PEOPLE_SIDEBAR_SECTIONS.flatMap((section) => section.items).find((item) => item.id === activeSidebarView);
   const activeViewLabel = activeSidebarItem?.label || "All People";
-  const resolvedUtilityNotice = activeSidebarItem?.surface === "utility"
+  const resolvedUtilityNotice = activeSidebarItem?.surface === "utility" && activeSidebarView !== "recently-deleted"
     ? utilityNotice || `${activeViewLabel} is a read-only People utility in this checkpoint. Stored-data actions remain disabled until matching backend support exists.`
     : utilityNotice;
   const profileGaps = selectedPerson ? getProfileGaps(selectedPerson) : [];
@@ -1838,8 +1836,7 @@ export default function PeopleWorkspace({
   ]).slice(0, 20);
   const selectedTags = [
     ...(fallbackPerson?.subjects || []).slice(0, 3),
-    ...(selectedPerson?.projects || []).slice(0, 2),
-    getPriorityLabel(selectedPerson)
+    ...(selectedPerson?.projects || []).slice(0, 2)
   ].filter(Boolean);
   const addFormDirty = [
     name,
@@ -1961,13 +1958,12 @@ export default function PeopleWorkspace({
       "health-wellness": stats.healthWellness,
       "all-lists": 6,
       "no-contact-90": stats.noContact90,
-      "high-priority": stats.highPriority,
       "birthdays-month": stats.birthdaysMonth,
       "new-people": stats.newPeople,
       "profile-gaps": stats.profileGaps,
       dormant: stats.dormant,
       duplicates: 0,
-      "recently-deleted": 0
+      "recently-deleted": archivedPeople.length
     };
     return counts[view];
   }
@@ -2336,7 +2332,9 @@ export default function PeopleWorkspace({
     id: string,
     patch: {
       status?: PersonalRecordStatus;
-      action?: "review";
+      action?: "review" | "archive" | "restore";
+      archiveReason?: string;
+      starred?: boolean;
       title?: string;
       body?: string;
       url?: string;
@@ -2364,11 +2362,19 @@ export default function PeopleWorkspace({
       profile: patch.profile,
       markReviewed: patch.action === "review"
     });
+    const currentRecord = people.find((record) => record.id === id);
     try {
       const response = await fetch("/api/personal/records", {
         method: "PATCH",
         headers: buildJsonHeadersWithCsrf(),
-        body: JSON.stringify({ id, expectedUpdatedAt: selectedPerson?.id === id ? selectedPerson.updatedAt : undefined, ...legacyPatch })
+        body: JSON.stringify({
+          id,
+          expectedUpdatedAt: currentRecord?.updatedAt,
+          ...legacyPatch,
+          ...(patch.action ? { action: patch.action } : {}),
+          ...(typeof patch.starred === "boolean" ? { starred: patch.starred } : {}),
+          ...(patch.archiveReason ? { archiveReason: patch.archiveReason } : {})
+        })
       });
       const payload = (await response
         .json()
@@ -2392,6 +2398,43 @@ export default function PeopleWorkspace({
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to reach the People store. Your draft is still here.");
       return false;
+    }
+  }
+
+  async function toggleStar(record: PersonalRecord) {
+    if (lifecycleSaving) return;
+    setLifecycleSaving("star");
+    const saved = await patchPerson(record.id, { starred: record.starred !== true });
+    if (saved) {
+      setActionNotice(record.starred ? `${record.title} is no longer starred.` : `${record.title} is now starred.`);
+    }
+    setLifecycleSaving("");
+  }
+
+  async function deleteProfile() {
+    if (!deleteTarget || lifecycleSaving) return;
+    setLifecycleSaving("delete");
+    const saved = await patchPerson(deleteTarget.id, {
+      action: "archive",
+      archiveReason: "Deleted from People"
+    });
+    setLifecycleSaving("");
+    if (!saved) return;
+    setDeleteTargetId("");
+    setProfileMenuOpen(false);
+    setSelectedId("");
+    setActiveSidebarView("recently-deleted");
+    setUtilityNotice(`${deleteTarget.title} was moved to Recently Deleted.`);
+    router.replace(`${getModuleRoute("people")}?sidebar=recently-deleted`);
+  }
+
+  async function restoreProfile(record: PersonalRecord) {
+    if (lifecycleSaving) return;
+    setLifecycleSaving("restore");
+    const saved = await patchPerson(record.id, { action: "restore" });
+    setLifecycleSaving("");
+    if (saved) {
+      setUtilityNotice(`${record.title} was restored to People${record.starred ? " and remains starred" : ""}.`);
     }
   }
 
@@ -2730,7 +2773,7 @@ export default function PeopleWorkspace({
         <header className="people-directory-header">
           <div>
             <h1>{activeViewLabel}</h1>
-            <span>{visiblePeople.length} shown · {people.length} People records · {totalRecords} total Personal Records</span>
+            <span>{visiblePeople.length} shown · {activePeople.length} People records · {totalRecords} total Personal Records</span>
           </div>
           <div className="people-header-actions">
             <button type="button" aria-label="Show filters" onClick={() => setFiltersOpen(true)}>
@@ -2795,7 +2838,6 @@ export default function PeopleWorkspace({
               <option value="last-name">Last Name</option>
               <option value="recent-contact">Recent Contact</option>
               <option value="next-follow-up">Next Follow-up</option>
-              <option value="priority">Priority</option>
             </select>
           </label>
         </div>
@@ -2812,7 +2854,6 @@ export default function PeopleWorkspace({
             {[
               ["Relationship type", fallbackPerson ? getPrimaryGroup(fallbackPerson) : "Any"],
               ["Cadence / Follow-up", activeFilter === "due" ? "Due soon" : "Anytime"],
-              ["Priority / Closeness", getPriorityLabel(selectedPerson)],
               ["Tags / Groups", `${selectedTags.length} selected`],
               ["Location", selectedProfile.livesIn || "Any"],
               ["Employer / Project", selectedProfile.primaryEmployer || selectedPerson?.projects[0] || "Any"],
@@ -2849,6 +2890,44 @@ export default function PeopleWorkspace({
             description={initialLoadError}
             action={{ label: "Reload", onSelect: () => window.location.reload() }}
           />
+        ) : activeSidebarView === "recently-deleted" ? (
+          <section className="people-utility-surface people-deleted-surface" aria-labelledby="people-deleted-title">
+            <header>
+              <div>
+                <h2 id="people-deleted-title">Recently Deleted</h2>
+                <p>Profiles stay recoverable here with their links, history, and star intact.</p>
+              </div>
+              <strong>{archivedPeople.length}</strong>
+            </header>
+            {utilityNotice && <p className="people-utility-notice" role="status">{utilityNotice}</p>}
+            {archivedPeople.length > 0 ? (
+              <div className="people-deleted-list">
+                {archivedPeople.map((record) => (
+                  <article data-people-deleted-row key={record.id}>
+                    <span className="people-row-avatar" aria-hidden="true">{getInitials(record)}</span>
+                    <div>
+                      <strong>{record.title}</strong>
+                      <span>Deleted {record.archivedAt ? formatFullDate(record.archivedAt) : "recently"}</span>
+                    </div>
+                    {record.starred && <span className="people-deleted-star" aria-label="Starred">★</span>}
+                    <button
+                      type="button"
+                      aria-label={`Restore ${record.title}`}
+                      onClick={() => void restoreProfile(record)}
+                      disabled={Boolean(lifecycleSaving)}
+                    >
+                      {lifecycleSaving === "restore" ? "Restoring..." : "Restore"}
+                    </button>
+                  </article>
+                ))}
+              </div>
+            ) : (
+              <div className="notes-empty-state">
+                <h3>Nothing to restore</h3>
+                <p>Deleted profiles will appear here instead of disappearing permanently.</p>
+              </div>
+            )}
+          </section>
         ) : resolvedUtilityNotice ? (
           <section className="people-utility-surface">
             <h2>{activeViewLabel}</h2>
@@ -2907,7 +2986,10 @@ export default function PeopleWorkspace({
                   >
                     <span className="people-row-avatar" aria-hidden="true">{getInitials(record)}</span>
                     <span className="people-row-main">
-                      <strong>{record.title}</strong>
+                      <strong>
+                        {record.title}
+                        {record.starred && <span className="people-directory-star" data-people-starred aria-label="Starred">★</span>}
+                      </strong>
                       <small>{[profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at ") || profile.context || getPrimaryGroup(record)}</small>
                       <span>
                         {[getPrimaryGroup(record), ...record.projects.slice(0, 1)].filter(Boolean).map((tag) => (
@@ -2927,9 +3009,9 @@ export default function PeopleWorkspace({
           </div>
         ) : (
           <div className="notes-empty-state">
-            <h3>{people.length === 0 ? "No people yet" : "No matching people"}</h3>
+            <h3>{activePeople.length === 0 ? "No people yet" : "No matching people"}</h3>
             <p>
-              {people.length === 0
+              {activePeople.length === 0
                 ? "Add your first person or import contacts to start building relationship context."
                 : "Try removing filters or search a broader term."}
             </p>
@@ -2967,11 +3049,14 @@ export default function PeopleWorkspace({
               <div className="people-profile-actions">
                 <button
                   type="button"
-                  aria-label="Star profile unavailable"
-                  disabled
-                  title="Star storage is not connected yet"
+                  className={`people-profile-star${selectedPerson.starred ? " is-starred" : ""}`}
+                  aria-label={selectedPerson.starred ? `Remove star from ${selectedPerson.title}` : `Star ${selectedPerson.title}`}
+                  aria-pressed={selectedPerson.starred === true}
+                  onClick={() => void toggleStar(selectedPerson)}
+                  disabled={Boolean(lifecycleSaving)}
+                  title={selectedPerson.starred ? "Remove from Starred" : "Add to Starred"}
                 >
-                  Star
+                  <span aria-hidden="true">{selectedPerson.starred ? "★" : "☆"}</span>
                 </button>
                 <button type="button" aria-label="Edit profile" onClick={openEditProfile}>Edit</button>
                 <button
@@ -2988,6 +3073,14 @@ export default function PeopleWorkspace({
                   <button type="button" disabled aria-describedby="people-unavailable-actions" title="List membership persistence is not connected yet">Add to list unavailable</button>
                   <button type="button" disabled aria-describedby="people-unavailable-actions" title="Lifecycle changes require a confirmation and undo path">Set dormant unavailable</button>
                   <button type="button" disabled aria-describedby="people-unavailable-actions" title="People export is not connected yet">Export contact unavailable</button>
+                  <button
+                    type="button"
+                    className="is-danger"
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      setDeleteTargetId(selectedPerson.id);
+                    }}
+                  >Delete profile</button>
                 </div>
               )}
               </header>
@@ -3261,7 +3354,7 @@ export default function PeopleWorkspace({
                         ["Last contact", formatLastContact(selectedPerson, true)],
                         ["Next follow-up", getNextContactLabel(selectedPerson)],
                         ["Cadence", getCadenceLabel(selectedPerson.time.reviewCadence)],
-                        ["Health", getPriorityLabel(selectedPerson) === "High" ? "Needs attention" : "Strong"]
+                        ["Health", getRelationshipHealth(selectedPerson)]
                       ].map(([label, value]) => (
                         <div key={label}>
                           <span>{label}</span>
@@ -3762,7 +3855,6 @@ export default function PeopleWorkspace({
         </header>
         {[
           ["Relationship", fallbackPerson ? getPrimaryGroup(fallbackPerson) : "Any"],
-          ["Priority", getPriorityLabel(selectedPerson)],
           ["Location", selectedProfile.livesIn || "Any"],
           ["Cadence status", activeFilter === "due" ? "Due soon" : "Anytime"],
           ["Next follow-up", getNextContactLabel(selectedPerson)]
@@ -3775,6 +3867,24 @@ export default function PeopleWorkspace({
         <button type="button" onClick={() => setFiltersOpen(true)}>+ Add filter</button>
         <button type="button" disabled aria-describedby="people-unavailable-actions" title="Saved views are not connected yet">+ Save as view unavailable</button>
       </aside>
+
+      <ConfirmationSheet
+        open={Boolean(deleteTarget)}
+        onOpenChange={(open) => {
+          if (!open && lifecycleSaving !== "delete") setDeleteTargetId("");
+        }}
+        onConfirm={deleteProfile}
+        title={`Delete ${deleteTarget?.title || "this profile"}?`}
+        description="This removes the profile from People, search, and Starred without erasing its relationship record."
+        consequences={[
+          "Its links and history will stay intact.",
+          "You can restore it from Recently Deleted."
+        ]}
+        confirmLabel="Delete profile"
+        tone="danger"
+        busy={lifecycleSaving === "delete"}
+        dismissible={lifecycleSaving !== "delete"}
+      />
 
       <ConfirmationSheet
         open={cancelConfirmOpen}

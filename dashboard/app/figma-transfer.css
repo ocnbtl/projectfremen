@@ -2481,6 +2481,23 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   gap: 6px;
 }
 
+.people-profile-actions .people-profile-star {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  min-width: 34px;
+  padding: 0;
+  color: var(--text-subtle);
+  font-size: 21px;
+  line-height: 1;
+}
+
+.people-profile-actions .people-profile-star.is-starred {
+  border-color: #c89f36;
+  background: #fff8df;
+  color: #a8790d;
+}
+
 .people-action-menu {
   position: absolute;
   top: 42px;
@@ -2509,6 +2526,14 @@ html[data-admin-preview="mobile"] .people-profile-rail {
 
 .people-action-menu button:hover {
   background: var(--surface-row-hover);
+}
+
+.people-action-menu button.is-danger {
+  color: var(--state-danger-text, #9f2f34);
+}
+
+.people-action-menu button.is-danger:hover {
+  background: var(--state-danger-soft, #fbeaec);
 }
 
 .people-profile-tabs {
@@ -3100,6 +3125,94 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   margin: 0;
   color: var(--text-body);
   line-height: 1.45;
+}
+
+.people-deleted-surface > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.people-deleted-surface > header > div {
+  display: grid;
+  gap: 5px;
+}
+
+.people-deleted-surface > header > strong {
+  display: grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  color: var(--text-strong);
+}
+
+.people-utility-notice {
+  padding: 9px 11px;
+  border: 1px solid #bcd9c8;
+  border-radius: 7px;
+  background: #edf8f1;
+  color: var(--accent-green) !important;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.people-deleted-list {
+  display: grid;
+  gap: 8px;
+}
+
+.people-deleted-list article {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+}
+
+.people-deleted-list article > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.people-deleted-list article > div strong,
+.people-deleted-list article > div span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-deleted-list article > div span {
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.people-deleted-list article > button {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.people-deleted-star,
+.people-directory-star {
+  color: #a8790d;
+}
+
+.people-directory-star {
+  margin-left: 6px;
+  font-size: 13px;
 }
 
 .people-utility-grid {
@@ -7531,6 +7644,21 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
 .people-directory-list.is-grid .people-directory-row-body {
   grid-template-columns: 42px minmax(0, 1fr);
   align-items: start;
+}
+
+@media (max-width: 620px) {
+  .people-deleted-list article {
+    grid-template-columns: 40px minmax(0, 1fr) auto;
+  }
+
+  .people-deleted-star {
+    grid-column: 2;
+  }
+
+  .people-deleted-list article > button {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
 }
 
 .people-interaction-dialog {

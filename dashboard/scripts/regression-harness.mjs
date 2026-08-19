@@ -6098,6 +6098,147 @@ async function checkPeopleUnknownLastContactBrowserState(baseUrl, cookieJar, per
   }
 }
 
+async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, personTitle) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "people-lifecycle-checkpoint");
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function contextFor(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      { name: "admin_session", value: cookieJar.get("admin_session"), url: baseUrl, httpOnly: true, sameSite: "Lax" },
+      { name: "admin_csrf", value: cookieJar.get("admin_csrf"), url: baseUrl, sameSite: "Lax" }
+    ]);
+    return context;
+  }
+
+  async function responseRecord(response) {
+    const payload = await response.json();
+    return payload?.items?.find((item) => item.id === personId);
+  }
+
+  try {
+    const context = await contextFor({ width: 1440, height: 900 });
+    const page = await context.newPage();
+    await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}`, { waitUntil: "networkidle" });
+
+    const starButton = page.getByRole("button", { name: `Star ${personTitle}`, exact: true });
+    await starButton.waitFor();
+    assert((await starButton.getAttribute("aria-pressed")) === "false", "People profile did not begin unstarred");
+    const [starResponse] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
+      starButton.click()
+    ]);
+    const starredPerson = await responseRecord(starResponse);
+    assert(starResponse.ok() && starredPerson?.starred === true, "People profile star did not persist through the canonical API");
+    assert(
+      await page.getByRole("button", { name: `Remove star from ${personTitle}`, exact: true }).getAttribute("aria-pressed") === "true",
+      "People profile star did not expose its selected state"
+    );
+
+    await page.goto(`${baseUrl}/admin/people?sidebar=starred`, { waitUntil: "networkidle" });
+    let row = page.locator(".people-directory-row").filter({ hasText: personTitle }).first();
+    await row.waitFor();
+    assert(await row.locator("[data-people-starred]").count() === 1, "Starred People view omitted the directory star");
+
+    await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}`, { waitUntil: "networkidle" });
+    const [unstarResponse] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
+      page.getByRole("button", { name: `Remove star from ${personTitle}`, exact: true }).click()
+    ]);
+    const unstarredPerson = await responseRecord(unstarResponse);
+    assert(unstarResponse.ok() && !unstarredPerson?.starred, "People profile star could not be removed");
+
+    const [restarResponse] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
+      page.getByRole("button", { name: `Star ${personTitle}`, exact: true }).click()
+    ]);
+    const restarredPerson = await responseRecord(restarResponse);
+    assert(restarResponse.ok() && restarredPerson?.starred === true, "People profile could not be starred again before lifecycle testing");
+
+    await page.getByRole("button", { name: "More profile actions" }).click();
+    await page.getByRole("button", { name: "Delete profile", exact: true }).click();
+    const confirmation = page.getByRole("dialog", { name: `Delete ${personTitle}?` });
+    await confirmation.waitFor();
+    const confirmationText = await confirmation.innerText();
+    assert(
+      confirmationText.includes("Recently Deleted") && confirmationText.includes("links and history"),
+      "People delete confirmation did not explain recovery and retained history"
+    );
+    const [archiveResponse] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
+      confirmation.getByRole("button", { name: "Delete profile", exact: true }).click()
+    ]);
+    const archivedPerson = await responseRecord(archiveResponse);
+    assert(
+      archiveResponse.ok() &&
+        archivedPerson?.archivedAt &&
+        archivedPerson.archiveReason === "Deleted from People" &&
+        archivedPerson.statusBeforeArchive === "active" &&
+        archivedPerson.status === "inactive" &&
+        archivedPerson.starred === true,
+      "People delete did not preserve a recoverable, starred profile with its prior lifecycle"
+    );
+    await page.waitForURL((url) => url.pathname === "/admin/people" && url.searchParams.get("sidebar") === "recently-deleted");
+
+    const archivedRoute = await requestText(baseUrl, cookieJar, `/admin/people/${encodeURIComponent(personId)}`);
+    assert(
+      isAppRouterNotFound(archivedRoute.response, archivedRoute.body),
+      "Deleted People profile remained available at its normal detail route"
+    );
+
+    await page.goto(`${baseUrl}/admin/people?sidebar=recently-deleted`, { waitUntil: "networkidle" });
+    const deletedRow = page.locator("[data-people-deleted-row]").filter({ hasText: personTitle }).first();
+    await deletedRow.waitFor();
+    await page.screenshot({ path: path.join(screenshotDir, "people-recently-deleted-desktop.png"), fullPage: true });
+    const [restoreResponse] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
+      deletedRow.getByRole("button", { name: `Restore ${personTitle}`, exact: true }).click()
+    ]);
+    const restoredPerson = await responseRecord(restoreResponse);
+    assert(
+      restoreResponse.ok() &&
+        restoredPerson &&
+        !restoredPerson.archivedAt &&
+        !restoredPerson.archiveReason &&
+        !restoredPerson.statusBeforeArchive &&
+        restoredPerson.status === "active" &&
+        restoredPerson.starred === true,
+      "People restore did not recover the prior lifecycle and star without residue"
+    );
+    await context.close();
+
+    for (const viewport of [
+      { label: "desktop", width: 1440, height: 900 },
+      { label: "tablet", width: 1024, height: 768 },
+      { label: "mobile", width: 390, height: 844 }
+    ]) {
+      const responsiveContext = await contextFor({ width: viewport.width, height: viewport.height });
+      const responsivePage = await responsiveContext.newPage();
+      await responsivePage.goto(`${baseUrl}/admin/people?sidebar=starred`, { waitUntil: "networkidle" });
+      row = responsivePage.locator(".people-directory-row").filter({ hasText: personTitle }).first();
+      await row.waitFor();
+      assert(
+        await row.locator("[data-people-starred]").count() === 1,
+        `Restored starred profile did not retain its directory marker at ${viewport.label}`
+      );
+      const dimensions = await responsivePage.evaluate(() => ({
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth
+      }));
+      assert(dimensions.scrollWidth <= dimensions.innerWidth, `People starred view overflowed at ${viewport.label}: ${JSON.stringify(dimensions)}`);
+      await responsivePage.screenshot({
+        path: path.join(screenshotDir, `people-starred-${viewport.label}.png`),
+        fullPage: true
+      });
+      await responsiveContext.close();
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
 async function checkPeopleFollowUpBridgeBrowserState(
   baseUrl,
   cookieJar,
@@ -13346,8 +13487,24 @@ async function main() {
         !personAfterLastContactClear.profile?.lastContact,
       "Cleared People last contact did not remain unknown after API reload"
     );
+    await checkPeopleStarArchiveBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdPerson.id,
+      updatedPersonTitle
+    );
+    const peopleAfterRestore = await requestJson(server.baseUrl, cookieJar, "/api/personal/records");
+    const restoredPerson = peopleAfterRestore.payload?.items?.find((item) => item.id === createdPerson.id);
+    assert(
+      peopleAfterRestore.response.ok &&
+        restoredPerson?.starred === true &&
+        !restoredPerson.archivedAt &&
+        restoredPerson.status === "active",
+      "Restored starred People profile did not survive canonical API reload"
+    );
     pass("People profiles preserve dated memories, automatic name parts, labeled emails and phone numbers, groups, cadence, education, jobs, and locations across desktop, tablet, and mobile");
     pass("People last contact can be cleared to a persistent N/A state without a generated date or green activity dot");
+    pass("People starring and recoverable deletion persist across directory, detail, Recently Deleted, reload, desktop, tablet, and mobile states");
     pass("People create/update/clear/reload/direct-route flow works through the Personal Records adapter");
 
     const peopleBridgeFollowUpTitle = `${testRunId}-people-status-bridge`;

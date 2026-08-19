@@ -146,6 +146,7 @@ async function createPersonal(command: VaultPendingCanonicalCommand, collection:
     className: collection,
     body: typeof command.patch.body === "string" ? command.patch.body : "",
     url: typeof command.patch.url === "string" ? command.patch.url : "",
+    starred: command.patch.starred === true,
     profile
   }, { requestedId: recordId });
   const created = items.find((item) => item.id === recordId);
@@ -234,6 +235,15 @@ async function applyLifecycleAction(
     throw new Error("This record changed after the offline action was queued. Refresh before retrying.");
   }
   const reason = action.name === "archive" ? requiredActionText(action.reason, "Archive reason") : "";
+  if (module === "personal-records" && (collection === "person" || collection === "org")) {
+    const items = await updatePersonalRecord(recordId, {
+      action: action.name,
+      ...(reason ? { archiveReason: reason } : {})
+    }, { expectedUpdatedAt: currentUpdatedAt });
+    const updated = items.find((item) => item.id === recordId);
+    if (!updated) throw new Error("The People profile could not be reloaded after its lifecycle changed");
+    return updated as unknown as Record<string, unknown>;
+  }
   if (module === "finance" && FINANCE_KIND[collection]) {
     const result = await updateFinanceRecord({
       kind: FINANCE_KIND[collection], id: recordId, expectedUpdatedAt: command.baseUpdatedAt, action: action.name, ...(reason ? { reason } : {})

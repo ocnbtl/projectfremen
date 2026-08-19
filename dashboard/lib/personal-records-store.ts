@@ -201,6 +201,10 @@ export type PersonalRecord = {
   createdMeta: PersonalRecordCreatedMeta;
   createdAt: string;
   updatedAt: string;
+  starred?: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
+  statusBeforeArchive?: PersonalRecordStatus;
 };
 
 export type PersonalRecordInput = {
@@ -220,6 +224,7 @@ export type PersonalRecordInput = {
   projects?: string[];
   intents?: string[];
   externalSources?: string[];
+  starred?: boolean;
   relations?: Partial<PersonalRecordRelations>;
   time?: PersonalRecordTime;
   profile?: Partial<PersonalContactProfile>;
@@ -228,10 +233,11 @@ export type PersonalRecordInput = {
 export type PersonalRecordPatch = Partial<
   Pick<
     PersonalRecord,
-    "title" | "status" | "body" | "url" | "projects" | "areas" | "subjects" | "externalSources"
+    "title" | "status" | "body" | "url" | "projects" | "areas" | "subjects" | "externalSources" | "starred"
   >
 > & {
-  action?: "review";
+  action?: "review" | "archive" | "restore";
+  archiveReason?: string;
   time?: Partial<PersonalRecordTime>;
   profile?: Partial<PersonalContactProfile>;
 };
@@ -1537,6 +1543,14 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
   const relations = normalizeRelations(raw.relations);
   const body = typeof raw.body === "string" ? raw.body : "";
   const profile = normalizeContactProfile(raw.profile);
+  const starred = raw.starred === true;
+  const archivedAt = typeof raw.archivedAt === "string" && raw.archivedAt.trim() ? raw.archivedAt.trim() : undefined;
+  const archiveReason = typeof raw.archiveReason === "string" && raw.archiveReason.trim()
+    ? raw.archiveReason.trim().slice(0, 200)
+    : undefined;
+  const statusBeforeArchive = PERSONAL_RECORD_STATUSES.includes(raw.statusBeforeArchive as PersonalRecordStatus)
+    ? (raw.statusBeforeArchive as PersonalRecordStatus)
+    : undefined;
   const record: PersonalRecord = {
     id: typeof raw.id === "string" ? raw.id : `personal-${crypto.randomUUID()}`,
     domain: typeof raw.domain === "string" ? raw.domain : "notes-docs",
@@ -1561,7 +1575,11 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     profile,
     createdMeta,
     createdAt,
-    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : createdAt
+    updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : createdAt,
+    ...(starred ? { starred: true } : {}),
+    ...(archivedAt ? { archivedAt } : {}),
+    ...(archivedAt && archiveReason ? { archiveReason } : {}),
+    ...(archivedAt && statusBeforeArchive ? { statusBeforeArchive } : {})
   };
   record.growth = calculateGrowth(record);
   return record;
@@ -1624,6 +1642,7 @@ export async function createPersonalRecord(
       PERSONAL_RECORD_INTENTS.includes(item as PersonalRecordIntent)
     ) as PersonalRecordIntent[],
     externalSources: sanitizeList(input.externalSources),
+    ...(input.starred === true ? { starred: true } : {}),
     relations,
     time: normalizeTime(
       {
@@ -1669,6 +1688,15 @@ export async function updatePersonalRecord(
   if (options.expectedUpdatedAt && current.updatedAt !== options.expectedUpdatedAt) {
     throw new Error("This record changed after it was opened. Refresh before saving so newer work is not overwritten.");
   }
+  if (current.archivedAt && patch.action !== "restore") {
+    throw new Error("Restore this profile from Recently Deleted before editing it.");
+  }
+  if ((patch.action === "archive" || patch.action === "restore") && current.className !== "person" && current.className !== "org") {
+    throw new Error("Only People profiles can use this lifecycle action.");
+  }
+  if (patch.action === "restore" && !current.archivedAt) {
+    throw new Error("This profile is not in Recently Deleted.");
+  }
   const time = mergeTimePatch(current.time, patch.time);
   const profilePatch = normalizeContactProfilePatch(patch.profile);
   for (const profileUrl of [profilePatch?.website, profilePatch?.linkedin]) {
@@ -1679,6 +1707,18 @@ export async function updatePersonalRecord(
     time.lastReview = now;
     time.nextReview = calculateNextReview(now, time.reviewCadence) || time.nextReview;
   }
+  const archiveReason = typeof patch.archiveReason === "string" ? patch.archiveReason.trim().slice(0, 200) : "";
+  if (patch.action === "archive" && !archiveReason) {
+    throw new Error("A delete reason is required so this profile can be recovered safely.");
+  }
+  const nextStatus = patch.action === "archive"
+    ? "inactive"
+    : patch.action === "restore"
+      ? current.statusBeforeArchive || "active"
+      : PERSONAL_RECORD_STATUSES.includes(patch.status as PersonalRecordStatus)
+        ? (patch.status as PersonalRecordStatus)
+        : current.status;
+  const nextStarred = typeof patch.starred === "boolean" ? patch.starred : current.starred === true;
 
   next[idx] = {
     ...current,
@@ -1693,12 +1733,24 @@ export async function updatePersonalRecord(
     externalSources: Array.isArray(patch.externalSources)
       ? sanitizeList(patch.externalSources)
       : current.externalSources,
-    status: PERSONAL_RECORD_STATUSES.includes(patch.status as PersonalRecordStatus)
-      ? (patch.status as PersonalRecordStatus)
-      : current.status,
+    status: nextStatus,
     time,
     profile: mergeContactProfile(current.profile, profilePatch),
-    updatedAt: now
+    updatedAt: now,
+    ...(nextStarred ? { starred: true } : { starred: undefined }),
+    ...(patch.action === "archive"
+      ? {
+          archivedAt: now,
+          archiveReason,
+          statusBeforeArchive: current.status
+        }
+      : patch.action === "restore"
+        ? {
+            archivedAt: undefined,
+            archiveReason: undefined,
+            statusBeforeArchive: undefined
+          }
+        : {})
   };
 
   return { value: next, result: next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };

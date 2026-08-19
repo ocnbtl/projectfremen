@@ -103,6 +103,7 @@ export function editableFieldsFor(module: CanonicalModule, collection: string): 
       FIELD("profile.birthday", "Birthday", "date", { group: "Planning" }),
       FIELD("profile.lastContact", "Last contact", "date", { group: "Planning" }),
       FIELD("profile.nextContact", "Next contact", "date", { group: "Planning" }),
+      FIELD("starred", "Starred", "checkbox", { group: "Planning", help: "Matches the star shown in People." }),
       FIELD("body", "Context", "textarea", { group: "Details", help: "General context shared with the People view." }),
       FIELD("profile.notes", "Private notes", "textarea", { group: "Details" })
     ];

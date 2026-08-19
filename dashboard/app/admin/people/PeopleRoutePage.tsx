@@ -46,7 +46,7 @@ export default async function PeopleRoutePage({
     (record): record is PersonalRecord => record.className === "person" || record.className === "org"
   );
 
-  if (!loadError && personId && !people.some((record) => record.id === personId)) {
+  if (!loadError && personId && !people.some((record) => record.id === personId && !record.archivedAt)) {
     notFound();
   }
 

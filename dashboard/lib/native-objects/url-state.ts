@@ -79,7 +79,7 @@ export function serializeUrlState<State extends object>(
 }
 
 const PEOPLE_FILTERS = ["all", "due", "week", "active", "dormant", "orgs"] as const;
-const PEOPLE_SORTS = ["last-name", "recent-contact", "next-follow-up", "priority"] as const;
+const PEOPLE_SORTS = ["last-name", "recent-contact", "next-follow-up"] as const;
 const PEOPLE_VIEWS = ["list", "compact", "grid"] as const;
 const PEOPLE_TABS = ["overview", "timeline", "notes", "relations", "files", "properties"] as const;
 const PEOPLE_SIDEBARS = [
@@ -97,7 +97,6 @@ const PEOPLE_SIDEBARS = [
   "health-wellness",
   "all-lists",
   "no-contact-90",
-  "high-priority",
   "birthdays-month",
   "new-people",
   "profile-gaps",

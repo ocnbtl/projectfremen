@@ -112,6 +112,9 @@ export type PeopleRecord = {
   sourceUrl?: string;
   createdAt: string;
   updatedAt: string;
+  starred: boolean;
+  archivedAt?: string;
+  archiveReason?: string;
   source: {
     kind: "legacy_personal_record";
     recordId: string;

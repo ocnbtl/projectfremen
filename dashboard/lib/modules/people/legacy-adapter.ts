@@ -48,7 +48,8 @@ function copyProfile(profile?: PersonalContactProfile): PeopleContactProfile {
   };
 }
 
-function profileStatus(status: PersonalRecordStatus): PeopleProfileStatus {
+function profileStatus(status: PersonalRecordStatus, archivedAt?: string): PeopleProfileStatus {
+  if (archivedAt) return "archived";
   return status === "inactive" ? "dormant" : "active";
 }
 
@@ -70,7 +71,7 @@ export function legacyPersonalRecordToPeopleRecord(record: LegacyPeopleRecord): 
     }),
     type: record.className === "org" ? "organization" : "person",
     fullName,
-    profileStatus: profileStatus(record.status),
+    profileStatus: profileStatus(record.status, record.archivedAt),
     legacyStatus: record.status as PeopleLegacyStatus,
     context: profile.context || record.body,
     profile,
@@ -92,6 +93,9 @@ export function legacyPersonalRecordToPeopleRecord(record: LegacyPeopleRecord): 
     sourceUrl: record.url,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
+    starred: record.starred === true,
+    archivedAt: record.archivedAt,
+    archiveReason: record.archiveReason,
     source: {
       kind: "legacy_personal_record",
       recordId: record.id,
@@ -101,8 +105,14 @@ export function legacyPersonalRecordToPeopleRecord(record: LegacyPeopleRecord): 
   };
 }
 
-export function legacyPersonalRecordsToPeople(records: PersonalRecord[]): PeopleRecord[] {
-  return records.filter(isLegacyPeopleRecord).map(legacyPersonalRecordToPeopleRecord);
+export function legacyPersonalRecordsToPeople(
+  records: PersonalRecord[],
+  options: { includeArchived?: boolean } = {}
+): PeopleRecord[] {
+  return records
+    .filter(isLegacyPeopleRecord)
+    .filter((record) => options.includeArchived || !record.archivedAt)
+    .map(legacyPersonalRecordToPeopleRecord);
 }
 
 function mergedProfile(

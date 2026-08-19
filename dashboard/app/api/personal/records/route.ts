@@ -59,6 +59,7 @@ export async function POST(request: Request) {
       projects: Array.isArray(body.projects) ? body.projects.map(String) : [],
       intents: Array.isArray(body.intents) ? body.intents.map(String) : [],
       externalSources: Array.isArray(body.externalSources) ? body.externalSources.map(String) : [],
+      starred: body.starred === true,
       relations: typeof body.relations === "object" && body.relations ? body.relations : {},
       time: typeof body.time === "object" && body.time ? body.time : {},
       profile: typeof body.profile === "object" && body.profile ? body.profile : {}
@@ -106,10 +107,15 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ ok: false, error: "Record id is required" }, { status: 400 });
     }
     const expectedUpdatedAt = typeof body.expectedUpdatedAt === "string" ? body.expectedUpdatedAt.trim() : "";
+    const action = body.action === "review" || body.action === "archive" || body.action === "restore"
+      ? body.action
+      : undefined;
     const items = await updatePersonalRecord(id, {
       title: typeof body.title === "string" ? body.title : undefined,
       status: typeof body.status === "string" ? body.status : undefined,
-      action: body.action === "review" ? "review" : undefined,
+      action,
+      archiveReason: typeof body.archiveReason === "string" ? body.archiveReason : undefined,
+      starred: typeof body.starred === "boolean" ? body.starred : undefined,
       body: typeof body.body === "string" ? body.body : undefined,
       url: typeof body.url === "string" ? body.url : undefined,
       areas: Array.isArray(body.areas) ? body.areas.map(String) : undefined,
@@ -129,7 +135,11 @@ export async function PATCH(request: Request) {
     const updated = items.find((item) => item.id === id);
     await appendAuditEvent({
       at: new Date().toISOString(),
-      action: "personal.record.update.success",
+      action: action === "archive"
+        ? "personal.record.archive.success"
+        : action === "restore"
+          ? "personal.record.restore.success"
+          : "personal.record.update.success",
       path: new URL(request.url).pathname,
       method: "PATCH",
       ip: getRequestIp(request),

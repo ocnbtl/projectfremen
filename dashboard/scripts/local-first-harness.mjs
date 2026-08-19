@@ -80,6 +80,7 @@ try {
   assert.equal(contactFields.find((field) => field.key === "subjects")?.control, "tags");
   assert.equal(contactFields.find((field) => field.key === "profile.instagram")?.control, "url");
   assert.equal(contactFields.find((field) => field.key === "profile.address")?.control, "textarea");
+  assert.equal(contactFields.find((field) => field.key === "starred")?.control, "checkbox");
   const commandId = crypto.randomUUID();
   const commandField = pendingCommandField(commandId);
   const commandSnapshot = snapshot(crypto.randomUUID(), "note", crypto.randomUUID(), "device-a", 900, {
