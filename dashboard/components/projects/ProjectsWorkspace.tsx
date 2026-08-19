@@ -94,6 +94,7 @@ type EditorKind =
   | "blocker-create"
   | "blocker-resolve"
   | "interaction-create"
+  | "interaction-edit"
   | "link-create"
   | "link-edit"
   | "link-health"
@@ -119,6 +120,16 @@ type EditorPersonDraft = {
   personId: string;
   role: string;
   context: string;
+};
+
+type ProjectActivityItem = {
+  id: string;
+  title: string;
+  summary: string;
+  occurredAt: string;
+  tone: "system" | "people" | "object" | "blocker" | "milestone" | "decision" | "update";
+  href: string;
+  kind: "timeline" | "decision";
 };
 
 type ConfirmationState =
@@ -239,6 +250,14 @@ function initials(value: string) {
   const cleaned = value.replace(/^Project\s+/i, "").trim();
   const words = cleaned.split(/\s+/).filter(Boolean);
   return words.length ? words.slice(0, 2).map((word) => word[0]?.toUpperCase()).join("") : "PR";
+}
+
+function ObjectiveDeleteIcon() {
+  return (
+    <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" focusable="false">
+      <path d="M4.5 5.5h11M8 5.5V4h4v1.5m-6 0 .6 10h6.8l.6-10M8.25 8v4.75M11.75 8v4.75" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 function excerpt(value: string, limit = 90) {
@@ -509,7 +528,7 @@ function personalRecordObjectRef(record: PersonalRecord): NativeObjectRef | null
   return null;
 }
 
-function activityTone(event: ProjectDirectoryItem["timelineEvents"][number]) {
+function activityTone(event: ProjectDirectoryItem["timelineEvents"][number]): ProjectActivityItem["tone"] {
   if (event.eventType.startsWith("milestone_")) return "milestone";
   if (event.eventType.startsWith("blocker_")) return "blocker";
   if (event.eventType === "interaction_logged") return "update";
@@ -519,6 +538,16 @@ function activityTone(event: ProjectDirectoryItem["timelineEvents"][number]) {
     return "object";
   }
   return "system";
+}
+
+function activityTitle(event: ProjectDirectoryItem["timelineEvents"][number]) {
+  if (!event.eventType.startsWith("link_")) return event.title;
+  const subject = event.sourceRef?.module === "people" ? "Person" : "Object";
+  if (event.eventType === "link_created") return `${subject} linked`;
+  if (event.eventType === "link_removed") return `${subject} link removed`;
+  if (event.eventType === "link_restored") return `${subject} link restored`;
+  if (event.eventType === "link_repaired") return `${subject} link repaired`;
+  return `${subject} connection updated`;
 }
 
 function EditorSurface({
@@ -664,7 +693,7 @@ function ProjectObjectivesEditor({
                   disabled={busy}
                   aria-label={`Delete ${objective.text || "objective"}`}
                   title="Delete objective"
-                ><span aria-hidden="true">⌫</span></button>
+                ><ObjectiveDeleteIcon /></button>
               )}
             </li>
           ))}
@@ -989,7 +1018,7 @@ export default function ProjectsWorkspace({
   function openEditor(
     kind: EditorKind,
     item?: ProjectDirectoryItem,
-    object?: ProjectBlocker | ProjectLink,
+    object?: ProjectBlocker | ProjectLink | ProjectInteraction,
     preset: Record<string, string | boolean> = {}
   ) {
     clearFeedback();
@@ -1024,6 +1053,12 @@ export default function ProjectsWorkspace({
       values = { resolution: object.resolution || "" };
     } else if (kind === "interaction-create") {
       values = { title: "", body: "", occurredAt: toLocalDateTimeInput() };
+    } else if (kind === "interaction-edit" && object?.objectType === "project_interaction") {
+      values = {
+        title: object.title,
+        body: object.body,
+        occurredAt: toLocalDateTimeInput(new Date(object.occurredAt))
+      };
     } else if (kind === "link-create") {
       values = {
         linkScope: "object",
@@ -1163,7 +1198,15 @@ export default function ProjectsWorkspace({
       const event = data.timelineEvent;
       updateDirectoryItem(event.projectId, (item) => ({
         ...item,
-        timelineEvents: [event, ...item.timelineEvents.filter((candidate) => candidate.id !== event.id)]
+        timelineEvents: [
+          event,
+          ...item.timelineEvents.filter((candidate) =>
+            candidate.id !== event.id && (
+              data.item.objectType !== "project_interaction" ||
+              candidate.relatedObjectRef?.objectId !== data.item.id
+            )
+          )
+        ]
       }));
     }
   }
@@ -1360,6 +1403,31 @@ export default function ProjectsWorkspace({
         setSelectedChildId(result.data.timelineEvent?.id || "");
         updateUrl({ tab: "timeline", item: initialDetail ? result.data.timelineEvent?.id || "" : item.project.id });
         setNotice(`Update “${result.data.item.title}” was logged.`);
+      } else if (editor.kind === "interaction-edit") {
+        const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
+        const interaction = item?.interactions.find((candidate) => candidate.id === editor.objectId);
+        if (!item || !interaction) {
+          setEditorError("The selected project update is no longer available.");
+          return;
+        }
+        if (!value("title") || !value("occurredAt")) {
+          setEditorError("Update title and date are required.");
+          return;
+        }
+        const result = await repository.update("interactions", interaction.id, {
+          title: value("title"),
+          body: optional("body"),
+          occurredAt: value("occurredAt")
+        }, interaction.updatedAt);
+        if (!result.ok) {
+          setEditorError(result.error.message);
+          return;
+        }
+        applyMutationEnvelope(result.data);
+        setActiveTab("timeline");
+        setSelectedChildId(result.data.timelineEvent?.id || "");
+        updateUrl({ tab: "timeline", item: initialDetail ? result.data.timelineEvent?.id || "" : item.project.id });
+        setNotice(`Update “${result.data.item.title}” was saved.`);
       } else if (editor.kind === "link-create") {
         const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
         if (!item?.project.editable) {
@@ -1768,26 +1836,51 @@ export default function ProjectsWorkspace({
     );
   }
 
-  function projectActivity(item: ProjectDirectoryItem) {
+  function projectActivity(item: ProjectDirectoryItem): ProjectActivityItem[] {
     const timeline = item.timelineEvents.map((event) => ({
       id: event.id,
-      title: event.title,
+      title: activityTitle(event),
       summary: event.summary,
       occurredAt: event.occurredAt,
       tone: activityTone(event),
-      href: "",
-      isManual: event.isManual
+      href: event.sourceRef?.route || (
+        event.relatedObjectRef?.objectType !== "project_interaction"
+          ? event.relatedObjectRef?.route || ""
+          : ""
+      ),
+      kind: "timeline" as const
     }));
     const decisionActivity = getLinkedDecisions(decisions, projectDecisionSource(item.project)).map((decision) => ({
       id: `decision-${decision.id}`,
       title: decision.title,
-      summary: decision.description || "Decision recorded",
+      summary: decision.finalDecision || decision.question || "Decision recorded",
       occurredAt: decision.updatedAt || decision.createdAt,
-      tone: "decision",
+      tone: "decision" as const,
       href: decisionOwnerRoute(decision),
-      isManual: false
+      kind: "decision" as const
     }));
     return [...timeline, ...decisionActivity].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
+  }
+
+  function renderActivityList(activity: ProjectActivityItem[], compact = false) {
+    return (
+      <ol className={styles.activityList} data-compact={compact || undefined}>
+        {activity.map((event) => (
+          <li key={event.id} aria-current={selectedChildId === event.id || undefined}>
+            <span className={styles.timelineDot} data-tone={event.tone} aria-hidden="true" />
+            <span className={styles.itemBody}>
+              <strong>{event.title}</strong>
+              <small>{event.summary}</small>
+            </span>
+            <time className={styles.timelineMeta}>{formatTimestamp(event.occurredAt)}</time>
+            <span className={styles.activityActions}>
+              <button type="button" className={styles.button} onClick={() => selectChild(event.id, "timeline")}>Inspect</button>
+              {event.href && <Link className={styles.textLink} href={event.href}>Open</Link>}
+            </span>
+          </li>
+        ))}
+      </ol>
+    );
   }
 
   function renderLinkedRows(item: ProjectDirectoryItem, modules?: readonly ModuleId[]) {
@@ -1926,7 +2019,7 @@ export default function ProjectsWorkspace({
               <h2>Recent work</h2>
               <button type="button" className={styles.button} onClick={() => openEditor("interaction-create", item)} disabled={readOnly}>Log update</button>
             </div>
-            {activity.length ? <ol className={styles.recentWorkList}>{activity.map((event) => <li key={event.id}><span className={styles.timelineDot} data-tone={event.tone} aria-hidden="true" />{event.href ? <Link className={styles.activityLink} href={event.href}><strong>{event.title}</strong><small>{event.summary}</small></Link> : <button type="button" onClick={() => selectChild(event.id, "timeline")}><strong>{event.title}</strong><small>{event.summary}</small></button>}<time>{formatTimestamp(event.occurredAt)}</time></li>)}</ol> : <p>No work logged yet.</p>}
+            {activity.length ? renderActivityList(activity, true) : <p>No work logged yet.</p>}
           </section>
         </div>
       </>
@@ -1943,23 +2036,16 @@ export default function ProjectsWorkspace({
             <h2>Activity</h2>
             <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("interaction-create", item)} disabled={readOnly}>Log update</button>
           </div>
-          {activity.length ? <ol className={styles.timelineList}>{activity.map((event) => (
-            <li key={event.id} aria-current={selectedChildId === event.id || undefined}>
-              <span className={styles.timelineDot} data-tone={event.tone} aria-hidden="true" />
-              <span className={styles.itemBody}><strong>{event.title}</strong><small>{event.summary}</small></span>
-              <time className={styles.timelineMeta}>{formatTimestamp(event.occurredAt)}</time>
-              {event.href ? <Link className={styles.textLink} href={event.href}>Open</Link> : <button type="button" className={styles.button} onClick={() => selectChild(event.id, "timeline")}>View</button>}
-            </li>
-          ))}</ol> : <p>No activity yet.</p>}
+          {activity.length ? renderActivityList(activity) : <p>No activity yet.</p>}
         </section>
         <aside className={styles.timelineSide}>
           <section className={styles.panel}>
             <div className={styles.panelHeader}><h2>Milestones</h2><button type="button" className={styles.button} onClick={() => openEditor("milestone-create", item)} disabled={readOnly}>Add milestone</button></div>
-            {item.milestones.length ? <ul className={styles.objectList}>{item.milestones.map((milestone) => <li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}><span className={styles.itemBody}><strong>{milestone.title}</strong><small>{formatDate(milestone.dueAt)} · {displayLabel(milestone.state)}</small></span><span className={styles.inlineActions}><button type="button" className={styles.button} onClick={() => selectChild(milestone.id, "timeline")}>View</button>{!["complete", "archived"].includes(milestone.state) && <button type="button" className={styles.button} disabled={readOnly || !milestone.completionCriteria.length} onClick={() => { setConfirmationReason(""); setConfirmation({ kind: "milestone-complete", projectId: item.project.id, objectId: milestone.id }); }}>Complete</button>}</span></li>)}</ul> : <p>No milestones yet.</p>}
+            {item.milestones.length ? <ul className={styles.objectList}>{item.milestones.map((milestone) => <li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}><span className={styles.itemBody}><strong>{milestone.title}</strong><small>{formatDate(milestone.dueAt)} · {displayLabel(milestone.state)}</small></span><span className={styles.inlineActions}><button type="button" className={styles.button} onClick={() => selectChild(milestone.id, "timeline")}>Inspect</button>{!["complete", "archived"].includes(milestone.state) && <button type="button" className={styles.button} disabled={readOnly || !milestone.completionCriteria.length} onClick={() => { setConfirmationReason(""); setConfirmation({ kind: "milestone-complete", projectId: item.project.id, objectId: milestone.id }); }}>Complete</button>}</span></li>)}</ul> : <p>No milestones yet.</p>}
           </section>
           <section className={styles.panel}>
             <div className={styles.panelHeader}><h2>Blockers</h2><button type="button" className={styles.button} onClick={() => openEditor("blocker-create", item)} disabled={readOnly}>Add blocker</button></div>
-            {item.blockers.length ? <ul className={styles.objectList}>{item.blockers.map((blocker) => <li key={blocker.id} aria-current={selectedChildId === blocker.id || undefined}><span className={styles.itemBody}><strong>{blocker.title}</strong><small>{displayLabel(blocker.state)} · {displayLabel(blocker.severity)}</small></span><span className={styles.inlineActions}><button type="button" className={styles.button} onClick={() => selectChild(blocker.id, "timeline")}>View</button>{blocker.state === "open" && <button type="button" className={styles.button} disabled={readOnly} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve</button>}</span></li>)}</ul> : <p>No blockers.</p>}
+            {item.blockers.length ? <ul className={styles.objectList}>{item.blockers.map((blocker) => <li key={blocker.id} aria-current={selectedChildId === blocker.id || undefined}><span className={styles.itemBody}><strong>{blocker.title}</strong><small>{displayLabel(blocker.state)} · {displayLabel(blocker.severity)}</small></span><span className={styles.inlineActions}><button type="button" className={styles.button} onClick={() => selectChild(blocker.id, "timeline")}>Inspect</button>{blocker.state === "open" && <button type="button" className={styles.button} disabled={readOnly} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve</button>}</span></li>)}</ul> : <p>No blockers.</p>}
           </section>
         </aside>
       </div>
@@ -1986,7 +2072,7 @@ export default function ProjectsWorkspace({
             <h2>Decisions</h2>
             <span className={styles.inlineActions}><Link className={styles.button} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link><button type="button" className={styles.button} onClick={() => void refreshDecisions()} disabled={decisionsLoading}>{decisionsLoading ? "Refreshing…" : "Refresh"}</button></span>
           </div>
-          <LinkedDecisionsPanel source={projectDecisionSource(item.project)} decisions={decisions} loading={decisionsLoading} error={decisionsError} onRefresh={() => void refreshDecisions()} createHref={personalOpsCreateHref("decisions", item.project)} className={styles.embeddedPanel} compact showHeader={false} showBoundary={false} title="Project decisions" />
+          <LinkedDecisionsPanel source={projectDecisionSource(item.project)} decisions={decisions} loading={decisionsLoading} error={decisionsError} onRefresh={() => void refreshDecisions()} createHref={personalOpsCreateHref("decisions", item.project)} className={styles.embeddedPanel} compact showHeader={false} showBoundary={false} showSummary={false} showDecisionDetails title="Project decisions" />
         </section>
       </div>
     );
@@ -2000,7 +2086,6 @@ export default function ProjectsWorkspace({
           <div className={styles.panelHeader}>
             <h2>People</h2>
             <span className={styles.inlineActions}>
-              <Link className={styles.textLink} href={nativeCreateHref("people", item.project)}>Open People</Link>
               <button
                 type="button"
                 className={styles.button}
@@ -2023,11 +2108,16 @@ export default function ProjectsWorkspace({
                 <li key={link.id}>
                   <span className={styles.personAvatar} aria-hidden="true">{initials(link.source.label)}</span>
                   <span className={styles.itemBody}>
-                    <strong><Link href={link.source.route}>{link.source.label}</Link></strong>
-                    <small>{link.role || "Project contributor"}</small>
-                    {link.projectSpecificNote && <span>{link.projectSpecificNote}</span>}
+                    <span className={styles.personHeading}>
+                      <strong>{link.source.label}</strong>
+                      <span className={styles.relationshipChip} data-tone="blue">{link.role || "Contributor"}</span>
+                    </span>
+                    {link.projectSpecificNote && <span className={styles.personDescription}>{link.projectSpecificNote}</span>}
                   </span>
-                  <button type="button" className={styles.button} onClick={() => selectChild(link.id, "people")}>Manage</button>
+                  <span className={styles.inlineActions}>
+                    <button type="button" className={styles.button} onClick={() => selectChild(link.id, "people")}>Inspect</button>
+                    <Link className={styles.textLink} href={link.source.route}>Open</Link>
+                  </span>
                 </li>
               ))}
             </ul>
@@ -2059,14 +2149,12 @@ export default function ProjectsWorkspace({
                   </span>
                   <span className={styles.rowState} data-tone={stateTone(link.linkState)}>{displayLabel(link.linkState)}</span>
                   <span className={styles.inlineActions}>
-                    <button type="button" className={styles.button} onClick={() => selectChild(link.id, "files-links")}>Manage</button>
+                    <button type="button" className={styles.button} onClick={() => selectChild(link.id, "files-links")}>Inspect</button>
                     {linkSourceIsUnsafe(link) ? (
-                      <button type="button" className={styles.button} disabled title="Repair this retained association before opening its source.">Source unavailable</button>
-                    ) : <Link className={styles.textLink} href={link.source.route}>Open source</Link>}
+                      <button type="button" className={styles.button} disabled title="Repair this retained association before opening its source.">Unavailable</button>
+                    ) : <Link className={styles.textLink} href={link.source.route}>Open</Link>}
                     {linkNeedsRepair(link) ? (
                       <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => openEditor("link-repair", item, link)}>Repair</button>
-                    ) : link.linkState !== "removed" ? (
-                      <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => openEditor("link-health", item, link)}>Report issue</button>
                     ) : null}
                     {link.linkState === "removed" ? (
                       <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={item.project.lifecycle === "complete" ? "Completed projects are read-only; reopen behavior is intentionally unavailable." : item.project.lifecycle === "archived" ? "Restore the project before restoring its links." : undefined} onClick={() => {
@@ -2129,6 +2217,10 @@ export default function ProjectsWorkspace({
     const blocker = item.blockers.find((candidate) => candidate.id === selectedChildId);
     const link = item.links.find((candidate) => candidate.id === selectedChildId);
     const timelineEvent = item.timelineEvents.find((candidate) => candidate.id === selectedChildId);
+    const selectedDecision = decisions.find((candidate) => `decision-${candidate.id}` === selectedChildId);
+    const interaction = timelineEvent?.relatedObjectRef?.objectType === "project_interaction"
+      ? item.interactions.find((candidate) => candidate.id === timelineEvent.relatedObjectRef?.objectId)
+      : undefined;
     const milestoneDecisionSource = milestone
       ? projectDecisionSource(item.project, {
           objectType: "milestone",
@@ -2173,7 +2265,7 @@ export default function ProjectsWorkspace({
         <header className={styles.selectedChildHeader}>
           <div>
             <span className={styles.eyebrow}>Selected project object</span>
-            <h2 id={headingId}>{milestone?.title || blocker?.title || link?.source.label || timelineEvent?.title || "Unavailable project object"}</h2>
+            <h2 id={headingId}>{milestone?.title || blocker?.title || link?.source.label || timelineEvent?.title || selectedDecision?.title || "Unavailable project object"}</h2>
           </div>
           <button type="button" className={styles.button} onClick={clearSelectedChild}>Close inspection</button>
         </header>
@@ -2297,8 +2389,6 @@ export default function ProjectsWorkspace({
               {link.linkState !== "removed" && !linkNeedsRepair(link) && <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("link-edit", item, link)}>Edit connection</button>}
               {linkNeedsRepair(link) ? (
                 <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("link-repair", item, link)}>Repair association</button>
-              ) : link.linkState !== "removed" ? (
-                <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("link-health", item, link)}>Report issue</button>
               ) : null}
               {link.linkState === "removed" ? (
                 <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => {
@@ -2320,18 +2410,29 @@ export default function ProjectsWorkspace({
             <p>{timelineEvent.summary}</p>
             <div className={styles.factGrid}>
               <div className={styles.fact}><span>Event type</span><strong>{displayLabel(timelineEvent.eventType)}</strong></div>
-              <div className={styles.fact}><span>Occurred</span><strong>{formatDate(timelineEvent.occurredAt)}</strong></div>
-              <div className={styles.fact}><span>Health at event</span><strong>{displayLabel(timelineEvent.health)}</strong></div>
-              <div className={styles.fact} data-mono="true"><span>Event ID</span><strong>{timelineEvent.id}</strong></div>
+              <div className={styles.fact}><span>Occurred</span><strong>{formatTimestamp(timelineEvent.occurredAt)}</strong></div>
             </div>
             <div className={styles.inlineActions}>
+              {interaction && <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("interaction-edit", item, interaction)}>Edit update</button>}
               {timelineEvent.sourceRef && <Link className={styles.textLink} href={timelineEvent.sourceRef.route}>Open source</Link>}
-              {timelineEvent.relatedObjectRef && <Link className={styles.textLink} href={timelineEvent.relatedObjectRef.route}>Open related object</Link>}
+              {timelineEvent.relatedObjectRef && !interaction && <Link className={styles.textLink} href={timelineEvent.relatedObjectRef.route}>Open related object</Link>}
             </div>
           </div>
         )}
 
-        {!milestone && !blocker && !link && !timelineEvent && (
+        {selectedDecision && (
+          <div className={styles.selectedChildBody}>
+            <div className={styles.decisionInspection}>
+              <span><small>Question</small>{selectedDecision.question || "No question recorded."}</span>
+              <span><small>Decision</small>{selectedDecision.finalDecision || "No decision recorded yet."}</span>
+            </div>
+            <div className={styles.inlineActions}>
+              <Link className={styles.button} href={decisionOwnerRoute(selectedDecision)}>Open decision</Link>
+            </div>
+          </div>
+        )}
+
+        {!milestone && !blocker && !link && !timelineEvent && !selectedDecision && (
           <SystemState variant="stale" compact title="Selected object is no longer available" description="The deep-linked child ID remains visible in the URL. Close this inspection to return to the project tab." />
         )}
       </section>
@@ -2397,9 +2498,11 @@ export default function ProjectsWorkspace({
           : editor?.kind === "blocker-create"
             ? "Add blocker"
         : editor?.kind === "blocker-resolve"
-              ? "Resolve blocker"
-              : editor?.kind === "interaction-create"
-                ? "Log project update"
+            ? "Resolve blocker"
+            : editor?.kind === "interaction-create"
+              ? "Log project update"
+              : editor?.kind === "interaction-edit"
+                ? "Edit project update"
               : editor?.kind === "link-edit"
                 ? "Edit connection"
               : editor?.kind === "link-health"
@@ -2419,6 +2522,8 @@ export default function ProjectsWorkspace({
           ? "Replaces only this Project-owned source reference after verification. The previous identity stays in audit history."
         : editor?.kind === "interaction-create"
           ? "Add a dated progress note, problem, or blocker update to the project timeline."
+        : editor?.kind === "interaction-edit"
+          ? "Update the title, details, or occurrence time for this project update."
       : "Changes are saved explicitly to the native Projects repository and recorded in audit history.";
 
   function renderEditorFields() {
@@ -2438,7 +2543,7 @@ export default function ProjectsWorkspace({
                 <button type="button" className={styles.removeObjectiveButton} onClick={() => {
                   setEditor((current) => current ? { ...current, objectives: current.objectives?.filter((item) => item.id !== objective.id) } : current);
                   setEditorDirty(true);
-                }} aria-label={`Delete objective ${index + 1}`} title="Delete objective"><span aria-hidden="true">⌫</span></button>
+                }} aria-label={`Delete objective ${index + 1}`} title="Delete objective"><ObjectiveDeleteIcon /></button>
               </li>)}
             </ul>
             <button type="button" className={styles.addRowButton} onClick={() => {
@@ -2509,7 +2614,7 @@ export default function ProjectsWorkspace({
     if (editor.kind === "blocker-resolve") {
       return <label className={styles.field}>Resolution record<textarea value={value("resolution")} onChange={(event) => changeEditorValue("resolution", event.target.value)} required autoFocus placeholder="What changed, and what evidence confirms the blocker is resolved?" /></label>;
     }
-    if (editor.kind === "interaction-create") {
+    if (editor.kind === "interaction-create" || editor.kind === "interaction-edit") {
       return <div className={styles.formGrid}>
         <label className={styles.field} data-wide="true">Update title<input value={value("title")} onChange={(event) => changeEditorValue("title", event.target.value)} required data-editor-autofocus placeholder="What happened?" /></label>
         <label className={styles.field} data-wide="true">Details <span>Optional</span><textarea value={value("body")} onChange={(event) => changeEditorValue("body", event.target.value)} placeholder="Add context, a problem, a blocker, or what you worked on." /></label>
@@ -2527,7 +2632,7 @@ export default function ProjectsWorkspace({
           <label className={styles.field}>Relationship<select value={value("relationship")} onChange={(event) => changeEditorValue("relationship", event.target.value)}>{LINK_RELATIONSHIPS.map((relationship) => <option value={relationship} key={relationship}>{displayLabel(relationship)}</option>)}</select></label>
           <label className={styles.field}>Strength<select value={value("relationshipStrength")} onChange={(event) => changeEditorValue("relationshipStrength", event.target.value)}>{["weak", "normal", "strong"].map((strength) => <option value={strength} key={strength}>{displayLabel(strength)}</option>)}</select></label>
         </>}
-        <label className={styles.field} data-wide="true">Context <span>Optional</span><textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} autoFocus={!editingPerson} /></label>
+        <label className={styles.field} data-wide="true">Description<textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} autoFocus={!editingPerson} /></label>
       </div>;
     }
     if (editor.kind === "link-health") {
@@ -2614,8 +2719,8 @@ export default function ProjectsWorkspace({
       )}
       {linkingPeople ? <>
         <label className={styles.field}>Role<input value={value("role")} onChange={(event) => changeEditorValue("role", event.target.value)} placeholder="e.g. Client, designer" /></label>
-        <label className={styles.field} data-wide="true">Context <span>Optional</span><textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} placeholder="Anything else useful about their involvement" /></label>
-      </> : <label className={styles.field} data-wide="true">Context <span>Optional</span><textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} /></label>}
+        <label className={styles.field} data-wide="true">Description<textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} placeholder="Anything else useful about their involvement" /></label>
+      </> : <label className={styles.field} data-wide="true">Description<textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} /></label>}
     </div>;
   }
 

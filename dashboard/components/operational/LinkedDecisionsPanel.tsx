@@ -34,6 +34,8 @@ export default function LinkedDecisionsPanel({
   compact = false,
   showHeader = true,
   showBoundary = true,
+  showSummary = true,
+  showDecisionDetails = false,
   hideWhenEmpty = false,
   className = "",
   wide = false,
@@ -49,6 +51,8 @@ export default function LinkedDecisionsPanel({
   compact?: boolean;
   showHeader?: boolean;
   showBoundary?: boolean;
+  showSummary?: boolean;
+  showDecisionDetails?: boolean;
   hideWhenEmpty?: boolean;
   className?: string;
   wide?: boolean;
@@ -100,9 +104,16 @@ export default function LinkedDecisionsPanel({
               >
                 <span className={styles.rowBody}>
                   <strong>{decision.title}</strong>
-                  <small>
-                    {decision.question || "No decision question recorded"} · {labelize(decision.risk)} risk
-                  </small>
+                  {showDecisionDetails ? (
+                    <span className={styles.decisionDetails}>
+                      <span><small>Question</small>{decision.question || "No question recorded."}</span>
+                      <span><small>Decision</small>{decision.finalDecision || "No decision recorded yet."}</span>
+                    </span>
+                  ) : (
+                    <small>
+                      {decision.question || "No decision question recorded"} · {labelize(decision.risk)} risk
+                    </small>
+                  )}
                 </span>
                 <span className={styles.state}>{labelize(decision.decisionState)}</span>
                 <small className={styles.ownerLink}>Open in Personal Ops</small>
@@ -122,16 +133,20 @@ export default function LinkedDecisionsPanel({
         </p>
       )}
 
-      <div className={styles.summary}>
-        <span>
-          {unresolvedCount} unresolved · {linked.length} total
-        </span>
-        {createHref && linked.length === 0 && (
-          <Link className={styles.create} href={createHref}>
-            File in Personal Ops
-          </Link>
-        )}
-      </div>
+      {(showSummary || (createHref && linked.length === 0)) && (
+        <div className={styles.summary}>
+          {showSummary && (
+            <span>
+              {unresolvedCount} unresolved · {linked.length} total
+            </span>
+          )}
+          {createHref && linked.length === 0 && (
+            <Link className={styles.create} href={createHref}>
+              File in Personal Ops
+            </Link>
+          )}
+        </div>
+      )}
 
       {showBoundary && (
         <p className={styles.boundary}>

@@ -1818,7 +1818,17 @@ export async function updateProjectsObject<Family extends ProjectObjectFamily>(
       ...interim,
       projects: replaceProject(interim, project),
       auditEvents: appendModuleAudit(state, auditEvent),
-      timelineEvents: appendTimeline(state, event)
+      timelineEvents: childNext.objectType === "project_interaction"
+        ? appendTimeline(
+            {
+              ...state,
+              timelineEvents: state.timelineEvents.filter(
+                (candidate) => candidate.relatedObjectRef?.objectId !== childNext.id
+              )
+            },
+            event
+          )
+        : appendTimeline(state, event)
     };
     await writeJsonFile(FILE_NAME, nextState);
     return {

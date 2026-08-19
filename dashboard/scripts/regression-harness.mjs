@@ -7471,7 +7471,12 @@ async function checkCrossModuleDecisionConnections(
     ].join(":");
   }
 
-  async function assertPanel(page, fixture, label) {
+  async function assertPanel(
+    page,
+    fixture,
+    label,
+    { expectSummary = true, expectDecisionDetails = false } = {}
+  ) {
     const decision = createdByKey.get(fixture.key);
     const panels = page.locator(`[data-linked-decisions="${sourceKey(fixture.source)}"]`);
     const panel = panels.first();
@@ -7484,11 +7489,23 @@ async function checkCrossModuleDecisionConnections(
       ? 1
       : 0;
     assert(await row.count() === 1, `${label} did not render its exact Personal Ops-owned Decision`);
+    const rowText = await row.innerText();
+    const panelText = await panel.innerText();
+    const expectedQuestion = decision.question || `What explicit choice should ${fixture.source.label} retain?`;
+    const expectedDecision = decision.finalDecision || "No decision recorded yet.";
     assert(
-      (await row.innerText()).includes(decision.title) &&
-        (await row.innerText()).includes(expectedState) &&
-        (await panel.innerText()).includes(`${expectedUnresolved} unresolved · 1 total`),
-      `${label} did not render the current owner title, state, and exact-source count`
+      rowText.includes(decision.title) &&
+        rowText.includes(expectedState) &&
+        (expectSummary
+          ? panelText.includes(`${expectedUnresolved} unresolved · 1 total`)
+          : !panelText.includes("unresolved") && !panelText.includes("total")) &&
+        (!expectDecisionDetails || (
+          rowText.toLowerCase().includes("question") &&
+          rowText.includes(expectedQuestion) &&
+          rowText.toLowerCase().includes("decision") &&
+          rowText.includes(expectedDecision)
+        )),
+      `${label} did not render the requested owner title, state, question, decision, and summary treatment: ${JSON.stringify({ rowText, panelText, expectedState, expectedQuestion, expectedDecision })}`
     );
     assert(
       await panel.getByRole("link", { name: "File in Personal Ops" }).count() === 0,
@@ -7508,7 +7525,10 @@ async function checkCrossModuleDecisionConnections(
     const projectPage = await desktopContext.newPage();
     observe(projectPage);
     await projectPage.goto(`${baseUrl}${sources[0].source.route}`, { waitUntil: "networkidle" });
-    const projectPanel = await assertPanel(projectPage, sources[0], "Project decisions");
+    const projectPanel = await assertPanel(projectPage, sources[0], "Project decisions", {
+      expectSummary: false,
+      expectDecisionDetails: true
+    });
     await projectPanel.row.click();
     await projectPage.waitForURL((url) =>
       url.pathname === "/admin/personal/decisions" &&
@@ -7553,6 +7573,12 @@ async function checkCrossModuleDecisionConnections(
     await projectPage
       .locator(`[data-decision-id="${projectOwner.id}"][data-decision-state="decided"]`)
       .waitFor();
+    assert(
+      (await projectPage.locator(`[data-decision-id="${projectOwner.id}"]`).innerText()).includes(
+        "Keep this operating choice in the canonical Personal Ops decision record."
+      ),
+      "Project Decisions did not show the saved decision beneath its question"
+    );
 
     await projectPage.goto(`${baseUrl}${sources[4].source.route}`, { waitUntil: "networkidle" });
     const milestonePanel = await assertPanel(projectPage, sources[4], "Project milestone decisions");
@@ -7728,7 +7754,10 @@ async function checkCrossModuleDecisionConnections(
         const { panel } = await assertPanel(
           page,
           route.fixture,
-          `${route.fixture.key} decisions at ${viewport.label}`
+          `${route.fixture.key} decisions at ${viewport.label}`,
+          route.fixture.key === "project"
+            ? { expectSummary: false, expectDecisionDetails: true }
+            : undefined
         );
         await panel.scrollIntoViewIfNeeded();
         if (viewport.width <= 760) {
@@ -8071,16 +8100,30 @@ async function checkProjectCreationWorkflow(
     );
     assert(
       await page.getByLabel("Mark Ship the Sage Burris website complete").count() === 0 &&
-        await page.getByLabel("Delete Ship the Sage Burris website").count() === 1,
+        await page.getByLabel("Delete Ship the Sage Burris website").count() === 1 &&
+        await page.getByLabel("Delete Ship the Sage Burris website").locator("svg").count() === 1,
       "Objectives retained checkbox/X completion controls instead of the compact delete interaction"
+    );
+    const objectiveSpacing = await overviewObjective.locator("xpath=ancestor::ul[1]").evaluate((list) => ({
+      rowGap: Number.parseFloat(getComputedStyle(list).rowGap || "0"),
+      rowHeight: list.querySelector("li")?.getBoundingClientRect().height || 0
+    }));
+    assert(
+      objectiveSpacing.rowGap <= 2 && objectiveSpacing.rowHeight <= 46.1,
+      `Objectives remained too loosely spaced: ${JSON.stringify(objectiveSpacing)}`
     );
 
     await page.locator(".admin-global-nav-button").filter({ hasText: "Projects" }).click();
-    const projectMenuRow = page.locator(".admin-project-menu-item").filter({ hasText: projectName }).first();
+    const projectMenuLabel = projectName.replace(/^Project\s+/i, "");
+    const projectMenuRow = page.locator(".admin-project-menu-item").filter({ hasText: projectMenuLabel }).first();
     await projectMenuRow.waitFor();
+    const projectMenuLabels = await page.locator(".admin-project-menu-item span").allTextContents();
+    const sortedProjectMenuLabels = [...projectMenuLabels].sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
     assert(
-      await projectMenuRow.locator("small").count() === 0,
-      "The Projects navigation dropdown still rendered lifecycle status text"
+      await projectMenuRow.locator("small").count() === 0 &&
+        !(await projectMenuRow.innerText()).includes("Project SAITE") &&
+        projectMenuLabels.join("|") === sortedProjectMenuLabels.join("|"),
+      `The Projects navigation dropdown retained the Project prefix, lifecycle text, or unsorted rows: ${projectMenuLabels.join(" | ")}`
     );
     await page.locator(".admin-global-nav-button").filter({ hasText: "Projects" }).click();
 
@@ -8096,7 +8139,43 @@ async function checkProjectCreationWorkflow(
     assert(interactionResponse.ok(), `Project update log failed with ${interactionResponse.status()}: ${await interactionResponse.text()}`);
     await page.getByText("Initial project setup complete", { exact: true }).first().waitFor();
 
+    const activityInspector = page.locator('section[aria-labelledby^="project-selected-child-"]');
+    await activityInspector.getByRole("button", { name: "Edit update" }).click();
+    const editInteractionForm = page.locator('form[aria-labelledby="projects-editor-title"]');
+    await editInteractionForm.waitFor();
+    assert(
+      (await editInteractionForm.getByRole("heading", { name: "Edit project update" }).count()) === 1 &&
+        (await editInteractionForm.innerText()).includes("Update title") &&
+        (await editInteractionForm.innerText()).includes("Details"),
+      "Project update editor did not expose the editable title and details"
+    );
+    await editInteractionForm.locator('input:not([type])').fill("Initial project brief logged");
+    await editInteractionForm.locator("textarea").fill("Created the project, linked its first stakeholder, and recorded the initial brief.");
+    const editInteractionResponsePromise = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
+    );
+    await editInteractionForm.getByRole("button", { name: "Save changes" }).click();
+    const editInteractionResponse = await editInteractionResponsePromise;
+    assert(editInteractionResponse.ok(), `Project update edit failed with ${editInteractionResponse.status()}: ${await editInteractionResponse.text()}`);
+    await page.getByText("Initial project brief logged", { exact: true }).first().waitFor();
+    assert(
+      await activityInspector.getByText("Health at event", { exact: true }).count() === 0,
+      "Activity inspection retained the removed health-at-event field"
+    );
+
     await page.getByRole("tab", { name: "Overview" }).click();
+    const recentWorkPanel = page.getByRole("heading", { name: "Recent work", exact: true }).locator("xpath=ancestor::section[1]");
+    const recentActivityRow = recentWorkPanel.locator("li").filter({ hasText: "Initial project brief logged" });
+    await recentActivityRow.waitFor();
+    const recentTypography = await recentActivityRow.evaluate((row) => ({
+      titleFont: getComputedStyle(row.querySelector("strong")).fontFamily,
+      summaryFont: getComputedStyle(row.querySelector("small")).fontFamily,
+      inspectCount: Array.from(row.querySelectorAll("button")).filter((button) => button.textContent?.trim() === "Inspect").length
+    }));
+    assert(
+      recentTypography.titleFont === recentTypography.summaryFont && recentTypography.inspectCount === 1,
+      `Recent work did not share the Timeline typography and Inspect action: ${JSON.stringify(recentTypography)}`
+    );
     await overviewObjective.fill("Ship and approve the Sage Burris website");
     const objectiveResponsePromise = page.waitForResponse(
       (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
@@ -8119,7 +8198,10 @@ async function checkProjectCreationWorkflow(
       (item) => item.projectId === projectId && item.source?.objectId === person.id && item.relationship === "project_person"
     );
     const storedInteraction = persisted.payload?.state?.interactions?.find(
-      (item) => item.projectId === projectId && item.title === "Initial project setup complete"
+      (item) => item.projectId === projectId && item.title === "Initial project brief logged"
+    );
+    const storedInteractionEvents = persisted.payload?.state?.timelineEvents?.filter(
+      (item) => item.relatedObjectRef?.objectId === storedInteraction?.id
     );
     assert(
       storedProject?.lifecycle === "idea" &&
@@ -8134,8 +8216,10 @@ async function checkProjectCreationWorkflow(
         !("priority" in storedProject) &&
         storedPerson?.role === "Client" &&
         storedPerson?.projectSpecificNote === "Website owner and primary stakeholder" &&
-        storedInteraction?.body === "Created the project and linked its first stakeholder.",
-      `Project creation workflow did not persist its additive state: ${JSON.stringify({ storedProject, storedPerson, storedInteraction })}`
+        storedInteraction?.body === "Created the project, linked its first stakeholder, and recorded the initial brief." &&
+        storedInteractionEvents?.length === 1 &&
+        storedInteractionEvents[0]?.title === "Initial project brief logged",
+      `Project creation workflow did not persist its additive state or reconcile the edited activity: ${JSON.stringify({ storedProject, storedPerson, storedInteraction, storedInteractionEvents })}`
     );
 
     const layout = await page.evaluate(() => ({
@@ -8146,7 +8230,7 @@ async function checkProjectCreationWorkflow(
     assert(!layout.overflowX, `Project overview overflowed horizontally: ${JSON.stringify(layout)}`);
     await page.screenshot({ path: path.join(screenshotDir, "project-saite-properties-1440x900.png"), fullPage: true });
     assert(
-      browserMutations.join("|") === "POST /api/projects|POST /api/projects|PATCH /api/projects",
+      browserMutations.join("|") === "POST /api/projects|POST /api/projects|PATCH /api/projects|PATCH /api/projects",
       `Project create browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
     );
     assert(browserErrors.length === 0, `Project create browser checks emitted errors: ${browserErrors.join(" | ")}`);
@@ -8281,7 +8365,7 @@ async function checkPeopleProjectConnections(
     const linkDialog = projectPage.locator("form").filter({ hasText: "Link native object" });
     await linkDialog.getByLabel("People identity").selectOption(person.id);
     await linkDialog.getByLabel("Role", { exact: true }).fill(projectRole);
-    await linkDialog.getByLabel("Context", { exact: false }).fill(relationshipNote);
+    await linkDialog.getByLabel("Description", { exact: true }).fill(relationshipNote);
     const projectLinkResponsePromise = projectPage.waitForResponse(
         (response) =>
           new URL(response.url()).pathname === "/api/projects" &&
@@ -8306,8 +8390,11 @@ async function checkPeopleProjectConnections(
     assert(
       projectPeopleText.includes(person.title) &&
         projectPeopleText.includes(projectRole) &&
-        projectPeopleText.includes(relationshipNote),
-      "Project People tab did not render the linked identity and role"
+        projectPeopleText.includes(relationshipNote) &&
+        !projectPeopleText.includes("Open People") &&
+        await personLinkRow.getByRole("button", { name: "Inspect" }).count() === 1 &&
+        await personLinkRow.getByRole("link", { name: "Open", exact: true }).count() === 1,
+      "Project People tab did not render the streamlined identity, role, description, and actions"
     );
 
     const linkedProjects = await requestJson(baseUrl, cookieJar, "/api/projects");
@@ -8330,7 +8417,49 @@ async function checkPeopleProjectConnections(
       `Projects did not persist one exact linked person with role and context: ${JSON.stringify(linkedProjects.payload)}`
     );
 
-    await personLinkRow.getByRole("link", { name: person.title }).click();
+    await projectPage.getByRole("tab", { name: "Timeline" }).click();
+    const personActivityRow = projectPage
+      .locator('[role="tabpanel"]:not([hidden]) li')
+      .filter({ hasText: person.title })
+      .filter({ hasText: "Person linked" })
+      .first();
+    await personActivityRow.waitFor();
+    assert(
+      await personActivityRow.locator('[data-tone="people"]').count() === 1 &&
+        await personActivityRow.getByRole("button", { name: "Inspect" }).count() === 1 &&
+        await personActivityRow.getByRole("link", { name: "Open", exact: true }).count() === 1 &&
+        !(await personActivityRow.innerText()).includes("Context linked"),
+      "Person activity did not use the blue Person linked treatment with Inspect/Open actions"
+    );
+    await projectPage.getByRole("tab", { name: "People" }).click();
+
+    await personLinkRow.getByRole("button", { name: "Inspect" }).click();
+    const connectionInspector = projectPage.locator('section[aria-labelledby^="project-selected-child-"]');
+    assert(
+      (await connectionInspector.innerText()).includes(projectRole) &&
+        await connectionInspector.getByRole("button", { name: "Edit connection" }).count() === 1 &&
+        await connectionInspector.getByRole("button", { name: "Report issue" }).count() === 0,
+      "Project People inspection did not expose the editable connection or retained Report issue"
+    );
+    await connectionInspector.getByRole("button", { name: "Edit connection" }).click();
+    const editConnectionForm = projectPage.locator('form[aria-labelledby="projects-editor-title"]');
+    await editConnectionForm.waitFor();
+    assert(
+      (await editConnectionForm.getByRole("heading", { name: "Edit connection" }).count()) === 1 &&
+        (await editConnectionForm.innerText()).includes("Description") &&
+        (await editConnectionForm.locator("textarea").count()) === 1,
+      "Project People connection editor opened the wrong form"
+    );
+    await editConnectionForm.locator("textarea").fill(refreshedRelationshipNote);
+    const connectionUpdateResponsePromise = projectPage.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
+    );
+    await editConnectionForm.getByRole("button", { name: "Save changes" }).click();
+    const connectionUpdateResponse = await connectionUpdateResponsePromise;
+    assert(connectionUpdateResponse.ok(), `Project People connection edit failed with ${connectionUpdateResponse.status()}: ${await connectionUpdateResponse.text()}`);
+    await personLinkRow.getByText(refreshedRelationshipNote, { exact: true }).waitFor();
+
+    await personLinkRow.getByRole("link", { name: "Open", exact: true }).click();
     await projectPage.waitForURL(
       (url) => url.pathname === `/admin/people/${encodeURIComponent(person.id)}`
     );
@@ -8363,7 +8492,7 @@ async function checkPeopleProjectConnections(
     assert(
       peopleProjectText.includes(project.name) &&
         peopleProjectText.includes(projectRole) &&
-        peopleProjectText.includes(relationshipNote) &&
+        peopleProjectText.includes(refreshedRelationshipNote) &&
         peoplePanelText.includes("1 active") &&
         peoplePanelText.includes("1 exact project identity"),
       "People did not derive the current Project status, role, context, and deduplicated count"
@@ -8382,31 +8511,6 @@ async function checkPeopleProjectConnections(
       "Browser Back did not restore the People identity and Relationships tab"
     );
 
-    const link = linkedPeopleRefs[0];
-    const updateLink = await requestJson(baseUrl, cookieJar, "/api/projects", {
-      method: "PATCH",
-      headers: {
-        "content-type": "application/json",
-        "x-csrf-token": csrfToken
-      },
-      body: JSON.stringify({
-        family: "links",
-        id: link.id,
-        expectedUpdatedAt: link.updatedAt,
-        patch: { projectSpecificNote: refreshedRelationshipNote }
-      })
-    });
-    assert(
-      updateLink.response.ok &&
-        updateLink.payload?.item?.projectSpecificNote === refreshedRelationshipNote,
-      `Project relationship status update failed: ${JSON.stringify(updateLink.payload)}`
-    );
-    await projectPage
-      .getByRole("button", {
-        name: `Refresh Projects involvement for ${person.title}`
-      })
-      .click();
-    await projectPage.getByText(refreshedRelationshipNote, { exact: false }).waitFor();
     await assertNoHorizontalOverflow(projectPage, "People-Projects desktop workflow");
     await desktopContext.close();
 
@@ -8443,7 +8547,7 @@ async function checkPeopleProjectConnections(
           (route.key === "people"
             ? text.includes(project.name)
             : text.includes(person.title)) &&
-            text.includes(relationshipNote),
+            text.includes(refreshedRelationshipNote),
           `${route.key} did not render the exact cross-module relationship at ${viewport.label}`
         );
         await assertNoHorizontalOverflow(
@@ -8485,7 +8589,8 @@ async function checkPeopleProjectConnections(
         finalPeople.response.ok &&
         finalPeople.payload.items.length === initialPersonCount &&
         finalPeopleRefs?.length === 1 &&
-        finalPeopleRefs[0]?.role === projectRole,
+        finalPeopleRefs[0]?.role === projectRole &&
+        finalPeopleRefs[0]?.projectSpecificNote === refreshedRelationshipNote,
       "People-Projects workflow duplicated a People or Project identity"
     );
     assert(
@@ -8502,8 +8607,7 @@ async function checkPeopleProjectConnections(
       "People-Projects link or refresh mutation was not represented in Projects audit history"
     );
     assert(
-      browserMutations.length === 1 &&
-        browserMutations[0] === "POST /api/projects",
+      browserMutations.join("|") === "POST /api/projects|PATCH /api/projects",
       `People-Projects browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
     );
     assert(
@@ -8714,6 +8818,28 @@ async function checkNoteProjectAssociations(
         projectRowText.includes(projectContext),
       "Notes did not render the current Projects-owned relationship, lifecycle, and context"
     );
+
+    const projectActivityPage = await desktopContext.newPage();
+    observe(projectActivityPage);
+    await projectActivityPage.goto(
+      `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=timeline`,
+      { waitUntil: "networkidle" }
+    );
+    await projectActivityPage.getByRole("tab", { name: "Timeline" }).click();
+    const objectActivityRow = projectActivityPage
+      .locator('[role="tabpanel"]:not([hidden]) li')
+      .filter({ hasText: note.title })
+      .filter({ hasText: "Object linked" })
+      .first();
+    await objectActivityRow.waitFor();
+    assert(
+      await objectActivityRow.locator('[data-tone="object"]').count() === 1 &&
+        await objectActivityRow.getByRole("button", { name: "Inspect" }).count() === 1 &&
+        await objectActivityRow.getByRole("link", { name: "Open", exact: true }).count() === 1 &&
+        !(await objectActivityRow.innerText()).includes("Context linked"),
+      "Object activity did not use the ochre Object linked treatment with Inspect/Open actions"
+    );
+    await projectActivityPage.close();
 
     await form.getByLabel("Destination Project").selectOption(project.id);
     await form.getByLabel("Project relationship").selectOption(relationship);
@@ -9028,7 +9154,9 @@ async function checkResourceMediaProjectAssociations(
               height: rect.height
             };
           })
-          .filter((item) => item.width < 44 || item.height < 44)
+          // Chromium can report an exact 44px target a tiny fraction below 44
+          // after device-pixel rounding (for example 43.99994px).
+          .filter((item) => item.width < 43.99 || item.height < 43.99)
       );
     assert(
       undersizedTargets.length === 0,

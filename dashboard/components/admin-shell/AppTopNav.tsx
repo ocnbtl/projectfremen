@@ -27,6 +27,10 @@ function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
+function projectMenuLabel(name: string) {
+  return name.replace(/^Project\s+/i, "").trim() || name;
+}
+
 export default function AppTopNav({
   showCommandSearch = true,
   onCommandSearch,
@@ -214,7 +218,7 @@ export default function AppTopNav({
           const projects = [
             ...projectMenuItems.map((project) => ({
               key: project.id,
-              label: project.name,
+              label: projectMenuLabel(project.name),
               href: `/admin/projects/${encodeURIComponent(project.slug || project.id)}`
             })),
             ...item.children
@@ -224,7 +228,7 @@ export default function AppTopNav({
                 label: project.shortLabel,
                 href: `/admin/projects/${encodeURIComponent(project.slug)}`
               }))
-          ];
+          ].sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: "base" }));
 
           return (
             <div className="admin-global-nav-group" key={item.label} ref={projectsGroupRef}>

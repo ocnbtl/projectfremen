@@ -697,7 +697,7 @@
 }
 
 .objectiveList,
-.recentWorkList,
+.activityList,
 .peopleList {
   display: grid;
   gap: 6px;
@@ -713,11 +713,15 @@
   align-items: center;
 }
 
+.objectiveList {
+  gap: 0;
+}
+
 .objectiveList li > input[type="text"],
 .objectiveList li > input:not([type]) {
   min-width: 0;
-  min-height: 32px;
-  padding: 4px 6px;
+  min-height: 28px;
+  padding: 2px 5px;
   border: 1px solid transparent;
   border-radius: 6px;
   background: transparent;
@@ -769,27 +773,12 @@
   cursor: pointer;
 }
 
-.recentWorkList li {
-  display: grid;
-  grid-template-columns: 9px minmax(0, 1fr) auto;
-  gap: 10px;
-  align-items: center;
-  padding: 8px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.recentWorkList {
+.activityList[data-compact="true"] {
   max-height: 300px;
   padding-right: 5px;
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
-
-.recentWorkList li:last-child { border-bottom: 0; }
-.recentWorkList button,
-.activityLink { display: grid; gap: 3px; min-width: 0; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; text-decoration: none; cursor: pointer; }
-.recentWorkList small { overflow: hidden; color: var(--text-muted); text-overflow: ellipsis; white-space: nowrap; }
-.recentWorkList time { color: var(--text-muted); font: 700 10px var(--font-mono); white-space: nowrap; }
 
 .followThroughPanel {
   display: grid;
@@ -820,6 +809,18 @@
 
 .peopleList li:last-child { border-bottom: 0; }
 .peopleList a { color: inherit; text-decoration: none; }
+.personHeading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+
+.personDescription {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.45;
+}
 .personAvatar {
   display: grid;
   width: 38px;
@@ -893,7 +894,7 @@
 }
 
 .objectList,
-.timelineList,
+.activityList,
 .linkList,
 .reviewCoverageList,
 .roleList,
@@ -906,7 +907,7 @@
 }
 
 .objectList li,
-.timelineList li,
+.activityList li,
 .linkList li,
 .reviewCoverageList li,
 .roleList li,
@@ -924,7 +925,7 @@
 }
 
 .objectList li[aria-current="true"],
-.timelineList li[aria-current="true"],
+.activityList li[aria-current="true"],
 .linkList li[aria-current="true"],
 .roleList li[aria-current="true"] {
   border-color: var(--border-strong);
@@ -933,7 +934,7 @@
 }
 
 .objectList li > span,
-.timelineList li > span,
+.activityList li > span,
 .linkList li > span,
 .reviewCoverageList li > span,
 .roleList li > span,
@@ -942,8 +943,44 @@
   overflow-wrap: anywhere;
 }
 
-.timelineList li {
+.activityList li {
   grid-template-columns: 9px minmax(0, 1fr) auto auto;
+  gap: 9px;
+  min-height: 48px;
+  padding-block: 8px;
+}
+
+.activityList .itemBody strong,
+.activityList .itemBody small,
+.activityList .timelineMeta {
+  font-family: var(--font-body);
+}
+
+.activityList .itemBody strong {
+  font-size: 12px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.activityList .itemBody small {
+  overflow: hidden;
+  font-size: 11px;
+  font-weight: 450;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.activityList .timelineMeta {
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.activityActions {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
 }
 
 .timelineDot {
@@ -997,6 +1034,26 @@
 .connectionIdentity span {
   color: var(--text-muted);
   font: 800 10px var(--font-heading);
+  text-transform: uppercase;
+}
+
+.decisionInspection {
+  display: grid;
+  gap: 10px;
+}
+
+.decisionInspection > span {
+  display: grid;
+  gap: 3px;
+  color: var(--text-strong);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.decisionInspection small {
+  color: var(--text-muted);
+  font: 850 9px var(--font-heading);
+  letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 
@@ -1616,11 +1673,11 @@
     min-height: 44px;
   }
 
-  .timelineList li {
+  .activityList li {
     grid-template-columns: 9px minmax(0, 1fr);
   }
 
-  .timelineList li > :nth-child(n + 3) {
+  .activityList li > :nth-child(n + 3) {
     grid-column: 2;
     justify-self: start;
   }

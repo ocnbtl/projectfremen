@@ -122,6 +122,26 @@
   line-height: 1.4;
 }
 
+.decisionDetails {
+  display: grid;
+  gap: 7px;
+  color: var(--text-strong, #102026);
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.decisionDetails > span {
+  display: grid;
+  gap: 2px;
+}
+
+.decisionDetails small {
+  color: var(--text-subtle, #56686f);
+  font: 800 9px var(--font-heading, sans-serif);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .ownerLink {
   grid-column: 1 / -1;
   color: #275f74;
