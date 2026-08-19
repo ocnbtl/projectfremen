@@ -24,10 +24,12 @@ const EMPTY_PROFILE_LISTS = {
   memories: [],
   education: [],
   occupations: [],
-  locations: []
+  locations: [],
+  emails: [],
+  phones: []
 } satisfies Pick<
   PeopleContactProfile,
-  "associatedPeople" | "children" | "interactions" | "memories" | "education" | "occupations" | "locations"
+  "associatedPeople" | "children" | "interactions" | "memories" | "education" | "occupations" | "locations" | "emails" | "phones"
 >;
 
 function copyProfile(profile?: PersonalContactProfile): PeopleContactProfile {
@@ -40,7 +42,9 @@ function copyProfile(profile?: PersonalContactProfile): PeopleContactProfile {
     memories: (profile?.memories || []).map((memory) => ({ ...memory })),
     education: (profile?.education || []).map((entry) => ({ ...entry })),
     occupations: (profile?.occupations || []).map((entry) => ({ ...entry })),
-    locations: (profile?.locations || []).map((entry) => ({ ...entry }))
+    locations: (profile?.locations || []).map((entry) => ({ ...entry })),
+    emails: (profile?.emails || []).map((entry) => ({ ...entry })),
+    phones: (profile?.phones || []).map((entry) => ({ ...entry }))
   };
 }
 

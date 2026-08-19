@@ -16,10 +16,13 @@ import { getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/rout
 import { parsePeopleUrlState, serializePeopleUrlState } from "../lib/native-objects/url-state";
 import type {
   PersonalContactProfile,
+  PersonalContactEntryCategory,
+  PersonalEmailEntry,
   PersonalEducationEntry,
   PersonalLocationEntry,
   PersonalMemoryEntry,
   PersonalOccupationEntry,
+  PersonalPhoneEntry,
   PersonalRecord,
   PersonalRecordClass,
   PersonalRecordStatus
@@ -90,6 +93,12 @@ type ContactMethod = {
   available: boolean;
   href?: string;
   actionLabel?: string;
+  details?: Array<{
+    label: string;
+    value: string;
+    href?: string;
+    actionLabel?: string;
+  }>;
 };
 
 type PeopleTimelineInteraction = {
@@ -187,6 +196,8 @@ type ContactProfileDraft = {
   partner: string;
   children: string;
   interactions: string;
+  emails: PersonalEmailEntry[];
+  phones: PersonalPhoneEntry[];
   memories: PersonalMemoryEntry[];
   education: PersonalEducationEntry[];
   occupations: PersonalOccupationEntry[];
@@ -195,7 +206,7 @@ type ContactProfileDraft = {
 
 type ContactProfileTextKey = Exclude<
   keyof ContactProfileDraft,
-  "memories" | "education" | "occupations" | "locations"
+  "memories" | "education" | "occupations" | "locations" | "emails" | "phones"
 >;
 
 type ProfileField = {
@@ -363,11 +374,6 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
     title: "Communication",
     tone: "blue",
     fields: [
-      { key: "phoneNumber", label: "Phone number", type: "tel" },
-      { key: "phoneCountryCode", label: "Default country code", placeholder: "+1" },
-      { key: "primaryEmail", label: "Primary email", type: "email" },
-      { key: "workEmail", label: "Work email", type: "email" },
-      { key: "universityEmail", label: "University email", type: "email" },
       { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/in/..." },
       { key: "website", label: "Website", type: "url", placeholder: "https://..." },
       { key: "instagram", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
@@ -443,6 +449,8 @@ const EMPTY_PROFILE_DRAFT: ContactProfileDraft = {
   partner: "",
   children: "",
   interactions: "",
+  emails: [],
+  phones: [],
   memories: [],
   education: [],
   occupations: [],
@@ -503,6 +511,30 @@ function formatPhone(value: string, countryCode = "+1"): string {
     return `+${codeDigits} ${local.replace(/(\d{3})(?=\d)/g, "$1 ").trim()}`;
   }
   return canonical;
+}
+
+const CONTACT_CATEGORY_OPTIONS: Array<{ value: PersonalContactEntryCategory; label: string }> = [
+  { value: "primary", label: "Primary" },
+  { value: "personal", label: "Personal" },
+  { value: "work", label: "Work" },
+  { value: "university", label: "University" },
+  { value: "custom", label: "Custom" }
+];
+
+function contactEntryLabel(entry: Pick<PersonalEmailEntry | PersonalPhoneEntry, "category" | "customLabel">): string {
+  if (entry.category === "custom") return entry.customLabel?.trim() || "Custom";
+  return CONTACT_CATEGORY_OPTIONS.find((option) => option.value === entry.category)?.label || "Contact";
+}
+
+function derivePersonNameParts(value: string) {
+  const parts = value.trim().replace(/\s+/g, " ").split(" ").filter(Boolean);
+  if (parts.length === 0) return { firstName: "", middleName: "", lastName: "" };
+  if (parts.length === 1) return { firstName: parts[0], middleName: "", lastName: "" };
+  return {
+    firstName: parts[0],
+    middleName: parts.slice(1, -1).join(" "),
+    lastName: parts[parts.length - 1]
+  };
 }
 
 function formatFullDate(value?: string) {
@@ -587,6 +619,79 @@ function newLocationEntry(input: Partial<PersonalLocationEntry> = {}): PersonalL
   };
 }
 
+function newEmailEntry(input: Partial<PersonalEmailEntry> = {}): PersonalEmailEntry {
+  return {
+    id: input.id || `email-${crypto.randomUUID()}`,
+    category: input.category || "personal",
+    customLabel: input.customLabel,
+    address: input.address || ""
+  };
+}
+
+function newPhoneEntry(input: Partial<PersonalPhoneEntry> = {}): PersonalPhoneEntry {
+  return {
+    id: input.id || `phone-${crypto.randomUUID()}`,
+    category: input.category || "personal",
+    customLabel: input.customLabel,
+    number: input.number || "",
+    countryCode: normalizedCountryCode(input.countryCode || "+1")
+  };
+}
+
+function cleanEmailEntries(entries: PersonalEmailEntry[]): PersonalEmailEntry[] {
+  const seen = new Set<string>();
+  return entries
+    .map((entry) => ({
+      ...entry,
+      address: entry.address.trim(),
+      customLabel: entry.category === "custom" ? entry.customLabel?.trim() || undefined : undefined
+    }))
+    .filter((entry) => {
+      if (!entry.address) return false;
+      const key = entry.address.toLowerCase();
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
+function cleanPhoneEntries(entries: PersonalPhoneEntry[]): PersonalPhoneEntry[] {
+  const seen = new Set<string>();
+  return entries
+    .map((entry) => ({
+      ...entry,
+      number: normalizePhoneForStorage(entry.number, entry.countryCode),
+      countryCode: normalizedCountryCode(entry.countryCode),
+      customLabel: entry.category === "custom" ? entry.customLabel?.trim() || undefined : undefined
+    }))
+    .filter((entry) => {
+      if (!entry.number || seen.has(entry.number)) return false;
+      seen.add(entry.number);
+      return true;
+    });
+}
+
+function legacyEmailEntries(profile: PersonalContactProfile): PersonalEmailEntry[] {
+  if (profile.emails?.length) return profile.emails.map((entry) => ({ ...entry }));
+  return cleanEmailEntries([
+    profile.primaryEmail ? newEmailEntry({ id: "legacy-email-primary", category: "primary", address: profile.primaryEmail }) : null,
+    profile.workEmail ? newEmailEntry({ id: "legacy-email-work", category: "work", address: profile.workEmail }) : null,
+    profile.universityEmail ? newEmailEntry({ id: "legacy-email-university", category: "university", address: profile.universityEmail }) : null
+  ].filter((entry): entry is PersonalEmailEntry => Boolean(entry)));
+}
+
+function legacyPhoneEntries(profile: PersonalContactProfile): PersonalPhoneEntry[] {
+  if (profile.phones?.length) return profile.phones.map((entry) => ({ ...entry }));
+  return profile.phoneNumber
+    ? [newPhoneEntry({
+        id: "legacy-phone-primary",
+        category: "primary",
+        number: profile.phoneNumber,
+        countryCode: profile.phoneCountryCode || "+1"
+      })]
+    : [];
+}
+
 function cleanEducationEntries(entries: PersonalEducationEntry[]): PersonalEducationEntry[] {
   return entries
     .map((entry) => ({
@@ -625,6 +730,20 @@ function updateEntry<T extends { id: string }>(entries: T[], id: string, patch: 
 
 function removeEntry<T extends { id: string }>(entries: T[], id: string): T[] {
   return entries.filter((entry) => entry.id !== id);
+}
+
+function updateContactEntry<T extends { id: string; category: PersonalContactEntryCategory }>(
+  entries: T[],
+  id: string,
+  patch: Partial<T>
+): T[] {
+  return entries.map((entry) => {
+    if (entry.id === id) return { ...entry, ...patch };
+    if (patch.category === "primary" && entry.category === "primary") {
+      return { ...entry, category: "personal" };
+    }
+    return entry;
+  });
 }
 
 function interactionOccurredOn(value: string): string | undefined {
@@ -833,6 +952,8 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     partner: profile?.partner || "",
     children: joinList(profile?.children),
     interactions: joinTextEntries(profile?.interactions),
+    emails: profile ? legacyEmailEntries(profile) : [],
+    phones: profile ? legacyPhoneEntries(profile) : [],
     memories: (profile?.memories || []).map((memory) => ({ ...memory })),
     education,
     occupations,
@@ -844,12 +965,21 @@ function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile
   const education = cleanEducationEntries(draft.education);
   const occupations = cleanOccupationEntries(draft.occupations);
   const locations = cleanLocationEntries(draft.locations);
+  const emails = cleanEmailEntries(draft.emails);
+  const phones = cleanPhoneEntries(draft.phones);
   const currentJobs = occupations.filter((entry) => entry.status === "current");
   const pastJobs = occupations.filter((entry) => entry.status === "past");
+  const primaryEmail = emails.find((entry) => entry.category === "primary") || emails[0];
+  const workEmail = emails.find((entry) => entry.category === "work");
+  const universityEmail = emails.find((entry) => entry.category === "university");
+  const primaryPhone = phones.find((entry) => entry.category === "primary") || phones[0];
   return {
     ...draft,
-    phoneCountryCode: normalizedCountryCode(draft.phoneCountryCode),
-    phoneNumber: normalizePhoneForStorage(draft.phoneNumber, draft.phoneCountryCode),
+    phoneCountryCode: primaryPhone?.countryCode || normalizedCountryCode(draft.phoneCountryCode),
+    phoneNumber: primaryPhone?.number || "",
+    primaryEmail: primaryEmail?.address || "",
+    workEmail: workEmail?.address || "",
+    universityEmail: universityEmail?.address || "",
     associatedPeople: splitList(draft.associatedPeople),
     children: splitList(draft.children),
     interactions: splitTextEntries(draft.interactions),
@@ -857,6 +987,8 @@ function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile
     education,
     occupations,
     locations,
+    emails,
+    phones,
     universityAffiliation: education[0]?.institution || "",
     primaryOccupation: currentJobs[0]?.title || "",
     primaryEmployer: currentJobs[0]?.employer || "",
@@ -984,7 +1116,7 @@ function isNewPerson(record: PersonalRecord) {
 function getProfileGaps(record: PersonalRecord) {
   const profile = getProfile(record);
   return [
-    !profile.primaryEmail && !profile.workEmail && !profile.phoneNumber ? "Primary contact method" : "",
+    profile.emails.length === 0 && profile.phones.length === 0 ? "Primary contact method" : "",
     !profile.birthday ? "Birthday" : "",
     !profile.livesIn ? "Location" : "",
     !profile.context ? "Relationship context" : "",
@@ -1146,6 +1278,140 @@ function LocationEntriesEditor({
   );
 }
 
+function EmailEntriesEditor({
+  entries,
+  onChange,
+  onAdd,
+  onRemove
+}: {
+  entries: PersonalEmailEntry[];
+  onChange: (id: string, patch: Partial<PersonalEmailEntry>) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <section className="people-repeatable-section people-contact-channel-section module-ref-tone-blue" data-people-email-editor>
+      <header className="people-repeatable-heading">
+        <div><h4>Email addresses</h4><p>Label work, university, personal, or anything custom.</p></div>
+        <button type="button" onClick={onAdd}>Add email</button>
+      </header>
+      {entries.length > 0 ? entries.map((entry, index) => (
+        <article className="people-contact-channel-entry" data-email-entry={entry.id} key={entry.id}>
+          <div className="people-contact-channel-fields">
+            <div className="people-contact-category-fields">
+              <label>
+                Category
+                <select
+                  aria-label={`Email ${index + 1} category`}
+                  value={entry.category}
+                  onChange={(event) => onChange(entry.id, { category: event.target.value as PersonalContactEntryCategory })}
+                >
+                  {CONTACT_CATEGORY_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              {entry.category === "custom" && (
+                <label>
+                  Custom category
+                  <input
+                    value={entry.customLabel || ""}
+                    onChange={(event) => onChange(entry.id, { customLabel: event.target.value })}
+                    placeholder="Alumni, volunteer, club..."
+                    required={Boolean(entry.address.trim())}
+                  />
+                </label>
+              )}
+            </div>
+            <label className="people-contact-value-field">
+              Email
+              <input
+                type="email"
+                value={entry.address}
+                onChange={(event) => onChange(entry.id, { address: event.target.value })}
+                placeholder="name@example.com"
+              />
+            </label>
+            <button type="button" className="people-contact-remove" onClick={() => onRemove(entry.id)} aria-label={`Remove email ${index + 1}`}>Remove</button>
+          </div>
+        </article>
+      )) : <p className="people-repeatable-empty">No email address added.</p>}
+    </section>
+  );
+}
+
+function PhoneEntriesEditor({
+  entries,
+  onChange,
+  onAdd,
+  onRemove
+}: {
+  entries: PersonalPhoneEntry[];
+  onChange: (id: string, patch: Partial<PersonalPhoneEntry>) => void;
+  onAdd: () => void;
+  onRemove: (id: string) => void;
+}) {
+  return (
+    <section className="people-repeatable-section people-contact-channel-section module-ref-tone-teal" data-people-phone-editor>
+      <header className="people-repeatable-heading">
+        <div><h4>Phone numbers</h4><p>Keep one by default and add another only when needed.</p></div>
+        <button type="button" onClick={onAdd}>Add phone</button>
+      </header>
+      {entries.length > 0 ? entries.map((entry, index) => (
+        <article className="people-contact-channel-entry" data-phone-entry={entry.id} key={entry.id}>
+          <div className="people-contact-channel-fields">
+            <div className="people-contact-category-fields">
+              <label>
+                Category
+                <select
+                  aria-label={`Phone ${index + 1} category`}
+                  value={entry.category}
+                  onChange={(event) => onChange(entry.id, { category: event.target.value as PersonalContactEntryCategory })}
+                >
+                  {CONTACT_CATEGORY_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+              {entry.category === "custom" && (
+                <label>
+                  Custom category
+                  <input
+                    value={entry.customLabel || ""}
+                    onChange={(event) => onChange(entry.id, { customLabel: event.target.value })}
+                    placeholder="Studio, travel, emergency..."
+                    required={Boolean(entry.number.trim())}
+                  />
+                </label>
+              )}
+            </div>
+            <label className="people-contact-value-field">
+              Phone
+              <input
+                type="tel"
+                inputMode="tel"
+                value={entry.number}
+                onChange={(event) => onChange(entry.id, { number: event.target.value })}
+                onBlur={() => onChange(entry.id, { number: formatPhone(entry.number, entry.countryCode) })}
+                placeholder="6147963848"
+              />
+            </label>
+            <button type="button" className="people-contact-remove" onClick={() => onRemove(entry.id)} aria-label={`Remove phone ${index + 1}`}>Remove</button>
+          </div>
+          <details className="people-contact-entry-advanced">
+            <summary>Country code {entry.countryCode}</summary>
+            <label>
+              Country code
+              <input
+                inputMode="tel"
+                value={entry.countryCode}
+                onChange={(event) => onChange(entry.id, { countryCode: normalizedCountryCode(event.target.value) })}
+                placeholder="+1"
+              />
+            </label>
+          </details>
+        </article>
+      )) : <p className="people-repeatable-empty">No phone number added.</p>}
+    </section>
+  );
+}
+
 export default function PeopleWorkspace({
   initialPeople,
   totalRecords,
@@ -1189,9 +1455,12 @@ export default function PeopleWorkspace({
   const [groups, setGroups] = useState<string[]>(["Collaborator"]);
   const [status, setStatus] = useState<PersonalRecordStatus>("active");
   const [quickContext, setQuickContext] = useState("");
-  const [quickEmail, setQuickEmail] = useState("");
-  const [quickPhone, setQuickPhone] = useState("");
-  const [quickPhoneCountryCode, setQuickPhoneCountryCode] = useState("+1");
+  const [quickEmails, setQuickEmails] = useState<PersonalEmailEntry[]>([
+    newEmailEntry({ id: "new-contact-email-1", category: "primary" })
+  ]);
+  const [quickPhones, setQuickPhones] = useState<PersonalPhoneEntry[]>([
+    newPhoneEntry({ id: "new-contact-phone-1", category: "primary", countryCode: "+1" })
+  ]);
   const [quickEducation, setQuickEducation] = useState<PersonalEducationEntry[]>([]);
   const [quickOccupations, setQuickOccupations] = useState<PersonalOccupationEntry[]>([
     newOccupationEntry({ id: "new-contact-job-1" })
@@ -1464,9 +1733,22 @@ export default function PeopleWorkspace({
   }, [people, starredIds]);
 
   const selectedProfile = getProfile(selectedPerson);
+  const emailContactDetails = selectedProfile.emails.map((entry) => ({
+    label: contactEntryLabel(entry),
+    value: entry.address,
+    ...contactMethodHref("email", entry.address)
+  }));
+  const phoneContactDetails = selectedProfile.phones.map((entry) => {
+    const value = formatPhone(entry.number, entry.countryCode);
+    return {
+      label: contactEntryLabel(entry),
+      value,
+      ...contactMethodHref("phone", value)
+    };
+  });
   const selectedContactMethods: ContactMethod[] = ([
-    { id: "email", label: "Email", value: selectedProfile.primaryEmail || selectedProfile.workEmail },
-    { id: "phone", label: "Phone", value: formatPhone(selectedProfile.phoneNumber, selectedProfile.phoneCountryCode) },
+    { id: "email", label: "Email", value: emailContactDetails[0]?.value || "", details: emailContactDetails },
+    { id: "phone", label: "Phone", value: phoneContactDetails[0]?.value || "", details: phoneContactDetails },
     { id: "website", label: "Website", value: selectedProfile.website },
     { id: "instagram", label: "Instagram", value: selectedProfile.instagram },
     { id: "tiktok", label: "TikTok", value: selectedProfile.tiktok },
@@ -1544,8 +1826,6 @@ export default function PeopleWorkspace({
   const addFormDirty = [
     name,
     quickContext,
-    quickEmail,
-    quickPhone,
     quickProjects,
     lastContact,
     nextContact,
@@ -1555,13 +1835,14 @@ export default function PeopleWorkspace({
     quickX,
     quickLinkedIn
   ].some((value) => value.trim().length > 0)
+    || cleanEmailEntries(quickEmails).length > 0
+    || cleanPhoneEntries(quickPhones).length > 0
     || cleanEducationEntries(quickEducation).length > 0
     || cleanOccupationEntries(quickOccupations).length > 0
     || cleanLocationEntries(quickLocations).length > 0
     || className !== "person"
     || groups.length !== 1
     || groups[0] !== "Collaborator"
-    || quickPhoneCountryCode !== "+1"
     || status !== "active"
     || cadence !== "P1M";
   const profileFormDirty = Boolean(
@@ -1939,13 +2220,14 @@ export default function PeopleWorkspace({
     setSaving(true);
     setError("");
 
+    const derivedName = className === "person" ? derivePersonNameParts(name) : { firstName: "", middleName: "", lastName: "" };
     const profile = buildProfilePayload({
       ...EMPTY_PROFILE_DRAFT,
       fullName: name,
+      ...derivedName,
       context: quickContext,
-      phoneNumber: normalizePhoneForStorage(quickPhone, quickPhoneCountryCode),
-      phoneCountryCode: normalizedCountryCode(quickPhoneCountryCode),
-      primaryEmail: quickEmail,
+      emails: quickEmails,
+      phones: quickPhones,
       education: quickEducation,
       occupations: quickOccupations,
       locations: quickLocations,
@@ -2006,9 +2288,8 @@ export default function PeopleWorkspace({
       setGroups(["Collaborator"]);
       setStatus("active");
       setQuickContext("");
-      setQuickEmail("");
-      setQuickPhone("");
-      setQuickPhoneCountryCode("+1");
+      setQuickEmails([newEmailEntry({ id: "new-contact-email-1", category: "primary" })]);
+      setQuickPhones([newPhoneEntry({ id: "new-contact-phone-1", category: "primary", countryCode: "+1" })]);
       setQuickEducation([]);
       setQuickOccupations([newOccupationEntry({ id: "new-contact-job-1" })]);
       setQuickLocations([newLocationEntry({ id: "new-contact-location-1", label: "Primary home" })]);
@@ -2186,7 +2467,28 @@ export default function PeopleWorkspace({
   }
 
   function updateProfileDraft(key: ContactProfileTextKey, value: string) {
-    setProfileDraft((current) => ({ ...current, [key]: value }));
+    setProfileDraft((current) => {
+      if (key !== "fullName" || selectedPerson?.className === "org") {
+        return { ...current, [key]: value };
+      }
+      const previous = derivePersonNameParts(current.fullName);
+      const next = derivePersonNameParts(value);
+      return {
+        ...current,
+        fullName: value,
+        firstName: !current.firstName || current.firstName === previous.firstName ? next.firstName : current.firstName,
+        middleName: !current.middleName || current.middleName === previous.middleName ? next.middleName : current.middleName,
+        lastName: !current.lastName || current.lastName === previous.lastName ? next.lastName : current.lastName
+      };
+    });
+  }
+
+  function updateProfileEmail(id: string, patch: Partial<PersonalEmailEntry>) {
+    setProfileDraft((current) => ({ ...current, emails: updateContactEntry(current.emails, id, patch) }));
+  }
+
+  function updateProfilePhone(id: string, patch: Partial<PersonalPhoneEntry>) {
+    setProfileDraft((current) => ({ ...current, phones: updateContactEntry(current.phones, id, patch) }));
   }
 
   function updateProfileEducation(id: string, patch: Partial<PersonalEducationEntry>) {
@@ -2214,6 +2516,8 @@ export default function PeopleWorkspace({
   }
 
   function renderAddPersonForm(extraClass = "") {
+    const derivedQuickName = className === "person" ? derivePersonNameParts(name) : null;
+    const showDerivedQuickName = Boolean(derivedQuickName?.firstName && derivedQuickName.lastName);
     return (
       <form className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
         <div className="people-edit-toolbar">
@@ -2223,8 +2527,21 @@ export default function PeopleWorkspace({
         </div>
         <label>
           Full name
-          <input value={name} onChange={(event) => setName(event.target.value)} placeholder="Person or organization" required />
+          <input
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Person or organization"
+            aria-describedby={showDerivedQuickName ? "people-derived-name" : undefined}
+            required
+          />
         </label>
+        {showDerivedQuickName && derivedQuickName && (
+          <div id="people-derived-name" className="people-derived-name" aria-live="polite" data-people-derived-name>
+            <span><small>First</small><strong data-derived-first-name>{derivedQuickName.firstName}</strong></span>
+            {derivedQuickName.middleName && <span><small>Middle</small><strong>{derivedQuickName.middleName}</strong></span>}
+            <span><small>Last</small><strong data-derived-last-name>{derivedQuickName.lastName}</strong></span>
+          </div>
+        )}
         <div className="people-capture-classification">
           <label className="people-type-field">
             Type
@@ -2242,9 +2559,22 @@ export default function PeopleWorkspace({
             <small>Choose every group that fits.</small>
           </fieldset>
         </div>
-        <div className="people-capture-grid">
-          <label>Primary email<input type="email" value={quickEmail} onChange={(event) => setQuickEmail(event.target.value)} /></label>
-          <label>Phone<input type="tel" inputMode="tel" value={quickPhone} onChange={(event) => setQuickPhone(event.target.value)} onBlur={() => setQuickPhone(formatPhone(quickPhone, quickPhoneCountryCode))} placeholder="6147963848" /></label>
+        <div className="people-contact-channel-grid">
+          <EmailEntriesEditor
+            entries={quickEmails}
+            onChange={(id, patch) => setQuickEmails((current) => updateContactEntry(current, id, patch))}
+            onAdd={() => setQuickEmails((current) => [...current, newEmailEntry({ category: current.some((entry) => entry.category === "primary") ? "personal" : "primary" })])}
+            onRemove={(id) => setQuickEmails((current) => removeEntry(current, id))}
+          />
+          <PhoneEntriesEditor
+            entries={quickPhones}
+            onChange={(id, patch) => setQuickPhones((current) => updateContactEntry(current, id, patch))}
+            onAdd={() => setQuickPhones((current) => [...current, newPhoneEntry({
+              category: current.some((entry) => entry.category === "primary") ? "personal" : "primary",
+              countryCode: current[0]?.countryCode || "+1"
+            })])}
+            onRemove={(id) => setQuickPhones((current) => removeEntry(current, id))}
+          />
         </div>
         <label>
           Relationship context
@@ -2287,10 +2617,6 @@ export default function PeopleWorkspace({
             <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(event.target.value)} placeholder="https://linkedin.com/in/..." /></label>
           </div>
         </fieldset>
-        <details className="people-advanced-properties">
-          <summary>Advanced properties</summary>
-          <label>Default phone country code<input inputMode="tel" value={quickPhoneCountryCode} onChange={(event) => setQuickPhoneCountryCode(normalizedCountryCode(event.target.value))} placeholder="+1" /></label>
-        </details>
         <datalist id="people-location-suggestions">
           {locationSuggestions.map((location) => <option value={location} key={location} />)}
         </datalist>
@@ -2775,6 +3101,29 @@ export default function PeopleWorkspace({
                     </section>
                     {section.title === "Communication" && (
                       <>
+                        <div className="people-contact-channel-grid">
+                          <EmailEntriesEditor
+                            entries={profileDraft.emails}
+                            onChange={updateProfileEmail}
+                            onAdd={() => setProfileDraft((current) => ({
+                              ...current,
+                              emails: [...current.emails, newEmailEntry({ category: current.emails.some((entry) => entry.category === "primary") ? "personal" : "primary" })]
+                            }))}
+                            onRemove={(id) => setProfileDraft((current) => ({ ...current, emails: removeEntry(current.emails, id) }))}
+                          />
+                          <PhoneEntriesEditor
+                            entries={profileDraft.phones}
+                            onChange={updateProfilePhone}
+                            onAdd={() => setProfileDraft((current) => ({
+                              ...current,
+                              phones: [...current.phones, newPhoneEntry({
+                                category: current.phones.some((entry) => entry.category === "primary") ? "personal" : "primary",
+                                countryCode: current.phones[0]?.countryCode || "+1"
+                              })]
+                            }))}
+                            onRemove={(id) => setProfileDraft((current) => ({ ...current, phones: removeEntry(current.phones, id) }))}
+                          />
+                        </div>
                         <OccupationEntriesEditor
                           entries={profileDraft.occupations}
                           onChange={updateProfileOccupation}
@@ -3226,12 +3575,26 @@ export default function PeopleWorkspace({
                   </div>
                   {expandedContact && (
                     <div className="people-contact-disclosure" data-contact-disclosure={expandedContact.id}>
-                      <span>{expandedContact.label}</span>
-                      <strong>{expandedContact.value}</strong>
-                      {expandedContact.href && (
-                        <a href={expandedContact.href} target={expandedContact.href.startsWith("http") ? "_blank" : undefined} rel={expandedContact.href.startsWith("http") ? "noreferrer" : undefined}>
-                          {expandedContact.actionLabel}
-                        </a>
+                      {expandedContact.details?.length ? expandedContact.details.map((detail) => (
+                        <div className="people-contact-disclosure-row" key={`${detail.label}-${detail.value}`}>
+                          <span>{detail.label}</span>
+                          <strong>{detail.value}</strong>
+                          {detail.href && (
+                            <a href={detail.href} target={detail.href.startsWith("http") ? "_blank" : undefined} rel={detail.href.startsWith("http") ? "noreferrer" : undefined}>
+                              {detail.actionLabel}
+                            </a>
+                          )}
+                        </div>
+                      )) : (
+                        <>
+                          <span>{expandedContact.label}</span>
+                          <strong>{expandedContact.value}</strong>
+                          {expandedContact.href && (
+                            <a href={expandedContact.href} target={expandedContact.href.startsWith("http") ? "_blank" : undefined} rel={expandedContact.href.startsWith("http") ? "noreferrer" : undefined}>
+                              {expandedContact.actionLabel}
+                            </a>
+                          )}
+                        </>
                       )}
                     </div>
                   )}

@@ -3841,6 +3841,109 @@ body.people-ai-panel-open .local-ai-widget {
   min-height: 70px;
 }
 
+.people-derived-name {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: -3px;
+}
+
+.people-derived-name > span {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  min-width: 0;
+  padding: 4px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel-soft);
+}
+
+.people-derived-name small {
+  color: var(--text-subtle);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.people-derived-name strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--text-strong);
+  font-size: 11px;
+}
+
+.people-contact-channel-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+
+.people-contact-channel-section {
+  align-content: start;
+}
+
+.people-contact-channel-entry {
+  min-width: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.people-contact-channel-fields {
+  display: grid;
+  grid-template-columns: minmax(112px, 0.55fr) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+}
+
+.people-contact-category-fields {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.people-contact-remove {
+  width: auto;
+  min-height: 38px;
+  border-color: var(--border) !important;
+  background: var(--surface-panel) !important;
+  color: var(--text-strong) !important;
+  white-space: nowrap;
+}
+
+.people-contact-entry-advanced {
+  margin-top: 6px;
+  color: var(--text-subtle);
+}
+
+.people-contact-entry-advanced summary {
+  width: max-content;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.people-contact-entry-advanced label {
+  max-width: 150px;
+  margin-top: 6px;
+}
+
+.people-contact-disclosure-row {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: minmax(74px, auto) minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  min-width: 0;
+}
+
+.people-contact-disclosure-row span {
+  grid-column: auto;
+}
+
 .people-advanced-properties {
   border-top: 1px solid var(--border-soft);
   padding-top: 8px;
@@ -4077,6 +4180,8 @@ body.people-ai-panel-open .local-ai-widget {
   .people-capture-grid,
   .people-profile-field-grid,
   .people-repeatable-fields,
+  .people-contact-channel-grid,
+  .people-contact-channel-fields,
   .people-notes-grid,
   .people-relationships-grid,
   .people-utility-grid,
@@ -4085,6 +4190,11 @@ body.people-ai-panel-open .local-ai-widget {
   .people-memory-inline-editor,
   .people-directory-list.is-grid {
     grid-template-columns: 1fr;
+  }
+
+  .people-contact-remove {
+    justify-self: start;
+    min-height: 44px;
   }
 
   .people-overview-contact-strip,

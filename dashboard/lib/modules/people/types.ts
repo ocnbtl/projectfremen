@@ -1,10 +1,12 @@
 import type { MutationError, MutationResult } from "../../native-objects/mutation-result";
 import type { CadenceState, NativeObjectRef } from "../../native-objects/types";
 import type {
+  PersonalEmailEntry,
   PersonalEducationEntry,
   PersonalLocationEntry,
   PersonalMemoryEntry,
-  PersonalOccupationEntry
+  PersonalOccupationEntry,
+  PersonalPhoneEntry
 } from "../../personal-records-store";
 
 export type PeopleMemoryEntry = PersonalMemoryEntry;
@@ -37,6 +39,8 @@ export type PeopleContactProfile = {
   primaryEmail?: string;
   workEmail?: string;
   universityEmail?: string;
+  emails: PersonalEmailEntry[];
+  phones: PersonalPhoneEntry[];
   primaryOccupation?: string;
   primaryEmployer?: string;
   secondaryOccupation?: string;

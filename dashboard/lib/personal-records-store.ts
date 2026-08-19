@@ -115,6 +115,23 @@ export type PersonalLocationEntry = {
   address?: string;
 };
 
+export type PersonalContactEntryCategory = "primary" | "personal" | "work" | "university" | "custom";
+
+export type PersonalEmailEntry = {
+  id: string;
+  category: PersonalContactEntryCategory;
+  customLabel?: string;
+  address: string;
+};
+
+export type PersonalPhoneEntry = {
+  id: string;
+  category: PersonalContactEntryCategory;
+  customLabel?: string;
+  number: string;
+  countryCode: string;
+};
+
 export type PersonalContactProfile = {
   fullName?: string;
   firstName?: string;
@@ -128,6 +145,8 @@ export type PersonalContactProfile = {
   primaryEmail?: string;
   workEmail?: string;
   universityEmail?: string;
+  emails: PersonalEmailEntry[];
+  phones: PersonalPhoneEntry[];
   primaryOccupation?: string;
   primaryEmployer?: string;
   secondaryOccupation?: string;
@@ -514,6 +533,152 @@ function profileEntryId(
   return id;
 }
 
+const CONTACT_ENTRY_CATEGORIES = ["primary", "personal", "work", "university", "custom"] as const;
+
+function normalizeContactEntryCategory(
+  value: unknown,
+  index: number,
+  strict: boolean,
+  kind: "email" | "phone"
+): PersonalContactEntryCategory {
+  const category = typeof value === "string" ? value.trim().toLowerCase() : index === 0 ? "primary" : "personal";
+  if (CONTACT_ENTRY_CATEGORIES.includes(category as PersonalContactEntryCategory)) {
+    return category as PersonalContactEntryCategory;
+  }
+  if (strict) throw new Error(`${kind === "email" ? "Email" : "Phone"} ${index + 1} category is invalid`);
+  return index === 0 ? "primary" : "personal";
+}
+
+function normalizeContactCountryCode(value: unknown, strict: boolean, label: string): string {
+  const raw = profileEntryText(value, 8, strict, label);
+  const digits = raw.replace(/\D/g, "").slice(0, 4);
+  return digits ? `+${digits}` : "+1";
+}
+
+function normalizeContactPhoneNumber(
+  value: unknown,
+  countryCode: string,
+  strict: boolean,
+  label: string
+): string {
+  const raw = profileEntryText(value, 40, strict, label);
+  if (!raw) return "";
+  const digits = raw.replace(/\D/g, "");
+  const codeDigits = countryCode.replace(/\D/g, "") || "1";
+  const canonical = raw.startsWith("+")
+    ? `+${digits}`
+    : digits.length === 10
+      ? `+${codeDigits}${digits}`
+      : codeDigits === "1" && digits.length === 11 && digits.startsWith("1")
+        ? `+${digits}`
+        : `+${codeDigits}${digits}`;
+  const canonicalDigits = canonical.replace(/\D/g, "");
+  if (strict && (canonicalDigits.length < 7 || canonicalDigits.length > 15)) {
+    throw new Error(`${label} must contain a valid international phone number`);
+  }
+  return canonicalDigits.length >= 7 && canonicalDigits.length <= 15 ? canonical : "";
+}
+
+function normalizeEmailEntries(value: unknown, strict = false): PersonalEmailEntry[] {
+  if (!Array.isArray(value)) {
+    if (strict && value !== undefined) throw new Error("Emails must be a list");
+    return [];
+  }
+  if (strict && value.length > 16) throw new Error("A profile can store up to 16 email addresses");
+
+  const entries: PersonalEmailEntry[] = [];
+  const ids = new Set<string>();
+  const addresses = new Set<string>();
+  let primaryCount = 0;
+  for (const [index, item] of value.slice(0, 16).entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      if (strict) throw new Error(`Email ${index + 1} is invalid`);
+      continue;
+    }
+    const raw = item as Record<string, unknown>;
+    const address = profileEntryText(raw.address, 320, strict, `Email ${index + 1} address`);
+    if (!address) {
+      if (strict) throw new Error(`Email ${index + 1} needs an address`);
+      continue;
+    }
+    if (strict && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(address)) {
+      throw new Error(`Email ${index + 1} needs a valid address`);
+    }
+    const normalizedAddress = address.toLowerCase();
+    if (addresses.has(normalizedAddress)) {
+      if (strict) throw new Error("Each email address must be unique");
+      continue;
+    }
+    addresses.add(normalizedAddress);
+    let category = normalizeContactEntryCategory(raw.category, index, strict, "email");
+    if (category === "primary") {
+      primaryCount += 1;
+      if (strict && primaryCount > 1) throw new Error("A profile can have only one primary email");
+      if (!strict && primaryCount > 1) category = "personal";
+    }
+    const customLabel = profileEntryText(raw.customLabel, 80, strict, `Email ${index + 1} custom category`);
+    if (strict && category === "custom" && !customLabel) {
+      throw new Error(`Email ${index + 1} needs a custom category`);
+    }
+    entries.push({
+      id: profileEntryId("email", raw.id, `${category}:${customLabel}:${normalizedAddress}`, index, ids, strict),
+      category,
+      customLabel: category === "custom" && customLabel ? customLabel : undefined,
+      address
+    });
+  }
+  return entries;
+}
+
+function normalizePhoneEntries(value: unknown, strict = false): PersonalPhoneEntry[] {
+  if (!Array.isArray(value)) {
+    if (strict && value !== undefined) throw new Error("Phone numbers must be a list");
+    return [];
+  }
+  if (strict && value.length > 16) throw new Error("A profile can store up to 16 phone numbers");
+
+  const entries: PersonalPhoneEntry[] = [];
+  const ids = new Set<string>();
+  const numbers = new Set<string>();
+  let primaryCount = 0;
+  for (const [index, item] of value.slice(0, 16).entries()) {
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      if (strict) throw new Error(`Phone ${index + 1} is invalid`);
+      continue;
+    }
+    const raw = item as Record<string, unknown>;
+    const countryCode = normalizeContactCountryCode(raw.countryCode, strict, `Phone ${index + 1} country code`);
+    const number = normalizeContactPhoneNumber(raw.number, countryCode, strict, `Phone ${index + 1}`);
+    if (!number) {
+      if (strict) throw new Error(`Phone ${index + 1} needs a number`);
+      continue;
+    }
+    if (numbers.has(number)) {
+      if (strict) throw new Error("Each phone number must be unique");
+      continue;
+    }
+    numbers.add(number);
+    let category = normalizeContactEntryCategory(raw.category, index, strict, "phone");
+    if (category === "primary") {
+      primaryCount += 1;
+      if (strict && primaryCount > 1) throw new Error("A profile can have only one primary phone number");
+      if (!strict && primaryCount > 1) category = "personal";
+    }
+    const customLabel = profileEntryText(raw.customLabel, 80, strict, `Phone ${index + 1} custom category`);
+    if (strict && category === "custom" && !customLabel) {
+      throw new Error(`Phone ${index + 1} needs a custom category`);
+    }
+    entries.push({
+      id: profileEntryId("phone", raw.id, `${category}:${customLabel}:${number}`, index, ids, strict),
+      category,
+      customLabel: category === "custom" && customLabel ? customLabel : undefined,
+      number,
+      countryCode
+    });
+  }
+  return entries;
+}
+
 function normalizeEducationEntries(value: unknown, strict = false): PersonalEducationEntry[] {
   if (!Array.isArray(value)) {
     if (strict && value !== undefined) throw new Error("Education must be a list");
@@ -612,10 +777,51 @@ function normalizeLocationEntries(value: unknown, strict = false): PersonalLocat
   return entries;
 }
 
-function reconcileContactProfileCollections(profile: PersonalContactProfile): PersonalContactProfile {
+function reconcileContactProfileCollections(
+  profile: PersonalContactProfile,
+  options: { preferEmails?: boolean; preferPhones?: boolean } = {}
+): PersonalContactProfile {
   const education = profile.education.map((entry) => ({ ...entry }));
   const occupations = profile.occupations.map((entry) => ({ ...entry }));
   const locations = profile.locations.map((entry) => ({ ...entry }));
+  const emails = profile.emails.map((entry) => ({ ...entry }));
+  const phones = profile.phones.map((entry) => ({ ...entry }));
+
+  const upsertLegacyEmail = (
+    category: Extract<PersonalContactEntryCategory, "primary" | "work" | "university">,
+    address: string | undefined
+  ) => {
+    if (!address) return;
+    const index = emails.findIndex((entry) => entry.category === category);
+    const next: PersonalEmailEntry = {
+      id: index >= 0 ? emails[index].id : deterministicProfileEntryId("email", `${category}:${address}`, emails.length),
+      category,
+      address
+    };
+    if (index >= 0) emails[index] = next;
+    else emails.push(next);
+  };
+  if (!options.preferEmails) {
+    upsertLegacyEmail("primary", profile.primaryEmail);
+    upsertLegacyEmail("work", profile.workEmail);
+    upsertLegacyEmail("university", profile.universityEmail);
+  }
+
+  if (!options.preferPhones && profile.phoneNumber) {
+    const countryCode = normalizeContactCountryCode(profile.phoneCountryCode, false, "Phone country code");
+    const number = normalizeContactPhoneNumber(profile.phoneNumber, countryCode, false, "Phone");
+    if (number) {
+      const index = phones.findIndex((entry) => entry.category === "primary");
+      const next: PersonalPhoneEntry = {
+        id: index >= 0 ? phones[index].id : deterministicProfileEntryId("phone", `primary:${number}`, phones.length),
+        category: "primary",
+        number,
+        countryCode
+      };
+      if (index >= 0) phones[index] = next;
+      else phones.unshift(next);
+    }
+  }
 
   if (profile.universityAffiliation) {
     if (education.length > 0) education[0] = { ...education[0], institution: profile.universityAffiliation };
@@ -674,8 +880,19 @@ function reconcileContactProfileCollections(profile: PersonalContactProfile): Pe
 
   const resolvedCurrentJobs = occupations.filter((entry) => entry.status === "current");
   const resolvedPastJobs = occupations.filter((entry) => entry.status === "past");
+  const primaryEmail = emails.find((entry) => entry.category === "primary") || emails[0];
+  const workEmail = emails.find((entry) => entry.category === "work");
+  const universityEmail = emails.find((entry) => entry.category === "university");
+  const primaryPhone = phones.find((entry) => entry.category === "primary") || phones[0];
   return {
     ...profile,
+    primaryEmail: options.preferEmails ? primaryEmail?.address : profile.primaryEmail || primaryEmail?.address,
+    workEmail: options.preferEmails ? workEmail?.address : profile.workEmail || workEmail?.address,
+    universityEmail: options.preferEmails ? universityEmail?.address : profile.universityEmail || universityEmail?.address,
+    phoneNumber: options.preferPhones ? primaryPhone?.number : profile.phoneNumber || primaryPhone?.number,
+    phoneCountryCode: options.preferPhones
+      ? primaryPhone?.countryCode || "+1"
+      : profile.phoneCountryCode || primaryPhone?.countryCode || "+1",
     universityAffiliation: profile.universityAffiliation || education[0]?.institution,
     primaryOccupation: profile.primaryOccupation || resolvedCurrentJobs[0]?.title,
     primaryEmployer: profile.primaryEmployer || resolvedCurrentJobs[0]?.employer,
@@ -687,7 +904,9 @@ function reconcileContactProfileCollections(profile: PersonalContactProfile): Pe
     address: profile.address || locations[0]?.address,
     education,
     occupations,
-    locations
+    locations,
+    emails,
+    phones
   };
 }
 
@@ -704,7 +923,9 @@ function normalizeContactProfile(input: unknown, strictEntries = false): Persona
     memories: normalizeMemoryEntries(raw.memories, strictEntries),
     education: normalizeEducationEntries(raw.education, strictEntries),
     occupations: normalizeOccupationEntries(raw.occupations, strictEntries),
-    locations: normalizeLocationEntries(raw.locations, strictEntries)
+    locations: normalizeLocationEntries(raw.locations, strictEntries),
+    emails: normalizeEmailEntries(raw.emails, strictEntries),
+    phones: normalizePhoneEntries(raw.phones, strictEntries)
   };
 
   for (const key of CONTACT_PROFILE_TEXT_KEYS) {
@@ -714,7 +935,10 @@ function normalizeContactProfile(input: unknown, strictEntries = false): Persona
     }
   }
 
-  return reconcileContactProfileCollections(profile);
+  return reconcileContactProfileCollections(profile, {
+    preferEmails: Array.isArray(raw.emails),
+    preferPhones: Array.isArray(raw.phones)
+  });
 }
 
 function normalizeContactProfilePatch(input: unknown): Partial<PersonalContactProfile> | undefined {
@@ -757,6 +981,12 @@ function normalizeContactProfilePatch(input: unknown): Partial<PersonalContactPr
   if (Object.prototype.hasOwnProperty.call(raw, "locations")) {
     patch.locations = normalizeLocationEntries(raw.locations, true);
   }
+  if (Object.prototype.hasOwnProperty.call(raw, "emails")) {
+    patch.emails = normalizeEmailEntries(raw.emails, true);
+  }
+  if (Object.prototype.hasOwnProperty.call(raw, "phones")) {
+    patch.phones = normalizePhoneEntries(raw.phones, true);
+  }
 
   return Object.keys(patch).length > 0 ? patch : undefined;
 }
@@ -772,6 +1002,8 @@ function mergeContactProfile(
   const education = (patch.education ?? current?.education ?? []).map((entry) => ({ ...entry }));
   const occupations = (patch.occupations ?? current?.occupations ?? []).map((entry) => ({ ...entry }));
   const locations = (patch.locations ?? current?.locations ?? []).map((entry) => ({ ...entry }));
+  const emails = (patch.emails ?? current?.emails ?? []).map((entry) => ({ ...entry }));
+  const phones = (patch.phones ?? current?.phones ?? []).map((entry) => ({ ...entry }));
 
   let universityAffiliation = has("universityAffiliation")
     ? patch.universityAffiliation
@@ -854,6 +1086,63 @@ function mergeContactProfile(
     }
   }
 
+  const updateProjectedEmail = (
+    category: Extract<PersonalContactEntryCategory, "primary" | "work" | "university">,
+    address: string | undefined
+  ) => {
+    const index = emails.findIndex((entry) => entry.category === category);
+    if (!address) {
+      if (index >= 0) emails.splice(index, 1);
+      return;
+    }
+    const replacement: PersonalEmailEntry = {
+      id: index >= 0 ? emails[index].id : deterministicProfileEntryId("email", `${category}:${address}`, emails.length),
+      category,
+      address
+    };
+    if (index >= 0) emails[index] = replacement;
+    else emails.push(replacement);
+  };
+
+  let primaryEmail = has("primaryEmail") ? patch.primaryEmail : current?.primaryEmail;
+  let workEmail = has("workEmail") ? patch.workEmail : current?.workEmail;
+  let universityEmail = has("universityEmail") ? patch.universityEmail : current?.universityEmail;
+  if (patch.emails) {
+    if (!has("primaryEmail")) primaryEmail = (emails.find((entry) => entry.category === "primary") || emails[0])?.address;
+    if (!has("workEmail")) workEmail = emails.find((entry) => entry.category === "work")?.address;
+    if (!has("universityEmail")) universityEmail = emails.find((entry) => entry.category === "university")?.address;
+  } else {
+    if (has("primaryEmail")) updateProjectedEmail("primary", primaryEmail);
+    if (has("workEmail")) updateProjectedEmail("work", workEmail);
+    if (has("universityEmail")) updateProjectedEmail("university", universityEmail);
+  }
+
+  let phoneNumber = has("phoneNumber") ? patch.phoneNumber : current?.phoneNumber;
+  let phoneCountryCode = has("phoneCountryCode") ? patch.phoneCountryCode : current?.phoneCountryCode;
+  if (patch.phones) {
+    const primaryPhone = phones.find((entry) => entry.category === "primary") || phones[0];
+    if (!has("phoneNumber")) phoneNumber = primaryPhone?.number;
+    if (!has("phoneCountryCode")) phoneCountryCode = primaryPhone?.countryCode || "+1";
+  } else if (has("phoneNumber") || has("phoneCountryCode")) {
+    const index = phones.findIndex((entry) => entry.category === "primary");
+    if (!phoneNumber) {
+      if (index >= 0) phones.splice(index, 1);
+    } else {
+      const countryCode = normalizeContactCountryCode(phoneCountryCode, false, "Phone country code");
+      const normalizedNumber = normalizeContactPhoneNumber(phoneNumber, countryCode, false, "Phone") || phoneNumber;
+      const replacement: PersonalPhoneEntry = {
+        id: index >= 0 ? phones[index].id : deterministicProfileEntryId("phone", `primary:${normalizedNumber}`, phones.length),
+        category: "primary",
+        number: normalizedNumber,
+        countryCode
+      };
+      if (index >= 0) phones[index] = replacement;
+      else phones.unshift(replacement);
+      phoneNumber = normalizedNumber;
+      phoneCountryCode = countryCode;
+    }
+  }
+
   return reconcileContactProfileCollections({
     ...current,
     ...patch,
@@ -866,13 +1155,26 @@ function mergeContactProfile(
     pastEmployer,
     livesIn,
     address,
+    primaryEmail,
+    workEmail,
+    universityEmail,
+    phoneNumber,
+    phoneCountryCode,
     associatedPeople: patch.associatedPeople ?? current?.associatedPeople ?? [],
     children: patch.children ?? current?.children ?? [],
     interactions: patch.interactions ?? current?.interactions ?? [],
     memories: patch.memories ?? current?.memories ?? [],
     education,
     occupations,
-    locations
+    locations,
+    emails,
+    phones
+  }, {
+    // mergeContactProfile has already reconciled scalar compatibility fields into
+    // these collections. From this point forward, the structured lists own the
+    // value so an unrelated patch cannot re-add a projected scalar as a duplicate.
+    preferEmails: true,
+    preferPhones: true
   });
 }
 

@@ -5646,9 +5646,17 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
       await emailButton.click();
       const emailDisclosure = overview.locator('[data-contact-disclosure="email"]');
       await emailDisclosure.waitFor();
+      const emailDisclosureText = await emailDisclosure.textContent();
+      const emailLinks = emailDisclosure.getByRole("link", { name: "Email" });
       assert(
-        (await emailDisclosure.textContent()).includes("regression-person@example.com") &&
-          await emailDisclosure.getByRole("link", { name: "Email" }).getAttribute("href") === "mailto:regression-person@example.com",
+        emailDisclosureText.includes("Primary") &&
+          emailDisclosureText.includes("regression-person@example.com") &&
+          emailDisclosureText.includes("Work") &&
+          emailDisclosureText.includes("studio-regression@example.com") &&
+          emailDisclosureText.includes("Alumni") &&
+          emailDisclosureText.includes("alumni-regression@example.edu") &&
+          await emailLinks.count() === 3 &&
+          await emailLinks.first().getAttribute("href") === "mailto:regression-person@example.com",
         `People Overview contact disclosure failed at ${viewport.label}`
       );
       if (viewport.label !== "mobile") {
@@ -5667,7 +5675,7 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
       assert(
         (await overview.locator('[data-people-overview-card="quick-info"]').innerText()).includes("Regression Studio") &&
           (await overview.locator('[data-people-overview-card="quick-info"]').innerText()).includes("Ohio State University") &&
-          !(await overview.locator('[data-people-overview-card="contact"]').innerText()).includes("Work"),
+          !(await overview.locator('[data-people-overview-card="contact"]').innerText()).includes("Regression Studio"),
         `People Overview did not move employer and university into the fact list without duplicate work copy at ${viewport.label}`
       );
       await assertNoOverflow(page, `People Overview ${viewport.label}`);
@@ -5872,6 +5880,13 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         `Properties did not render every repeatable university, job, and location at ${viewport.label}`
       );
       assert(
+        await page.locator("[data-email-entry]").count() === 3 &&
+          await page.locator("[data-phone-entry]").count() === 2 &&
+          await page.getByLabel("Email 3 category").inputValue() === "custom" &&
+          await page.getByLabel("Custom category").first().inputValue() === "Alumni",
+        `Properties did not render every labeled email and phone number at ${viewport.label}`
+      );
+      assert(
         await page.locator('[data-location-entry="location-regression-1"] textarea').inputValue() === "123 Test Street, Columbus, Ohio 43215, USA",
         `Properties did not expose the primary street address at ${viewport.label}`
       );
@@ -5894,6 +5909,13 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
       await typeSelect.selectOption("org");
       assert(await page.locator(".people-edit-toolbar strong").textContent() === "New Organization", `New People did not reflect Organization type at ${viewport.label}`);
       await typeSelect.selectOption("person");
+      await page.getByLabel("Full name").fill("Avery Juniper North");
+      assert(
+        await page.locator("[data-derived-first-name]").textContent() === "Avery" &&
+          await page.locator("[data-people-derived-name]").getByText("Juniper", { exact: true }).count() === 1 &&
+          await page.locator("[data-derived-last-name]").textContent() === "North",
+        `New People did not derive first, middle, and last names from the quick full name at ${viewport.label}`
+      );
       const createGroups = (await classification.locator(".people-group-picker label").allTextContents())
         .map((label) => label.trim());
       assert(
@@ -5903,10 +5925,27 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
       const createCadenceOptions = await page.locator("[data-people-cadence-select] option").allTextContents();
       assert(createCadenceOptions.includes("No cadence"), `New People omitted No cadence at ${viewport.label}`);
       assert(
+        await page.locator("[data-email-entry]").count() === 1 &&
+          await page.locator("[data-phone-entry]").count() === 1 &&
         await page.locator("[data-education-entry]").count() === 0 &&
           await page.locator("[data-occupation-entry]").count() === 1 &&
           await page.locator("[data-location-entry]").count() === 1,
-        `New People did not start with one compact job/location and no university at ${viewport.label}`
+        `New People did not start with one compact email, phone, job, and location and no university at ${viewport.label}`
+      );
+      await page.getByLabel("Email", { exact: true }).first().fill("avery.north@example.com");
+      await page.getByLabel("Phone", { exact: true }).first().fill("6147963848");
+      await page.getByRole("button", { name: "Add email" }).click();
+      await page.getByRole("button", { name: "Add phone" }).click();
+      await page.getByLabel("Email 2 category").selectOption("custom");
+      await page.getByLabel("Custom category").fill("Alumni");
+      await page.getByLabel("Email", { exact: true }).nth(1).fill("avery.alumni@example.edu");
+      await page.getByLabel("Phone 2 category").selectOption("work");
+      await page.getByLabel("Phone", { exact: true }).nth(1).fill("6145550142");
+      assert(
+        await page.locator("[data-email-entry]").count() === 2 &&
+          await page.locator("[data-phone-entry]").count() === 2 &&
+          await page.getByLabel("Custom category").inputValue() === "Alumni",
+        `New People repeatable labeled contact controls failed at ${viewport.label}`
       );
       await page.getByRole("button", { name: "Add university" }).click();
       await page.getByRole("button", { name: "Add job" }).click();
@@ -5928,6 +5967,28 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         path: path.join(screenshotDir, `people-profile-fields-${viewport.label}.png`),
         fullPage: true
       });
+      if (viewport.label === "desktop") {
+        const [createResponse] = await Promise.all([
+          page.waitForResponse((response) =>
+            response.url().endsWith("/api/personal/records") && response.request().method() === "POST"
+          ),
+          page.getByRole("button", { name: "Save", exact: true }).click()
+        ]);
+        const createdPayload = await createResponse.json();
+        const createdFromQuickEntry = createdPayload?.items?.find((item) => item.title === "Avery Juniper North");
+        assert(createResponse.ok() && createdFromQuickEntry, "People quick entry did not save through the canonical Personal Records route");
+        assert(
+          createdFromQuickEntry.profile?.firstName === "Avery" &&
+            createdFromQuickEntry.profile?.middleName === "Juniper" &&
+            createdFromQuickEntry.profile?.lastName === "North" &&
+            createdFromQuickEntry.profile?.emails?.length === 2 &&
+            createdFromQuickEntry.profile.emails[1].category === "custom" &&
+            createdFromQuickEntry.profile.emails[1].customLabel === "Alumni" &&
+            createdFromQuickEntry.profile?.phones?.length === 2 &&
+            createdFromQuickEntry.profile.phones[1].category === "work",
+          "People quick entry did not persist derived name parts and every labeled contact method"
+        );
+      }
       await context.close();
     }
   } finally {
@@ -12974,8 +13035,16 @@ async function main() {
         time: { lastReview: "2026-07-14", reviewCadence: "NONE" },
         profile: {
           fullName: updatedPersonTitle,
-          primaryEmail: "regression-person@example.com",
           contactCadence: "NONE",
+          emails: [
+            { id: "email-regression-primary", category: "primary", address: "regression-person@example.com" },
+            { id: "email-regression-work", category: "work", address: "studio-regression@example.com" },
+            { id: "email-regression-alumni", category: "custom", customLabel: "Alumni", address: "alumni-regression@example.edu" }
+          ],
+          phones: [
+            { id: "phone-regression-primary", category: "primary", number: "6147963848", countryCode: "+1" },
+            { id: "phone-regression-university", category: "university", number: "6145550142", countryCode: "+1" }
+          ],
           education: [
             { id: "education-regression-1", institution: "Ohio State University", degree: "Bachelor of Arts", fieldOfStudy: "Economics" },
             { id: "education-regression-2", institution: "Columbus College of Art & Design", degree: "Certificate", fieldOfStudy: "Interaction design" }
@@ -13016,6 +13085,20 @@ async function main() {
     assert(persistedPerson?.title === updatedPersonTitle, "People title update did not persist");
     assert(persistedPerson?.createdAt === createdPerson.createdAt, "People update changed the original createdAt provenance");
     assert(persistedPerson?.profile?.primaryEmail === "regression-person@example.com", "People profile update did not persist");
+    assert(
+      persistedPerson?.profile?.emails?.length === 3 &&
+        persistedPerson.profile.emails[2].category === "custom" &&
+        persistedPerson.profile.emails[2].customLabel === "Alumni" &&
+        persistedPerson.profile.workEmail === "studio-regression@example.com",
+      "People repeatable labeled emails did not persist with compatible primary and work projections"
+    );
+    assert(
+      persistedPerson?.profile?.phones?.length === 2 &&
+        persistedPerson.profile.phones[0].number === "+16147963848" &&
+        persistedPerson.profile.phones[1].category === "university" &&
+        persistedPerson.profile.phoneNumber === "+16147963848",
+      "People repeatable labeled phone numbers did not persist with canonical formatting"
+    );
     assert(persistedPerson?.profile?.interactions?.length === 1, "People interaction history did not persist");
     assert(
       persistedPerson?.subjects?.includes("Colleague") &&
@@ -13051,6 +13134,23 @@ async function main() {
         persistedPerson.profile.memories[0].id === "memory-regression-older" &&
         persistedPerson.profile.memories[1].occurredOn === "2026-08-10",
       "People dated memory entries did not persist with stable identity and input order"
+    );
+
+    const rejectUnlabeledCustomEmail = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: createdPerson.id,
+        expectedUpdatedAt: persistedPerson.updatedAt,
+        profile: { emails: [{ id: "email-invalid-custom", category: "custom", address: "custom@example.com" }] }
+      })
+    });
+    assert(
+      rejectUnlabeledCustomEmail.response.status === 400 && !rejectUnlabeledCustomEmail.payload?.ok,
+      "People PATCH accepted a custom email category without its required label"
     );
 
     const rejectStalePersonMemory = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
@@ -13129,7 +13229,7 @@ async function main() {
       createdPerson.id,
       ["memory-regression-newer", "memory-regression-older"]
     );
-    pass("People profiles preserve dated memories, alphabetized groups with Acquaintance and Other, No cadence, and repeatable universities, jobs, locations, and addresses across desktop, tablet, and mobile");
+    pass("People profiles preserve dated memories, automatic name parts, labeled emails and phone numbers, groups, cadence, education, jobs, and locations across desktop, tablet, and mobile");
     pass("People create/update/clear/reload/direct-route flow works through the Personal Records adapter");
 
     const peopleBridgeFollowUpTitle = `${testRunId}-people-status-bridge`;

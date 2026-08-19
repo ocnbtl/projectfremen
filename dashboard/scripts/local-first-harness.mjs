@@ -408,6 +408,10 @@ try {
   assert.match(peopleWorkspace, /const \[groups, setGroups\]/i);
   assert.match(peopleWorkspace, /Columbus, Ohio, USA/i);
   assert.match(peopleWorkspace, /normalizePhoneForStorage/i);
+  assert.match(peopleWorkspace, /derivePersonNameParts/i);
+  assert.match(peopleWorkspace, /EmailEntriesEditor/i);
+  assert.match(peopleWorkspace, /PhoneEntriesEditor/i);
+  assert.match(peopleWorkspace, /Custom category/i);
   assert.match(peopleWorkspace, /Website & social profiles/i);
   assert.match(peopleWorkspace, /people-location-suggestions/i);
   assert.match(
@@ -423,6 +427,10 @@ try {
   assert.doesNotMatch(peopleWorkspace, /Meaningful interaction/i);
   const personalRecordsStore = await readFile("lib/personal-records-store.ts", "utf8");
   assert.match(personalRecordsStore, /phoneCountryCode/i);
+  assert.match(personalRecordsStore, /PersonalEmailEntry/i);
+  assert.match(personalRecordsStore, /PersonalPhoneEntry/i);
+  assert.match(personalRecordsStore, /normalizeEmailEntries/i);
+  assert.match(personalRecordsStore, /normalizePhoneEntries/i);
   assert.match(personalRecordsStore, /instagram/i);
   assert.match(personalRecordsStore, /tiktok/i);
   assert.match(personalRecordsStore, /normalizeEducationEntries/i);
