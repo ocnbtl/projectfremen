@@ -5351,6 +5351,36 @@ async function checkNotesSmartViewsBrowserState(
         );
       }
 
+      await page.goto(
+        `${baseUrl}/admin/notes/${encodeURIComponent(noteId)}?tab=history&probe=keep`,
+        { waitUntil: "domcontentloaded" }
+      );
+      await page.getByRole("heading", { level: 2, name: "Encrypted version history" }).waitFor();
+      await page.locator(`[data-note-version-history="${noteId}"][data-note-history-state="locked"]`).waitFor();
+      assert(
+        await page.getByRole("tab", { name: "History", selected: true }).count() === 1,
+        `Note History ${viewport.label} did not restore direct tab state`
+      );
+      assert(
+        new URL(page.url()).searchParams.get("probe") === "keep",
+        `Note History ${viewport.label} dropped unknown safe URL state`
+      );
+      const vaultLink = page.getByRole("link", { name: "Open in Vault" });
+      const vaultHref = await vaultLink.getAttribute("href");
+      assert(
+        vaultHref?.startsWith("/vault?kind=note") && vaultHref.includes("focus=search"),
+        `Note History ${viewport.label} did not expose a scoped Vault route: ${vaultHref}`
+      );
+      const historyOverflow = await page.evaluate(() => ({
+        overflowX: document.documentElement.scrollWidth > window.innerWidth,
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth
+      }));
+      assert(!historyOverflow.overflowX, `Note History ${viewport.label} has document overflow: ${JSON.stringify(historyOverflow)}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `note-history-locked-${viewport.label}.png`)
+      });
+
       await context.close();
     }
 
@@ -7911,6 +7941,183 @@ async function checkArchivedReviewFollowUpOwnerBrowserState(
   }
 }
 
+async function checkProjectCreationWorkflow(
+  baseUrl,
+  cookieJar,
+  person
+) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const browserMutations = [];
+  const screenshotDir = path.join(
+    dashboardDir,
+    "output",
+    "playwright",
+    "projects-create-workflow"
+  );
+  await mkdir(screenshotDir, { recursive: true });
+  const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+  await context.addCookies([
+    {
+      name: "admin_session",
+      value: cookieJar.get("admin_session"),
+      url: baseUrl,
+      httpOnly: true,
+      sameSite: "Lax"
+    },
+    {
+      name: "admin_csrf",
+      value: cookieJar.get("admin_csrf"),
+      url: baseUrl,
+      sameSite: "Lax"
+    }
+  ]);
+  const page = await context.newPage();
+  page.on("console", (message) => {
+    if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+      browserErrors.push(`console: ${message.text()}`);
+    }
+  });
+  page.on("pageerror", (error) => browserErrors.push(`page: ${error.message}`));
+  page.on("request", (request) => {
+    if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) {
+      browserMutations.push(`${request.method()} ${new URL(request.url()).pathname}`);
+    }
+  });
+  page.on("response", (response) => {
+    const pathname = new URL(response.url()).pathname;
+    if (response.status() >= 400 && pathname !== "/_vercel/insights/script.js") {
+      failedResponses.push(`${response.status()} ${pathname}`);
+    }
+  });
+
+  try {
+    await page.goto(`${baseUrl}/admin/projects`, { waitUntil: "networkidle" });
+    await page.getByRole("button", { name: "New project" }).click();
+    const createForm = page.locator("form").filter({ hasText: "Create native project" });
+    await createForm.waitFor();
+    const editorGeometry = await createForm.evaluate((form) => {
+      const rect = form.getBoundingClientRect();
+      return {
+        width: rect.width,
+        backdropCount: document.querySelectorAll("[class*='formBackdrop']").length
+      };
+    });
+    assert(
+      editorGeometry.width >= 430 && editorGeometry.backdropCount === 0,
+      `Project create editor did not occupy the detail pane: ${JSON.stringify(editorGeometry)}`
+    );
+
+    const projectName = `Project SAITE ${testRunId}`;
+    const nameInput = createForm.getByLabel("Project name");
+    await nameInput.pressSequentially(projectName);
+    const focusState = await nameInput.evaluate((input) => ({
+      value: input.value,
+      stillFocused: document.activeElement === input
+    }));
+    assert(
+      focusState.value === projectName && focusState.stillFocused,
+      `Project name lost focus while typing: ${JSON.stringify(focusState)}`
+    );
+
+    await createForm.getByLabel("Description").fill("Website build for Sage Burris.");
+    await createForm.getByLabel("Objective 1", { exact: true }).fill("Ship the Sage Burris website");
+    await createForm.getByLabel("Person 1", { exact: true }).selectOption(person.id);
+    await createForm.getByLabel("Role", { exact: true }).fill("Client");
+    await createForm.getByLabel("Context", { exact: true }).fill("Website owner and primary stakeholder");
+    await createForm.getByLabel("Status").selectOption("idea");
+    await createForm.getByLabel("Completion target").fill("Website is approved and live.");
+
+    const createResponsePromise = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "POST"
+    );
+    await createForm.getByRole("button", { name: "Create project" }).click();
+    const createResponse = await createResponsePromise;
+    assert(createResponse.ok(), `Project creation failed with ${createResponse.status()}: ${await createResponse.text()}`);
+    const createdPayload = await createResponse.json();
+    const projectId = createdPayload.item?.id;
+    assert(projectId, `Project creation response did not include an ID: ${JSON.stringify(createdPayload)}`);
+    await createForm.waitFor({ state: "detached" });
+
+    const projectHeader = page.getByRole("heading", { name: projectName, exact: true }).locator("..");
+    const headerText = await projectHeader.innerText();
+    assert(
+      headerText.includes(projectName) &&
+        !headerText.includes("Website build for Sage Burris") &&
+        !headerText.includes(projectId) &&
+        !headerText.includes("Native project") &&
+        !headerText.includes("priority"),
+      `Project header was not streamlined: ${headerText}`
+    );
+    await page.getByText("Website build for Sage Burris.", { exact: true }).last().waitFor();
+    const overviewObjective = page.locator('input[aria-label="Objective"]:visible').first();
+    await overviewObjective.waitFor();
+    assert(
+      (await overviewObjective.inputValue()) === "Ship the Sage Burris website",
+      "Created objective was not rendered in the streamlined overview"
+    );
+
+    await page.getByRole("button", { name: "Log update", exact: true }).first().click();
+    const interactionForm = page.locator("form").filter({ hasText: "Log project update" });
+    await interactionForm.getByLabel("Update title").fill("Initial project setup complete");
+    await interactionForm.getByLabel("Details", { exact: false }).fill("Created the project and linked its first stakeholder.");
+    const interactionResponsePromise = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "POST"
+    );
+    await interactionForm.getByRole("button", { name: "Save changes" }).click();
+    const interactionResponse = await interactionResponsePromise;
+    assert(interactionResponse.ok(), `Project update log failed with ${interactionResponse.status()}: ${await interactionResponse.text()}`);
+    await page.getByText("Initial project setup complete", { exact: true }).first().waitFor();
+
+    await page.getByRole("tab", { name: "Overview" }).click();
+    const objectiveCheckbox = page.getByLabel("Mark Ship the Sage Burris website complete");
+    await objectiveCheckbox.check();
+    const objectiveResponsePromise = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
+    );
+    await page.getByRole("button", { name: "Save objectives" }).click();
+    const objectiveResponse = await objectiveResponsePromise;
+    assert(objectiveResponse.ok(), `Objective completion failed with ${objectiveResponse.status()}: ${await objectiveResponse.text()}`);
+
+    const persisted = await requestJson(baseUrl, cookieJar, "/api/projects");
+    const storedProject = persisted.payload?.state?.projects?.find((item) => item.id === projectId);
+    const storedPerson = persisted.payload?.state?.links?.find(
+      (item) => item.projectId === projectId && item.source?.objectId === person.id && item.relationship === "project_person"
+    );
+    const storedInteraction = persisted.payload?.state?.interactions?.find(
+      (item) => item.projectId === projectId && item.title === "Initial project setup complete"
+    );
+    assert(
+      storedProject?.lifecycle === "idea" &&
+        storedProject.objectives?.length === 1 &&
+        Boolean(storedProject.objectives[0].completedAt) &&
+        storedPerson?.role === "Client" &&
+        storedPerson?.projectSpecificNote === "Website owner and primary stakeholder" &&
+        storedInteraction?.body === "Created the project and linked its first stakeholder.",
+      `Project creation workflow did not persist its additive state: ${JSON.stringify({ storedProject, storedPerson, storedInteraction })}`
+    );
+
+    const layout = await page.evaluate(() => ({
+      overflowX: document.documentElement.scrollWidth > window.innerWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(!layout.overflowX, `Project overview overflowed horizontally: ${JSON.stringify(layout)}`);
+    await page.screenshot({ path: path.join(screenshotDir, "project-saite-overview-1440x900.png"), fullPage: true });
+    assert(
+      browserMutations.join("|") === "POST /api/projects|POST /api/projects|PATCH /api/projects",
+      `Project create browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
+    );
+    assert(browserErrors.length === 0, `Project create browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Project create browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await context.close();
+    await browser.close();
+  }
+}
+
 async function checkPeopleProjectConnections(
   baseUrl,
   cookieJar,
@@ -7929,7 +8136,8 @@ async function checkPeopleProjectConnections(
     "playwright",
     "people-projects-checkpoint"
   );
-  const relationshipNote = `Design advisor for ${testRunId} project integration.`;
+  const projectRole = "Design advisor";
+  const relationshipNote = `Project context for ${testRunId} integration.`;
   const refreshedRelationshipNote = `${relationshipNote} Current status refreshed from Projects.`;
   await mkdir(screenshotDir, { recursive: true });
 
@@ -8029,57 +8237,19 @@ async function checkPeopleProjectConnections(
       { waitUntil: "networkidle" }
     );
 
-    await projectPage.getByRole("button", { name: "Edit", exact: true }).click();
-    const editDialog = projectPage.getByRole("dialog", { name: "Edit project" });
-    await editDialog.getByLabel("Project owner identity").selectOption(person.id);
-    const editFormState = await editDialog.evaluate((form) => ({
-      valid: form instanceof HTMLFormElement ? form.checkValidity() : false,
-      invalid: Array.from(form.querySelectorAll(":invalid")).map((element) => ({
-        label: element.getAttribute("aria-label") || element.getAttribute("name"),
-        value: "value" in element ? element.value : ""
-      }))
-    }));
-    assert(
-      editFormState.valid,
-      `Project editor remained invalid after selecting a People owner: ${JSON.stringify(editFormState)}`
-    );
-    const projectSaveButton = editDialog.getByRole("button", { name: "Save", exact: true });
-    assert(
-      !(await projectSaveButton.isDisabled()),
-      "Project editor Save action remained disabled after selecting a People owner"
-    );
-    const projectUpdateResponsePromise = projectPage.waitForResponse(
-      (response) =>
-        new URL(response.url()).pathname === "/api/projects" &&
-        response.request().method() === "PATCH"
-    );
-    await projectSaveButton.focus();
-    await projectSaveButton.press("Enter");
-    const projectUpdateResponse = await projectUpdateResponsePromise;
-    assert(
-      projectUpdateResponse.ok(),
-      `Project People owner update failed with ${projectUpdateResponse.status()}: ${await projectUpdateResponse.text()}`
-    );
-    await editDialog.waitFor({ state: "detached" });
-
     const projectPeoplePanel = projectPage.locator(`[data-project-people="${projectId}"]`);
     await projectPeoplePanel.getByRole("button", { name: "Link person" }).click();
-    const linkDialog = projectPage.getByRole("dialog", { name: "Link native object" });
+    const linkDialog = projectPage.locator("form").filter({ hasText: "Link native object" });
     await linkDialog.getByLabel("People identity").selectOption(person.id);
-    await linkDialog
-      .getByLabel("Relationship", { exact: true })
-      .selectOption("advisor_context");
-    await linkDialog
-      .getByLabel("Relationship strength", { exact: true })
-      .selectOption("strong");
-    await linkDialog.getByLabel("Project role or contribution").fill(relationshipNote);
+    await linkDialog.getByLabel("Role", { exact: true }).fill(projectRole);
+    await linkDialog.getByLabel("Context", { exact: false }).fill(relationshipNote);
     const projectLinkResponsePromise = projectPage.waitForResponse(
         (response) =>
           new URL(response.url()).pathname === "/api/projects" &&
           response.request().method() === "POST"
       );
     const projectLinkSaveButton = linkDialog.getByRole("button", {
-      name: "Save",
+      name: "Save changes",
       exact: true
     });
     await projectLinkSaveButton.focus();
@@ -8096,7 +8266,8 @@ async function checkPeopleProjectConnections(
     const projectPeopleText = await projectPeoplePanel.innerText();
     assert(
       projectPeopleText.includes(person.title) &&
-        projectPeopleText.includes("Advisor Context"),
+        projectPeopleText.includes(projectRole) &&
+        projectPeopleText.includes(relationshipNote),
       "Project People tab did not render the linked identity and role"
     );
 
@@ -8113,16 +8284,14 @@ async function checkPeopleProjectConnections(
     );
     assert(
       linkedProjects.response.ok &&
-        linkedProject?.ownerRef?.module === "people" &&
-        linkedProject.ownerRef.objectId === person.id &&
-        linkedProject.ownerRef.route === `/admin/people/${encodeURIComponent(person.id)}` &&
         linkedPeopleRefs?.length === 1 &&
-        linkedPeopleRefs[0].relationship === "advisor_context" &&
-        linkedPeopleRefs[0].relationshipStrength === "strong",
-      `Projects did not persist one exact People owner and link: ${JSON.stringify(linkedProjects.payload)}`
+        linkedPeopleRefs[0].relationship === "project_person" &&
+        linkedPeopleRefs[0].role === projectRole &&
+        linkedPeopleRefs[0].projectSpecificNote === relationshipNote,
+      `Projects did not persist one exact linked person with role and context: ${JSON.stringify(linkedProjects.payload)}`
     );
 
-    await personLinkRow.getByRole("link", { name: "Open source" }).click();
+    await personLinkRow.getByRole("link", { name: person.title }).click();
     await projectPage.waitForURL(
       (url) => url.pathname === `/admin/people/${encodeURIComponent(person.id)}`
     );
@@ -8154,11 +8323,11 @@ async function checkPeopleProjectConnections(
     const peoplePanelText = await peopleProjectsPanel.innerText();
     assert(
       peopleProjectText.includes(project.name) &&
-        peopleProjectText.includes("Project owner") &&
-        peopleProjectText.includes("Advisor Context") &&
+        peopleProjectText.includes(projectRole) &&
+        peopleProjectText.includes(relationshipNote) &&
         peoplePanelText.includes("1 active") &&
         peoplePanelText.includes("1 exact project identity"),
-      "People did not derive the current Project lifecycle, roles, context, and deduplicated count"
+      "People did not derive the current Project status, role, context, and deduplicated count"
     );
 
     await peopleProjectRow.click();
@@ -8277,16 +8446,11 @@ async function checkPeopleProjectConnections(
         finalPeople.response.ok &&
         finalPeople.payload.items.length === initialPersonCount &&
         finalPeopleRefs?.length === 1 &&
-        finalProject?.ownerRef?.objectId === person.id,
+        finalPeopleRefs[0]?.role === projectRole,
       "People-Projects workflow duplicated a People or Project identity"
     );
     assert(
       finalProjects.payload.state.auditEvents.some(
-        (event) =>
-          event.action === "project.updated" &&
-          event.object?.objectId === projectId
-      ) &&
-        finalProjects.payload.state.auditEvents.some(
           (event) =>
             event.action === "project_link.created" &&
             event.object?.objectId === finalPeopleRefs[0].id
@@ -8296,12 +8460,11 @@ async function checkPeopleProjectConnections(
             event.action === "project_link.updated" &&
             event.object?.objectId === finalPeopleRefs[0].id
         ),
-      "People-Projects owner, link, or refresh mutation was not represented in Projects audit history"
+      "People-Projects link or refresh mutation was not represented in Projects audit history"
     );
     assert(
-      browserMutations.length === 2 &&
-        browserMutations[0] === "PATCH /api/projects" &&
-        browserMutations[1] === "POST /api/projects",
+      browserMutations.length === 1 &&
+        browserMutations[0] === "POST /api/projects",
       `People-Projects browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
     );
     assert(
@@ -9147,7 +9310,7 @@ async function checkResourceMediaProjectAssociations(
         await repairOwnerLink.click();
         await page.waitForURL((url) => url.pathname === `/admin/projects/${project.id}` && url.searchParams.get("tab") === "files-links");
         await page.getByRole("button", { name: "Repair association" }).click();
-        const repairDialog = page.getByRole("dialog", { name: "Repair source association" });
+        const repairDialog = page.locator("form").filter({ hasText: "Repair source association" });
         await repairDialog.waitFor();
         const repairReason = `${testRunId} reverified the exact Resource identity and owner route.`;
         await repairDialog.getByLabel("Repair explanation").fill(repairReason);
@@ -9155,12 +9318,17 @@ async function checkResourceMediaProjectAssociations(
           (response) =>
             new URL(response.url()).pathname === "/api/projects" &&
             response.request().method() === "PATCH"
-        );
-        await repairDialog.getByRole("button", { name: "Save", exact: true }).click();
-        const repairResponse = await repairResponsePromise;
+        ).catch(() => null);
+        await repairDialog.getByRole("button", { name: "Save changes", exact: true }).click();
+        const repairResponse = await Promise.race([
+          repairResponsePromise,
+          page.waitForTimeout(3000).then(async () =>
+            fail(`Resource Project association repair did not submit. Editor state: ${await repairDialog.innerText()}`)
+          )
+        ]);
         assert(
-          repairResponse.ok(),
-          `Resource Project association repair failed with ${repairResponse.status()}: ${await repairResponse.text()}`
+          repairResponse?.ok(),
+          `Resource Project association repair failed${repairResponse ? ` with ${repairResponse.status()}: ${await repairResponse.text()}` : " before a response"}`
         );
         await page.getByText("previous source identity remains in audit history", { exact: false }).waitFor();
         await page.goBack({ waitUntil: "networkidle" });
@@ -13684,6 +13852,22 @@ async function main() {
     assert(noteDetail.body.includes(noteTitle), "Note editor route missing the persisted Note");
     assert(noteDetail.body.includes("Persistence boundary"), "Note editor did not disclose its persistence boundary");
 
+    const noteHistory = await requestText(server.baseUrl, cookieJar, `/admin/notes/${createdNote.id}?tab=history`);
+    assert(noteHistory.response.ok, `Note History route failed: ${describeStatus(noteHistory.response)}`);
+    assertSelectedTab(
+      noteHistory.body,
+      `note-detail-${createdNote.id}-tab-history`,
+      "Note History direct tab URL state"
+    );
+    for (const expected of [
+      "Encrypted version history",
+      "Unlock Vault to read encrypted history",
+      "The Personal Records API remains the Note writer",
+      "Open in Vault"
+    ]) {
+      assert(noteHistory.body.includes(expected), `Note History route omitted its canonical boundary: ${expected}`);
+    }
+
     const updatedNoteTitle = `${noteTitle}-updated`;
     const updateNote = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
       method: "PATCH",
@@ -16785,7 +16969,7 @@ async function main() {
       promotedProject.name,
       weeklyReviewRun.title
     );
-    pass("Notes smart views preserve URL history, responsive access, owner evidence, and zero mutations");
+    pass("Notes smart views and encrypted history preserve URL state, responsive access, owner evidence, and zero mutations");
 
     const mediaInUseWithReview = await requestText(
       server.baseUrl,
@@ -17020,6 +17204,13 @@ async function main() {
       personWithClearedUrls
     );
     pass("Projects selects and links existing People identities while People derives one current, deduplicated project-involvement view");
+
+    await checkProjectCreationWorkflow(
+      server.baseUrl,
+      cookieJar,
+      personWithClearedUrls
+    );
+    pass("Project creation keeps keyboard focus, uses the full detail pane, and persists objectives, people roles, status, and dated updates");
 
     for (const checklistItem of weeklyReviewRun.checklist.filter((item) => item.required && item.state !== "complete")) {
       const resolveWeeklyChecklist = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs", {

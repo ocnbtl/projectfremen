@@ -15,6 +15,7 @@ export type PeopleProjectConnection = {
   health: Project["health"];
   priority: Project["priority"];
   owner: boolean;
+  roles: string[];
   relationships: ProjectLinkRelationship[];
   relationshipStrengths: ProjectLinkStrength[];
   notes: string[];
@@ -86,6 +87,7 @@ function buildProjectConnections(
         health: project.health,
         priority: project.priority,
         owner,
+        roles: unique(links.map((link) => link.role?.trim() || "").filter(Boolean)),
         relationships: unique(links.map((link) => link.relationship)),
         relationshipStrengths: unique(links.map((link) => link.relationshipStrength)),
         notes: unique(

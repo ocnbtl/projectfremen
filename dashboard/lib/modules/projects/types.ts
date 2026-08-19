@@ -15,11 +15,23 @@ export const PROJECT_OBJECT_FAMILIES = [
   "projects",
   "milestones",
   "blockers",
-  "links"
+  "links",
+  "interactions"
 ] as const;
 
 export type ProjectObjectFamily = (typeof PROJECT_OBJECT_FAMILIES)[number];
-export type ProjectObjectType = "project" | "milestone" | "blocker" | "project_link";
+export type ProjectObjectType =
+  | "project"
+  | "milestone"
+  | "blocker"
+  | "project_link"
+  | "project_interaction";
+export type ProjectLifecycleState =
+  | LifecycleState
+  | "idea"
+  | "developing"
+  | "monitoring"
+  | "dormant";
 export type ProjectPriority = "low" | "medium" | "high" | "critical";
 export type ProjectReviewState = ReviewState | "unknown";
 export type ProjectCadenceState = CadenceState | "unset";
@@ -43,6 +55,21 @@ export type LegacyProjectSource = {
   entityName?: string;
 };
 
+export type ProjectObjective = {
+  id: string;
+  text: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type ProjectObjectiveInput = {
+  id?: string;
+  text: string;
+  completed?: boolean;
+  completedAt?: string;
+};
+
 export type Project = {
   id: string;
   objectType: "project";
@@ -51,7 +78,8 @@ export type Project = {
   description: string;
   area?: string;
   objective?: string;
-  lifecycle: LifecycleState;
+  objectives: ProjectObjective[];
+  lifecycle: ProjectLifecycleState;
   health: HealthState;
   review: ProjectReviewState;
   cadence: ProjectCadenceState;
@@ -68,7 +96,7 @@ export type Project = {
   completedAt?: string;
   archivedAt?: string;
   archiveReason?: string;
-  lifecycleBeforeArchive?: Exclude<LifecycleState, "archived" | "complete">;
+  lifecycleBeforeArchive?: Exclude<ProjectLifecycleState, "archived" | "complete">;
   legacySource?: LegacyProjectSource;
   createdAt: string;
   updatedAt: string;
@@ -154,6 +182,7 @@ export type ProjectLinkRelationship =
   | "advisor_context"
   | "finance_context"
   | "follow_up_context"
+  | "project_person"
   | "related_project";
 
 export type ProjectLinkStrength = "weak" | "normal" | "strong";
@@ -177,6 +206,7 @@ export type ProjectLink = {
   isReviewed: boolean;
   review: ReviewState;
   linkState: LinkState;
+  role?: string;
   projectSpecificNote?: string;
   linkedMilestoneId?: string;
   linkedDecisionId?: string;
@@ -196,12 +226,27 @@ export type ProjectLink = {
   history: ProjectHistoryEntry[];
 };
 
+export type ProjectInteraction = {
+  id: string;
+  objectType: "project_interaction";
+  projectId: string;
+  title: string;
+  body: string;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+  history: ProjectHistoryEntry[];
+};
+
 export type ProjectTimelineEventType =
   | "project_created"
   | "legacy_project_promoted"
   | "project_updated"
   | "project_archived"
   | "project_restored"
+  | "interaction_logged"
   | "milestone_created"
   | "milestone_updated"
   | "milestone_completed"
@@ -263,6 +308,7 @@ export type ProjectsState = {
   milestones: ProjectMilestone[];
   blockers: ProjectBlocker[];
   links: ProjectLink[];
+  interactions: ProjectInteraction[];
   timelineEvents: ProjectTimelineEvent[];
   auditEvents: AuditEvent[];
   legacyMappings: ProjectsLegacyMapping[];
@@ -274,7 +320,9 @@ export type ProjectCreateInput = {
   description?: string;
   area?: string;
   objective?: string;
-  lifecycle?: Extract<LifecycleState, "draft" | "planned" | "active">;
+  objectives?: ProjectObjectiveInput[];
+  people?: ProjectPersonAssignmentInput[];
+  lifecycle?: Exclude<ProjectLifecycleState, "complete" | "archived">;
   review?: ProjectReviewState;
   cadence?: ProjectCadenceState;
   priority?: ProjectPriority;
@@ -286,6 +334,12 @@ export type ProjectCreateInput = {
   visibility?: ProjectVisibility;
   privacyScope?: ProjectPrivacyScope;
   starred?: boolean;
+};
+
+export type ProjectPersonAssignmentInput = {
+  personRef: NativeObjectRef;
+  role?: string;
+  context?: string;
 };
 
 export type LegacyProjectPromotionInput = {
@@ -320,6 +374,7 @@ export type ProjectUpdateInput = Partial<
     | "starred"
   >
 > & {
+  objectives?: ProjectObjectiveInput[];
   archiveReason?: string;
   archiveConfirmed?: true;
 };
@@ -392,6 +447,7 @@ export type ProjectLinkCreateInput = {
   isPinned?: boolean;
   isReviewed?: boolean;
   review?: ReviewState;
+  role?: string;
   projectSpecificNote?: string;
   linkedMilestoneId?: string;
   linkedDecisionId?: string;
@@ -407,6 +463,7 @@ export type ProjectLinkUpdateInput = Partial<
     | "isPinned"
     | "isReviewed"
     | "review"
+    | "role"
     | "linkState"
     | "projectSpecificNote"
     | "linkedMilestoneId"
@@ -421,11 +478,23 @@ export type ProjectLinkUpdateInput = Partial<
   removalReason?: string;
 };
 
+export type ProjectInteractionCreateInput = {
+  projectId: string;
+  title: string;
+  body?: string;
+  occurredAt: string;
+};
+
+export type ProjectInteractionUpdateInput = Partial<
+  Pick<ProjectInteraction, "title" | "body" | "occurredAt">
+>;
+
 export type ProjectsCreateInputByFamily = {
   projects: ProjectCreateInput;
   milestones: ProjectMilestoneCreateInput;
   blockers: ProjectBlockerCreateInput;
   links: ProjectLinkCreateInput;
+  interactions: ProjectInteractionCreateInput;
 };
 
 export type ProjectsUpdateInputByFamily = {
@@ -433,6 +502,7 @@ export type ProjectsUpdateInputByFamily = {
   milestones: ProjectMilestoneUpdateInput;
   blockers: ProjectBlockerUpdateInput;
   links: ProjectLinkUpdateInput;
+  interactions: ProjectInteractionUpdateInput;
 };
 
 export type ProjectsObjectByFamily = {
@@ -440,12 +510,14 @@ export type ProjectsObjectByFamily = {
   milestones: ProjectMilestone;
   blockers: ProjectBlocker;
   links: ProjectLink;
+  interactions: ProjectInteraction;
 };
 
 export type ProjectsCreateResult<Family extends ProjectObjectFamily> = {
   item: ProjectsObjectByFamily[Family];
   project: Project;
   created: boolean;
+  linkedPeople?: ProjectLink[];
   mapping?: ProjectsLegacyMapping;
   auditEvent?: AuditEvent;
   timelineEvent?: ProjectTimelineEvent;

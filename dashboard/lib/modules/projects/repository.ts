@@ -180,7 +180,9 @@ function expectedObjectType(family: ProjectObjectFamily) {
       ? "milestone"
       : family === "blockers"
         ? "blocker"
-        : "project_link";
+        : family === "links"
+          ? "project_link"
+          : "project_interaction";
 }
 
 function isObjectForFamily<Family extends ProjectObjectFamily>(
@@ -203,6 +205,7 @@ function isState(value: unknown): value is ProjectsState {
     Array.isArray(value.milestones) &&
     Array.isArray(value.blockers) &&
     Array.isArray(value.links) &&
+    Array.isArray(value.interactions) &&
     Array.isArray(value.timelineEvents) &&
     Array.isArray(value.auditEvents) &&
     Array.isArray(value.legacyMappings)
@@ -227,6 +230,12 @@ function optionalTimelineEvent(value: unknown): ProjectTimelineEvent | undefined
     : undefined;
 }
 
+function optionalLinkedPeople(value: unknown) {
+  return Array.isArray(value)
+    ? value.filter((item) => isObjectForFamily(item, "links"))
+    : undefined;
+}
+
 function createResult<Family extends ProjectObjectFamily>(
   payload: ApiPayload,
   family: Family
@@ -244,6 +253,9 @@ function createResult<Family extends ProjectObjectFamily>(
       item: payload.item,
       project: payload.project,
       created: payload.created,
+      ...(optionalLinkedPeople(payload.linkedPeople)
+        ? { linkedPeople: optionalLinkedPeople(payload.linkedPeople) }
+        : {}),
       ...(optionalMapping(payload.mapping) ? { mapping: optionalMapping(payload.mapping) } : {}),
       ...(optionalAuditEvent(payload.auditEvent) ? { auditEvent: optionalAuditEvent(payload.auditEvent) } : {}),
       ...(optionalTimelineEvent(payload.timelineEvent)

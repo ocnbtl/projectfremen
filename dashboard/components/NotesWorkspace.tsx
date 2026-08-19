@@ -27,6 +27,7 @@ import NoteLinksManager from "./notes/NoteLinksManager";
 import NotePropertiesEditorSheet from "./notes/NotePropertiesEditorSheet";
 import NotePropertiesView, { NotePropertiesSummary } from "./notes/NotePropertiesView";
 import NoteReviewScheduleEditorSheet from "./notes/NoteReviewScheduleEditorSheet";
+import NoteVersionHistory from "./notes/NoteVersionHistory";
 import {
   contentLinksForObject,
   contentTargetGroupsForObject,
@@ -170,7 +171,8 @@ const HOME_TABS: readonly DetailTab[] = [
   { id: "decisions", label: "Decisions" },
   { id: "review", label: "Review" },
   { id: "attachments", label: "Attachments" },
-  { id: "properties", label: "Properties" }
+  { id: "properties", label: "Properties" },
+  { id: "history", label: "History" }
 ];
 
 const DETAIL_TABS: readonly DetailTab[] = [
@@ -179,7 +181,8 @@ const DETAIL_TABS: readonly DetailTab[] = [
   { id: "decisions", label: "Decisions" },
   { id: "review", label: "Review" },
   { id: "attachments", label: "Attachments" },
-  { id: "properties", label: "Properties" }
+  { id: "properties", label: "Properties" },
+  { id: "history", label: "History" }
 ];
 
 const VIEW_LABELS: Readonly<Record<NotesView, string>> = {
@@ -2132,6 +2135,14 @@ export default function NotesWorkspace({
       );
     }
 
+    if (inspectorDisplayTab === "history") {
+      return (
+        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="history" active>
+          <NoteVersionHistory noteId={selectedNote.id} noteTitle={selectedNote.title} />
+        </DetailTabPanel>
+      );
+    }
+
     if (inspectorDisplayTab !== "overview" && inspectorDisplayTab !== "body") {
       return (
         <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId={inspectorDisplayTab} active>
@@ -2363,7 +2374,7 @@ export default function NotesWorkspace({
                   </div>
                   {saveError && <p className={styles.errorBanner} role="alert">{saveError}</p>}
                   {notice && <p className={styles.successBanner} role="status">{notice}</p>}
-                  <div className={styles.readOnlyNotice}><strong>Persistence boundary</strong><span>Explicit Save writes title and body through the current audited Personal Records API. Lifecycle is written only when its source is directly draft/active and you explicitly change it. Autosave, structured nodes, and version history remain intentionally unavailable.</span></div>
+                  <div className={styles.readOnlyNotice}><strong>Persistence boundary</strong><span>Explicit Save writes title and body through the current audited Personal Records API. Lifecycle is written only when its source is directly draft/active and you explicitly change it. Autosave and structured nodes remain unavailable. Encrypted versions are read-only on the History tab; restore remains in Vault.</span></div>
                   <form className={styles.editorSurface} onSubmit={(event) => { event.preventDefault(); void saveNote(); }}>
                     <label className={`${styles.editorField} ${styles.editorTitle}`}>
                       Editable title
@@ -2400,6 +2411,10 @@ export default function NotesWorkspace({
                 renderDetailAttachmentsPanel(currentNote, detailTabsId)
               ) : activeTab === "properties" ? (
                 renderDetailPropertiesPanel(currentNote, detailTabsId)
+              ) : activeTab === "history" ? (
+                <DetailTabPanel tabsId={detailTabsId} tabId="history" active>
+                  <NoteVersionHistory noteId={currentNote.id} noteTitle={currentNote.title} />
+                </DetailTabPanel>
               ) : (
                 <DetailTabPanel tabsId={detailTabsId} tabId={activeTab} active>
                   <SystemState

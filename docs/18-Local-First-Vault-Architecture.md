@@ -61,7 +61,7 @@ On reconnection:
 
 ## Current implementation boundary
 
-The Vault workspace is local-first for Notes, Contacts, and Resources, including editing, complete version browsing, and restore-as-a-new-version. Projects, Personal Ops, Reviews, Finance, Media, and other mirrored records are also browsable and restorable without deleting their later history. Existing online mutations in Notes, People, Resources, Media, Personal Records, and Finance create an encrypted local mirror when the vault is unlocked in that browser session.
+The Vault workspace is local-first for Notes, Contacts, and Resources, including editing, complete version browsing, and restore-as-a-new-version. The specialized Notes workspace can also read the same encrypted Note history when that browser's Vault is unlocked; it remains a read-only projection there, and restore stays in Vault so later history and canonical reconciliation remain intact. Projects, Personal Ops, Reviews, Finance, Media, and other mirrored records are also browsable and restorable without deleting their later history. Existing online mutations in Notes, People, Resources, Media, Personal Records, and Finance create an encrypted local mirror when the vault is unlocked in that browser session.
 
 The older dashboard modules have not all been made offline-editable. Their existing Supabase-backed APIs remain canonical for their specialized validation, authorization, audits, Finance invariants, and cross-module ownership rules. Bootstrap can import their current state into encrypted history without mutating production records. This prevents a risky destructive migration while the remaining domain editors move to local-first commands one at a time.
 

@@ -288,7 +288,10 @@ export default function LinkedProjectsPanel({
             {visible.map((connection) => {
               const roles = [
                 ...(connection.owner ? ["Project owner"] : []),
-                ...connection.relationships.map(labelize)
+                ...connection.roles,
+                ...connection.relationships
+                  .filter((relationship) => relationship !== "project_person" || connection.roles.length === 0)
+                  .map(labelize)
               ];
               return (
                 <li key={connection.projectId}>

@@ -11,7 +11,6 @@ import {
   isModuleId,
   type CadenceState,
   type HealthState,
-  type LifecycleState,
   type LinkState,
   type NativeObjectRef,
   type ReviewState
@@ -31,11 +30,16 @@ import {
   type ProjectCadenceState,
   type ProjectCreateInput,
   type ProjectHistoryEntry,
+  type ProjectInteraction,
+  type ProjectLifecycleState,
   type ProjectLink,
   type ProjectLinkRelationship,
   type ProjectLinkStrength,
   type ProjectMilestone,
   type ProjectMilestoneState,
+  type ProjectObjective,
+  type ProjectObjectiveInput,
+  type ProjectPersonAssignmentInput,
   type ProjectObjectFamily,
   type ProjectPriority,
   type ProjectReviewState,
@@ -56,7 +60,17 @@ const FILE_NAME = "projects.json";
 const MAX_MODULE_AUDIT_EVENTS = 1000;
 const MAX_TIMELINE_EVENTS = 5000;
 
-const LIFECYCLE_STATES: LifecycleState[] = ["draft", "planned", "active", "complete", "archived"];
+const LIFECYCLE_STATES: ProjectLifecycleState[] = [
+  "draft",
+  "planned",
+  "idea",
+  "developing",
+  "active",
+  "monitoring",
+  "dormant",
+  "complete",
+  "archived"
+];
 const REVIEW_STATES: ProjectReviewState[] = [
   "not_required",
   "not_reviewed",
@@ -106,6 +120,7 @@ const LINK_RELATIONSHIPS: ProjectLinkRelationship[] = [
   "advisor_context",
   "finance_context",
   "follow_up_context",
+  "project_person",
   "related_project"
 ];
 const LINK_STRENGTHS: ProjectLinkStrength[] = ["weak", "normal", "strong"];
@@ -123,7 +138,7 @@ const NATIVE_REVIEW_STATES: ReviewState[] = [
 /**
  * Explicit, versioned health rules. These are category rules, not a weighted
  * readiness formula: high/critical blockers block; other open-loop conditions
- * need attention; an operational project with owner and objective is healthy.
+ * need attention; an operational project with at least one objective is healthy.
  */
 export const PROJECT_HEALTH_RULESET_VERSION = "projects-health-v1" as const;
 
@@ -131,7 +146,8 @@ const FAMILY_OBJECT_TYPE = {
   projects: "project",
   milestones: "milestone",
   blockers: "blocker",
-  links: "project_link"
+  links: "project_link",
+  interactions: "project_interaction"
 } as const;
 
 let mutationQueue: Promise<void> = Promise.resolve();
@@ -166,6 +182,7 @@ export function createEmptyProjectsState(): ProjectsState {
     milestones: [],
     blockers: [],
     links: [],
+    interactions: [],
     timelineEvents: [],
     auditEvents: [],
     legacyMappings: []
@@ -254,6 +271,41 @@ function stringList(value: unknown, field: string, limit = 60): string[] {
   return result;
 }
 
+function normalizeObjectives(
+  value: unknown,
+  field: string,
+  now: string,
+  existing: ProjectObjective[] = []
+): ProjectObjective[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) validation(`${field} must be a list`, field);
+  if (value.length > 40) validation(`${field} can include at most 40 objectives`, field);
+  const seen = new Set<string>();
+  return value.map((candidate, index) => {
+    if (!isRecord(candidate)) validation(`${field}.${index} must be an objective`, field);
+    const id = optionalText(candidate.id, `${field}.${index}.id`, 240) || `project-objective-${crypto.randomUUID()}`;
+    if (seen.has(id)) validation(`${field} cannot include duplicate objective IDs`, field);
+    seen.add(id);
+    const prior = existing.find((item) => item.id === id);
+    const text = requiredText(candidate.text, `${field}.${index}.text`, 1000);
+    const completed = candidate.completed === true || Boolean(candidate.completedAt);
+    const completedAt = completed
+      ? optionalDate(candidate.completedAt, `${field}.${index}.completedAt`) || prior?.completedAt || now
+      : undefined;
+    return {
+      id,
+      text,
+      ...(completedAt ? { completedAt } : {}),
+      createdAt: prior?.createdAt || optionalDate(candidate.createdAt, `${field}.${index}.createdAt`) || now,
+      updatedAt: now
+    };
+  });
+}
+
+function objectiveSummary(objectives: ProjectObjective[]): string | undefined {
+  return objectives.find((item) => !item.completedAt)?.text || objectives[0]?.text;
+}
+
 function normalizeNativeRef(value: unknown, field: string): NativeObjectRef {
   if (!isRecord(value)) validation(`${field} must be a native object reference`, field);
   const module = requiredText(value.module, `${field}.module`, 40);
@@ -331,7 +383,14 @@ function projectRef(project: Project): NativeObjectRef {
   });
 }
 
-function objectRef(item: Project | ProjectMilestone | ProjectBlocker | ProjectLink): NativeObjectRef {
+type ProjectAuditableObject =
+  | Project
+  | ProjectMilestone
+  | ProjectBlocker
+  | ProjectLink
+  | ProjectInteraction;
+
+function objectRef(item: ProjectAuditableObject): NativeObjectRef {
   if (item.objectType === "project") return projectRef(item);
   const label =
     item.objectType === "project_link"
@@ -346,17 +405,17 @@ function objectRef(item: Project | ProjectMilestone | ProjectBlocker | ProjectLi
   });
 }
 
-function snapshot(value: Project | ProjectMilestone | ProjectBlocker | ProjectLink | null): AuditSnapshot {
+function snapshot(value: ProjectAuditableObject | null): AuditSnapshot {
   if (!value) return null;
   return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
 }
 
 function moduleAuditEvent(input: {
-  item: Project | ProjectMilestone | ProjectBlocker | ProjectLink;
+  item: ProjectAuditableObject;
   action: string;
   actorId: string;
   occurredAt: string;
-  before: Project | ProjectMilestone | ProjectBlocker | ProjectLink | null;
+  before: ProjectAuditableObject | null;
   source?: AuditSource;
 }): AuditEvent {
   return createAuditEvent({
@@ -378,8 +437,9 @@ function timelineEvent(input: {
   summary: string;
   actorId: string;
   occurredAt: string;
-  relatedObject?: Project | ProjectMilestone | ProjectBlocker | ProjectLink;
+  relatedObject?: ProjectAuditableObject;
   sourceRef?: NativeObjectRef;
+  isManual?: boolean;
 }): ProjectTimelineEvent {
   return {
     id: `project-event-${crypto.randomUUID()}`,
@@ -392,7 +452,7 @@ function timelineEvent(input: {
     occurredAt: input.occurredAt,
     ...(input.sourceRef ? { sourceRef: input.sourceRef } : {}),
     ...(input.relatedObject ? { relatedObjectRef: objectRef(input.relatedObject) } : {}),
-    isManual: false,
+    isManual: input.isManual ?? false,
     actorId: input.actorId,
     createdAt: input.occurredAt
   };
@@ -444,7 +504,37 @@ function assertState(value: unknown): ProjectsState {
       });
     }
   }
-  return value as unknown as ProjectsState;
+  const interactions = Array.isArray(value.interactions) ? value.interactions : [];
+  const projects = (value.projects as unknown[]).map((candidate, index) => {
+    if (!isRecord(candidate)) {
+      throw new ProjectsStoreError("server", `Projects data is malformed: projects.${index} must be an object.`, {
+        status: 500
+      });
+    }
+    const migrationTime =
+      typeof candidate.updatedAt === "string"
+        ? candidate.updatedAt
+        : typeof candidate.createdAt === "string"
+          ? candidate.createdAt
+          : new Date(0).toISOString();
+    const legacyObjective = optionalText(candidate.objective, `projects.${index}.objective`, 4000);
+    const objectiveSource = Array.isArray(candidate.objectives)
+      ? candidate.objectives
+      : legacyObjective
+        ? [{ id: `objective-${String(candidate.id || index)}-legacy`, text: legacyObjective }]
+        : [];
+    const objectives = normalizeObjectives(objectiveSource, `projects.${index}.objectives`, migrationTime);
+    return {
+      ...candidate,
+      objectives,
+      objective: objectiveSummary(objectives)
+    } as Project;
+  });
+  return {
+    ...(value as unknown as ProjectsState),
+    projects,
+    interactions: interactions as ProjectInteraction[]
+  };
 }
 
 export async function readProjectsState(): Promise<ProjectsState> {
@@ -523,8 +613,7 @@ function deriveProjectHealth(project: Project, state: ProjectsState, now: string
     blockers.length > 0 ||
     hasOverdueMilestone ||
     milestones.some((milestone) => milestone.state === "blocked" || milestone.state === "due") ||
-    !project.owner ||
-    !project.objective
+    project.objectives.length === 0
   ) {
     return "attention";
   }
@@ -592,6 +681,12 @@ function buildNativeProject(
     );
   }
 
+  const legacyObjective = optionalText(raw.objective, "objective", 4000);
+  const objectives = normalizeObjectives(
+    raw.objectives ?? (legacyObjective ? [{ text: legacyObjective }] : []),
+    "objectives",
+    now
+  );
   const project: Project = {
     id: newProjectId(),
     objectType: "project",
@@ -599,8 +694,9 @@ function buildNativeProject(
     name,
     description: optionalText(raw.description, "description") || "",
     area: optionalText(raw.area, "area", 160),
-    objective: optionalText(raw.objective, "objective", 4000),
-    lifecycle: enumValue(raw.lifecycle, ["draft", "planned", "active"] as const, "planned", "lifecycle"),
+    objective: objectiveSummary(objectives),
+    objectives,
+    lifecycle: enumValue(raw.lifecycle, LIFECYCLE_STATES.filter((state) => !["complete", "archived"].includes(state)), "idea", "lifecycle"),
     health: "unknown",
     review: enumValue(raw.review, REVIEW_STATES, "not_reviewed", "review"),
     cadence: enumValue(raw.cadence, CADENCE_STATES, "unset", "cadence"),
@@ -662,6 +758,12 @@ export async function promoteLegacyProject(
     uniqueProjectSlug(state, definition.slug);
 
     const now = requestedNow;
+    const legacyObjective = optionalText(raw.objective, "objective", 4000);
+    const objectives = normalizeObjectives(
+      legacyObjective ? [{ text: legacyObjective }] : [],
+      "objectives",
+      now
+    );
     const project: Project = {
       id: definition.projectId,
       objectType: "project",
@@ -669,7 +771,8 @@ export async function promoteLegacyProject(
       name: definition.name,
       description: definition.description,
       area: optionalText(raw.area, "area", 160),
-      objective: optionalText(raw.objective, "objective", 4000),
+      objective: objectiveSummary(objectives),
+      objectives,
       lifecycle: definition.lifecycle,
       health: "unknown",
       review: "unknown",
@@ -821,6 +924,7 @@ function buildLink(
     isReviewed: booleanValue(raw.isReviewed, false, "isReviewed"),
     review: enumValue(raw.review, NATIVE_REVIEW_STATES, "not_reviewed", "review"),
     linkState: "active",
+    role: optionalText(raw.role, "role", 240),
     projectSpecificNote: optionalText(raw.projectSpecificNote, "projectSpecificNote", 4000),
     linkedMilestoneId: optionalText(raw.linkedMilestoneId, "linkedMilestoneId", 240),
     linkedDecisionId: optionalText(raw.linkedDecisionId, "linkedDecisionId", 240),
@@ -833,7 +937,66 @@ function buildLink(
   };
 }
 
-function createEventDetails(item: ProjectMilestone | ProjectBlocker | ProjectLink) {
+function buildInteraction(
+  input: ProjectsCreateInputByFamily["interactions"],
+  now: string,
+  actorId: string
+): ProjectInteraction {
+  const raw = input as unknown as Record<string, unknown>;
+  return {
+    id: `project-interaction-${crypto.randomUUID()}`,
+    objectType: "project_interaction",
+    projectId: requiredText(raw.projectId, "projectId", 240),
+    title: requiredText(raw.title, "title", 240),
+    body: optionalText(raw.body, "body", 12000) || "",
+    occurredAt: new Date(
+      requiredText(optionalDate(raw.occurredAt, "occurredAt"), "occurredAt", 120)
+    ).toISOString(),
+    createdAt: now,
+    updatedAt: now,
+    createdBy: actorId,
+    updatedBy: actorId,
+    history: [historyEntry("logged", now, actorId)]
+  };
+}
+
+function buildProjectPeople(
+  value: unknown,
+  state: ProjectsState,
+  project: Project,
+  now: string,
+  actorId: string
+): ProjectLink[] {
+  if (value === undefined) return [];
+  if (!Array.isArray(value)) validation("people must be a list", "people");
+  if (value.length > 40) validation("A project can include at most 40 people during creation", "people");
+  const seen = new Set<string>();
+  return value.map((candidate, index) => {
+    if (!isRecord(candidate)) validation(`people.${index} must be a person assignment`, "people");
+    const assignment = candidate as unknown as ProjectPersonAssignmentInput;
+    const personRef = normalizeNativeRef(assignment.personRef, `people.${index}.personRef`);
+    if (personRef.module !== "people") {
+      validation(`people.${index}.personRef must link to the People module`, `people.${index}.personRef`);
+    }
+    const identity = `${personRef.objectType}:${personRef.objectId}`;
+    if (seen.has(identity)) validation("Each person can only be added once", "people");
+    seen.add(identity);
+    return buildLink(
+      {
+        projectId: project.id,
+        source: personRef,
+        relationship: "project_person",
+        role: assignment.role,
+        projectSpecificNote: assignment.context
+      },
+      state,
+      now,
+      actorId
+    );
+  });
+}
+
+function createEventDetails(item: ProjectMilestone | ProjectBlocker | ProjectLink | ProjectInteraction) {
   if (item.objectType === "milestone") {
     return {
       eventType: "milestone_created" as const,
@@ -846,6 +1009,13 @@ function createEventDetails(item: ProjectMilestone | ProjectBlocker | ProjectLin
       eventType: "blocker_opened" as const,
       title: "Blocker opened",
       summary: `${item.title} opened with ${item.severity} severity.`
+    };
+  }
+  if (item.objectType === "project_interaction") {
+    return {
+      eventType: "interaction_logged" as const,
+      title: item.title,
+      summary: item.body || "Update logged."
     };
   }
   return {
@@ -868,6 +1038,13 @@ export async function createProjectsObject<Family extends ProjectObjectFamily>(
     const state = await readProjectsState();
     if (family === "projects") {
       const item = buildNativeProject(input as ProjectCreateInput, state, requestedNow, actorId);
+      const linkedPeople = buildProjectPeople(
+        (input as ProjectCreateInput).people,
+        state,
+        item,
+        requestedNow,
+        actorId
+      );
       const auditEvent = moduleAuditEvent({
         item,
         action: "project.created",
@@ -884,27 +1061,38 @@ export async function createProjectsObject<Family extends ProjectObjectFamily>(
         occurredAt: requestedNow,
         relatedObject: item
       });
+      const peopleAuditEvents = linkedPeople.map((link) =>
+        moduleAuditEvent({
+          item: link,
+          action: "project_link.created",
+          actorId,
+          occurredAt: requestedNow,
+          before: null
+        })
+      );
       await writeJsonFile(FILE_NAME, {
         ...state,
         projects: [item, ...state.projects],
-        auditEvents: appendModuleAudit(state, auditEvent),
+        links: [...linkedPeople, ...state.links],
+        auditEvents: [...state.auditEvents, auditEvent, ...peopleAuditEvents].slice(-MAX_MODULE_AUDIT_EVENTS),
         timelineEvents: appendTimeline(state, event)
       } satisfies ProjectsState);
       return {
         item,
         project: item,
         created: true,
+        linkedPeople,
         auditEvent,
         timelineEvent: event
       } as ProjectsCreateResult<Family>;
     }
 
-    let child: ProjectMilestone | ProjectBlocker | ProjectLink;
+    let child: ProjectMilestone | ProjectBlocker | ProjectLink | ProjectInteraction;
     if (family === "milestones") {
       child = buildMilestone(input as ProjectsCreateInputByFamily["milestones"], requestedNow, actorId);
     } else if (family === "blockers") {
       child = buildBlocker(input as ProjectsCreateInputByFamily["blockers"], requestedNow, actorId);
-    } else {
+    } else if (family === "links") {
       const linkCandidate = buildLink(
         input as ProjectsCreateInputByFamily["links"],
         state,
@@ -923,6 +1111,12 @@ export async function createProjectsObject<Family extends ProjectObjectFamily>(
         const project = projectById(state, existing.projectId);
         return { item: existing, project, created: false } as ProjectsCreateResult<Family>;
       }
+    } else {
+      child = buildInteraction(
+        input as ProjectsCreateInputByFamily["interactions"],
+        requestedNow,
+        actorId
+      );
     }
 
     const currentProject = projectById(state, child.projectId);
@@ -950,9 +1144,10 @@ export async function createProjectsObject<Family extends ProjectObjectFamily>(
       project,
       ...details,
       actorId,
-      occurredAt: requestedNow,
+      occurredAt: child.objectType === "project_interaction" ? child.occurredAt : requestedNow,
       relatedObject: child,
-      ...(child.objectType === "project_link" ? { sourceRef: child.source } : {})
+      ...(child.objectType === "project_link" ? { sourceRef: child.source } : {}),
+      ...(child.objectType === "project_interaction" ? { isManual: true } : {})
     });
     const nextState: ProjectsState = {
       ...interim,
@@ -1014,7 +1209,21 @@ function applyProjectPatch(
   if (hasOwn(patch, "slug")) next.slug = normalizeSlug(patch.slug, next.name);
   if (hasOwn(patch, "description")) next.description = optionalText(patch.description, "description") || "";
   if (hasOwn(patch, "area")) next.area = optionalText(patch.area, "area", 160);
-  if (hasOwn(patch, "objective")) next.objective = optionalText(patch.objective, "objective", 4000);
+  if (hasOwn(patch, "objectives")) {
+    next.objectives = normalizeObjectives(patch.objectives, "objectives", now, current.objectives);
+    next.objective = objectiveSummary(next.objectives);
+  } else if (hasOwn(patch, "objective")) {
+    const legacyObjective = optionalText(patch.objective, "objective", 4000);
+    next.objectives = normalizeObjectives(
+      legacyObjective
+        ? [{ id: current.objectives[0]?.id, text: legacyObjective }]
+        : [],
+      "objectives",
+      now,
+      current.objectives
+    );
+    next.objective = objectiveSummary(next.objectives);
+  }
   if (hasOwn(patch, "review")) next.review = enumValue(patch.review, REVIEW_STATES, current.review, "review");
   if (hasOwn(patch, "cadence")) next.cadence = enumValue(patch.cadence, CADENCE_STATES, current.cadence, "cadence");
   if (hasOwn(patch, "priority")) next.priority = enumValue(patch.priority, PRIORITIES, current.priority, "priority");
@@ -1033,13 +1242,13 @@ function applyProjectPatch(
     if (patch.archiveConfirmed !== true) {
       validation("Confirm project archive after reviewing its active milestones and links", "archiveConfirmed");
     }
-    next.lifecycleBeforeArchive = current.lifecycle as Exclude<LifecycleState, "archived" | "complete">;
+    next.lifecycleBeforeArchive = current.lifecycle as Exclude<ProjectLifecycleState, "archived" | "complete">;
     next.lifecycle = "archived";
     next.archivedAt = now;
     next.archiveReason = requiredText(patch.archiveReason, "archiveReason", 2000);
   } else if (current.lifecycle === "archived" && requestedLifecycle !== "archived") {
-    if (!["draft", "planned", "active"].includes(requestedLifecycle)) {
-      validation("Restore a project to draft, planned, or active", "lifecycle");
+    if (!["draft", "planned", "idea", "developing", "active", "monitoring", "dormant"].includes(requestedLifecycle)) {
+      validation("Restore a project to an operational status", "lifecycle");
     }
     next.lifecycle = next.lifecycleBeforeArchive || requestedLifecycle;
     next.lifecycleBeforeArchive = undefined;
@@ -1344,6 +1553,7 @@ function applyLinkPatch(
     next.isReviewed = booleanValue(patch.isReviewed, current.isReviewed, "isReviewed");
   }
   if (hasOwn(patch, "review")) next.review = enumValue(patch.review, NATIVE_REVIEW_STATES, current.review, "review");
+  if (hasOwn(patch, "role")) next.role = optionalText(patch.role, "role", 240);
   if (hasOwn(patch, "projectSpecificNote")) {
     next.projectSpecificNote = optionalText(patch.projectSpecificNote, "projectSpecificNote", 4000);
   }
@@ -1389,9 +1599,29 @@ function applyLinkPatch(
   return next;
 }
 
+function applyInteractionPatch(
+  current: ProjectInteraction,
+  patch: Record<string, unknown>,
+  now: string,
+  actorId: string
+): ProjectInteraction {
+  const next: ProjectInteraction = { ...current };
+  if (hasOwn(patch, "title")) next.title = requiredText(patch.title, "title", 240);
+  if (hasOwn(patch, "body")) next.body = optionalText(patch.body, "body", 12000) || "";
+  if (hasOwn(patch, "occurredAt")) {
+    next.occurredAt = new Date(
+      requiredText(optionalDate(patch.occurredAt, "occurredAt"), "occurredAt", 120)
+    ).toISOString();
+  }
+  next.updatedAt = monotonicTimestamp(current.updatedAt, now);
+  next.updatedBy = actorId;
+  next.history = [...current.history, historyEntry("updated", next.updatedAt, actorId)];
+  return next;
+}
+
 function updateEventDetails(
-  current: ProjectMilestone | ProjectBlocker | ProjectLink,
-  next: ProjectMilestone | ProjectBlocker | ProjectLink,
+  current: ProjectMilestone | ProjectBlocker | ProjectLink | ProjectInteraction,
+  next: ProjectMilestone | ProjectBlocker | ProjectLink | ProjectInteraction,
   mutationAction = "update"
 ) {
   if (next.objectType === "milestone" && current.objectType === "milestone") {
@@ -1415,6 +1645,13 @@ function updateEventDetails(
       eventType,
       title: eventType === "blocker_updated" ? "Blocker updated" : `Blocker ${next.state.replace(/_/g, " ")}`,
       summary: `${next.title} is now ${next.state.replace(/_/g, " ")}.`
+    };
+  }
+  if (next.objectType === "project_interaction" && current.objectType === "project_interaction") {
+    return {
+      eventType: "interaction_logged" as const,
+      title: next.title,
+      summary: next.body || "Update logged."
     };
   }
   const link = next as ProjectLink;
@@ -1505,16 +1742,18 @@ export async function updateProjectsObject<Family extends ProjectObjectFamily>(
       return { item, project: item, auditEvent, timelineEvent: event } as ProjectsUpdateResult<Family>;
     }
 
-    const childCurrent = current as ProjectMilestone | ProjectBlocker | ProjectLink;
+    const childCurrent = current as ProjectMilestone | ProjectBlocker | ProjectLink | ProjectInteraction;
     const currentProject = projectById(state, childCurrent.projectId);
     ensureOperationalProject(currentProject);
-    let childNext: ProjectMilestone | ProjectBlocker | ProjectLink;
+    let childNext: ProjectMilestone | ProjectBlocker | ProjectLink | ProjectInteraction;
     if (family === "milestones" && childCurrent.objectType === "milestone") {
       childNext = applyMilestonePatch(childCurrent, rawPatch, requestedNow, actorId);
     } else if (family === "blockers" && childCurrent.objectType === "blocker") {
       childNext = applyBlockerPatch(childCurrent, rawPatch, requestedNow, actorId);
     } else if (family === "links" && childCurrent.objectType === "project_link") {
       childNext = applyLinkPatch(childCurrent, rawPatch, state, requestedNow, actorId);
+    } else if (family === "interactions" && childCurrent.objectType === "project_interaction") {
+      childNext = applyInteractionPatch(childCurrent, rawPatch, requestedNow, actorId);
     } else {
       throw new ProjectsStoreError("server", "Projects object family did not match its object type", {
         status: 500
@@ -1558,9 +1797,10 @@ export async function updateProjectsObject<Family extends ProjectObjectFamily>(
       project,
       ...details,
       actorId,
-      occurredAt: childNext.updatedAt,
+      occurredAt: childNext.objectType === "project_interaction" ? childNext.occurredAt : childNext.updatedAt,
       relatedObject: childNext,
-      ...(childNext.objectType === "project_link" ? { sourceRef: childNext.source } : {})
+      ...(childNext.objectType === "project_link" ? { sourceRef: childNext.source } : {}),
+      ...(childNext.objectType === "project_interaction" ? { isManual: true } : {})
     });
     const nextState: ProjectsState = {
       ...interim,

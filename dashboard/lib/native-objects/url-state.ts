@@ -472,7 +472,7 @@ const NOTES_VIEWS = [
 const NOTES_FILTERS = ["all", "active", "pinned", "linked", "no-links", "needs-review"] as const;
 const NOTES_SORTS = ["updated-desc", "updated-asc", "created-desc", "title", "review"] as const;
 const NOTES_DENSITIES = ["comfortable", "compact"] as const;
-const NOTES_TABS = ["overview", "body", "links", "decisions", "review", "attachments", "properties"] as const;
+const NOTES_TABS = ["overview", "body", "links", "decisions", "review", "attachments", "properties", "history"] as const;
 
 export type NotesView = (typeof NOTES_VIEWS)[number];
 export type NotesFilter = (typeof NOTES_FILTERS)[number];

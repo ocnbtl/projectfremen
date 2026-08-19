@@ -4,7 +4,6 @@ import { createNativeObjectRef } from "../../native-objects/routes";
 import type {
   CadenceState,
   HealthState,
-  LifecycleState,
   NativeObjectRef,
   ReviewState
 } from "../../native-objects/types";
@@ -18,8 +17,11 @@ import type {
   Project,
   ProjectBlocker,
   ProjectCadenceState,
+  ProjectInteraction,
+  ProjectLifecycleState,
   ProjectLink,
   ProjectMilestone,
+  ProjectObjective,
   ProjectPriority,
   ProjectReviewState,
   ProjectsState,
@@ -44,7 +46,7 @@ export type ProjectDisplayRecord = {
   sourceKind: "native" | "legacy_projection";
   editable: boolean;
   promotable: boolean;
-  lifecycle: LifecycleState;
+  lifecycle: ProjectLifecycleState;
   health: HealthState;
   review: ProjectReviewState;
   cadence: ProjectCadenceState;
@@ -53,6 +55,7 @@ export type ProjectDisplayRecord = {
   ownerRef?: NativeObjectRef;
   area?: string;
   objective?: string;
+  objectives: ProjectObjective[];
   lifecycleBeforeArchive?: Project["lifecycleBeforeArchive"];
   starred: boolean;
   legacyKey?: string;
@@ -67,6 +70,7 @@ export type ProjectLinkedContextSummary = {
   sourceKind: "native_project_link" | "legacy_project_tag" | "personal_ops_reference";
   relationship: string;
   summary?: string;
+  role?: string;
   legacyStatus?: string;
   updatedAt?: string;
 };
@@ -96,6 +100,7 @@ export type ProjectDirectoryItem = {
   milestones: ProjectMilestone[];
   blockers: ProjectBlocker[];
   links: ProjectLink[];
+  interactions: ProjectInteraction[];
   timelineEvents: ProjectTimelineEvent[];
   linkedContext: ProjectLinkedContextSummary[];
   legacyKpis: LegacyKpiSummary[];
@@ -155,6 +160,7 @@ function displayFromNative(project: Project): ProjectDisplayRecord {
     ownerRef: project.ownerRef,
     area: project.area,
     objective: project.objective,
+    objectives: project.objectives,
     lifecycleBeforeArchive: project.lifecycleBeforeArchive,
     starred: project.starred,
     legacyKey: project.legacySource?.key,
@@ -180,6 +186,7 @@ function displayFromLegacy(project: LegacyProjectDefinition): ProjectDisplayReco
     review: "unknown",
     cadence: "unset",
     priority: "medium",
+    objectives: [],
     starred: false,
     legacyKey: project.key,
     legacyRoute: project.legacyRoute,
@@ -317,6 +324,7 @@ function nativeLinkContext(links: readonly ProjectLink[]): ProjectLinkedContextS
       sourceKind: "native_project_link" as const,
       relationship: link.relationship,
       summary: link.projectSpecificNote,
+      role: link.role,
       legacyStatus: link.linkState,
       updatedAt: link.updatedAt
     }));
@@ -371,8 +379,7 @@ function attentionReasons(input: {
   }
   if (input.project.lifecycle === "archived") return [];
   const reasons: string[] = [];
-  if (!input.project.owner) reasons.push("Project owner is not assigned.");
-  if (!input.project.objective) reasons.push("Project objective is not defined.");
+  if (input.project.objectives.length === 0) reasons.push("Project objectives are not defined.");
   const openBlockers = input.blockers.filter((blocker) => blocker.state === "open");
   if (openBlockers.length) reasons.push(`${openBlockers.length} open project blocker${openBlockers.length === 1 ? "" : "s"}.`);
   const now = Date.now();
@@ -413,6 +420,9 @@ export function buildProjectsWorkspaceSnapshot({
     const links = state.links
       .filter((item) => item.projectId === project.id)
       .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+    const interactions = state.interactions
+      .filter((item) => item.projectId === project.id)
+      .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
     const timelineEvents = state.timelineEvents
       .filter((item) => item.projectId === project.id)
       .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
@@ -422,6 +432,7 @@ export function buildProjectsWorkspaceSnapshot({
       milestones,
       blockers,
       links,
+      interactions,
       timelineEvents,
       linkedContext: [
         ...nativeLinkContext(links),
@@ -467,7 +478,7 @@ export function findProjectDirectoryItem(
 
 // Re-export commonly consumed state dimensions for the client workspace contract.
 export type ProjectWorkspaceStateDimensions = {
-  lifecycle: LifecycleState;
+  lifecycle: ProjectLifecycleState;
   health: HealthState;
   review: ReviewState | "unknown";
   cadence: CadenceState | "unset";
