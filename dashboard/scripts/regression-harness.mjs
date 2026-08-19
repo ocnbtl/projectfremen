@@ -6284,25 +6284,47 @@ async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, 
       { label: "tablet", width: 1024, height: 768 },
       { label: "mobile", width: 390, height: 844 }
     ]) {
-      const responsiveContext = await contextFor({ width: viewport.width, height: viewport.height });
-      const responsivePage = await responsiveContext.newPage();
-      await responsivePage.goto(`${baseUrl}/admin/people?sidebar=starred`, { waitUntil: "networkidle" });
-      row = responsivePage.locator(".people-directory-row").filter({ hasText: personTitle }).first();
-      await row.waitFor();
-      assert(
-        await row.locator("[data-people-starred]").count() === 1,
-        `Restored starred profile did not retain its directory marker at ${viewport.label}`
-      );
-      const dimensions = await responsivePage.evaluate(() => ({
-        scrollWidth: document.documentElement.scrollWidth,
-        innerWidth: window.innerWidth
-      }));
-      assert(dimensions.scrollWidth <= dimensions.innerWidth, `People starred view overflowed at ${viewport.label}: ${JSON.stringify(dimensions)}`);
-      await responsivePage.screenshot({
-        path: path.join(screenshotDir, `people-starred-${viewport.label}.png`),
-        fullPage: true
-      });
-      await responsiveContext.close();
+      for (const viewMode of ["list", "compact", "grid"]) {
+        const responsiveContext = await contextFor({ width: viewport.width, height: viewport.height });
+        const responsivePage = await responsiveContext.newPage();
+        await responsivePage.goto(`${baseUrl}/admin/people?sidebar=starred&view=${viewMode}`, { waitUntil: "networkidle" });
+        row = responsivePage.locator(".people-directory-row").filter({ hasText: personTitle }).first();
+        await row.waitFor();
+        const starMarker = row.locator("[data-people-starred]");
+        assert(
+          await starMarker.count() === 1,
+          `Restored starred profile did not retain its directory marker in ${viewMode} view at ${viewport.label}`
+        );
+        assert(
+          await row.locator(".people-row-main [data-people-starred]").count() === 0,
+          `People directory left the star inside the name block in ${viewMode} view at ${viewport.label}`
+        );
+        const rowBox = await row.boundingBox();
+        const mainBox = await row.locator(".people-row-main").boundingBox();
+        const starBox = await starMarker.boundingBox();
+        assert(rowBox && mainBox && starBox, `People directory did not render the starred row layout in ${viewMode} view at ${viewport.label}`);
+        assert(
+          starBox.x >= mainBox.x + mainBox.width,
+          `People directory did not place the star to the right of the name in ${viewMode} view at ${viewport.label}`
+        );
+        assert(
+          rowBox.x + rowBox.width - (starBox.x + starBox.width) <= 20,
+          `People directory did not align the star to the far-right edge in ${viewMode} view at ${viewport.label}`
+        );
+        const dimensions = await responsivePage.evaluate(() => ({
+          scrollWidth: document.documentElement.scrollWidth,
+          innerWidth: window.innerWidth
+        }));
+        assert(
+          dimensions.scrollWidth <= dimensions.innerWidth,
+          `People starred ${viewMode} view overflowed at ${viewport.label}: ${JSON.stringify(dimensions)}`
+        );
+        await responsivePage.screenshot({
+          path: path.join(screenshotDir, `people-starred-${viewMode}-${viewport.label}.png`),
+          fullPage: true
+        });
+        await responsiveContext.close();
+      }
     }
   } finally {
     await browser.close();

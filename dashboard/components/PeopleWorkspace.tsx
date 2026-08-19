@@ -2996,10 +2996,7 @@ export default function PeopleWorkspace({
                   >
                     <span className="people-row-avatar" aria-hidden="true">{getInitials(record)}</span>
                     <span className="people-row-main">
-                      <strong>
-                        {record.title}
-                        {record.starred && <span className="people-directory-star" data-people-starred aria-label="Starred">★</span>}
-                      </strong>
+                      <strong>{record.title}</strong>
                       <small>{[profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at ") || profile.context || getPrimaryGroup(record)}</small>
                       <span>
                         {[getPrimaryGroup(record), ...record.projects.slice(0, 1)].filter(Boolean).map((tag) => (
@@ -3012,6 +3009,7 @@ export default function PeopleWorkspace({
                       {formatLastContact(record)}
                     </span>
                     <span className="people-row-next">{getDirectoryNextContactLabel(record)}</span>
+                    {record.starred && <span className="people-row-star" data-people-starred aria-label="Starred">★</span>}
                   </button>
                 </article>
               );
