@@ -20,13 +20,12 @@ import { usePersonalOpsDecisions } from "../operational/usePersonalOpsDecisions"
 import { usePersonalOpsFollowUps } from "../operational/usePersonalOpsFollowUps";
 import {
   buildDecisionCreationRoute,
+  decisionOwnerRoute,
   getLinkedDecisions,
-  isUnresolvedDecision,
   type DecisionSourceRef
 } from "../../lib/modules/personal-ops/decision-links";
 import {
   buildFollowUpCreationRoute,
-  getActiveFollowUpsForSource,
   type FollowUpSourceRef
 } from "../../lib/modules/personal-ops/follow-up-links";
 import type {
@@ -34,6 +33,7 @@ import type {
   PersonalOpsFollowUp
 } from "../../lib/modules/personal-ops/types";
 import { createProjectsRepository } from "../../lib/modules/projects/repository";
+import { projectUuid } from "../../lib/modules/projects/identity";
 import type {
   Project,
   ProjectBlocker,
@@ -43,7 +43,6 @@ import type {
   ProjectLinkRelationship,
   ProjectMilestone,
   ProjectObjectiveInput,
-  ProjectPriority,
   ProjectsObjectByFamily
 } from "../../lib/modules/projects/types";
 import {
@@ -82,7 +81,7 @@ type ProjectsWorkspaceProps = {
   initialDecisionsError?: string;
   initialPersonalOpsFollowUps: PersonalOpsFollowUp[];
   initialFollowUpsError?: string;
-  initialPeople: PersonalRecord[];
+  initialPersonalRecords: PersonalRecord[];
   initialReviewViews: ReviewRunView[];
   initialReviewsError?: string;
 };
@@ -96,6 +95,7 @@ type EditorKind =
   | "blocker-resolve"
   | "interaction-create"
   | "link-create"
+  | "link-edit"
   | "link-health"
   | "link-repair";
 
@@ -168,7 +168,7 @@ const SORT_LABELS: Readonly<Record<ProjectSort, string>> = {
   "attention-updated": "Attention, then updated",
   "updated-desc": "Updated — newest",
   title: "Title — A–Z",
-  priority: "Priority",
+  priority: "Updated — newest",
   due: "Next milestone"
 };
 
@@ -199,13 +199,6 @@ const LINK_MODULES: readonly ModuleId[] = [
   "projects"
 ];
 
-const PRIORITY_ORDER: Readonly<Record<ProjectPriority, number>> = {
-  critical: 0,
-  high: 1,
-  medium: 2,
-  low: 3
-};
-
 function displayLabel(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
@@ -222,6 +215,24 @@ function formatDate(value?: string, fallback = "Not recorded") {
     day: "numeric",
     year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric"
   }).format(date);
+}
+
+function formatTimestamp(value?: string, fallback = "Not recorded") {
+  if (!value) return fallback;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  }).format(date);
+}
+
+function toLocalDateTimeInput(date = new Date()) {
+  const offset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
 function initials(value: string) {
@@ -261,11 +272,10 @@ function matchesQuery(item: ProjectDirectoryItem, query: string) {
   if (!normalized) return true;
   return [
     item.project.id,
+    item.project.uuid,
     item.project.slug,
     item.project.name,
     item.project.description,
-    item.project.area,
-    item.project.owner,
     item.project.objective,
     item.project.legacyEntityName,
     ...item.attentionReasons,
@@ -311,10 +321,7 @@ function dueValue(item: ProjectDirectoryItem) {
 function sortProjects(items: ProjectDirectoryItem[], sort: ProjectSort) {
   return [...items].sort((left, right) => {
     if (sort === "title") return left.project.name.localeCompare(right.project.name, undefined, { sensitivity: "base" });
-    if (sort === "priority") {
-      const delta = PRIORITY_ORDER[left.project.priority] - PRIORITY_ORDER[right.project.priority];
-      if (delta !== 0) return delta;
-    }
+    if (sort === "priority") sort = "updated-desc";
     if (sort === "due") {
       const delta = dueValue(left).localeCompare(dueValue(right));
       if (delta !== 0) return delta;
@@ -364,6 +371,7 @@ function useMediaQuery(query: string) {
 function projectDisplayFromNative(project: Project): ProjectDisplayRecord {
   return {
     id: project.id,
+    uuid: projectUuid(project.uuid, project.id),
     nativeRef: createNativeObjectRef({
       module: "projects",
       objectType: "project",
@@ -380,12 +388,9 @@ function projectDisplayFromNative(project: Project): ProjectDisplayRecord {
     health: project.health,
     review: project.review,
     cadence: project.cadence,
-    priority: project.priority,
-    owner: project.owner,
-    ownerRef: project.ownerRef,
-    area: project.area,
     objective: project.objective,
     objectives: project.objectives,
+    defaultCadence: project.defaultCadence,
     starred: project.starred,
     legacyKey: project.legacySource?.key,
     legacyRoute: project.legacySource?.legacyRoute,
@@ -404,9 +409,6 @@ function emptyDirectoryItem(project: Project): ProjectDirectoryItem {
     interactions: [],
     timelineEvents: [],
     linkedContext: [],
-    legacyKpis: [],
-    legacyDocuments: [],
-    legacyDocumentTotal: 0,
     attentionReasons: [
       ...(project.objectives.length === 0 ? ["Project objectives are not defined."] : [])
     ]
@@ -492,6 +494,31 @@ function peopleIdentityRef(record: PersonalRecord): NativeObjectRef {
     objectId: record.id,
     label: record.profile?.fullName || record.title
   });
+}
+
+function personalRecordObjectRef(record: PersonalRecord): NativeObjectRef | null {
+  if (record.className === "note") {
+    return createNativeObjectRef({ module: "notes", objectType: "note", objectId: record.id, label: record.title });
+  }
+  if (record.className === "resource") {
+    return createNativeObjectRef({ module: "resources", objectType: "resource", objectId: record.id, label: record.title });
+  }
+  if (record.className === "file") {
+    return createNativeObjectRef({ module: "media", objectType: "media_asset", objectId: record.id, label: record.title });
+  }
+  return null;
+}
+
+function activityTone(event: ProjectDirectoryItem["timelineEvents"][number]) {
+  if (event.eventType.startsWith("milestone_")) return "milestone";
+  if (event.eventType.startsWith("blocker_")) return "blocker";
+  if (event.eventType === "interaction_logged") return "update";
+  if (event.eventType.startsWith("link_")) {
+    if (event.sourceRef?.module === "people") return "people";
+    if (event.sourceRef?.module === "personal_ops" && event.sourceRef.objectType === "decision") return "decision";
+    return "object";
+  }
+  return "system";
 }
 
 function EditorSurface({
@@ -583,12 +610,12 @@ function ProjectObjectivesEditor({
 }) {
   const signature = objectives.map((item) => `${item.id}:${item.text}:${item.completedAt || ""}`).join("|");
   const [drafts, setDrafts] = useState<EditorObjectiveDraft[]>(() =>
-    objectives.map((item) => ({ id: item.id, text: item.text, completed: Boolean(item.completedAt) }))
+    objectives.map((item) => ({ id: item.id, text: item.text, completed: false }))
   );
   const [dirty, setDirty] = useState(false);
 
   useEffect(() => {
-    setDrafts(objectives.map((item) => ({ id: item.id, text: item.text, completed: Boolean(item.completedAt) })));
+    setDrafts(objectives.map((item) => ({ id: item.id, text: item.text, completed: false })));
     setDirty(false);
   }, [signature]);
 
@@ -599,7 +626,7 @@ function ProjectObjectivesEditor({
 
   async function save() {
     const valid = drafts.filter((item) => item.text.trim());
-    if (await onSave(valid.map((item) => ({ id: item.id, text: item.text, completed: item.completed })))) {
+    if (await onSave(valid.map((item) => ({ id: item.id, text: item.text, completed: false })))) {
       setDirty(false);
     }
   }
@@ -617,14 +644,8 @@ function ProjectObjectivesEditor({
       {drafts.length ? (
         <ul className={styles.objectiveList}>
           {drafts.map((objective) => (
-            <li key={objective.id} data-complete={objective.completed || undefined}>
-              <input
-                type="checkbox"
-                checked={objective.completed}
-                onChange={(event) => updateDraft(objective.id, { completed: event.target.checked })}
-                disabled={readOnly || busy}
-                aria-label={`Mark ${objective.text || "objective"} complete`}
-              />
+            <li key={objective.id}>
+              <span className={styles.objectiveBullet} aria-hidden="true">•</span>
               <input
                 value={objective.text}
                 onChange={(event) => updateDraft(objective.id, { text: event.target.value })}
@@ -635,14 +656,15 @@ function ProjectObjectivesEditor({
               {!readOnly && (
                 <button
                   type="button"
-                  className={styles.iconButton}
+                  className={styles.removeObjectiveButton}
                   onClick={() => {
                     setDrafts((current) => current.filter((item) => item.id !== objective.id));
                     setDirty(true);
                   }}
                   disabled={busy}
-                  aria-label={`Remove ${objective.text || "objective"}`}
-                >×</button>
+                  aria-label={`Delete ${objective.text || "objective"}`}
+                  title="Delete objective"
+                ><span aria-hidden="true">⌫</span></button>
               )}
             </li>
           ))}
@@ -700,7 +722,7 @@ export default function ProjectsWorkspace({
   initialDecisionsError = "",
   initialPersonalOpsFollowUps,
   initialFollowUpsError = "",
-  initialPeople,
+  initialPersonalRecords,
   initialReviewViews,
   initialReviewsError = ""
 }: ProjectsWorkspaceProps) {
@@ -709,6 +731,10 @@ export default function ProjectsWorkspace({
   const searchParams = useSearchParams();
   const repository = useMemo(() => createProjectsRepository(), []);
   const reviewsRepository = useMemo(() => createReviewsRepository(), []);
+  const initialPeople = useMemo(
+    () => initialPersonalRecords.filter((record) => record.className === "person" || record.className === "org"),
+    [initialPersonalRecords]
+  );
   const {
     decisions,
     error: decisionsError,
@@ -891,15 +917,6 @@ export default function ProjectsWorkspace({
     setInspectorOpen(false);
   }
 
-  function selectArea(area: string) {
-    setView("all");
-    setFilter("all");
-    setQuery(area);
-    const targetPath = initialDetail ? getModuleRoute("projects") : pathname;
-    updateUrl({ view: "all", filter: "all", query: area, item: initialDetail ? "" : selectedProjectId }, initialDetail ? "push" : "replace", targetPath);
-    setMobileSidebarOpen(false);
-  }
-
   function selectProject(item: ProjectDirectoryItem) {
     setSelectedProjectId(item.project.id);
     setSelectedChildId("");
@@ -980,7 +997,7 @@ export default function ProjectsWorkspace({
     let objectives: EditorObjectiveDraft[] | undefined;
     let people: EditorPersonDraft[] | undefined;
     if (kind === "project-create") {
-      values = { name: "", description: "", completionTarget: "", lifecycle: "idea" };
+      values = { name: "", description: "", completionTarget: "", lifecycle: "idea", defaultCadence: "" };
       objectives = [{ id: `draft-objective-${crypto.randomUUID()}`, text: "", completed: false }];
       people = [{ id: `draft-person-${crypto.randomUUID()}`, personId: "", role: "", context: "" }];
     } else if (kind === "project-edit" && item) {
@@ -989,15 +1006,16 @@ export default function ProjectsWorkspace({
         name: item.project.name,
         description: item.project.description,
         lifecycle: item.project.lifecycle,
+        defaultCadence: nativeProject?.defaultCadence || "",
         completionTarget: nativeProject?.completionTarget || ""
       };
       objectives = (nativeProject?.objectives || []).map((objective) => ({
         id: objective.id,
         text: objective.text,
-        completed: Boolean(objective.completedAt)
+        completed: false
       }));
     } else if (kind === "legacy-promote" && item) {
-      values = { objective: item.project.objective || "", area: item.project.area || "", owner: item.project.owner || "", ownerIdentityId: "", priority: item.project.priority };
+      values = { objective: item.project.objective || "" };
     } else if (kind === "milestone-create") {
       values = { title: "", description: "", dueAt: "", owner: "", completionCriteria: "" };
     } else if (kind === "blocker-create") {
@@ -1005,11 +1023,12 @@ export default function ProjectsWorkspace({
     } else if (kind === "blocker-resolve" && object?.objectType === "blocker") {
       values = { resolution: object.resolution || "" };
     } else if (kind === "interaction-create") {
-      values = { title: "", body: "", occurredAt: new Date().toISOString().slice(0, 10) };
+      values = { title: "", body: "", occurredAt: toLocalDateTimeInput() };
     } else if (kind === "link-create") {
       values = {
-        sourceModule: "notes",
-        sourceObjectType: "note",
+        linkScope: "object",
+        sourceModule: "media",
+        sourceObjectType: "",
         sourceObjectId: "",
         sourceContainerObjectId: "",
         sourceLabel: "",
@@ -1018,6 +1037,13 @@ export default function ProjectsWorkspace({
         role: "",
         projectSpecificNote: "",
         isRequiredEvidence: false
+      };
+    } else if (kind === "link-edit" && object?.objectType === "project_link") {
+      values = {
+        role: object.role || "",
+        projectSpecificNote: object.projectSpecificNote || "",
+        relationship: object.relationship,
+        relationshipStrength: object.relationshipStrength
       };
     } else if (kind === "link-health" && object?.objectType === "project_link") {
       values = {
@@ -1147,17 +1173,6 @@ export default function ProjectsWorkspace({
     if (!editor || mutationBusy) return;
     const value = (name: string) => String(editor.values[name] ?? "").trim();
     const optional = (name: string) => value(name) || undefined;
-    const currentNativeProject = editor.projectId
-      ? snapshot.nativeState.projects.find((project) => project.id === editor.projectId)
-      : undefined;
-    const selectedOwner = initialPeople.find(
-      (person) => person.id === value("ownerIdentityId")
-    );
-    const selectedOwnerRef = selectedOwner
-      ? peopleIdentityRef(selectedOwner)
-      : value("ownerIdentityId") === currentNativeProject?.ownerRef?.objectId
-        ? currentNativeProject.ownerRef
-        : undefined;
     setEditorError("");
     setMutationBusy(true);
     try {
@@ -1168,7 +1183,7 @@ export default function ProjectsWorkspace({
         }
         const objectives = (editor.objectives || [])
           .filter((objective) => objective.text.trim())
-          .map((objective) => ({ id: objective.id, text: objective.text.trim(), completed: objective.completed }));
+          .map((objective) => ({ id: objective.id, text: objective.text.trim(), completed: false }));
         const personRows = (editor.people || []).filter((person) => person.personId || person.role.trim() || person.context.trim());
         if (personRows.some((person) => !person.personId)) {
           setEditorError("Choose a People identity for each person row, or remove the unused row.");
@@ -1188,6 +1203,7 @@ export default function ProjectsWorkspace({
             context: person.context.trim() || undefined
           })),
           completionTarget: optional("completionTarget"),
+          defaultCadence: optional("defaultCadence"),
           lifecycle: value("lifecycle") as Exclude<Project["lifecycle"], "complete" | "archived">
         });
         if (!result.ok) {
@@ -1198,6 +1214,7 @@ export default function ProjectsWorkspace({
         result.data.linkedPeople?.forEach(applyLink);
         setSelectedProjectId(result.data.project.id);
         setNotice(`${result.data.project.name} was created and is now tracked natively.`);
+        window.dispatchEvent(new Event("projects:changed"));
         updateUrl({ item: result.data.project.id, tab: "overview" }, "push");
       } else if (editor.kind === "project-edit") {
         const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
@@ -1214,8 +1231,9 @@ export default function ProjectsWorkspace({
           description: value("description"),
           objectives: (editor.objectives || [])
             .filter((objective) => objective.text.trim())
-            .map((objective) => ({ id: objective.id, text: objective.text.trim(), completed: objective.completed })),
+            .map((objective) => ({ id: objective.id, text: objective.text.trim(), completed: false })),
           completionTarget: optional("completionTarget"),
+          defaultCadence: optional("defaultCadence"),
           lifecycle: value("lifecycle") as Project["lifecycle"]
         }, item.project.updatedAt);
         if (!result.ok) {
@@ -1223,6 +1241,7 @@ export default function ProjectsWorkspace({
           return;
         }
         applyMutationEnvelope(result.data);
+        window.dispatchEvent(new Event("projects:changed"));
         setNotice(`${result.data.project.name} was saved.`);
       } else if (editor.kind === "legacy-promote") {
         const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
@@ -1233,11 +1252,7 @@ export default function ProjectsWorkspace({
         const result = await repository.promoteLegacy({
           legacyKey: item.project.legacyKey,
           promotionConfirmed: true,
-          objective: optional("objective"),
-          area: optional("area"),
-          owner: optional("owner"),
-          ownerRef: selectedOwnerRef,
-          priority: value("priority") as ProjectPriority
+          objective: optional("objective")
         });
         if (!result.ok) {
           setEditorError(result.error.message);
@@ -1398,6 +1413,25 @@ export default function ProjectsWorkspace({
         setSelectedChildId(result.data.item.id);
         updateUrl({ tab: nextTab, item: initialDetail ? result.data.item.id : item.project.id });
         setNotice(`Reference to “${result.data.item.source.label}” was linked without copying its native object.`);
+      } else if (editor.kind === "link-edit") {
+        const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
+        const link = item?.links.find((candidate) => candidate.id === editor.objectId);
+        if (!item || !link) {
+          setEditorError("The selected connection is no longer available.");
+          return;
+        }
+        const result = await repository.update("links", link.id, {
+          role: optional("role"),
+          projectSpecificNote: optional("projectSpecificNote"),
+          relationship: value("relationship") as ProjectLinkRelationship,
+          relationshipStrength: value("relationshipStrength") as ProjectLink["relationshipStrength"]
+        }, link.updatedAt);
+        if (!result.ok) {
+          setEditorError(result.error.message);
+          return;
+        }
+        applyMutationEnvelope(result.data);
+        setNotice(`Connection to “${result.data.item.source.label}” was updated.`);
       } else if (editor.kind === "link-health") {
         const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
         const link = item?.links.find((candidate) => candidate.id === editor.objectId);
@@ -1570,9 +1604,7 @@ export default function ProjectsWorkspace({
   const sourceErrors = Object.entries(snapshot.sourceAvailability)
     .filter((entry): entry is [string, string] => Boolean(entry[1]))
     .map(([source, error]) => `${displayLabel(source)}: ${error}`);
-  const areas = Array.from(new Set(snapshot.projects.map((item) => item.project.area).filter((area): area is string => Boolean(area)))).sort();
   const countForView = (candidateView: ProjectView) => queryScopedProjects.filter((item) => matchesView(item, candidateView)).length;
-  const countForArea = (area: string) => queryScopedProjects.filter((item) => item.project.area === area).length;
 
   const sidebarSections: readonly ModuleSidebarSection[] = [
     {
@@ -1582,28 +1614,10 @@ export default function ProjectsWorkspace({
         id: itemView,
         label: VIEW_LABELS[itemView],
         count: countForView(itemView),
-        active: view === itemView && !areas.includes(query),
+        active: view === itemView,
         tone: itemView === "attention" ? "attention" as const : itemView === "blocked" ? "danger" as const : undefined,
         onSelect: () => selectView(itemView)
       }))
-    },
-    {
-      id: "areas",
-      label: "Areas",
-      items: areas.length
-        ? areas.map((area) => ({
-            id: `area-${area.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-            label: area,
-            count: countForArea(area),
-            active: query === area,
-            onSelect: () => selectArea(area)
-          }))
-        : [{
-            id: "areas-unavailable",
-            label: "No project areas yet",
-            disabled: true,
-            disabledReason: "Assign an area while editing a native project."
-          }]
     },
     {
       id: "smart-views",
@@ -1712,7 +1726,7 @@ export default function ProjectsWorkspace({
         onSelect: () => openEditor("milestone-create", item)
       },
       { id: "blocker", label: "Add blocker", onSelect: () => openEditor("blocker-create", item) },
-      { id: "link", label: "Link object", onSelect: () => openEditor("link-create", item) },
+      { id: "link", label: "Link object", onSelect: () => openEditor("link-create", item, undefined, { linkScope: "object", sourceModule: "media" }) },
       {
         id: "decision",
         label: "File decision",
@@ -1736,20 +1750,44 @@ export default function ProjectsWorkspace({
             {item.project.starred ? "★" : "☆"}
           </button>
         )}
-        {item.project.editable ? (
-          <button type="button" className={styles.iconButton} onClick={() => openEditor("project-edit", item)} disabled={["complete", "archived"].includes(item.project.lifecycle)} title="Edit project" aria-label="Edit project">✎</button>
-        ) : (
-          <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("legacy-promote", item)}>Start tracking</button>
-        )}
-        {initialMode === "index" && (
-          <Link className={styles.iconButton} href={getNativeObjectRoute(item.project.nativeRef)} title="Open full project" aria-label="Open full project">↗</Link>
-        )}
-        {isInspectorOverlay && (
-          <button type="button" className={styles.iconButton} onClick={() => setInspectorOpen(false)} aria-label="Close project details">×</button>
-        )}
+        <details className={styles.projectMenu}>
+          <summary className={styles.iconButton} aria-label="More project options">•••</summary>
+          <div className={styles.projectMenuPanel} role="menu">
+            {item.project.editable ? <>
+              <button type="button" role="menuitem" onClick={() => openEditor("project-edit", item)} disabled={["complete", "archived"].includes(item.project.lifecycle)}>Edit project</button>
+              <button type="button" role="menuitem" data-danger="true" disabled={item.project.lifecycle === "archived"} onClick={() => {
+                setConfirmationReason("");
+                setConfirmation({ kind: "project-archive", projectId: item.project.id });
+              }}>Delete project</button>
+            </> : <button type="button" role="menuitem" onClick={() => openEditor("legacy-promote", item)}>Start tracking</button>}
+            {isInspectorOverlay && <button type="button" role="menuitem" onClick={() => setInspectorOpen(false)}>Close panel</button>}
+          </div>
+        </details>
         </div>
       </header>
     );
+  }
+
+  function projectActivity(item: ProjectDirectoryItem) {
+    const timeline = item.timelineEvents.map((event) => ({
+      id: event.id,
+      title: event.title,
+      summary: event.summary,
+      occurredAt: event.occurredAt,
+      tone: activityTone(event),
+      href: "",
+      isManual: event.isManual
+    }));
+    const decisionActivity = getLinkedDecisions(decisions, projectDecisionSource(item.project)).map((decision) => ({
+      id: `decision-${decision.id}`,
+      title: decision.title,
+      summary: decision.description || "Decision recorded",
+      occurredAt: decision.updatedAt || decision.createdAt,
+      tone: "decision",
+      href: decisionOwnerRoute(decision),
+      isManual: false
+    }));
+    return [...timeline, ...decisionActivity].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
   }
 
   function renderLinkedRows(item: ProjectDirectoryItem, modules?: readonly ModuleId[]) {
@@ -1794,8 +1832,7 @@ export default function ProjectsWorkspace({
       >
         <div className={styles.panelHeader}>
           <div>
-            <Heading>Review coverage</Heading>
-            <p>Explicit ReviewRun context for this {targetLabel}; Reviews remains the owner.</p>
+            <Heading>Reviews</Heading>
           </div>
           <div className={styles.inlineActions}>
             <button
@@ -1805,9 +1842,7 @@ export default function ProjectsWorkspace({
               disabled={reviewsLoading}
               aria-label={`Refresh Review coverage for ${target.label}`}
             >{reviewsLoading ? "Refreshing…" : "Refresh"}</button>
-            <Link className={styles.textLink} href={buildProjectReviewHandoffRoute(target)}>
-              Link in Reviews
-            </Link>
+            <Link className={styles.button} href={buildProjectReviewHandoffRoute(target)}>Link review</Link>
           </div>
         </div>
         {reviewsError && (
@@ -1848,8 +1883,8 @@ export default function ProjectsWorkspace({
           <SystemState
             variant="empty"
             compact
-            title={`No ReviewRun links this ${targetLabel}`}
-            description="Open Reviews with this exact source prefilled, choose a ReviewRun, and confirm the link. No Project object will be copied."
+            title="No linked reviews yet"
+            description={`Link a review when this ${targetLabel} needs one.`}
           />
         )}
       </section>
@@ -1858,17 +1893,15 @@ export default function ProjectsWorkspace({
 
   function renderOverview(item: ProjectDirectoryItem) {
     const blockers = openBlockers(item);
-    const activeFollowUpCount = getActiveFollowUpsForSource(
-      followUps,
-      projectFollowUpSource(item.project)
-    ).length;
-    const unresolvedDecisionCount = getLinkedDecisions(
-      decisions,
-      projectDecisionSource(item.project)
-    ).filter(isUnresolvedDecision).length;
+    const activity = projectActivity(item);
     const readOnly = !item.project.editable || ["complete", "archived"].includes(item.project.lifecycle);
     return (
       <>
+        <QuickActionBar
+          actions={projectQuickActions(item)}
+          label={<strong>Quick actions</strong>}
+          ariaLabel={`${item.project.name} quick actions`}
+        />
         <div className={styles.signalStrip} aria-label="Project summary">
           <button type="button" onClick={() => selectTab("timeline")}><strong>{activeMilestones(item).length}</strong><span>Milestones</span></button>
           <button type="button" onClick={() => selectTab("timeline")} data-alert={blockers.length || undefined}><strong>{blockers.length}</strong><span>Blockers</span></button>
@@ -1879,7 +1912,6 @@ export default function ProjectsWorkspace({
           <section className={`${styles.panel} ${styles.contextPanel}`} data-wide="true">
             <div className={styles.panelHeader}>
               <h2>Project context</h2>
-              {item.project.editable && <button type="button" className={styles.iconButton} onClick={() => openEditor("project-edit", item)} disabled={readOnly} aria-label="Edit project context" title="Edit project context">✎</button>}
             </div>
             <p>{item.project.description || "No project description yet."}</p>
           </section>
@@ -1894,189 +1926,67 @@ export default function ProjectsWorkspace({
               <h2>Recent work</h2>
               <button type="button" className={styles.button} onClick={() => openEditor("interaction-create", item)} disabled={readOnly}>Log update</button>
             </div>
-            {item.timelineEvents.length ? <ol className={styles.recentWorkList}>{item.timelineEvents.slice(0, 4).map((event) => <li key={event.id}><span className={styles.timelineDot} aria-hidden="true" /><button type="button" onClick={() => selectChild(event.id, "timeline")}><strong>{event.title}</strong><small>{event.summary}</small></button><time>{formatDate(event.occurredAt)}</time></li>)}</ol> : <p>No work logged yet.</p>}
+            {activity.length ? <ol className={styles.recentWorkList}>{activity.map((event) => <li key={event.id}><span className={styles.timelineDot} data-tone={event.tone} aria-hidden="true" />{event.href ? <Link className={styles.activityLink} href={event.href}><strong>{event.title}</strong><small>{event.summary}</small></Link> : <button type="button" onClick={() => selectChild(event.id, "timeline")}><strong>{event.title}</strong><small>{event.summary}</small></button>}<time>{formatTimestamp(event.occurredAt)}</time></li>)}</ol> : <p>No work logged yet.</p>}
           </section>
-          <div className={`${styles.panel} ${styles.followThroughPanel}`} data-wide="true">
-            <div className={styles.followThroughHeader}>
-              <div>
-                <h2>Project follow-through</h2>
-                <p>{activeFollowUpCount} active follow-up{activeFollowUpCount === 1 ? "" : "s"} · {unresolvedDecisionCount} open decision{unresolvedDecisionCount === 1 ? "" : "s"}</p>
-              </div>
-              <div className={styles.inlineActions}>
-                <Link className={styles.button} href={personalOpsCreateHref("follow-ups", item.project)}>Create follow-up</Link>
-                <Link className={styles.button} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link>
-              </div>
-            </div>
-            <LinkedFollowUpsPanel
-              source={projectFollowUpSource(item.project)}
-              followUps={followUps}
-              loading={followUpsLoading}
-              error={followUpsError}
-              onRefresh={() => void refreshFollowUps()}
-              compact
-              showHeader={false}
-              showBoundary={false}
-              className={styles.compactFollowUps}
-              title="Project follow-through"
-            />
-          </div>
         </div>
       </>
     );
   }
 
   function renderTimeline(item: ProjectDirectoryItem) {
+    const readOnly = !item.project.editable || ["complete", "archived"].includes(item.project.lifecycle);
+    const activity = projectActivity(item);
     return (
-      <div className={styles.overviewGrid}>
-        <section className={styles.panel} data-wide="true">
+      <div className={styles.timelineLayout}>
+        <section className={`${styles.panel} ${styles.timelineActivityPanel}`}>
           <div className={styles.panelHeader}>
-            <div><h2>Milestones</h2><p>Project-owned gates with explicit dates and completion criteria.</p></div>
-            <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("milestone-create", item)} disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)} title={!item.project.editable ? "Start tracking this legacy project first." : ["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined}>Add milestone</button>
+            <h2>Activity</h2>
+            <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("interaction-create", item)} disabled={readOnly}>Log update</button>
           </div>
-          {item.milestones.length ? (
-            <ul className={styles.objectList}>
-              {item.milestones.map((milestone) => {
-                const source = projectFollowUpSource(item.project, {
-                  objectType: "milestone",
-                  objectId: milestone.id,
-                  label: milestone.title
-                });
-                const activeFollowUpCount = getActiveFollowUpsForSource(followUps, source).length;
-                const unresolvedDecisionCount = getLinkedDecisions(decisions, source).filter(isUnresolvedDecision).length;
-                const reviewCount = getProjectSourceReviewContexts(reviewViews, projectReviewSource(item.project, {
-                  objectType: "milestone",
-                  objectId: milestone.id,
-                  label: milestone.title
-                })).length;
-                return (
-                  <li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}>
-                    <span className={styles.itemBody}>
-                      <strong>{milestone.title}</strong>
-                      <small>{formatDate(milestone.dueAt)} · {displayLabel(milestone.state)} · {milestone.owner || "No owner"}</small>
-                      <span className={styles.ownerSummary} aria-label={`${activeFollowUpCount} active Follow-ups, ${unresolvedDecisionCount} unresolved Decisions, ${reviewCount} Reviews`}>
-                        <span className={styles.relationshipChip} data-tone={activeFollowUpCount ? "blue" : undefined}>Follow-ups {activeFollowUpCount}</span>
-                        <span className={styles.relationshipChip} data-tone={unresolvedDecisionCount ? "purple" : undefined}>Decisions {unresolvedDecisionCount}</span>
-                        <span className={styles.relationshipChip} data-tone={reviewCount ? "blue" : undefined}>Reviews {reviewCount}</span>
-                      </span>
-                    </span>
-                    <span className={styles.inlineActions}>
-                      <button type="button" className={styles.button} onClick={() => selectChild(milestone.id, "timeline")}>Inspect</button>
-                      {!['complete', 'archived'].includes(milestone.state) && (
-                        <button type="button" className={styles.button} disabled={!milestone.completionCriteria.length || ["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? item.project.lifecycle === "complete" ? "Completed projects are read-only; reopen behavior is intentionally unavailable." : "Restore the project before completing milestones." : !milestone.completionCriteria.length ? "Add completion criteria before completing this milestone." : undefined} onClick={() => {
-                          setConfirmationReason("");
-                          setConfirmation({ kind: "milestone-complete", projectId: item.project.id, objectId: milestone.id });
-                        }}>Complete</button>
-                      )}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : <SystemState variant="empty" compact title="No native milestones" description={item.project.editable ? "Add the next concrete gate; no legacy task counts are converted into milestones." : "Start tracking to add native milestones."} />}
+          {activity.length ? <ol className={styles.timelineList}>{activity.map((event) => (
+            <li key={event.id} aria-current={selectedChildId === event.id || undefined}>
+              <span className={styles.timelineDot} data-tone={event.tone} aria-hidden="true" />
+              <span className={styles.itemBody}><strong>{event.title}</strong><small>{event.summary}</small></span>
+              <time className={styles.timelineMeta}>{formatTimestamp(event.occurredAt)}</time>
+              {event.href ? <Link className={styles.textLink} href={event.href}>Open</Link> : <button type="button" className={styles.button} onClick={() => selectChild(event.id, "timeline")}>View</button>}
+            </li>
+          ))}</ol> : <p>No activity yet.</p>}
         </section>
-        <section className={styles.panel} data-wide="true">
-          <div className={styles.panelHeader}>
-            <div><h2>Blockers and open loops</h2><p>Only project conditions live here. Actionable follow-through belongs in Personal Ops.</p></div>
-            <button type="button" className={styles.button} onClick={() => openEditor("blocker-create", item)} disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)} title={!item.project.editable ? "Start tracking this legacy project first." : ["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined}>Add blocker</button>
-          </div>
-          {item.blockers.length ? (
-            <ul className={styles.objectList}>
-              {item.blockers.map((blocker) => {
-                const source = projectFollowUpSource(item.project, {
-                  objectType: "blocker",
-                  objectId: blocker.id,
-                  label: blocker.title
-                });
-                const activeFollowUpCount = getActiveFollowUpsForSource(followUps, source).length;
-                const unresolvedDecisionCount = getLinkedDecisions(decisions, source).filter(isUnresolvedDecision).length;
-                const reviewCount = getProjectSourceReviewContexts(reviewViews, projectReviewSource(item.project, {
-                  objectType: "blocker",
-                  objectId: blocker.id,
-                  label: blocker.title
-                })).length;
-                return (
-                  <li key={blocker.id} aria-current={selectedChildId === blocker.id || undefined}>
-                    <span className={styles.itemBody}>
-                      <strong>{blocker.title}</strong>
-                      <small>{displayLabel(blocker.state)} · {displayLabel(blocker.severity)} · {blocker.owner || "No owner"}</small>
-                      <span className={styles.ownerSummary} aria-label={`${activeFollowUpCount} active Follow-ups, ${unresolvedDecisionCount} unresolved Decisions, ${reviewCount} Reviews`}>
-                        <span className={styles.relationshipChip} data-tone={activeFollowUpCount ? "blue" : undefined}>Follow-ups {activeFollowUpCount}</span>
-                        <span className={styles.relationshipChip} data-tone={unresolvedDecisionCount ? "purple" : undefined}>Decisions {unresolvedDecisionCount}</span>
-                        <span className={styles.relationshipChip} data-tone={reviewCount ? "blue" : undefined}>Reviews {reviewCount}</span>
-                      </span>
-                    </span>
-                    <span className={styles.inlineActions}>
-                      <button type="button" className={styles.button} onClick={() => selectChild(blocker.id, "timeline")}>Inspect</button>
-                      {blocker.state === "open" && <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve</button>}
-                      <Link className={styles.textLink} href={personalOpsCreateHref("follow-ups", item.project, { objectType: "blocker", objectId: blocker.id, label: blocker.title }, { dueAt: blocker.dueAt })}>Follow-up</Link>
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          ) : <SystemState variant="empty" compact title="No native blockers" description="Legacy action items are deliberately not inferred as Project blockers." />}
-        </section>
-        {renderReviewCoverage(item)}
-        <section className={styles.panel} data-wide="true">
-          <div className={styles.panelHeader}>
-            <div><h2>Project activity</h2><p>Progress, problems, and system changes in date order.</p></div>
-            <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("interaction-create", item)} disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)}>Log update</button>
-          </div>
-          {item.timelineEvents.length ? (
-            <ol className={styles.timelineList}>
-              {item.timelineEvents.map((timelineEvent) => (
-                <li key={timelineEvent.id} aria-current={selectedChildId === timelineEvent.id || undefined}>
-                  <span className={styles.timelineDot} aria-hidden="true" />
-                  <span className={styles.itemBody}><strong>{timelineEvent.title}</strong><small>{timelineEvent.summary}</small>{timelineEvent.isManual && <span className={styles.relationshipChip} data-tone="blue">Logged update</span>}</span>
-                  <span className={styles.timelineMeta}>{formatDate(timelineEvent.occurredAt)}</span>
-                  <button type="button" className={styles.button} onClick={() => selectChild(timelineEvent.id, "timeline")}>Inspect</button>
-                </li>
-              ))}
-            </ol>
-          ) : <SystemState variant="empty" compact title="No native timeline events yet" description={item.project.editable ? "The first native change will appear here." : "Legacy activity is not rewritten as native audit history."} />}
-        </section>
+        <aside className={styles.timelineSide}>
+          <section className={styles.panel}>
+            <div className={styles.panelHeader}><h2>Milestones</h2><button type="button" className={styles.button} onClick={() => openEditor("milestone-create", item)} disabled={readOnly}>Add milestone</button></div>
+            {item.milestones.length ? <ul className={styles.objectList}>{item.milestones.map((milestone) => <li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}><span className={styles.itemBody}><strong>{milestone.title}</strong><small>{formatDate(milestone.dueAt)} · {displayLabel(milestone.state)}</small></span><span className={styles.inlineActions}><button type="button" className={styles.button} onClick={() => selectChild(milestone.id, "timeline")}>View</button>{!["complete", "archived"].includes(milestone.state) && <button type="button" className={styles.button} disabled={readOnly || !milestone.completionCriteria.length} onClick={() => { setConfirmationReason(""); setConfirmation({ kind: "milestone-complete", projectId: item.project.id, objectId: milestone.id }); }}>Complete</button>}</span></li>)}</ul> : <p>No milestones yet.</p>}
+          </section>
+          <section className={styles.panel}>
+            <div className={styles.panelHeader}><h2>Blockers</h2><button type="button" className={styles.button} onClick={() => openEditor("blocker-create", item)} disabled={readOnly}>Add blocker</button></div>
+            {item.blockers.length ? <ul className={styles.objectList}>{item.blockers.map((blocker) => <li key={blocker.id} aria-current={selectedChildId === blocker.id || undefined}><span className={styles.itemBody}><strong>{blocker.title}</strong><small>{displayLabel(blocker.state)} · {displayLabel(blocker.severity)}</small></span><span className={styles.inlineActions}><button type="button" className={styles.button} onClick={() => selectChild(blocker.id, "timeline")}>View</button>{blocker.state === "open" && <button type="button" className={styles.button} disabled={readOnly} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve</button>}</span></li>)}</ul> : <p>No blockers.</p>}
+          </section>
+        </aside>
       </div>
     );
   }
 
   function renderNotesDecisions(item: ProjectDirectoryItem) {
     const noteContext = item.linkedContext.filter((context) => context.ref.module === "notes");
-    const decisionContext = item.linkedContext.filter((context) => context.ref.module === "personal_ops" && context.ref.objectType === "decision");
-    const projectDecisionOwner = projectDecisionSource(item.project);
-    const hasProjectDecisionOwner = getLinkedDecisions(decisions, projectDecisionOwner).length > 0;
+    const readOnly = !item.project.editable || ["complete", "archived"].includes(item.project.lifecycle);
     return (
       <div className={styles.overviewGrid}>
         <section className={styles.panel} data-wide="true">
           <div className={styles.panelHeader}>
-            <div><h2>Notes and decision context</h2><p>Authored knowledge remains in Notes; durable decisions remain in Personal Ops.</p></div>
+            <h2>Notes</h2>
             <span className={styles.inlineActions}>
-              <Link className={styles.textLink} href={nativeCreateHref("notes", item.project)}>Open Notes</Link>
-              {!hasProjectDecisionOwner && <Link className={styles.textLink} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link>}
-              <button type="button" className={styles.button} onClick={() => openEditor("link-create", item)} disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined}>Link existing</button>
+              <Link className={styles.button} href={nativeCreateHref("notes", item.project)}>New note</Link>
+              <button type="button" className={styles.button} onClick={() => openEditor("link-create", item, undefined, { linkScope: "note", sourceModule: "notes", sourceObjectType: "note", relationship: "source_material" })} disabled={readOnly}>Link note</button>
             </span>
           </div>
-          {noteContext.length || decisionContext.length ? renderLinkedRows(item, ["notes", "personal_ops"]) : <SystemState variant="empty" compact title="No linked notes or durable decisions" description="Open the owner module to author the object, then link it here by stable ID." />}
+          {noteContext.length ? renderLinkedRows(item, ["notes"]) : <p>No linked notes yet.</p>}
         </section>
-        <LinkedDecisionsPanel
-          source={projectDecisionSource(item.project)}
-          decisions={decisions}
-          loading={decisionsLoading}
-          error={decisionsError}
-          onRefresh={() => void refreshDecisions()}
-          createHref={personalOpsCreateHref("decisions", item.project)}
-          className={styles.panel}
-          wide
-          title="Project decisions"
-        />
-        <section className={styles.panel}>
-          <h2>Legacy KPI context</h2>
-          {item.legacyKpis.length ? (
-            <ul className={styles.objectList}>{item.legacyKpis.map((kpi) => <li key={kpi.id}><span className={styles.itemBody}><strong>{kpi.name}</strong><small>{kpi.value} · {kpi.sourceLabel}</small></span>{kpi.link ? <Link className={styles.textLink} href={kpi.link}>Open</Link> : <span className={styles.rowState}>Read only</span>}</li>)}</ul>
-          ) : <p>No legacy KPI source is associated with this project. KPI records are not converted into milestones or progress.</p>}
-        </section>
-        <section className={styles.panel}>
-          <h2>Decision workflow boundary</h2>
-          <p>Projects may hold project-local candidate context, but the canonical durable Decision is filed in Personal Ops and referenced here. No decision is silently promoted.</p>
+        <section className={styles.panel} data-wide="true">
+          <div className={styles.panelHeader}>
+            <h2>Decisions</h2>
+            <span className={styles.inlineActions}><Link className={styles.button} href={personalOpsCreateHref("decisions", item.project)}>File decision</Link><button type="button" className={styles.button} onClick={() => void refreshDecisions()} disabled={decisionsLoading}>{decisionsLoading ? "Refreshing…" : "Refresh"}</button></span>
+          </div>
+          <LinkedDecisionsPanel source={projectDecisionSource(item.project)} decisions={decisions} loading={decisionsLoading} error={decisionsError} onRefresh={() => void refreshDecisions()} createHref={personalOpsCreateHref("decisions", item.project)} className={styles.embeddedPanel} compact showHeader={false} showBoundary={false} title="Project decisions" />
         </section>
       </div>
     );
@@ -2088,7 +1998,7 @@ export default function ProjectsWorkspace({
       <div className={styles.overviewGrid}>
         <section className={styles.panel} data-wide="true" data-project-people={item.project.id}>
           <div className={styles.panelHeader}>
-            <div><h2>People</h2><p>Linked identities, their project roles, and useful context.</p></div>
+            <h2>People</h2>
             <span className={styles.inlineActions}>
               <Link className={styles.textLink} href={nativeCreateHref("people", item.project)}>Open People</Link>
               <button
@@ -2097,6 +2007,7 @@ export default function ProjectsWorkspace({
                 onClick={() => openEditor("link-create", item, undefined, {
                   sourceModule: "people",
                   sourceObjectType: "person",
+                  linkScope: "people",
                   relationship: "project_person"
                 })}
                 disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)}
@@ -2116,7 +2027,7 @@ export default function ProjectsWorkspace({
                     <small>{link.role || "Project contributor"}</small>
                     {link.projectSpecificNote && <span>{link.projectSpecificNote}</span>}
                   </span>
-                  <button type="button" className={styles.button} onClick={() => selectChild(link.id, "people")}>Inspect</button>
+                  <button type="button" className={styles.button} onClick={() => selectChild(link.id, "people")}>Manage</button>
                 </li>
               ))}
             </ul>
@@ -2127,17 +2038,18 @@ export default function ProjectsWorkspace({
   }
 
   function renderFilesLinks(item: ProjectDirectoryItem) {
-    const fileModules: readonly ModuleId[] = ["media", "resources", "finance", "reviews", "projects"];
+    const objectLinks = item.links.filter((link) => link.source.module !== "people" && link.source.module !== "notes" && !(link.source.module === "personal_ops" && link.source.objectType === "decision"));
+    const readOnly = !item.project.editable || ["complete", "archived"].includes(item.project.lifecycle);
     return (
       <div className={styles.overviewGrid}>
         <section className={styles.panel} data-wide="true">
           <div className={styles.panelHeader}>
-            <div><h2>Native project references</h2><p>Projects stores relationship semantics, review state, and project-specific notes—not the linked source object.</p></div>
-            <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("link-create", item)} disabled={!item.project.editable || ["complete", "archived"].includes(item.project.lifecycle)} title={!item.project.editable ? "Start tracking this legacy project first." : ["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined}>Link object</button>
+            <h2>Files & resources</h2>
+            <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("link-create", item, undefined, { linkScope: "object", sourceModule: "media" })} disabled={readOnly}>Link object</button>
           </div>
-          {item.links.length ? (
+          {objectLinks.length ? (
             <ul className={styles.linkList}>
-              {item.links.map((link) => (
+              {objectLinks.map((link) => (
                 <li key={link.id} aria-current={selectedChildId === link.id || undefined} data-link-state={link.linkState}>
                   <span className={styles.itemBody}>
                     <strong>{link.source.label}</strong>
@@ -2147,7 +2059,7 @@ export default function ProjectsWorkspace({
                   </span>
                   <span className={styles.rowState} data-tone={stateTone(link.linkState)}>{displayLabel(link.linkState)}</span>
                   <span className={styles.inlineActions}>
-                    <button type="button" className={styles.button} onClick={() => selectChild(link.id, "files-links")}>Inspect</button>
+                    <button type="button" className={styles.button} onClick={() => selectChild(link.id, "files-links")}>Manage</button>
                     {linkSourceIsUnsafe(link) ? (
                       <button type="button" className={styles.button} disabled title="Repair this retained association before opening its source.">Source unavailable</button>
                     ) : <Link className={styles.textLink} href={link.source.route}>Open source</Link>}
@@ -2171,23 +2083,9 @@ export default function ProjectsWorkspace({
                 </li>
               ))}
             </ul>
-          ) : <SystemState variant="empty" compact title="No native project links" description="Legacy project tags remain visible below but are not silently rewritten into native ObjectLinks." />}
+          ) : <p>No linked files or resources yet.</p>}
         </section>
-        <section className={styles.panel} data-wide="true">
-          <h2>Visible source context</h2>
-          {renderLinkedRows(item, fileModules)}
-        </section>
-        <section className={styles.panel} data-wide="true">
-          <h2>Legacy document index</h2>
-          {item.legacyDocuments.length ? (
-            <ul className={styles.objectList}>{item.legacyDocuments.map((document) => <li key={document.id}><span className={styles.itemBody}><strong>{document.title}</strong><small>{document.repo} · {document.path} · read-only index</small></span><Link className={styles.textLink} href={document.url}>Open source</Link></li>)}</ul>
-          ) : <p>No indexed legacy documents are available for this project.</p>}
-          {item.legacyDocumentTotal > item.legacyDocuments.length && <p>{item.legacyDocuments.length} of {item.legacyDocumentTotal} indexed documents shown. Open the legacy source for the complete read-only set.</p>}
-        </section>
-        <div className={styles.boundary} data-wide="true">
-          <strong>Source boundary</strong>
-          URL and external-source identity belongs to Resources. Binary files, versions, rights, and usage belong to Media. Removing a Project link never deletes either source.
-        </div>
+        {renderReviewCoverage(item)}
       </div>
     );
   }
@@ -2195,51 +2093,16 @@ export default function ProjectsWorkspace({
   function renderProperties(item: ProjectDirectoryItem) {
     return (
       <div className={styles.overviewGrid}>
-        <section className={styles.panel}>
-          <h2>Native state dimensions</h2>
+        <section className={styles.panel} data-wide="true">
+          <div className={styles.panelHeader}><h2>Properties</h2>{item.project.editable && <button type="button" className={styles.button} onClick={() => openEditor("project-edit", item)} disabled={["complete", "archived"].includes(item.project.lifecycle)}>Edit properties</button>}</div>
           <div className={styles.factGrid}>
             <div className={styles.fact}><span>Status</span><strong>{displayLabel(item.project.lifecycle)}</strong></div>
-            <div className={styles.fact}><span>Health</span><strong>{displayLabel(item.project.health)}</strong></div>
-            <div className={styles.fact}><span>Review</span><strong>{displayLabel(item.project.review)}</strong></div>
-            <div className={styles.fact}><span>Cadence</span><strong>{displayLabel(item.project.cadence)}</strong></div>
-          </div>
-        </section>
-        {(item.project.owner || item.project.ownerRef || item.project.area || item.project.priority !== "medium") && <section className={styles.panel} data-wide="true">
-          <h2>Retained legacy metadata</h2>
-          <div className={styles.factGrid}>
-            <div className={styles.fact}><span>Previous owner</span><strong>{item.project.ownerRef ? <Link className={styles.textLink} href={item.project.ownerRef.route}>{item.project.ownerRef.label}</Link> : item.project.owner || "None"}</strong></div>
-            <div className={styles.fact}><span>Previous area</span><strong>{item.project.area || "None"}</strong></div>
-            <div className={styles.fact}><span>Previous priority</span><strong>{displayLabel(item.project.priority)}</strong></div>
-          </div>
-          <p>Kept for provenance; new project workflows use linked people, roles, and status.</p>
-        </section>}
-        <section className={styles.panel}>
-          <h2>Identity and provenance</h2>
-          <div className={styles.factGrid}>
-            <div className={styles.fact} data-mono="true"><span>Project ID</span><strong>{item.project.id}</strong></div>
+            <div className={styles.fact}><span>Review cadence</span><strong>{item.project.defaultCadence ? displayLabel(item.project.defaultCadence) : "Not set"}</strong></div>
+            <div className={styles.fact} data-mono="true"><span>Project ID</span><strong>{item.project.uuid}</strong></div>
             <div className={styles.fact} data-mono="true"><span>Slug</span><strong>{item.project.slug}</strong></div>
-            <div className={styles.fact}><span>Source</span><strong>{item.project.sourceKind === "native" ? "Projects store" : "Legacy projection"}</strong></div>
-            <div className={styles.fact}><span>Visibility</span><strong>{item.project.sourceKind === "native" ? "Native policy" : "Legacy source"}</strong></div>
+            <div className={styles.fact}><span>Last updated</span><strong>{formatTimestamp(item.project.updatedAt)}</strong></div>
           </div>
         </section>
-        <section className={styles.panel} data-wide="true">
-          <h2>Source availability</h2>
-          {sourceErrors.length ? <ul className={styles.guardList}>{sourceErrors.map((error) => <li key={error}><span>{error}</span><span className={styles.rowState} data-tone="amber">Unavailable</span></li>)}</ul> : <p>All optional read sources used by this snapshot loaded successfully. This does not imply native writes exist in those owner modules.</p>}
-        </section>
-        <section className={styles.panel} data-wide="true">
-          <h2>Legacy compatibility</h2>
-          <div className={styles.factGrid}>
-            <div className={styles.fact}><span>Legacy key</span><strong>{item.project.legacyKey || "None"}</strong></div>
-            <div className={styles.fact}><span>Legacy entity</span><strong>{item.project.legacyEntityName || "None"}</strong></div>
-            <div className={styles.fact}><span>Legacy route</span><strong>{item.project.legacyRoute || "None"}</strong></div>
-            <div className={styles.fact}><span>Last activity</span><strong>{formatDate(item.project.lastActivityAt)}</strong></div>
-          </div>
-          {item.project.legacyRoute && <Link className={styles.textLink} href={item.project.legacyRoute}>Open compatibility route</Link>}
-        </section>
-        <div className={styles.boundary} data-wide="true">
-          <strong>Migration treatment</strong>
-          Legacy projections remain read-only until explicit promotion. Promotion preserves the stable project identity and provenance; it does not import legacy task counts, KPIs, notes, or documents as native Project objects.
-        </div>
       </div>
     );
   }
@@ -2423,19 +2286,15 @@ export default function ProjectsWorkspace({
 
         {link && (
           <div className={styles.selectedChildBody}>
-            <p>{link.projectSpecificNote || "No project-specific relationship note recorded."}</p>
+            <p>{link.projectSpecificNote || (link.source.module === "people" ? "No additional context yet." : "No project note yet.")}</p>
             {link.healthNote && <div className={styles.boundary}><strong>{displayLabel(link.linkState)} association</strong>{link.healthNote}</div>}
             {link.lastRepair && <div className={styles.boundary}><strong>Last repaired {formatDate(link.lastRepair.repairedAt)}</strong>{link.lastRepair.reason} Previous source: {link.lastRepair.previousSource.label}.</div>}
-            <div className={styles.factGrid}>
-              <div className={styles.fact}><span>Owner module</span><strong>{displayLabel(link.source.module)}</strong></div>
-              <div className={styles.fact}><span>Relationship</span><strong>{displayLabel(link.relationship)}</strong></div>
-              <div className={styles.fact}><span>Link state</span><strong>{displayLabel(link.linkState)}</strong></div>
-              <div className={styles.fact}><span>Evidence</span><strong>{link.isRequiredEvidence ? "Required" : "Supporting"}</strong></div>
-            </div>
+            {link.source.module === "people" && <p><strong>Role:</strong> {link.role || "Project contributor"}</p>}
             <div className={styles.inlineActions}>
               {linkSourceIsUnsafe(link) ? (
                 <button type="button" className={styles.button} disabled title="Repair this retained association before opening its source.">Source unavailable</button>
-              ) : <Link className={styles.textLink} href={link.source.route}>Open source object</Link>}
+              ) : <Link className={styles.button} href={link.source.route}>Open {link.source.module === "people" ? "person" : "source"}</Link>}
+              {link.linkState !== "removed" && !linkNeedsRepair(link) && <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("link-edit", item, link)}>Edit connection</button>}
               {linkNeedsRepair(link) ? (
                 <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("link-repair", item, link)}>Repair association</button>
               ) : link.linkState !== "removed" ? (
@@ -2493,12 +2352,6 @@ export default function ProjectsWorkspace({
         <DetailTabPanel tabsId={tabsId} tabId="people" active={activeTab === "people"}>{renderPeople(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="files-links" active={activeTab === "files-links"}>{renderFilesLinks(item)}</DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="properties" active={activeTab === "properties"}>{renderProperties(item)}</DetailTabPanel>
-        <QuickActionBar
-          actions={projectQuickActions(item)}
-          label={<strong>Quick actions</strong>}
-          sticky
-          ariaLabel={`${item.project.name} quick actions`}
-        />
       </>
     );
   }
@@ -2511,7 +2364,7 @@ export default function ProjectsWorkspace({
         <section className={styles.panel}>
           <h2>Project progress</h2>
           <ul className={styles.guardList}>
-            <li><span>Objectives</span><strong>{item.project.objectives.filter((objective) => objective.completedAt).length}/{item.project.objectives.length}</strong></li>
+            <li><span>Objectives</span><strong>{item.project.objectives.length}</strong></li>
             <li><span>Open milestones</span><strong>{incompleteMilestones.length}</strong></li>
             <li><span>Open blockers</span><strong>{blockers.length}</strong></li>
             <li><span>Linked context</span><strong>{item.linkedContext.length}</strong></li>
@@ -2547,15 +2400,19 @@ export default function ProjectsWorkspace({
               ? "Resolve blocker"
               : editor?.kind === "interaction-create"
                 ? "Log project update"
+              : editor?.kind === "link-edit"
+                ? "Edit connection"
               : editor?.kind === "link-health"
                 ? "Report association issue"
                 : editor?.kind === "link-repair"
                   ? "Repair source association"
                   : "Link native object";
   const editorDescription = editor?.kind === "legacy-promote"
-    ? "Creates the native Project record while preserving legacy identity and route provenance. No legacy tasks, KPIs, notes, or documents are copied."
+    ? "Start tracking this project in the current workspace."
     : editor?.kind === "link-create"
-      ? "Stores a typed reference and project relationship only. The source object remains in its owner module."
+      ? "Choose an existing item to connect to this project."
+      : editor?.kind === "link-edit"
+        ? "Update the role or context stored on this connection."
       : editor?.kind === "link-health"
         ? "Retains the source association and records why it needs attention. No source object is changed."
       : editor?.kind === "link-repair"
@@ -2578,10 +2435,10 @@ export default function ProjectsWorkspace({
               {(editor.objectives || []).map((objective, index) => <li key={objective.id}>
                 <span aria-hidden="true">•</span>
                 <input value={objective.text} onChange={(event) => updateEditorObjective(objective.id, { text: event.target.value })} aria-label={`Objective ${index + 1}`} placeholder="Describe an objective" />
-                <button type="button" className={styles.iconButton} onClick={() => {
+                <button type="button" className={styles.removeObjectiveButton} onClick={() => {
                   setEditor((current) => current ? { ...current, objectives: current.objectives?.filter((item) => item.id !== objective.id) } : current);
                   setEditorDirty(true);
-                }} aria-label={`Remove objective ${index + 1}`}>×</button>
+                }} aria-label={`Delete objective ${index + 1}`} title="Delete objective"><span aria-hidden="true">⌫</span></button>
               </li>)}
             </ul>
             <button type="button" className={styles.addRowButton} onClick={() => {
@@ -2614,6 +2471,10 @@ export default function ProjectsWorkspace({
             {!(["idea", "developing", "active", "monitoring", "dormant"] as string[]).includes(value("lifecycle")) && <option value={value("lifecycle")}>{displayLabel(value("lifecycle"))} (legacy)</option>}
             {["idea", "developing", "active", "monitoring", "dormant"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}
           </select></label>
+          <label className={styles.field}>Review cadence<select name="defaultCadence" value={value("defaultCadence")} onChange={(event) => changeEditorValue("defaultCadence", event.target.value)}>
+            <option value="">Not set</option>
+            {["weekly", "monthly", "quarterly", "biannual", "annual"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}
+          </select></label>
           <label className={styles.field} data-wide="true">Completion target<textarea name="completionTarget" value={value("completionTarget")} onChange={(event) => changeEditorValue("completionTarget", event.target.value)} placeholder="What does done look like?" /></label>
         </div>
       );
@@ -2621,22 +2482,8 @@ export default function ProjectsWorkspace({
     if (editor.kind === "legacy-promote") {
       return (
         <>
-          <div className={styles.boundary}><strong>Explicit migration boundary</strong>This creates one native Project record mapped to the legacy project. Existing compatibility routes and source material remain intact.</div>
           <div className={styles.formGrid}>
             <label className={styles.field} data-wide="true">Current objective<textarea value={value("objective")} onChange={(event) => changeEditorValue("objective", event.target.value)} autoFocus /></label>
-            <label className={styles.field}>Area<input value={value("area")} onChange={(event) => changeEditorValue("area", event.target.value)} /></label>
-            <label className={styles.field}>Owner<input value={value("owner")} onChange={(event) => changeEditorValue("owner", event.target.value)} /></label>
-            <label className={styles.field}>Owner identity<select aria-label="Project owner identity" value={value("ownerIdentityId")} onChange={(event) => {
-              const person = initialPeople.find((candidate) => candidate.id === event.target.value);
-              changeEditorValues({
-                ownerIdentityId: event.target.value,
-                ...(person ? { owner: person.profile?.fullName || person.title } : {})
-              });
-            }}>
-              <option value="">Display name only</option>
-              {initialPeople.map((person) => <option value={person.id} key={person.id}>{person.profile?.fullName || person.title}</option>)}
-            </select></label>
-            <label className={styles.field}>Priority<select value={value("priority")} onChange={(event) => changeEditorValue("priority", event.target.value)}>{["low", "medium", "high", "critical"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</select></label>
           </div>
         </>
       );
@@ -2666,7 +2513,21 @@ export default function ProjectsWorkspace({
       return <div className={styles.formGrid}>
         <label className={styles.field} data-wide="true">Update title<input value={value("title")} onChange={(event) => changeEditorValue("title", event.target.value)} required data-editor-autofocus placeholder="What happened?" /></label>
         <label className={styles.field} data-wide="true">Details <span>Optional</span><textarea value={value("body")} onChange={(event) => changeEditorValue("body", event.target.value)} placeholder="Add context, a problem, a blocker, or what you worked on." /></label>
-        <label className={styles.field}>Date<input type="date" value={value("occurredAt")} onChange={(event) => changeEditorValue("occurredAt", event.target.value)} required /></label>
+        <label className={styles.field}>Date & time<input type="datetime-local" value={value("occurredAt")} onChange={(event) => changeEditorValue("occurredAt", event.target.value)} required /></label>
+      </div>;
+    }
+    if (editor.kind === "link-edit") {
+      const item = snapshot.projects.find((candidate) => candidate.project.id === editor.projectId);
+      const link = item?.links.find((candidate) => candidate.id === editor.objectId);
+      const editingPerson = link?.source.module === "people";
+      return <div className={styles.formGrid}>
+        <div className={styles.connectionIdentity} data-wide="true"><span>{editingPerson ? "Person" : "Linked object"}</span><strong>{link?.source.label || "Unavailable connection"}</strong></div>
+        {editingPerson && <label className={styles.field}>Role<input value={value("role")} onChange={(event) => changeEditorValue("role", event.target.value)} autoFocus placeholder="e.g. Client, designer" /></label>}
+        {!editingPerson && <>
+          <label className={styles.field}>Relationship<select value={value("relationship")} onChange={(event) => changeEditorValue("relationship", event.target.value)}>{LINK_RELATIONSHIPS.map((relationship) => <option value={relationship} key={relationship}>{displayLabel(relationship)}</option>)}</select></label>
+          <label className={styles.field}>Strength<select value={value("relationshipStrength")} onChange={(event) => changeEditorValue("relationshipStrength", event.target.value)}>{["weak", "normal", "strong"].map((strength) => <option value={strength} key={strength}>{displayLabel(strength)}</option>)}</select></label>
+        </>}
+        <label className={styles.field} data-wide="true">Context <span>Optional</span><textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} autoFocus={!editingPerson} /></label>
       </div>;
     }
     if (editor.kind === "link-health") {
@@ -2687,15 +2548,21 @@ export default function ProjectsWorkspace({
         <div className={styles.boundary} data-wide="true"><strong>Identity replacement only</strong>The relationship remains Project-owned. No Note, Resource, Media asset, Review, or other native object is copied, deleted, or merged.</div>
       </div>;
     }
-    const linkingPeople = value("sourceModule") === "people";
+    const linkScope = value("linkScope") || (value("sourceModule") === "people" ? "people" : "object");
+    const linkingPeople = linkScope === "people";
+    const linkingNote = linkScope === "note";
+    const recordOptions = initialPersonalRecords
+      .map((record) => ({ record, ref: personalRecordObjectRef(record) }))
+      .filter((entry): entry is { record: PersonalRecord; ref: NativeObjectRef } => Boolean(entry.ref))
+      .filter((entry) => linkingNote ? entry.ref.module === "notes" : entry.ref.module === value("sourceModule"));
+    const reviewOptions = reviewViews.map((view) => createNativeObjectRef({
+      module: "reviews",
+      objectType: "review_run",
+      objectId: view.run.id,
+      label: view.run.title
+    }));
+    const objectOptions = value("sourceModule") === "reviews" ? reviewOptions : recordOptions.map((entry) => entry.ref);
     return <div className={styles.formGrid}>
-      <label className={styles.field}>Owner module<select value={value("sourceModule")} onChange={(event) => changeEditorValues({
-        sourceModule: event.target.value,
-        sourceObjectType: event.target.value === "people" ? "person" : "",
-        sourceObjectId: "",
-        sourceContainerObjectId: "",
-        sourceLabel: ""
-      })}>{LINK_MODULES.map((module) => <option value={module} key={module}>{displayLabel(module)}</option>)}</select></label>
       {linkingPeople ? (
         <label className={styles.field} data-wide="true">
           People identity
@@ -2719,21 +2586,36 @@ export default function ProjectsWorkspace({
         </label>
       ) : (
         <>
-          <label className={styles.field}>Object type<input value={value("sourceObjectType")} onChange={(event) => changeEditorValue("sourceObjectType", event.target.value)} required placeholder="note, resource, media_asset…" /></label>
-          <label className={styles.field}>Stable object ID<input value={value("sourceObjectId")} onChange={(event) => changeEditorValue("sourceObjectId", event.target.value)} required autoFocus /></label>
-          <label className={styles.field}>Parent / container ID<input value={value("sourceContainerObjectId")} onChange={(event) => changeEditorValue("sourceContainerObjectId", event.target.value)} placeholder="Required for nested Project or Review objects" /></label>
-          <label className={styles.field}>Source label<input value={value("sourceLabel")} onChange={(event) => changeEditorValue("sourceLabel", event.target.value)} required /></label>
+          {!linkingNote && <label className={styles.field}>Object type<select value={value("sourceModule")} onChange={(event) => changeEditorValues({
+            sourceModule: event.target.value,
+            sourceObjectType: "",
+            sourceObjectId: "",
+            sourceContainerObjectId: "",
+            sourceLabel: "",
+            relationship: event.target.value === "reviews" ? "review_input" : "supporting_context"
+          })}>
+            <option value="media">Files & media</option>
+            <option value="resources">Resources</option>
+            <option value="reviews">Reviews</option>
+          </select></label>}
+          <label className={styles.field} data-wide="true">{linkingNote ? "Note" : "Object"}<select value={value("sourceObjectId")} onChange={(event) => {
+            const selected = objectOptions.find((option) => option.objectId === event.target.value);
+            changeEditorValues({
+              sourceObjectId: selected?.objectId || "",
+              sourceObjectType: selected?.objectType || "",
+              sourceContainerObjectId: selected?.containerObjectId || "",
+              sourceLabel: selected?.label || ""
+            });
+          }} required autoFocus>
+            <option value="">Choose an existing {linkingNote ? "note" : "object"}</option>
+            {objectOptions.map((option) => <option value={option.objectId} key={`${option.module}-${option.objectId}`}>{option.label}</option>)}
+          </select></label>
         </>
       )}
       {linkingPeople ? <>
         <label className={styles.field}>Role<input value={value("role")} onChange={(event) => changeEditorValue("role", event.target.value)} placeholder="e.g. Client, designer" /></label>
         <label className={styles.field} data-wide="true">Context <span>Optional</span><textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} placeholder="Anything else useful about their involvement" /></label>
-      </> : <>
-        <label className={styles.field}>Relationship<select aria-label="Relationship" value={value("relationship")} onChange={(event) => changeEditorValue("relationship", event.target.value)}>{LINK_RELATIONSHIPS.map((relationship) => <option value={relationship} key={relationship}>{displayLabel(relationship)}</option>)}</select></label>
-        <label className={styles.field}>Relationship strength<select aria-label="Relationship strength" value={value("relationshipStrength")} onChange={(event) => changeEditorValue("relationshipStrength", event.target.value)}>{["weak", "normal", "strong"].map((strength) => <option value={strength} key={strength}>{displayLabel(strength)}</option>)}</select></label>
-        <label className={styles.field} data-wide="true">Project-specific note<textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} /></label>
-        <label className={styles.field}><span><input type="checkbox" checked={Boolean(editor.values.isRequiredEvidence)} onChange={(event) => changeEditorValue("isRequiredEvidence", event.target.checked)} /> Required completion evidence</span></label>
-      </>}
+      </> : <label className={styles.field} data-wide="true">Context <span>Optional</span><textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} /></label>}
     </div>;
   }
 
@@ -2751,7 +2633,7 @@ export default function ProjectsWorkspace({
   const confirmationTitle = confirmation?.kind === "project-complete"
     ? "Complete this project?"
     : confirmation?.kind === "project-archive"
-      ? "Archive this project?"
+      ? "Delete this project?"
       : confirmation?.kind === "project-restore"
         ? "Restore this project?"
         : confirmation?.kind === "milestone-complete"
@@ -2764,7 +2646,7 @@ export default function ProjectsWorkspace({
       ? "Completion is blocked until the native project gates below are satisfied."
       : "The project will be marked complete and retained with its links, timeline, and audit history."
     : confirmation?.kind === "project-archive"
-      ? "Archiving removes the project from active views without deleting milestones, blockers, links, or history."
+      ? "The project will leave active views, but its history and links stay recoverable."
       : confirmation?.kind === "project-restore"
         ? "The project will return to active views. Existing history and references remain unchanged."
         : confirmation?.kind === "milestone-complete"
@@ -2792,7 +2674,7 @@ export default function ProjectsWorkspace({
         </div>
 
         {initialLoadError && <SystemState variant="error" compact title="Some project sources did not load" description={initialLoadError} />}
-        {sourceErrors.length > 0 && <p className={styles.notice} role="status">Optional read sources are partially unavailable. Native project data remains usable; see Properties for exact source errors.</p>}
+        {sourceErrors.length > 0 && <p className={styles.notice} role="status">Some linked context could not be loaded. Native project data remains usable.</p>}
         {mutationError && <p className={styles.errorBanner} role="alert">{mutationError}</p>}
         {notice && <p className={styles.successBanner} role="status">{notice}</p>}
 
@@ -2836,7 +2718,7 @@ export default function ProjectsWorkspace({
               setSort(nextSort);
               updateUrl({ sort: nextSort });
             }} aria-label="Sort projects">
-              {Object.entries(SORT_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+              {Object.entries(SORT_LABELS).filter(([value]) => value !== "priority").map(([value, label]) => <option value={value} key={value}>{label}</option>)}
             </select>
           </div>
           <span>{VIEW_LABELS[view]} · {FILTER_LABELS[filter]}</span>
@@ -2862,7 +2744,7 @@ export default function ProjectsWorkspace({
                   title={item.project.name}
                   description={excerpt(item.project.description || item.project.objective || "No project context recorded.")}
                   leading={<span className={styles.rowAvatar} aria-label={`${item.project.name} initials`}>{initials(item.project.name)}</span>}
-                  metadata={`${item.project.id} · ${item.linkedContext.length} links · ${activeMilestones(item).length} milestones`}
+                  metadata={`${item.project.uuid} · ${item.linkedContext.length} links · ${activeMilestones(item).length} milestones`}
                   trailing={<>
                     <span className={styles.rowState} data-tone={stateTone(item.project.lifecycle)}>{displayLabel(item.project.lifecycle)}</span>
                     <span>{attention || (milestone ? `Next ${formatDate(milestone.dueAt)}` : `Updated ${formatDate(item.project.updatedAt)}`)}</span>
@@ -3020,7 +2902,7 @@ export default function ProjectsWorkspace({
           {mutationError && <p className={styles.errorBanner} role="alert">{mutationError}</p>}
         </>}
         consequences={completionIssues}
-        confirmLabel={confirmation?.kind === "project-archive" ? "Archive project" : confirmation?.kind === "link-remove" ? "Remove link" : confirmation?.kind === "project-restore" || confirmation?.kind === "link-restore" ? "Restore" : "Confirm completion"}
+        confirmLabel={confirmation?.kind === "project-archive" ? "Delete project" : confirmation?.kind === "link-remove" ? "Remove link" : confirmation?.kind === "project-restore" || confirmation?.kind === "link-restore" ? "Restore" : "Confirm completion"}
         tone={confirmation?.kind === "project-archive" || confirmation?.kind === "link-remove" ? "danger" : "default"}
         busy={mutationBusy}
         confirmDisabled={completionIssues.length > 0 || Boolean(confirmationNeedsReason && !confirmationReason.trim())}
@@ -3028,7 +2910,7 @@ export default function ProjectsWorkspace({
       >
         {confirmationNeedsReason && (
           <label className={styles.field}>
-            {confirmation?.kind === "project-archive" ? "Archive reason" : confirmation?.kind === "link-remove" ? "Removal reason" : "Completion note"}
+            {confirmation?.kind === "project-archive" ? "Deletion reason" : confirmation?.kind === "link-remove" ? "Removal reason" : "Completion note"}
             <textarea value={confirmationReason} onChange={(event) => setConfirmationReason(event.target.value)} autoFocus={Boolean(confirmationNeedsReason)} />
           </label>
         )}

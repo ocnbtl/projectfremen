@@ -7,6 +7,14 @@ import { useEffect, useRef, useState } from "react";
 import { ADMIN_NAV_ITEMS } from "../../lib/admin-navigation";
 import PersonalViewportToggle from "../PersonalViewportToggle";
 
+type ProjectMenuItem = {
+  id: string;
+  slug: string;
+  name: string;
+  lifecycle: string;
+  archivedAt?: string;
+};
+
 export type AppTopNavProps = {
   showCommandSearch?: boolean;
   onCommandSearch?: (query: string) => void;
@@ -31,6 +39,7 @@ export default function AppTopNav({
   const [projectsOpen, setProjectsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
+  const [projectMenuItems, setProjectMenuItems] = useState<ProjectMenuItem[]>([]);
   const projectsGroupRef = useRef<HTMLDivElement>(null);
   const mobileNavRef = useRef<HTMLDivElement>(null);
   const mobileNavTriggerRef = useRef<HTMLButtonElement>(null);
@@ -83,6 +92,27 @@ export default function AppTopNav({
     document.body.classList.toggle("app-mobile-nav-open", mobileNavOpen);
     return () => document.body.classList.remove("app-mobile-nav-open");
   }, [mobileNavOpen]);
+
+  useEffect(() => {
+    let active = true;
+    async function refreshProjects() {
+      try {
+        const response = await fetch("/api/projects?family=projects", { cache: "no-store" });
+        const payload = await response.json() as { ok?: boolean; items?: ProjectMenuItem[] };
+        if (active && response.ok && payload.ok && Array.isArray(payload.items)) {
+          setProjectMenuItems(payload.items.filter((project) => !project.archivedAt && project.lifecycle !== "archived"));
+        }
+      } catch {
+        // Static navigation remains available when the optional live refresh fails.
+      }
+    }
+    void refreshProjects();
+    window.addEventListener("projects:changed", refreshProjects);
+    return () => {
+      active = false;
+      window.removeEventListener("projects:changed", refreshProjects);
+    };
+  }, []);
 
   useEffect(() => {
     if (mobileNavOpen) {
@@ -180,12 +210,31 @@ export default function AppTopNav({
             );
           }
 
+          const liveSlugs = new Set(projectMenuItems.map((project) => project.slug));
+          const projects = [
+            ...projectMenuItems.map((project) => ({
+              key: project.id,
+              label: project.name,
+              href: `/admin/projects/${encodeURIComponent(project.slug || project.id)}`
+            })),
+            ...item.children
+              .filter((project) => !liveSlugs.has(project.slug))
+              .map((project) => ({
+                key: project.slug,
+                label: project.shortLabel,
+                href: `/admin/projects/${encodeURIComponent(project.slug)}`
+              }))
+          ];
+
           return (
             <div className="admin-global-nav-group" key={item.label} ref={projectsGroupRef}>
               <button
                 type="button"
                 className={cx("admin-global-nav-button", itemActive && "is-active")}
-                onClick={() => setProjectsOpen((current) => !current)}
+                onClick={() => {
+                  setProjectsOpen((current) => !current);
+                  window.dispatchEvent(new Event("projects:changed"));
+                }}
                 aria-expanded={projectsOpen}
                 aria-haspopup="menu"
                 aria-controls="app-project-navigation"
@@ -210,16 +259,15 @@ export default function AppTopNav({
                 >
                   All projects
                 </Link>
-                {item.children.map((project) => (
+                {projects.map((project) => (
                   <Link
                     href={project.href}
                     className="admin-project-menu-item"
                     role="menuitem"
-                    key={project.slug}
+                    key={project.key}
                     onClick={() => setProjectsOpen(false)}
                   >
-                    <span>{project.shortLabel}</span>
-                    <small>{project.status === "active" ? "Active" : "Planned"}</small>
+                    <span>{project.label}</span>
                   </Link>
                 ))}
               </div>

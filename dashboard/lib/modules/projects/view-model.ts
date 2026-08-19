@@ -1,4 +1,3 @@
-import type { DocsIndexState, KpiEntry } from "../../types";
 import type { PersonalRecord } from "../../personal-records-store";
 import { createNativeObjectRef } from "../../native-objects/routes";
 import type {
@@ -12,6 +11,7 @@ import {
   LEGACY_PROJECT_DEFINITIONS,
   getLegacyProjectNativeRef
 } from "./legacy-adapter";
+import { projectUuid, stableProjectUuid } from "./identity";
 import type {
   LegacyProjectDefinition,
   Project,
@@ -22,7 +22,6 @@ import type {
   ProjectLink,
   ProjectMilestone,
   ProjectObjective,
-  ProjectPriority,
   ProjectReviewState,
   ProjectsState,
   ProjectTimelineEvent
@@ -32,13 +31,12 @@ export type ProjectsSourceAvailability = {
   projects?: string;
   personalRecords?: string;
   personalOps?: string;
-  kpis?: string;
-  docs?: string;
   reviews?: string;
 };
 
 export type ProjectDisplayRecord = {
   id: string;
+  uuid: string;
   nativeRef: NativeObjectRef;
   slug: string;
   name: string;
@@ -50,12 +48,9 @@ export type ProjectDisplayRecord = {
   health: HealthState;
   review: ProjectReviewState;
   cadence: ProjectCadenceState;
-  priority: ProjectPriority;
-  owner?: string;
-  ownerRef?: NativeObjectRef;
-  area?: string;
   objective?: string;
   objectives: ProjectObjective[];
+  defaultCadence?: string;
   lifecycleBeforeArchive?: Project["lifecycleBeforeArchive"];
   starred: boolean;
   legacyKey?: string;
@@ -75,26 +70,6 @@ export type ProjectLinkedContextSummary = {
   updatedAt?: string;
 };
 
-export type LegacyKpiSummary = {
-  id: string;
-  name: string;
-  value: string;
-  priority: string;
-  updatedAt: string;
-  link?: string;
-  sourceLabel: "Legacy KPI source";
-};
-
-export type LegacyDocumentSummary = {
-  id: string;
-  title: string;
-  repo: string;
-  path: string;
-  url: string;
-  updatedAt: string;
-  sourceLabel: "Legacy document index";
-};
-
 export type ProjectDirectoryItem = {
   project: ProjectDisplayRecord;
   milestones: ProjectMilestone[];
@@ -103,10 +78,6 @@ export type ProjectDirectoryItem = {
   interactions: ProjectInteraction[];
   timelineEvents: ProjectTimelineEvent[];
   linkedContext: ProjectLinkedContextSummary[];
-  legacyKpis: LegacyKpiSummary[];
-  legacyDocuments: LegacyDocumentSummary[];
-  legacyDocumentTotal: number;
-  docsLastSynced?: string;
   attentionReasons: string[];
 };
 
@@ -122,8 +93,6 @@ type BuildProjectsWorkspaceSnapshotInput = {
   state: ProjectsState;
   personalRecords?: PersonalRecord[];
   personalOpsState?: PersonalOpsState;
-  kpis?: KpiEntry[];
-  docsState?: DocsIndexState;
   sourceAvailability?: ProjectsSourceAvailability;
 };
 
@@ -139,6 +108,7 @@ function excerpt(value: string, limit = 180) {
 function displayFromNative(project: Project): ProjectDisplayRecord {
   return {
     id: project.id,
+    uuid: projectUuid(project.uuid, project.id),
     nativeRef: createNativeObjectRef({
       module: "projects",
       objectType: "project",
@@ -155,12 +125,9 @@ function displayFromNative(project: Project): ProjectDisplayRecord {
     health: project.health,
     review: project.review,
     cadence: project.cadence,
-    priority: project.priority,
-    owner: project.owner,
-    ownerRef: project.ownerRef,
-    area: project.area,
     objective: project.objective,
     objectives: project.objectives,
+    defaultCadence: project.defaultCadence,
     lifecycleBeforeArchive: project.lifecycleBeforeArchive,
     starred: project.starred,
     legacyKey: project.legacySource?.key,
@@ -174,6 +141,7 @@ function displayFromNative(project: Project): ProjectDisplayRecord {
 function displayFromLegacy(project: LegacyProjectDefinition): ProjectDisplayRecord {
   return {
     id: project.projectId,
+    uuid: stableProjectUuid(project.projectId),
     nativeRef: getLegacyProjectNativeRef(project),
     slug: project.slug,
     name: project.name,
@@ -185,7 +153,6 @@ function displayFromLegacy(project: LegacyProjectDefinition): ProjectDisplayReco
     health: "unknown",
     review: "unknown",
     cadence: "unset",
-    priority: "medium",
     objectives: [],
     starred: false,
     legacyKey: project.key,
@@ -330,45 +297,6 @@ function nativeLinkContext(links: readonly ProjectLink[]): ProjectLinkedContextS
     }));
 }
 
-function legacyKpisFor(
-  definition: LegacyProjectDefinition | undefined,
-  kpis: readonly KpiEntry[]
-): LegacyKpiSummary[] {
-  if (!definition?.entityName) return [];
-  return kpis
-    .filter((kpi) => kpi.entity === definition.entityName)
-    .map((kpi) => ({
-      id: kpi.id,
-      name: kpi.name,
-      value: kpi.value,
-      priority: kpi.priority,
-      updatedAt: kpi.updatedAt,
-      link: kpi.link,
-      sourceLabel: "Legacy KPI source" as const
-    }));
-}
-
-function legacyDocsFor(
-  definition: LegacyProjectDefinition | undefined,
-  docsState: DocsIndexState | undefined
-) {
-  if (!definition || !docsState) return { total: 0, items: [] as LegacyDocumentSummary[] };
-  const repos = new Set(definition.repos);
-  const documents = docsState.items.filter((item) => repos.has(item.repo));
-  return {
-    total: documents.length,
-    items: documents.slice(0, 20).map((item) => ({
-      id: item.id,
-      title: item.title,
-      repo: item.repo,
-      path: item.path,
-      url: item.url,
-      updatedAt: item.updatedAt,
-      sourceLabel: "Legacy document index" as const
-    }))
-  };
-}
-
 function attentionReasons(input: {
   project: ProjectDisplayRecord;
   blockers: readonly ProjectBlocker[];
@@ -397,8 +325,6 @@ export function buildProjectsWorkspaceSnapshot({
   state,
   personalRecords = [],
   personalOpsState,
-  kpis = [],
-  docsState,
   sourceAvailability = {}
 }: BuildProjectsWorkspaceSnapshotInput): ProjectsWorkspaceSnapshot {
   const mappedLegacyKeys = new Set(state.legacyMappings.map((mapping) => mapping.legacyKey));
@@ -426,7 +352,6 @@ export function buildProjectsWorkspaceSnapshot({
     const timelineEvents = state.timelineEvents
       .filter((item) => item.projectId === project.id)
       .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
-    const docs = legacyDocsFor(definition, docsState);
     return {
       project,
       milestones,
@@ -439,10 +364,6 @@ export function buildProjectsWorkspaceSnapshot({
         ...legacyRecordContext(project, definition, personalRecords),
         ...personalOpsContext(project, personalOpsState)
       ],
-      legacyKpis: legacyKpisFor(definition, kpis),
-      legacyDocuments: docs.items,
-      legacyDocumentTotal: docs.total,
-      docsLastSynced: docsState?.lastSynced || undefined,
       attentionReasons: attentionReasons({ project, blockers, milestones })
     };
   });

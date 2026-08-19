@@ -41,7 +41,6 @@ import {
   type ProjectObjectiveInput,
   type ProjectPersonAssignmentInput,
   type ProjectObjectFamily,
-  type ProjectPriority,
   type ProjectReviewState,
   type ProjectsCreateInputByFamily,
   type ProjectsCreateResult,
@@ -55,6 +54,7 @@ import {
   type ProjectVisibility,
   type ProjectPrivacyScope
 } from "./types";
+import { isProjectUuid, projectUuid } from "./identity";
 
 const FILE_NAME = "projects.json";
 const MAX_MODULE_AUDIT_EVENTS = 1000;
@@ -88,7 +88,6 @@ const CADENCE_STATES: ProjectCadenceState[] = [
   "paused",
   "unset"
 ];
-const PRIORITIES: ProjectPriority[] = ["low", "medium", "high", "critical"];
 const VISIBILITIES: ProjectVisibility[] = ["private", "shared"];
 const PRIVACY_SCOPES: ProjectPrivacyScope[] = ["project_only", "module_shared"];
 const MILESTONE_STATES: ProjectMilestoneState[] = [
@@ -524,8 +523,14 @@ function assertState(value: unknown): ProjectsState {
         ? [{ id: `objective-${String(candidate.id || index)}-legacy`, text: legacyObjective }]
         : [];
     const objectives = normalizeObjectives(objectiveSource, `projects.${index}.objectives`, migrationTime);
+    const normalizedCandidate = { ...candidate };
+    delete normalizedCandidate.area;
+    delete normalizedCandidate.owner;
+    delete normalizedCandidate.ownerRef;
+    delete normalizedCandidate.priority;
     return {
-      ...candidate,
+      ...normalizedCandidate,
+      uuid: projectUuid(candidate.uuid, String(candidate.id || index)),
       objectives,
       objective: objectiveSummary(objectives)
     } as Project;
@@ -540,6 +545,26 @@ function assertState(value: unknown): ProjectsState {
 export async function readProjectsState(): Promise<ProjectsState> {
   const empty = createEmptyProjectsState();
   return assertState(await readJsonFile<unknown>(FILE_NAME, empty));
+}
+
+export async function retireLegacyProjectMetadata(): Promise<{ state: ProjectsState; updated: boolean }> {
+  return withMutationLock(async () => {
+    const empty = createEmptyProjectsState();
+    const raw = await readJsonFile<unknown>(FILE_NAME, empty);
+    const state = assertState(raw);
+    const rawProjects = isRecord(raw) && Array.isArray(raw.projects) ? raw.projects : [];
+    const updated = rawProjects.some((candidate) =>
+      isRecord(candidate) && (
+        hasOwn(candidate, "area") ||
+        hasOwn(candidate, "owner") ||
+        hasOwn(candidate, "ownerRef") ||
+        hasOwn(candidate, "priority") ||
+        !isProjectUuid(candidate.uuid)
+      )
+    );
+    if (updated) await writeJsonFile(FILE_NAME, state);
+    return { state, updated };
+  });
 }
 
 function collectionFor<Family extends ProjectObjectFamily>(
@@ -656,10 +681,6 @@ function uniqueProjectName(state: ProjectsState, name: string, excludingId?: str
   }
 }
 
-function newProjectId(): string {
-  return `PRJ-${crypto.randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase()}`;
-}
-
 function buildNativeProject(
   input: ProjectCreateInput,
   state: ProjectsState,
@@ -687,22 +708,20 @@ function buildNativeProject(
     "objectives",
     now
   );
+  const id = crypto.randomUUID();
   const project: Project = {
-    id: newProjectId(),
+    id,
+    uuid: id,
     objectType: "project",
     slug,
     name,
     description: optionalText(raw.description, "description") || "",
-    area: optionalText(raw.area, "area", 160),
     objective: objectiveSummary(objectives),
     objectives,
     lifecycle: enumValue(raw.lifecycle, LIFECYCLE_STATES.filter((state) => !["complete", "archived"].includes(state)), "idea", "lifecycle"),
     health: "unknown",
     review: enumValue(raw.review, REVIEW_STATES, "not_reviewed", "review"),
     cadence: enumValue(raw.cadence, CADENCE_STATES, "unset", "cadence"),
-    priority: enumValue(raw.priority, PRIORITIES, "medium", "priority"),
-    owner: optionalText(raw.owner, "owner", 160),
-    ownerRef: optionalNativeRef(raw.ownerRef, "ownerRef"),
     nextReviewAt: optionalDate(raw.nextReviewAt, "nextReviewAt"),
     defaultCadence: optionalText(raw.defaultCadence, "defaultCadence", 160),
     completionTarget: optionalText(raw.completionTarget, "completionTarget", 4000),
@@ -766,20 +785,17 @@ export async function promoteLegacyProject(
     );
     const project: Project = {
       id: definition.projectId,
+      uuid: projectUuid(undefined, definition.projectId),
       objectType: "project",
       slug: definition.slug,
       name: definition.name,
       description: definition.description,
-      area: optionalText(raw.area, "area", 160),
       objective: objectiveSummary(objectives),
       objectives,
       lifecycle: definition.lifecycle,
       health: "unknown",
       review: "unknown",
       cadence: "unset",
-      priority: enumValue(raw.priority, PRIORITIES, "medium", "priority"),
-      owner: optionalText(raw.owner, "owner", 160),
-      ownerRef: optionalNativeRef(raw.ownerRef, "ownerRef"),
       visibility: "private",
       privacyScope: "project_only",
       starred: false,
@@ -1208,7 +1224,6 @@ function applyProjectPatch(
   if (hasOwn(patch, "name")) next.name = requiredText(patch.name, "name", 240);
   if (hasOwn(patch, "slug")) next.slug = normalizeSlug(patch.slug, next.name);
   if (hasOwn(patch, "description")) next.description = optionalText(patch.description, "description") || "";
-  if (hasOwn(patch, "area")) next.area = optionalText(patch.area, "area", 160);
   if (hasOwn(patch, "objectives")) {
     next.objectives = normalizeObjectives(patch.objectives, "objectives", now, current.objectives);
     next.objective = objectiveSummary(next.objectives);
@@ -1226,9 +1241,6 @@ function applyProjectPatch(
   }
   if (hasOwn(patch, "review")) next.review = enumValue(patch.review, REVIEW_STATES, current.review, "review");
   if (hasOwn(patch, "cadence")) next.cadence = enumValue(patch.cadence, CADENCE_STATES, current.cadence, "cadence");
-  if (hasOwn(patch, "priority")) next.priority = enumValue(patch.priority, PRIORITIES, current.priority, "priority");
-  if (hasOwn(patch, "owner")) next.owner = optionalText(patch.owner, "owner", 160);
-  if (hasOwn(patch, "ownerRef")) next.ownerRef = optionalNativeRef(patch.ownerRef, "ownerRef");
   if (hasOwn(patch, "nextReviewAt")) next.nextReviewAt = optionalDate(patch.nextReviewAt, "nextReviewAt");
   if (hasOwn(patch, "defaultCadence")) next.defaultCadence = optionalText(patch.defaultCadence, "defaultCadence", 160);
   if (hasOwn(patch, "completionTarget")) next.completionTarget = optionalText(patch.completionTarget, "completionTarget", 4000);

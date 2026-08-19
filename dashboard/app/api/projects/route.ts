@@ -10,6 +10,7 @@ import {
   ProjectsStoreError,
   readProjectsObject,
   readProjectsState,
+  retireLegacyProjectMetadata,
   updateProjectsObject
 } from "../../../lib/modules/projects/store";
 import type {
@@ -130,6 +131,18 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Request body must be an object" }, { status: 400 });
     }
     operation = typeof body.operation === "string" ? body.operation.trim() : "";
+    if (operation === "retire_legacy_metadata") {
+      const result = await retireLegacyProjectMetadata();
+      await appendAuditEvent({
+        at: new Date().toISOString(),
+        action: result.updated ? "projects.legacy_metadata_retired" : "projects.legacy_metadata_already_retired",
+        path: new URL(request.url).pathname,
+        method: "POST",
+        ip: getRequestIp(request),
+        status: "ok"
+      });
+      return NextResponse.json({ ok: true, updated: result.updated });
+    }
     if (!isRecord(body.input)) {
       return NextResponse.json({ ok: false, error: "input must be an object" }, { status: 400 });
     }
@@ -158,7 +171,7 @@ export async function POST(request: Request) {
 
     if (operation !== "create") {
       return NextResponse.json(
-        { ok: false, error: "operation must be create or promote_legacy" },
+        { ok: false, error: "operation must be create, promote_legacy, or retire_legacy_metadata" },
         { status: 400 }
       );
     }

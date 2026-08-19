@@ -72,10 +72,12 @@ export type ProjectObjectiveInput = {
 
 export type Project = {
   id: string;
+  uuid?: string;
   objectType: "project";
   slug: string;
   name: string;
   description: string;
+  /** @deprecated Retired from Projects; read normalization removes it. */
   area?: string;
   objective?: string;
   objectives: ProjectObjective[];
@@ -83,8 +85,11 @@ export type Project = {
   health: HealthState;
   review: ProjectReviewState;
   cadence: ProjectCadenceState;
-  priority: ProjectPriority;
+  /** @deprecated Retired from Projects; read normalization removes it. */
+  priority?: ProjectPriority;
+  /** @deprecated Retired from Projects; use typed People links. */
   owner?: string;
+  /** @deprecated Retired from Projects; use typed People links. */
   ownerRef?: NativeObjectRef;
   nextReviewAt?: string;
   defaultCadence?: string;
@@ -318,16 +323,12 @@ export type ProjectCreateInput = {
   name: string;
   slug?: string;
   description?: string;
-  area?: string;
   objective?: string;
   objectives?: ProjectObjectiveInput[];
   people?: ProjectPersonAssignmentInput[];
   lifecycle?: Exclude<ProjectLifecycleState, "complete" | "archived">;
   review?: ProjectReviewState;
   cadence?: ProjectCadenceState;
-  priority?: ProjectPriority;
-  owner?: string;
-  ownerRef?: NativeObjectRef;
   nextReviewAt?: string;
   defaultCadence?: string;
   completionTarget?: string;
@@ -346,10 +347,6 @@ export type LegacyProjectPromotionInput = {
   legacyKey: string;
   promotionConfirmed: true;
   objective?: string;
-  area?: string;
-  owner?: string;
-  ownerRef?: NativeObjectRef;
-  priority?: ProjectPriority;
 };
 
 export type ProjectUpdateInput = Partial<
@@ -358,14 +355,10 @@ export type ProjectUpdateInput = Partial<
     | "name"
     | "slug"
     | "description"
-    | "area"
     | "objective"
     | "lifecycle"
     | "review"
     | "cadence"
-    | "priority"
-    | "owner"
-    | "ownerRef"
     | "nextReviewAt"
     | "defaultCadence"
     | "completionTarget"

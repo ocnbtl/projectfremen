@@ -6896,7 +6896,10 @@ async function checkCrossModuleFollowUpConnections(
       `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=overview`,
       { waitUntil: "networkidle" }
     );
-    await assertPanel(desktopPage, sources[0], "Project follow-through");
+    assert(
+      await desktopPage.locator(`[data-linked-follow-ups="${sourceKey(sources[0].source)}"]`).count() === 0,
+      "Project overview retained the removed follow-through panel"
+    );
 
     await desktopPage.goto(
       `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}`,
@@ -7116,10 +7119,6 @@ async function checkCrossModuleFollowUpConnections(
     await desktopContext.close();
 
     const responsiveRoutes = [
-      {
-        key: "project",
-        path: `/admin/projects/${encodeURIComponent(project.id)}?tab=overview`
-      },
       {
         key: "blocker",
         path: `/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}`
@@ -7547,7 +7546,9 @@ async function checkCrossModuleDecisionConnections(
     );
     createdByKey.set("project", decideProjectOwner.payload.item);
     await projectPage
-      .getByRole("button", { name: `Refresh linked Decisions for ${project.name}` })
+      .getByRole("heading", { name: "Decisions", exact: true })
+      .locator("xpath=ancestor::section[1]")
+      .getByRole("button", { name: "Refresh", exact: true })
       .click();
     await projectPage
       .locator(`[data-decision-id="${projectOwner.id}"][data-decision-state="decided"]`)
@@ -7558,10 +7559,6 @@ async function checkCrossModuleDecisionConnections(
     assert(
       await projectPage.locator('section[aria-labelledby^="project-selected-child-"]').getByRole("link", { name: "File decision" }).count() === 0,
       "Project milestone inspector offered a duplicate Decision creation action"
-    );
-    assert(
-      (await projectPage.getByLabel(/active Follow-ups, 1 unresolved Decisions, \d+ Reviews/).count()) >= 1,
-      "Project milestone row did not summarize current Personal Ops and Reviews owner state"
     );
     await milestonePanel.row.click();
     await projectPage.waitForURL((url) =>
@@ -7581,10 +7578,6 @@ async function checkCrossModuleDecisionConnections(
     assert(
       await projectPage.locator('section[aria-labelledby^="project-selected-child-"]').getByRole("link", { name: "File decision" }).count() === 0,
       "Project blocker inspector offered a duplicate Decision creation action"
-    );
-    assert(
-      (await projectPage.getByLabel(/active Follow-ups, 1 unresolved Decisions, \d+ Reviews/).count()) >= 1,
-      "Project blocker row did not summarize current Personal Ops and Reviews owner state"
     );
 
     const reviewPage = await desktopContext.newPage();
@@ -8028,6 +8021,7 @@ async function checkProjectCreationWorkflow(
     await createForm.getByLabel("Role", { exact: true }).fill("Client");
     await createForm.getByLabel("Context", { exact: true }).fill("Website owner and primary stakeholder");
     await createForm.getByLabel("Status").selectOption("idea");
+    await createForm.getByLabel("Review cadence").selectOption("monthly");
     await createForm.getByLabel("Completion target").fill("Website is approved and live.");
 
     const createResponsePromise = page.waitForResponse(
@@ -8039,6 +8033,10 @@ async function checkProjectCreationWorkflow(
     const createdPayload = await createResponse.json();
     const projectId = createdPayload.item?.id;
     assert(projectId, `Project creation response did not include an ID: ${JSON.stringify(createdPayload)}`);
+    assert(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(projectId),
+      `New Project identity was not a UUID: ${projectId}`
+    );
     await createForm.waitFor({ state: "detached" });
 
     const projectHeader = page.getByRole("heading", { name: projectName, exact: true }).locator("..");
@@ -8052,12 +8050,39 @@ async function checkProjectCreationWorkflow(
       `Project header was not streamlined: ${headerText}`
     );
     await page.getByText("Website build for Sage Burris.", { exact: true }).last().waitFor();
+    await projectHeader.getByLabel("More project options").click();
+    assert(
+      await projectHeader.getByRole("menuitem", { name: "Edit project" }).count() === 1 &&
+        await projectHeader.getByRole("menuitem", { name: "Delete project" }).count() === 1 &&
+        await projectHeader.getByLabel("Open full project").count() === 0,
+      "Project header did not reduce actions to star and the Edit/Delete overflow menu"
+    );
+    await projectHeader.getByLabel("More project options").click();
+    assert(
+      await page.getByText("Quick actions", { exact: true }).count() === 1 &&
+        await page.getByText("Project follow-through", { exact: true }).count() === 0,
+      "Project overview did not keep one top quick-action group or retained follow-through"
+    );
     const overviewObjective = page.locator('input[aria-label="Objective"]:visible').first();
     await overviewObjective.waitFor();
     assert(
       (await overviewObjective.inputValue()) === "Ship the Sage Burris website",
       "Created objective was not rendered in the streamlined overview"
     );
+    assert(
+      await page.getByLabel("Mark Ship the Sage Burris website complete").count() === 0 &&
+        await page.getByLabel("Delete Ship the Sage Burris website").count() === 1,
+      "Objectives retained checkbox/X completion controls instead of the compact delete interaction"
+    );
+
+    await page.locator(".admin-global-nav-button").filter({ hasText: "Projects" }).click();
+    const projectMenuRow = page.locator(".admin-project-menu-item").filter({ hasText: projectName }).first();
+    await projectMenuRow.waitFor();
+    assert(
+      await projectMenuRow.locator("small").count() === 0,
+      "The Projects navigation dropdown still rendered lifecycle status text"
+    );
+    await page.locator(".admin-global-nav-button").filter({ hasText: "Projects" }).click();
 
     await page.getByRole("button", { name: "Log update", exact: true }).first().click();
     const interactionForm = page.locator("form").filter({ hasText: "Log project update" });
@@ -8072,14 +8097,21 @@ async function checkProjectCreationWorkflow(
     await page.getByText("Initial project setup complete", { exact: true }).first().waitFor();
 
     await page.getByRole("tab", { name: "Overview" }).click();
-    const objectiveCheckbox = page.getByLabel("Mark Ship the Sage Burris website complete");
-    await objectiveCheckbox.check();
+    await overviewObjective.fill("Ship and approve the Sage Burris website");
     const objectiveResponsePromise = page.waitForResponse(
       (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
     );
     await page.getByRole("button", { name: "Save objectives" }).click();
     const objectiveResponse = await objectiveResponsePromise;
-    assert(objectiveResponse.ok(), `Objective completion failed with ${objectiveResponse.status()}: ${await objectiveResponse.text()}`);
+    assert(objectiveResponse.ok(), `Objective update failed with ${objectiveResponse.status()}: ${await objectiveResponse.text()}`);
+
+    await page.getByRole("tab", { name: "Properties" }).click();
+    await page.getByText(projectId, { exact: true }).waitFor();
+    assert(
+      await page.getByText("Retained legacy metadata", { exact: true }).count() === 0 &&
+        await page.getByText("Identity and provenance", { exact: true }).count() === 0,
+      "Project Properties retained legacy metadata/provenance sections"
+    );
 
     const persisted = await requestJson(baseUrl, cookieJar, "/api/projects");
     const storedProject = persisted.payload?.state?.projects?.find((item) => item.id === projectId);
@@ -8091,8 +8123,15 @@ async function checkProjectCreationWorkflow(
     );
     assert(
       storedProject?.lifecycle === "idea" &&
+        storedProject?.uuid === projectId &&
+        storedProject?.defaultCadence === "monthly" &&
         storedProject.objectives?.length === 1 &&
-        Boolean(storedProject.objectives[0].completedAt) &&
+        storedProject.objectives[0].text === "Ship and approve the Sage Burris website" &&
+        !storedProject.objectives[0].completedAt &&
+        !("area" in storedProject) &&
+        !("owner" in storedProject) &&
+        !("ownerRef" in storedProject) &&
+        !("priority" in storedProject) &&
         storedPerson?.role === "Client" &&
         storedPerson?.projectSpecificNote === "Website owner and primary stakeholder" &&
         storedInteraction?.body === "Created the project and linked its first stakeholder.",
@@ -8105,7 +8144,7 @@ async function checkProjectCreationWorkflow(
       innerWidth: window.innerWidth
     }));
     assert(!layout.overflowX, `Project overview overflowed horizontally: ${JSON.stringify(layout)}`);
-    await page.screenshot({ path: path.join(screenshotDir, "project-saite-overview-1440x900.png"), fullPage: true });
+    await page.screenshot({ path: path.join(screenshotDir, "project-saite-properties-1440x900.png"), fullPage: true });
     assert(
       browserMutations.join("|") === "POST /api/projects|POST /api/projects|PATCH /api/projects",
       `Project create browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
@@ -8705,7 +8744,7 @@ async function checkNoteProjectAssociations(
         url.searchParams.get("tab") === "notes-decisions"
     );
     const projectNotesPanel = page
-      .getByRole("heading", { name: "Notes and decision context" })
+      .getByRole("heading", { name: "Notes", exact: true })
       .locator("xpath=ancestor::section[1]");
     await projectNotesPanel.getByText(note.title, { exact: true }).waitFor();
     assert(
@@ -8769,7 +8808,7 @@ async function checkNoteProjectAssociations(
         const surface = route.selector
           ? responsivePage.locator(route.selector)
           : responsivePage
-              .getByRole("heading", { name: "Notes and decision context" })
+              .getByRole("heading", { name: "Notes", exact: true })
               .locator("xpath=ancestor::section[1]");
         await surface.waitFor();
         const text = await surface.innerText();
@@ -9357,7 +9396,7 @@ async function checkResourceMediaProjectAssociations(
       { waitUntil: "networkidle" }
     );
     const projectReferences = page
-      .getByRole("heading", { name: "Native project references" })
+      .getByRole("heading", { name: "Files & resources", exact: true })
       .locator("xpath=ancestor::section[1]");
     await projectReferences.getByText(resource.title, { exact: true }).waitFor();
     await projectReferences.getByText(media.title, { exact: true }).first().waitFor();
@@ -9467,7 +9506,7 @@ async function checkResourceMediaProjectAssociations(
         { waitUntil: "networkidle" }
       );
       const projectReferencesAtViewport = projectPage
-        .getByRole("heading", { name: "Native project references" })
+        .getByRole("heading", { name: "Files & resources", exact: true })
         .locator("xpath=ancestor::section[1]");
       await projectReferencesAtViewport.getByText(resource.title, { exact: true }).waitFor();
       await projectReferencesAtViewport.getByText(media.title, { exact: true }).first().waitFor();
@@ -9709,8 +9748,8 @@ async function checkProjectReviewContextBrowserState(
       await page.goto(projectRoute, { waitUntil: "domcontentloaded" });
       await page.getByRole("heading", { name: blocker.title }).waitFor();
       assert(
-        await page.getByRole("heading", { name: "Review coverage" }).count() >= 1,
-        `Projects ${viewport.label} omitted Review coverage`
+        await page.getByRole("heading", { name: "Reviews", exact: true }).count() >= 1,
+        `Projects ${viewport.label} omitted Reviews`
       );
       assert(
         await page.getByText(reviewRun.title, { exact: true }).count() >= 1,
@@ -16828,7 +16867,7 @@ async function main() {
     );
     assert(
       projectReviewCoveragePage.response.ok &&
-        projectReviewCoveragePage.body.includes("Review coverage") &&
+        projectReviewCoveragePage.body.includes("Reviews") &&
         projectReviewCoveragePage.body.includes(weeklyReviewRun.title) &&
         projectReviewCoveragePage.body.includes(`/admin/reviews/${weeklyReviewRun.id}?tab=overview&amp;item=${linkedReviewContext.id}`) &&
         projectReviewCoveragePage.body.includes("Repair in Reviews") &&

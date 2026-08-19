@@ -1,8 +1,6 @@
 import { notFound } from "next/navigation";
 import AdminChrome from "../../../components/AdminChrome";
 import ProjectsWorkspace from "../../../components/projects/ProjectsWorkspace";
-import { readDocsIndex } from "../../../lib/docs-sync";
-import { readKpis } from "../../../lib/kpis-store";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
 import { createEmptyProjectsState, readProjectsState } from "../../../lib/modules/projects/store";
 import {
@@ -49,7 +47,7 @@ export default async function ProjectsRoutePage({
 }) {
   await requireAdminSession();
 
-  const [native, personalRecords, personalOps, kpis, docs, reviews] = await Promise.all([
+  const [native, personalRecords, personalOps, reviews] = await Promise.all([
     settleSource(
       readProjectsState(),
       createEmptyProjectsState(),
@@ -57,8 +55,6 @@ export default async function ProjectsRoutePage({
     ),
     settleSource(readPersonalRecords(), [], "Legacy Personal Records could not be loaded."),
     settleSource(readPersonalOpsState(), undefined, "Personal Ops context could not be loaded."),
-    settleSource(readKpis(), [], "Legacy KPI context could not be loaded."),
-    settleSource(readDocsIndex(), undefined, "Legacy document context could not be loaded."),
     settleSource(
       readReviewsState(),
       createEmptyReviewsState(),
@@ -70,16 +66,12 @@ export default async function ProjectsRoutePage({
     ...(native.error ? { projects: native.error } : {}),
     ...(personalRecords.error ? { personalRecords: personalRecords.error } : {}),
     ...(personalOps.error ? { personalOps: personalOps.error } : {}),
-    ...(kpis.error ? { kpis: kpis.error } : {}),
-    ...(docs.error ? { docs: docs.error } : {}),
     ...(reviews.error ? { reviews: reviews.error } : {})
   };
   const snapshot = buildProjectsWorkspaceSnapshot({
     state: native.value,
     personalRecords: personalRecords.value,
     personalOpsState: personalOps.value,
-    kpis: kpis.value,
-    docsState: docs.value,
     sourceAvailability
   });
   const reviewViews = reviews.value.runs.map(toReviewRunView);
@@ -111,9 +103,7 @@ export default async function ProjectsRoutePage({
         initialDecisionsError={personalOps.error}
         initialPersonalOpsFollowUps={personalOps.value?.followUps || []}
         initialFollowUpsError={personalOps.error}
-        initialPeople={personalRecords.value.filter(
-          (record) => record.className === "person" || record.className === "org"
-        )}
+        initialPersonalRecords={personalRecords.value}
         initialReviewViews={reviewViews}
         initialReviewsError={reviews.error}
       />
