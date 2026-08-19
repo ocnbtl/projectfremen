@@ -961,6 +961,23 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
   };
 }
 
+function getLastContactValue(record: PersonalRecord): string {
+  return getProfile(record).lastContact || record.time.lastReview || "";
+}
+
+function formatLastContact(record: PersonalRecord, full = false): string {
+  const value = getLastContactValue(record);
+  if (!value) return "N/A";
+  return full ? formatFullDate(value) : formatDate(value);
+}
+
+function lastContactTimestamp(record: PersonalRecord): number {
+  const value = getLastContactValue(record);
+  if (!value) return Number.NEGATIVE_INFINITY;
+  const timestamp = parseDisplayDate(value).getTime();
+  return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
+}
+
 function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile {
   const education = cleanEducationEntries(draft.education);
   const occupations = cleanOccupationEntries(draft.occupations);
@@ -1088,7 +1105,7 @@ function getLastName(record: PersonalRecord) {
 }
 
 function isRecentContact(record: PersonalRecord) {
-  const last = record.time.lastReview || record.updatedAt;
+  const last = getLastContactValue(record);
   if (!last) return false;
   const date = parseDisplayDate(last);
   return !Number.isNaN(date.getTime()) && Date.now() - date.getTime() <= 1000 * 60 * 60 * 24 * 30;
@@ -1163,7 +1180,8 @@ function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView, sta
 function sortPeople(records: PersonalRecord[], sortMode: PeopleSortMode) {
   return [...records].sort((left, right) => {
     if (sortMode === "recent-contact") {
-      return new Date(right.time.lastReview || right.updatedAt).getTime() - new Date(left.time.lastReview || left.updatedAt).getTime();
+      const difference = lastContactTimestamp(right) - lastContactTimestamp(left);
+      return !Number.isNaN(difference) && difference !== 0 ? difference : getLastName(left).localeCompare(getLastName(right));
     }
     if (sortMode === "next-follow-up") {
       return (new Date(left.time.nextReview || "9999-12-31").getTime()) - (new Date(right.time.nextReview || "9999-12-31").getTime());
@@ -1797,7 +1815,7 @@ export default function PeopleWorkspace({
   const connectionItems = relationshipConnections.map((connection) => connection.label);
   const importantDates = [
     ["Birthday", selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "Not recorded"],
-    ["Last contact", selectedPerson ? formatFullDate(selectedPerson.time.lastReview || selectedProfile.lastContact || selectedPerson.updatedAt) : "-"],
+    ["Last contact", selectedPerson ? formatLastContact(selectedPerson, true) : "N/A"],
     ["Next follow-up", selectedPerson ? getNextContactLabel(selectedPerson) : "-"],
     ["Added", selectedPerson ? formatFullDate(selectedPerson.createdAt) : "-"]
   ];
@@ -2897,9 +2915,9 @@ export default function PeopleWorkspace({
                         ))}
                       </span>
                     </span>
-                    <span className="people-row-date">
-                      <i />
-                      {formatDate(record.time.lastReview || record.updatedAt)}
+                    <span className={`people-row-date${getLastContactValue(record) ? "" : " is-unknown"}`}>
+                      {getLastContactValue(record) && <i />}
+                      {formatLastContact(record)}
                     </span>
                     <span className="people-row-next">{getNextContactLabel(record)}</span>
                   </button>
@@ -3209,7 +3227,7 @@ export default function PeopleWorkspace({
                       ) : (
                         <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
                           <div className="people-timeline-entry-meta">
-                            <span>{item.date ? formatFullDate(item.date) : formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)}</span>
+                            <span>{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson) ? formatLastContact(selectedPerson, true) : "Date unknown"}</span>
                             {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind}</span>}
                           </div>
                           <strong className="people-timeline-entry-title">{item.interaction.title}</strong>
@@ -3240,7 +3258,7 @@ export default function PeopleWorkspace({
                     <section className="people-relationship-rhythm">
                       <h3>Relationship rhythm</h3>
                       {[
-                        ["Last contact", formatFullDate(selectedPerson.time.lastReview || selectedPerson.updatedAt)],
+                        ["Last contact", formatLastContact(selectedPerson, true)],
                         ["Next follow-up", getNextContactLabel(selectedPerson)],
                         ["Cadence", getCadenceLabel(selectedPerson.time.reviewCadence)],
                         ["Health", getPriorityLabel(selectedPerson) === "High" ? "Needs attention" : "Strong"]

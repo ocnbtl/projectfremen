@@ -5981,6 +5981,7 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
           createdFromQuickEntry.profile?.firstName === "Avery" &&
             createdFromQuickEntry.profile?.middleName === "Juniper" &&
             createdFromQuickEntry.profile?.lastName === "North" &&
+            !createdFromQuickEntry.time?.lastReview &&
             createdFromQuickEntry.profile?.emails?.length === 2 &&
             createdFromQuickEntry.profile.emails[1].category === "custom" &&
             createdFromQuickEntry.profile.emails[1].customLabel === "Alumni" &&
@@ -5989,6 +5990,107 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
           "People quick entry did not persist derived name parts and every labeled contact method"
         );
       }
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkPeopleUnknownLastContactBrowserState(baseUrl, cookieJar, personId, personTitle) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "people-memory-checkpoint");
+  await mkdir(screenshotDir, { recursive: true });
+
+  async function contextFor(viewport) {
+    const context = await browser.newContext({ viewport });
+    await context.addCookies([
+      {
+        name: "admin_session",
+        value: cookieJar.get("admin_session"),
+        url: baseUrl,
+        httpOnly: true,
+        sameSite: "Lax"
+      },
+      {
+        name: "admin_csrf",
+        value: cookieJar.get("admin_csrf"),
+        url: baseUrl,
+        sameSite: "Lax"
+      }
+    ]);
+    return context;
+  }
+
+  async function assertNoOverflow(page, label) {
+    const dimensions = await page.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(dimensions.scrollWidth <= dimensions.innerWidth, `${label} overflowed horizontally: ${JSON.stringify(dimensions)}`);
+  }
+
+  try {
+    const editorContext = await contextFor({ width: 1440, height: 900 });
+    const editorPage = await editorContext.newPage();
+    await editorPage.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
+    const lastContactInput = editorPage.getByLabel("Last contact", { exact: true });
+    assert(await lastContactInput.inputValue() === "2026-07-14", "People last-contact clear fixture did not begin with the persisted date");
+    await lastContactInput.fill("");
+    const [clearResponse] = await Promise.all([
+      editorPage.waitForResponse((response) =>
+        response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"
+      ),
+      editorPage.getByRole("button", { name: "Save", exact: true }).click()
+    ]);
+    const clearPayload = await clearResponse.json();
+    const clearedPerson = clearPayload?.items?.find((item) => item.id === personId);
+    assert(clearResponse.ok() && clearedPerson, "People editor did not save the cleared last-contact field");
+    assert(
+      !clearedPerson.time?.lastReview && !clearedPerson.profile?.lastContact,
+      "People editor replaced the cleared last contact with a generated date"
+    );
+    await editorContext.close();
+
+    for (const viewport of [
+      { label: "desktop", width: 1440, height: 900 },
+      { label: "tablet", width: 1024, height: 768 },
+      { label: "mobile", width: 390, height: 844 }
+    ]) {
+      const context = await contextFor({ width: viewport.width, height: viewport.height });
+      const page = await context.newPage();
+      await page.goto(`${baseUrl}/admin/people`, { waitUntil: "networkidle" });
+      const row = page.locator(".people-directory-row").filter({ hasText: personTitle }).first();
+      await row.waitFor();
+      const lastContact = row.locator(".people-row-date");
+      assert(
+        (await lastContact.innerText()).trim() === "N/A" &&
+          await lastContact.locator("i").count() === 0 &&
+          (await lastContact.getAttribute("class"))?.includes("is-unknown"),
+        `People directory did not show a neutral N/A last-contact state at ${viewport.label}`
+      );
+      await assertNoOverflow(page, `People unknown last contact directory ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-unknown-last-contact-${viewport.label}.png`),
+        fullPage: true
+      });
+
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=timeline`, { waitUntil: "networkidle" });
+      const rhythmLastContact = page.locator(".people-relationship-rhythm > div").filter({ hasText: "Last contact" });
+      await rhythmLastContact.waitFor();
+      assert(
+        (await rhythmLastContact.innerText()).includes("N/A"),
+        `People relationship rhythm invented a last-contact date at ${viewport.label}`
+      );
+
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=notes`, { waitUntil: "networkidle" });
+      const importantLastContact = page.locator(".people-memory-row").filter({ hasText: "Last contact" });
+      await importantLastContact.waitFor();
+      assert(
+        (await importantLastContact.innerText()).includes("N/A"),
+        `People important dates invented a last-contact date at ${viewport.label}`
+      );
       await context.close();
     }
   } finally {
@@ -13229,7 +13331,23 @@ async function main() {
       createdPerson.id,
       ["memory-regression-newer", "memory-regression-older"]
     );
+    await checkPeopleUnknownLastContactBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdPerson.id,
+      updatedPersonTitle
+    );
+    const peopleAfterLastContactClear = await requestJson(server.baseUrl, cookieJar, "/api/personal/records");
+    const personAfterLastContactClear = peopleAfterLastContactClear.payload?.items?.find((item) => item.id === createdPerson.id);
+    assert(
+      peopleAfterLastContactClear.response.ok &&
+        personAfterLastContactClear &&
+        !personAfterLastContactClear.time?.lastReview &&
+        !personAfterLastContactClear.profile?.lastContact,
+      "Cleared People last contact did not remain unknown after API reload"
+    );
     pass("People profiles preserve dated memories, automatic name parts, labeled emails and phone numbers, groups, cadence, education, jobs, and locations across desktop, tablet, and mobile");
+    pass("People last contact can be cleared to a persistent N/A state without a generated date or green activity dot");
     pass("People create/update/clear/reload/direct-route flow works through the Personal Records adapter");
 
     const peopleBridgeFollowUpTitle = `${testRunId}-people-status-bridge`;

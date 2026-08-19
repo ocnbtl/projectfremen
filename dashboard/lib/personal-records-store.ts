@@ -1410,9 +1410,15 @@ function calculateNextReview(lastReview: string | undefined, cadence: string | u
   return dateOnly(addMonths(base, amount * 12));
 }
 
-function normalizeTime(input: PersonalRecordTime | undefined, meta: PersonalRecordCreatedMeta, stage: PersonalRecordStage): PersonalRecordTime {
+function normalizeTime(
+  input: PersonalRecordTime | undefined,
+  meta: PersonalRecordCreatedMeta,
+  stage: PersonalRecordStage,
+  className: PersonalRecordClass
+): PersonalRecordTime {
   const reviewCadence = input?.reviewCadence?.trim().toUpperCase() || undefined;
-  const lastReview = input?.lastReview?.trim() || meta.createdIso;
+  const keepsUnknownLastContact = className === "person" || className === "org";
+  const lastReview = input?.lastReview?.trim() || (keepsUnknownLastContact ? undefined : meta.createdIso);
   const nextReview = input?.nextReview?.trim() || calculateNextReview(lastReview, reviewCadence);
   return {
     startDate: input?.startDate?.trim() || undefined,
@@ -1551,7 +1557,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     ) as PersonalRecordIntent[],
     externalSources: sanitizeList(raw.externalSources as string[] | undefined),
     relations,
-    time: normalizeTime(raw.time, createdMeta, stage),
+    time: normalizeTime(raw.time, createdMeta, stage, className),
     profile,
     createdMeta,
     createdAt,
@@ -1625,7 +1631,8 @@ export async function createPersonalRecord(
         dueDate: input.time?.dueDate || input.happensOn
       },
       meta,
-      stage
+      stage,
+      className
     ),
     profile,
     createdMeta: meta,

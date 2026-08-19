@@ -431,6 +431,7 @@ try {
   assert.match(personalRecordsStore, /PersonalPhoneEntry/i);
   assert.match(personalRecordsStore, /normalizeEmailEntries/i);
   assert.match(personalRecordsStore, /normalizePhoneEntries/i);
+  assert.match(personalRecordsStore, /keepsUnknownLastContact/i);
   assert.match(personalRecordsStore, /instagram/i);
   assert.match(personalRecordsStore, /tiktok/i);
   assert.match(personalRecordsStore, /normalizeEducationEntries/i);

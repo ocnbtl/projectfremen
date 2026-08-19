@@ -2399,6 +2399,10 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   color: var(--accent-green);
 }
 
+.people-row-date.is-unknown {
+  color: var(--text-subtle);
+}
+
 .people-row-date i {
   width: 8px;
   height: 8px;
