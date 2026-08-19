@@ -966,7 +966,10 @@ function getLastContactValue(record: PersonalRecord): string {
 function formatLastContact(record: PersonalRecord, full = false): string {
   const value = getLastContactValue(record);
   if (!value) return "N/A";
-  return full ? formatFullDate(value) : formatDate(value);
+  if (full) return formatFullDate(value);
+  const date = parseDisplayDate(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.getFullYear() === new Date().getFullYear() ? formatDate(value) : formatFullDate(value);
 }
 
 function lastContactTimestamp(record: PersonalRecord): number {
@@ -1055,6 +1058,13 @@ function getNextContactLabel(record?: PersonalRecord) {
   if (days < 0) return `${Math.abs(days)}d overdue`;
   if (days === 0) return "Today";
   return `In ${days} days`;
+}
+
+function getDirectoryNextContactLabel(record: PersonalRecord) {
+  if (!record.time.nextReview && getProfile(record).contactCadence.toUpperCase() === "NONE") {
+    return "N/A";
+  }
+  return getNextContactLabel(record);
 }
 
 function toDateInputValue(date: Date) {
@@ -3001,7 +3011,7 @@ export default function PeopleWorkspace({
                       {getLastContactValue(record) && <i />}
                       {formatLastContact(record)}
                     </span>
-                    <span className="people-row-next">{getNextContactLabel(record)}</span>
+                    <span className="people-row-next">{getDirectoryNextContactLabel(record)}</span>
                   </button>
                 </article>
               );

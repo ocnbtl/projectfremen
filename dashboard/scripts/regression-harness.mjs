@@ -6034,10 +6034,80 @@ async function checkPeopleUnknownLastContactBrowserState(baseUrl, cookieJar, per
   try {
     const editorContext = await contextFor({ width: 1440, height: 900 });
     const editorPage = await editorContext.newPage();
+    const currentYear = new Date().getFullYear();
+    const currentContactDate = `${currentYear}-07-14`;
+    const olderContactDate = `${currentYear - 1}-07-14`;
+
+    await editorPage.goto(`${baseUrl}/admin/people`, { waitUntil: "networkidle" });
+    let directoryRow = editorPage.locator(".people-directory-row").filter({ hasText: personTitle }).first();
+    await directoryRow.waitFor();
+    assert(
+      (await directoryRow.locator(".people-row-date").innerText()).trim() === "Jul 14",
+      "People directory did not keep the current-year last-contact date compact"
+    );
+    assert(
+      (await directoryRow.locator(".people-row-next").innerText()).trim() === "N/A",
+      "People directory did not replace the no-cadence follow-up label with N/A"
+    );
+
     await editorPage.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
     const lastContactInput = editorPage.getByLabel("Last contact", { exact: true });
-    assert(await lastContactInput.inputValue() === "2026-07-14", "People last-contact clear fixture did not begin with the persisted date");
-    await lastContactInput.fill("");
+    assert(await lastContactInput.inputValue() === currentContactDate, "People last-contact clear fixture did not begin with the persisted date");
+    await lastContactInput.fill(olderContactDate);
+    const [olderDateResponse] = await Promise.all([
+      editorPage.waitForResponse((response) =>
+        response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"
+      ),
+      editorPage.getByRole("button", { name: "Save", exact: true }).click()
+    ]);
+    assert(olderDateResponse.ok(), "People editor did not save the prior-year last-contact fixture");
+    await editorPage.waitForURL((url) => url.pathname === `/admin/people/${personId}`);
+
+    for (const viewport of [
+      { label: "desktop", width: 1440, height: 900 },
+      { label: "tablet", width: 1024, height: 768 },
+      { label: "mobile", width: 390, height: 844 }
+    ]) {
+      const dateContext = await contextFor({ width: viewport.width, height: viewport.height });
+      const datePage = await dateContext.newPage();
+      await datePage.goto(`${baseUrl}/admin/people`, { waitUntil: "networkidle" });
+      directoryRow = datePage.locator(".people-directory-row").filter({ hasText: personTitle }).first();
+      await directoryRow.waitFor();
+      assert(
+        (await directoryRow.locator(".people-row-date").innerText()).trim() === `Jul 14, ${currentYear - 1}`,
+        `People directory omitted the prior-year last-contact year at ${viewport.label}`
+      );
+      assert(
+        (await directoryRow.locator(".people-row-next").innerText()).trim() === "N/A",
+        `People directory did not keep the no-cadence follow-up neutral at ${viewport.label}`
+      );
+      const dateLabel = directoryRow.locator(".people-row-date");
+      assert(
+        await dateLabel.evaluate((element) => element.scrollWidth <= element.clientWidth),
+        `People directory clipped the prior-year last-contact date at ${viewport.label}`
+      );
+      const mainBox = await directoryRow.locator(".people-row-main").boundingBox();
+      const dateBox = await dateLabel.boundingBox();
+      assert(mainBox && dateBox, `People directory did not render the prior-year date layout at ${viewport.label}`);
+      const labelsOverlap = !(
+        mainBox.x + mainBox.width <= dateBox.x
+        || dateBox.x + dateBox.width <= mainBox.x
+        || mainBox.y + mainBox.height <= dateBox.y
+        || dateBox.y + dateBox.height <= mainBox.y
+      );
+      assert(!labelsOverlap, `People directory overlapped the prior-year date and contact summary at ${viewport.label}`);
+      await assertNoOverflow(datePage, `People prior-year last contact directory ${viewport.label}`);
+      await datePage.screenshot({
+        path: path.join(screenshotDir, `people-prior-year-last-contact-${viewport.label}.png`),
+        fullPage: true
+      });
+      await dateContext.close();
+    }
+
+    await editorPage.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
+    const priorYearLastContactInput = editorPage.getByLabel("Last contact", { exact: true });
+    assert(await priorYearLastContactInput.inputValue() === olderContactDate, "People prior-year last-contact fixture did not persist before clearing");
+    await priorYearLastContactInput.fill("");
     const [clearResponse] = await Promise.all([
       editorPage.waitForResponse((response) =>
         response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"

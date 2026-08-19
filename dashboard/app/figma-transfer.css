@@ -7835,7 +7835,7 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
 
 @media (max-width: 1280px) {
   .people-directory-row-body {
-    grid-template-columns: 42px minmax(0, 1fr) 70px;
+    grid-template-columns: 42px minmax(0, 1fr) 88px;
   }
 }
 
@@ -7903,7 +7903,12 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
   }
 
   .people-directory-row-body {
-    grid-template-columns: 46px minmax(0, 1fr) 70px;
+    grid-template-columns: 46px minmax(0, 1fr);
+  }
+
+  .people-directory-row-body .people-row-date {
+    grid-column: 2;
+    justify-self: start;
   }
 
   .people-mobile-topbar button,
