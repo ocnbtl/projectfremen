@@ -323,6 +323,116 @@ const ORGANIZATION_TYPE_OPTIONS = [
   "Other"
 ] as const;
 
+type OrganizationType = (typeof ORGANIZATION_TYPE_OPTIONS)[number];
+
+const ORGANIZATION_INDUSTRY_OPTIONS: Record<OrganizationType, readonly string[]> = {
+  Business: [
+    "Technology",
+    "Professional services",
+    "Retail & consumer",
+    "Finance & insurance",
+    "Healthcare",
+    "Media & entertainment",
+    "Manufacturing",
+    "Construction & real estate",
+    "Hospitality & travel",
+    "Transportation & logistics",
+    "Agriculture & food",
+    "Energy & utilities",
+    "Fashion & apparel",
+    "Other"
+  ],
+  Nonprofit: [
+    "Arts & culture",
+    "Education",
+    "Environment",
+    "Health",
+    "Human services",
+    "Civil rights & advocacy",
+    "Community development",
+    "International development",
+    "Religion & faith",
+    "Research",
+    "Animal welfare",
+    "Other"
+  ],
+  "University / School": [
+    "Primary / secondary education",
+    "College / university",
+    "Vocational / technical",
+    "Research institute",
+    "Online education",
+    "Student organization",
+    "Alumni organization",
+    "Other"
+  ],
+  Government: [
+    "Federal",
+    "State / provincial",
+    "Local / municipal",
+    "Judicial / legal",
+    "Public safety",
+    "Public health",
+    "Transportation",
+    "Economic development",
+    "Education",
+    "International / diplomatic",
+    "Other"
+  ],
+  Agency: [
+    "Creative / design",
+    "Marketing / advertising",
+    "Talent / modeling",
+    "Public relations",
+    "Consulting",
+    "Staffing / recruiting",
+    "Digital / product",
+    "Media / production",
+    "Real estate",
+    "Government / regulatory",
+    "Other"
+  ],
+  Community: [
+    "Neighborhood",
+    "Professional network",
+    "Cultural",
+    "Religious / faith",
+    "Sports / recreation",
+    "Arts / creative",
+    "Mutual aid",
+    "Online community",
+    "Social club",
+    "Other"
+  ],
+  Association: [
+    "Trade association",
+    "Professional association",
+    "Industry group",
+    "Alumni association",
+    "Standards body",
+    "Labor / worker organization",
+    "Membership organization",
+    "Advocacy coalition",
+    "Other"
+  ],
+  Other: [
+    "Education",
+    "Healthcare",
+    "Technology",
+    "Arts & culture",
+    "Public service",
+    "Research",
+    "Media",
+    "Community",
+    "Professional services",
+    "Other"
+  ]
+};
+
+function organizationIndustryOptions(type: string): readonly string[] {
+  return ORGANIZATION_INDUSTRY_OPTIONS[type as OrganizationType] || ORGANIZATION_INDUSTRY_OPTIONS.Other;
+}
+
 const PEOPLE_VIEWS: Array<{ id: PeopleView; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "timeline", label: "Timeline" },
@@ -458,35 +568,17 @@ const ORGANIZATION_PROFILE_SECTIONS: Array<{ title: string; tone: string; fields
       { key: "industry", label: "Industry or field" },
       { key: "foundedYear", label: "Founded year", placeholder: "1998" },
       { key: "teamSize", label: "Team size", placeholder: "1–10, 50, global network..." },
-      { key: "context", label: "Relationship context", type: "textarea", placeholder: "How this organization matters and how you are connected." }
+      { key: "context", label: "Description", type: "textarea", placeholder: "What this organization is and why it is relevant." }
     ]
   },
   {
-    title: "Organization profile",
-    tone: "violet",
-    fields: [
-      { key: "mission", label: "Mission", type: "textarea" },
-      { key: "services", label: "Services or capabilities", type: "textarea" },
-      { key: "headquarters", label: "Headquarters" }
-    ]
-  },
-  {
-    title: "Communication",
+    title: "Links",
     tone: "blue",
     fields: [
       { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/company/..." },
       { key: "website", label: "Website", type: "url", placeholder: "https://..." },
       { key: "instagram", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
       { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." }
-    ]
-  },
-  {
-    title: "Cadence",
-    tone: "orange",
-    fields: [
-      { key: "lastContact", label: "Last contact", type: "date" },
-      { key: "nextContact", label: "Next contact", type: "date" },
-      { key: "contactCadence", label: "Review cadence" }
     ]
   },
   {
@@ -965,6 +1057,24 @@ function relationshipName(value: string) {
   return value.replace(/\s+\([^)]*\)\s*$/, "").trim();
 }
 
+function associatedPersonMatches(value: string, person: PersonalRecord) {
+  const normalized = relationshipName(value).toLocaleLowerCase();
+  return value === person.id || normalized === person.title.trim().toLocaleLowerCase();
+}
+
+function resolveAssociatedPersonIds(value: string | string[], people: PersonalRecord[]) {
+  const entries = Array.isArray(value) ? value : splitList(value);
+  return Array.from(new Set(entries.flatMap((entry) => {
+    const person = people.find((candidate) => associatedPersonMatches(entry, candidate));
+    return person ? [person.id] : [];
+  })));
+}
+
+function mergeAssociatedPersonIds(value: string, people: PersonalRecord[], selectedIds: string[]) {
+  const unresolvedEntries = splitList(value).filter((entry) => !people.some((person) => associatedPersonMatches(entry, person)));
+  return joinList([...unresolvedEntries, ...selectedIds]);
+}
+
 function getProfile(record?: PersonalRecord): ContactProfileDraft {
   if (!record) {
     return { ...EMPTY_PROFILE_DRAFT };
@@ -991,8 +1101,13 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
       ].filter((entry): entry is PersonalOccupationEntry => Boolean(entry));
   const locations = profile?.locations?.length
     ? profile.locations.map((entry) => ({ ...entry }))
-    : profile?.livesIn || profile?.address
-      ? [newLocationEntry({ id: "legacy-location-primary", label: "Primary home", location: profile.livesIn, address: profile.address })]
+    : profile?.livesIn || profile?.address || (record.className === "org" && profile?.headquarters)
+      ? [newLocationEntry({
+          id: "legacy-location-primary",
+          label: record.className === "org" ? "Relevant location" : "Primary home",
+          location: profile?.livesIn || (record.className === "org" ? profile?.headquarters : ""),
+          address: profile?.address
+        })]
       : [];
   return {
     fullName: profile?.fullName || record.title,
@@ -1233,10 +1348,11 @@ function getProfileGaps(record: PersonalRecord) {
   const profile = getProfile(record);
   if (record.className === "org") {
     return [
-      profile.emails.length === 0 && profile.phones.length === 0 ? "Primary contact method" : "",
       !profile.organizationType ? "Organization type" : "",
+      !profile.industry ? "Industry or field" : "",
+      !profile.headquarters && !profile.livesIn ? "Relevant location" : "",
       !profile.website ? "Website" : "",
-      !profile.context ? "Organization context" : ""
+      !profile.context ? "Description" : ""
     ].filter(Boolean);
   }
   return [
@@ -1494,10 +1610,8 @@ function LocationEntriesEditor({
     <section className="people-repeatable-section module-ref-tone-green" data-people-location-editor>
       <header className="people-repeatable-heading">
         <div>
-          <h4>{organization ? "Offices & locations" : "Homes & locations"}</h4>
-          <p>{organization
-            ? "Save headquarters, offices, or other useful organization locations."
-            : "Save a city, a full address, or both. Add another place only when needed."}</p>
+          <h4>{organization ? "Locations" : "Homes & locations"}</h4>
+          {!organization && <p>Save a city, a full address, or both. Add another place only when needed.</p>}
         </div>
         <button type="button" onClick={onAdd}>Add location</button>
       </header>
@@ -1508,12 +1622,105 @@ function LocationEntriesEditor({
             <button type="button" onClick={() => onRemove(entry.id)} aria-label={`Remove location ${index + 1}`}>Remove</button>
           </div>
           <div className="people-repeatable-fields people-repeatable-fields-location">
-            <label>Label<input value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? index === 0 ? "Headquarters" : "Regional office" : index === 0 ? "Primary home" : "Second home"} /></label>
+            <label>Label<input value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? "Relevant location" : index === 0 ? "Primary home" : "Second home"} /></label>
             <label>City / region<input list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing a city" /></label>
             <label className="is-wide">Street address<textarea value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={2} /></label>
           </div>
         </article>
       )) : <p className="people-repeatable-empty">No location added.</p>}
+    </section>
+  );
+}
+
+function OrganizationIndustrySelect({
+  organizationType,
+  value,
+  onChange
+}: {
+  organizationType: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const options = organizationIndustryOptions(organizationType);
+  const hasLegacyValue = Boolean(value && !options.includes(value));
+  return (
+    <select data-organization-industry value={value} onChange={(event) => onChange(event.target.value)}>
+      <option value="">Select industry or field</option>
+      {hasLegacyValue && <option value={value}>{value} · current</option>}
+      {options.map((option) => <option value={option} key={option}>{option}</option>)}
+    </select>
+  );
+}
+
+function OrganizationPeopleEditor({
+  people,
+  selectedIds,
+  derivedIds = [],
+  onChange
+}: {
+  people: PersonalRecord[];
+  selectedIds: string[];
+  derivedIds?: string[];
+  onChange: (selectedIds: string[]) => void;
+}) {
+  const [pendingId, setPendingId] = useState("");
+  const selected = new Set(selectedIds);
+  const derived = new Set(derivedIds);
+  const linkedIds = Array.from(new Set([...selectedIds, ...derivedIds]));
+  const linkedPeople = linkedIds.flatMap((id) => {
+    const person = people.find((candidate) => candidate.id === id);
+    return person ? [person] : [];
+  });
+  const availablePeople = people.filter((person) => !selected.has(person.id) && !derived.has(person.id));
+
+  function addPerson() {
+    if (!pendingId || selected.has(pendingId) || derived.has(pendingId)) return;
+    onChange([...selectedIds, pendingId]);
+    setPendingId("");
+  }
+
+  return (
+    <section className="people-organization-link-editor module-ref-tone-purple" data-organization-people-editor>
+      <header>
+        <div>
+          <h4>People</h4>
+          <p>Link people directly or let employer and education links add them automatically.</p>
+        </div>
+      </header>
+      <div className="people-organization-link-controls">
+        <label>
+          Person
+          <select aria-label="Person to link" value={pendingId} onChange={(event) => setPendingId(event.target.value)}>
+            <option value="">Select a person</option>
+            {availablePeople.map((person) => <option value={person.id} key={person.id}>{person.title}</option>)}
+          </select>
+        </label>
+        <button type="button" onClick={addPerson} disabled={!pendingId}>Add person</button>
+      </div>
+      <div className="people-organization-linked-list" aria-label="Linked people">
+        {linkedPeople.length ? linkedPeople.map((person) => {
+          const direct = selected.has(person.id);
+          const backfilled = derived.has(person.id);
+          const source = direct && backfilled ? "Direct + profile link" : backfilled ? "Employer or education link" : "Direct link";
+          return (
+            <article key={person.id} data-linked-person={person.id}>
+              <PeopleProfileAvatar
+                label={person.title}
+                initials={getInitials(person)}
+                photoUrl={person.profile?.photoUrl}
+                photoUpdatedAt={person.profile?.photoUpdatedAt}
+                compact
+              />
+              <span><strong>{person.title}</strong><small>{source}</small></span>
+              {direct && (
+                <button type="button" onClick={() => onChange(selectedIds.filter((id) => id !== person.id))} aria-label={`Remove direct link to ${person.title}`}>
+                  Remove
+                </button>
+              )}
+            </article>
+          );
+        }) : <p>No people linked yet.</p>}
+      </div>
     </section>
   );
 }
@@ -1721,11 +1928,9 @@ export default function PeopleWorkspace({
   const [quickContext, setQuickContext] = useState("");
   const [quickOrganizationType, setQuickOrganizationType] = useState("Business");
   const [quickIndustry, setQuickIndustry] = useState("");
-  const [quickMission, setQuickMission] = useState("");
-  const [quickServices, setQuickServices] = useState("");
   const [quickFoundedYear, setQuickFoundedYear] = useState("");
   const [quickTeamSize, setQuickTeamSize] = useState("");
-  const [quickHeadquarters, setQuickHeadquarters] = useState("");
+  const [quickOrganizationPeople, setQuickOrganizationPeople] = useState<string[]>([]);
   const [quickEmails, setQuickEmails] = useState<PersonalEmailEntry[]>([
     newEmailEntry({ id: "new-contact-email-1", category: "primary" })
   ]);
@@ -1955,6 +2160,12 @@ export default function PeopleWorkspace({
       .sort((left, right) => left.title.localeCompare(right.title)),
     [activePeople]
   );
+  const personOptions = useMemo(
+    () => activePeople
+      .filter((record) => record.className === "person")
+      .sort((left, right) => left.title.localeCompare(right.title)),
+    [activePeople]
+  );
   const archivedPeople = useMemo(
     () => people.filter((record) => Boolean(record.archivedAt)).sort((left, right) => (right.archivedAt || "").localeCompare(left.archivedAt || "")),
     [people]
@@ -1983,13 +2194,21 @@ export default function PeopleWorkspace({
   const selectedPerson = useMemo(() => {
     return activePeople.find((record) => record.id === selectedId) || visiblePeople[0];
   }, [activePeople, selectedId, visiblePeople]);
-  const selectedOrganizationPeople = useMemo(() => {
+  const selectedOrganizationDerivedPersonIds = useMemo(() => {
     if (!selectedPerson || selectedPerson.className !== "org") return [];
-    return activePeople.filter((record) => record.className === "person" && (
+    return personOptions.filter((record) => (
       (record.profile?.occupations || []).some((entry) => entry.organizationId === selectedPerson.id) ||
       (record.profile?.education || []).some((entry) => entry.organizationId === selectedPerson.id)
-    ));
-  }, [activePeople, selectedPerson]);
+    )).map((record) => record.id);
+  }, [personOptions, selectedPerson]);
+  const selectedOrganizationDirectPersonIds = useMemo(() => {
+    if (!selectedPerson || selectedPerson.className !== "org") return [];
+    return resolveAssociatedPersonIds(selectedPerson.profile?.associatedPeople || [], personOptions);
+  }, [personOptions, selectedPerson]);
+  const selectedOrganizationPeople = useMemo(() => {
+    const linkedIds = new Set([...selectedOrganizationDirectPersonIds, ...selectedOrganizationDerivedPersonIds]);
+    return personOptions.filter((record) => linkedIds.has(record.id));
+  }, [personOptions, selectedOrganizationDerivedPersonIds, selectedOrganizationDirectPersonIds]);
   const deleteTarget = useMemo(() => people.find((record) => record.id === deleteTargetId), [deleteTargetId, people]);
   useEffect(() => {
     setProfileDraft(getProfile(selectedPerson));
@@ -2026,6 +2245,9 @@ export default function PeopleWorkspace({
   }, [activePeople]);
 
   const selectedProfile = getProfile(selectedPerson);
+  const organizationProfileSelectedPersonIds = selectedPerson?.className === "org"
+    ? resolveAssociatedPersonIds(profileDraft.associatedPeople, personOptions)
+    : [];
   const emailContactDetails = selectedProfile.emails.map((entry) => ({
     label: contactEntryLabel(entry),
     value: entry.address,
@@ -2047,7 +2269,9 @@ export default function PeopleWorkspace({
     { id: "tiktok", label: "TikTok", value: selectedProfile.tiktok },
     { id: "x", label: "X", value: selectedProfile.x },
     { id: "linkedin", label: "LinkedIn", value: selectedProfile.linkedin }
-  ] satisfies Array<Omit<ContactMethod, "available">>).map((method) => ({
+  ] satisfies Array<Omit<ContactMethod, "available">>)
+    .filter((method) => selectedPerson?.className !== "org" || !["email", "phone"].includes(method.id))
+    .map((method) => ({
     ...method,
     available: Boolean(method.value),
     ...contactMethodHref(method.id, method.value)
@@ -2079,8 +2303,9 @@ export default function PeopleWorkspace({
   const relationshipConnections = Array.from(new Map([
     ...associatedPeople.map((label) => {
       const name = relationshipName(label);
-      const target = people.find((record) => record.title.localeCompare(name, undefined, { sensitivity: "base" }) === 0);
-      return [name.toLowerCase(), { label, target }] as const;
+      const target = people.find((record) => record.id === label || record.title.localeCompare(name, undefined, { sensitivity: "base" }) === 0);
+      const resolvedLabel = target?.title || label;
+      return [resolvedLabel.toLowerCase(), { label: resolvedLabel, target }] as const;
     }),
     ...(selectedPerson?.relations.related || []).map((id) => {
       const target = people.find((record) => record.id === id);
@@ -2141,11 +2366,8 @@ export default function PeopleWorkspace({
     quickBirthday,
     quickContext,
     quickIndustry,
-    quickMission,
-    quickServices,
     quickFoundedYear,
     quickTeamSize,
-    quickHeadquarters,
     quickProjects,
     lastContact,
     nextContact,
@@ -2155,11 +2377,12 @@ export default function PeopleWorkspace({
     quickX,
     quickLinkedIn
   ].some((value) => value.trim().length > 0)
-    || cleanEmailEntries(quickEmails).length > 0
-    || cleanPhoneEntries(quickPhones).length > 0
+    || (className === "person" && cleanEmailEntries(quickEmails).length > 0)
+    || (className === "person" && cleanPhoneEntries(quickPhones).length > 0)
     || cleanEducationEntries(quickEducation).length > 0
     || cleanOccupationEntries(quickOccupations).length > 0
     || cleanLocationEntries(quickLocations).length > 0
+    || quickOrganizationPeople.length > 0
     || className !== "person"
     || groups.length !== 1
     || groups[0] !== "Collaborator"
@@ -2378,7 +2601,13 @@ export default function PeopleWorkspace({
 
   async function saveProfileDraft(nextDraft: ContactProfileDraft) {
     if (!selectedPerson) return false;
-    const profile = buildProfilePayload(nextDraft);
+    const builtProfile = buildProfilePayload(nextDraft);
+    const profile = selectedPerson.className === "org"
+      ? {
+          ...builtProfile,
+          headquarters: builtProfile.locations[0]?.location || builtProfile.locations[0]?.address || builtProfile.headquarters
+        }
+      : builtProfile;
     const previousProfileSources = new Set(
       [selectedProfile.website, selectedProfile.linkedin, selectedProfile.instagram, selectedProfile.tiktok, selectedProfile.x]
         .filter((value): value is string => Boolean(value))
@@ -2540,6 +2769,7 @@ export default function PeopleWorkspace({
     setError("");
 
     const derivedName = className === "person" ? derivePersonNameParts(name) : { firstName: "", middleName: "", lastName: "" };
+    const organizationLocation = className === "org" ? cleanLocationEntries(quickLocations)[0] : undefined;
     const profile = buildProfilePayload({
       ...EMPTY_PROFILE_DRAFT,
       fullName: name,
@@ -2549,19 +2779,18 @@ export default function PeopleWorkspace({
       context: quickContext,
       organizationType: className === "org" ? quickOrganizationType : "",
       industry: className === "org" ? quickIndustry : "",
-      mission: className === "org" ? quickMission : "",
-      services: className === "org" ? quickServices : "",
       foundedYear: className === "org" ? quickFoundedYear : "",
       teamSize: className === "org" ? quickTeamSize : "",
-      headquarters: className === "org" ? quickHeadquarters : "",
-      emails: quickEmails,
-      phones: quickPhones,
+      headquarters: organizationLocation?.location || organizationLocation?.address || "",
+      associatedPeople: className === "org" ? joinList(quickOrganizationPeople) : "",
+      emails: className === "person" ? quickEmails : [],
+      phones: className === "person" ? quickPhones : [],
       education: className === "person" ? quickEducation : [],
       occupations: className === "person" ? quickOccupations : [],
       locations: quickLocations,
-      lastContact,
-      nextContact,
-      contactCadence: cadence,
+      lastContact: className === "person" ? lastContact : "",
+      nextContact: className === "person" ? nextContact : "",
+      contactCadence: className === "person" ? cadence : "",
       website: referenceUrl,
       instagram: quickInstagram,
       tiktok: quickTikTok,
@@ -2572,16 +2801,16 @@ export default function PeopleWorkspace({
     const legacyInput = peopleCreateInputToLegacy({
       fullName: name.trim(),
       type: className === "org" ? "organization" : "person",
-      status,
+      status: className === "org" ? "active" : status,
       context: quickContext,
       profile,
       time: {
-        reviewCadence: cadence,
-        lastReview: lastContact,
-        nextReview: nextContact
+        reviewCadence: className === "person" ? cadence : "",
+        lastReview: className === "person" ? lastContact : "",
+        nextReview: className === "person" ? nextContact : ""
       },
       areas: ["Relationships"],
-      subjects: groups,
+      subjects: className === "org" ? [] : groups,
       projects: splitList(quickProjects),
       externalSources: [referenceUrl, quickInstagram, quickTikTok, quickX, quickLinkedIn].filter(Boolean),
       sourceUrl: referenceUrl
@@ -2620,11 +2849,9 @@ export default function PeopleWorkspace({
       setQuickContext("");
       setQuickOrganizationType("Business");
       setQuickIndustry("");
-      setQuickMission("");
-      setQuickServices("");
       setQuickFoundedYear("");
       setQuickTeamSize("");
-      setQuickHeadquarters("");
+      setQuickOrganizationPeople([]);
       setQuickEmails([newEmailEntry({ id: "new-contact-email-1", category: "primary" })]);
       setQuickPhones([newPhoneEntry({ id: "new-contact-phone-1", category: "primary", countryCode: "+1" })]);
       setQuickEducation([]);
@@ -2782,13 +3009,18 @@ export default function PeopleWorkspace({
     setQuickNickname("");
     setQuickBirthday("");
     setQuickContext("");
+    setQuickOrganizationType("Business");
+    setQuickIndustry("");
+    setQuickFoundedYear("");
+    setQuickTeamSize("");
+    setQuickOrganizationPeople([]);
     setQuickEmails([newEmailEntry({ id: "new-contact-email-1", category: "primary" })]);
     setQuickPhones([newPhoneEntry({ id: "new-contact-phone-1", category: "primary", countryCode: "+1" })]);
     setQuickEducation([]);
     setQuickOccupations(type === "person" ? [newOccupationEntry({ id: "new-contact-job-1" })] : []);
     setQuickLocations([newLocationEntry({
       id: "new-contact-location-1",
-      label: type === "org" ? "Headquarters" : "Primary home"
+      label: type === "org" ? "Relevant location" : "Primary home"
     })]);
     setAddingPerson(true);
     setDetailMode("edit");
@@ -2982,19 +3214,25 @@ export default function PeopleWorkspace({
         <div className="people-capture-classification">
           <label className="people-type-field">
             Type
-            <select value={className} onChange={(event) => setClassName(event.target.value as "person" | "org")}>
+            <select value={className} onChange={(event) => {
+              const nextClassName = event.target.value as "person" | "org";
+              setClassName(nextClassName);
+              setQuickLocations((current) => current.map((entry, index) => index === 0 && ["Primary home", "Relevant location", "Headquarters"].includes(entry.label || "")
+                ? { ...entry, label: nextClassName === "org" ? "Relevant location" : "Primary home" }
+                : entry));
+            }}>
               <option value="person">Person</option>
               <option value="org">Organization</option>
             </select>
           </label>
-          <fieldset className="people-group-picker">
+          {className === "person" && <fieldset className="people-group-picker">
             <legend>Groups</legend>
             <div>{GROUP_OPTIONS.map((option) => <label key={option}>
               <input type="checkbox" checked={groups.includes(option)} onChange={() => toggleGroup(option)} />
               <span>{option}</span>
             </label>)}</div>
             <small>Choose every group that fits.</small>
-          </fieldset>
+          </fieldset>}
         </div>
         {className === "org" && (
           <section className="people-organization-create-fields" aria-labelledby="people-organization-details-title">
@@ -3004,20 +3242,22 @@ export default function PeopleWorkspace({
             <div className="people-profile-field-grid">
               <label>
                 Organization type
-                <select value={quickOrganizationType} onChange={(event) => setQuickOrganizationType(event.target.value)}>
+                <select data-organization-type value={quickOrganizationType} onChange={(event) => {
+                  const nextType = event.target.value;
+                  setQuickOrganizationType(nextType);
+                  if (!organizationIndustryOptions(nextType).includes(quickIndustry)) setQuickIndustry("");
+                }}>
                   {ORGANIZATION_TYPE_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
                 </select>
               </label>
-              <label>Industry or field<input value={quickIndustry} onChange={(event) => setQuickIndustry(event.target.value)} /></label>
+              <label>Industry or field<OrganizationIndustrySelect organizationType={quickOrganizationType} value={quickIndustry} onChange={setQuickIndustry} /></label>
               <label>Founded year<input inputMode="numeric" pattern="\d{4}" value={quickFoundedYear} onChange={(event) => setQuickFoundedYear(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1998" /></label>
               <label>Team size<input value={quickTeamSize} onChange={(event) => setQuickTeamSize(event.target.value)} placeholder="1–10, 50, global network..." /></label>
-              <label className="is-wide">Mission<textarea value={quickMission} onChange={(event) => setQuickMission(event.target.value)} rows={3} /></label>
-              <label className="is-wide">Services or capabilities<textarea value={quickServices} onChange={(event) => setQuickServices(event.target.value)} rows={3} /></label>
-              <label className="is-wide">Headquarters<input value={quickHeadquarters} onChange={(event) => setQuickHeadquarters(event.target.value)} placeholder="City, region, or country" /></label>
+              <label className="is-wide">Description<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={3} placeholder="What this organization is and why it is relevant." /></label>
             </div>
           </section>
         )}
-        <div className="people-contact-channel-grid">
+        {className === "person" && <div className="people-contact-channel-grid">
           <EmailEntriesEditor
             entries={quickEmails}
             onChange={(id, patch) => setQuickEmails((current) => updateContactEntry(current, id, patch))}
@@ -3033,11 +3273,11 @@ export default function PeopleWorkspace({
             })])}
             onRemove={(id) => setQuickPhones((current) => removeEntry(current, id))}
           />
-        </div>
-        <label>
-          {className === "org" ? "Organization context" : "Relationship context"}
+        </div>}
+        {className === "person" && <label>
+          Relationship context
           <textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={4} />
-        </label>
+        </label>}
         {className === "person" && (
           <>
             <OccupationEntriesEditor
@@ -3060,18 +3300,25 @@ export default function PeopleWorkspace({
           entries={quickLocations}
           organization={className === "org"}
           onChange={(id, patch) => setQuickLocations((current) => updateEntry(current, id, patch))}
-          onAdd={() => setQuickLocations((current) => [...current, newLocationEntry({ label: current.length === 0 ? className === "org" ? "Headquarters" : "Primary home" : "" })])}
+          onAdd={() => setQuickLocations((current) => [...current, newLocationEntry({ label: current.length === 0 ? className === "org" ? "Relevant location" : "Primary home" : "" })])}
           onRemove={(id) => setQuickLocations((current) => removeEntry(current, id))}
         />
-        <div className="people-capture-grid">
+        {className === "org" && (
+          <OrganizationPeopleEditor
+            people={personOptions}
+            selectedIds={quickOrganizationPeople}
+            onChange={setQuickOrganizationPeople}
+          />
+        )}
+        {className === "person" && <div className="people-capture-grid">
           <label>Status<select value={status} onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}><option value="active">Active</option><option value="next">Next</option><option value="idea">Loose tie</option><option value="inactive">Dormant</option></select></label>
           <label>Cadence<select data-people-cadence-select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
-        </div>
+        </div>}
         <label>Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
-        <div className="people-capture-grid">
+        {className === "person" && <div className="people-capture-grid">
           <label>Last contact<input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} /></label>
           <label>Next contact<input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></label>
-        </div>
+        </div>}
         <fieldset className="people-social-fields">
           <legend>Website & social profiles</legend>
           <div className="people-capture-grid">
@@ -3544,14 +3791,14 @@ export default function PeopleWorkspace({
                     <strong>{selectedPerson.className === "org" ? "Edit Organization" : "Edit Profile"}</strong>
                     <button type="submit" disabled={profileSaving}>{profileSaving ? "Saving..." : "Save"}</button>
                   </div>
-                  <fieldset className="people-group-picker people-profile-group-picker">
+                  {selectedPerson.className === "person" && <fieldset className="people-group-picker people-profile-group-picker">
                     <legend>Groups</legend>
                     <div>{GROUP_OPTIONS.map((option) => <label key={option}>
                       <input type="checkbox" checked={profileGroups.includes(option)} onChange={() => toggleProfileGroup(option)} />
                       <span>{option}</span>
                     </label>)}</div>
-                    <small>{selectedPerson.className === "org" ? "Groups organize this Organization without changing its object identity." : "A person can belong to several groups without creating another contact."}</small>
-                  </fieldset>
+                    <small>A person can belong to several groups without creating another contact.</small>
+                  </fieldset>}
                   {(selectedPerson.className === "org" ? ORGANIZATION_PROFILE_SECTIONS : PROFILE_SECTIONS).map((section) => (
                     <Fragment key={section.title}>
                     <section className={`people-profile-section module-ref-tone-${section.tone}`}>
@@ -3569,10 +3816,23 @@ export default function PeopleWorkspace({
                                 {CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
                               </select>
                             ) : field.key === "organizationType" ? (
-                              <select value={profileDraft.organizationType} onChange={(event) => updateProfileDraft("organizationType", event.target.value)}>
+                              <select data-organization-type value={profileDraft.organizationType} onChange={(event) => {
+                                const nextType = event.target.value;
+                                setProfileDraft((current) => ({
+                                  ...current,
+                                  organizationType: nextType,
+                                  industry: organizationIndustryOptions(nextType).includes(current.industry) ? current.industry : ""
+                                }));
+                              }}>
                                 <option value="">Select type</option>
                                 {ORGANIZATION_TYPE_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
                               </select>
+                            ) : field.key === "industry" && selectedPerson.className === "org" ? (
+                              <OrganizationIndustrySelect
+                                organizationType={profileDraft.organizationType}
+                                value={profileDraft.industry}
+                                onChange={(value) => updateProfileDraft("industry", value)}
+                              />
                             ) : field.type === "textarea" ? (
                               <textarea
                                 value={profileDraft[field.key]}
@@ -3648,9 +3908,9 @@ export default function PeopleWorkspace({
                         </div>
                       )}
                     </section>
-                    {section.title === "Communication" && (
+                    {(section.title === "Communication" || section.title === "Links") && (
                       <>
-                        <div className="people-contact-channel-grid">
+                        {selectedPerson.className === "person" && <div className="people-contact-channel-grid">
                           <EmailEntriesEditor
                             entries={profileDraft.emails}
                             onChange={updateProfileEmail}
@@ -3672,7 +3932,7 @@ export default function PeopleWorkspace({
                             }))}
                             onRemove={(id) => setProfileDraft((current) => ({ ...current, phones: removeEntry(current.phones, id) }))}
                           />
-                        </div>
+                        </div>}
                         {selectedPerson.className === "person" && (
                           <>
                             <OccupationEntriesEditor
@@ -3697,10 +3957,21 @@ export default function PeopleWorkspace({
                           onChange={updateProfileLocation}
                           onAdd={() => setProfileDraft((current) => ({
                             ...current,
-                            locations: [...current.locations, newLocationEntry({ label: current.locations.length === 0 ? selectedPerson.className === "org" ? "Headquarters" : "Primary home" : "" })]
+                            locations: [...current.locations, newLocationEntry({ label: current.locations.length === 0 ? selectedPerson.className === "org" ? "Relevant location" : "Primary home" : "" })]
                           }))}
                           onRemove={(id) => setProfileDraft((current) => ({ ...current, locations: removeEntry(current.locations, id) }))}
                         />
+                        {selectedPerson.className === "org" && (
+                          <OrganizationPeopleEditor
+                            people={personOptions}
+                            selectedIds={organizationProfileSelectedPersonIds}
+                            derivedIds={selectedOrganizationDerivedPersonIds}
+                            onChange={(selectedIds) => setProfileDraft((current) => ({
+                              ...current,
+                              associatedPeople: mergeAssociatedPersonIds(current.associatedPeople, personOptions, selectedIds)
+                            }))}
+                          />
+                        )}
                       </>
                     )}
                     </Fragment>
@@ -4055,12 +4326,12 @@ export default function PeopleWorkspace({
                   </section>
 
                   <section className="people-relation-list">
-                    <h4>{selectedPerson.className === "org" ? "Organization context" : "Family and close context"}</h4>
+                    <h4>{selectedPerson.className === "org" ? "Organization details" : "Family and close context"}</h4>
                     {(selectedPerson.className === "org" ? [
                       ["Linked people", selectedOrganizationPeople.length ? selectedOrganizationPeople.map((person) => person.title).join(", ") : "Not recorded"],
                       ["Industry", selectedProfile.industry || "Not recorded"],
                       ["Headquarters", selectedProfile.headquarters || selectedProfile.livesIn || "Not recorded"],
-                      ["How you are connected", selectedProfile.context || selectedPerson.body || "Not recorded"]
+                      ["Description", selectedProfile.context || selectedPerson.body || "Not recorded"]
                     ] : [
                       ["Partner", selectedProfile.partner || "Not recorded"],
                       ["Children", selectedChildren.length ? selectedChildren.join(", ") : "Not recorded"],
@@ -4180,10 +4451,8 @@ export default function PeopleWorkspace({
                   })}
                 </article>
                 <article className="people-overview-about" data-people-overview-card="about">
-                  <h3>{selectedPerson.className === "org" ? "Organization overview" : `About ${selectedPerson.title.split(" ")[0]}`}</h3>
-                  <p>{selectedProfile.context || selectedPerson.body || (selectedPerson.className === "org" ? "No organization context recorded yet." : "No relationship context recorded yet.")}</p>
-                  {selectedPerson.className === "org" && selectedProfile.mission && <><strong>Mission</strong><p>{selectedProfile.mission}</p></>}
-                  {selectedPerson.className === "org" && selectedProfile.services && <><strong>Services</strong><p>{selectedProfile.services}</p></>}
+                  <h3>{selectedPerson.className === "org" ? "Description" : `About ${selectedPerson.title.split(" ")[0]}`}</h3>
+                  <p>{selectedProfile.context || selectedPerson.body || (selectedPerson.className === "org" ? "No description recorded yet." : "No relationship context recorded yet.")}</p>
                 </article>
                 <article data-people-overview-card="projects">
                   <LinkedProjectsPanel
@@ -4222,7 +4491,7 @@ export default function PeopleWorkspace({
                               photoUpdatedAt={person.profile?.photoUpdatedAt}
                               compact
                             />
-                            <span><strong>{person.title}</strong><small>{roles.join(" · ") || getPrimaryGroup(person)}</small></span>
+                            <span><strong>{person.title}</strong><small>{roles.join(" · ") || (selectedOrganizationDirectPersonIds.includes(person.id) ? "Direct link" : getPrimaryGroup(person))}</small></span>
                             <span aria-hidden="true">→</span>
                           </button>
                         );

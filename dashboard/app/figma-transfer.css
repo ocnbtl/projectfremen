@@ -9179,6 +9179,118 @@ html[data-admin-preview="mobile"] .module-ref-shell h1 {
   margin: 0;
 }
 
+.people-organization-link-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-left: 4px solid currentColor;
+  border-radius: 10px;
+  background: var(--surface-panel-soft);
+}
+
+.people-organization-link-editor header h4,
+.people-organization-link-editor header p,
+.people-organization-linked-list p {
+  margin: 0;
+}
+
+.people-organization-link-editor header h4 {
+  color: var(--text-strong);
+  font-family: var(--font-heading);
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.people-organization-link-editor header p,
+.people-organization-linked-list p {
+  margin-top: 3px;
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.people-organization-link-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.people-organization-link-controls label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.people-organization-link-controls select {
+  width: 100%;
+  min-width: 0;
+  min-height: 38px;
+}
+
+.people-organization-link-controls > button,
+.people-organization-linked-list article > button {
+  width: auto;
+  min-height: 38px;
+  border-color: var(--border);
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+
+.people-organization-link-controls > button:not(:disabled):hover,
+.people-organization-linked-list article > button:hover {
+  border-color: color-mix(in srgb, var(--accent-purple) 48%, var(--border));
+  background: color-mix(in srgb, var(--accent-purple) 8%, var(--surface-panel));
+}
+
+.people-organization-linked-list {
+  display: grid;
+  gap: 6px;
+}
+
+.people-organization-linked-list article {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+}
+
+.people-organization-linked-list article > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.people-organization-linked-list strong,
+.people-organization-linked-list small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-organization-linked-list strong {
+  font-size: 12px;
+}
+
+.people-organization-linked-list small {
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 750;
+}
+
 .people-organization-create-fields header p {
   margin-top: 4px;
   color: var(--text-subtle);
@@ -9448,8 +9560,14 @@ html[data-admin-preview="mobile"] .module-ref-shell h1 {
   }
 
   .people-capture-identity-grid,
-  .people-photo-options {
+  .people-photo-options,
+  .people-organization-link-controls {
     grid-template-columns: 1fr;
+  }
+
+  .people-organization-link-controls > button,
+  .people-organization-linked-list article > button {
+    min-height: 44px;
   }
 
   .people-birthday-field {

@@ -5981,14 +5981,52 @@ async function checkPeopleMemoryBrowserState(
       const typeSelect = classification.locator(".people-type-field select");
       await typeSelect.selectOption("org");
       assert(await page.locator(".people-edit-toolbar strong").textContent() === "New Organization", `New People did not reflect Organization type at ${viewport.label}`);
+      const organizationForm = page.locator(".people-capture-form");
       assert(
         await page.getByRole("heading", { name: "Organization details" }).count() === 1 &&
           await page.getByLabel("Organization type").count() === 1 &&
           await page.getByLabel("Industry or field").count() === 1 &&
+          await organizationForm.locator(".people-group-picker").count() === 0 &&
+          await organizationForm.getByLabel("Email", { exact: true }).count() === 0 &&
+          await organizationForm.getByLabel("Phone", { exact: true }).count() === 0 &&
+          await organizationForm.getByLabel("Status", { exact: true }).count() === 0 &&
+          await organizationForm.getByLabel("Cadence", { exact: true }).count() === 0 &&
+          await organizationForm.getByText("Mission", { exact: true }).count() === 0 &&
+          await organizationForm.getByText("Services or capabilities", { exact: true }).count() === 0 &&
+          await organizationForm.getByText("Organization context", { exact: true }).count() === 0 &&
           await page.locator("[data-people-occupation-editor]").count() === 0 &&
           await page.locator("[data-people-education-editor]").count() === 0 &&
           await page.locator("[data-people-birthday-editor]").count() === 0,
         `New Organization did not use its organization-specific property form at ${viewport.label}`
+      );
+      const organizationTypeSelect = organizationForm.locator("[data-organization-type]");
+      const organizationIndustrySelect = organizationForm.locator("[data-organization-industry]");
+      assert(
+        (await organizationIndustrySelect.locator("option").allTextContents()).includes("Technology"),
+        `Business did not expose its relevant industry options at ${viewport.label}`
+      );
+      await organizationTypeSelect.selectOption("University / School");
+      const universityIndustryOptions = await organizationIndustrySelect.locator("option").allTextContents();
+      assert(
+        universityIndustryOptions.includes("College / university") && !universityIndustryOptions.includes("Finance & insurance"),
+        `Organization industry options did not respond to University / School at ${viewport.label}`
+      );
+      await organizationTypeSelect.selectOption("Business");
+      assert(
+        await organizationForm.locator("[data-location-entry]").first().locator("input").first().inputValue() === "Relevant location" &&
+          await organizationForm.getByRole("heading", { name: "People", exact: true }).count() === 1,
+        `Organization location and people controls were not purpose-built at ${viewport.label}`
+      );
+      await organizationForm.getByLabel("Person to link").selectOption(personId);
+      await organizationForm.getByRole("button", { name: "Add person" }).click();
+      assert(
+        await organizationForm.locator(`[data-linked-person="${personId}"]`).count() === 1,
+        `Organization people picker did not add a selected Person at ${viewport.label}`
+      );
+      await organizationForm.getByRole("button", { name: `Remove direct link to ${personTitle}` }).click();
+      assert(
+        await organizationForm.locator(`[data-linked-person="${personId}"]`).count() === 0,
+        `Organization people picker did not remove a direct draft link at ${viewport.label}`
       );
       await typeSelect.selectOption("person");
       await page.getByLabel("Full name").fill('Avery "June" North');
@@ -6117,12 +6155,45 @@ async function checkPeopleMemoryBrowserState(
             createdFromQuickEntry.profile.education[0].organizationId === organizationId,
           "People quick entry did not persist nickname, partial birthday, international phone, and Organization object links"
         );
+
+        await page.goto(`${baseUrl}/admin/people/new`, { waitUntil: "networkidle" });
+        const organizationQuickForm = page.locator(".people-capture-form");
+        await organizationQuickForm.locator(".people-type-field select").selectOption("org");
+        const quickOrganizationTitle = `${organizationTitle}-ui`;
+        await organizationQuickForm.getByLabel("Organization name").fill(quickOrganizationTitle);
+        await organizationQuickForm.getByLabel("Industry or field").selectOption("Technology");
+        await organizationQuickForm.getByLabel("Description").fill("A directly linked organization created by the regression UI.");
+        await organizationQuickForm.locator("[data-location-entry]").first().locator("input").nth(1).fill("Columbus, Ohio, USA");
+        await organizationQuickForm.getByLabel("Person to link").selectOption(personId);
+        await organizationQuickForm.getByRole("button", { name: "Add person" }).click();
+        const [organizationCreateResponse] = await Promise.all([
+          page.waitForResponse((response) =>
+            response.url().endsWith("/api/personal/records") && response.request().method() === "POST"
+          ),
+          organizationQuickForm.getByRole("button", { name: "Save", exact: true }).click()
+        ]);
+        const organizationCreatePayload = await organizationCreateResponse.json();
+        const createdFromOrganizationQuickEntry = organizationCreatePayload?.items?.find((item) => item.title === quickOrganizationTitle);
+        assert(
+          organizationCreateResponse.ok() &&
+            createdFromOrganizationQuickEntry?.profile?.organizationType === "Business" &&
+            createdFromOrganizationQuickEntry.profile.industry === "Technology" &&
+            createdFromOrganizationQuickEntry.profile.context === "A directly linked organization created by the regression UI." &&
+            createdFromOrganizationQuickEntry.profile.headquarters === "Columbus, Ohio, USA" &&
+            createdFromOrganizationQuickEntry.profile.locations?.[0]?.label === "Relevant location" &&
+            createdFromOrganizationQuickEntry.profile.associatedPeople?.includes(personId) &&
+            createdFromOrganizationQuickEntry.profile.emails?.length === 0 &&
+            createdFromOrganizationQuickEntry.profile.phones?.length === 0 &&
+            createdFromOrganizationQuickEntry.subjects?.length === 0 &&
+            !createdFromOrganizationQuickEntry.time?.reviewCadence,
+          "Organization quick entry did not persist the streamlined fields, location, and direct People links"
+        );
       }
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}?tab=overview`, { waitUntil: "networkidle" });
       assert(
         await page.locator(".people-profile-header h2").textContent() === organizationTitle &&
-          await page.getByText("Research Studio", { exact: true }).count() > 0 &&
+          await page.getByText("Business", { exact: true }).count() > 0 &&
           await page.getByRole("heading", { name: "Linked people" }).count() === 1 &&
           (await page.locator(".people-overview-grid").innerText()).includes(personTitle),
         `Organization profile did not render organization facts and linked People at ${viewport.label}`
@@ -6132,6 +6203,19 @@ async function checkPeopleMemoryBrowserState(
         path: path.join(screenshotDir, `people-organization-profile-${viewport.label}.png`),
         fullPage: true
       });
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}/edit?tab=properties`, { waitUntil: "networkidle" });
+      const organizationEditForm = page.locator(".people-edit-form");
+      assert(
+        await organizationEditForm.locator(".people-profile-group-picker").count() === 0 &&
+          await organizationEditForm.locator("[data-people-email-editor]").count() === 0 &&
+          await organizationEditForm.locator("[data-people-phone-editor]").count() === 0 &&
+          await organizationEditForm.locator("[data-people-cadence-select]").count() === 0 &&
+          await organizationEditForm.getByLabel("Description").count() === 1 &&
+          await organizationEditForm.locator(`[data-linked-person="${personId}"]`).count() === 1 &&
+          (await organizationEditForm.locator(`[data-linked-person="${personId}"]`).innerText()).includes("Direct + profile link"),
+        `Organization Properties did not retain its streamlined fields and bidirectional People map at ${viewport.label}`
+      );
+      await assertNoOverflow(page, `Organization Properties ${viewport.label}`);
       await context.close();
     }
   } finally {
@@ -14021,20 +14105,19 @@ async function main() {
         title: organizationTitle,
         className: "org",
         status: "active",
-        body: "Regression-created organization context.",
+        body: "Regression-created organization description.",
         areas: ["Relationships"],
-        subjects: ["Collaborator"],
-        time: { reviewCadence: "P3M" },
+        subjects: [],
+        time: {},
         profile: {
           fullName: organizationTitle,
-          context: "Regression-created organization context.",
-          organizationType: "Research Studio",
-          industry: "Design research",
-          mission: "Make complex systems easier to understand.",
-          services: "Research, strategy, and prototyping",
+          context: "Regression-created organization description.",
+          organizationType: "Business",
+          industry: "Professional services",
           foundedYear: "2021",
           teamSize: "1–10",
           headquarters: "Columbus, Ohio, USA",
+          locations: [{ id: "organization-location-regression-1", label: "Relevant location", location: "Columbus, Ohio, USA" }],
           associatedPeople: [],
           children: [],
           interactions: [],
@@ -14051,8 +14134,11 @@ async function main() {
     );
     assert(
       createdOrganization?.id &&
-        createdOrganization.profile?.organizationType === "Research Studio" &&
-        createdOrganization.profile?.mission === "Make complex systems easier to understand.",
+        createdOrganization.profile?.organizationType === "Business" &&
+        createdOrganization.profile?.industry === "Professional services" &&
+        createdOrganization.profile?.locations?.[0]?.label === "Relevant location" &&
+        createdOrganization.subjects?.length === 0 &&
+        !createdOrganization.time?.reviewCadence,
       "Organization-specific properties did not persist"
     );
 
@@ -14223,6 +14309,24 @@ async function main() {
         persistedPerson.profile.memories[0].id === "memory-regression-older" &&
         persistedPerson.profile.memories[1].occurredOn === "2026-08-10",
       "People dated memory entries did not persist with stable identity and input order"
+    );
+
+    const linkPersonDirectlyToOrganization = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: createdOrganization.id,
+        expectedUpdatedAt: createdOrganization.updatedAt,
+        profile: { associatedPeople: [createdPerson.id] }
+      })
+    });
+    assert(
+      linkPersonDirectlyToOrganization.response.ok &&
+        linkPersonDirectlyToOrganization.payload?.items?.find((item) => item.id === createdOrganization.id)?.profile?.associatedPeople?.[0] === createdPerson.id,
+      "Organization direct People link did not persist as a stable Person ID"
     );
 
     const rejectInvalidPeruPhone = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
