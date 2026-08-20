@@ -1,0 +1,8 @@
+.next
+node_modules
+.env.local
+*.tsbuildinfo
+output
+debug.log
+data/audit-log.json
+data/exports
