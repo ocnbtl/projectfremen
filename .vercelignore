@@ -1,0 +1,9 @@
+**/.next
+**/node_modules
+**/.env.local
+**/*.tsbuildinfo
+dashboard/output
+dashboard/debug.log
+dashboard/data/audit-log.json
+dashboard/data/exports
+PROJECT_CONTINUATION_PACKET.md
