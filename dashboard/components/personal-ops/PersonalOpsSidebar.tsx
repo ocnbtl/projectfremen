@@ -120,12 +120,14 @@ export default function PersonalOpsSidebar({
     };
   });
 
-  const smartItems: ModuleSidebarItem[] = SMART_VIEWS.map(([id, label]) => ({
+  const smartItems: ModuleSidebarItem[] = SMART_VIEWS
+    .filter(([id]) => activeView !== "decisions" || (id !== "recurring" && id !== "blocked"))
+    .map(([id, label]) => ({
     id,
     label,
     href: `${pathname}?filter=${id}`,
     active: filter === id
-  }));
+    }));
 
   const sections: ModuleSidebarSection[] = [
     {

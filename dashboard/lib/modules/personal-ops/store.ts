@@ -802,6 +802,7 @@ function synchronizeDecision(item: PersonalOpsDecision): void {
   if (item.lifecycle === "archived") return;
   if (item.decisionState === "decided" || item.decisionState === "superseded") {
     item.lifecycle = "complete";
+    item.review = "reviewed";
   }
   if (item.decisionState === "deferred" && item.lifecycle === "complete") {
     item.lifecycle = "active";
@@ -814,7 +815,6 @@ function validateDecision(item: PersonalOpsDecision): void {
   }
   if (item.decisionState === "decided") {
     if (!item.finalDecision) validation("A final decision is required before marking decided", "finalDecision");
-    if (!item.rationale) validation("Rationale is required before marking decided", "rationale");
   }
   if (item.decisionState === "deferred") {
     if (!item.deferReason) validation("A defer reason is required", "deferReason");

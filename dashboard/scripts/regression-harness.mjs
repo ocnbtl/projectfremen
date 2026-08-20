@@ -7561,7 +7561,8 @@ async function checkCrossModuleDecisionConnections(
     });
     assert(
       decideProjectOwner.response.ok &&
-        decideProjectOwner.payload?.item?.decisionState === "decided",
+        decideProjectOwner.payload?.item?.decisionState === "decided" &&
+        decideProjectOwner.payload?.item?.review === "reviewed",
       `Project-linked Decision state update failed: ${JSON.stringify(decideProjectOwner.payload)}`
     );
     createdByKey.set("project", decideProjectOwner.payload.item);
@@ -7579,6 +7580,75 @@ async function checkCrossModuleDecisionConnections(
       ),
       "Project Decisions did not show the saved decision beneath its question"
     );
+
+    const personalDecisionPage = await desktopContext.newPage();
+    observe(personalDecisionPage);
+    await personalDecisionPage.goto(`${baseUrl}/admin/personal/decisions`, { waitUntil: "networkidle" });
+    assert(
+      await personalDecisionPage.getByRole("heading", { name: "Decisions", exact: true }).count() === 1 &&
+        await personalDecisionPage.getByText("Durable choices with rationale, reversibility, provenance, and explicit review state.", { exact: true }).count() === 0 &&
+        await personalDecisionPage.getByLabel("Current scope status").count() === 0,
+      "Personal Ops Decisions retained the removed header copy or status-count strip"
+    );
+    assert(
+      await personalDecisionPage.getByRole("columnheader", { name: "Type", exact: true }).count() === 0 &&
+        await personalDecisionPage.getByRole("columnheader", { name: "Review state", exact: true }).count() === 1 &&
+        await personalDecisionPage.getByRole("columnheader", { name: "Decision state", exact: true }).count() === 1,
+      "Personal Ops Decisions did not replace the redundant Type column with review and decision state"
+    );
+    assert(
+      await personalDecisionPage.getByText("Recurring", { exact: true }).count() === 0 &&
+        await personalDecisionPage.getByText("Blocked", { exact: true }).count() === 0 &&
+        await personalDecisionPage.getByText("Linked", { exact: true }).count() === 0,
+      "Personal Ops Decisions retained health, recurring, or linked summary controls"
+    );
+    const personalDecisionRow = personalDecisionPage.locator("tbody tr").filter({ hasText: projectOwner.title }).first();
+    await personalDecisionRow.waitFor();
+    const personalDecisionRowText = await personalDecisionRow.innerText();
+    assert(
+      personalDecisionRowText.includes(projectOwner.question) &&
+        personalDecisionRowText.includes("Keep this operating choice in the canonical Personal Ops decision record.") &&
+        await personalDecisionRow.getByLabel("Question", { exact: true }).count() === 1 &&
+        await personalDecisionRow.getByLabel("Decision", { exact: true }).count() === 1 &&
+        personalDecisionRowText.includes("Reviewed") &&
+        personalDecisionRowText.includes("Decided"),
+      `Personal Ops decision row did not show question, decision, review state, and decision state: ${personalDecisionRowText}`
+    );
+    await personalDecisionRow.getByRole("button").click();
+    await personalDecisionPage.waitForURL((url) =>
+      url.pathname === "/admin/personal/decisions" &&
+      url.searchParams.get("selected") === projectOwner.id
+    );
+    const personalDecisionInspector = personalDecisionPage.getByRole("dialog", { name: "Selected object inspector" });
+    await personalDecisionInspector.waitFor();
+    assert(
+      await personalDecisionInspector.getByText("Question and decision", { exact: true }).count() === 1 &&
+        await personalDecisionInspector.getByLabel("Question", { exact: true }).count() === 1 &&
+        await personalDecisionInspector.getByLabel("Decision", { exact: true }).count() === 1 &&
+        await personalDecisionInspector.getByText("Health", { exact: true }).count() === 0 &&
+        await personalDecisionInspector.getByText("Cadence", { exact: true }).count() === 0,
+      "Personal Ops decision inspector did not expose the streamlined question, decision, and state overview"
+    );
+    await personalDecisionInspector.getByRole("button", { name: "Edit", exact: true }).click();
+    const editDecisionDialog = personalDecisionPage.getByRole("dialog", { name: "Edit Decision" });
+    await editDecisionDialog.waitFor();
+    for (const expectedLabel of ["Title", "Domain", "Due date", "Priority", "Review state", "Context", "Question", "Decision state", "Reversibility", "Decision"]) {
+      assert(
+        await editDecisionDialog.getByLabel(expectedLabel, { exact: true }).count() === 1,
+        `Edit Decision omitted streamlined field: ${expectedLabel}`
+      );
+    }
+    for (const removedLabel of ["Health", "Cadence", "Cadence rule", "Description", "Risk", "Options", "Rationale", "Final decision"]) {
+      assert(
+        await editDecisionDialog.getByLabel(removedLabel, { exact: true }).count() === 0,
+        `Edit Decision retained removed field: ${removedLabel}`
+      );
+    }
+    await editDecisionDialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    await personalDecisionPage.screenshot({
+      path: path.join(screenshotDir, "personal-decisions-1440x900.png"),
+      fullPage: true
+    });
 
     await projectPage.goto(`${baseUrl}${sources[4].source.route}`, { waitUntil: "networkidle" });
     const milestonePanel = await assertPanel(projectPage, sources[4], "Project milestone decisions");
@@ -7666,10 +7736,30 @@ async function checkCrossModuleDecisionConnections(
     await financeDecisionDialog
       .getByText("This creates a linked operating object. The source stays in Finance.", { exact: true })
       .waitFor();
+    for (const expectedLabel of ["Title", "Domain", "Due date", "Priority", "Review state", "Context", "Question", "Decision state", "Reversibility", "Decision"]) {
+      assert(
+        await financeDecisionDialog.getByLabel(expectedLabel, { exact: true }).count() === 1,
+        `New Decision omitted streamlined field: ${expectedLabel}`
+      );
+    }
+    for (const removedLabel of ["Health", "Cadence", "Cadence rule", "Description", "Risk", "Options", "Rationale", "Final decision"]) {
+      assert(
+        await financeDecisionDialog.getByLabel(removedLabel, { exact: true }).count() === 0,
+        `New Decision retained removed field: ${removedLabel}`
+      );
+    }
+    const linkedFollowUpCheckbox = financeDecisionDialog.getByRole("checkbox", { name: /Create one linked follow-up/ });
+    const linkedFollowUpBox = await linkedFollowUpCheckbox.boundingBox();
+    const linkedFollowUpTarget = await linkedFollowUpCheckbox.locator("xpath=ancestor::label[1]").boundingBox();
+    assert(
+      linkedFollowUpBox && linkedFollowUpBox.width >= 16 && linkedFollowUpBox.width <= 20 && linkedFollowUpBox.height >= 16 && linkedFollowUpBox.height <= 20 &&
+        linkedFollowUpTarget && linkedFollowUpTarget.height >= 44,
+      `New Decision linked follow-up checkbox is not visually compact with an accessible target: ${JSON.stringify({ linkedFollowUpBox, linkedFollowUpTarget })}`
+    );
     const handoffDecisionTitle = `${handoffBudget.category} budget · source-preserving decision`;
     await financeDecisionDialog.getByLabel("Title").fill(handoffDecisionTitle);
     await financeDecisionDialog.getByLabel("Question").fill("What choice should retain this exact Finance budget as its source?");
-    await financeDecisionDialog.getByRole("checkbox", { name: /Create one linked follow-up/ }).uncheck();
+    await linkedFollowUpCheckbox.uncheck();
     await Promise.all([
       financeBudgetPage.waitForResponse(
         (response) =>
@@ -7790,6 +7880,48 @@ async function checkCrossModuleDecisionConnections(
         await context.close();
       }
     }
+
+    const mobileDecisionContext = await authenticatedContext({ width: 390, height: 844 });
+    const mobileDecisionPage = await mobileDecisionContext.newPage();
+    observe(mobileDecisionPage);
+    await mobileDecisionPage.goto(`${baseUrl}/admin/personal/decisions`, { waitUntil: "networkidle" });
+    const mobileDecisionRow = mobileDecisionPage.locator("tbody tr").filter({ hasText: projectOwner.title }).first();
+    await mobileDecisionRow.waitFor();
+    assert(
+      await mobileDecisionRow.getByLabel("Question", { exact: true }).count() === 1 &&
+        await mobileDecisionRow.getByLabel("Decision", { exact: true }).count() === 1,
+      "Mobile Personal Ops decision row omitted the question and decision markers"
+    );
+    await mobileDecisionRow.getByRole("button").click();
+    const mobileDecisionInspector = mobileDecisionPage.getByRole("dialog", { name: "Selected object inspector" });
+    await mobileDecisionInspector.waitFor();
+    const mobileDecisionTargets = await mobileDecisionInspector
+      .locator("button:visible, a:visible, input:visible, select:visible, textarea:visible")
+      .evaluateAll((elements) =>
+        elements
+          .map((element) => {
+            const rect = element.getBoundingClientRect();
+            return {
+              label: element.getAttribute("aria-label") || element.textContent?.trim().slice(0, 60),
+              width: rect.width,
+              height: rect.height
+            };
+          })
+          .filter((item) => item.width < 44 || item.height < 44)
+      );
+    const mobileDecisionLayout = await mobileDecisionPage.evaluate(() => ({
+      scrollWidth: document.documentElement.scrollWidth,
+      innerWidth: window.innerWidth
+    }));
+    assert(
+      mobileDecisionTargets.length === 0 && mobileDecisionLayout.scrollWidth <= mobileDecisionLayout.innerWidth,
+      `Mobile Personal Ops decision inspector failed target-size or overflow checks: ${JSON.stringify({ mobileDecisionTargets, mobileDecisionLayout })}`
+    );
+    await mobileDecisionPage.screenshot({
+      path: path.join(screenshotDir, "personal-decisions-390x844.png"),
+      fullPage: true
+    });
+    await mobileDecisionContext.close();
 
     const finalDecisions = await requestJson(
       baseUrl,
@@ -10919,7 +11051,6 @@ async function main() {
         label: "Decisions",
         expected: [
           "Decisions",
-          "Durable choices with rationale, reversibility, provenance, and explicit review state.",
           "File decision"
         ]
       },
@@ -10977,6 +11108,12 @@ async function main() {
       assert(page.response.ok, `Personal Ops ${route.label} page failed: ${describeStatus(page.response)}`);
       for (const expected of route.expected) {
         assert(page.body.includes(expected), `Personal Ops ${route.label} page missing expected text: ${expected}`);
+      }
+      if (route.label === "Decisions") {
+        assert(
+          !page.body.includes("Durable choices with rationale, reversibility, provenance, and explicit review state."),
+          "Personal Ops Decisions retained the removed explanatory header copy"
+        );
       }
     }
     pass("All canonical Personal Ops routes load through one shared shell with explicit advanced safety boundaries");
@@ -12363,7 +12500,8 @@ async function main() {
     assert(
       decideNativeDecision.response.ok &&
         decideNativeDecision.payload?.item?.decisionState === "decided" &&
-        decideNativeDecision.payload?.item?.lifecycle === "complete",
+        decideNativeDecision.payload?.item?.lifecycle === "complete" &&
+        decideNativeDecision.payload?.item?.review === "reviewed",
       `Native Decision update failed: ${JSON.stringify(decideNativeDecision.payload)}`
     );
     pass("Explicit legacy Decision conversion is typed, idempotent, and preserves its source mapping");
