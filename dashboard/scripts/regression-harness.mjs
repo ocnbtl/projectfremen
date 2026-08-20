@@ -5596,7 +5596,15 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
   }
 }
 
-async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expectedMemoryIds) {
+async function checkPeopleMemoryBrowserState(
+  baseUrl,
+  cookieJar,
+  personId,
+  personTitle,
+  expectedMemoryIds,
+  organizationId,
+  organizationTitle
+) {
   const expectedGroupOptions = [
     "Acquaintance",
     "Advisor",
@@ -5655,6 +5663,24 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=overview`, { waitUntil: "networkidle" });
       const overview = page.locator(".people-overview-grid");
       await overview.waitFor();
+      const profilePhoto = page.getByRole("button", { name: new RegExp(`profile picture for ${personTitle}`, "i") });
+      await profilePhoto.waitFor();
+      assert(
+        await profilePhoto.locator("img").count() === 1,
+        `People profile did not render its private photo at ${viewport.label}`
+      );
+      await profilePhoto.click();
+      const photoDialog = page.getByRole("dialog", { name: personTitle });
+      await photoDialog.waitFor();
+      const photoOptions = await photoDialog.locator(".people-photo-options button").allTextContents();
+      assert(
+        photoOptions.length === 3 &&
+          photoOptions.some((label) => label.includes("Upload")) &&
+          photoOptions.some((label) => label.includes("Paste")) &&
+          photoOptions.some((label) => label.includes("Take picture")),
+        `Profile picture dialog omitted upload, paste, or camera capture at ${viewport.label}`
+      );
+      await photoDialog.getByRole("button", { name: "Close profile picture options" }).click();
       const overviewCards = overview.locator(":scope > [data-people-overview-card]");
       assert(
         JSON.stringify(await overviewCards.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-people-overview-card")))) ===
@@ -5703,9 +5729,8 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         );
       }
       assert(
-        (await overview.locator('[data-people-overview-card="quick-info"]').innerText()).includes("Regression Studio") &&
-          (await overview.locator('[data-people-overview-card="quick-info"]').innerText()).includes("Ohio State University") &&
-          !(await overview.locator('[data-people-overview-card="contact"]').innerText()).includes("Regression Studio"),
+        (await overview.locator('[data-people-overview-card="quick-info"]').innerText()).includes(organizationTitle) &&
+          !(await overview.locator('[data-people-overview-card="contact"]').innerText()).includes(organizationTitle),
         `People Overview did not move employer and university into the fact list without duplicate work copy at ${viewport.label}`
       );
       await assertNoOverflow(page, `People Overview ${viewport.label}`);
@@ -5909,6 +5934,24 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
           await page.locator("[data-location-entry]").count() === 2,
         `Properties did not render every repeatable university, job, and location at ${viewport.label}`
       );
+      const linkedJobOrganization = await page
+        .locator('[data-occupation-entry="occupation-regression-1"] select')
+        .filter({ has: page.locator(`option[value="${organizationId}"]`) })
+        .inputValue();
+      const linkedEducationOrganization = await page
+        .locator('[data-education-entry="education-regression-1"] select')
+        .filter({ has: page.locator(`option[value="${organizationId}"]`) })
+        .inputValue();
+      assert(
+        linkedJobOrganization === organizationId && linkedEducationOrganization === organizationId,
+        `Properties did not retain employer and university Organization object links at ${viewport.label}: ${JSON.stringify({ linkedJobOrganization, linkedEducationOrganization, organizationId })}`
+      );
+      assert(
+        await page.locator("[data-people-birthday-editor] select").nth(0).inputValue() === "3" &&
+          await page.locator("[data-people-birthday-editor] select").nth(1).inputValue() === "14" &&
+          await page.locator("[data-people-birthday-editor] input").inputValue() === "",
+        `Properties did not retain the birthday without inventing a year at ${viewport.label}`
+      );
       assert(
         await page.locator("[data-email-entry]").count() === 3 &&
           await page.locator("[data-phone-entry]").count() === 2 &&
@@ -5938,13 +5981,31 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
       const typeSelect = classification.locator(".people-type-field select");
       await typeSelect.selectOption("org");
       assert(await page.locator(".people-edit-toolbar strong").textContent() === "New Organization", `New People did not reflect Organization type at ${viewport.label}`);
+      assert(
+        await page.getByRole("heading", { name: "Organization details" }).count() === 1 &&
+          await page.getByLabel("Organization type").count() === 1 &&
+          await page.getByLabel("Industry or field").count() === 1 &&
+          await page.locator("[data-people-occupation-editor]").count() === 0 &&
+          await page.locator("[data-people-education-editor]").count() === 0 &&
+          await page.locator("[data-people-birthday-editor]").count() === 0,
+        `New Organization did not use its organization-specific property form at ${viewport.label}`
+      );
       await typeSelect.selectOption("person");
-      await page.getByLabel("Full name").fill("Avery Juniper North");
+      await page.getByLabel("Full name").fill('Avery "June" North');
       assert(
         await page.locator("[data-derived-first-name]").textContent() === "Avery" &&
-          await page.locator("[data-people-derived-name]").getByText("Juniper", { exact: true }).count() === 1 &&
-          await page.locator("[data-derived-last-name]").textContent() === "North",
-        `New People did not derive first, middle, and last names from the quick full name at ${viewport.label}`
+          await page.locator("[data-derived-last-name]").textContent() === "North" &&
+          await page.getByLabel("Full name").inputValue() === "Avery North" &&
+          await page.getByLabel("Nickname").inputValue() === "June",
+        `New People did not extract a quoted nickname while deriving the full name at ${viewport.label}`
+      );
+      const birthdayEditor = page.locator("[data-people-birthday-editor]");
+      await birthdayEditor.locator("select").nth(0).selectOption("3");
+      await birthdayEditor.locator("select").nth(1).selectOption("14");
+      assert(
+        await birthdayEditor.locator("input").inputValue() === "" &&
+          (await birthdayEditor.locator("legend").innerText()).trim() === "Birthday",
+        `New People did not accept a month and day with an unknown birth year at ${viewport.label}`
       );
       const createGroups = (await classification.locator(".people-group-picker label").allTextContents())
         .map((label) => label.trim());
@@ -5963,13 +6024,34 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
         `New People did not start with one compact email, phone, job, and location and no university at ${viewport.label}`
       );
       await page.getByLabel("Email", { exact: true }).first().fill("avery.north@example.com");
-      await page.getByLabel("Phone", { exact: true }).first().fill("6147963848");
-      await page.getByRole("button", { name: "Add email" }).click();
-      await page.getByRole("button", { name: "Add phone" }).click();
+      const firstPhoneEntry = page.locator("[data-phone-entry]").first();
+      await firstPhoneEntry.locator("summary").click();
+      const firstCountryCode = firstPhoneEntry.getByLabel("Country code");
+      await firstCountryCode.fill("");
+      assert(await firstCountryCode.inputValue() === "", `New People did not allow the preset +1 code to be cleared at ${viewport.label}`);
+      await firstCountryCode.fill("+51");
+      await page.getByLabel("Phone", { exact: true }).first().fill("987654321");
+      await page.getByLabel("Phone", { exact: true }).first().blur();
+      assert(
+        await firstCountryCode.inputValue() === "+51" &&
+          await page.getByLabel("Phone", { exact: true }).first().inputValue() === "+51 987-654-321" &&
+          await firstPhoneEntry.locator(".people-phone-error").count() === 0,
+        `New People did not format a nine-digit Peru phone number at ${viewport.label}`
+      );
+      const addEmailButton = page.getByRole("button", { name: "Add email" });
+      const addPhoneButton = page.getByRole("button", { name: "Add phone" });
+      if (viewport.label === "mobile") {
+        await addEmailButton.dispatchEvent("click");
+        await addPhoneButton.dispatchEvent("click");
+      } else {
+        await addEmailButton.click();
+        await addPhoneButton.click();
+      }
       await page.getByLabel("Email 2 category").selectOption("custom");
       await page.getByLabel("Custom category").fill("Alumni");
       await page.getByLabel("Email", { exact: true }).nth(1).fill("avery.alumni@example.edu");
       await page.getByLabel("Phone 2 category").selectOption("work");
+      await page.getByLabel("Country code").nth(1).fill("+1");
       await page.getByLabel("Phone", { exact: true }).nth(1).fill("6145550142");
       assert(
         await page.locator("[data-email-entry]").count() === 2 &&
@@ -5977,9 +6059,20 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
           await page.getByLabel("Custom category").inputValue() === "Alumni",
         `New People repeatable labeled contact controls failed at ${viewport.label}`
       );
-      await page.getByRole("button", { name: "Add university" }).click();
-      await page.getByRole("button", { name: "Add job" }).click();
-      await page.getByRole("button", { name: "Add location" }).click();
+      const addUniversityButton = page.getByRole("button", { name: "Add university" });
+      const addJobButton = page.getByRole("button", { name: "Add job" });
+      const addLocationButton = page.getByRole("button", { name: "Add location" });
+      if (viewport.label === "mobile") {
+        await addUniversityButton.dispatchEvent("click");
+        await addJobButton.dispatchEvent("click");
+        await addLocationButton.dispatchEvent("click");
+      } else {
+        await addUniversityButton.click();
+        await addJobButton.click();
+        await addLocationButton.click();
+      }
+      await page.getByLabel("Education 1 organization").selectOption(organizationId);
+      await page.getByLabel("Job 1 organization").selectOption(organizationId);
       assert(
         await page.locator("[data-education-entry]").count() === 1 &&
           await page.locator("[data-occupation-entry]").count() === 2 &&
@@ -6005,21 +6098,40 @@ async function checkPeopleMemoryBrowserState(baseUrl, cookieJar, personId, expec
           page.getByRole("button", { name: "Save", exact: true }).click()
         ]);
         const createdPayload = await createResponse.json();
-        const createdFromQuickEntry = createdPayload?.items?.find((item) => item.title === "Avery Juniper North");
+        const createdFromQuickEntry = createdPayload?.items?.find((item) => item.title === "Avery North");
         assert(createResponse.ok() && createdFromQuickEntry, "People quick entry did not save through the canonical Personal Records route");
         assert(
           createdFromQuickEntry.profile?.firstName === "Avery" &&
-            createdFromQuickEntry.profile?.middleName === "Juniper" &&
+            !createdFromQuickEntry.profile?.middleName &&
             createdFromQuickEntry.profile?.lastName === "North" &&
+            createdFromQuickEntry.profile?.nickname === "June" &&
+            createdFromQuickEntry.profile?.birthday === "--03-14" &&
             !createdFromQuickEntry.time?.lastReview &&
             createdFromQuickEntry.profile?.emails?.length === 2 &&
             createdFromQuickEntry.profile.emails[1].category === "custom" &&
             createdFromQuickEntry.profile.emails[1].customLabel === "Alumni" &&
             createdFromQuickEntry.profile?.phones?.length === 2 &&
-            createdFromQuickEntry.profile.phones[1].category === "work",
-          "People quick entry did not persist derived name parts and every labeled contact method"
+            createdFromQuickEntry.profile.phones[0].number === "+51987654321" &&
+            createdFromQuickEntry.profile.phones[1].category === "work" &&
+            createdFromQuickEntry.profile.occupations[0].organizationId === organizationId &&
+            createdFromQuickEntry.profile.education[0].organizationId === organizationId,
+          "People quick entry did not persist nickname, partial birthday, international phone, and Organization object links"
         );
       }
+
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}?tab=overview`, { waitUntil: "networkidle" });
+      assert(
+        await page.locator(".people-profile-header h2").textContent() === organizationTitle &&
+          await page.getByText("Research Studio", { exact: true }).count() > 0 &&
+          await page.getByRole("heading", { name: "Linked people" }).count() === 1 &&
+          (await page.locator(".people-overview-grid").innerText()).includes(personTitle),
+        `Organization profile did not render organization facts and linked People at ${viewport.label}`
+      );
+      await assertNoOverflow(page, `Organization profile ${viewport.label}`);
+      await page.screenshot({
+        path: path.join(screenshotDir, `people-organization-profile-${viewport.label}.png`),
+        fullPage: true
+      });
       await context.close();
     }
   } finally {
@@ -13897,6 +14009,53 @@ async function main() {
     pass("Personal Ops record create/read/render/detail flow works");
 
     logStep("Checking People adapter persistence and direct routes");
+    const organizationTitle = `${testRunId}-research-studio`;
+    const createOrganization = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        domain: "notes-docs",
+        title: organizationTitle,
+        className: "org",
+        status: "active",
+        body: "Regression-created organization context.",
+        areas: ["Relationships"],
+        subjects: ["Collaborator"],
+        time: { reviewCadence: "P3M" },
+        profile: {
+          fullName: organizationTitle,
+          context: "Regression-created organization context.",
+          organizationType: "Research Studio",
+          industry: "Design research",
+          mission: "Make complex systems easier to understand.",
+          services: "Research, strategy, and prototyping",
+          foundedYear: "2021",
+          teamSize: "1–10",
+          headquarters: "Columbus, Ohio, USA",
+          associatedPeople: [],
+          children: [],
+          interactions: [],
+          memories: []
+        }
+      })
+    });
+    assert(
+      createOrganization.response.ok && createOrganization.payload?.ok,
+      `Organization create failed: ${JSON.stringify(createOrganization.payload)}`
+    );
+    const createdOrganization = createOrganization.payload.items?.find(
+      (item) => item.title === organizationTitle && item.className === "org"
+    );
+    assert(
+      createdOrganization?.id &&
+        createdOrganization.profile?.organizationType === "Research Studio" &&
+        createdOrganization.profile?.mission === "Make complex systems easier to understand.",
+      "Organization-specific properties did not persist"
+    );
+
     const personTitle = `${testRunId}-person`;
     const createPerson = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
       method: "POST",
@@ -13952,15 +14111,27 @@ async function main() {
             { id: "email-regression-alumni", category: "custom", customLabel: "Alumni", address: "alumni-regression@example.edu" }
           ],
           phones: [
-            { id: "phone-regression-primary", category: "primary", number: "6147963848", countryCode: "+1" },
+            { id: "phone-regression-primary", category: "primary", number: "987654321", countryCode: "+51" },
             { id: "phone-regression-university", category: "university", number: "6145550142", countryCode: "+1" }
           ],
+          birthday: "--03-14",
           education: [
-            { id: "education-regression-1", institution: "Ohio State University", degree: "Bachelor of Arts", fieldOfStudy: "Economics" },
+            {
+              id: "education-regression-1",
+              institution: organizationTitle,
+              organizationId: createdOrganization.id,
+              degree: "Bachelor of Arts",
+              fieldOfStudy: "Economics"
+            },
             { id: "education-regression-2", institution: "Columbus College of Art & Design", degree: "Certificate", fieldOfStudy: "Interaction design" }
           ],
           occupations: [
-            { id: "occupation-regression-1", title: "Product designer", employer: "Regression Studio", status: "current" },
+            {
+              id: "occupation-regression-1",
+              title: "Product designer",
+              employer: organizationTitle,
+              status: "current"
+            },
             { id: "occupation-regression-2", title: "Research advisor", employer: "Example Lab", status: "current" },
             { id: "occupation-regression-3", title: "Design intern", employer: "Archive Works", status: "past" }
           ],
@@ -14004,10 +14175,14 @@ async function main() {
     );
     assert(
       persistedPerson?.profile?.phones?.length === 2 &&
-        persistedPerson.profile.phones[0].number === "+16147963848" &&
+        persistedPerson.profile.phones[0].number === "+51987654321" &&
         persistedPerson.profile.phones[1].category === "university" &&
-        persistedPerson.profile.phoneNumber === "+16147963848",
+        persistedPerson.profile.phoneNumber === "+51987654321",
       "People repeatable labeled phone numbers did not persist with canonical formatting"
+    );
+    assert(
+      persistedPerson?.profile?.birthday === "--03-14",
+      "People birthday without a known year did not persist"
     );
     assert(persistedPerson?.profile?.interactions?.length === 1, "People interaction history did not persist");
     assert(
@@ -14023,15 +14198,19 @@ async function main() {
     );
     assert(
       persistedPerson?.profile?.education?.length === 2 &&
+        persistedPerson.profile.education[0].organizationId === createdOrganization.id &&
+        persistedPerson.profile.education[0].institution === organizationTitle &&
         persistedPerson.profile.education[1].fieldOfStudy === "Interaction design",
-      "People repeatable university and degree history did not persist"
+      "People repeatable university history did not retain its Organization object link"
     );
     assert(
       persistedPerson?.profile?.occupations?.length === 3 &&
         persistedPerson.profile.primaryOccupation === "Product designer" &&
+        persistedPerson.profile.occupations[0].organizationId === createdOrganization.id &&
+        persistedPerson.profile.primaryEmployer === organizationTitle &&
         persistedPerson.profile.secondaryEmployer === "Example Lab" &&
         persistedPerson.profile.pastOccupation === "Design intern",
-      "People repeatable jobs did not persist with compatible primary, secondary, and past projections"
+      "People repeatable jobs did not retain their Organization object link and compatible projections"
     );
     assert(
       persistedPerson?.profile?.locations?.length === 2 &&
@@ -14044,6 +14223,25 @@ async function main() {
         persistedPerson.profile.memories[0].id === "memory-regression-older" &&
         persistedPerson.profile.memories[1].occurredOn === "2026-08-10",
       "People dated memory entries did not persist with stable identity and input order"
+    );
+
+    const rejectInvalidPeruPhone = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: createdPerson.id,
+        expectedUpdatedAt: persistedPerson.updatedAt,
+        profile: {
+          phones: [{ id: "phone-invalid-peru", category: "primary", number: "98765432", countryCode: "+51" }]
+        }
+      })
+    });
+    assert(
+      rejectInvalidPeruPhone.response.status === 400 && !rejectInvalidPeruPhone.payload?.ok,
+      "People PATCH accepted a Peru phone number without nine local digits"
     );
 
     const rejectUnlabeledCustomEmail = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
@@ -14117,13 +14315,86 @@ async function main() {
     assert(!personWithClearedUrls?.profile?.website && !personWithClearedUrls?.profile?.linkedin, "Cleared People profile URLs reappeared");
     assert(personWithClearedUrls?.externalSources?.length === 0, "Cleared People profile sources reappeared");
 
+    const photoPath = `/api/people/photos/${encodeURIComponent(createdPerson.id)}`;
+    const photoWithoutCsrf = new FormData();
+    photoWithoutCsrf.append(
+      "photo",
+      new Blob([Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")], { type: "image/png" }),
+      "profile.png"
+    );
+    const rejectPhotoWithoutCsrf = await requestJson(server.baseUrl, cookieJar, photoPath, {
+      method: "POST",
+      body: photoWithoutCsrf
+    });
+    assert(
+      rejectPhotoWithoutCsrf.response.status === 403 && !rejectPhotoWithoutCsrf.payload?.ok,
+      "People profile picture upload accepted a request without CSRF protection"
+    );
+
+    const unauthenticatedPhoto = await requestJson(server.baseUrl, new CookieJar(), photoPath);
+    assert(
+      unauthenticatedPhoto.response.status === 401 && !unauthenticatedPhoto.payload?.ok,
+      "People profile picture was readable without an admin session"
+    );
+
+    const photoForm = new FormData();
+    const photoBytes = Buffer.from(
+      "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+      "base64"
+    );
+    photoForm.append("photo", new Blob([photoBytes], { type: "image/png" }), "profile.png");
+    const savePhoto = await requestJson(server.baseUrl, cookieJar, photoPath, {
+      method: "POST",
+      headers: { "x-csrf-token": csrfToken },
+      body: photoForm
+    });
+    assert(
+      savePhoto.response.ok &&
+        savePhoto.payload?.ok &&
+        savePhoto.payload.photo?.url === photoPath &&
+        savePhoto.payload.photo?.byteLength === photoBytes.byteLength,
+      `People profile picture upload failed: ${JSON.stringify(savePhoto.payload)}`
+    );
+
+    const persistPhotoMetadata = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: createdPerson.id,
+        expectedUpdatedAt: personWithClearedUrls.updatedAt,
+        profile: {
+          photoUrl: savePhoto.payload.photo.url,
+          photoUpdatedAt: savePhoto.payload.photo.updatedAt
+        }
+      })
+    });
+    const personWithPhoto = persistPhotoMetadata.payload?.items?.find((item) => item.id === createdPerson.id);
+    assert(
+      persistPhotoMetadata.response.ok &&
+        persistPhotoMetadata.payload?.ok &&
+        personWithPhoto?.profile?.photoUrl === photoPath,
+      "People profile picture metadata did not persist on the profile"
+    );
+
+    const readPhoto = await requestText(server.baseUrl, cookieJar, photoPath);
+    assert(
+      readPhoto.response.ok &&
+        readPhoto.response.headers.get("content-type") === "image/png" &&
+        readPhoto.response.headers.get("x-content-type-options") === "nosniff" &&
+        Buffer.from(readPhoto.body, "latin1").byteLength > 0,
+      "People profile picture did not return as a protected image response"
+    );
+
     const rejectInvalidPersonUrl = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
       method: "PATCH",
       headers: {
         "content-type": "application/json",
         "x-csrf-token": csrfToken
       },
-      body: JSON.stringify({ id: createdPerson.id, expectedUpdatedAt: personWithClearedUrls.updatedAt, url: "javascript:alert(1)" })
+      body: JSON.stringify({ id: createdPerson.id, expectedUpdatedAt: personWithPhoto.updatedAt, url: "javascript:alert(1)" })
     });
     assert(rejectInvalidPersonUrl.response.status === 400 && !rejectInvalidPersonUrl.payload?.ok, "People PATCH accepted a non-http(s) URL");
 
@@ -14137,7 +14408,10 @@ async function main() {
       server.baseUrl,
       cookieJar,
       createdPerson.id,
-      ["memory-regression-newer", "memory-regression-older"]
+      updatedPersonTitle,
+      ["memory-regression-newer", "memory-regression-older"],
+      createdOrganization.id,
+      organizationTitle
     );
     await checkPeopleUnknownLastContactBrowserState(
       server.baseUrl,
@@ -14169,7 +14443,35 @@ async function main() {
         restoredPerson.status === "active",
       "Restored starred People profile did not survive canonical API reload"
     );
+    const removePhoto = await requestJson(server.baseUrl, cookieJar, photoPath, {
+      method: "DELETE",
+      headers: { "x-csrf-token": csrfToken }
+    });
+    assert(removePhoto.response.ok && removePhoto.payload?.ok, "People profile picture removal failed");
+    const removedPhotoRead = await requestJson(server.baseUrl, cookieJar, photoPath);
+    assert(
+      removedPhotoRead.response.status === 404 && !removedPhotoRead.payload?.ok,
+      "Removed People profile picture remained readable"
+    );
+    const clearPhotoMetadata = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        id: restoredPerson.id,
+        expectedUpdatedAt: restoredPerson.updatedAt,
+        profile: { photoUrl: "", photoUpdatedAt: "" }
+      })
+    });
+    assert(
+      clearPhotoMetadata.response.ok && clearPhotoMetadata.payload?.ok,
+      "People profile picture metadata did not clear after removal"
+    );
     pass("People profiles preserve dated memories, automatic name parts, labeled emails and phone numbers, groups, cadence, education, jobs, and locations across desktop, tablet, and mobile");
+    pass("People profiles preserve private photos, unknown-year birthdays, Peru phone formatting, quoted nicknames, and Organization object affiliations");
+    pass("Organizations use dedicated properties and profile views with linked People across desktop, tablet, and mobile");
     pass("People last contact can be cleared to a persistent N/A state without a generated date or green activity dot");
     pass("People starring and recoverable deletion persist across directory, detail, Recently Deleted, reload, desktop, tablet, and mobile states");
     pass("People create/update/clear/reload/direct-route flow works through the Personal Records adapter");

@@ -34,6 +34,8 @@ export type PeopleContactProfile = {
   nickname?: string;
   context?: string;
   birthday?: string;
+  photoUrl?: string;
+  photoUpdatedAt?: string;
   phoneNumber?: string;
   phoneCountryCode?: string;
   primaryEmail?: string;
@@ -64,6 +66,13 @@ export type PeopleContactProfile = {
   tiktok?: string;
   x?: string;
   partner?: string;
+  organizationType?: string;
+  industry?: string;
+  mission?: string;
+  services?: string;
+  foundedYear?: string;
+  teamSize?: string;
+  headquarters?: string;
   children: string[];
   interactions: string[];
   memories: PeopleMemoryEntry[];

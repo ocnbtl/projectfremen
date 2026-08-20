@@ -1,4 +1,10 @@
 import { mutateJsonFile, readJsonFile } from "./file-store";
+import { normalizeBirthday } from "./modules/people/birthday";
+import {
+  canonicalCountryCode,
+  normalizePhoneForStorage,
+  validateInternationalPhone
+} from "./modules/people/phone";
 import { getPersonalSystemDomain } from "./personal-systems";
 
 export type PersonalRecordClass =
@@ -97,6 +103,7 @@ export type PersonalMemoryEntry = {
 export type PersonalEducationEntry = {
   id: string;
   institution: string;
+  organizationId?: string;
   degree?: string;
   fieldOfStudy?: string;
 };
@@ -105,6 +112,7 @@ export type PersonalOccupationEntry = {
   id: string;
   title: string;
   employer?: string;
+  organizationId?: string;
   status: "current" | "past";
 };
 
@@ -140,6 +148,8 @@ export type PersonalContactProfile = {
   nickname?: string;
   context?: string;
   birthday?: string;
+  photoUrl?: string;
+  photoUpdatedAt?: string;
   phoneNumber?: string;
   phoneCountryCode?: string;
   primaryEmail?: string;
@@ -170,6 +180,13 @@ export type PersonalContactProfile = {
   tiktok?: string;
   x?: string;
   partner?: string;
+  organizationType?: string;
+  industry?: string;
+  mission?: string;
+  services?: string;
+  foundedYear?: string;
+  teamSize?: string;
+  headquarters?: string;
   children: string[];
   interactions: string[];
   memories: PersonalMemoryEntry[];
@@ -347,6 +364,8 @@ const CONTACT_PROFILE_TEXT_KEYS = [
   "nickname",
   "context",
   "birthday",
+  "photoUrl",
+  "photoUpdatedAt",
   "phoneNumber",
   "phoneCountryCode",
   "primaryEmail",
@@ -373,7 +392,14 @@ const CONTACT_PROFILE_TEXT_KEYS = [
   "instagram",
   "tiktok",
   "x",
-  "partner"
+  "partner",
+  "organizationType",
+  "industry",
+  "mission",
+  "services",
+  "foundedYear",
+  "teamSize",
+  "headquarters"
 ] as const;
 
 const CONTACT_PROFILE_LIST_KEYS = ["associatedPeople", "children", "interactions"] as const;
@@ -557,8 +583,9 @@ function normalizeContactEntryCategory(
 
 function normalizeContactCountryCode(value: unknown, strict: boolean, label: string): string {
   const raw = profileEntryText(value, 8, strict, label);
-  const digits = raw.replace(/\D/g, "").slice(0, 4);
-  return digits ? `+${digits}` : "+1";
+  const normalized = canonicalCountryCode(raw, strict ? "" : "+1");
+  if (strict && !normalized) throw new Error(`${label} is required`);
+  return normalized;
 }
 
 function normalizeContactPhoneNumber(
@@ -569,20 +596,10 @@ function normalizeContactPhoneNumber(
 ): string {
   const raw = profileEntryText(value, 40, strict, label);
   if (!raw) return "";
-  const digits = raw.replace(/\D/g, "");
-  const codeDigits = countryCode.replace(/\D/g, "") || "1";
-  const canonical = raw.startsWith("+")
-    ? `+${digits}`
-    : digits.length === 10
-      ? `+${codeDigits}${digits}`
-      : codeDigits === "1" && digits.length === 11 && digits.startsWith("1")
-        ? `+${digits}`
-        : `+${codeDigits}${digits}`;
-  const canonicalDigits = canonical.replace(/\D/g, "");
-  if (strict && (canonicalDigits.length < 7 || canonicalDigits.length > 15)) {
-    throw new Error(`${label} must contain a valid international phone number`);
-  }
-  return canonicalDigits.length >= 7 && canonicalDigits.length <= 15 ? canonical : "";
+  const canonical = normalizePhoneForStorage(raw, countryCode);
+  const validationError = canonical ? validateInternationalPhone(canonical, countryCode) : "Phone number needs a country code.";
+  if (strict && validationError) throw new Error(`${label}: ${validationError}`);
+  return validationError ? "" : canonical;
 }
 
 function normalizeEmailEntries(value: unknown, strict = false): PersonalEmailEntry[] {
@@ -700,16 +717,21 @@ function normalizeEducationEntries(value: unknown, strict = false): PersonalEduc
       continue;
     }
     const raw = item as Record<string, unknown>;
+    const organizationId = profileEntryText(raw.organizationId, 80, strict, `Education entry ${index + 1} organization`);
+    if (strict && organizationId && !/^personal-[0-9a-f-]{36}$/i.test(organizationId)) {
+      throw new Error(`Education entry ${index + 1} organization link is invalid`);
+    }
     const institution = profileEntryText(raw.institution, 240, strict, `Education entry ${index + 1} university`);
     const degree = profileEntryText(raw.degree, 240, strict, `Education entry ${index + 1} degree`);
     const fieldOfStudy = profileEntryText(raw.fieldOfStudy, 240, strict, `Education entry ${index + 1} field of study`);
-    if (!institution && !degree && !fieldOfStudy) {
+    if (!institution && !organizationId && !degree && !fieldOfStudy) {
       if (strict) throw new Error(`Education entry ${index + 1} needs a university, degree, or field of study`);
       continue;
     }
     entries.push({
       id: profileEntryId("education", raw.id, `${institution}:${degree}:${fieldOfStudy}`, index, ids, strict),
       institution,
+      organizationId: organizationId || undefined,
       degree: degree || undefined,
       fieldOfStudy: fieldOfStudy || undefined
     });
@@ -732,9 +754,13 @@ function normalizeOccupationEntries(value: unknown, strict = false): PersonalOcc
       continue;
     }
     const raw = item as Record<string, unknown>;
+    const organizationId = profileEntryText(raw.organizationId, 80, strict, `Job ${index + 1} organization`);
+    if (strict && organizationId && !/^personal-[0-9a-f-]{36}$/i.test(organizationId)) {
+      throw new Error(`Job ${index + 1} organization link is invalid`);
+    }
     const title = profileEntryText(raw.title, 240, strict, `Job ${index + 1} title`);
     const employer = profileEntryText(raw.employer, 240, strict, `Job ${index + 1} employer`);
-    if (!title && !employer) {
+    if (!title && !employer && !organizationId) {
       if (strict) throw new Error(`Job ${index + 1} needs a title or employer`);
       continue;
     }
@@ -745,6 +771,7 @@ function normalizeOccupationEntries(value: unknown, strict = false): PersonalOcc
       id: profileEntryId("occupation", raw.id, `${title}:${employer}:${status}`, index, ids, strict),
       title,
       employer: employer || undefined,
+      organizationId: organizationId || undefined,
       status
     });
   }
@@ -844,6 +871,7 @@ function reconcileContactProfileCollections(
       id: currentJobs[0]?.id || deterministicProfileEntryId("occupation", `${profile.primaryOccupation || ""}:${profile.primaryEmployer || ""}:current`, 0),
       title: profile.primaryOccupation || currentJobs[0]?.title || "",
       employer: profile.primaryEmployer || currentJobs[0]?.employer,
+      organizationId: currentJobs[0]?.organizationId,
       status: "current"
     };
     const index = currentJobs[0] ? occupations.findIndex((entry) => entry.id === currentJobs[0].id) : -1;
@@ -855,6 +883,7 @@ function reconcileContactProfileCollections(
       id: currentJobs[1]?.id || deterministicProfileEntryId("occupation", `${profile.secondaryOccupation || ""}:${profile.secondaryEmployer || ""}:current`, 1),
       title: profile.secondaryOccupation || currentJobs[1]?.title || "",
       employer: profile.secondaryEmployer || currentJobs[1]?.employer,
+      organizationId: currentJobs[1]?.organizationId,
       status: "current"
     };
     const index = currentJobs[1] ? occupations.findIndex((entry) => entry.id === currentJobs[1].id) : -1;
@@ -866,6 +895,7 @@ function reconcileContactProfileCollections(
       id: pastJobs[0]?.id || deterministicProfileEntryId("occupation", `${profile.pastOccupation || ""}:${profile.pastEmployer || ""}:past`, 0),
       title: profile.pastOccupation || pastJobs[0]?.title || "",
       employer: profile.pastEmployer || pastJobs[0]?.employer,
+      organizationId: pastJobs[0]?.organizationId,
       status: "past"
     };
     const index = pastJobs[0] ? occupations.findIndex((entry) => entry.id === pastJobs[0].id) : -1;
@@ -941,6 +971,20 @@ function normalizeContactProfile(input: unknown, strictEntries = false): Persona
     }
   }
 
+  if (profile.birthday) profile.birthday = normalizeBirthday(profile.birthday, strictEntries) || undefined;
+  if (profile.photoUrl && !/^\/api\/people\/photos\/personal-[0-9a-f-]{36}$/i.test(profile.photoUrl)) {
+    if (strictEntries) throw new Error("Profile picture reference is invalid");
+    profile.photoUrl = undefined;
+  }
+  if (profile.photoUpdatedAt && Number.isNaN(Date.parse(profile.photoUpdatedAt))) {
+    if (strictEntries) throw new Error("Profile picture timestamp is invalid");
+    profile.photoUpdatedAt = undefined;
+  }
+  if (profile.foundedYear && !/^\d{4}$/.test(profile.foundedYear)) {
+    if (strictEntries) throw new Error("Founded year must contain four digits");
+    profile.foundedYear = undefined;
+  }
+
   return reconcileContactProfileCollections(profile, {
     preferEmails: Array.isArray(raw.emails),
     preferPhones: Array.isArray(raw.phones)
@@ -963,6 +1007,17 @@ function normalizeContactProfilePatch(input: unknown): Partial<PersonalContactPr
     if (typeof value === "string") {
       patch[key] = value.trim() || undefined;
     }
+  }
+
+  if (patch.birthday) patch.birthday = normalizeBirthday(patch.birthday, true) || undefined;
+  if (patch.photoUrl && !/^\/api\/people\/photos\/personal-[0-9a-f-]{36}$/i.test(patch.photoUrl)) {
+    throw new Error("Profile picture reference is invalid");
+  }
+  if (patch.photoUpdatedAt && Number.isNaN(Date.parse(patch.photoUpdatedAt))) {
+    throw new Error("Profile picture timestamp is invalid");
+  }
+  if (patch.foundedYear && !/^\d{4}$/.test(patch.foundedYear)) {
+    throw new Error("Founded year must contain four digits");
   }
 
   for (const key of CONTACT_PROFILE_LIST_KEYS) {
@@ -1585,11 +1640,52 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
   return record;
 }
 
+function resolveOrganizationReferences(
+  profile: PersonalContactProfile | undefined,
+  records: readonly PersonalRecord[],
+  strict: boolean
+): PersonalContactProfile | undefined {
+  if (!profile) return profile;
+  const organizations = records.filter((record) => record.className === "org");
+  const activeOrganizations = organizations.filter((record) => !record.archivedAt);
+  const byId = new Map(organizations.map((record) => [record.id, record]));
+  const byName = new Map(activeOrganizations.map((record) => [record.title.trim().toLowerCase(), record]));
+  const resolve = (organizationId: string | undefined, label: string | undefined, entryLabel: string) => {
+    const linked = organizationId ? byId.get(organizationId) : label ? byName.get(label.trim().toLowerCase()) : undefined;
+    if (strict && organizationId && !linked) throw new Error(`${entryLabel} must link to an existing Organization profile`);
+    return linked;
+  };
+  const education = profile.education.map((entry, index) => {
+    const linked = resolve(entry.organizationId, entry.institution, `Education entry ${index + 1}`);
+    return linked ? { ...entry, institution: linked.title, organizationId: linked.id } : { ...entry };
+  });
+  const occupations = profile.occupations.map((entry, index) => {
+    const linked = resolve(entry.organizationId, entry.employer, `Job ${index + 1}`);
+    return linked ? { ...entry, employer: linked.title, organizationId: linked.id } : { ...entry };
+  });
+  const currentJobs = occupations.filter((entry) => entry.status === "current");
+  const pastJobs = occupations.filter((entry) => entry.status === "past");
+  return {
+    ...profile,
+    education,
+    occupations,
+    universityAffiliation: education[0]?.institution || profile.universityAffiliation,
+    primaryOccupation: currentJobs[0]?.title || profile.primaryOccupation,
+    primaryEmployer: currentJobs[0]?.employer || profile.primaryEmployer,
+    secondaryOccupation: currentJobs[1]?.title || profile.secondaryOccupation,
+    secondaryEmployer: currentJobs[1]?.employer || profile.secondaryEmployer,
+    pastOccupation: pastJobs[0]?.title || profile.pastOccupation,
+    pastEmployer: pastJobs[0]?.employer || profile.pastEmployer
+  };
+}
+
 export async function readPersonalRecords(): Promise<PersonalRecord[]> {
   const existing = await readJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>>(FILE_NAME, []);
-  return existing
+  const records = existing
     .map(normalizeRecord)
-    .filter((record) => isAllowedDomain(record.domain))
+    .filter((record) => isAllowedDomain(record.domain));
+  return records
+    .map((record) => ({ ...record, profile: resolveOrganizationReferences(record.profile, records, false) }))
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
@@ -1665,6 +1761,7 @@ export async function createPersonalRecord(
     if (existing.some((record) => record.id === nextRecord.id)) {
       return { value: stored, result: existing.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), changed: false };
     }
+    nextRecord.profile = resolveOrganizationReferences(nextRecord.profile, existing, true);
     const next = applyReciprocalRelations([nextRecord, ...existing], nextRecord.id);
     return { value: next, result: next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
   });
@@ -1720,6 +1817,7 @@ export async function updatePersonalRecord(
         : current.status;
   const nextStarred = typeof patch.starred === "boolean" ? patch.starred : current.starred === true;
 
+  const nextProfile = resolveOrganizationReferences(mergeContactProfile(current.profile, profilePatch), existing, true);
   next[idx] = {
     ...current,
     title: typeof patch.title === "string" ? sanitizeTitle(patch.title) : current.title,
@@ -1735,7 +1833,7 @@ export async function updatePersonalRecord(
       : current.externalSources,
     status: nextStatus,
     time,
-    profile: mergeContactProfile(current.profile, profilePatch),
+    profile: nextProfile,
     updatedAt: now,
     ...(nextStarred ? { starred: true } : { starred: undefined }),
     ...(patch.action === "archive"

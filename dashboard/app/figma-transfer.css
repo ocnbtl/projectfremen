@@ -9065,3 +9065,432 @@ html[data-admin-preview="mobile"] .command-hero h1,
 html[data-admin-preview="mobile"] .module-ref-shell h1 {
   font-size: clamp(28px, 9vw, 38px);
 }
+
+/* People identity media, partial birthdays, and Organization object links. */
+.people-profile-photo,
+.people-profile-photo-trigger {
+  position: relative;
+  flex: 0 0 auto;
+  overflow: hidden;
+  padding: 0;
+}
+
+.people-profile-photo img,
+.people-profile-photo-trigger img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.people-profile-photo-trigger {
+  min-width: 72px;
+  cursor: pointer;
+}
+
+.people-profile-photo-trigger:hover,
+.people-profile-photo-trigger:focus-visible {
+  border-color: var(--text-strong);
+  outline: 2px solid color-mix(in srgb, var(--accent-blue) 36%, transparent);
+  outline-offset: 2px;
+}
+
+.people-profile-photo-badge {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--surface-panel);
+  border-radius: 999px;
+  background: var(--text-strong);
+  color: var(--surface-panel);
+  font-size: 14px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.people-capture-identity-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 1.5fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.people-birthday-field {
+  display: grid;
+  grid-template-columns: minmax(120px, 1.2fr) minmax(80px, 0.7fr) minmax(104px, 0.8fr);
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel-soft);
+}
+
+.people-birthday-field legend {
+  padding: 0 4px;
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.people-birthday-field label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.people-birthday-field label > span {
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.people-birthday-field input,
+.people-birthday-field select {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-app-alt);
+  color: var(--text-strong);
+}
+
+.people-organization-create-fields {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-panel-soft);
+}
+
+.people-organization-create-fields header h4,
+.people-organization-create-fields header p {
+  margin: 0;
+}
+
+.people-organization-create-fields header p {
+  margin-top: 4px;
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.people-repeatable-fields label > small {
+  color: var(--accent-orange);
+  font-size: 10px;
+  font-weight: 750;
+  line-height: 1.35;
+}
+
+.people-phone-error {
+  margin: 8px 0 0;
+  color: var(--accent-crimson);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.people-inline-object-link {
+  display: block;
+  justify-content: flex-start;
+  width: 100%;
+  min-width: 0 !important;
+  max-width: 100%;
+  min-height: 28px !important;
+  padding: 0 8px !important;
+  border-color: color-mix(in srgb, var(--accent-blue) 34%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--accent-blue) 8%, var(--surface-panel)) !important;
+  color: var(--accent-blue) !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.people-info-row,
+.people-info-row > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.people-organization-members {
+  display: grid;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.people-organization-members > button {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 52px;
+  padding: 7px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel-soft);
+  color: var(--text-strong);
+  text-align: left;
+  cursor: pointer;
+}
+
+.people-organization-members > button:hover,
+.people-organization-members > button:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-selected);
+  outline: 0;
+}
+
+.people-organization-members > button > span:nth-child(2) {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.people-organization-members > button strong,
+.people-organization-members > button small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-organization-members > button strong {
+  font-size: 12px;
+}
+
+.people-organization-members > button small {
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.people-photo-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 240;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(22, 27, 30, 0.42);
+  backdrop-filter: blur(5px);
+}
+
+.people-photo-dialog {
+  display: grid;
+  gap: 16px;
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--border-strong);
+  border-radius: 14px;
+  background: var(--surface-panel);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.04), 0 16px 44px rgba(23, 31, 35, 0.18);
+}
+
+.people-photo-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.people-photo-dialog > header span,
+.people-photo-dialog > header h2,
+.people-photo-dialog > p {
+  margin: 0;
+}
+
+.people-photo-dialog > header span {
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 850;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.people-photo-dialog > header h2 {
+  margin-top: 4px;
+  color: var(--text-strong);
+  font-size: 20px;
+}
+
+.people-photo-dialog > header button {
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel-soft);
+  color: var(--text-strong);
+  cursor: pointer;
+}
+
+.people-photo-dialog > p,
+.people-photo-paste-hint,
+.people-photo-status {
+  color: var(--text-subtle);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.people-photo-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.people-photo-options button {
+  display: grid;
+  justify-items: start;
+  gap: 5px;
+  min-height: 112px;
+  padding: 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-panel-soft);
+  color: var(--text-strong);
+  text-align: left;
+  cursor: pointer;
+}
+
+.people-photo-options button:hover,
+.people-photo-options button:focus-visible {
+  border-color: var(--border-strong);
+  background: var(--surface-selected);
+  outline: 0;
+}
+
+.people-photo-options button > span {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: var(--surface-app-alt);
+  font-size: 17px;
+}
+
+.people-photo-options button strong {
+  font-size: 13px;
+}
+
+.people-photo-options button small {
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.people-photo-paste-hint {
+  padding: 12px;
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface-app-alt);
+  text-align: center;
+}
+
+.people-photo-paste-hint:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--accent-blue) 36%, transparent);
+  outline-offset: 2px;
+}
+
+.people-photo-dialog footer,
+.people-photo-remove-confirm {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.people-photo-dialog footer button {
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel-soft);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.people-photo-dialog footer button.is-danger,
+.people-photo-remove {
+  color: var(--accent-crimson) !important;
+}
+
+.people-photo-remove-confirm span {
+  margin-right: auto;
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+@media (max-width: 760px) {
+  .people-overview-facts {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .people-profile-tabs,
+  .people-contact-methods-compact {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .people-capture-identity-grid,
+  .people-photo-options {
+    grid-template-columns: 1fr;
+  }
+
+  .people-birthday-field {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr);
+  }
+
+  .people-birthday-field label:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .people-photo-overlay {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .people-photo-dialog {
+    max-height: calc(100vh - 24px);
+    padding: 16px;
+    border-radius: 14px 14px 8px 8px;
+  }
+
+  .people-photo-options button {
+    grid-template-columns: 36px minmax(0, 1fr);
+    align-items: center;
+    min-height: 64px;
+  }
+
+  .people-photo-options button small {
+    grid-column: 2;
+  }
+}
+
+html[data-admin-preview="mobile"] .people-capture-identity-grid,
+html[data-admin-preview="mobile"] .people-photo-options {
+  grid-template-columns: 1fr;
+}
+
+html[data-admin-preview="mobile"] .people-birthday-field {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.7fr);
+}
+
+html[data-admin-preview="mobile"] .people-birthday-field label:last-child {
+  grid-column: 1 / -1;
+}
