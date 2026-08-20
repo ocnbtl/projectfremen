@@ -14,6 +14,8 @@ import type {
   ProjectsMutationResult,
   ProjectsObjectByFamily,
   ProjectsState,
+  ProjectTimelineEventUpdateInput,
+  ProjectTimelineEventUpdateResult,
   ProjectsUpdateInputByFamily,
   ProjectsUpdateResult,
   ProjectTimelineEvent
@@ -45,6 +47,11 @@ export type ProjectsRepository = {
     patch: ProjectsUpdateInputByFamily[Family],
     expectedUpdatedAt: string
   ): Promise<ProjectsMutationResult<ProjectsUpdateResult<Family>>>;
+  updateTimelineEvent(
+    id: string,
+    patch: ProjectTimelineEventUpdateInput,
+    expectedUpdatedAt: string
+  ): Promise<ProjectsMutationResult<ProjectTimelineEventUpdateResult>>;
 };
 
 export type ProjectsRepositoryOptions = {
@@ -290,6 +297,17 @@ function updateResult<Family extends ProjectObjectFamily>(
   };
 }
 
+function timelineEventUpdateResult(
+  payload: ApiPayload
+): ProjectsMutationResult<ProjectTimelineEventUpdateResult> {
+  const item = optionalTimelineEvent(payload.item);
+  const auditEvent = optionalAuditEvent(payload.auditEvent);
+  if (!item || !isProject(payload.project) || !auditEvent) {
+    return failure("unknown", "The Projects response did not include a valid timeline event update");
+  }
+  return { ok: true, data: { item, project: payload.project, auditEvent } };
+}
+
 export function createProjectsRepository(
   options: ProjectsRepositoryOptions = {}
 ): ProjectsRepository {
@@ -362,6 +380,16 @@ export function createProjectsRepository(
       const parsed = updateResult(result.data, family);
       if (parsed.ok) await mirrorCanonicalRecord("projects", family, "project", parsed.data.item as unknown as Record<string, unknown>);
       return parsed;
+    },
+
+    async updateTimelineEvent(id, patch, expectedUpdatedAt) {
+      const result = await requestPayload(fetcher, endpoint, {
+        method: "PATCH",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({ operation: "update_timeline_event", id, patch, expectedUpdatedAt })
+      });
+      if (!result.ok) return forwardFailure<ProjectTimelineEventUpdateResult>(result);
+      return timelineEventUpdateResult(result.data);
     }
   };
 }

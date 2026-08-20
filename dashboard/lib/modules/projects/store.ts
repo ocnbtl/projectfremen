@@ -16,11 +16,13 @@ import {
   type ReviewState
 } from "../../native-objects/types";
 import {
+  LEGACY_PROJECT_DEFINITIONS,
   findLegacyProjectMapping,
   getLegacyProjectDefinition
 } from "./legacy-adapter";
 import {
   PROJECT_OBJECT_FAMILIES,
+  PROJECT_TIMELINE_EVENT_TYPES,
   PROJECTS_SCHEMA_VERSION,
   type LegacyProjectPromotionInput,
   type Project,
@@ -50,6 +52,8 @@ import {
   type ProjectsUpdateInputByFamily,
   type ProjectsUpdateResult,
   type ProjectTimelineEvent,
+  type ProjectTimelineEventUpdateInput,
+  type ProjectTimelineEventUpdateResult,
   type ProjectTimelineEventType,
   type ProjectVisibility,
   type ProjectPrivacyScope
@@ -291,9 +295,11 @@ function normalizeObjectives(
     const completedAt = completed
       ? optionalDate(candidate.completedAt, `${field}.${index}.completedAt`) || prior?.completedAt || now
       : undefined;
+    const targetAt = optionalDate(candidate.targetAt, `${field}.${index}.targetAt`);
     return {
       id,
       text,
+      ...(targetAt ? { targetAt } : {}),
       ...(completedAt ? { completedAt } : {}),
       createdAt: prior?.createdAt || optionalDate(candidate.createdAt, `${field}.${index}.createdAt`) || now,
       updatedAt: now
@@ -387,7 +393,8 @@ type ProjectAuditableObject =
   | ProjectMilestone
   | ProjectBlocker
   | ProjectLink
-  | ProjectInteraction;
+  | ProjectInteraction
+  | ProjectTimelineEvent;
 
 function objectRef(item: ProjectAuditableObject): NativeObjectRef {
   if (item.objectType === "project") return projectRef(item);
@@ -453,7 +460,10 @@ function timelineEvent(input: {
     ...(input.relatedObject ? { relatedObjectRef: objectRef(input.relatedObject) } : {}),
     isManual: input.isManual ?? false,
     actorId: input.actorId,
-    createdAt: input.occurredAt
+    createdAt: input.occurredAt,
+    updatedAt: input.occurredAt,
+    updatedBy: input.actorId,
+    history: [historyEntry("created", input.occurredAt, input.actorId)]
   };
 }
 
@@ -535,10 +545,32 @@ function assertState(value: unknown): ProjectsState {
       objective: objectiveSummary(objectives)
     } as Project;
   });
+  const timelineEvents = (value.timelineEvents as unknown[]).map((candidate, index) => {
+    if (!isRecord(candidate)) {
+      throw new ProjectsStoreError("server", `Projects data is malformed: timelineEvents.${index} must be an object.`, {
+        status: 500
+      });
+    }
+    const createdAt = typeof candidate.createdAt === "string"
+      ? candidate.createdAt
+      : typeof candidate.occurredAt === "string"
+        ? candidate.occurredAt
+        : new Date(0).toISOString();
+    const actorId = typeof candidate.actorId === "string" ? candidate.actorId : "system";
+    return {
+      ...candidate,
+      updatedAt: typeof candidate.updatedAt === "string" ? candidate.updatedAt : createdAt,
+      updatedBy: typeof candidate.updatedBy === "string" ? candidate.updatedBy : actorId,
+      history: Array.isArray(candidate.history)
+        ? candidate.history
+        : [historyEntry("created", createdAt, actorId)]
+    } as ProjectTimelineEvent;
+  });
   return {
     ...(value as unknown as ProjectsState),
     projects,
-    interactions: interactions as ProjectInteraction[]
+    interactions: interactions as ProjectInteraction[],
+    timelineEvents
   };
 }
 
@@ -634,9 +666,13 @@ function deriveProjectHealth(project: Project, state: ProjectsState, now: string
     (milestone) => milestone.projectId === project.id && milestone.state !== "complete" && milestone.state !== "archived"
   );
   const hasOverdueMilestone = milestones.some((milestone) => Date.parse(milestone.dueAt) < Date.parse(now));
+  const hasOverdueObjective = project.objectives.some(
+    (objective) => !objective.completedAt && objective.targetAt && Date.parse(objective.targetAt) < Date.parse(now)
+  );
   if (
     blockers.length > 0 ||
     hasOverdueMilestone ||
+    hasOverdueObjective ||
     milestones.some((milestone) => milestone.state === "blocked" || milestone.state === "due") ||
     project.objectives.length === 0
   ) {
@@ -851,6 +887,29 @@ export async function promoteLegacyProject(
     await writeJsonFile(FILE_NAME, nextState);
     return { item: project, project, created: true, mapping, auditEvent, timelineEvent: event };
   });
+}
+
+/**
+ * One-time, additive Project migration for the five stable identities that
+ * predate the native Projects store. It preserves their IDs, routes, and
+ * provenance while making every directory item immediately operational.
+ */
+export async function ensureLegacyProjectsTracked(
+  options: { actorId?: string } = {}
+): Promise<ProjectsState> {
+  const actorId = options.actorId || "system";
+  for (const definition of LEGACY_PROJECT_DEFINITIONS) {
+    const state = await readProjectsState();
+    if (findLegacyProjectMapping(state, definition.key)) continue;
+    await promoteLegacyProject(
+      {
+        legacyKey: definition.key,
+        promotionConfirmed: true
+      },
+      { actorId }
+    );
+  }
+  return readProjectsState();
 }
 
 function buildMilestone(
@@ -1697,6 +1756,93 @@ function updateEventDetails(
           ? `${link.source.label} was repaired: ${link.lastRepair.reason}`
           : `${link.source.label} is ${link.linkState}.`
   };
+}
+
+function timelineEventTitle(eventType: ProjectTimelineEventType): string {
+  const titles: Readonly<Record<ProjectTimelineEventType, string>> = {
+    project_created: "Project created",
+    legacy_project_promoted: "Legacy project promoted",
+    project_updated: "Project updated",
+    project_archived: "Project archived",
+    project_restored: "Project restored",
+    interaction_logged: "Project update logged",
+    milestone_created: "Milestone created",
+    milestone_updated: "Milestone updated",
+    milestone_completed: "Milestone completed",
+    blocker_opened: "Blocker opened",
+    blocker_updated: "Blocker updated",
+    blocker_resolved: "Blocker resolved",
+    blocker_waived: "Blocker waived",
+    blocker_carried_forward: "Blocker carried forward",
+    link_created: "Link created",
+    link_updated: "Link updated",
+    link_health_updated: "Link health updated",
+    link_repaired: "Link repaired",
+    link_removed: "Link removed",
+    link_restored: "Link restored"
+  };
+  return titles[eventType];
+}
+
+export async function updateProjectTimelineEvent(
+  id: string,
+  patch: ProjectTimelineEventUpdateInput,
+  options: { expectedUpdatedAt: string; actorId?: string; now?: Date }
+): Promise<ProjectTimelineEventUpdateResult> {
+  const eventId = requiredText(id, "id", 240);
+  const expectedUpdatedAt = requiredText(options.expectedUpdatedAt, "expectedUpdatedAt", 120);
+  const actorId = options.actorId || "admin";
+  const requestedNow = (options.now || new Date()).toISOString();
+  const raw = patch as unknown as Record<string, unknown>;
+
+  return withMutationLock(async () => {
+    const state = await readProjectsState();
+    const current = state.timelineEvents.find((event) => event.id === eventId);
+    if (!current) throw new ProjectsStoreError("not_found", "Project timeline event not found", { status: 404 });
+    if (current.updatedAt !== expectedUpdatedAt) {
+      throw new ProjectsStoreError(
+        "stale",
+        "This timeline event changed after it was opened. Reload the latest version before saving again.",
+        { status: 409 }
+      );
+    }
+    const eventType = hasOwn(raw, "eventType")
+      ? enumValue(raw.eventType, PROJECT_TIMELINE_EVENT_TYPES, current.eventType, "eventType")
+      : current.eventType;
+    const occurredAt = hasOwn(raw, "occurredAt")
+      ? new Date(requiredText(optionalDate(raw.occurredAt, "occurredAt"), "occurredAt", 120)).toISOString()
+      : current.occurredAt;
+    const updatedAt = monotonicTimestamp(current.updatedAt, requestedNow);
+    const changeDetail = [
+      eventType !== current.eventType ? `type ${current.eventType} -> ${eventType}` : "",
+      occurredAt !== current.occurredAt ? `occurred ${current.occurredAt} -> ${occurredAt}` : ""
+    ].filter(Boolean).join("; ") || "timeline metadata reviewed";
+    const item: ProjectTimelineEvent = {
+      ...current,
+      eventType,
+      title: eventType === current.eventType ? current.title : timelineEventTitle(eventType),
+      occurredAt,
+      updatedAt,
+      updatedBy: actorId,
+      history: [...current.history, historyEntry("updated", updatedAt, actorId, changeDetail)]
+    };
+    const project = projectById(state, item.projectId);
+    ensureOperationalProject(project);
+    const auditEvent = moduleAuditEvent({
+      item,
+      action: "timeline_event.updated",
+      actorId,
+      occurredAt: updatedAt,
+      before: current
+    });
+    const nextState: ProjectsState = {
+      ...state,
+      timelineEvents: state.timelineEvents.map((event) => event.id === item.id ? item : event),
+      auditEvents: appendModuleAudit(state, auditEvent)
+    };
+    await writeJsonFile(FILE_NAME, nextState);
+    return { item, project, auditEvent };
+  });
 }
 
 export async function updateProjectsObject<Family extends ProjectObjectFamily>(

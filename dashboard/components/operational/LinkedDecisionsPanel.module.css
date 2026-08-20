@@ -132,14 +132,21 @@
 
 .decisionDetails > span {
   display: grid;
-  gap: 2px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
 }
 
 .decisionDetails small {
-  color: var(--text-subtle, #56686f);
-  font: 800 9px var(--font-heading, sans-serif);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid var(--border-soft, #c8d7dc);
+  border-radius: 50%;
+  background: var(--panel-bg, #f7fafb);
+  color: var(--text-strong, #102026);
+  font: 900 11px var(--font-heading, sans-serif);
 }
 
 .ownerLink {

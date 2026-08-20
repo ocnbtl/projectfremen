@@ -58,6 +58,7 @@ export type LegacyProjectSource = {
 export type ProjectObjective = {
   id: string;
   text: string;
+  targetAt?: string;
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
@@ -66,6 +67,7 @@ export type ProjectObjective = {
 export type ProjectObjectiveInput = {
   id?: string;
   text: string;
+  targetAt?: string;
   completed?: boolean;
   completedAt?: string;
 };
@@ -245,27 +247,30 @@ export type ProjectInteraction = {
   history: ProjectHistoryEntry[];
 };
 
-export type ProjectTimelineEventType =
-  | "project_created"
-  | "legacy_project_promoted"
-  | "project_updated"
-  | "project_archived"
-  | "project_restored"
-  | "interaction_logged"
-  | "milestone_created"
-  | "milestone_updated"
-  | "milestone_completed"
-  | "blocker_opened"
-  | "blocker_updated"
-  | "blocker_resolved"
-  | "blocker_waived"
-  | "blocker_carried_forward"
-  | "link_created"
-  | "link_updated"
-  | "link_health_updated"
-  | "link_repaired"
-  | "link_removed"
-  | "link_restored";
+export const PROJECT_TIMELINE_EVENT_TYPES = [
+  "project_created",
+  "legacy_project_promoted",
+  "project_updated",
+  "project_archived",
+  "project_restored",
+  "interaction_logged",
+  "milestone_created",
+  "milestone_updated",
+  "milestone_completed",
+  "blocker_opened",
+  "blocker_updated",
+  "blocker_resolved",
+  "blocker_waived",
+  "blocker_carried_forward",
+  "link_created",
+  "link_updated",
+  "link_health_updated",
+  "link_repaired",
+  "link_removed",
+  "link_restored"
+] as const;
+
+export type ProjectTimelineEventType = (typeof PROJECT_TIMELINE_EVENT_TYPES)[number];
 
 export type ProjectTimelineEvent = {
   id: string;
@@ -281,6 +286,20 @@ export type ProjectTimelineEvent = {
   isManual: boolean;
   actorId: string;
   createdAt: string;
+  updatedAt: string;
+  updatedBy: string;
+  history: ProjectHistoryEntry[];
+};
+
+export type ProjectTimelineEventUpdateInput = {
+  eventType?: ProjectTimelineEventType;
+  occurredAt?: string;
+};
+
+export type ProjectTimelineEventUpdateResult = {
+  item: ProjectTimelineEvent;
+  project: Project;
+  auditEvent: AuditEvent;
 };
 
 export type LegacyProjectDefinition = {

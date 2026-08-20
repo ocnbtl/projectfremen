@@ -140,6 +140,28 @@
   flex-wrap: wrap;
 }
 
+.viewSwitch {
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  border-radius: 7px;
+  background: var(--panel-bg);
+}
+
+.viewSwitch button {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-muted);
+  font: 850 11px var(--font-heading);
+}
+
+.viewSwitch button:last-child { border-right: 0; }
+.viewSwitch button[data-active="true"] { background: var(--selected-bg); color: var(--text-strong); }
+.viewSwitch button:focus-visible { position: relative; z-index: 1; outline: 2px solid var(--action-primary); outline-offset: -2px; }
+
 .button,
 .iconButton,
 .filterChip,
@@ -303,6 +325,69 @@
 .list[data-density="compact"] {
   gap: 5px;
 }
+
+.projectGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(238px, 1fr));
+  gap: 10px;
+}
+
+.projectCard {
+  position: relative;
+  min-width: 0;
+  min-height: 212px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-bg);
+}
+
+.projectCard[data-selected="true"] {
+  border-color: var(--border-strong);
+  background: var(--selected-bg);
+  box-shadow: inset 3px 0 0 var(--action-primary);
+}
+
+.projectCardCheckbox {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 2;
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+}
+
+.projectCardCheckbox input { width: 17px; height: 17px; accent-color: var(--action-primary); }
+
+.projectCardBody {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  width: 100%;
+  min-height: 212px;
+  padding: 12px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+}
+
+.projectCardBody > strong { padding-right: 32px; font: 900 17px/1.25 var(--font-heading); }
+.projectCardTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; padding-right: 32px; }
+.projectCardDescription { min-height: 40px; color: var(--text-muted); font-size: 11px; line-height: 1.45; }
+.projectCardSignal { margin-top: auto; padding-top: 8px; border-top: 1px solid var(--border); color: var(--text-muted); font-size: 10px; }
+
+.projectMeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  align-items: center;
+  font-family: var(--font-body);
+}
+
+.projectMeta > span { display: inline-flex; gap: 4px; align-items: center; color: var(--text-muted); font-size: 10px; white-space: nowrap; }
 
 .shell :global(.dense-object-row) {
   display: grid;
@@ -708,7 +793,7 @@
 
 .objectiveList li {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) 122px auto;
   gap: 4px;
   align-items: center;
 }
@@ -737,10 +822,27 @@
 }
 
 .objectiveBullet {
+  display: grid;
+  align-self: stretch;
+  place-items: center;
   color: var(--text-muted);
   font-size: 16px;
   line-height: 1;
 }
+
+.objectiveDate {
+  min-width: 0;
+  min-height: 28px;
+  padding: 2px 5px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 600 11px var(--font-body);
+}
+
+.objectiveDate:focus-visible { border-color: var(--border-strong); background: var(--panel-bg-subtle); outline: 2px solid var(--action-primary); outline-offset: 1px; }
+.autosaveState { color: var(--text-muted); font: 700 10px var(--font-body); }
 
 .removeObjectiveButton {
   display: inline-grid;
@@ -974,6 +1076,7 @@
 .activityList .timelineMeta {
   font-size: 10px;
   font-weight: 600;
+  justify-self: end;
   white-space: nowrap;
 }
 
@@ -982,6 +1085,24 @@
   gap: 6px;
   align-items: center;
 }
+
+.rowActionIcon {
+  display: inline-grid;
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  color: var(--text-muted);
+  text-decoration: none;
+}
+
+.rowActionIcon:hover { border-color: var(--border-strong); color: var(--text-strong); }
+.rowActionIcon:focus-visible { outline: 2px solid var(--action-primary); outline-offset: 2px; }
+.rowActionIcon:disabled { background: var(--panel-bg-subtle); color: var(--text-faint); cursor: not-allowed; opacity: .62; }
 
 .timelineDot {
   width: 8px;
@@ -1031,6 +1152,42 @@
   background: var(--panel-bg-subtle);
 }
 
+.connectionForm,
+.changeLog {
+  display: grid;
+  gap: 10px;
+}
+
+.eventEditor {
+  display: grid;
+  grid-template-columns: minmax(150px, .8fr) minmax(190px, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+}
+
+.changeLog {
+  padding-top: 4px;
+}
+
+.changeLog > strong { font: 900 12px var(--font-heading); }
+.changeLog > p { color: var(--text-muted); }
+.changeLog ul { display: grid; gap: 5px; margin: 0; padding: 0; list-style: none; }
+.changeLog li {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: baseline;
+  padding: 7px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--panel-bg);
+  font-size: 10px;
+}
+.changeLog li > span:first-child { color: var(--text-muted); font-weight: 800; }
+.changeLog del { color: #973047; text-decoration-thickness: 1px; }
+.changeLog ins { color: #216e4a; text-decoration: none; }
+.changeLog time { color: var(--text-faint); font-family: var(--font-mono); white-space: nowrap; }
+
 .connectionIdentity span {
   color: var(--text-muted);
   font: 800 10px var(--font-heading);
@@ -1044,17 +1201,24 @@
 
 .decisionInspection > span {
   display: grid;
-  gap: 3px;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 7px;
+  align-items: start;
   color: var(--text-strong);
   font-size: 12px;
   line-height: 1.5;
 }
 
 .decisionInspection small {
-  color: var(--text-muted);
-  font: 850 9px var(--font-heading);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  display: grid;
+  width: 20px;
+  height: 20px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--panel-bg);
+  color: var(--text-strong);
+  font: 900 11px var(--font-heading);
 }
 
 .itemBody {
@@ -1377,7 +1541,7 @@
 
 .repeatableField li {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) 132px auto;
   gap: 8px;
   align-items: center;
 }
@@ -1571,9 +1735,12 @@
 
   .iconButton,
   .mobileMenuButton,
-  .mobileInspectorButton {
+  .mobileInspectorButton,
+  .rowActionIcon {
     min-width: 44px;
   }
+
+  .rowActionIcon { width: 44px; height: 44px; }
 
   .shell :global(.quick-action-bar__action) {
     min-height: 44px;
@@ -1643,9 +1810,29 @@
 
   .overviewGrid,
   .factGrid,
-  .formGrid {
+  .formGrid,
+  .eventEditor {
     grid-template-columns: 1fr;
   }
+
+  .objectiveList li,
+  .repeatableField li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+
+  .objectiveList .objectiveDate,
+  .repeatableField .objectiveDate {
+    grid-column: 2;
+    width: min(100%, 170px);
+  }
+
+  .objectiveList .removeObjectiveButton,
+  .repeatableField .removeObjectiveButton {
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+
+  .changeLog li { grid-template-columns: 1fr; }
 
   .signalStrip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1681,6 +1868,13 @@
     grid-column: 2;
     justify-self: start;
   }
+
+  .activityList .activityActions,
+  .activityList .timelineMeta {
+    grid-row: 2;
+  }
+
+  .activityList .timelineMeta { justify-self: end; }
 
   .objectList li {
     grid-template-columns: minmax(0, 1fr);

@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import AdminChrome from "../../../components/AdminChrome";
 import ProjectsWorkspace from "../../../components/projects/ProjectsWorkspace";
 import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
-import { createEmptyProjectsState, readProjectsState } from "../../../lib/modules/projects/store";
+import { createEmptyProjectsState, ensureLegacyProjectsTracked } from "../../../lib/modules/projects/store";
 import {
   createEmptyReviewsState,
   readReviewsState,
@@ -49,7 +49,7 @@ export default async function ProjectsRoutePage({
 
   const [native, personalRecords, personalOps, reviews] = await Promise.all([
     settleSource(
-      readProjectsState(),
+      ensureLegacyProjectsTracked(),
       createEmptyProjectsState(),
       "Native Projects data could not be loaded."
     ),

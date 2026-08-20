@@ -11,12 +11,14 @@ import {
   readProjectsObject,
   readProjectsState,
   retireLegacyProjectMetadata,
+  updateProjectTimelineEvent,
   updateProjectsObject
 } from "../../../lib/modules/projects/store";
 import type {
   LegacyProjectPromotionInput,
   ProjectObjectFamily,
   ProjectsCreateInputByFamily,
+  ProjectTimelineEventUpdateInput,
   ProjectsUpdateInputByFamily
 } from "../../../lib/modules/projects/types";
 
@@ -218,10 +220,7 @@ export async function PATCH(request: Request) {
     if (!isRecord(body)) {
       return NextResponse.json({ ok: false, error: "Request body must be an object" }, { status: 400 });
     }
-    family = parseFamily(body.family);
-    if (!family) {
-      return NextResponse.json({ ok: false, error: "Invalid Projects family" }, { status: 400 });
-    }
+    const operation = typeof body.operation === "string" ? body.operation.trim() : "update";
     const id = typeof body.id === "string" ? body.id.trim() : "";
     const expectedUpdatedAt =
       typeof body.expectedUpdatedAt === "string" ? body.expectedUpdatedAt.trim() : "";
@@ -234,6 +233,30 @@ export async function PATCH(request: Request) {
     }
     if (!isRecord(body.patch)) {
       return NextResponse.json({ ok: false, error: "patch must be an object" }, { status: 400 });
+    }
+    if (operation === "update_timeline_event") {
+      const result = await updateProjectTimelineEvent(
+        id,
+        body.patch as ProjectTimelineEventUpdateInput,
+        { expectedUpdatedAt, actorId: "admin" }
+      );
+      await appendAuditEvent({
+        at: new Date().toISOString(),
+        action: "projects.timeline.update.success",
+        path: new URL(request.url).pathname,
+        method: "PATCH",
+        ip: getRequestIp(request),
+        status: "ok",
+        detail: result.item.id
+      });
+      return NextResponse.json({ ok: true, ...result, auditEventId: result.auditEvent.id });
+    }
+    if (operation !== "update") {
+      return NextResponse.json({ ok: false, error: "Unsupported Projects update operation" }, { status: 400 });
+    }
+    family = parseFamily(body.family);
+    if (!family) {
+      return NextResponse.json({ ok: false, error: "Invalid Projects family" }, { status: 400 });
     }
 
     const result = await updateProjectsObject(

@@ -106,8 +106,8 @@ export default function LinkedDecisionsPanel({
                   <strong>{decision.title}</strong>
                   {showDecisionDetails ? (
                     <span className={styles.decisionDetails}>
-                      <span><small>Question</small>{decision.question || "No question recorded."}</span>
-                      <span><small>Decision</small>{decision.finalDecision || "No decision recorded yet."}</span>
+                      <span><small aria-label="Question">?</small><span>{decision.question || "No question recorded."}</span></span>
+                      <span><small aria-label="Decision">!</small><span>{decision.finalDecision || "No decision recorded yet."}</span></span>
                     </span>
                   ) : (
                     <small>

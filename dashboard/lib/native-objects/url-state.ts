@@ -919,6 +919,7 @@ const PROJECT_FILTERS = [
   "active",
   "planned",
   "due",
+  "due-month",
   "needs-review",
   "blocked",
   "linked",
@@ -955,6 +956,7 @@ export type ProjectsUrlState = {
   item: string;
   tab: ProjectTab;
   compact: boolean;
+  grid: boolean;
   ai: boolean;
 };
 
@@ -979,6 +981,13 @@ export const PROJECTS_URL_STATE_SCHEMA: UrlStateSchema<ProjectsUrlState> = {
   tab: enumCodec("tab", PROJECT_TABS, "overview"),
   compact: {
     param: "compact",
+    defaultValue: false,
+    parse: (raw) => (raw === "1" || raw === "true" ? true : raw === "0" || raw === "false" ? false : undefined),
+    serialize: (value) => (value ? "1" : null),
+    omit: (value) => !value
+  },
+  grid: {
+    param: "grid",
     defaultValue: false,
     parse: (raw) => (raw === "1" || raw === "true" ? true : raw === "0" || raw === "false" ? false : undefined),
     serialize: (value) => (value ? "1" : null),

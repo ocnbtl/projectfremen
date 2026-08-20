@@ -318,6 +318,10 @@ function attentionReasons(input: {
       Date.parse(milestone.dueAt) < now
   );
   if (overdue.length) reasons.push(`${overdue.length} overdue milestone${overdue.length === 1 ? "" : "s"}.`);
+  const overdueObjectives = input.project.objectives.filter(
+    (objective) => !objective.completedAt && objective.targetAt && Date.parse(objective.targetAt) < now
+  );
+  if (overdueObjectives.length) reasons.push(`${overdueObjectives.length} overdue objective${overdueObjectives.length === 1 ? "" : "s"}.`);
   return reasons;
 }
 

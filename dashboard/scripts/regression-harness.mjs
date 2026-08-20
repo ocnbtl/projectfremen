@@ -7500,9 +7500,9 @@ async function checkCrossModuleDecisionConnections(
           ? panelText.includes(`${expectedUnresolved} unresolved · 1 total`)
           : !panelText.includes("unresolved") && !panelText.includes("total")) &&
         (!expectDecisionDetails || (
-          rowText.toLowerCase().includes("question") &&
+          await row.getByLabel("Question", { exact: true }).count() === 1 &&
           rowText.includes(expectedQuestion) &&
-          rowText.toLowerCase().includes("decision") &&
+          await row.getByLabel("Decision", { exact: true }).count() === 1 &&
           rowText.includes(expectedDecision)
         )),
       `${label} did not render the requested owner title, state, question, decision, and summary treatment: ${JSON.stringify({ rowText, panelText, expectedState, expectedQuestion, expectedDecision })}`
@@ -8017,6 +8017,17 @@ async function checkProjectCreationWorkflow(
 
   try {
     await page.goto(`${baseUrl}/admin/projects`, { waitUntil: "networkidle" });
+    const layoutControls = page.getByRole("group", { name: "Project layout" });
+    await layoutControls.getByRole("button", { name: "Grid" }).click();
+    await page.locator('article[role="listitem"]').first().waitFor();
+    assert(
+      await page.locator('article[role="listitem"]').count() >= 5 &&
+        await layoutControls.getByRole("button", { name: "Grid" }).getAttribute("aria-pressed") === "true",
+      "Projects Grid did not render a distinct card directory"
+    );
+    await page.screenshot({ path: path.join(screenshotDir, "projects-grid-1440x900.png"), fullPage: true });
+    await layoutControls.getByRole("button", { name: "Comfortable" }).click();
+    assert(await page.locator('article[role="listitem"]').count() === 0, "Comfortable Projects view retained the Grid cards");
     await page.getByRole("button", { name: "New project" }).click();
     const createForm = page.locator("form").filter({ hasText: "Create native project" });
     await createForm.waitFor();
@@ -8046,11 +8057,12 @@ async function checkProjectCreationWorkflow(
 
     await createForm.getByLabel("Description").fill("Website build for Sage Burris.");
     await createForm.getByLabel("Objective 1", { exact: true }).fill("Ship the Sage Burris website");
+    await createForm.getByLabel("Objective 1 target date").fill("2026-08-24");
     await createForm.getByLabel("Person 1", { exact: true }).selectOption(person.id);
     await createForm.getByLabel("Role", { exact: true }).fill("Client");
     await createForm.getByLabel("Context", { exact: true }).fill("Website owner and primary stakeholder");
     await createForm.getByLabel("Status").selectOption("idea");
-    await createForm.getByLabel("Review cadence").selectOption("monthly");
+    await createForm.getByLabel("Review cadence").selectOption("P1M");
     await createForm.getByLabel("Completion target").fill("Website is approved and live.");
 
     const createResponsePromise = page.waitForResponse(
@@ -8067,6 +8079,19 @@ async function checkProjectCreationWorkflow(
       `New Project identity was not a UUID: ${projectId}`
     );
     await createForm.waitFor({ state: "detached" });
+
+    const projectFilters = page.getByRole("toolbar", { name: "Project filters" });
+    await projectFilters.getByRole("button", { name: "Due 7 days" }).click();
+    assert(
+      await page.locator('[role="listitem"]').filter({ hasText: projectName }).count() === 1,
+      "Objective target date did not place the project in Due 7 days"
+    );
+    await projectFilters.getByRole("button", { name: "Due 30 days" }).click();
+    assert(
+      await page.locator('[role="listitem"]').filter({ hasText: projectName }).count() === 1,
+      "Objective target date did not place the project in Due 30 days"
+    );
+    await projectFilters.getByRole("button", { name: "All", exact: true }).click();
 
     const projectHeader = page.getByRole("heading", { name: projectName, exact: true }).locator("..");
     const headerText = await projectHeader.innerText();
@@ -8162,6 +8187,28 @@ async function checkProjectCreationWorkflow(
       await activityInspector.getByText("Health at event", { exact: true }).count() === 0,
       "Activity inspection retained the removed health-at-event field"
     );
+    const eventDetailsForm = activityInspector.locator("form").filter({ hasText: "Event type" });
+    assert(
+      await eventDetailsForm.getByLabel("Event type").count() === 1 &&
+        await eventDetailsForm.getByLabel("Occurred").count() === 1 &&
+        await activityInspector.getByText("Change log", { exact: true }).count() === 1,
+      "Activity inspection did not expose editable event metadata and a change log"
+    );
+    const activityChangeLogText = await activityInspector.getByText("Change log", { exact: true }).locator("..").innerText();
+    assert(
+      activityChangeLogText.includes("Title") &&
+        activityChangeLogText.includes("Initial project setup complete") &&
+        activityChangeLogText.includes("Initial project brief logged"),
+      `Activity inspection did not isolate the change log to the selected event: ${activityChangeLogText}`
+    );
+    await eventDetailsForm.getByLabel("Occurred").fill("2026-08-19T15:30");
+    const eventDetailsResponsePromise = page.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
+    );
+    await eventDetailsForm.getByRole("button", { name: "Save event details" }).click();
+    const eventDetailsResponse = await eventDetailsResponsePromise;
+    assert(eventDetailsResponse.ok(), `Timeline event details failed with ${eventDetailsResponse.status()}: ${await eventDetailsResponse.text()}`);
+    await activityInspector.getByText("Occurred", { exact: true }).last().waitFor();
 
     await page.getByRole("tab", { name: "Overview" }).click();
     const recentWorkPanel = page.getByRole("heading", { name: "Recent work", exact: true }).locator("xpath=ancestor::section[1]");
@@ -8173,16 +8220,19 @@ async function checkProjectCreationWorkflow(
       inspectCount: Array.from(row.querySelectorAll("button")).filter((button) => button.textContent?.trim() === "Inspect").length
     }));
     assert(
-      recentTypography.titleFont === recentTypography.summaryFont && recentTypography.inspectCount === 1,
-      `Recent work did not share the Timeline typography and Inspect action: ${JSON.stringify(recentTypography)}`
+      recentTypography.titleFont === recentTypography.summaryFont &&
+        await recentActivityRow.getByRole("button", { name: /Inspect Initial project brief logged/ }).count() === 1 &&
+        await recentActivityRow.getByRole("button", { name: /Open Initial project brief logged unavailable/ }).count() === 1,
+      `Recent work did not share Timeline typography or the enabled/disabled icon actions: ${JSON.stringify(recentTypography)}`
     );
-    await overviewObjective.fill("Ship and approve the Sage Burris website");
     const objectiveResponsePromise = page.waitForResponse(
       (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
     );
-    await page.getByRole("button", { name: "Save objectives" }).click();
+    await overviewObjective.fill("Ship and approve the Sage Burris website");
     const objectiveResponse = await objectiveResponsePromise;
     assert(objectiveResponse.ok(), `Objective update failed with ${objectiveResponse.status()}: ${await objectiveResponse.text()}`);
+    assert(await page.getByRole("button", { name: "Save objectives" }).count() === 0, "Objectives retained a manual Save button instead of autosave");
+    await page.screenshot({ path: path.join(screenshotDir, "project-saite-overview-1440x900.png"), fullPage: true });
 
     await page.getByRole("tab", { name: "Properties" }).click();
     await page.getByText(projectId, { exact: true }).waitFor();
@@ -8206,9 +8256,10 @@ async function checkProjectCreationWorkflow(
     assert(
       storedProject?.lifecycle === "idea" &&
         storedProject?.uuid === projectId &&
-        storedProject?.defaultCadence === "monthly" &&
+        storedProject?.defaultCadence === "P1M" &&
         storedProject.objectives?.length === 1 &&
         storedProject.objectives[0].text === "Ship and approve the Sage Burris website" &&
+        storedProject.objectives[0].targetAt === "2026-08-24" &&
         !storedProject.objectives[0].completedAt &&
         !("area" in storedProject) &&
         !("owner" in storedProject) &&
@@ -8230,7 +8281,7 @@ async function checkProjectCreationWorkflow(
     assert(!layout.overflowX, `Project overview overflowed horizontally: ${JSON.stringify(layout)}`);
     await page.screenshot({ path: path.join(screenshotDir, "project-saite-properties-1440x900.png"), fullPage: true });
     assert(
-      browserMutations.join("|") === "POST /api/projects|POST /api/projects|PATCH /api/projects|PATCH /api/projects",
+      browserMutations.join("|") === "POST /api/projects|POST /api/projects|PATCH /api/projects|PATCH /api/projects|PATCH /api/projects",
       `Project create browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
     );
     assert(browserErrors.length === 0, `Project create browser checks emitted errors: ${browserErrors.join(" | ")}`);
@@ -8392,8 +8443,8 @@ async function checkPeopleProjectConnections(
         projectPeopleText.includes(projectRole) &&
         projectPeopleText.includes(relationshipNote) &&
         !projectPeopleText.includes("Open People") &&
-        await personLinkRow.getByRole("button", { name: "Inspect" }).count() === 1 &&
-        await personLinkRow.getByRole("link", { name: "Open", exact: true }).count() === 1,
+        await personLinkRow.getByRole("button", { name: new RegExp(`Inspect ${person.title} connection`) }).count() === 1 &&
+        await personLinkRow.getByRole("link", { name: new RegExp(`Open ${person.title}`) }).count() === 1,
       "Project People tab did not render the streamlined identity, role, description, and actions"
     );
 
@@ -8426,40 +8477,55 @@ async function checkPeopleProjectConnections(
     await personActivityRow.waitFor();
     assert(
       await personActivityRow.locator('[data-tone="people"]').count() === 1 &&
-        await personActivityRow.getByRole("button", { name: "Inspect" }).count() === 1 &&
-        await personActivityRow.getByRole("link", { name: "Open", exact: true }).count() === 1 &&
+        await personActivityRow.getByRole("button", { name: /Inspect Person linked/ }).count() === 1 &&
+        await personActivityRow.getByRole("link", { name: /Open Person linked/ }).count() === 1 &&
         !(await personActivityRow.innerText()).includes("Context linked"),
       "Person activity did not use the blue Person linked treatment with Inspect/Open actions"
     );
     await projectPage.getByRole("tab", { name: "People" }).click();
 
-    await personLinkRow.getByRole("button", { name: "Inspect" }).click();
+    await personLinkRow.getByRole("button", { name: new RegExp(`Inspect ${person.title} connection`) }).click();
     const connectionInspector = projectPage.locator('section[aria-labelledby^="project-selected-child-"]');
+    const editConnectionForm = connectionInspector.locator("form");
     assert(
-      (await connectionInspector.innerText()).includes(projectRole) &&
-        await connectionInspector.getByRole("button", { name: "Edit connection" }).count() === 1 &&
+      (await editConnectionForm.getByLabel("Role").inputValue()) === projectRole &&
+        await connectionInspector.getByRole("button", { name: "Edit connection" }).count() === 0 &&
+        await editConnectionForm.getByRole("button", { name: "Save connection" }).count() === 1 &&
         await connectionInspector.getByRole("button", { name: "Report issue" }).count() === 0,
-      "Project People inspection did not expose the editable connection or retained Report issue"
+      "Project People inspection was not directly editable or retained obsolete actions"
     );
-    await connectionInspector.getByRole("button", { name: "Edit connection" }).click();
-    const editConnectionForm = projectPage.locator('form[aria-labelledby="projects-editor-title"]');
-    await editConnectionForm.waitFor();
-    assert(
-      (await editConnectionForm.getByRole("heading", { name: "Edit connection" }).count()) === 1 &&
-        (await editConnectionForm.innerText()).includes("Description") &&
-        (await editConnectionForm.locator("textarea").count()) === 1,
-      "Project People connection editor opened the wrong form"
-    );
-    await editConnectionForm.locator("textarea").fill(refreshedRelationshipNote);
+    await editConnectionForm.getByLabel("Description").fill(refreshedRelationshipNote);
     const connectionUpdateResponsePromise = projectPage.waitForResponse(
       (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
     );
-    await editConnectionForm.getByRole("button", { name: "Save changes" }).click();
+    await editConnectionForm.getByRole("button", { name: "Save connection" }).click();
     const connectionUpdateResponse = await connectionUpdateResponsePromise;
     assert(connectionUpdateResponse.ok(), `Project People connection edit failed with ${connectionUpdateResponse.status()}: ${await connectionUpdateResponse.text()}`);
     await personLinkRow.getByText(refreshedRelationshipNote, { exact: true }).waitFor();
 
-    await personLinkRow.getByRole("link", { name: "Open", exact: true }).click();
+    await connectionInspector.getByRole("button", { name: "Remove link" }).click();
+    const removeDialog = projectPage.getByRole("dialog", { name: "Remove this project link?" });
+    const removeLinkButton = removeDialog.getByRole("button", { name: "Remove link" });
+    assert(await removeLinkButton.isEnabled(), "Remove link confirmation remained disabled without an unexplained required field");
+    const removeResponsePromise = projectPage.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
+    );
+    await removeLinkButton.click();
+    const removeResponse = await removeResponsePromise;
+    assert(removeResponse.ok(), `Project link removal failed with ${removeResponse.status()}: ${await removeResponse.text()}`);
+    assert(await personLinkRow.count() === 0, "Removed person link remained visible as active");
+
+    await connectionInspector.getByRole("button", { name: "Restore link" }).click();
+    const restoreDialog = projectPage.getByRole("dialog", { name: "Restore this project link?" });
+    const restoreResponsePromise = projectPage.waitForResponse(
+      (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
+    );
+    await restoreDialog.getByRole("button", { name: "Restore" }).click();
+    const restoreResponse = await restoreResponsePromise;
+    assert(restoreResponse.ok(), `Project link restore failed with ${restoreResponse.status()}: ${await restoreResponse.text()}`);
+    await personLinkRow.waitFor();
+
+    await personLinkRow.getByRole("link", { name: new RegExp(`Open ${person.title}`) }).click();
     await projectPage.waitForURL(
       (url) => url.pathname === `/admin/people/${encodeURIComponent(person.id)}`
     );
@@ -8603,11 +8669,21 @@ async function checkPeopleProjectConnections(
           (event) =>
             event.action === "project_link.updated" &&
             event.object?.objectId === finalPeopleRefs[0].id
+        ) &&
+        finalProjects.payload.state.auditEvents.some(
+          (event) =>
+            event.action === "project_link.removed" &&
+            event.object?.objectId === finalPeopleRefs[0].id
+        ) &&
+        finalProjects.payload.state.auditEvents.some(
+          (event) =>
+            event.action === "project_link.restored" &&
+            event.object?.objectId === finalPeopleRefs[0].id
         ),
-      "People-Projects link or refresh mutation was not represented in Projects audit history"
+      "People-Projects create, edit, remove, or restore mutation was not represented in Projects audit history"
     );
     assert(
-      browserMutations.join("|") === "POST /api/projects|PATCH /api/projects",
+      browserMutations.join("|") === "POST /api/projects|PATCH /api/projects|PATCH /api/projects|PATCH /api/projects",
       `People-Projects browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`
     );
     assert(
@@ -8834,8 +8910,8 @@ async function checkNoteProjectAssociations(
     await objectActivityRow.waitFor();
     assert(
       await objectActivityRow.locator('[data-tone="object"]').count() === 1 &&
-        await objectActivityRow.getByRole("button", { name: "Inspect" }).count() === 1 &&
-        await objectActivityRow.getByRole("link", { name: "Open", exact: true }).count() === 1 &&
+        await objectActivityRow.getByRole("button", { name: /Inspect Object linked/ }).count() === 1 &&
+        await objectActivityRow.getByRole("link", { name: /Open Object linked/ }).count() === 1 &&
         !(await objectActivityRow.innerText()).includes("Context linked"),
       "Object activity did not use the ochre Object linked treatment with Inspect/Open actions"
     );
@@ -9530,10 +9606,11 @@ async function checkResourceMediaProjectAssociations(
     await projectReferences.getByText(media.title, { exact: true }).first().waitFor();
     const projectReferenceText = await projectReferences.innerText();
     assert(
-      projectReferenceText.includes("Source Material") &&
-        projectReferenceText.includes("Evidence") &&
-        projectReferenceText.includes("required evidence"),
-      "Projects Files & Links did not expose the typed Resource and Media association state"
+      projectReferenceText.includes(fixtures[0].context) &&
+        projectReferenceText.includes(fixtures[1].context) &&
+        !projectReferenceText.includes("Resources supporting context active") &&
+        !projectReferenceText.includes("Media supporting context active"),
+      "Projects Files & Links did not prioritize each Resource and Media association description"
     );
     await assertNoHorizontalOverflow(page, "Projects Files & Links desktop workflow");
     await desktopContext.close();
@@ -11367,8 +11444,9 @@ async function main() {
         initialProjectsState.payload?.ok &&
         initialProjectsState.payload.state?.schemaVersion === 1 &&
         Array.isArray(initialProjectsState.payload.state?.projects) &&
-        initialProjectsState.payload.state.projects.length === 0,
-      `Native Projects state did not start isolated and empty: ${JSON.stringify(initialProjectsState.payload)}`
+        initialProjectsState.payload.state.projects.length === 5 &&
+        initialProjectsState.payload.state.legacyMappings?.length === 5,
+      `Projects did not auto-track the five stable legacy identities: ${JSON.stringify(initialProjectsState.payload)}`
     );
     const legacyProjectProjections = [
       ["PRJ-BLK", "Project Blacktube"],
@@ -11377,17 +11455,17 @@ async function main() {
       ["PRJ-PAC", "Project Pacific"],
       ["PRJ-PNT", "Project Pint"]
     ];
-    for (const [id, name] of legacyProjectProjections) {
+    for (const [, name] of legacyProjectProjections) {
       assert(
-        projectsPage.body.includes(id) && projectsPage.body.includes(name),
-        `Projects route did not expose the legacy projection ${id}:${name}`
+        projectsPage.body.includes(name),
+        `Projects route did not expose the tracked project ${name}`
       );
     }
     assert(
-      projectsPage.body.includes("Start tracking"),
-      "Projects route did not disclose the explicit legacy-promotion action"
+      !projectsPage.body.includes("Start tracking") && !projectsPage.body.includes("Open legacy command center"),
+      "Projects route retained legacy tracking or command-center actions"
     );
-    pass("Projects presents exactly five stable legacy identities over an empty isolated native state");
+    pass("Projects auto-tracks the five stable legacy identities without legacy setup actions");
 
     const rejectProjectsCsrf = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
       method: "POST",
@@ -11421,10 +11499,10 @@ async function main() {
     assert(
       promoteLegacyProject.response.ok &&
         promoteLegacyProject.payload?.ok &&
-        promoteLegacyProject.payload.created === true &&
+        promoteLegacyProject.payload.created === false &&
         promoteLegacyProject.payload.item?.id === "PRJ-ICE" &&
         promoteLegacyProject.payload.mapping?.legacyKey === "admin-project:iceflake",
-      `Explicit legacy Project promotion failed: ${JSON.stringify(promoteLegacyProject.payload)}`
+      `Auto-tracked legacy Project did not retain idempotent promotion compatibility: ${JSON.stringify(promoteLegacyProject.payload)}`
     );
     const promotedProject = promoteLegacyProject.payload.item;
 
@@ -11487,7 +11565,31 @@ async function main() {
       rejectStaleProject.response.status === 409 && rejectStaleProject.payload?.code === "stale",
       `Native Projects accepted a stale overwrite: ${JSON.stringify(rejectStaleProject.payload)}`
     );
-    pass("Projects requires CSRF proof and enforces explicit idempotent promotion plus optimistic concurrency");
+    const projectUpdateEvent = updatePromotedProject.payload?.timelineEvent;
+    const updateTimelineEvent = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
+      method: "PATCH",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        operation: "update_timeline_event",
+        id: projectUpdateEvent.id,
+        expectedUpdatedAt: projectUpdateEvent.updatedAt,
+        patch: {
+          eventType: "project_updated",
+          occurredAt: "2026-08-18T14:30:00.000Z"
+        }
+      })
+    });
+    assert(
+      updateTimelineEvent.response.ok &&
+        updateTimelineEvent.payload?.item?.occurredAt === "2026-08-18T14:30:00.000Z" &&
+        updateTimelineEvent.payload?.item?.history?.at(-1)?.action === "updated" &&
+        updateTimelineEvent.payload?.auditEvent?.before?.occurredAt === projectUpdateEvent.occurredAt,
+      `Project timeline metadata edit did not persist an auditable change: ${JSON.stringify(updateTimelineEvent.payload)}`
+    );
+    pass("Projects requires CSRF proof and preserves idempotent promotion compatibility plus optimistic concurrency");
 
     const createProjectMilestone = await requestJson(server.baseUrl, cookieJar, "/api/projects", {
       method: "POST",
@@ -11970,8 +12072,8 @@ async function main() {
     const persistedProjectsState = await requestJson(server.baseUrl, cookieJar, "/api/projects");
     assert(
       persistedProjectsState.response.ok &&
-        persistedProjectsState.payload?.state?.projects?.length === 1 &&
-        persistedProjectsState.payload.state.legacyMappings?.length === 1 &&
+        persistedProjectsState.payload?.state?.projects?.length === 5 &&
+        persistedProjectsState.payload.state.legacyMappings?.length === 5 &&
         persistedProjectsState.payload.state.milestones?.some(
           (item) => item.id === projectMilestone.id && item.state === "complete"
         ) &&
