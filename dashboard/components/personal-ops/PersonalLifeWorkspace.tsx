@@ -4,13 +4,16 @@ import dynamic from "next/dynamic";
 import type { FormEvent } from "react";
 import { useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
+import type { NativeObjectRef } from "../../lib/native-objects/types";
 import type {
   BuildItemStatus,
   PersonalBuildItem,
   PersonalLifeCollection,
   PersonalLifeState,
   PersonalList,
-  PersonalListItem,
+  PersonalListCell,
+  PersonalListColumnType,
+  PersonalListRow,
   PersonalTrip,
   PersonalVehicle,
   TripStatus,
@@ -20,6 +23,7 @@ import type {
 import type { PersonalOpsState } from "../../lib/modules/personal-ops/types";
 import type { CredentialDetail, CredentialSummary } from "../../lib/modules/personal-passwords/types";
 import PersonalOpsSidebar, { type PersonalOpsSidebarCounts } from "./PersonalOpsSidebar";
+import PersonalOpsIcon from "./PersonalOpsIcon";
 import baseStyles from "./PersonalOpsWorkspace.module.css";
 import styles from "./PersonalLifeWorkspace.module.css";
 
@@ -29,6 +33,11 @@ const TravelWorldMap = dynamic(() => import("./TravelWorldMap"), {
 });
 
 export type PersonalLifeView = "passwords" | "lists" | "travel" | "personal-build" | "car";
+
+export type PersonalLifeLinkOption = {
+  kind: "person" | "object";
+  ref: NativeObjectRef;
+};
 
 type LifeEditor = {
   collection: PersonalLifeCollection;
@@ -41,6 +50,7 @@ type CredentialDraft = {
   updatedAt?: string;
   title: string;
   username: string;
+  email: string;
   secret: string;
   website: string;
   notes: string;
@@ -57,6 +67,20 @@ const VIEW_COPY: Record<PersonalLifeView, { title: string; description: string; 
 const TRIP_LABELS: Record<TripStatus, string> = { been: "Been", want: "Want to go", lived: "Lived", planned: "Planned" };
 const BUILD_LABELS: Record<BuildItemStatus, string> = { wanted: "Wanted", researching: "Researching", acquired: "Acquired", retired: "Retired" };
 const MOD_LABELS: Record<VehicleModificationStatus, string> = { idea: "Ideas", researching: "Researching", planned: "Planned", installed: "Installed", skipped: "Skipped" };
+const LIST_COLUMN_LABELS: Record<PersonalListColumnType, string> = {
+  text: "Text",
+  date: "Date",
+  price: "Price",
+  place: "Place",
+  time: "Time",
+  rating: "Rating",
+  person: "Person",
+  object: "Object"
+};
+
+function linkKey(ref: NativeObjectRef) {
+  return `${ref.module}:${ref.objectType}:${ref.objectId}`;
+}
 
 function formatDate(value?: string) {
   if (!value) return "No date";
@@ -94,12 +118,14 @@ export default function PersonalLifeWorkspace({
   initialState,
   personalOpsState,
   initialCredentials,
+  initialLinkOptions,
   initialLoadError
 }: {
   initialView: PersonalLifeView;
   initialState: PersonalLifeState;
   personalOpsState: PersonalOpsState;
   initialCredentials: CredentialSummary[];
+  initialLinkOptions: PersonalLifeLinkOption[];
   initialLoadError?: string;
 }) {
   const [state, setState] = useState(initialState);
@@ -109,7 +135,8 @@ export default function PersonalLifeWorkspace({
   const [notice, setNotice] = useState("");
   const [error, setError] = useState(initialLoadError || "");
   const [selectedListId, setSelectedListId] = useState(initialState.lists[0]?.id || "");
-  const [newListItem, setNewListItem] = useState("");
+  const [listDraft, setListDraft] = useState<PersonalList | null>(initialState.lists[0] || null);
+  const [listColumnType, setListColumnType] = useState<PersonalListColumnType>("text");
   const [tripFilters, setTripFilters] = useState<Set<TripStatus>>(() => new Set(["been", "want", "lived", "planned"]));
   const [selectedTripId, setSelectedTripId] = useState(initialState.trips[0]?.id || "");
   const [selectedVehicleId, setSelectedVehicleId] = useState(initialState.vehicles[0]?.id || "");
@@ -157,6 +184,7 @@ export default function PersonalLifeWorkspace({
 
   const sidebarCounts = countsFor(personalOpsState, state, credentials.length);
   const selectedList = state.lists.find((item) => item.id === selectedListId) || state.lists[0] || null;
+  const workingList = listDraft?.id === selectedList?.id ? listDraft : selectedList;
   const selectedTrip = state.trips.find((item) => item.id === selectedTripId) || null;
   const selectedVehicle = state.vehicles.find((item) => item.id === selectedVehicleId) || state.vehicles[0] || null;
 
@@ -209,7 +237,7 @@ export default function PersonalLifeWorkspace({
 
   function openCreate(preset: Record<string, string> = {}) {
     if (initialView === "passwords") {
-      setCredentialDraft({ title: "", username: "", secret: "", website: "", notes: "" });
+      setCredentialDraft({ title: "", username: "", email: "", secret: "", website: "", notes: "" });
       return;
     }
     if (initialView === "lists") setEditor({ collection: "lists", values: { title: "", description: "", kind: "custom", ...preset } });
@@ -242,7 +270,12 @@ export default function PersonalLifeWorkspace({
     if (!editor) return;
     const existing = editor.id ? state[editor.collection].find((item) => item.id === editor.id) : undefined;
     const values: Record<string, unknown> = { ...editor.values };
-    if (editor.collection === "lists") values.items = (existing as PersonalList | undefined)?.items || [];
+    if (editor.collection === "lists") {
+      const list = existing as PersonalList | undefined;
+      values.items = list?.items || [];
+      values.columns = list?.columns || [{ id: crypto.randomUUID(), label: "Item", type: "text" }];
+      values.rows = list?.rows || [];
+    }
     if (editor.collection === "trips") {
       values.latitude = Number(editor.values.latitude);
       values.longitude = Number(editor.values.longitude);
@@ -250,7 +283,10 @@ export default function PersonalLifeWorkspace({
     if (editor.collection === "vehicles") values.modifications = (existing as PersonalVehicle | undefined)?.modifications || [];
     const saved = await saveObject(editor.collection, values, existing);
     if (!saved) return;
-    if (editor.collection === "lists") setSelectedListId(saved.id);
+    if (editor.collection === "lists") {
+      setSelectedListId(saved.id);
+      setListDraft(saved as PersonalList);
+    }
     if (editor.collection === "trips") setSelectedTripId(saved.id);
     if (editor.collection === "vehicles") setSelectedVehicleId(saved.id);
     setEditor(null);
@@ -341,8 +377,59 @@ export default function PersonalLifeWorkspace({
     }
   }
 
-  async function patchListItems(list: PersonalList, items: PersonalListItem[]) {
-    await saveObject("lists", { items }, list);
+  function selectList(list: PersonalList) {
+    setSelectedListId(list.id);
+    setListDraft(list);
+  }
+
+  function updateListDraft(update: (current: PersonalList) => PersonalList) {
+    setListDraft((current) => current ? update(current) : current);
+  }
+
+  function updateListCell(rowId: string, columnId: string, cell: PersonalListCell) {
+    updateListDraft((current) => ({
+      ...current,
+      rows: current.rows.map((row) => row.id === rowId
+        ? { ...row, cells: { ...row.cells, [columnId]: cell } }
+        : row)
+    }));
+  }
+
+  function addListColumn() {
+    const id = crypto.randomUUID();
+    const column = { id, label: LIST_COLUMN_LABELS[listColumnType], type: listColumnType };
+    updateListDraft((current) => ({
+      ...current,
+      columns: [...current.columns, column],
+      rows: current.rows.map((row) => ({ ...row, cells: { ...row.cells, [id]: { value: "" } } }))
+    }));
+  }
+
+  function addListRow() {
+    updateListDraft((current) => ({
+      ...current,
+      rows: [
+        ...current.rows,
+        {
+          id: crypto.randomUUID(),
+          completed: false,
+          cells: Object.fromEntries(current.columns.map((column) => [column.id, { value: "" }]))
+        }
+      ]
+    }));
+  }
+
+  async function saveListDraft() {
+    if (!workingList || !selectedList) return;
+    const saved = await saveObject("lists", {
+      title: workingList.title,
+      description: workingList.description,
+      kind: workingList.kind,
+      items: workingList.items,
+      columns: workingList.columns,
+      rows: workingList.rows
+    }, selectedList);
+    if (saved) setListDraft(saved as PersonalList);
   }
 
   async function addModification(vehicle: PersonalVehicle) {
@@ -352,23 +439,67 @@ export default function PersonalLifeWorkspace({
     if (saved) setModDraft("");
   }
 
+  function renderListCell(row: PersonalListRow, columnId: string, type: PersonalListColumnType, label: string) {
+    const cell = row.cells[columnId] || { value: "" };
+    if (type === "rating") {
+      const rating = Number(cell.value) || 0;
+      return <div className={styles.ratingInput} aria-label={`${label} rating`}>{[1, 2, 3, 4, 5].map((value) => <button type="button" aria-label={`Set ${label} to ${value} stars`} aria-pressed={rating === value} data-active={value <= rating || undefined} onClick={() => updateListCell(row.id, columnId, { value: String(value) })} key={value}>★</button>)}</div>;
+    }
+    if (type === "person" || type === "object") {
+      const options = initialLinkOptions.filter((option) => option.kind === type);
+      const selectedKey = cell.ref ? linkKey(cell.ref) : "";
+      return <div className={styles.linkCell}>
+        <PersonalOpsIcon name={type} />
+        <select aria-label={label} value={selectedKey} onChange={(event) => {
+          const option = options.find((candidate) => linkKey(candidate.ref) === event.target.value);
+          updateListCell(row.id, columnId, option ? { value: option.ref.label, ref: option.ref } : { value: "" });
+        }}>
+          <option value="">Choose {type === "person" ? "a person" : "an object"}</option>
+          {cell.ref && !options.some((option) => linkKey(option.ref) === selectedKey) && <option value={selectedKey}>{cell.ref.label}</option>}
+          {options.map((option) => <option value={linkKey(option.ref)} key={linkKey(option.ref)}>{option.ref.label}</option>)}
+        </select>
+        {cell.ref && <a href={cell.ref.route} aria-label={`Open ${cell.ref.label}`} title={`Open ${cell.ref.label}`}><PersonalOpsIcon name="open" /></a>}
+      </div>;
+    }
+    return <input
+      aria-label={label}
+      type={type === "date" || type === "time" ? type : "text"}
+      inputMode={type === "price" ? "decimal" : undefined}
+      placeholder={type === "price" ? "$0.00" : type === "place" ? "Add place…" : ""}
+      value={cell.value}
+      onChange={(event) => updateListCell(row.id, columnId, { value: event.target.value })}
+    />;
+  }
+
   function renderPasswords() {
     return (
       <section className={styles.keyring} data-masked={passwordsMasked || undefined} aria-label="Encrypted password keyring">
-        <div className={styles.keyringRail}><span>Encrypted</span><strong>{credentials.length}</strong><small>credentials</small></div>
+        <header className={styles.keyringHeader}>
+          <span className={styles.keyringMark}><PersonalOpsIcon name="password" /></span>
+          <div><strong>Encrypted credentials</strong><small>Protected at rest · available in this admin session</small></div>
+          <span className={styles.keyringCount}>{credentials.length}</span>
+        </header>
         <div className={styles.credentialList}>
           {credentials.length ? credentials.map((item) => (
             <article className={styles.credentialRow} key={item.id}>
-              <span className={styles.keyIcon} aria-hidden="true">⌁</span>
-              <div className={styles.credentialPrivate}><strong>{item.title || "Untitled credential"}</strong><small>{item.username || item.website || "No account label"}</small></div>
+              <span className={styles.keyIcon}><PersonalOpsIcon name="password" /></span>
+              <div className={`${styles.credentialIdentity} ${styles.credentialPrivate}`}>
+                <strong>{item.title || "Untitled credential"}</strong>
+                <div className={styles.credentialMeta}>
+                  {item.username && <span><b>Username</b>{item.username}</span>}
+                  {item.email && <span><b>Email</b>{item.email}</span>}
+                  {item.website && <span><b>Website</b>{item.website}</span>}
+                  {!item.username && !item.email && !item.website && <span>No account details</span>}
+                </div>
+              </div>
               <code className={styles.credentialPrivate} aria-label={passwordsMasked ? "Hidden password" : "Revealed password"}>{passwordsMasked ? "••••••••••••" : credentialSecrets[item.id] || ""}</code>
-              <div className={styles.rowActions}>
-                <button type="button" onClick={() => void copyCredential(item)}>Copy</button>
-                <button type="button" onClick={() => void editCredential(item)}>Edit</button>
-                <button type="button" onClick={() => void deleteCredential(item)}>Delete</button>
+              <div className={styles.iconActions} aria-label={`${item.title} actions`}>
+                <button type="button" aria-label={`Copy password for ${item.title}`} title="Copy password" onClick={() => void copyCredential(item)}><PersonalOpsIcon name="copy" /></button>
+                <button type="button" aria-label={`Edit ${item.title}`} title="Edit" onClick={() => void editCredential(item)}><PersonalOpsIcon name="edit" /></button>
+                <button type="button" aria-label={`Delete ${item.title}`} title="Delete" onClick={() => void deleteCredential(item)}><PersonalOpsIcon name="delete" /></button>
               </div>
             </article>
-          )) : <div className={styles.empty}><strong>No passwords yet</strong><span>Add a credential to this encrypted keyring.</span></div>}
+          )) : <div className={styles.empty}><strong>No passwords yet</strong><span>Add a credential when you are ready.</span></div>}
         </div>
       </section>
     );
@@ -377,16 +508,36 @@ export default function PersonalLifeWorkspace({
   function renderLists() {
     return <div className={styles.notebook}>
       <aside className={styles.listIndex} aria-label="Lists">
-        {state.lists.map((list) => <button type="button" data-active={selectedList?.id === list.id || undefined} onClick={() => setSelectedListId(list.id)} key={list.id}><span>{list.title}</span><small>{list.items.filter((item) => item.completed).length}/{list.items.length}</small></button>)}
+        {state.lists.map((list) => <button type="button" data-active={selectedList?.id === list.id || undefined} onClick={() => selectList(list)} key={list.id}><span>{list.title}</span><small>{list.rows.filter((row) => row.completed).length}/{list.rows.length}</small></button>)}
         {!state.lists.length && <p>No lists yet.</p>}
       </aside>
       <section className={styles.listPage}>
-        {selectedList ? <>
-          <header><div><span>{selectedList.kind}</span><h2>{selectedList.title}</h2><p>{selectedList.description || "A flexible working list."}</p></div><div className={styles.rowActions}><button type="button" onClick={() => openEdit("lists", selectedList)}>Edit</button><button type="button" onClick={() => void removeObject("lists", selectedList)}>Delete</button></div></header>
-          <ol className={styles.checklist}>
-            {selectedList.items.map((item) => <li data-complete={item.completed || undefined} key={item.id}><button type="button" className={styles.checkmark} aria-label={item.completed ? `Reopen ${item.text}` : `Complete ${item.text}`} onClick={() => void patchListItems(selectedList, selectedList.items.map((candidate) => candidate.id === item.id ? { ...candidate, completed: !candidate.completed } : candidate))}>{item.completed ? "✓" : ""}</button><span><strong>{item.text}</strong>{item.note && <small>{item.note}</small>}</span><button type="button" className={styles.iconOnly} aria-label={`Delete ${item.text}`} onClick={() => void patchListItems(selectedList, selectedList.items.filter((candidate) => candidate.id !== item.id))}>×</button></li>)}
-          </ol>
-          <form className={styles.inlineComposer} onSubmit={(event) => { event.preventDefault(); if (!newListItem.trim()) return; const item = { id: crypto.randomUUID(), text: newListItem.trim(), note: "", completed: false }; void patchListItems(selectedList, [...selectedList.items, item]).then(() => setNewListItem("")); }}><input value={newListItem} onChange={(event) => setNewListItem(event.target.value)} placeholder="Add an item…" aria-label="New list item" /><button type="submit">Add</button></form>
+        {workingList && selectedList ? <>
+          <header className={styles.listEditorHeader}>
+            <div className={styles.listIdentityEditor}>
+              <select aria-label="List type" value={workingList.kind} onChange={(event) => updateListDraft((current) => ({ ...current, kind: event.target.value as PersonalList["kind"] }))}><option value="shopping">Things to buy</option><option value="watchlist">Watchlist</option><option value="favorites">Favorites</option><option value="packing">Packing</option><option value="custom">Custom</option></select>
+              <input aria-label="List title" value={workingList.title} onChange={(event) => updateListDraft((current) => ({ ...current, title: event.target.value }))} />
+              <input aria-label="List description" value={workingList.description} onChange={(event) => updateListDraft((current) => ({ ...current, description: event.target.value }))} placeholder="Add a short description…" />
+            </div>
+            <div className={styles.listHeaderActions}>
+              <button type="button" className={styles.primaryButton} disabled={busy || !workingList.title.trim()} onClick={() => void saveListDraft()}>{busy ? "Saving…" : "Save list"}</button>
+              <button type="button" className={styles.squareAction} aria-label={`Delete ${workingList.title}`} title="Delete list" onClick={() => { setListDraft(null); void removeObject("lists", selectedList); }}><PersonalOpsIcon name="delete" /></button>
+            </div>
+          </header>
+          <div className={styles.listTableScroller}>
+            <table className={styles.listTable}>
+              <thead><tr><th className={styles.completeColumn}><span className={styles.visuallyHidden}>Complete</span></th>{workingList.columns.map((column) => <th key={column.id}><div className={styles.columnHeading}><input aria-label={`${column.label} column name`} value={column.label} onChange={(event) => updateListDraft((current) => ({ ...current, columns: current.columns.map((candidate) => candidate.id === column.id ? { ...candidate, label: event.target.value } : candidate) }))} /><span>{LIST_COLUMN_LABELS[column.type]}</span>{workingList.columns.length > 1 && <button type="button" aria-label={`Remove ${column.label} column`} title="Remove column" onClick={() => updateListDraft((current) => ({ ...current, columns: current.columns.filter((candidate) => candidate.id !== column.id), rows: current.rows.map((row) => { const cells = { ...row.cells }; delete cells[column.id]; return { ...row, cells }; }) }))}><PersonalOpsIcon name="delete" /></button>}</div></th>)}<th className={styles.rowActionColumn}><span className={styles.visuallyHidden}>Row actions</span></th></tr></thead>
+              <tbody>{workingList.rows.map((row, rowIndex) => <tr data-complete={row.completed || undefined} key={row.id}>
+                <td className={styles.completeColumn}><button type="button" className={styles.checkmark} aria-label={row.completed ? `Reopen row ${rowIndex + 1}` : `Complete row ${rowIndex + 1}`} onClick={() => updateListDraft((current) => ({ ...current, rows: current.rows.map((candidate) => candidate.id === row.id ? { ...candidate, completed: !candidate.completed } : candidate) }))}>{row.completed && <PersonalOpsIcon name="check" />}</button></td>
+                {workingList.columns.map((column) => <td key={column.id}>{renderListCell(row, column.id, column.type, column.label)}</td>)}
+                <td className={styles.rowActionColumn}><button type="button" className={styles.squareAction} aria-label={`Delete row ${rowIndex + 1}`} title="Delete row" onClick={() => updateListDraft((current) => ({ ...current, rows: current.rows.filter((candidate) => candidate.id !== row.id) }))}><PersonalOpsIcon name="delete" /></button></td>
+              </tr>)}</tbody>
+            </table>
+          </div>
+          <div className={styles.listComposer}>
+            <button type="button" onClick={addListRow}>+ Add item</button>
+            <div><select aria-label="New column type" value={listColumnType} onChange={(event) => setListColumnType(event.target.value as PersonalListColumnType)}>{Object.entries(LIST_COLUMN_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select><button type="button" onClick={addListColumn}><PersonalOpsIcon name="add-column" />Add column</button></div>
+          </div>
         </> : <div className={styles.empty}><strong>Start a list</strong><span>Create a focused notebook for anything you want to track.</span></div>}
       </section>
     </div>;
@@ -433,6 +584,17 @@ export default function PersonalLifeWorkspace({
     </div>;
   }
 
+  const tripEditorStatus = (editor?.collection === "trips" ? editorValue("status") : "want") as TripStatus;
+  const tripEditorTitle = editor?.id
+    ? `Edit ${TRIP_LABELS[tripEditorStatus].toLowerCase()} record`
+    : tripEditorStatus === "been"
+      ? "Add a place you’ve been"
+      : tripEditorStatus === "lived"
+        ? "Add a place you lived"
+        : tripEditorStatus === "planned"
+          ? "Plan a trip"
+          : "Add somewhere you want to go";
+
   return <div className={baseStyles.shell}>
     <PersonalOpsSidebar activeView={initialView} filter="" pathname={`/admin/personal/${initialView}`} counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
     <main className={baseStyles.directory}>
@@ -451,11 +613,23 @@ export default function PersonalLifeWorkspace({
       </div>
     </main>
 
-    {credentialDraft && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCredentialDraft(null); }}><form className={styles.editor} onSubmit={saveCredential}><header><div><span>Encrypted credential</span><h2>{credentialDraft.id ? "Edit password" : "Add password"}</h2></div><button type="button" aria-label="Close password editor" onClick={() => setCredentialDraft(null)}>×</button></header>{input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}{input("Username or email", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "name@example.com" })}{input("Password", "secret", credentialDraft.secret, (value) => setCredentialDraft((current) => current ? { ...current, secret: value } : current), { type: "password", required: true })}{input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}<label className={styles.full}><span>Notes</span><textarea value={credentialDraft.notes} onChange={(event) => setCredentialDraft((current) => current ? { ...current, notes: event.target.value } : current)} rows={4} /></label><footer><button type="button" onClick={() => setCredentialDraft(null)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy}>{busy ? "Encrypting…" : "Encrypt & save"}</button></footer></form></div>}
+    {credentialDraft && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCredentialDraft(null); }}><form className={styles.editor} onSubmit={saveCredential}><header><div><h2>{credentialDraft.id ? "Edit password" : "Add password"}</h2></div><button type="button" aria-label="Close password editor" onClick={() => setCredentialDraft(null)}>×</button></header>{input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}{input("Username", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "Optional username" })}{input("Email", "email", credentialDraft.email, (value) => setCredentialDraft((current) => current ? { ...current, email: value } : current), { type: "email", placeholder: "name@example.com" })}{input("Password", "secret", credentialDraft.secret, (value) => setCredentialDraft((current) => current ? { ...current, secret: value } : current), { type: "password", required: true })}{input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}<label className={styles.full}><span>Notes</span><textarea value={credentialDraft.notes} onChange={(event) => setCredentialDraft((current) => current ? { ...current, notes: event.target.value } : current)} rows={4} /></label><footer><button type="button" onClick={() => setCredentialDraft(null)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy}>{busy ? "Saving…" : "Save"}</button></footer></form></div>}
 
-    {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} onSubmit={submitEditor}><header><div><span>Personal Ops record</span><h2>{editor.id ? "Edit" : "Add"} {editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)}>×</button></header>
+    {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} onSubmit={submitEditor}><header><div>{editor.collection !== "trips" && <span>Personal Ops record</span>}<h2>{editor.collection === "trips" ? tripEditorTitle : `${editor.id ? "Edit" : "Add"} ${editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}`}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)}>×</button></header>
       {editor.collection === "lists" && <>{input("Title", "title", editorValue("title"), (value) => setEditorValue("title", value), { required: true })}<label><span>Type</span><select value={editorValue("kind")} onChange={(event) => setEditorValue("kind", event.target.value)}><option value="shopping">Things to buy</option><option value="watchlist">Watchlist</option><option value="favorites">Favorites</option><option value="packing">Packing</option><option value="custom">Custom</option></select></label><label className={styles.full}><span>Description</span><textarea value={editorValue("description")} onChange={(event) => setEditorValue("description", event.target.value)} rows={3} /></label></>}
-      {editor.collection === "trips" && <>{input("Trip name", "name", editorValue("name"), (value) => setEditorValue("name", value), { required: true })}{input("Place", "place", editorValue("place"), (value) => setEditorValue("place", value), { required: true, placeholder: "City or country" })}{input("Region", "region", editorValue("region"), (value) => setEditorValue("region", value), { placeholder: "State, province, or region" })}<label><span>Map status</span><select value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}>{Object.entries(TRIP_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label><label><span>Travel mode</span><select value={editorValue("travelMode")} onChange={(event) => setEditorValue("travelMode", event.target.value)}>{["car", "plane", "train", "boat", "bus", "bike", "walk", "other"].map((value) => <option value={value} key={value}>{value}</option>)}</select></label>{input("Latitude", "latitude", editorValue("latitude"), (value) => setEditorValue("latitude", value), { type: "number", required: true })}{input("Longitude", "longitude", editorValue("longitude"), (value) => setEditorValue("longitude", value), { type: "number", required: true })}{input("Start", "startDate", editorValue("startDate"), (value) => setEditorValue("startDate", value), { type: "date" })}{input("End", "endDate", editorValue("endDate"), (value) => setEditorValue("endDate", value), { type: "date" })}<label className={styles.full}><span>Notes</span><textarea value={editorValue("notes")} onChange={(event) => setEditorValue("notes", event.target.value)} rows={4} /></label></>}
+      {editor.collection === "trips" && <>
+        <label className={styles.full}><span>Status</span><select value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}>{Object.entries(TRIP_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+        {input(tripEditorStatus === "want" ? "Place name" : tripEditorStatus === "lived" ? "Home label" : "Trip name", "name", editorValue("name"), (value) => setEditorValue("name", value), { required: true, placeholder: tripEditorStatus === "planned" ? "Weekend in Montréal" : "Name this place" })}
+        {input(tripEditorStatus === "planned" ? "Destination" : "Place", "place", editorValue("place"), (value) => setEditorValue("place", value), { required: true, placeholder: "City or country" })}
+        {input("Region", "region", editorValue("region"), (value) => setEditorValue("region", value), { placeholder: "State, province, or region" })}
+        {(tripEditorStatus === "been" || tripEditorStatus === "planned") && <label><span>Travel mode</span><select value={editorValue("travelMode")} onChange={(event) => setEditorValue("travelMode", event.target.value)}>{["car", "plane", "train", "boat", "bus", "bike", "walk", "other"].map((value) => <option value={value} key={value}>{value}</option>)}</select></label>}
+        {tripEditorStatus === "want" && input("Target date", "startDate", editorValue("startDate"), (value) => setEditorValue("startDate", value), { type: "date" })}
+        {tripEditorStatus === "been" && <>{input("Arrived", "startDate", editorValue("startDate"), (value) => setEditorValue("startDate", value), { type: "date" })}{input("Returned", "endDate", editorValue("endDate"), (value) => setEditorValue("endDate", value), { type: "date" })}</>}
+        {tripEditorStatus === "lived" && <>{input("Moved in", "startDate", editorValue("startDate"), (value) => setEditorValue("startDate", value), { type: "date" })}{input("Moved out", "endDate", editorValue("endDate"), (value) => setEditorValue("endDate", value), { type: "date" })}</>}
+        {tripEditorStatus === "planned" && <>{input("Depart", "startDate", editorValue("startDate"), (value) => setEditorValue("startDate", value), { type: "date" })}{input("Return", "endDate", editorValue("endDate"), (value) => setEditorValue("endDate", value), { type: "date" })}</>}
+        <fieldset className={styles.coordinateFields}><legend>Map pin</legend>{input("Latitude", "latitude", editorValue("latitude"), (value) => setEditorValue("latitude", value), { type: "number", required: true })}{input("Longitude", "longitude", editorValue("longitude"), (value) => setEditorValue("longitude", value), { type: "number", required: true })}</fieldset>
+        <label className={styles.full}><span>{tripEditorStatus === "want" ? "Why it’s on the list" : tripEditorStatus === "lived" ? "Living notes" : "Trip notes"}</span><textarea value={editorValue("notes")} onChange={(event) => setEditorValue("notes", event.target.value)} rows={4} /></label>
+      </>}
       {editor.collection === "buildItems" && <>{input("Item", "name", editorValue("name"), (value) => setEditorValue("name", value), { required: true, placeholder: "Boots, jacket, vest…" })}{input("Category", "category", editorValue("category"), (value) => setEditorValue("category", value), { placeholder: "Footwear, outerwear, gear…" })}<label><span>Status</span><select value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}>{Object.entries(BUILD_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>{input("Target", "targetDate", editorValue("targetDate"), (value) => setEditorValue("targetDate", value), { type: "date" })}{input("Budget", "budget", editorValue("budget"), (value) => setEditorValue("budget", value), { placeholder: "$ or range" })}<label className={styles.full}><span>Notes</span><textarea value={editorValue("notes")} onChange={(event) => setEditorValue("notes", event.target.value)} rows={4} /></label></>}
       {editor.collection === "vehicles" && <>{input("Build name", "name", editorValue("name"), (value) => setEditorValue("name", value), { required: true, placeholder: "Daily driver or future build" })}{input("Year", "year", editorValue("year"), (value) => setEditorValue("year", value))}{input("Make", "make", editorValue("make"), (value) => setEditorValue("make", value))}{input("Model", "model", editorValue("model"), (value) => setEditorValue("model", value))}{input("Trim", "trim", editorValue("trim"), (value) => setEditorValue("trim", value))}<label><span>Status</span><select value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}><option value="current">Current</option><option value="future">Future</option><option value="previous">Previous</option></select></label>{input("Identification note", "vinNote", editorValue("vinNote"), (value) => setEditorValue("vinNote", value), { placeholder: "Optional partial reference—never a key" })}<label className={styles.full}><span>Build notes</span><textarea value={editorValue("notes")} onChange={(event) => setEditorValue("notes", event.target.value)} rows={4} /></label></>}
       <footer><button type="button" onClick={() => setEditor(null)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy}>{busy ? "Saving…" : "Save"}</button></footer></form></div>}

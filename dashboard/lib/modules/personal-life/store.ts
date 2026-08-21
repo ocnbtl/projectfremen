@@ -1,12 +1,18 @@
 import { mutateJsonFile, readJsonFile } from "../../file-store";
+import { createNativeObjectRef } from "../../native-objects/routes";
+import { isModuleId, type NativeObjectRef } from "../../native-objects/types";
 import {
   PERSONAL_LIFE_COLLECTIONS,
+  PERSONAL_LIST_COLUMN_TYPES,
   PERSONAL_LIFE_SCHEMA_VERSION,
   type PersonalBuildItem,
   type PersonalLifeCollection,
   type PersonalLifeInputByCollection,
   type PersonalLifeObjectByCollection,
   type PersonalLifeState,
+  type PersonalListCell,
+  type PersonalListColumn,
+  type PersonalListRow,
   type PersonalList,
   type PersonalTrip,
   type PersonalVehicle,
@@ -64,6 +70,89 @@ function listItems(value: unknown): PersonalList["items"] {
   });
 }
 
+function nativeRef(value: unknown, field: string): NativeObjectRef | undefined {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (!isRecord(value)) throw new Error(`${field} must be a linked object`);
+  const module = text(value.module, `${field}.module`, 40, true);
+  if (!isModuleId(module)) throw new Error(`${field}.module is not supported`);
+  return createNativeObjectRef({
+    module,
+    objectType: text(value.objectType, `${field}.objectType`, 120, true),
+    objectId: text(value.objectId, `${field}.objectId`, 240, true),
+    containerObjectId: text(value.containerObjectId, `${field}.containerObjectId`, 240) || undefined,
+    label: text(value.label, `${field}.label`, 500, true),
+    versionId: text(value.versionId, `${field}.versionId`, 240) || undefined
+  });
+}
+
+function listColumns(value: unknown, legacyItems: PersonalList["items"]): PersonalListColumn[] {
+  if (Array.isArray(value) && value.length) {
+    return value.slice(0, 24).map((candidate, index) => {
+      const column = isRecord(candidate) ? candidate : {};
+      return {
+        id: identifier(column.id),
+        label: text(column.label, `columns.${index}.label`, 80, true),
+        type: member(column.type, PERSONAL_LIST_COLUMN_TYPES, "text")
+      };
+    });
+  }
+  return [
+    { id: "item", label: "Item", type: "text" as const },
+    ...(legacyItems.some((item) => item.note) ? [{ id: "notes", label: "Notes", type: "text" as const }] : [])
+  ];
+}
+
+function listCell(value: unknown, field: string, column: PersonalListColumn): PersonalListCell {
+  const candidate = isRecord(value) ? value : { value };
+  const ref = nativeRef(candidate.ref, `${field}.ref`);
+  if (ref && column.type === "person" && ref.module !== "people") {
+    throw new Error(`${field} must link to a People record`);
+  }
+  if (ref && column.type === "object" && ref.module === "people") {
+    throw new Error(`${field} must link to an object record`);
+  }
+  return {
+    value: text(candidate.value, `${field}.value`, 4_000),
+    ...(ref ? { ref } : {})
+  };
+}
+
+function listRows(value: unknown, columns: PersonalListColumn[], legacyItems: PersonalList["items"]): PersonalListRow[] {
+  if (Array.isArray(value)) {
+    return value.slice(0, 500).map((candidate, rowIndex) => {
+      const row = isRecord(candidate) ? candidate : {};
+      const rawCells = isRecord(row.cells) ? row.cells : {};
+      return {
+        id: identifier(row.id),
+        completed: row.completed === true,
+        cells: Object.fromEntries(columns.map((column) => [
+          column.id,
+          listCell(rawCells[column.id], `rows.${rowIndex}.cells.${column.id}`, column)
+        ]))
+      };
+    });
+  }
+  return legacyItems.map((item) => ({
+    id: item.id,
+    completed: item.completed,
+    cells: Object.fromEntries(columns.map((column) => [
+      column.id,
+      { value: column.id === "item" ? item.text : column.id === "notes" ? item.note : "" }
+    ]))
+  }));
+}
+
+function compatibilityItems(columns: PersonalListColumn[], rows: PersonalListRow[]): PersonalList["items"] {
+  const primary = columns[0];
+  const notes = columns.find((column) => column.label.toLowerCase() === "notes");
+  return rows.map((row) => ({
+    id: row.id,
+    text: row.cells[primary.id]?.value || "Untitled item",
+    note: notes ? row.cells[notes.id]?.value || "" : "",
+    completed: row.completed
+  }));
+}
+
 function modifications(value: unknown): VehicleModification[] {
   if (!Array.isArray(value)) return [];
   return value.slice(0, 300).map((candidate, index) => {
@@ -95,12 +184,17 @@ function base(raw: Record<string, unknown>, now: string) {
 }
 
 function normalizeList(raw: Record<string, unknown>, now: string): PersonalList {
+  const legacyItems = listItems(raw.items);
+  const columns = listColumns(raw.columns, legacyItems);
+  const rows = listRows(raw.rows, columns, legacyItems);
   return {
     ...base(raw, now),
     title: text(raw.title, "List title", 240, true),
     description: text(raw.description, "List description", 2_000),
     kind: member(raw.kind, ["shopping", "watchlist", "favorites", "packing", "custom"] as const, "custom"),
-    items: listItems(raw.items)
+    items: compatibilityItems(columns, rows),
+    columns,
+    rows
   };
 }
 

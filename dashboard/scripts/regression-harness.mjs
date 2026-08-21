@@ -10914,6 +10914,9 @@ async function main() {
         !personalLifeWorkspace.includes("browserVault") &&
         personalLifeWorkspace.includes('/api/personal/passwords?includeSecrets=true') &&
         personalLifeWorkspace.includes("togglePasswordPrivacy") &&
+        personalLifeWorkspace.includes('input("Email", "email"') &&
+        personalLifeTypes.includes('"rating", "person", "object"') &&
+        personalLifeWorkspace.includes("renderListCell") &&
         personalPasswordsStore.includes('createCipheriv("aes-256-gcm"') &&
         personalPasswordsStore.includes("cipher.setAAD") &&
         personalPasswordsApi.includes("hasAdminSession") &&
@@ -11411,7 +11414,7 @@ async function main() {
     const createdCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "POST",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
-      body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}@example.com`, secret: syntheticPassword, website: "https://example.com/account", notes: "Synthetic credential context." } })
+      body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}-user`, email: `${testRunId}@example.com`, secret: syntheticPassword, website: "https://example.com/account", notes: "Synthetic credential context." } })
     });
     assert(
       createdCredential.response.ok && createdCredential.payload?.ok && createdCredential.payload.item?.id && !("secret" in createdCredential.payload.item),
@@ -11420,8 +11423,8 @@ async function main() {
     const credentialSummary = createdCredential.payload.item;
     const listedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords");
     assert(
-      listedCredentials.response.ok && listedCredentials.payload?.items?.some((item) => item.id === credentialSummary.id && !("secret" in item)),
-      "Default encrypted password list exposed a secret or omitted the created credential"
+      listedCredentials.response.ok && listedCredentials.payload?.items?.some((item) => item.id === credentialSummary.id && item.username === `${testRunId}-user` && item.email === `${testRunId}@example.com` && !("secret" in item)),
+      "Default encrypted password list exposed a secret or omitted separate username/email fields"
     );
     const revealedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords?includeSecrets=true");
     assert(
@@ -11433,13 +11436,14 @@ async function main() {
       encryptedPasswordFile.includes('"algorithm": "aes-256-gcm"') &&
         !encryptedPasswordFile.includes(syntheticCredentialTitle) &&
         !encryptedPasswordFile.includes(syntheticPassword.trim()) &&
+        !encryptedPasswordFile.includes(`${testRunId}-user`) &&
         !encryptedPasswordFile.includes(`${testRunId}@example.com`),
       "Encrypted password persistence leaked plaintext fields or omitted its authenticated-encryption marker"
     );
     const updatedCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "PATCH",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
-      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: `${syntheticCredentialTitle} updated`, username: `${testRunId}@example.com`, secret: syntheticPassword, website: "https://example.com/account", notes: "Updated synthetic context." } })
+      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: `${syntheticCredentialTitle} updated`, username: `${testRunId}-user-2`, email: `${testRunId}-updated@example.com`, secret: syntheticPassword, website: "https://example.com/account", notes: "Updated synthetic context." } })
     });
     assert(updatedCredential.response.ok && updatedCredential.payload?.item?.updatedAt !== credentialSummary.updatedAt, "Encrypted password update did not persist");
     const staleCredentialUpdate = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
@@ -11480,12 +11484,42 @@ async function main() {
     }
     const createdList = createdLifeObjects.find((entry) => entry.collection === "lists").item;
     const listItemId = crypto.randomUUID();
+    const listColumns = [
+      { id: "item", label: "Item", type: "text" },
+      { id: "due", label: "Due", type: "date" },
+      { id: "price", label: "Price", type: "price" },
+      { id: "rating", label: "Rating", type: "rating" },
+      { id: "person", label: "Person", type: "person" },
+      { id: "object", label: "Object", type: "object" }
+    ];
+    const linkedPersonRef = { module: "people", objectType: "person", objectId: `${testRunId}-person`, label: "Regression Person", route: "javascript:ignored" };
+    const linkedObjectRef = { module: "notes", objectType: "note", objectId: `${testRunId}-note`, label: "Regression Note", route: "javascript:ignored" };
+    const listRows = [{
+      id: listItemId,
+      completed: true,
+      cells: {
+        item: { value: "Verify the field notebook" },
+        due: { value: "2026-09-01" },
+        price: { value: "$48" },
+        rating: { value: "5" },
+        person: { value: linkedPersonRef.label, ref: linkedPersonRef },
+        object: { value: linkedObjectRef.label, ref: linkedObjectRef }
+      }
+    }];
     const updatedLifeList = await requestJson(server.baseUrl, cookieJar, "/api/personal/life", {
       method: "PATCH",
       headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
-      body: JSON.stringify({ collection: "lists", id: createdList.id, expectedUpdatedAt: createdList.updatedAt, patch: { items: [{ id: listItemId, text: "Verify the field notebook", note: "", completed: true }] } })
+      body: JSON.stringify({ collection: "lists", id: createdList.id, expectedUpdatedAt: createdList.updatedAt, patch: { columns: listColumns, rows: listRows } })
     });
-    assert(updatedLifeList.response.ok && updatedLifeList.payload?.item?.items?.[0]?.completed === true, "Personal Lists item update did not persist");
+    assert(
+      updatedLifeList.response.ok &&
+        updatedLifeList.payload?.item?.items?.[0]?.completed === true &&
+        updatedLifeList.payload?.item?.columns?.length === listColumns.length &&
+        updatedLifeList.payload?.item?.rows?.[0]?.cells?.rating?.value === "5" &&
+        updatedLifeList.payload?.item?.rows?.[0]?.cells?.person?.ref?.route?.startsWith("/admin/people") &&
+        updatedLifeList.payload?.item?.rows?.[0]?.cells?.object?.ref?.route?.startsWith("/admin/notes"),
+      "Personal Lists typed columns, rows, or canonical People/Object references did not persist"
+    );
     const staleLifeList = await requestJson(server.baseUrl, cookieJar, "/api/personal/life", {
       method: "PATCH",
       headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
@@ -11502,7 +11536,7 @@ async function main() {
         !JSON.stringify(personalLifeState.payload.state).toLowerCase().includes("password"),
       `Personal life systems did not persist one object per working surface: ${JSON.stringify(personalLifeState.payload)}`
     );
-    pass("Lists, Travel, Personal Build, and Car persist typed records with CSRF and stale-write protection while passwords remain in their separate encrypted store");
+    pass("Lists persist typed columns plus canonical People/Object references; Travel, Personal Build, and Car retain typed records; passwords remain in their separate encrypted store");
 
     const personalOpsAfterRouteReads = await readFile(personalOpsDataPath, "utf8");
     assert(

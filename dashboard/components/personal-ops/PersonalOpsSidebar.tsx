@@ -1,11 +1,11 @@
 "use client";
 
-import type { ReactNode } from "react";
 import ModuleSidebar, {
   type ModuleSidebarItem,
   type ModuleSidebarSection
 } from "../admin-shell/ModuleSidebar";
 import styles from "./PersonalOpsWorkspace.module.css";
+import PersonalOpsIcon, { type PersonalOpsIconName } from "./PersonalOpsIcon";
 
 export type PersonalOpsSidebarView =
   | "command"
@@ -75,10 +75,6 @@ const SMART_VIEWS = [
   ["linked-reviews", "Linked to Reviews"]
 ] as const;
 
-function Icon({ children }: { children: ReactNode }) {
-  return <span aria-hidden="true">{children}</span>;
-}
-
 function viewItem({
   id,
   label,
@@ -93,7 +89,7 @@ function viewItem({
   view: PersonalOpsSidebarView;
   activeView: PersonalOpsSidebarView;
   count: number;
-  icon?: ReactNode;
+  icon?: PersonalOpsIconName;
   unavailableReason?: string;
 }): ModuleSidebarItem {
   return {
@@ -102,7 +98,7 @@ function viewItem({
     href: VIEW_ROUTES[view],
     active: activeView === view,
     count,
-    icon,
+    icon: icon ? <PersonalOpsIcon name={icon} /> : undefined,
     disabled: Boolean(unavailableReason),
     disabledReason: unavailableReason
   };
@@ -156,14 +152,14 @@ export default function PersonalOpsSidebar({
           href: VIEW_ROUTES.command,
           active: activeView === "command" && filter !== "week",
           count: counts.command,
-          icon: <Icon>⌂</Icon>
+          icon: <PersonalOpsIcon name="today" />
         },
         {
           id: "week",
           label: "This Week",
           href: `${VIEW_ROUTES.command}?filter=week`,
           active: activeView === "command" && filter === "week",
-          icon: <Icon>7</Icon>
+          icon: <PersonalOpsIcon name="week" />
         },
         viewItem({
           id: "goals",
@@ -171,7 +167,7 @@ export default function PersonalOpsSidebar({
           view: "goals",
           activeView,
           count: counts.goals,
-          icon: <Icon>◎</Icon>,
+          icon: "goal",
           unavailableReason: unavailableViews?.goals
         }),
         viewItem({
@@ -180,7 +176,7 @@ export default function PersonalOpsSidebar({
           view: "follow-ups",
           activeView,
           count: counts.followUps,
-          icon: <Icon>↗</Icon>,
+          icon: "follow-up",
           unavailableReason: unavailableViews?.["follow-ups"]
         }),
         viewItem({
@@ -189,7 +185,7 @@ export default function PersonalOpsSidebar({
           view: "decisions",
           activeView,
           count: counts.decisions,
-          icon: <Icon>◇</Icon>,
+          icon: "decision",
           unavailableReason: unavailableViews?.decisions
         }),
         viewItem({
@@ -198,7 +194,7 @@ export default function PersonalOpsSidebar({
           view: "routines",
           activeView,
           count: counts.routines,
-          icon: <Icon>↻</Icon>,
+          icon: "routine",
           unavailableReason: unavailableViews?.routines
         }),
         viewItem({
@@ -207,7 +203,7 @@ export default function PersonalOpsSidebar({
           view: "passwords",
           activeView,
           count: counts.passwords || 0,
-          icon: <Icon>⌁</Icon>
+          icon: "password"
         }),
         viewItem({
           id: "lists",
@@ -215,7 +211,7 @@ export default function PersonalOpsSidebar({
           view: "lists",
           activeView,
           count: counts.lists || 0,
-          icon: <Icon>≡</Icon>
+          icon: "list"
         }),
         viewItem({
           id: "travel",
@@ -223,7 +219,7 @@ export default function PersonalOpsSidebar({
           view: "travel",
           activeView,
           count: counts.travel || 0,
-          icon: <Icon>⌖</Icon>
+          icon: "travel"
         }),
         viewItem({
           id: "personal-build",
@@ -231,7 +227,7 @@ export default function PersonalOpsSidebar({
           view: "personal-build",
           activeView,
           count: counts.personalBuild || 0,
-          icon: <Icon>◇</Icon>
+          icon: "build"
         }),
         viewItem({
           id: "car",
@@ -239,7 +235,7 @@ export default function PersonalOpsSidebar({
           view: "car",
           activeView,
           count: counts.car || 0,
-          icon: <Icon>▱</Icon>
+          icon: "car"
         })
       ]
     };

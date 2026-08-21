@@ -93,6 +93,11 @@
   color: var(--text-muted);
 }
 
+.sidebar :global(.module-sidebar__item-icon svg) {
+  width: 16px;
+  height: 16px;
+}
+
 .directory {
   grid-column: 2;
   grid-row: 1;

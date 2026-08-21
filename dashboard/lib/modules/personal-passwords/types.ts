@@ -23,6 +23,7 @@ export type PersonalPasswordsState = {
 export type CredentialInput = {
   title: string;
   username: string;
+  email: string;
   secret: string;
   website: string;
   notes: string;

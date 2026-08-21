@@ -77,6 +77,7 @@ function normalizeInput(value: unknown): CredentialInput {
   return {
     title: cleanText(value.title, "Account", 240, true),
     username: cleanText(value.username, "Username", 1_000),
+    email: cleanText(value.email, "Email", 1_000),
     secret: cleanSecret(value.secret),
     website,
     notes: cleanText(value.notes, "Notes", 12_000)

@@ -20,25 +20,31 @@
 .empty strong { color: var(--text-strong); font: 800 15px var(--font-heading); }
 .empty span { font-size: 12px; }
 
-/* Passwords: a restrained encrypted keyring with a page-level privacy shutter. */
-.vaultGate { display: grid; max-width: 560px; min-height: 320px; margin: 7vh auto; place-items: center; align-content: center; gap: 9px; padding: 36px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-bg-subtle); text-align: center; }
-.vaultGate h2, .vaultGate p { margin: 0; }
-.vaultGate p { max-width: 50ch; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
-.vaultMark { display: grid; width: 46px; height: 46px; place-items: center; border: 1px solid var(--border-strong); border-radius: 50%; color: var(--action-primary); font-size: 24px; }
-.keyring { display: grid; grid-template-columns: 120px minmax(0, 1fr); min-height: 420px; overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-bg); }
-.keyringRail { display: grid; align-content: start; gap: 5px; padding: 18px 14px; border-right: 1px solid var(--border); background: var(--panel-bg-subtle); }
-.keyringRail span, .keyringRail small { color: var(--text-muted); font: 750 10px var(--font-heading); text-transform: uppercase; letter-spacing: .07em; }
-.keyringRail strong { margin-top: 20px; color: var(--text-strong); font: 800 34px/1 var(--font-mono); }
+/* Passwords: a dense encrypted ledger with a page-level privacy shutter. */
+.keyring { min-height: 360px; overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-bg); }
+.keyringHeader { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 9px; min-height: 48px; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--border); background: var(--panel-bg-subtle); }
+.keyringHeader > div { display: grid; gap: 1px; }
+.keyringHeader strong { color: var(--text-strong); font: 780 12px var(--font-heading); }
+.keyringHeader small { color: var(--text-muted); font-size: 10px; }
+.keyringMark { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid var(--border); border-radius: 6px; color: var(--action-primary); background: var(--panel-bg); }
+.keyringMark svg, .keyIcon svg { width: 16px; height: 16px; }
+.keyringCount { display: grid; min-width: 28px; height: 26px; place-items: center; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); background: var(--panel-bg); font: 700 10px var(--font-mono); }
 .credentialList { display: grid; align-content: start; }
-.credentialRow { display: grid; grid-template-columns: 34px minmax(150px, 1fr) minmax(140px, .7fr) auto; gap: 10px; align-items: center; min-height: 66px; padding: 9px 12px; border-bottom: 1px solid var(--border); }
-.credentialRow > div:nth-child(2) { display: grid; gap: 3px; min-width: 0; }
-.credentialRow strong, .credentialRow small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.credentialRow strong { color: var(--text-strong); font: 780 13px var(--font-heading); }
-.credentialRow small { color: var(--text-muted); font-size: 11px; }
-.credentialRow code { padding: 6px 8px; overflow: hidden; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg-subtle); color: var(--text); font: 650 11px var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.credentialRow { display: grid; grid-template-columns: 26px minmax(220px, 1.4fr) minmax(170px, .72fr) auto; gap: 9px; align-items: center; min-height: 52px; padding: 6px 10px; border-bottom: 1px solid var(--border); content-visibility: auto; contain-intrinsic-size: 0 52px; }
+.credentialRow:last-child { border-bottom: 0; }
+.credentialIdentity { display: grid; min-width: 0; gap: 3px; }
+.credentialIdentity > strong { overflow: hidden; color: var(--text-strong); font: 780 12px var(--font-heading); text-overflow: ellipsis; white-space: nowrap; }
+.credentialMeta { display: flex; min-width: 0; gap: 9px; overflow: hidden; color: var(--text-muted); font-size: 9px; }
+.credentialMeta span { display: inline-flex; min-width: 0; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.credentialMeta b { color: var(--text-muted); font: 750 8px var(--font-heading); letter-spacing: .04em; text-transform: uppercase; }
+.credentialRow code { padding: 6px 8px; overflow: hidden; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg-subtle); color: var(--text-strong); font: 680 14px/1 var(--font-mono); letter-spacing: .025em; text-overflow: ellipsis; white-space: nowrap; }
 .credentialPrivate { transition: filter 150ms ease, opacity 150ms ease; }
 .keyring[data-masked] .credentialPrivate { filter: blur(6px); opacity: .66; pointer-events: none; user-select: none; }
-.keyIcon { color: var(--action-primary); font-size: 20px; }
+.keyIcon { display: grid; width: 26px; height: 26px; place-items: center; color: var(--action-primary); }
+.iconActions { display: flex; gap: 3px; }
+.iconActions button, .squareAction { display: inline-grid; width: 30px; height: 30px; min-height: 30px; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.iconActions button:hover, .squareAction:hover { border-color: var(--border); background: var(--panel-bg-subtle); color: var(--text-strong); }
+.iconActions svg, .squareAction svg { width: 15px; height: 15px; }
 
 /* Lists: notebook index and ruled working page. */
 .notebook { display: grid; grid-template-columns: minmax(170px, 220px) minmax(0, 1fr); min-height: 520px; overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-bg); }
@@ -47,21 +53,47 @@
 .listIndex button[data-active] { background: var(--selected-bg); box-shadow: inset 3px 0 0 var(--action-primary); }
 .listIndex button span { overflow: hidden; font: 750 12px var(--font-heading); text-overflow: ellipsis; white-space: nowrap; }
 .listIndex button small { color: var(--text-muted); font: 650 10px var(--font-mono); }
-.listPage { min-width: 0; padding: 18px 20px; background: repeating-linear-gradient(to bottom, transparent 0, transparent 35px, color-mix(in srgb, var(--border) 55%, transparent) 36px); }
-.listPage > header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; min-height: 98px; padding-bottom: 14px; background: var(--panel-bg); }
-.listPage header span { color: var(--action-primary); font: 800 10px var(--font-heading); text-transform: uppercase; letter-spacing: .07em; }
-.listPage h2, .listPage p { margin: 0; }
-.listPage h2 { margin-top: 3px; font: 820 21px var(--font-heading); }
-.listPage p { margin-top: 4px; color: var(--text-muted); font-size: 12px; }
-.checklist { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; }
-.checklist li { display: grid; grid-template-columns: 24px minmax(0, 1fr) 28px; gap: 8px; align-items: center; min-height: 36px; }
-.checklist li > span { display: grid; gap: 2px; }
-.checklist li strong { font: 650 12px var(--font-body); }
-.checklist li small { color: var(--text-muted); font-size: 10px; }
-.checklist li[data-complete] strong { color: var(--text-muted); text-decoration: line-through; }
+.listPage { min-width: 0; padding: 14px; }
+.listEditorHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: start; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+.listIdentityEditor { display: grid; max-width: 660px; grid-template-columns: 124px minmax(160px, .8fr) minmax(220px, 1.25fr); gap: 6px; }
+.listIdentityEditor input, .listIdentityEditor select { min-width: 0; min-height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg); color: var(--text); font: 12px var(--font-body); }
+.listIdentityEditor input[aria-label="List title"] { color: var(--text-strong); font: 780 13px var(--font-heading); }
+.listHeaderActions { display: flex; gap: 5px; }
+.listTableScroller { overflow: auto; margin-top: 10px; border: 1px solid var(--border); border-radius: 7px; }
+.listTable { width: 100%; min-width: 620px; border-collapse: collapse; background: var(--panel-bg); table-layout: auto; }
+.listTable th, .listTable td { min-width: 150px; padding: 4px 6px; border-right: 1px solid var(--border); border-bottom: 1px solid var(--border); text-align: left; }
+.listTable th:last-child, .listTable td:last-child { border-right: 0; }
+.listTable tbody tr:last-child td { border-bottom: 0; }
+.listTable th { height: 38px; background: var(--panel-bg-subtle); }
+.listTable tbody tr { content-visibility: auto; contain-intrinsic-size: 0 40px; }
+.listTable tbody tr[data-complete] { opacity: .58; }
+.listTable tbody tr[data-complete] input { text-decoration: line-through; }
+.listTable .completeColumn { width: 38px; min-width: 38px; text-align: center; }
+.listTable .rowActionColumn { width: 42px; min-width: 42px; text-align: center; }
+.columnHeading { display: grid; grid-template-columns: minmax(70px, 1fr) auto 24px; gap: 5px; align-items: center; }
+.columnHeading input { width: 100%; min-width: 0; border: 0; background: transparent; color: var(--text-strong); font: 750 10px var(--font-heading); }
+.columnHeading > span { color: var(--text-muted); font: 700 8px var(--font-heading); letter-spacing: .04em; text-transform: uppercase; }
+.columnHeading button { display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; background: transparent; color: var(--text-muted); cursor: pointer; }
+.columnHeading button svg { width: 13px; height: 13px; }
+.listTable td > input, .linkCell select { width: 100%; min-width: 120px; min-height: 30px; padding: 0 7px; border: 1px solid transparent; border-radius: 4px; background: transparent; color: var(--text); font: 11px var(--font-body); }
+.listTable td > input:hover, .listTable td > input:focus, .linkCell select:hover, .linkCell select:focus { border-color: var(--border); background: var(--panel-bg-subtle); outline: none; }
 .checkmark { display: grid; width: 18px; height: 18px; place-items: center; padding: 0; border: 1px solid var(--border-strong); border-radius: 50%; background: var(--panel-bg); color: #21845f; font-size: 11px; cursor: pointer; }
+.checkmark svg { width: 12px; height: 12px; }
+.linkCell { display: grid; grid-template-columns: 16px minmax(110px, 1fr) 26px; gap: 4px; align-items: center; color: var(--text-muted); }
+.linkCell > svg { width: 14px; height: 14px; }
+.linkCell a { display: grid; width: 26px; height: 26px; place-items: center; border-radius: 4px; color: var(--text-muted); }
+.linkCell a:hover { background: var(--panel-bg-subtle); color: var(--text-strong); }
+.linkCell a svg { width: 13px; height: 13px; }
+.ratingInput { display: flex; gap: 1px; }
+.ratingInput button { width: 22px; height: 28px; padding: 0; border: 0; background: transparent; color: color-mix(in srgb, var(--text-muted) 36%, transparent); font-size: 15px; cursor: pointer; }
+.ratingInput button[data-active] { color: #b77518; }
+.listComposer { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 9px; }
+.listComposer > div { display: flex; gap: 5px; }
+.listComposer button, .listComposer select { display: inline-flex; min-height: 32px; align-items: center; gap: 6px; padding: 0 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg); color: var(--text); font: 750 10px var(--font-heading); cursor: pointer; }
+.listComposer button svg { width: 14px; height: 14px; }
 .inlineComposer, .modComposer { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--border); background: var(--panel-bg); }
 .inlineComposer input, .modComposer input, .modComposer select { min-height: 34px; padding: 0 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg); color: var(--text); font: 12px var(--font-body); }
+.visuallyHidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; clip-path: inset(50%); }
 
 /* Travel: atlas surface with selectable semantic layers. */
 .atlas { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(270px, .75fr); gap: 14px; }
@@ -148,11 +180,16 @@
 .editor header, .editor footer, .editor .full { grid-column: 1 / -1; }
 .editor header { display: flex; align-items: start; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .editor header h2 { margin: 3px 0 0; font: 820 18px var(--font-heading); }
+.editor header h2:first-child { margin-top: 0; }
 .editor header button { width: 30px; height: 30px; border: 0; background: transparent; color: var(--text-muted); font-size: 20px; cursor: pointer; }
 .editor label { display: grid; align-content: start; gap: 5px; color: var(--text-muted); font: 750 10px var(--font-heading); }
 .editor input, .editor select, .editor textarea { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg); color: var(--text); font: 12px var(--font-body); }
 .editor textarea { resize: vertical; }
 .editor footer { display: flex; justify-content: flex-end; gap: 6px; padding-top: 9px; border-top: 1px solid var(--border); }
+.editor footer button { display: inline-flex; width: 96px; min-width: 96px; min-height: 34px; align-items: center; justify-content: center; }
+.editor footer .primaryButton { border-color: var(--action-primary); background: var(--action-primary); color: #fff; }
+.coordinateFields { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
+.coordinateFields legend { padding: 0 5px; color: var(--text-muted); font: 750 9px var(--font-heading); letter-spacing: .05em; text-transform: uppercase; }
 
 @media (max-width: 1100px) {
   .atlas { grid-template-columns: 1fr; }
@@ -169,14 +206,17 @@
   .pageHeader { grid-template-columns: 1fr; padding: 14px 12px 10px; }
   .headerActions { justify-content: flex-start; }
   .headerActions .primaryButton { display: none; }
-  .keyring { grid-template-columns: 1fr; }
-  .keyringRail { display: flex; min-height: auto; align-items: center; border-right: 0; border-bottom: 1px solid var(--border); }
-  .keyringRail strong { margin: 0 0 0 auto; font-size: 22px; }
-  .credentialRow { grid-template-columns: 28px minmax(0, 1fr); }
-  .credentialRow code, .credentialRow .rowActions { grid-column: 2; }
+  .credentialRow { grid-template-columns: 26px minmax(0, 1fr) auto; }
+  .credentialRow code { grid-column: 2 / -1; grid-row: 2; }
+  .credentialRow .iconActions { grid-column: 3; grid-row: 1; }
+  .credentialMeta { flex-wrap: wrap; gap: 3px 8px; }
   .notebook { grid-template-columns: 1fr; }
   .listIndex { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }
   .listIndex button { min-width: 130px; }
+  .listEditorHeader { grid-template-columns: 1fr; }
+  .listIdentityEditor { grid-template-columns: 1fr; max-width: none; }
+  .listComposer { align-items: stretch; flex-direction: column; }
+  .listComposer > div { display: grid; grid-template-columns: 1fr auto; }
   .atlas { display: block; }
   .tripLedger { margin-top: 10px; }
   .loadoutLanes { grid-template-columns: 1fr; }
@@ -186,6 +226,7 @@
   .modLanes { grid-template-columns: 1fr; }
   .editor { grid-template-columns: 1fr; }
   .editor header, .editor footer, .editor .full { grid-column: 1; }
+  .coordinateFields { grid-column: 1; grid-template-columns: 1fr; }
 }
 
 /* Preview mode is a 430px field frame inside a desktop viewport. */
@@ -197,24 +238,28 @@
 :global(html[data-personal-preview="mobile"]) .headerActions { justify-content: flex-start; }
 :global(html[data-admin-preview="mobile"]) .headerActions .primaryButton,
 :global(html[data-personal-preview="mobile"]) .headerActions .primaryButton { display: none; }
-:global(html[data-admin-preview="mobile"]) .keyring,
-:global(html[data-personal-preview="mobile"]) .keyring { grid-template-columns: 1fr; }
-:global(html[data-admin-preview="mobile"]) .keyringRail,
-:global(html[data-personal-preview="mobile"]) .keyringRail { display: flex; min-height: auto; align-items: center; border-right: 0; border-bottom: 1px solid var(--border); }
-:global(html[data-admin-preview="mobile"]) .keyringRail strong,
-:global(html[data-personal-preview="mobile"]) .keyringRail strong { margin: 0 0 0 auto; font-size: 22px; }
 :global(html[data-admin-preview="mobile"]) .credentialRow,
-:global(html[data-personal-preview="mobile"]) .credentialRow { grid-template-columns: 28px minmax(0, 1fr); }
+:global(html[data-personal-preview="mobile"]) .credentialRow { grid-template-columns: 26px minmax(0, 1fr) auto; }
 :global(html[data-admin-preview="mobile"]) .credentialRow code,
-:global(html[data-admin-preview="mobile"]) .credentialRow .rowActions,
-:global(html[data-personal-preview="mobile"]) .credentialRow code,
-:global(html[data-personal-preview="mobile"]) .credentialRow .rowActions { grid-column: 2; }
+:global(html[data-personal-preview="mobile"]) .credentialRow code { grid-column: 2 / -1; grid-row: 2; }
+:global(html[data-admin-preview="mobile"]) .credentialRow .iconActions,
+:global(html[data-personal-preview="mobile"]) .credentialRow .iconActions { grid-column: 3; grid-row: 1; }
+:global(html[data-admin-preview="mobile"]) .credentialMeta,
+:global(html[data-personal-preview="mobile"]) .credentialMeta { flex-wrap: wrap; gap: 3px 8px; }
 :global(html[data-admin-preview="mobile"]) .notebook,
 :global(html[data-personal-preview="mobile"]) .notebook { grid-template-columns: 1fr; }
 :global(html[data-admin-preview="mobile"]) .listIndex,
 :global(html[data-personal-preview="mobile"]) .listIndex { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }
 :global(html[data-admin-preview="mobile"]) .listIndex button,
 :global(html[data-personal-preview="mobile"]) .listIndex button { min-width: 130px; }
+:global(html[data-admin-preview="mobile"]) .listEditorHeader,
+:global(html[data-personal-preview="mobile"]) .listEditorHeader { grid-template-columns: 1fr; }
+:global(html[data-admin-preview="mobile"]) .listIdentityEditor,
+:global(html[data-personal-preview="mobile"]) .listIdentityEditor { grid-template-columns: 1fr; max-width: none; }
+:global(html[data-admin-preview="mobile"]) .listComposer,
+:global(html[data-personal-preview="mobile"]) .listComposer { align-items: stretch; flex-direction: column; }
+:global(html[data-admin-preview="mobile"]) .listComposer > div,
+:global(html[data-personal-preview="mobile"]) .listComposer > div { display: grid; grid-template-columns: 1fr auto; }
 :global(html[data-admin-preview="mobile"]) .atlas,
 :global(html[data-personal-preview="mobile"]) .atlas { display: block; }
 :global(html[data-admin-preview="mobile"]) .tripLedger,
@@ -241,6 +286,8 @@
 :global(html[data-personal-preview="mobile"]) .editor header,
 :global(html[data-personal-preview="mobile"]) .editor footer,
 :global(html[data-personal-preview="mobile"]) .editor .full { grid-column: 1; }
+:global(html[data-admin-preview="mobile"]) .coordinateFields,
+:global(html[data-personal-preview="mobile"]) .coordinateFields { grid-column: 1; grid-template-columns: 1fr; }
 
 @media (prefers-reduced-motion: reduce) {
   .mapPin, .overlay { scroll-behavior: auto; }

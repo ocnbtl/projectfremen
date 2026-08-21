@@ -1,3 +1,5 @@
+import type { NativeObjectRef } from "../../native-objects/types";
+
 export const PERSONAL_LIFE_SCHEMA_VERSION = 1 as const;
 
 export const PERSONAL_LIFE_COLLECTIONS = ["lists", "trips", "buildItems", "vehicles"] as const;
@@ -19,11 +21,35 @@ export type PersonalListItem = {
   completed: boolean;
 };
 
+export const PERSONAL_LIST_COLUMN_TYPES = ["text", "date", "price", "place", "time", "rating", "person", "object"] as const;
+
+export type PersonalListColumnType = (typeof PERSONAL_LIST_COLUMN_TYPES)[number];
+
+export type PersonalListColumn = {
+  id: string;
+  label: string;
+  type: PersonalListColumnType;
+};
+
+export type PersonalListCell = {
+  value: string;
+  ref?: NativeObjectRef;
+};
+
+export type PersonalListRow = {
+  id: string;
+  completed: boolean;
+  cells: Record<string, PersonalListCell>;
+};
+
 export type PersonalList = PersonalLifeBase & {
   title: string;
   description: string;
   kind: PersonalListKind;
+  /** Compatibility projection retained for legacy consumers. */
   items: PersonalListItem[];
+  columns: PersonalListColumn[];
+  rows: PersonalListRow[];
 };
 
 export type TripStatus = "been" | "want" | "lived" | "planned";
