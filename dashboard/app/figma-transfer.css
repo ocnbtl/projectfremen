@@ -7602,24 +7602,11 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
 }
 
 .people-directory-row {
-  grid-template-columns: 44px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 8px;
   min-height: 76px;
   padding: 6px 8px;
   cursor: default;
-}
-
-.people-row-checkbox {
-  display: grid;
-  place-items: center;
-  min-width: 44px;
-  min-height: 44px;
-}
-
-.people-row-checkbox input {
-  width: 17px;
-  height: 17px;
-  accent-color: var(--action-primary);
 }
 
 .people-directory-row-body {
@@ -7636,11 +7623,12 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
   color: inherit;
   text-align: left;
   cursor: pointer;
+  box-sizing: border-box;
 }
 
 .people-directory-list.is-compact .people-directory-row,
 .people-directory-list.is-grid .people-directory-row {
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1fr);
 }
 
 .people-directory-list.is-compact .people-directory-row-body {
@@ -7965,6 +7953,13 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
     grid-template-columns: 46px minmax(0, 1fr) 20px;
   }
 
+  .people-directory-row,
+  .people-directory-list.is-compact .people-directory-row,
+  .people-directory-list.is-grid .people-directory-row,
+  html[data-admin-preview="mobile"] .people-directory-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .people-directory-row-body .people-row-date {
     grid-column: 2;
     grid-row: 2;
@@ -7975,6 +7970,7 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
     grid-column: 3;
     grid-row: 1 / span 2;
     align-self: center;
+    justify-self: end;
   }
 
   .people-mobile-topbar button,

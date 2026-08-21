@@ -1918,7 +1918,6 @@ export default function PeopleWorkspace({
   const [sortMode, setSortMode] = useState<PeopleSortMode>(initialUrlState.sort);
   const [listMode, setListMode] = useState<PeopleListMode>(initialUrlState.view);
   const [selectedId, setSelectedId] = useState(initialSelectedId || initialUrlState.person || initialPeople[0]?.id || "");
-  const [batchSelectedIds, setBatchSelectedIds] = useState<Set<string>>(() => new Set());
   const [name, setName] = useState("");
   const [quickNickname, setQuickNickname] = useState("");
   const [quickBirthday, setQuickBirthday] = useState("");
@@ -2588,15 +2587,6 @@ export default function PeopleWorkspace({
     setDetailMode("profile");
     setActiveView("overview");
     router.push(destination, { scroll: false });
-  }
-
-  function toggleBatchSelection(id: string) {
-    setBatchSelectedIds((current) => {
-      const next = new Set(current);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
   }
 
   async function saveProfileDraft(nextDraft: ContactProfileDraft) {
@@ -3532,15 +3522,6 @@ export default function PeopleWorkspace({
           </section>
         )}
 
-        {batchSelectedIds.size > 0 && (
-          <div className="people-batch-bar" role="toolbar" aria-label="People batch actions">
-            <strong>{batchSelectedIds.size} selected</strong>
-            <button type="button" disabled aria-describedby="people-unavailable-actions" title="Durable list membership is not connected yet">Add to list unavailable</button>
-            <button type="button" disabled aria-describedby="people-unavailable-actions" title="People export is not connected yet">Export unavailable</button>
-            <button type="button" onClick={() => setBatchSelectedIds(new Set())}>Clear selection</button>
-          </div>
-        )}
-
         {initialLoadError ? (
           <SystemState
             variant="error"
@@ -3635,13 +3616,6 @@ export default function PeopleWorkspace({
                   className={`people-directory-row module-ref-tone-${getPeopleTone(record)}${selectedPerson?.id === record.id ? " is-selected" : ""}`}
                   key={record.id}
                 >
-                  <label className="people-row-checkbox" aria-label={`Select ${record.title} for batch actions`}>
-                    <input
-                      type="checkbox"
-                      checked={batchSelectedIds.has(record.id)}
-                      onChange={() => toggleBatchSelection(record.id)}
-                    />
-                  </label>
                   <button
                     type="button"
                     className="people-directory-row-body"

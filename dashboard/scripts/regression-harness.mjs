@@ -8353,9 +8353,11 @@ async function checkProjectCreationWorkflow(
         await layoutControls.getByRole("button", { name: "Grid" }).getAttribute("aria-pressed") === "true",
       "Projects Grid did not render a distinct card directory"
     );
+    assert(await page.locator('article[role="listitem"] input[type="checkbox"]').count() === 0, "Projects Grid retained batch-selection checkboxes");
     await page.screenshot({ path: path.join(screenshotDir, "projects-grid-1440x900.png"), fullPage: true });
     await layoutControls.getByRole("button", { name: "Comfortable" }).click();
     assert(await page.locator('article[role="listitem"]').count() === 0, "Comfortable Projects view retained the Grid cards");
+    assert(await page.locator(".dense-object-row__checkbox").count() === 0, "Projects directory retained DenseObjectRow batch checkboxes");
     await page.getByRole("button", { name: "New project" }).click();
     const createForm = page.locator("form").filter({ hasText: "Create native project" });
     await createForm.waitFor();
@@ -8553,14 +8555,32 @@ async function checkProjectCreationWorkflow(
         await recentActivityRow.getByRole("button", { name: /Open Initial project brief logged unavailable/ }).count() === 1,
       `Recent work did not share Timeline typography or the enabled/disabled icon actions: ${JSON.stringify(recentTypography)}`
     );
+    const objectivePatchCount = () => browserMutations.filter((entry) => entry === "PATCH /api/projects").length;
+    const objectivePatchesBeforeTyping = objectivePatchCount();
+    await overviewObjective.fill("Ship and approve the Sage Burris website");
+    await page.waitForTimeout(1_100);
+    assert(objectivePatchCount() === objectivePatchesBeforeTyping, "Objective typing emitted a timer-driven project update before the field was left");
     const objectiveResponsePromise = page.waitForResponse(
       (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "PATCH"
     );
-    await overviewObjective.fill("Ship and approve the Sage Burris website");
+    await overviewObjective.blur();
     const objectiveResponse = await objectiveResponsePromise;
     assert(objectiveResponse.ok(), `Objective update failed with ${objectiveResponse.status()}: ${await objectiveResponse.text()}`);
-    assert(await page.getByRole("button", { name: "Save objectives" }).count() === 0, "Objectives retained a manual Save button instead of autosave");
+    assert(objectivePatchCount() === objectivePatchesBeforeTyping + 1, "One objective edit did not coalesce to one project update on blur");
+    assert(await page.getByRole("button", { name: "Save objectives" }).count() === 0, "Objectives retained a manual Save button");
     await page.screenshot({ path: path.join(screenshotDir, "project-saite-overview-1440x900.png"), fullPage: true });
+
+    await page.getByRole("tab", { name: "Timeline" }).click();
+    const activityFilters = page.getByRole("group", { name: "Filter project activity" });
+    await activityFilters.waitFor();
+    await activityFilters.getByRole("button", { name: "Project updated" }).click();
+    await activityFilters.getByRole("button", { name: "Updates" }).click();
+    assert(
+      await activityFilters.getByRole("button", { name: "Project updated" }).getAttribute("aria-pressed") === "true" &&
+        await activityFilters.getByRole("button", { name: "Updates" }).getAttribute("aria-pressed") === "true",
+      "Project Timeline did not retain multiple activity filters"
+    );
+    await activityFilters.getByRole("button", { name: "All", exact: true }).click();
 
     await page.getByRole("tab", { name: "Properties" }).click();
     await page.getByText(projectId, { exact: true }).waitFor();
@@ -10880,6 +10900,21 @@ async function main() {
     }
     pass("Media local intake contains no file-content read, transport, preview URL, or browser-persistence path");
 
+    const [personalLifeTypes, personalLifeWorkspace, projectsWorkspaceSource, peopleWorkspaceSource] = await Promise.all([
+      readFile(path.join(dashboardDir, "lib/modules/personal-life/types.ts"), "utf8"),
+      readFile(path.join(dashboardDir, "components/personal-ops/PersonalLifeWorkspace.tsx"), "utf8"),
+      readFile(path.join(dashboardDir, "components/projects/ProjectsWorkspace.tsx"), "utf8"),
+      readFile(path.join(dashboardDir, "components/PeopleWorkspace.tsx"), "utf8")
+    ]);
+    assert(
+      !personalLifeTypes.includes("password") &&
+        personalLifeWorkspace.includes("browserVault.saveObject") &&
+        !projectsWorkspaceSource.includes("batchSelection") &&
+        !peopleWorkspaceSource.includes("batchSelectedIds"),
+      "Personal systems crossed the credential storage boundary or retained Project/People batch-selection state"
+    );
+    pass("Passwords remain Vault-only and Project/People directories contain no batch-selection state");
+
     logStep("Running typecheck");
     await runCommand(["run", "typecheck"], {
       env: { NEXT_TELEMETRY_DISABLED: "1" }
@@ -10948,6 +10983,10 @@ async function main() {
       `Expected /api/personal/ops to return 401, got ${describeStatus(unauthPersonalOps.response)}`
     );
     pass("Unauthenticated native Personal Ops API is blocked");
+
+    const unauthPersonalLife = await requestJson(server.baseUrl, cookieJar, "/api/personal/life");
+    assert(unauthPersonalLife.response.status === 401, `Expected /api/personal/life to return 401, got ${describeStatus(unauthPersonalLife.response)}`);
+    pass("Unauthenticated personal life systems API is blocked");
 
     const unauthSecondaryCreate = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
       method: "POST",
@@ -11026,7 +11065,12 @@ async function main() {
     for (const pathname of [
       "/admin/personal/routines",
       "/admin/personal/inbox",
-      "/admin/personal/templates"
+      "/admin/personal/templates",
+      "/admin/personal/passwords",
+      "/admin/personal/lists",
+      "/admin/personal/travel",
+      "/admin/personal/personal-build",
+      "/admin/personal/car"
     ]) {
       const unauthenticatedPage = await requestText(server.baseUrl, cookieJar, pathname);
       assert(
@@ -11034,7 +11078,7 @@ async function main() {
         `Expected ${pathname} to redirect to admin login when unauthenticated, got ${describeStatus(unauthenticatedPage.response)}`
       );
     }
-    pass("Unauthenticated Routines, Capture Inbox, and Templates routes redirect to login");
+    pass("Unauthenticated advanced and personal-system routes redirect to login");
 
     const unauthenticatedMediaNeedsReview = await requestText(
       server.baseUrl,
@@ -11229,6 +11273,7 @@ async function main() {
     }
     assert(!personalPage.body.includes("Architecture Guardrails"), "Personal Ops Command still renders the obsolete static architecture mockup");
     assert(!personalPage.body.includes("Native Database"), "Personal Ops Command still renders the obsolete fake native-database card");
+    assert(!personalPage.body.includes('href="/admin/personal/obligations"'), "Personal Ops Command navigation retained Obligations");
     pass("Personal Ops Command loads with the native operating queue and explicit unfinished boundaries");
 
     const personalOpsRoutes = [
@@ -11297,6 +11342,31 @@ async function main() {
           "Testing writes nothing",
           "Review Templates"
         ]
+      },
+      {
+        pathname: "/admin/personal/passwords",
+        label: "Passwords",
+        expected: ["Passwords", "Encrypted credentials kept inside your local-first Vault.", "Add password"]
+      },
+      {
+        pathname: "/admin/personal/lists",
+        label: "Lists",
+        expected: ["Lists", "Flexible notebooks for things to buy, watch, pack, remember, or rank.", "New list"]
+      },
+      {
+        pathname: "/admin/personal/travel",
+        label: "Travel",
+        expected: ["Travel", "A personal atlas of places lived, visited, planned, and wanted.", "Add trip"]
+      },
+      {
+        pathname: "/admin/personal/personal-build",
+        label: "Personal Build",
+        expected: ["Personal Build", "The long-term loadout you are deliberately assembling.", "Add item"]
+      },
+      {
+        pathname: "/admin/personal/car",
+        label: "Car",
+        expected: ["Car", "Current vehicle records and the build sheet for what comes next.", "Add vehicle"]
       }
     ];
     for (const route of personalOpsRoutes) {
@@ -11313,6 +11383,54 @@ async function main() {
       }
     }
     pass("All canonical Personal Ops routes load through one shared shell with explicit advanced safety boundaries");
+
+    const personalLifeWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/life", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ collection: "lists", input: { title: "Rejected", description: "", kind: "custom", items: [] } })
+    });
+    assert(personalLifeWithoutCsrf.response.status === 403, "Personal life systems API accepted a write without CSRF proof");
+    const personalLifeFixtures = [
+      { collection: "lists", input: { title: `${testRunId} Field list`, description: "A regression notebook.", kind: "custom", items: [] } },
+      { collection: "trips", input: { name: `${testRunId} Peru`, place: "Lima", region: "Peru", status: "been", travelMode: "plane", latitude: -12.0464, longitude: -77.0428, startDate: "2026-04-04", endDate: "2026-04-12", notes: "Synthetic regression trip." } },
+      { collection: "buildItems", input: { name: `${testRunId} Boots`, category: "Footwear", status: "researching", targetDate: "2027-01-15", budget: "$200", notes: "Synthetic regression loadout." } },
+      { collection: "vehicles", input: { name: `${testRunId} Future build`, year: "2030", make: "Example", model: "Trail", trim: "Field", status: "future", vinNote: "", notes: "Synthetic regression vehicle.", modifications: [{ id: crypto.randomUUID(), name: "Roof rack", category: "Utility", status: "planned", estimate: "$900", notes: "" }] } }
+    ];
+    const createdLifeObjects = [];
+    for (const fixture of personalLifeFixtures) {
+      const created = await requestJson(server.baseUrl, cookieJar, "/api/personal/life", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+        body: JSON.stringify(fixture)
+      });
+      assert(created.response.ok && created.payload?.item?.id, `Personal life ${fixture.collection} create failed: ${JSON.stringify(created.payload)}`);
+      createdLifeObjects.push({ ...fixture, item: created.payload.item });
+    }
+    const createdList = createdLifeObjects.find((entry) => entry.collection === "lists").item;
+    const listItemId = crypto.randomUUID();
+    const updatedLifeList = await requestJson(server.baseUrl, cookieJar, "/api/personal/life", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ collection: "lists", id: createdList.id, expectedUpdatedAt: createdList.updatedAt, patch: { items: [{ id: listItemId, text: "Verify the field notebook", note: "", completed: true }] } })
+    });
+    assert(updatedLifeList.response.ok && updatedLifeList.payload?.item?.items?.[0]?.completed === true, "Personal Lists item update did not persist");
+    const staleLifeList = await requestJson(server.baseUrl, cookieJar, "/api/personal/life", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ collection: "lists", id: createdList.id, expectedUpdatedAt: createdList.updatedAt, patch: { description: "Stale overwrite" } })
+    });
+    assert(staleLifeList.response.status === 409, "Personal life optimistic concurrency accepted a stale overwrite");
+    const personalLifeState = await requestJson(server.baseUrl, cookieJar, "/api/personal/life");
+    assert(
+      personalLifeState.response.ok &&
+        personalLifeState.payload?.state?.lists?.length === 1 &&
+        personalLifeState.payload.state.trips?.length === 1 &&
+        personalLifeState.payload.state.buildItems?.length === 1 &&
+        personalLifeState.payload.state.vehicles?.length === 1 &&
+        !JSON.stringify(personalLifeState.payload.state).toLowerCase().includes("password"),
+      `Personal life systems did not persist one object per working surface: ${JSON.stringify(personalLifeState.payload)}`
+    );
+    pass("Lists, Travel, Personal Build, and Car persist typed records with CSRF and stale-write protection while passwords stay outside the server state");
 
     const personalOpsAfterRouteReads = await readFile(personalOpsDataPath, "utf8");
     assert(
@@ -11749,10 +11867,10 @@ async function main() {
 
     const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
     assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);
-    for (const expected of ["Travel", "Create Note", "Core Properties", "Time and Review", "Saved Notes", "Database Fields", "Privacy Boundary", "trip command board"]) {
+    for (const expected of ["Travel", "Add trip", "Trip ledger", "Click anywhere to place a new trip", "Been", "Lima"]) {
       assert(personalTravelPage.body.includes(expected), `Personal Ops Travel page missing expected text: ${expected}`);
     }
-    pass("Personal Ops detail route loads with workflows, sources, and privacy boundary");
+    pass("Personal Ops Travel loads its map-first atlas and trip ledger");
 
     const entityPage = await requestText(server.baseUrl, cookieJar, "/admin/entities/unigentamos");
     assert(entityPage.response.ok, `Entity page failed: ${describeStatus(entityPage.response)}`);
@@ -14077,10 +14195,6 @@ async function main() {
     );
     assert(savedPersonalRecord, "Saved Personal Ops record was not returned by domain GET with the full property model");
 
-    const personalTravelAfterSave = await requestText(server.baseUrl, cookieJar, `/admin/personal/travel?record=${Date.now()}`);
-    assert(personalTravelAfterSave.body.includes(personalRecordTitle), "Saved Personal Ops record missing from Travel page");
-    assert(personalTravelAfterSave.body.includes("All Properties"), "Travel page missing full properties disclosure");
-
     const personalRecordDetail = await requestText(
       server.baseUrl,
       cookieJar,
@@ -14090,7 +14204,7 @@ async function main() {
     for (const expected of [personalRecordTitle, "All Properties", "Created_YearMonth", "Created_Quarter", "Review_Cadence"]) {
       assert(personalRecordDetail.body.includes(expected), `Personal record detail missing expected text: ${expected}`);
     }
-    pass("Personal Ops record create/read/render/detail flow works");
+    pass("Legacy Personal Ops record create/read and canonical detail flow remain compatible beside the native Travel atlas");
 
     logStep("Checking People adapter persistence and direct routes");
     const organizationTitle = `${testRunId}-research-studio`;

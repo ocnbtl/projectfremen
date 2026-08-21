@@ -14,6 +14,11 @@ export type PersonalOpsSidebarView =
   | "obligations"
   | "follow-ups"
   | "routines"
+  | "passwords"
+  | "lists"
+  | "travel"
+  | "personal-build"
+  | "car"
   | "inbox"
   | "templates";
 
@@ -27,6 +32,11 @@ export type PersonalOpsSidebarCounts = {
   captures: number;
   templates: number;
   archived: number;
+  passwords?: number;
+  lists?: number;
+  travel?: number;
+  personalBuild?: number;
+  car?: number;
 };
 
 export const PERSONAL_OPS_DOMAIN_LABELS = [
@@ -46,6 +56,11 @@ const VIEW_ROUTES: Record<PersonalOpsSidebarView, string> = {
   obligations: "/admin/personal/obligations",
   "follow-ups": "/admin/personal/follow-ups",
   routines: "/admin/personal/routines",
+  passwords: "/admin/personal/passwords",
+  lists: "/admin/personal/lists",
+  travel: "/admin/personal/travel",
+  "personal-build": "/admin/personal/personal-build",
+  car: "/admin/personal/car",
   inbox: "/admin/personal/inbox",
   templates: "/admin/personal/templates"
 };
@@ -110,6 +125,7 @@ export default function PersonalOpsSidebar({
   mobileOpen: boolean;
   onClose: () => void;
 }) {
+  const isPersonalSystemView = ["passwords", "lists", "travel", "personal-build", "car"].includes(activeView);
   const domainItems: ModuleSidebarItem[] = PERSONAL_OPS_DOMAIN_LABELS.map((domain) => {
     const id = `domain-${domain.toLowerCase().replace(/\s+/g, "-")}`;
     return {
@@ -129,7 +145,7 @@ export default function PersonalOpsSidebar({
     active: filter === id
     }));
 
-  const sections: ModuleSidebarSection[] = [
+  const commandSection: ModuleSidebarSection =
     {
       id: "command",
       label: "Command",
@@ -177,15 +193,6 @@ export default function PersonalOpsSidebar({
           unavailableReason: unavailableViews?.decisions
         }),
         viewItem({
-          id: "obligations",
-          label: "Obligations",
-          view: "obligations",
-          activeView,
-          count: counts.obligations,
-          icon: <Icon>✓</Icon>,
-          unavailableReason: unavailableViews?.obligations
-        }),
-        viewItem({
           id: "routines",
           label: "Routines",
           view: "routines",
@@ -193,11 +200,50 @@ export default function PersonalOpsSidebar({
           count: counts.routines,
           icon: <Icon>↻</Icon>,
           unavailableReason: unavailableViews?.routines
+        }),
+        viewItem({
+          id: "passwords",
+          label: "Passwords",
+          view: "passwords",
+          activeView,
+          count: counts.passwords || 0,
+          icon: <Icon>⌁</Icon>
+        }),
+        viewItem({
+          id: "lists",
+          label: "Lists",
+          view: "lists",
+          activeView,
+          count: counts.lists || 0,
+          icon: <Icon>≡</Icon>
+        }),
+        viewItem({
+          id: "travel",
+          label: "Travel",
+          view: "travel",
+          activeView,
+          count: counts.travel || 0,
+          icon: <Icon>⌖</Icon>
+        }),
+        viewItem({
+          id: "personal-build",
+          label: "Personal Build",
+          view: "personal-build",
+          activeView,
+          count: counts.personalBuild || 0,
+          icon: <Icon>◇</Icon>
+        }),
+        viewItem({
+          id: "car",
+          label: "Car",
+          view: "car",
+          activeView,
+          count: counts.car || 0,
+          icon: <Icon>▱</Icon>
         })
       ]
-    },
-    { id: "domains", label: "Domains", items: domainItems },
-    { id: "smart", label: "Smart Views", items: smartItems },
+    };
+  const dataSection: ModuleSidebarSection =
     {
       id: "data",
       label: "Data",
@@ -218,27 +264,28 @@ export default function PersonalOpsSidebar({
           count: counts.templates,
           unavailableReason: unavailableViews?.templates
         }),
-        {
+        ...(!isPersonalSystemView ? [{
           id: "archived",
           label: "Archived",
           href: `${pathname}?filter=archived`,
           active: filter === "archived",
           count: counts.archived
-        },
-        {
+        }, {
           id: "settings",
           label: "Settings",
           disabled: true,
           disabledReason: "Personal Ops settings are not connected yet."
-        }
+        }] : [])
       ]
-    }
-  ];
+    };
+  const sections: ModuleSidebarSection[] = isPersonalSystemView
+    ? [commandSection, dataSection]
+    : [commandSection, { id: "domains", label: "Domains", items: domainItems }, { id: "smart", label: "Smart Views", items: smartItems }, dataSection];
 
   return (
     <ModuleSidebar
       title="Personal Ops"
-      description="Goals, decisions, obligations, and follow-ups."
+      description="Daily command, durable records, and personal systems."
       sections={sections}
       className={styles.sidebar}
       mobileOpen={mobileOpen}

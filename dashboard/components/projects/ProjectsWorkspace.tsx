@@ -136,6 +136,7 @@ type ProjectActivityItem = {
   tone: "system" | "people" | "object" | "blocker" | "milestone" | "decision" | "update";
   openHref: string;
   kind: "timeline" | "decision";
+  filterKey: string;
 };
 
 type ConfirmationState =
@@ -655,6 +656,36 @@ function activityTitle(event: ProjectDirectoryItem["timelineEvents"][number]) {
   return `${subject} connection updated`;
 }
 
+function activityFilterKey(event: ProjectDirectoryItem["timelineEvents"][number]) {
+  if (event.eventType.startsWith("link_") && event.sourceRef?.module === "people") return "person_linked";
+  if (event.eventType.startsWith("link_") && event.sourceRef?.module === "personal_ops" && event.sourceRef.objectType === "decision") return "decision_linked";
+  if (event.eventType.startsWith("link_")) return "object_linked";
+  return event.eventType;
+}
+
+function activityFilterLabel(value: string) {
+  const labels: Record<string, string> = {
+    project_created: "Project created",
+    project_updated: "Project updated",
+    project_archived: "Project archived",
+    project_restored: "Project restored",
+    interaction_logged: "Updates",
+    milestone_created: "Milestones",
+    milestone_updated: "Milestones",
+    milestone_completed: "Milestones",
+    blocker_opened: "Blockers",
+    blocker_updated: "Blockers",
+    blocker_resolved: "Blockers",
+    blocker_waived: "Blockers",
+    blocker_carried_forward: "Blockers",
+    person_linked: "People linked",
+    object_linked: "Objects linked",
+    decision_linked: "Decisions",
+    legacy_project_promoted: "Project promoted"
+  };
+  return labels[value] || displayLabel(value);
+}
+
 const CHANGELOG_FIELDS: Readonly<Record<string, string>> = {
   name: "Name",
   description: "Description",
@@ -832,7 +863,6 @@ function ProjectObjectivesEditor({
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const onSaveRef = useRef(onSave);
   onSaveRef.current = onSave;
-  const draftSignature = drafts.map((item) => `${item.id}:${item.text}:${item.targetAt}`).join("|");
 
   useEffect(() => {
     setDrafts(objectives.map((item) => ({ id: item.id, text: item.text, targetAt: item.targetAt || "", completed: false })));
@@ -840,22 +870,18 @@ function ProjectObjectivesEditor({
     setSaveState("idle");
   }, [signature]);
 
-  useEffect(() => {
-    if (!dirty || readOnly || busy || drafts.some((item) => !item.text.trim())) return;
-    const timer = window.setTimeout(async () => {
-      setSaveState("saving");
-      const valid = drafts.filter((item) => item.text.trim());
-      const saved = await onSaveRef.current(valid.map((item) => ({
-        id: item.id,
-        text: item.text.trim(),
-        targetAt: item.targetAt || undefined,
-        completed: false
-      })));
-      setSaveState(saved ? "saved" : "error");
-      if (saved) setDirty(false);
-    }, 650);
-    return () => window.clearTimeout(timer);
-  }, [busy, dirty, draftSignature, drafts, readOnly]);
+  async function commitDrafts(nextDrafts = drafts) {
+    if (!dirty || readOnly || busy || nextDrafts.some((item) => !item.text.trim())) return;
+    setSaveState("saving");
+    const saved = await onSaveRef.current(nextDrafts.map((item) => ({
+      id: item.id,
+      text: item.text.trim(),
+      targetAt: item.targetAt || undefined,
+      completed: false
+    })));
+    setSaveState(saved ? "saved" : "error");
+    if (saved) setDirty(false);
+  }
 
   function updateDraft(id: string, patch: Partial<EditorObjectiveDraft>) {
     setDrafts((current) => current.map((item) => item.id === id ? { ...item, ...patch } : item));
@@ -867,7 +893,7 @@ function ProjectObjectivesEditor({
       <div className={styles.panelHeader}>
         <h2>Objectives</h2>
         {!readOnly && <span className={styles.autosaveState} role="status">
-          {saveState === "saving" || busy ? "Saving…" : saveState === "error" ? "Could not save" : dirty ? "Autosaves after typing" : saveState === "saved" ? "Saved" : "Autosaved"}
+          {saveState === "saving" || busy ? "Saving…" : saveState === "error" ? "Could not save" : dirty ? "Unsaved" : saveState === "saved" ? "Saved" : "Saves when you leave a field"}
         </span>}
       </div>
       {drafts.length ? (
@@ -878,11 +904,14 @@ function ProjectObjectivesEditor({
               <input
                 value={objective.text}
                 onChange={(event) => updateDraft(objective.id, { text: event.target.value })}
-                onBlur={() => {
+                onBlur={(event) => {
+                  if ((event.relatedTarget as HTMLElement | null)?.dataset.objectiveDelete) return;
                   if (!objective.text.trim()) {
                     setDrafts((current) => current.filter((item) => item.id !== objective.id));
                     setDirty(true);
+                    return;
                   }
+                  void commitDrafts();
                 }}
                 disabled={readOnly || busy}
                 aria-label="Objective"
@@ -893,6 +922,7 @@ function ProjectObjectivesEditor({
                 type="date"
                 value={objective.targetAt}
                 onChange={(event) => updateDraft(objective.id, { targetAt: event.target.value })}
+                onBlur={() => void commitDrafts()}
                 disabled={readOnly || busy}
                 aria-label={`Target date for ${objective.text || "objective"}`}
                 title="Objective target date"
@@ -902,9 +932,12 @@ function ProjectObjectivesEditor({
                   type="button"
                   className={styles.removeObjectiveButton}
                   onClick={() => {
-                    setDrafts((current) => current.filter((item) => item.id !== objective.id));
+                    const next = drafts.filter((item) => item.id !== objective.id);
+                    setDrafts(next);
                     setDirty(true);
+                    queueMicrotask(() => void onSaveRef.current(next.filter((item) => item.text.trim()).map((item) => ({ id: item.id, text: item.text.trim(), targetAt: item.targetAt || undefined, completed: false }))).then((saved) => { setSaveState(saved ? "saved" : "error"); if (saved) setDirty(false); }));
                   }}
+                  data-objective-delete="true"
                   disabled={busy}
                   aria-label={`Delete ${objective.text || "objective"}`}
                   title="Delete objective"
@@ -1083,7 +1116,7 @@ export default function ProjectsWorkspace({
   const [activeTab, setActiveTab] = useState<ProjectTab>(initialUrlState.tab);
   const [selectedProjectId, setSelectedProjectId] = useState(initialSelectedProject || "");
   const [selectedChildId, setSelectedChildId] = useState(initialDetail ? initialUrlState.item : "");
-  const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
+  const [activityFilters, setActivityFilters] = useState<Set<string>>(() => new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
@@ -1258,15 +1291,6 @@ export default function ProjectsWorkspace({
     setSelectedChildId(objectId);
     setActiveTab(tab);
     updateUrl({ item: objectId, tab });
-  }
-
-  function setChecked(id: string, checked: boolean) {
-    setBatchSelection((current) => {
-      const next = new Set(current);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
   }
 
   function clearFeedback() {
@@ -2187,7 +2211,8 @@ export default function ProjectsWorkspace({
       occurredAt: event.occurredAt,
       tone: activityTone(event),
       openHref: event.eventType.startsWith("link_") ? event.sourceRef?.route || "" : "",
-      kind: "timeline" as const
+      kind: "timeline" as const,
+      filterKey: activityFilterKey(event)
     }));
     const decisionActivity = getLinkedDecisions(decisions, projectDecisionSource(item.project)).map((decision) => ({
       id: `decision-${decision.id}`,
@@ -2196,7 +2221,8 @@ export default function ProjectsWorkspace({
       occurredAt: decision.updatedAt || decision.createdAt,
       tone: "decision" as const,
       openHref: decisionOwnerRoute(decision),
-      kind: "decision" as const
+      kind: "decision" as const,
+      filterKey: "decision_linked"
     }));
     return [...timeline, ...decisionActivity].sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
   }
@@ -2372,6 +2398,8 @@ export default function ProjectsWorkspace({
   function renderTimeline(item: ProjectDirectoryItem) {
     const readOnly = !item.project.editable || ["complete", "archived"].includes(item.project.lifecycle);
     const activity = projectActivity(item);
+    const filterOptions = Array.from(new Set(activity.map((event) => event.filterKey)));
+    const visibleActivity = activityFilters.size ? activity.filter((event) => activityFilters.has(event.filterKey)) : activity;
     return (
       <div className={styles.timelineLayout}>
         <section className={`${styles.panel} ${styles.timelineActivityPanel}`}>
@@ -2379,7 +2407,11 @@ export default function ProjectsWorkspace({
             <h2>Activity</h2>
             <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("interaction-create", item)} disabled={readOnly}>Log update</button>
           </div>
-          {activity.length ? renderActivityList(activity) : <p>No activity yet.</p>}
+          {filterOptions.length > 1 && <div className={styles.activityFilters} role="group" aria-label="Filter project activity">
+            <button type="button" data-active={activityFilters.size === 0 || undefined} aria-pressed={activityFilters.size === 0} onClick={() => setActivityFilters(new Set())}>All</button>
+            {filterOptions.map((option) => <button type="button" data-active={activityFilters.has(option) || undefined} aria-pressed={activityFilters.has(option)} onClick={() => setActivityFilters((current) => { const next = new Set(current); if (next.has(option)) next.delete(option); else next.add(option); return next; })} key={option}>{activityFilterLabel(option)}</button>)}
+          </div>}
+          {visibleActivity.length ? renderActivityList(visibleActivity) : <p>No activity matches these filters.</p>}
         </section>
         <aside className={styles.timelineSide}>
           <section className={styles.panel}>
@@ -3192,15 +3224,6 @@ export default function ProjectsWorkspace({
           <span>{VIEW_LABELS[view]} · {FILTER_LABELS[filter]}</span>
         </div>
 
-        {batchSelection.size > 0 && (
-          <div className={styles.batchBar} role="status">
-            <strong>{batchSelection.size} selected</strong>
-            <span>Checkbox selection is independent from the inspector.</span>
-            <button type="button" className={styles.button} disabled title="Batch archive needs per-project reason and consequence review; use each project’s Archive action.">Batch archive</button>
-            <button type="button" className={styles.button} onClick={() => setBatchSelection(new Set())}>Clear</button>
-          </div>
-        )}
-
         {visibleProjects.length ? (
           <div className={grid ? styles.projectGrid : styles.list} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">
             {visibleProjects.map((item) => {
@@ -3215,7 +3238,6 @@ export default function ProjectsWorkspace({
               </span>;
               if (grid) return (
                 <article className={styles.projectCard} data-selected={selectedProjectId === item.project.id || undefined} role="listitem" key={item.project.id}>
-                  <label className={styles.projectCardCheckbox}><input type="checkbox" checked={batchSelection.has(item.project.id)} onChange={(event) => setChecked(item.project.id, event.target.checked)} aria-label={`Select ${item.project.name} for batch actions`} /></label>
                   <button type="button" className={styles.projectCardBody} onClick={() => selectProject(item)} aria-pressed={selectedProjectId === item.project.id}>
                     <span className={styles.projectCardTop}><span className={styles.rowAvatar} aria-hidden="true">{initials(item.project.name)}</span><span className={styles.rowState} data-tone={stateTone(item.project.lifecycle)}>{displayLabel(item.project.lifecycle)}</span></span>
                     <strong>{item.project.name}</strong>
@@ -3238,11 +3260,6 @@ export default function ProjectsWorkspace({
                   </>}
                   selected={selectedProjectId === item.project.id}
                   onSelect={() => selectProject(item)}
-                  checkbox={{
-                    checked: batchSelection.has(item.project.id),
-                    onCheckedChange: (checked) => setChecked(item.project.id, checked),
-                    label: `Select ${item.project.name} for batch actions`
-                  }}
                   key={item.project.id}
                 />
               );
