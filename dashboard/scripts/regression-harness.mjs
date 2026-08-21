@@ -11000,6 +11000,7 @@ async function main() {
 
     const unauthPersonalLife = await requestJson(server.baseUrl, cookieJar, "/api/personal/life");
     assert(unauthPersonalLife.response.status === 401, `Expected /api/personal/life to return 401, got ${describeStatus(unauthPersonalLife.response)}`);
+    assert(unauthPersonalLife.response.headers.get("cache-control")?.includes("private") && unauthPersonalLife.response.headers.get("cache-control")?.includes("no-store"), "Unauthenticated personal life response did not preserve the private no-store cache boundary");
     pass("Unauthenticated personal life systems API is blocked");
 
     const unauthPersonalPasswords = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords?includeSecrets=true");
@@ -11529,6 +11530,8 @@ async function main() {
     const personalLifeState = await requestJson(server.baseUrl, cookieJar, "/api/personal/life");
     assert(
       personalLifeState.response.ok &&
+        personalLifeState.response.headers.get("cache-control")?.includes("private") &&
+        personalLifeState.response.headers.get("cache-control")?.includes("no-store") &&
         personalLifeState.payload?.state?.lists?.length === 1 &&
         personalLifeState.payload.state.trips?.length === 1 &&
         personalLifeState.payload.state.buildItems?.length === 1 &&

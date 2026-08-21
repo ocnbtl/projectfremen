@@ -13,16 +13,23 @@ import type { PersonalLifeInputByCollection } from "../../../../lib/modules/pers
 
 export const runtime = "nodejs";
 
+const PRIVATE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0",
+  Pragma: "no-cache",
+  Vary: "Cookie"
+};
+
+function json(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: PRIVATE_HEADERS });
+}
+
 function responseFor(error: unknown) {
   const message = error instanceof Error ? error.message : "Personal Ops data could not be saved";
-  return NextResponse.json(
-    { ok: false, error: message },
-    { status: message.startsWith("This record changed") ? 409 : message.endsWith("not found") ? 404 : 400 }
-  );
+  return json({ ok: false, error: message }, message.startsWith("This record changed") ? 409 : message.endsWith("not found") ? 404 : 400);
 }
 
 async function authorizedMutation(request: Request, action: string) {
-  if (!(await hasAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!(await hasAdminSession())) return json({ ok: false, error: "Unauthorized" }, 401);
   if (isCsrfRequestValid(request)) return null;
   await appendAuditEvent({
     at: new Date().toISOString(),
@@ -32,12 +39,12 @@ async function authorizedMutation(request: Request, action: string) {
     ip: getRequestIp(request),
     status: "denied"
   });
-  return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
+  return json({ ok: false, error: "Invalid CSRF token" }, 403);
 }
 
 export async function GET() {
-  if (!(await hasAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  return NextResponse.json({ ok: true, state: await readPersonalLifeState() });
+  if (!(await hasAdminSession())) return json({ ok: false, error: "Unauthorized" }, 401);
+  return json({ ok: true, state: await readPersonalLifeState() });
 }
 
 export async function POST(request: Request) {
@@ -49,7 +56,7 @@ export async function POST(request: Request) {
     const collection = body.collection;
     const item = await createPersonalLifeObject(collection, (body.input || {}) as PersonalLifeInputByCollection[typeof collection]);
     await appendAuditEvent({ at: new Date().toISOString(), action: `personal_life.${collection}.create.success`, path: new URL(request.url).pathname, method: "POST", ip: getRequestIp(request), status: "ok", detail: item.id });
-    return NextResponse.json({ ok: true, item });
+    return json({ ok: true, item });
   } catch (error) {
     return responseFor(error);
   }
@@ -67,7 +74,7 @@ export async function PATCH(request: Request) {
     const collection = body.collection;
     const item = await updatePersonalLifeObject(collection, id, (body.patch || {}) as Partial<PersonalLifeInputByCollection[typeof collection]>, expectedUpdatedAt);
     await appendAuditEvent({ at: new Date().toISOString(), action: `personal_life.${collection}.update.success`, path: new URL(request.url).pathname, method: "PATCH", ip: getRequestIp(request), status: "ok", detail: item.id });
-    return NextResponse.json({ ok: true, item });
+    return json({ ok: true, item });
   } catch (error) {
     return responseFor(error);
   }
@@ -84,7 +91,7 @@ export async function DELETE(request: Request) {
     if (!id || !expectedUpdatedAt) throw new Error("Record id and expectedUpdatedAt are required");
     await deletePersonalLifeObject(body.collection, id, expectedUpdatedAt);
     await appendAuditEvent({ at: new Date().toISOString(), action: `personal_life.${body.collection}.delete.success`, path: new URL(request.url).pathname, method: "DELETE", ip: getRequestIp(request), status: "ok", detail: id });
-    return NextResponse.json({ ok: true, id });
+    return json({ ok: true, id });
   } catch (error) {
     return responseFor(error);
   }
