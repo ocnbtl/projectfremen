@@ -184,6 +184,7 @@ export type RoutineFrequency =
   | "annual"
   | "custom";
 export type RoutineTrigger = "manual" | "scheduled_window" | "after_completion";
+export type RoutineReminderUnit = "minutes" | "hours" | "days" | "weeks";
 
 export type RoutineCadenceRule = {
   frequency: RoutineFrequency;
@@ -192,6 +193,8 @@ export type RoutineCadenceRule = {
   timezone: string;
   anchorDate?: string;
   weekdays: number[];
+  reminderAmount?: number;
+  reminderUnit?: RoutineReminderUnit;
   reminderWindowDays: number;
   trigger: RoutineTrigger;
   skipBehavior: "skip_occurrence" | "move_to_next_window" | "require_decision";
@@ -246,6 +249,8 @@ export type PersonalOpsRoutine = {
   linkedRefs: NativeObjectRef[];
   lastRunAt?: string;
   nextRunAt?: string;
+  nextRunDate?: string;
+  nextRunTime?: string;
   runHistory: RoutineRun[];
   createdAt: string;
   updatedAt: string;
@@ -660,6 +665,8 @@ export type RoutineCreateInput = {
   completionCriteria?: string[];
   linkedRefs?: NativeObjectRef[];
   nextRunAt?: string;
+  nextRunDate?: string;
+  nextRunTime?: string;
 };
 
 export type RoutineUpdateInput = Partial<Omit<RoutineCreateInput, "cadenceRule">> & {

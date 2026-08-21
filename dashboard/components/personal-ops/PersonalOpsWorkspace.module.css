@@ -1405,6 +1405,22 @@ button.metric {
   resize: vertical;
 }
 
+.compoundField {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 6px;
+}
+
+.sortControl select {
+  min-height: 34px;
+  padding: 0 28px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--panel-bg);
+  color: var(--text-strong);
+  font: 750 11px var(--font-heading);
+}
+
 .fullWidth {
   grid-column: 1 / -1;
 }

@@ -85,6 +85,7 @@ import {
   type RoutineFrequency,
   type RoutineGenerationRule,
   type RoutineLifecycleState,
+  type RoutineReminderUnit,
   type RoutineRun,
   type RoutineRunPreview,
   type RoutineRunPreviewEntry,
@@ -171,6 +172,7 @@ const ROUTINE_FREQUENCIES: RoutineFrequency[] = [
   "custom"
 ];
 const ROUTINE_TRIGGERS: RoutineTrigger[] = ["manual", "scheduled_window", "after_completion"];
+const ROUTINE_REMINDER_UNITS: RoutineReminderUnit[] = ["minutes", "hours", "days", "weeks"];
 const CAPTURE_LIFECYCLE_STATES: PersonalOpsCaptureItem["lifecycle"][] = ["active", "archived"];
 const CAPTURE_TRIAGE_STATES: CaptureTriageState[] = [
   "untriaged",
@@ -345,6 +347,44 @@ function optionalDate(value: unknown, field: string): string | undefined {
   if (!normalized) return undefined;
   if (Number.isNaN(Date.parse(normalized))) validation(`${field} must be a valid date or timestamp`, field);
   return normalized;
+}
+
+function optionalCalendarDate(value: unknown, field: string): string | undefined {
+  const normalized = optionalText(value, field, 10);
+  if (!normalized) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    validation(`${field} must use YYYY-MM-DD`, field);
+  }
+  const [year, month, day] = normalized.split("-").map(Number);
+  const candidate = new Date(Date.UTC(year, month - 1, day));
+  if (
+    candidate.getUTCFullYear() !== year ||
+    candidate.getUTCMonth() !== month - 1 ||
+    candidate.getUTCDate() !== day
+  ) {
+    validation(`${field} must be a valid calendar date`, field);
+  }
+  return normalized;
+}
+
+function optionalClockTime(value: unknown, field: string): string | undefined {
+  const normalized = optionalText(value, field, 5);
+  if (!normalized) return undefined;
+  if (!/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(normalized)) {
+    validation(`${field} must use 24-hour HH:mm`, field);
+  }
+  return normalized;
+}
+
+function combinedNextRun(
+  date: string | undefined,
+  time: string | undefined,
+  legacy: string | undefined
+): string | undefined {
+  if (date && time) return `${date}T${time}:00`;
+  if (date) return date;
+  if (time) return undefined;
+  return legacy;
 }
 
 function enumValue<Value extends string>(
@@ -1411,6 +1451,31 @@ function normalizeRoutineCadenceRule(value: unknown, field: string): RoutineCade
       `${field}.autoCreateNext`
     );
   }
+  const legacyReminderDays = positiveInteger(
+    value.reminderWindowDays,
+    `${field}.reminderWindowDays`,
+    3,
+    3650
+  );
+  const reminderAmount = positiveInteger(
+    value.reminderAmount,
+    `${field}.reminderAmount`,
+    legacyReminderDays,
+    525_600
+  );
+  const reminderUnit = enumValue(
+    value.reminderUnit,
+    ROUTINE_REMINDER_UNITS,
+    "days",
+    `${field}.reminderUnit`
+  );
+  const reminderWindowDays = reminderUnit === "weeks"
+    ? reminderAmount * 7
+    : reminderUnit === "days"
+      ? reminderAmount
+      : reminderUnit === "hours"
+        ? Math.floor(reminderAmount / 24)
+        : Math.floor(reminderAmount / 1440);
   return {
     frequency: enumValue(value.frequency, ROUTINE_FREQUENCIES, "weekly", `${field}.frequency`),
     interval,
@@ -1418,12 +1483,9 @@ function normalizeRoutineCadenceRule(value: unknown, field: string): RoutineCade
     timezone: optionalText(value.timezone, `${field}.timezone`, 120) || "America/New_York",
     anchorDate: optionalDate(value.anchorDate, `${field}.anchorDate`),
     weekdays,
-    reminderWindowDays: positiveInteger(
-      value.reminderWindowDays,
-      `${field}.reminderWindowDays`,
-      3,
-      90
-    ),
+    reminderAmount,
+    reminderUnit,
+    reminderWindowDays,
     trigger: enumValue(value.trigger, ROUTINE_TRIGGERS, "manual", `${field}.trigger`),
     skipBehavior: enumValue(
       value.skipBehavior,
@@ -1635,6 +1697,9 @@ function normalizeTemplateDefinitions(value: unknown): TemplateGeneratedDefiniti
 
 function buildRoutine(input: RoutineCreateInput, now: string, actorId: string): PersonalOpsRoutine {
   const raw = input as unknown as Record<string, unknown>;
+  const nextRunDate = optionalCalendarDate(raw.nextRunDate, "nextRunDate");
+  const nextRunTime = optionalClockTime(raw.nextRunTime, "nextRunTime");
+  const legacyNextRunAt = optionalDate(raw.nextRunAt, "nextRunAt");
   const item: PersonalOpsRoutine = {
     id: `${SECONDARY_ID_PREFIX.routines}-${crypto.randomUUID()}`,
     objectType: "routine",
@@ -1651,7 +1716,9 @@ function buildRoutine(input: RoutineCreateInput, now: string, actorId: string): 
     generationRules: normalizeGenerationRules(raw.generationRules, "generationRules"),
     completionCriteria: stringList(raw.completionCriteria, "completionCriteria", 40),
     linkedRefs: normalizeNativeRefs(raw.linkedRefs, "linkedRefs"),
-    nextRunAt: optionalDate(raw.nextRunAt, "nextRunAt"),
+    nextRunAt: combinedNextRun(nextRunDate, nextRunTime, legacyNextRunAt),
+    nextRunDate,
+    nextRunTime,
     runHistory: [],
     createdAt: now,
     updatedAt: now,
@@ -1949,7 +2016,17 @@ function updateRoutine(
   if (hasOwn(patch, "generationRules")) next.generationRules = normalizeGenerationRules(patch.generationRules, "generationRules");
   if (hasOwn(patch, "completionCriteria")) next.completionCriteria = stringList(patch.completionCriteria, "completionCriteria", 40);
   if (hasOwn(patch, "linkedRefs")) next.linkedRefs = normalizeNativeRefs(patch.linkedRefs, "linkedRefs");
-  if (hasOwn(patch, "nextRunAt")) next.nextRunAt = optionalDate(patch.nextRunAt, "nextRunAt");
+  if (hasOwn(patch, "nextRunDate") || hasOwn(patch, "nextRunTime")) {
+    next.nextRunDate = hasOwn(patch, "nextRunDate")
+      ? optionalCalendarDate(patch.nextRunDate, "nextRunDate")
+      : current.nextRunDate;
+    next.nextRunTime = hasOwn(patch, "nextRunTime")
+      ? optionalClockTime(patch.nextRunTime, "nextRunTime")
+      : current.nextRunTime;
+    next.nextRunAt = combinedNextRun(next.nextRunDate, next.nextRunTime, undefined);
+  } else if (hasOwn(patch, "nextRunAt")) {
+    next.nextRunAt = optionalDate(patch.nextRunAt, "nextRunAt");
+  }
   applySecondaryArchive(current, next, patch, now);
   validateRoutine(next, now, actorId);
   return next;
@@ -2065,6 +2142,8 @@ const SECONDARY_PATCH_KEYS: Record<PersonalOpsSecondaryFamily, readonly string[]
     "completionCriteria",
     "linkedRefs",
     "nextRunAt",
+    "nextRunDate",
+    "nextRunTime",
     "archiveReason",
     "archiveConfirmed",
     "restoreConfirmed"

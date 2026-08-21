@@ -4,8 +4,12 @@
 .pageHeader span, .editor header span { color: var(--text-muted); font: 800 10px/1.2 var(--font-heading); letter-spacing: .09em; text-transform: uppercase; }
 .pageHeader h1 { margin: 3px 0 2px; color: var(--text-strong); font: 820 24px/1.15 var(--font-heading); letter-spacing: -.02em; }
 .pageHeader p { margin: 0; color: var(--text-muted); font-size: 12px; }
+.headerActions { display: flex; align-items: center; gap: 7px; }
+.privacyToggle { display: inline-flex; width: auto; min-height: 34px; align-items: center; gap: 6px; padding: 0 10px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-bg); color: var(--text); font: 750 10px var(--font-heading); cursor: pointer; }
+.privacyToggle:disabled { opacity: .55; cursor: wait; }
+.privacyToggle svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-linecap: round; stroke-linejoin: round; stroke-width: 1.7; }
 .workspace { min-height: calc(100dvh - 190px); padding: 16px 22px 32px; }
-.primaryButton { display: inline-flex; min-height: 34px; align-items: center; justify-content: center; padding: 0 13px; border: 1px solid var(--action-primary); border-radius: 6px; background: var(--action-primary); color: #fff; font: 800 11px var(--font-heading); text-decoration: none; cursor: pointer; }
+.primaryButton { display: inline-flex; width: auto; min-height: 34px; align-items: center; justify-content: center; padding: 0 13px; border: 1px solid var(--action-primary); border-radius: 6px; background: var(--action-primary); color: #fff; font: 800 11px var(--font-heading); text-decoration: none; cursor: pointer; }
 .primaryButton:disabled { opacity: .55; cursor: not-allowed; }
 .notice, .error { margin: 10px 22px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
 .notice { background: color-mix(in srgb, #21845f 8%, var(--panel-bg)); color: #176848; }
@@ -16,7 +20,7 @@
 .empty strong { color: var(--text-strong); font: 800 15px var(--font-heading); }
 .empty span { font-size: 12px; }
 
-/* Passwords: a restrained keyring, with plaintext never rendered until asked for. */
+/* Passwords: a restrained encrypted keyring with a page-level privacy shutter. */
 .vaultGate { display: grid; max-width: 560px; min-height: 320px; margin: 7vh auto; place-items: center; align-content: center; gap: 9px; padding: 36px; border: 1px solid var(--border); border-radius: 10px; background: var(--panel-bg-subtle); text-align: center; }
 .vaultGate h2, .vaultGate p { margin: 0; }
 .vaultGate p { max-width: 50ch; color: var(--text-muted); font-size: 12px; line-height: 1.55; }
@@ -32,6 +36,8 @@
 .credentialRow strong { color: var(--text-strong); font: 780 13px var(--font-heading); }
 .credentialRow small { color: var(--text-muted); font-size: 11px; }
 .credentialRow code { padding: 6px 8px; overflow: hidden; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg-subtle); color: var(--text); font: 650 11px var(--font-mono); text-overflow: ellipsis; white-space: nowrap; }
+.credentialPrivate { transition: filter 150ms ease, opacity 150ms ease; }
+.keyring[data-masked] .credentialPrivate { filter: blur(6px); opacity: .66; pointer-events: none; user-select: none; }
 .keyIcon { color: var(--action-primary); font-size: 20px; }
 
 /* Lists: notebook index and ruled working page. */
@@ -61,18 +67,33 @@
 .atlas { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(270px, .75fr); gap: 14px; }
 .mapPanel, .tripLedger { overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-bg); }
 .mapToolbar { display: flex; flex-wrap: wrap; gap: 5px; padding: 10px; border-bottom: 1px solid var(--border); }
-.mapToolbar button { display: inline-flex; min-height: 28px; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-bg); color: var(--text-muted); font: 750 10px var(--font-heading); cursor: pointer; opacity: .55; }
+.mapToolbar button { display: inline-flex; width: auto; min-height: 28px; align-items: center; gap: 6px; padding: 0 8px; border: 1px solid var(--border); border-radius: 999px; background: var(--panel-bg); color: var(--text-muted); font: 750 10px var(--font-heading); cursor: pointer; opacity: .55; }
 .mapToolbar button[data-active] { color: var(--text-strong); opacity: 1; }
 .mapToolbar button span, .tripStatus::before { width: 7px; height: 7px; border-radius: 50%; background: #879397; content: ""; }
-.mapToolbar [data-status="been"] > span, .mapPin[data-status="been"] span, .tripStatus[data-status="been"]::before { background: #227da8; }
-.mapToolbar [data-status="want"] > span, .mapPin[data-status="want"] span, .tripStatus[data-status="want"]::before { background: #c97418; }
-.mapToolbar [data-status="lived"] > span, .mapPin[data-status="lived"] span, .tripStatus[data-status="lived"]::before { background: #21845f; }
-.mapToolbar [data-status="planned"] > span, .mapPin[data-status="planned"] span, .tripStatus[data-status="planned"]::before { background: #7f55c7; }
-.worldMap { position: relative; aspect-ratio: 2 / 1; overflow: hidden; background: color-mix(in srgb, #227da8 5%, var(--panel-bg-subtle)); cursor: crosshair; }
-.worldMap svg { display: block; width: 100%; height: 100%; }
-.worldMap path { fill: color-mix(in srgb, #8aa28d 30%, var(--panel-bg)); stroke: color-mix(in srgb, #607e68 48%, var(--border)); stroke-width: 2; }
-.mapPin { position: absolute; z-index: 2; display: grid; width: 22px; height: 22px; margin: -11px 0 0 -11px; place-items: center; padding: 0; border: 2px solid var(--panel-bg); border-radius: 50%; background: var(--text-strong); box-shadow: 0 1px 5px color-mix(in srgb, #000 28%, transparent); cursor: pointer; }
-.mapPin span { width: 8px; height: 8px; border-radius: 50%; }
+.mapToolbar [data-status="been"] > span, .tripStatus[data-status="been"]::before { background: #227da8; }
+.mapToolbar [data-status="want"] > span, .tripStatus[data-status="want"]::before { background: #c97418; }
+.mapToolbar [data-status="lived"] > span, .tripStatus[data-status="lived"]::before { background: #21845f; }
+.mapToolbar [data-status="planned"] > span, .tripStatus[data-status="planned"]::before { background: #7f55c7; }
+.worldMapShell { position: relative; aspect-ratio: 2 / 1; overflow: hidden; background: color-mix(in srgb, #227da8 7%, var(--panel-bg-subtle)); }
+.worldMapLoading { display: grid; aspect-ratio: 2 / 1; place-items: center; background: color-mix(in srgb, #227da8 7%, var(--panel-bg-subtle)); color: var(--text-muted); font-size: 11px; }
+.worldMap { display: block; width: 100%; height: 100%; background: transparent; cursor: grab; touch-action: none; }
+.worldMap:active { cursor: grabbing; }
+.mapSphere { fill: color-mix(in srgb, #8cbacd 17%, var(--panel-bg)); stroke: color-mix(in srgb, #227da8 30%, var(--border)); stroke-width: 1; }
+.mapGraticule { fill: none; stroke: color-mix(in srgb, #6f97a5 26%, var(--border)); stroke-width: .45; vector-effect: non-scaling-stroke; }
+.mapCountry { fill: color-mix(in srgb, #7f9e82 30%, var(--panel-bg)); stroke: none; }
+.mapCountry:hover { fill: color-mix(in srgb, #6d9573 43%, var(--panel-bg)); }
+.mapBorders { fill: none; stroke: color-mix(in srgb, #587260 56%, var(--border)); stroke-width: .65; vector-effect: non-scaling-stroke; pointer-events: none; }
+.mapPin { outline: none; cursor: pointer; }
+.mapPin circle:first-child { fill: #879397; stroke: var(--panel-bg); stroke-width: 2; vector-effect: non-scaling-stroke; }
+.mapPin[data-status="been"] circle:first-child { fill: #227da8; }
+.mapPin[data-status="want"] circle:first-child { fill: #c97418; }
+.mapPin[data-status="lived"] circle:first-child { fill: #21845f; }
+.mapPin[data-status="planned"] circle:first-child { fill: #7f55c7; }
+.mapPinCore { fill: #fff; pointer-events: none; }
+.mapPin:focus-visible circle:first-child, .mapPin[data-selected] circle:first-child { stroke: var(--text-strong); stroke-width: 3; }
+.mapControls { position: absolute; top: 8px; left: 8px; z-index: 3; display: flex; overflow: hidden; border: 1px solid var(--border); border-radius: 6px; background: color-mix(in srgb, var(--panel-bg) 92%, transparent); }
+.mapControls button { width: auto; min-width: 30px; min-height: 30px; padding: 0 8px; border: 0; border-right: 1px solid var(--border); background: transparent; color: var(--text); font: 750 11px var(--font-heading); cursor: pointer; }
+.mapControls button:last-child { border-right: 0; }
 .mapHint { position: absolute; right: 9px; bottom: 7px; padding: 4px 6px; border-radius: 4px; background: color-mix(in srgb, var(--panel-bg) 88%, transparent); color: var(--text-muted); font: 700 9px var(--font-heading); pointer-events: none; }
 .tripLedger > header { display: flex; min-height: 47px; align-items: center; justify-content: space-between; padding: 0 12px; border-bottom: 1px solid var(--border); }
 .tripLedger h2 { margin: 0; font: 800 14px var(--font-heading); }
@@ -146,7 +167,8 @@
 @media (max-width: 760px) {
   .workspace { padding: 10px 10px 24px; }
   .pageHeader { grid-template-columns: 1fr; padding: 14px 12px 10px; }
-  .pageHeader > button { display: none; }
+  .headerActions { justify-content: flex-start; }
+  .headerActions .primaryButton { display: none; }
   .keyring { grid-template-columns: 1fr; }
   .keyringRail { display: flex; min-height: auto; align-items: center; border-right: 0; border-bottom: 1px solid var(--border); }
   .keyringRail strong { margin: 0 0 0 auto; font-size: 22px; }
@@ -171,8 +193,10 @@
 :global(html[data-personal-preview="mobile"]) .workspace { padding: 10px 10px 24px; }
 :global(html[data-admin-preview="mobile"]) .pageHeader,
 :global(html[data-personal-preview="mobile"]) .pageHeader { grid-template-columns: 1fr; padding: 14px 12px 10px; }
-:global(html[data-admin-preview="mobile"]) .pageHeader > button,
-:global(html[data-personal-preview="mobile"]) .pageHeader > button { display: none; }
+:global(html[data-admin-preview="mobile"]) .headerActions,
+:global(html[data-personal-preview="mobile"]) .headerActions { justify-content: flex-start; }
+:global(html[data-admin-preview="mobile"]) .headerActions .primaryButton,
+:global(html[data-personal-preview="mobile"]) .headerActions .primaryButton { display: none; }
 :global(html[data-admin-preview="mobile"]) .keyring,
 :global(html[data-personal-preview="mobile"]) .keyring { grid-template-columns: 1fr; }
 :global(html[data-admin-preview="mobile"]) .keyringRail,
@@ -220,4 +244,5 @@
 
 @media (prefers-reduced-motion: reduce) {
   .mapPin, .overlay { scroll-behavior: auto; }
+  .credentialPrivate { transition: none; }
 }

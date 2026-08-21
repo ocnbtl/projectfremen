@@ -91,8 +91,10 @@ type AdvancedDraft = {
   frequency: "daily" | "weekly" | "biweekly" | "monthly" | "quarterly" | "annual" | "custom";
   interval: string;
   timezone: string;
-  reminderWindowDays: string;
-  nextRunAt: string;
+  reminderAmount: string;
+  reminderUnit: "minutes" | "hours" | "days" | "weeks";
+  nextRunDate: string;
+  nextRunTime: string;
   completionCriteria: string;
   generateFollowUp: boolean;
   generateObligation: boolean;
@@ -228,14 +230,6 @@ function cleanLabel(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
-function toLocalDate(value?: string) {
-  if (!value) return "";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value.slice(0, 10);
-  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 10);
-}
-
 function toIsoDate(value: string) {
   if (!value) return undefined;
   const date = new Date(`${value}T12:00:00`);
@@ -260,6 +254,62 @@ function formatTimestamp(value?: string) {
     hour: "numeric",
     minute: "2-digit"
   }).format(date);
+}
+
+function legacyRoutineDate(item: PersonalOpsRoutine): string {
+  if (!item.nextRunAt) return "";
+  return item.nextRunAt.slice(0, 10);
+}
+
+function legacyRoutineTime(item: PersonalOpsRoutine): string {
+  if (!item.nextRunAt?.includes("T")) return "";
+  const date = new Date(item.nextRunAt);
+  if (Number.isNaN(date.getTime())) return item.nextRunAt.slice(11, 16);
+  return new Intl.DateTimeFormat("en-CA", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).format(date);
+}
+
+function routineNextRunTime(item: PersonalOpsRoutine, reference = new Date()): number | null {
+  const dateValue = item.nextRunDate || legacyRoutineDate(item);
+  const timeValue = item.nextRunTime || legacyRoutineTime(item);
+  if (dateValue) {
+    const candidate = new Date(`${dateValue}T${timeValue || "00:00"}:00`);
+    return Number.isNaN(candidate.getTime()) ? null : candidate.getTime();
+  }
+  if (timeValue) {
+    const [hours, minutes] = timeValue.split(":").map(Number);
+    const candidate = new Date(reference);
+    candidate.setHours(hours, minutes, 0, 0);
+    if (candidate.getTime() < reference.getTime()) candidate.setDate(candidate.getDate() + 1);
+    return candidate.getTime();
+  }
+  if (!item.nextRunAt) return null;
+  const legacy = new Date(item.nextRunAt).getTime();
+  return Number.isNaN(legacy) ? null : legacy;
+}
+
+function formatRoutineNextRun(item: PersonalOpsRoutine, fallback = "Not scheduled") {
+  const dateValue = item.nextRunDate || legacyRoutineDate(item);
+  const timeValue = item.nextRunTime || legacyRoutineTime(item);
+  if (dateValue && timeValue) return formatTimestamp(`${dateValue}T${timeValue}:00`);
+  if (dateValue) return formatDate(dateValue, fallback);
+  if (timeValue) {
+    const [hours, minutes] = timeValue.split(":").map(Number);
+    const candidate = new Date(2000, 0, 1, hours, minutes);
+    return `Next ${new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(candidate)}`;
+  }
+  return item.nextRunAt ? formatTimestamp(item.nextRunAt) : fallback;
+}
+
+function formatRoutineReminder(item: PersonalOpsRoutine) {
+  const amount = item.cadenceRule.reminderAmount ?? item.cadenceRule.reminderWindowDays;
+  const unit = item.cadenceRule.reminderUnit ?? "days";
+  if (amount === 0) return "No lead time";
+  const singular = unit.endsWith("s") ? unit.slice(0, -1) : unit;
+  return `${amount} ${amount === 1 ? singular : unit}`;
 }
 
 function isLegacy(item: AdvancedListItem): item is LegacyCaptureProjection {
@@ -298,7 +348,10 @@ function domainFor(item: AdvancedListItem) {
 
 function dateFor(item: AdvancedListItem) {
   if (isLegacy(item)) return item.updatedAt;
-  if (item.objectType === "routine") return item.nextRunAt;
+  if (item.objectType === "routine") {
+    const nextRun = routineNextRunTime(item);
+    return nextRun === null ? undefined : new Date(nextRun).toISOString();
+  }
   if (item.objectType === "capture_item") return item.source.capturedAt;
   return item.lastUsedAt || item.updatedAt;
 }
@@ -388,8 +441,10 @@ function defaultDraft(family: PersonalOpsSecondaryFamily, item?: PersonalOpsSeco
     frequency: item?.objectType === "routine" ? item.cadenceRule.frequency : "weekly",
     interval: item?.objectType === "routine" ? String(item.cadenceRule.interval) : "1",
     timezone: item?.objectType === "routine" ? item.cadenceRule.timezone : Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC",
-    reminderWindowDays: item?.objectType === "routine" ? String(item.cadenceRule.reminderWindowDays) : "2",
-    nextRunAt: item?.objectType === "routine" ? toLocalDate(item.nextRunAt) : "",
+    reminderAmount: item?.objectType === "routine" ? String(item.cadenceRule.reminderAmount ?? item.cadenceRule.reminderWindowDays) : "2",
+    reminderUnit: item?.objectType === "routine" ? item.cadenceRule.reminderUnit ?? "days" : "days",
+    nextRunDate: item?.objectType === "routine" ? item.nextRunDate || legacyRoutineDate(item) : "",
+    nextRunTime: item?.objectType === "routine" ? item.nextRunTime || legacyRoutineTime(item) : "",
     completionCriteria: item?.objectType === "routine" ? item.completionCriteria.join("\n") : "",
     generateFollowUp: item?.objectType === "routine" ? item.generationRules.some((rule) => rule.destination.module === "personal_ops" && rule.destination.family === "followUps") : true,
     generateObligation: item?.objectType === "routine" ? item.generationRules.some((rule) => rule.destination.module === "personal_ops" && rule.destination.family === "obligations") : false,
@@ -404,9 +459,7 @@ function defaultDraft(family: PersonalOpsSecondaryFamily, item?: PersonalOpsSeco
 
 function createSecondaryInput(form: OpenForm, draft: AdvancedDraft): PersonalOpsSecondaryCreateInputByFamily[PersonalOpsSecondaryFamily] {
   if (form.family === "routines") {
-    const generationRules = [];
-    if (draft.generateFollowUp) generationRules.push({ label: "Routine follow-up", enabled: true, destination: { module: "personal_ops" as const, family: "followUps" as const, input: { title: `${draft.title} follow-up`, followUpType: "recurring_cadence" as const, followUpState: "open" as const, context: `Generated from routine: ${draft.title}`, domain: draft.domain, lifecycle: "draft" as const } } });
-    if (draft.generateObligation) generationRules.push({ label: "Routine obligation", enabled: true, destination: { module: "personal_ops" as const, family: "obligations" as const, input: { title: `${draft.title} obligation`, consequence: `Recurring obligation generated from ${draft.title}.`, domain: draft.domain, lifecycle: "draft" as const, obligationState: "open" as const, completionCriteria: [{ label: "Review and complete this routine output", satisfied: false }] } } });
+    const existingRoutine = form.item?.objectType === "routine" ? form.item : undefined;
     return {
       title: draft.title,
       summary: draft.summary,
@@ -420,13 +473,15 @@ function createSecondaryInput(form: OpenForm, draft: AdvancedDraft): PersonalOps
         frequency: draft.frequency,
         interval: Math.max(1, Number(draft.interval) || 1),
         timezone: draft.timezone,
-        reminderWindowDays: Math.max(0, Number(draft.reminderWindowDays) || 0),
+        reminderAmount: Math.max(0, Number(draft.reminderAmount) || 0),
+        reminderUnit: draft.reminderUnit,
         trigger: "manual",
         autoCreateNext: false
       },
-      generationRules,
-      completionCriteria: lines(draft.completionCriteria),
-      nextRunAt: toIsoDate(draft.nextRunAt)
+      generationRules: existingRoutine?.generationRules || [],
+      completionCriteria: existingRoutine?.completionCriteria || [],
+      nextRunDate: draft.nextRunDate || undefined,
+      nextRunTime: draft.nextRunTime || undefined
     };
   }
   if (form.family === "captures") {
@@ -502,6 +557,7 @@ function AdvancedObjectForm({
 }) {
   const sheetRef = useRef<HTMLFormElement>(null);
   const draftRef = useRef(draft);
+  const onCloseRef = useRef(onClose);
   const label = form.family === "routines" ? "Routine" : form.family === "captures" ? "Capture" : "Template";
   const editing = Boolean(form.item);
 
@@ -510,15 +566,19 @@ function AdvancedObjectForm({
   }, [draft]);
 
   useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
+  useEffect(() => {
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     const controls = () => Array.from(sheetRef.current?.querySelectorAll<HTMLElement>(
       "button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex='-1'])"
     ) || []);
-    controls()[0]?.focus();
+    (sheetRef.current?.querySelector<HTMLElement>("[data-autofocus]") || controls()[0])?.focus();
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (event.key !== "Tab") return;
@@ -539,7 +599,7 @@ function AdvancedObjectForm({
       document.removeEventListener("keydown", handleKeyDown);
       previousFocus?.focus();
     };
-  }, [onClose]);
+  }, []);
 
   function update<Key extends keyof AdvancedDraft>(key: Key, value: AdvancedDraft[Key]) {
     const next = { ...draftRef.current, [key]: value };
@@ -572,17 +632,17 @@ function AdvancedObjectForm({
             ) : null}
 
             <Field label={form.family === "captures" ? "Title (optional)" : "Title"} full>
-              <input value={draft.title} onChange={(event) => update("title", event.target.value)} required={form.family !== "captures"} maxLength={240} />
+              <input data-autofocus value={draft.title} onChange={(event) => update("title", event.target.value)} required={form.family !== "captures"} maxLength={240} />
             </Field>
             <Field label="Domain">
               <select value={draft.domain} onChange={(event) => update("domain", event.target.value)}>
                 {PERSONAL_OPS_DOMAIN_LABELS.map((domain) => <option key={domain}>{domain}</option>)}
               </select>
             </Field>
-            <Field label="Owner">
+            {form.family !== "routines" && <Field label="Owner">
               <input value={draft.owner} onChange={(event) => update("owner", event.target.value)} maxLength={160} />
-            </Field>
-            {form.family !== "templates" && (
+            </Field>}
+            {form.family !== "templates" && form.family !== "routines" && (
               <Field label="Health">
                 <select value={draft.health} onChange={(event) => update("health", event.target.value as AdvancedDraft["health"])}>
                   <option value="unknown">Unknown</option>
@@ -593,7 +653,7 @@ function AdvancedObjectForm({
                 </select>
               </Field>
             )}
-            <Field label="Review state">
+            {form.family !== "routines" && <Field label="Review state">
               <select value={draft.review} onChange={(event) => update("review", event.target.value as AdvancedDraft["review"])}>
                 <option value="not_reviewed">Not reviewed</option>
                 <option value="needs_review">Needs review</option>
@@ -602,39 +662,35 @@ function AdvancedObjectForm({
                 <option value="not_required">Not required</option>
                 <option value="waived">Waived</option>
               </select>
-            </Field>
+            </Field>}
 
             {form.family === "routines" && (
               <>
-                <Field label="Summary" full>
-                  <textarea value={draft.summary} onChange={(event) => update("summary", event.target.value)} rows={4} />
-                </Field>
                 <Field label="Frequency">
                   <select value={draft.frequency} onChange={(event) => update("frequency", event.target.value as AdvancedDraft["frequency"])}>
                     {(["daily", "weekly", "biweekly", "monthly", "quarterly", "annual", "custom"] as const).map((value) => <option value={value} key={value}>{cleanLabel(value)}</option>)}
                   </select>
                 </Field>
-                <Field label="Interval">
-                  <input type="number" min="1" max="365" value={draft.interval} onChange={(event) => update("interval", event.target.value)} required />
+                <Field label="Next run date" hint="Optional">
+                  <input type="date" value={draft.nextRunDate} onInput={(event) => update("nextRunDate", event.currentTarget.value)} />
                 </Field>
-                <Field label="Next run">
-                  <input type="date" value={draft.nextRunAt} onInput={(event) => update("nextRunAt", event.currentTarget.value)} />
+                <Field label="Next run time" hint="Optional">
+                  <input type="time" value={draft.nextRunTime} onInput={(event) => update("nextRunTime", event.currentTarget.value)} />
                 </Field>
-                <Field label="Reminder window (days)">
-                  <input type="number" min="0" max="90" value={draft.reminderWindowDays} onChange={(event) => update("reminderWindowDays", event.target.value)} />
+                <Field label="Reminder">
+                  <span className={styles.compoundField}>
+                    <input aria-label="Reminder amount" type="number" min="0" max="525600" value={draft.reminderAmount} onChange={(event) => update("reminderAmount", event.target.value)} />
+                    <select aria-label="Reminder unit" value={draft.reminderUnit} onChange={(event) => update("reminderUnit", event.target.value as AdvancedDraft["reminderUnit"])}>
+                      <option value="minutes">M</option>
+                      <option value="hours">H</option>
+                      <option value="days">D</option>
+                      <option value="weeks">W</option>
+                    </select>
+                  </span>
                 </Field>
-                <Field label="Timezone" full>
-                  <input value={draft.timezone} onChange={(event) => update("timezone", event.target.value)} required />
+                <Field label="Description" full>
+                  <textarea value={draft.summary} onChange={(event) => update("summary", event.target.value)} rows={5} maxLength={6000} />
                 </Field>
-                <Field label="Completion criteria" full hint="One run-level criterion per line. Completing a run never completes the Routine definition.">
-                  <textarea value={draft.completionCriteria} onChange={(event) => update("completionCriteria", event.target.value)} />
-                </Field>
-                <fieldset className={[styles.field, styles.fullWidth, styles.choiceGroup].join(" ")}>
-                  <legend>Confirmed run may create</legend>
-                  <label><input type="checkbox" checked={draft.generateFollowUp} onChange={(event) => update("generateFollowUp", event.target.checked)} /> Draft Follow-up</label>
-                  <label><input type="checkbox" checked={draft.generateObligation} onChange={(event) => update("generateObligation", event.target.checked)} /> Draft Obligation</label>
-                  <small className={styles.fieldHint}>Cross-module Review, Finance, Note, and Resource writes stay disabled until their destination repositories expose safe create adapters.</small>
-                </fieldset>
               </>
             )}
 
@@ -833,8 +889,16 @@ export default function PersonalOpsAdvancedWorkspace({
       .join(" ").toLowerCase().includes(query));
   }, [baseItems, urlState.query]);
 
+  const effectiveSort: PersonalOpsSort = initialView === "routines" && urlState.sort === "priority"
+    ? "due"
+    : urlState.sort;
+
   const scopedItems = useMemo(() => {
     const now = Date.now();
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
     const filtered = queryItems.filter((item) => {
       const filter = urlState.filter;
       if (filter === "all") return lifecycleFor(item) !== "archived";
@@ -846,7 +910,22 @@ export default function PersonalOpsAdvancedWorkspace({
       if (filter === "linked-finance") return refsFor(item).some((ref) => ref.module === "finance");
       if (filter === "linked-reviews") return refsFor(item).some((ref) => ref.module === "reviews");
       if (filter === "recurring") return !isLegacy(item) && item.objectType === "routine";
-      if (filter === "due-soon") return !isLegacy(item) && item.objectType === "routine" && Boolean(item.nextRunAt && new Date(item.nextRunAt).getTime() <= now + 7 * 86_400_000);
+      if (filter === "due-today") {
+        if (isLegacy(item) || item.objectType !== "routine") return false;
+        const nextRun = routineNextRunTime(item);
+        return nextRun !== null && nextRun >= today.getTime() && nextRun < tomorrow.getTime();
+      }
+      if (filter === "due-soon") {
+        if (isLegacy(item) || item.objectType !== "routine") return false;
+        const nextRun = routineNextRunTime(item);
+        return nextRun !== null && nextRun >= now && nextRun <= now + 7 * 86_400_000;
+      }
+      if (filter === "overdue") {
+        return !isLegacy(item) && item.objectType === "routine" && (routineNextRunTime(item) ?? Number.POSITIVE_INFINITY) < now;
+      }
+      if (filter === "unscheduled") {
+        return !isLegacy(item) && item.objectType === "routine" && routineNextRunTime(item) === null;
+      }
       if (filter === "active") return lifecycleFor(item) === "active" && stateFor(item) !== "paused";
       if (filter === "paused") return stateFor(item) === "paused";
       if (filter === "ready") return stateFor(item) === "ready";
@@ -857,13 +936,13 @@ export default function PersonalOpsAdvancedWorkspace({
       return lifecycleFor(item) !== "archived";
     });
     return [...filtered].sort((left, right) => {
-      if (urlState.sort === "title") return left.title.localeCompare(right.title);
-      if (urlState.sort === "updated") return (right.updatedAt || "").localeCompare(left.updatedAt || "");
-      if (urlState.sort === "due") return (dateFor(left) || "9999").localeCompare(dateFor(right) || "9999");
+      if (effectiveSort === "title") return left.title.localeCompare(right.title);
+      if (effectiveSort === "updated") return (right.updatedAt || "").localeCompare(left.updatedAt || "");
+      if (effectiveSort === "due") return (dateFor(left) || "9999").localeCompare(dateFor(right) || "9999");
       const weights = { critical: 0, high: 1, medium: 2, low: 3 };
       return weights[priorityFor(left)] - weights[priorityFor(right)] || (dateFor(left) || "9999").localeCompare(dateFor(right) || "9999");
     });
-  }, [queryItems, urlState.filter, urlState.sort]);
+  }, [effectiveSort, queryItems, urlState.filter]);
 
   const selectedItem = useMemo(() => baseItems.find((item) => item.id === urlState.selected) || null, [baseItems, urlState.selected]);
   const selectedNative = selectedItem && !isLegacy(selectedItem) ? selectedItem : null;
@@ -895,16 +974,15 @@ export default function PersonalOpsAdvancedWorkspace({
     if (initialView === "routines") {
       const routines = native.filter((item): item is PersonalOpsRoutine => item.objectType === "routine");
       const now = new Date();
+      const startToday = new Date(now);
+      startToday.setHours(0, 0, 0, 0);
       const endToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1).getTime();
       return [
         metric("active", "Active routines", routines.filter((item) => item.lifecycle === "active" && item.cadence !== "paused").length, "manual definitions", "positive"),
-        metric("due-today", "Due today", routines.filter((item) => item.nextRunAt && new Date(item.nextRunAt).getTime() < endToday && new Date(item.nextRunAt).getTime() >= now.setHours(0, 0, 0, 0)).length, "explicit next run", "attention"),
-        metric("due-soon", "Due this week", routines.filter((item) => item.nextRunAt && new Date(item.nextRunAt).getTime() <= Date.now() + 7 * 86_400_000).length, "next 7 days", "attention"),
-        metric("overdue", "Missed cadence", routines.filter((item) => item.cadence === "overdue").length, "needs a decision", "danger"),
-        metric("needs-review", "Needs review", routines.filter((item) => item.review === "needs_review").length, "explicit review state", "review"),
-        { id: "follow-ups", label: "Generates follow-ups", value: routines.filter((item) => item.generationRules.some((rule) => rule.enabled && rule.destination.module === "personal_ops" && rule.destination.family === "followUps")).length, detail: "confirmation-first" },
-        { id: "obligations", label: "Generates obligations", value: routines.filter((item) => item.generationRules.some((rule) => rule.enabled && rule.destination.module === "personal_ops" && rule.destination.family === "obligations")).length, detail: "confirmation-first" },
-        { id: "reviews", label: "Linked reviews", value: routines.filter((item) => item.linkedRefs.some((ref) => ref.module === "reviews")).length, detail: "reference only", tone: "review" },
+        metric("due-today", "Due today", routines.filter((item) => { const nextRun = routineNextRunTime(item, now); return nextRun !== null && nextRun >= startToday.getTime() && nextRun < endToday; }).length, "date or time", "attention"),
+        metric("due-soon", "Next 7 days", routines.filter((item) => { const nextRun = routineNextRunTime(item, now); return nextRun !== null && nextRun >= now.getTime() && nextRun <= now.getTime() + 7 * 86_400_000; }).length, "upcoming", "attention"),
+        metric("overdue", "Overdue", routines.filter((item) => (routineNextRunTime(item, now) ?? Number.POSITIVE_INFINITY) < now.getTime()).length, "past next run", "danger"),
+        metric("unscheduled", "Unscheduled", routines.filter((item) => routineNextRunTime(item, now) === null).length, "date and time open"),
         metric("paused", "Paused", routines.filter((item) => item.cadence === "paused").length, "generates nothing", "attention")
       ];
     }
@@ -939,7 +1017,7 @@ export default function PersonalOpsAdvancedWorkspace({
 
   const filters = useMemo(() => {
     const ids = initialView === "routines"
-      ? [["all", "All"], ["active", "Active"], ["due-soon", "Due soon"], ["needs-review", "Needs review"], ["paused", "Paused"], ["archived", "Archived"]]
+      ? [["all", "All"], ["active", "Active"], ["due-today", "Today"], ["due-soon", "Next 7 days"], ["overdue", "Overdue"], ["unscheduled", "Unscheduled"], ["paused", "Paused"], ["archived", "Archived"]]
       : initialView === "inbox"
         ? [["all", "All"], ["untriaged", "Untriaged"], ["ready", "Ready"], ["needs-review", "Needs review"], ["processed", "Processed"], ["archived", "Archived"]]
         : [["all", "All"], ["active", "Active"], ["draft", "Draft"], ["needs-review", "Needs review"], ["deprecated", "Deprecated"], ["archived", "Archived"]];
@@ -951,6 +1029,18 @@ export default function PersonalOpsAdvancedWorkspace({
         if (id === "archived") return lifecycleFor(item) === "archived";
         if (id === "active") return lifecycleFor(item) === "active" && stateFor(item) !== "paused";
         if (id === "needs-review") return !isLegacy(item) && (item.review === "needs_review" || item.review === "not_reviewed");
+        if (initialView === "routines" && !isLegacy(item) && item.objectType === "routine") {
+          const nextRun = routineNextRunTime(item);
+          const now = Date.now();
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+          if (id === "due-today") return nextRun !== null && nextRun >= today.getTime() && nextRun < tomorrow.getTime();
+          if (id === "due-soon") return nextRun !== null && nextRun >= now && nextRun <= now + 7 * 86_400_000;
+          if (id === "overdue") return nextRun !== null && nextRun < now;
+          if (id === "unscheduled") return nextRun === null;
+        }
         return stateFor(item) === id;
       }).length,
       active: urlState.filter === id,
@@ -1281,9 +1371,9 @@ export default function PersonalOpsAdvancedWorkspace({
     if (initialView === "routines") {
       if (isLegacy(item) || item.objectType !== "routine") return "—";
       if (column === 0) return cleanLabel(item.cadenceRule.frequency);
-      if (column === 1) return formatDate(item.nextRunAt);
-      if (column === 2) return `${item.generationRules.filter((rule) => rule.enabled).length} definitions`;
-      if (column === 3) return <PersonalOpsStatusChip tone={toneFor(item.health)}>{cleanLabel(item.health)}</PersonalOpsStatusChip>;
+      if (column === 1) return formatRoutineNextRun(item);
+      if (column === 2) return formatRoutineReminder(item);
+      if (column === 3) return item.lastRunAt ? formatDate(item.lastRunAt) : "Not run";
       return <PersonalOpsStatusChip tone={toneFor(item.cadence)}>{item.lifecycle === "archived" ? "Archived" : cleanLabel(item.cadence)}</PersonalOpsStatusChip>;
     }
     if (initialView === "inbox") {
@@ -1311,7 +1401,7 @@ export default function PersonalOpsAdvancedWorkspace({
   }
 
   const columnLabels = initialView === "routines"
-    ? ["Cadence", "Next run", "Generates", "Health", "State"]
+    ? ["Frequency", "Next run", "Reminder", "Last run", "State"]
     : initialView === "inbox"
       ? ["Source", "Suggested type", "Confidence", "Linked to", "Triage state"]
       : ["Object type", "Required fields", "Usage", "Health", "State"];
@@ -1348,7 +1438,15 @@ export default function PersonalOpsAdvancedWorkspace({
                 onChange={(event) => changeQuery(event.target.value)}
                 placeholder={`Search ${config.title.toLowerCase()}`}
               />
-              <button type="button" className={styles.button} onClick={() => updateUrl({ filter: urlState.filter === "all" ? "needs-review" : "all", selected: "" })}>Filter</button>
+              <button type="button" className={styles.button} onClick={() => updateUrl({ filter: urlState.filter === "all" ? initialView === "routines" ? "due-today" : "needs-review" : "all", selected: "" })}>Filter</button>
+              {initialView === "routines" && <label className={styles.sortControl}>
+                <span className={styles.visuallyHidden}>Sort routines</span>
+                <select value={effectiveSort} onChange={(event) => updateUrl({ sort: event.target.value as PersonalOpsSort, selected: "" })}>
+                  <option value="due">Next run</option>
+                  <option value="title">Title</option>
+                  <option value="updated">Recently updated</option>
+                </select>
+              </label>}
               <button type="button" className={styles.button} aria-pressed={urlState.compact} onClick={() => updateUrl({ compact: !urlState.compact })}>Compact</button>
               <button type="button" className={styles.primaryButton} onClick={openCreate}>+ {config.singular}</button>
               <button
@@ -1408,7 +1506,7 @@ export default function PersonalOpsAdvancedWorkspace({
                       <th style={{ width: "38%" }}>{config.singular}</th>
                       <th>Domain</th>
                       {columnLabels.map((label) => <th key={label}>{label}</th>)}
-                      <th>{initialView === "routines" ? "Last action" : initialView === "inbox" ? "Captured" : "Last used"}</th>
+                      <th>{initialView === "routines" ? "Updated" : initialView === "inbox" ? "Captured" : "Last used"}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1435,7 +1533,7 @@ export default function PersonalOpsAdvancedWorkspace({
                           </td>
                           <td data-label="Domain">{domainFor(item)}</td>
                           {columnLabels.map((label, index) => <td data-label={label} key={label}>{secondaryCell(item, index)}</td>)}
-                          <td data-label={initialView === "routines" ? "Last action" : initialView === "inbox" ? "Captured" : "Last used"} className={styles.mono}>{formatDate(dateFor(item))}</td>
+                          <td data-label={initialView === "routines" ? "Updated" : initialView === "inbox" ? "Captured" : "Last used"} className={styles.mono}>{formatDate(initialView === "routines" && !isLegacy(item) ? item.updatedAt : dateFor(item))}</td>
                         </tr>
                       );
                     })}
@@ -1493,7 +1591,7 @@ export default function PersonalOpsAdvancedWorkspace({
                     ) : selectedItem.cadence === "paused" ? (
                       <button type="button" className={styles.primaryButton} onClick={() => setPendingAction({ type: "resume-routine", item: selectedItem })} disabled={busy}>Resume</button>
                     ) : (
-                      <button type="button" className={styles.primaryButton} onClick={() => void startRoutinePreview(selectedItem)} disabled={busy}>Run now</button>
+                      <button type="button" className={styles.primaryButton} onClick={() => void startRoutinePreview(selectedItem)} disabled={busy || selectedItem.generationRules.length === 0} title={selectedItem.generationRules.length === 0 ? "This schedule has no legacy generated-item definitions." : undefined}>Run now</button>
                     )}
                     {selectedItem.lifecycle === "active" && selectedItem.cadence !== "paused" && <button type="button" className={styles.button} onClick={() => setPendingAction({ type: "pause-routine", item: selectedItem })} disabled={busy}>Pause</button>}
                     <button type="button" className={styles.button} onClick={() => setPendingAction({ type: "archive", item: selectedItem })} disabled={busy}>Archive</button>
@@ -1557,15 +1655,15 @@ export default function PersonalOpsAdvancedWorkspace({
                     <span className={styles.objectIcon} aria-hidden="true">{selectedItem.objectType === "routine" ? "↻" : selectedItem.objectType === "capture_item" ? "↳" : "▤"}</span>
                     <div>
                       <h2>{selectedItem.title}</h2>
-                      <p>{cleanLabel(selectedItem.objectType)} · {selectedItem.domain} · owner {selectedItem.owner}</p>
+                      <p>{cleanLabel(selectedItem.objectType)} · {selectedItem.domain}{selectedItem.objectType === "routine" ? "" : ` · owner ${selectedItem.owner}`}</p>
                     </div>
                     <button type="button" className={styles.closeButton} onClick={() => updateUrl({ selected: "" }, true)} aria-label="Close inspector">×</button>
                   </div>
                   <div className={styles.chipRow}>
                     <PersonalOpsStatusChip tone={toneFor(selectedItem.lifecycle)}>{cleanLabel(selectedItem.lifecycle)}</PersonalOpsStatusChip>
                     <PersonalOpsStatusChip tone={toneFor(stateFor(selectedItem))}>{cleanLabel(stateFor(selectedItem))}</PersonalOpsStatusChip>
-                    <PersonalOpsStatusChip tone={toneFor(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>
-                    <PersonalOpsStatusChip tone={toneFor(selectedItem.review)}>{cleanLabel(selectedItem.review)}</PersonalOpsStatusChip>
+                    {selectedItem.objectType !== "routine" && <PersonalOpsStatusChip tone={toneFor(selectedItem.health)}>{cleanLabel(selectedItem.health)}</PersonalOpsStatusChip>}
+                    {selectedItem.objectType !== "routine" && <PersonalOpsStatusChip tone={toneFor(selectedItem.review)}>{cleanLabel(selectedItem.review)}</PersonalOpsStatusChip>}
                     {selectionOutsideScope && <PersonalOpsStatusChip tone="attention">Outside current filter</PersonalOpsStatusChip>}
                   </div>
                   <div className={styles.inspectorTabs}>
@@ -1579,9 +1677,9 @@ export default function PersonalOpsAdvancedWorkspace({
                       <>
                         <PersonalOpsStateGrid items={selectedItem.objectType === "routine" ? [
                           { id: "lifecycle", label: "Lifecycle", value: cleanLabel(selectedItem.lifecycle), detail: "definition state", tone: toneFor(selectedItem.lifecycle) },
-                          { id: "cadence", label: "Cadence", value: cleanLabel(selectedItem.cadence), detail: formatDate(selectedItem.nextRunAt), tone: toneFor(selectedItem.cadence) },
-                          { id: "health", label: "Health", value: cleanLabel(selectedItem.health), detail: "separate from cadence", tone: toneFor(selectedItem.health) },
-                          { id: "review", label: "Review", value: cleanLabel(selectedItem.review), detail: "explicit review state", tone: toneFor(selectedItem.review) }
+                          { id: "cadence", label: "Cadence", value: cleanLabel(selectedItem.cadence), detail: "schedule state", tone: toneFor(selectedItem.cadence) },
+                          { id: "frequency", label: "Frequency", value: cleanLabel(selectedItem.cadenceRule.frequency), detail: formatRoutineReminder(selectedItem) },
+                          { id: "next-run", label: "Next run", value: formatRoutineNextRun(selectedItem), detail: selectedItem.nextRunDate && selectedItem.nextRunTime ? "date and time" : selectedItem.nextRunDate ? "date only" : selectedItem.nextRunTime ? "time only" : "not scheduled" }
                         ] : selectedItem.objectType === "capture_item" ? [
                           { id: "lifecycle", label: "Lifecycle", value: cleanLabel(selectedItem.lifecycle), detail: "soft archive only", tone: toneFor(selectedItem.lifecycle) },
                           { id: "triage", label: "Triage", value: cleanLabel(selectedItem.triageState), detail: "intake workflow", tone: toneFor(selectedItem.triageState) },
@@ -1594,10 +1692,9 @@ export default function PersonalOpsAdvancedWorkspace({
                           { id: "review", label: "Review", value: cleanLabel(selectedItem.review), detail: "manual review state", tone: toneFor(selectedItem.review) }
                         ]} />
                         <div className={styles.panelGrid}>
-                          <PersonalOpsPanel title={selectedItem.objectType === "capture_item" ? "Immutable raw source" : "Operating summary"} wide>
-                            <p className={selectedItem.objectType === "capture_item" ? styles.rawSource : undefined}>{selectedItem.objectType === "capture_item" ? selectedItem.rawText : selectedItem.summary || "No summary recorded."}</p>
+                          <PersonalOpsPanel title={selectedItem.objectType === "capture_item" ? "Immutable raw source" : selectedItem.objectType === "routine" ? "Description" : "Operating summary"} wide>
+                            <p className={selectedItem.objectType === "capture_item" ? styles.rawSource : undefined}>{selectedItem.objectType === "capture_item" ? selectedItem.rawText : selectedItem.summary || (selectedItem.objectType === "routine" ? "No description recorded." : "No summary recorded.")}</p>
                           </PersonalOpsPanel>
-                          {selectedItem.objectType === "routine" && <PersonalOpsPanel title="Completion criteria"><ul className={styles.compactList}>{selectedItem.completionCriteria.length ? selectedItem.completionCriteria.map((criterion) => <li key={criterion}>{criterion}</li>) : <li>No criteria recorded.</li>}</ul></PersonalOpsPanel>}
                           {selectedItem.objectType === "capture_item" && <PersonalOpsPanel title="Source provenance"><dl className={styles.metadataList}><div><dt>Source</dt><dd>{selectedItem.source.label}</dd></div><div><dt>Captured</dt><dd>{formatTimestamp(selectedItem.source.capturedAt)}</dd></div><div><dt>Raw edited</dt><dd>Never</dd></div></dl></PersonalOpsPanel>}
                           {selectedItem.objectType === "template" && <PersonalOpsPanel title="Creation contract"><p>{selectedItem.generatedDefinitions.length} destination definition{selectedItem.generatedDefinitions.length === 1 ? "" : "s"}; testing is non-writing and confirmed use creates one native object.</p></PersonalOpsPanel>}
                           <PersonalOpsPanel title="Native links"><NativeReferenceList refs={refsFor(selectedItem)} /></PersonalOpsPanel>
@@ -1606,8 +1703,8 @@ export default function PersonalOpsAdvancedWorkspace({
                     )}
 
                     {selectedItem.objectType === "routine" && activeTab === "cadence" && <div className={styles.panelGrid}>
-                      <PersonalOpsPanel title="Cadence rule" wide><dl className={styles.metadataList}><div><dt>Frequency</dt><dd>{cleanLabel(selectedItem.cadenceRule.frequency)}</dd></div><div><dt>Interval</dt><dd>Every {selectedItem.cadenceRule.interval}</dd></div><div><dt>Timezone</dt><dd>{selectedItem.cadenceRule.timezone}</dd></div><div><dt>Next run</dt><dd>{formatTimestamp(selectedItem.nextRunAt)}</dd></div><div><dt>Trigger</dt><dd>Manual confirmation</dd></div><div><dt>Background create</dt><dd>Disabled</dd></div></dl></PersonalOpsPanel>
-                      <PersonalOpsPanel title="Reminder window"><p>{selectedItem.cadenceRule.reminderWindowDays} day{selectedItem.cadenceRule.reminderWindowDays === 1 ? "" : "s"}. This is displayed as context; notification delivery is not connected.</p></PersonalOpsPanel>
+                      <PersonalOpsPanel title="Schedule" wide><dl className={styles.metadataList}><div><dt>Frequency</dt><dd>{cleanLabel(selectedItem.cadenceRule.frequency)}</dd></div><div><dt>Next run</dt><dd>{formatRoutineNextRun(selectedItem)}</dd></div><div><dt>Date</dt><dd>{selectedItem.nextRunDate ? formatDate(selectedItem.nextRunDate) : "Open"}</dd></div><div><dt>Time</dt><dd>{selectedItem.nextRunTime ? formatRoutineNextRun({ ...selectedItem, nextRunDate: undefined, nextRunAt: undefined } as PersonalOpsRoutine) : "Open"}</dd></div><div><dt>Reminder</dt><dd>{formatRoutineReminder(selectedItem)}</dd></div></dl></PersonalOpsPanel>
+                      <PersonalOpsPanel title="Reminder"><p>{formatRoutineReminder(selectedItem)} before the next run. Notification delivery is not connected yet.</p></PersonalOpsPanel>
                       <PersonalOpsPanel title="Missed occurrence"><p>{cleanLabel(selectedItem.cadenceRule.skipBehavior)}. Any catch-up remains a manual decision.</p></PersonalOpsPanel>
                     </div>}
                     {selectedItem.objectType === "routine" && activeTab === "generated-items" && <div className={styles.panelGrid}>
@@ -1631,7 +1728,7 @@ export default function PersonalOpsAdvancedWorkspace({
                     {selectedItem.objectType === "template" && activeTab === "activity" && <div className={styles.panelGrid}><PersonalOpsPanel title="Object audit" wide><HistoryList entries={selectedItem.history} /></PersonalOpsPanel></div>}
 
                     {activeTab === "links" && <div className={styles.panelGrid}><PersonalOpsPanel title="Linked native objects" wide><NativeReferenceList refs={refsFor(selectedItem)} empty="No native links recorded. Removing a link never deletes either object." /></PersonalOpsPanel><PersonalOpsPanel title="Ownership rule" wide><p>References open the owner module through the centralized native-object route registry. This object stores only the reference and provenance.</p></PersonalOpsPanel></div>}
-                    {activeTab === "properties" && <div className={styles.panelGrid}><PersonalOpsPanel title="Properties" wide><dl className={styles.metadataList}><div><dt>ID</dt><dd className={styles.mono}>{selectedItem.id}</dd></div><div><dt>Object type</dt><dd>{cleanLabel(selectedItem.objectType)}</dd></div><div><dt>Domain</dt><dd>{selectedItem.domain}</dd></div><div><dt>Owner</dt><dd>{selectedItem.owner}</dd></div><div><dt>Created</dt><dd>{formatTimestamp(selectedItem.createdAt)}</dd></div><div><dt>Updated</dt><dd>{formatTimestamp(selectedItem.updatedAt)}</dd></div>{selectedItem.archivedAt && <div><dt>Archived</dt><dd>{formatTimestamp(selectedItem.archivedAt)}</dd></div>}</dl></PersonalOpsPanel></div>}
+                    {activeTab === "properties" && <div className={styles.panelGrid}><PersonalOpsPanel title="Properties" wide><dl className={styles.metadataList}><div><dt>ID</dt><dd className={styles.mono}>{selectedItem.id}</dd></div><div><dt>Object type</dt><dd>{cleanLabel(selectedItem.objectType)}</dd></div><div><dt>Domain</dt><dd>{selectedItem.domain}</dd></div>{selectedItem.objectType !== "routine" && <div><dt>Owner</dt><dd>{selectedItem.owner}</dd></div>}<div><dt>Created</dt><dd>{formatTimestamp(selectedItem.createdAt)}</dd></div><div><dt>Updated</dt><dd>{formatTimestamp(selectedItem.updatedAt)}</dd></div>{selectedItem.archivedAt && <div><dt>Archived</dt><dd>{formatTimestamp(selectedItem.archivedAt)}</dd></div>}</dl></PersonalOpsPanel></div>}
                   </DetailTabPanel>
                 </div>
               </>

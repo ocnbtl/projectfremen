@@ -10900,20 +10900,31 @@ async function main() {
     }
     pass("Media local intake contains no file-content read, transport, preview URL, or browser-persistence path");
 
-    const [personalLifeTypes, personalLifeWorkspace, projectsWorkspaceSource, peopleWorkspaceSource] = await Promise.all([
+    const [personalLifeTypes, personalLifeWorkspace, personalPasswordsStore, personalPasswordsApi, travelMapSource, projectsWorkspaceSource, peopleWorkspaceSource] = await Promise.all([
       readFile(path.join(dashboardDir, "lib/modules/personal-life/types.ts"), "utf8"),
       readFile(path.join(dashboardDir, "components/personal-ops/PersonalLifeWorkspace.tsx"), "utf8"),
+      readFile(path.join(dashboardDir, "lib/modules/personal-passwords/store.ts"), "utf8"),
+      readFile(path.join(dashboardDir, "app/api/personal/passwords/route.ts"), "utf8"),
+      readFile(path.join(dashboardDir, "components/personal-ops/TravelWorldMap.tsx"), "utf8"),
       readFile(path.join(dashboardDir, "components/projects/ProjectsWorkspace.tsx"), "utf8"),
       readFile(path.join(dashboardDir, "components/PeopleWorkspace.tsx"), "utf8")
     ]);
     assert(
       !personalLifeTypes.includes("password") &&
-        personalLifeWorkspace.includes("browserVault.saveObject") &&
+        !personalLifeWorkspace.includes("browserVault") &&
+        personalLifeWorkspace.includes('/api/personal/passwords?includeSecrets=true') &&
+        personalLifeWorkspace.includes("togglePasswordPrivacy") &&
+        personalPasswordsStore.includes('createCipheriv("aes-256-gcm"') &&
+        personalPasswordsStore.includes("cipher.setAAD") &&
+        personalPasswordsApi.includes("hasAdminSession") &&
+        personalPasswordsApi.includes("isCsrfRequestValid") &&
+        travelMapSource.includes("geoNaturalEarth1") &&
+        travelMapSource.includes("world-atlas/countries-110m.json") &&
         !projectsWorkspaceSource.includes("batchSelection") &&
         !peopleWorkspaceSource.includes("batchSelectedIds"),
-      "Personal systems crossed the credential storage boundary or retained Project/People batch-selection state"
+      "Personal systems crossed the encrypted credential boundary, retained the placeholder map, or retained Project/People batch-selection state"
     );
-    pass("Passwords remain Vault-only and Project/People directories contain no batch-selection state");
+    pass("Passwords use an admin-authenticated AES-GCM store, Travel uses geographic world data, and Project/People directories contain no batch-selection state");
 
     logStep("Running typecheck");
     await runCommand(["run", "typecheck"], {
@@ -10987,6 +10998,10 @@ async function main() {
     const unauthPersonalLife = await requestJson(server.baseUrl, cookieJar, "/api/personal/life");
     assert(unauthPersonalLife.response.status === 401, `Expected /api/personal/life to return 401, got ${describeStatus(unauthPersonalLife.response)}`);
     pass("Unauthenticated personal life systems API is blocked");
+
+    const unauthPersonalPasswords = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords?includeSecrets=true");
+    assert(unauthPersonalPasswords.response.status === 401, `Expected /api/personal/passwords to return 401, got ${describeStatus(unauthPersonalPasswords.response)}`);
+    pass("Unauthenticated encrypted password reads are blocked");
 
     const unauthSecondaryCreate = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
       method: "POST",
@@ -11346,7 +11361,7 @@ async function main() {
       {
         pathname: "/admin/personal/passwords",
         label: "Passwords",
-        expected: ["Passwords", "Encrypted credentials kept inside your local-first Vault.", "Add password"]
+        expected: ["Passwords", "Encrypted credentials available inside your authenticated admin session.", "Add password", "Unblur"]
       },
       {
         pathname: "/admin/personal/lists",
@@ -11383,6 +11398,63 @@ async function main() {
       }
     }
     pass("All canonical Personal Ops routes load through one shared shell with explicit advanced safety boundaries");
+
+    const passwordCsrfToken = cookieJar.get("admin_csrf");
+    const passwordWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: { title: "Rejected credential", username: "", secret: "never-save", website: "", notes: "" } })
+    });
+    assert(passwordWithoutCsrf.response.status === 403, "Encrypted password API accepted a write without CSRF proof");
+    const syntheticPassword = `  ${testRunId}-secret with intentional spaces  `;
+    const syntheticCredentialTitle = `${testRunId} encrypted credential`;
+    const createdCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
+      body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}@example.com`, secret: syntheticPassword, website: "https://example.com/account", notes: "Synthetic credential context." } })
+    });
+    assert(
+      createdCredential.response.ok && createdCredential.payload?.ok && createdCredential.payload.item?.id && !("secret" in createdCredential.payload.item),
+      `Encrypted credential create failed or returned plaintext: ${JSON.stringify(createdCredential.payload)}`
+    );
+    const credentialSummary = createdCredential.payload.item;
+    const listedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords");
+    assert(
+      listedCredentials.response.ok && listedCredentials.payload?.items?.some((item) => item.id === credentialSummary.id && !("secret" in item)),
+      "Default encrypted password list exposed a secret or omitted the created credential"
+    );
+    const revealedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords?includeSecrets=true");
+    assert(
+      revealedCredentials.response.ok && revealedCredentials.payload?.items?.find((item) => item.id === credentialSummary.id)?.secret === syntheticPassword,
+      "Explicit authenticated password reveal did not preserve the credential secret exactly"
+    );
+    const encryptedPasswordFile = await readFile(path.join(serverEnv.FREMEN_DATA_DIR, "personal-passwords.json"), "utf8");
+    assert(
+      encryptedPasswordFile.includes('"algorithm": "aes-256-gcm"') &&
+        !encryptedPasswordFile.includes(syntheticCredentialTitle) &&
+        !encryptedPasswordFile.includes(syntheticPassword.trim()) &&
+        !encryptedPasswordFile.includes(`${testRunId}@example.com`),
+      "Encrypted password persistence leaked plaintext fields or omitted its authenticated-encryption marker"
+    );
+    const updatedCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
+      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: `${syntheticCredentialTitle} updated`, username: `${testRunId}@example.com`, secret: syntheticPassword, website: "https://example.com/account", notes: "Updated synthetic context." } })
+    });
+    assert(updatedCredential.response.ok && updatedCredential.payload?.item?.updatedAt !== credentialSummary.updatedAt, "Encrypted password update did not persist");
+    const staleCredentialUpdate = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
+      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: "Stale overwrite", username: "", secret: syntheticPassword, website: "", notes: "" } })
+    });
+    assert(staleCredentialUpdate.response.status === 409, "Encrypted password optimistic concurrency accepted a stale overwrite");
+    const deletedCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
+      method: "DELETE",
+      headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
+      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: updatedCredential.payload.item.updatedAt })
+    });
+    assert(deletedCredential.response.ok && deletedCredential.payload?.ok, "Encrypted password delete failed");
+    pass("Encrypted passwords require admin auth and CSRF, preserve exact secrets, persist only AES-GCM ciphertext, and enforce stale-write protection");
 
     const personalLifeWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/life", {
       method: "POST",
@@ -11430,7 +11502,7 @@ async function main() {
         !JSON.stringify(personalLifeState.payload.state).toLowerCase().includes("password"),
       `Personal life systems did not persist one object per working surface: ${JSON.stringify(personalLifeState.payload)}`
     );
-    pass("Lists, Travel, Personal Build, and Car persist typed records with CSRF and stale-write protection while passwords stay outside the server state");
+    pass("Lists, Travel, Personal Build, and Car persist typed records with CSRF and stale-write protection while passwords remain in their separate encrypted store");
 
     const personalOpsAfterRouteReads = await readFile(personalOpsDataPath, "utf8");
     assert(
@@ -11867,7 +11939,7 @@ async function main() {
 
     const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
     assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);
-    for (const expected of ["Travel", "Add trip", "Trip ledger", "Click anywhere to place a new trip", "Been", "Lima"]) {
+    for (const expected of ["Travel", "Add trip", "Trip ledger", "Loading the world map", "Been", "Lima"]) {
       assert(personalTravelPage.body.includes(expected), `Personal Ops Travel page missing expected text: ${expected}`);
     }
     pass("Personal Ops Travel loads its map-first atlas and trip ledger");
@@ -13197,11 +13269,14 @@ async function main() {
         interval: 1,
         timezone: "America/New_York",
         weekdays: [],
-        reminderWindowDays: 3,
+        reminderAmount: 90,
+        reminderUnit: "minutes",
         trigger: "manual",
         skipBehavior: "require_decision",
         autoCreateNext: false
       },
+      nextRunDate: "2026-09-15",
+      nextRunTime: "08:30",
       generationRules: [
         {
           id: routineReadyRuleId,
@@ -13264,7 +13339,11 @@ async function main() {
       createRoutine.response.ok &&
         createRoutine.payload?.created === true &&
         createRoutine.payload.item?.objectType === "routine" &&
-        createRoutine.payload.item?.lifecycle === "draft",
+        createRoutine.payload.item?.lifecycle === "draft" &&
+        createRoutine.payload.item?.nextRunDate === "2026-09-15" &&
+        createRoutine.payload.item?.nextRunTime === "08:30" &&
+        createRoutine.payload.item?.cadenceRule?.reminderAmount === 90 &&
+        createRoutine.payload.item?.cadenceRule?.reminderUnit === "minutes",
       `Routine create failed: ${JSON.stringify(createRoutine.payload)}`
     );
     const routineDraft = createRoutine.payload.item;

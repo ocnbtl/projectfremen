@@ -1,11 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import type { FormEvent, MouseEvent as ReactMouseEvent } from "react";
-import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import type { FormEvent } from "react";
+import { useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
-import { browserVault } from "../../lib/local-first/browser-engine";
-import type { VaultObjectSnapshot } from "../../lib/local-first/types";
 import type {
   BuildItemStatus,
   PersonalBuildItem,
@@ -20,9 +18,15 @@ import type {
   VehicleModificationStatus
 } from "../../lib/modules/personal-life/types";
 import type { PersonalOpsState } from "../../lib/modules/personal-ops/types";
+import type { CredentialDetail, CredentialSummary } from "../../lib/modules/personal-passwords/types";
 import PersonalOpsSidebar, { type PersonalOpsSidebarCounts } from "./PersonalOpsSidebar";
 import baseStyles from "./PersonalOpsWorkspace.module.css";
 import styles from "./PersonalLifeWorkspace.module.css";
+
+const TravelWorldMap = dynamic(() => import("./TravelWorldMap"), {
+  ssr: false,
+  loading: () => <div className={styles.worldMapLoading}>Loading the world map…</div>
+});
 
 export type PersonalLifeView = "passwords" | "lists" | "travel" | "personal-build" | "car";
 
@@ -34,6 +38,7 @@ type LifeEditor = {
 
 type CredentialDraft = {
   id?: string;
+  updatedAt?: string;
   title: string;
   username: string;
   secret: string;
@@ -42,7 +47,7 @@ type CredentialDraft = {
 };
 
 const VIEW_COPY: Record<PersonalLifeView, { title: string; description: string; action: string }> = {
-  passwords: { title: "Passwords", description: "Encrypted credentials kept inside your local-first Vault.", action: "Add password" },
+  passwords: { title: "Passwords", description: "Encrypted credentials available inside your authenticated admin session.", action: "Add password" },
   lists: { title: "Lists", description: "Flexible notebooks for things to buy, watch, pack, remember, or rank.", action: "New list" },
   travel: { title: "Travel", description: "A personal atlas of places lived, visited, planned, and wanted.", action: "Add trip" },
   "personal-build": { title: "Personal Build", description: "The long-term loadout you are deliberately assembling.", action: "Add item" },
@@ -52,11 +57,6 @@ const VIEW_COPY: Record<PersonalLifeView, { title: string; description: string; 
 const TRIP_LABELS: Record<TripStatus, string> = { been: "Been", want: "Want to go", lived: "Lived", planned: "Planned" };
 const BUILD_LABELS: Record<BuildItemStatus, string> = { wanted: "Wanted", researching: "Researching", acquired: "Acquired", retired: "Retired" };
 const MOD_LABELS: Record<VehicleModificationStatus, string> = { idea: "Ideas", researching: "Researching", planned: "Planned", installed: "Installed", skipped: "Skipped" };
-
-function stringField(snapshot: VaultObjectSnapshot, field: string): string {
-  const value = snapshot.fields[field];
-  return typeof value === "string" ? value : "";
-}
 
 function formatDate(value?: string) {
   if (!value) return "No date";
@@ -93,11 +93,13 @@ export default function PersonalLifeWorkspace({
   initialView,
   initialState,
   personalOpsState,
+  initialCredentials,
   initialLoadError
 }: {
   initialView: PersonalLifeView;
   initialState: PersonalLifeState;
   personalOpsState: PersonalOpsState;
+  initialCredentials: CredentialSummary[];
   initialLoadError?: string;
 }) {
   const [state, setState] = useState(initialState);
@@ -113,37 +115,45 @@ export default function PersonalLifeWorkspace({
   const [selectedVehicleId, setSelectedVehicleId] = useState(initialState.vehicles[0]?.id || "");
   const [modDraft, setModDraft] = useState("");
   const [modStatus, setModStatus] = useState<VehicleModificationStatus>("idea");
-  const [vaultStatus, setVaultStatus] = useState<"loading" | "ready" | "locked" | "unconfigured">("loading");
-  const [credentials, setCredentials] = useState<VaultObjectSnapshot[]>([]);
+  const [credentials, setCredentials] = useState<CredentialSummary[]>(initialCredentials);
+  const [credentialSecrets, setCredentialSecrets] = useState<Record<string, string>>({});
+  const [passwordsMasked, setPasswordsMasked] = useState(true);
   const [credentialDraft, setCredentialDraft] = useState<CredentialDraft | null>(null);
-  const [revealed, setRevealed] = useState<Set<string>>(() => new Set());
   const copy = VIEW_COPY[initialView];
 
-  async function refreshVault() {
-    setVaultStatus("loading");
-    const status = await browserVault.status();
-    if (!status.configured) {
-      setVaultStatus("unconfigured");
-      setCredentials([]);
-      return;
-    }
-    if (!status.unlocked) {
-      setVaultStatus("locked");
-      setCredentials([]);
-      return;
-    }
-    const objects = await browserVault.listObjects();
-    setCredentials(objects.filter((item) => !item.tombstone && item.objectKind === "personal_ops" && item.fields.recordType === "credential"));
-    setVaultStatus("ready");
+  async function requestCredentials(url = "/api/personal/passwords") {
+    const response = await fetch(url, { cache: "no-store" });
+    const payload = await response.json() as { ok?: boolean; items?: CredentialSummary[] | CredentialDetail[]; item?: CredentialDetail; error?: string };
+    if (!response.ok || !payload.ok) throw new Error(payload.error || "Encrypted credentials could not be loaded.");
+    return payload;
   }
 
-  useEffect(() => {
-    if (initialView !== "passwords") return;
-    void refreshVault().catch((cause: unknown) => {
-      setVaultStatus("locked");
-      setError(cause instanceof Error ? cause.message : "The Vault could not be opened.");
-    });
-  }, [initialView]);
+  async function revealCredential(id: string): Promise<CredentialDetail> {
+    const payload = await requestCredentials(`/api/personal/passwords?id=${encodeURIComponent(id)}`);
+    if (!payload.item) throw new Error("Credential not found.");
+    return payload.item;
+  }
+
+  async function togglePasswordPrivacy() {
+    setError("");
+    if (!passwordsMasked) {
+      setPasswordsMasked(true);
+      setCredentialSecrets({});
+      return;
+    }
+    setBusy(true);
+    try {
+      const payload = await requestCredentials("/api/personal/passwords?includeSecrets=true");
+      const details = (payload.items || []) as CredentialDetail[];
+      setCredentials(details.map(({ secret: _secret, ...summary }) => summary));
+      setCredentialSecrets(Object.fromEntries(details.map((item) => [item.id, item.secret])));
+      setPasswordsMasked(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Passwords could not be revealed.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const sidebarCounts = countsFor(personalOpsState, state, credentials.length);
   const selectedList = state.lists.find((item) => item.id === selectedListId) || state.lists[0] || null;
@@ -252,21 +262,28 @@ export default function PersonalLifeWorkspace({
     setBusy(true);
     setError("");
     try {
-      await browserVault.saveObject({
-        ...(credentialDraft.id ? { objectId: credentialDraft.id } : {}),
-        objectKind: "personal_ops",
-        fields: {
-          recordType: "credential",
-          title: credentialDraft.title.trim(),
-          username: credentialDraft.username.trim(),
-          secret: credentialDraft.secret,
-          website: credentialDraft.website.trim(),
-          notes: credentialDraft.notes.trim()
-        }
+      const response = await fetch("/api/personal/passwords", {
+        method: credentialDraft.id ? "PATCH" : "POST",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify(credentialDraft.id
+          ? {
+              id: credentialDraft.id,
+              expectedUpdatedAt: credentialDraft.updatedAt,
+              input: credentialDraft
+            }
+          : { input: credentialDraft })
       });
-      await refreshVault();
+      const payload = await response.json() as { ok?: boolean; item?: CredentialSummary; error?: string };
+      if (!response.ok || !payload.ok || !payload.item) {
+        throw new Error(payload.error || "The credential could not be saved.");
+      }
+      setCredentials((current) => current.some((item) => item.id === payload.item?.id)
+        ? current.map((item) => item.id === payload.item?.id ? payload.item! : item)
+        : [...current, payload.item!].sort((left, right) => left.title.localeCompare(right.title)));
+      setCredentialSecrets({});
+      setPasswordsMasked(true);
       setCredentialDraft(null);
-      setNotice("Credential encrypted and saved to the Vault.");
+      setNotice("Credential encrypted and saved.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The credential could not be saved.");
     } finally {
@@ -274,13 +291,49 @@ export default function PersonalLifeWorkspace({
     }
   }
 
-  async function deleteCredential(item: VaultObjectSnapshot) {
-    if (!window.confirm(`Delete “${stringField(item, "title") || "credential"}” from the encrypted Vault?`)) return;
+  async function editCredential(item: CredentialSummary) {
     setBusy(true);
+    setError("");
     try {
-      await browserVault.saveObject({ objectId: item.objectId, objectKind: "personal_ops", fields: {}, tombstone: true });
-      await refreshVault();
-      setNotice("Credential deleted from the Vault.");
+      const detail = await revealCredential(item.id);
+      setCredentialDraft(detail);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The credential could not be opened.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function copyCredential(item: CredentialSummary) {
+    setError("");
+    try {
+      const detail = await revealCredential(item.id);
+      await navigator.clipboard.writeText(detail.secret);
+      setNotice("Password copied.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The password could not be copied.");
+    }
+  }
+
+  async function deleteCredential(item: CredentialSummary) {
+    if (!window.confirm(`Delete “${item.title || "credential"}”? This removes the encrypted record.`)) return;
+    setBusy(true);
+    setError("");
+    try {
+      const response = await fetch("/api/personal/passwords", {
+        method: "DELETE",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({ id: item.id, expectedUpdatedAt: item.updatedAt })
+      });
+      const payload = await response.json() as { ok?: boolean; error?: string };
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "The credential could not be deleted.");
+      setCredentials((current) => current.filter((candidate) => candidate.id !== item.id));
+      setCredentialSecrets((current) => {
+        const next = { ...current };
+        delete next[item.id];
+        return next;
+      });
+      setNotice("Credential deleted.");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The credential could not be deleted.");
     } finally {
@@ -299,42 +352,23 @@ export default function PersonalLifeWorkspace({
     if (saved) setModDraft("");
   }
 
-  function mapClick(event: ReactMouseEvent<HTMLDivElement>) {
-    if ((event.target as Element).closest("button")) return;
-    const rect = event.currentTarget.getBoundingClientRect();
-    const longitude = Math.round(((event.clientX - rect.left) / rect.width) * 360 - 180);
-    const latitude = Math.round(90 - ((event.clientY - rect.top) / rect.height) * 180);
-    openCreate({ latitude: String(latitude), longitude: String(longitude) });
-  }
-
   function renderPasswords() {
-    if (vaultStatus !== "ready") return (
-      <section className={styles.vaultGate}>
-        <span className={styles.vaultMark} aria-hidden="true">⌁</span>
-        <h2>{vaultStatus === "loading" ? "Checking your Vault…" : vaultStatus === "locked" ? "Unlock your Vault" : "Set up your Vault"}</h2>
-        <p>Passwords are never written to the Personal Ops server store. They are available here only while your encrypted local-first Vault is unlocked.</p>
-        {vaultStatus !== "loading" && <Link href="/vault" className={styles.primaryButton}>{vaultStatus === "locked" ? "Unlock Vault" : "Set up Vault"}</Link>}
-      </section>
-    );
     return (
-      <section className={styles.keyring} aria-label="Encrypted password keyring">
-        <div className={styles.keyringRail}><span>Encrypted</span><strong>{credentials.length}</strong><small>Vault entries</small></div>
+      <section className={styles.keyring} data-masked={passwordsMasked || undefined} aria-label="Encrypted password keyring">
+        <div className={styles.keyringRail}><span>Encrypted</span><strong>{credentials.length}</strong><small>credentials</small></div>
         <div className={styles.credentialList}>
-          {credentials.length ? credentials.map((item) => {
-            const secret = stringField(item, "secret");
-            const isRevealed = revealed.has(item.objectId);
-            return <article className={styles.credentialRow} key={item.objectId}>
+          {credentials.length ? credentials.map((item) => (
+            <article className={styles.credentialRow} key={item.id}>
               <span className={styles.keyIcon} aria-hidden="true">⌁</span>
-              <div><strong>{stringField(item, "title") || "Untitled credential"}</strong><small>{stringField(item, "username") || stringField(item, "website") || "No account label"}</small></div>
-              <code aria-label={isRevealed ? "Revealed password" : "Hidden password"}>{isRevealed ? secret : "••••••••••••"}</code>
+              <div className={styles.credentialPrivate}><strong>{item.title || "Untitled credential"}</strong><small>{item.username || item.website || "No account label"}</small></div>
+              <code className={styles.credentialPrivate} aria-label={passwordsMasked ? "Hidden password" : "Revealed password"}>{passwordsMasked ? "••••••••••••" : credentialSecrets[item.id] || ""}</code>
               <div className={styles.rowActions}>
-                <button type="button" onClick={() => setRevealed((current) => { const next = new Set(current); if (next.has(item.objectId)) next.delete(item.objectId); else next.add(item.objectId); return next; })}>{isRevealed ? "Hide" : "Reveal"}</button>
-                <button type="button" onClick={() => void navigator.clipboard.writeText(secret).then(() => setNotice("Password copied."))}>Copy</button>
-                <button type="button" onClick={() => setCredentialDraft({ id: item.objectId, title: stringField(item, "title"), username: stringField(item, "username"), secret, website: stringField(item, "website"), notes: stringField(item, "notes") })}>Edit</button>
+                <button type="button" onClick={() => void copyCredential(item)}>Copy</button>
+                <button type="button" onClick={() => void editCredential(item)}>Edit</button>
                 <button type="button" onClick={() => void deleteCredential(item)}>Delete</button>
               </div>
-            </article>;
-          }) : <div className={styles.empty}><strong>No passwords yet</strong><span>Add a credential when your Vault is unlocked.</span></div>}
+            </article>
+          )) : <div className={styles.empty}><strong>No passwords yet</strong><span>Add a credential to this encrypted keyring.</span></div>}
         </div>
       </section>
     );
@@ -363,11 +397,13 @@ export default function PersonalLifeWorkspace({
     return <div className={styles.atlas}>
       <section className={styles.mapPanel}>
         <div className={styles.mapToolbar} aria-label="Travel map layers">{(Object.keys(TRIP_LABELS) as TripStatus[]).map((status) => <button type="button" data-status={status} data-active={tripFilters.has(status) || undefined} aria-pressed={tripFilters.has(status)} onClick={() => setTripFilters((current) => { const next = new Set(current); if (next.has(status)) next.delete(status); else next.add(status); return next; })} key={status}><span />{TRIP_LABELS[status]}</button>)}</div>
-        <div className={styles.worldMap} onClick={mapClick} role="application" aria-label="Interactive travel map. Click the map to add a place at that coordinate.">
-          <svg viewBox="0 0 1000 500" aria-hidden="true"><path d="M76 92 170 52l128 30 62 87-66 62-90-18-47 63-76-62Z M363 253l62-18 47 58-18 127-55 54-42-106Z M480 83l94-42 112 24 55 54-37 46-76-18-42 31-82-21Z M680 168l133-18 103 70-67 65-84-16-61 57-54-63Z M803 360l91-26 57 54-42 50-94-11Z" /></svg>
-          {visibleTrips.map((trip) => <button type="button" className={styles.mapPin} data-status={trip.status} style={{ left: `${((trip.longitude + 180) / 360) * 100}%`, top: `${((90 - trip.latitude) / 180) * 100}%` }} aria-label={`${trip.name}, ${TRIP_LABELS[trip.status]}`} onClick={(event) => { event.stopPropagation(); setSelectedTripId(trip.id); }} key={trip.id}><span /></button>)}
-          <span className={styles.mapHint}>Click anywhere to place a new trip</span>
-        </div>
+        <TravelWorldMap
+          trips={visibleTrips}
+          selectedTripId={selectedTripId}
+          labels={TRIP_LABELS}
+          onSelectTrip={setSelectedTripId}
+          onCreateAt={(latitude, longitude) => openCreate({ latitude: String(latitude), longitude: String(longitude) })}
+        />
       </section>
       <section className={styles.tripLedger}>
         <header><h2>Trip ledger</h2><span>{visibleTrips.length} shown</span></header>
@@ -402,7 +438,7 @@ export default function PersonalLifeWorkspace({
     <main className={baseStyles.directory}>
       <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}>☰ Personal Ops</button><button type="button" onClick={() => openCreate()}>+ {copy.action}</button></div>
       <div className={styles.scroll}>
-        <header className={styles.pageHeader}><div><span>Personal Ops / Command</span><h1>{copy.title}</h1><p>{copy.description}</p></div><button type="button" className={styles.primaryButton} onClick={() => openCreate()} disabled={initialView === "passwords" && vaultStatus !== "ready"}>+ {copy.action}</button></header>
+        <header className={styles.pageHeader}><div><span>Personal Ops / Command</span><h1>{copy.title}</h1><p>{copy.description}</p></div><div className={styles.headerActions}>{initialView === "passwords" && <button type="button" className={styles.privacyToggle} aria-label={passwordsMasked ? "Unblur password page" : "Blur password page"} aria-pressed={!passwordsMasked} onClick={() => void togglePasswordPrivacy()} disabled={busy} title={passwordsMasked ? "Unblur page" : "Blur page"}>{passwordsMasked ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.8" /></svg> : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 6.1A10 10 0 0 1 12 6c6.1 0 9.5 6 9.5 6a15 15 0 0 1-2.1 2.8M6.6 6.7A15.2 15.2 0 0 0 2.5 12s3.4 6 9.5 6a9.8 9.8 0 0 0 3.3-.6M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>}<span>{passwordsMasked ? "Unblur" : "Blur"}</span></button>}<button type="button" className={styles.primaryButton} onClick={() => openCreate()}>+ {copy.action}</button></div></header>
         {error && <p className={styles.error} role="alert">{error}</p>}
         {notice && <p className={styles.notice} role="status">{notice}</p>}
         <div className={styles.workspace} data-view={initialView}>
@@ -415,7 +451,7 @@ export default function PersonalLifeWorkspace({
       </div>
     </main>
 
-    {credentialDraft && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCredentialDraft(null); }}><form className={styles.editor} onSubmit={saveCredential}><header><div><span>Encrypted Vault entry</span><h2>{credentialDraft.id ? "Edit password" : "Add password"}</h2></div><button type="button" aria-label="Close password editor" onClick={() => setCredentialDraft(null)}>×</button></header>{input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}{input("Username or email", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "name@example.com" })}{input("Password", "secret", credentialDraft.secret, (value) => setCredentialDraft((current) => current ? { ...current, secret: value } : current), { type: "password", required: true })}{input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}<label className={styles.full}><span>Notes</span><textarea value={credentialDraft.notes} onChange={(event) => setCredentialDraft((current) => current ? { ...current, notes: event.target.value } : current)} rows={4} /></label><footer><button type="button" onClick={() => setCredentialDraft(null)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy}>{busy ? "Encrypting…" : "Encrypt & save"}</button></footer></form></div>}
+    {credentialDraft && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCredentialDraft(null); }}><form className={styles.editor} onSubmit={saveCredential}><header><div><span>Encrypted credential</span><h2>{credentialDraft.id ? "Edit password" : "Add password"}</h2></div><button type="button" aria-label="Close password editor" onClick={() => setCredentialDraft(null)}>×</button></header>{input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}{input("Username or email", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "name@example.com" })}{input("Password", "secret", credentialDraft.secret, (value) => setCredentialDraft((current) => current ? { ...current, secret: value } : current), { type: "password", required: true })}{input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}<label className={styles.full}><span>Notes</span><textarea value={credentialDraft.notes} onChange={(event) => setCredentialDraft((current) => current ? { ...current, notes: event.target.value } : current)} rows={4} /></label><footer><button type="button" onClick={() => setCredentialDraft(null)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy}>{busy ? "Encrypting…" : "Encrypt & save"}</button></footer></form></div>}
 
     {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} onSubmit={submitEditor}><header><div><span>Personal Ops record</span><h2>{editor.id ? "Edit" : "Add"} {editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)}>×</button></header>
       {editor.collection === "lists" && <>{input("Title", "title", editorValue("title"), (value) => setEditorValue("title", value), { required: true })}<label><span>Type</span><select value={editorValue("kind")} onChange={(event) => setEditorValue("kind", event.target.value)}><option value="shopping">Things to buy</option><option value="watchlist">Watchlist</option><option value="favorites">Favorites</option><option value="packing">Packing</option><option value="custom">Custom</option></select></label><label className={styles.full}><span>Description</span><textarea value={editorValue("description")} onChange={(event) => setEditorValue("description", event.target.value)} rows={3} /></label></>}
