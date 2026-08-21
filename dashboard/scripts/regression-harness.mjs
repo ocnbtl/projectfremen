@@ -11000,6 +11000,12 @@ async function main() {
       unauthPersonalRecords.response.status === 401,
       `Expected /api/personal/records to return 401, got ${describeStatus(unauthPersonalRecords.response)}`
     );
+    assert(
+      unauthPersonalRecords.response.headers.get("cache-control")?.includes("private") &&
+        unauthPersonalRecords.response.headers.get("cache-control")?.includes("no-store") &&
+        unauthPersonalRecords.response.headers.get("vary")?.toLowerCase().includes("cookie"),
+      "Unauthenticated Personal Records response did not preserve the private no-store cache boundary"
+    );
     pass("Unauthenticated Personal Ops records API is blocked");
 
     const unauthPersonalOps = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops");
@@ -11228,6 +11234,16 @@ async function main() {
     assert(cookieJar.get("admin_session"), "Login did not set admin_session cookie");
     assert(cookieJar.get("admin_csrf"), "Login did not set admin_csrf cookie");
     pass("Admin login succeeded and set session cookies");
+
+    const authenticatedPersonalRecords = await requestJson(server.baseUrl, cookieJar, "/api/personal/records");
+    assert(
+      authenticatedPersonalRecords.response.ok &&
+        authenticatedPersonalRecords.response.headers.get("cache-control")?.includes("private") &&
+        authenticatedPersonalRecords.response.headers.get("cache-control")?.includes("no-store") &&
+        authenticatedPersonalRecords.response.headers.get("vary")?.toLowerCase().includes("cookie"),
+      "Authenticated Personal Records response did not preserve the private no-store cache boundary"
+    );
+    pass("Personal Records responses remain private and non-cacheable across the admin boundary");
 
     const vaultTime = await requestJson(server.baseUrl, cookieJar, "/api/vault/time");
     assert(vaultTime.response.ok && vaultTime.payload?.ok && vaultTime.response.headers.get("date"), "Vault time endpoint did not return authenticated server time");

@@ -10,15 +10,26 @@ import {
 } from "../../../../lib/personal-records-store";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const PRIVATE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0",
+  Pragma: "no-cache",
+  Vary: "Cookie"
+};
+
+function json(body: unknown, status = 200) {
+  return NextResponse.json(body, { status, headers: PRIVATE_HEADERS });
+}
 
 export async function GET(request: Request) {
   if (!(await hasAdminSession())) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return json({ ok: false, error: "Unauthorized" }, 401);
   }
 
   const domain = new URL(request.url).searchParams.get("domain")?.trim() || "";
   const records = await readPersonalRecords();
-  return NextResponse.json({
+  return json({
     ok: true,
     items: domain ? getRecordsForDomain(records, domain) : records
   });
@@ -26,7 +37,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!(await hasAdminSession())) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return json({ ok: false, error: "Unauthorized" }, 401);
   }
   if (!isCsrfRequestValid(request)) {
     await appendAuditEvent({
@@ -37,7 +48,7 @@ export async function POST(request: Request) {
       ip: getRequestIp(request),
       status: "denied"
     });
-    return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
+    return json({ ok: false, error: "Invalid CSRF token" }, 403);
   }
 
   try {
@@ -76,18 +87,18 @@ export async function POST(request: Request) {
       detail: String(body.domain ?? "")
     });
 
-    return NextResponse.json({ ok: true, items });
+    return json({ ok: true, items });
   } catch (error) {
-    return NextResponse.json(
+    return json(
       { ok: false, error: error instanceof Error ? error.message : "Failed to create record" },
-      { status: 400 }
+      400
     );
   }
 }
 
 export async function PATCH(request: Request) {
   if (!(await hasAdminSession())) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return json({ ok: false, error: "Unauthorized" }, 401);
   }
   if (!isCsrfRequestValid(request)) {
     await appendAuditEvent({
@@ -98,14 +109,14 @@ export async function PATCH(request: Request) {
       ip: getRequestIp(request),
       status: "denied"
     });
-    return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
+    return json({ ok: false, error: "Invalid CSRF token" }, 403);
   }
 
   try {
     const body = await request.json();
     const id = String(body.id ?? "").trim();
     if (!id) {
-      return NextResponse.json({ ok: false, error: "Record id is required" }, { status: 400 });
+      return json({ ok: false, error: "Record id is required" }, 400);
     }
     const expectedUpdatedAt = typeof body.expectedUpdatedAt === "string" ? body.expectedUpdatedAt.trim() : "";
     const action = body.action === "review" || body.action === "archive" || body.action === "restore"
@@ -148,12 +159,12 @@ export async function PATCH(request: Request) {
       detail: `${updated?.domain || "unknown"}:${id}`
     });
 
-    return NextResponse.json({ ok: true, items });
+    return json({ ok: true, items });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update record";
-    return NextResponse.json(
+    return json(
       { ok: false, error: message },
-      { status: message.startsWith("This record changed after it was opened") ? 409 : 400 }
+      message.startsWith("This record changed after it was opened") ? 409 : 400
     );
   }
 }
