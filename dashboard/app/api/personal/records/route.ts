@@ -62,7 +62,8 @@ export async function POST(request: Request) {
       starred: body.starred === true,
       relations: typeof body.relations === "object" && body.relations ? body.relations : {},
       time: typeof body.time === "object" && body.time ? body.time : {},
-      profile: typeof body.profile === "object" && body.profile ? body.profile : {}
+      profile: typeof body.profile === "object" && body.profile ? body.profile : {},
+      interaction: typeof body.interaction === "object" && body.interaction ? body.interaction : undefined
     });
 
     await appendAuditEvent({

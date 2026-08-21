@@ -81,7 +81,7 @@ export function serializeUrlState<State extends object>(
 const PEOPLE_FILTERS = ["all", "due", "week", "active", "dormant", "orgs"] as const;
 const PEOPLE_SORTS = ["last-name", "recent-contact", "next-follow-up"] as const;
 const PEOPLE_VIEWS = ["list", "compact", "grid"] as const;
-const PEOPLE_TABS = ["overview", "timeline", "notes", "relations", "files", "properties"] as const;
+const PEOPLE_TABS = ["overview", "timeline", "links", "properties"] as const;
 const PEOPLE_SIDEBARS = [
   "all",
   "starred",
@@ -159,7 +159,17 @@ export const PEOPLE_URL_STATE_SCHEMA: UrlStateSchema<PeopleUrlState> = {
     serialize: (value) => value.trim(),
     omit: (value) => value.trim() === ""
   },
-  tab: enumCodec("tab", PEOPLE_TABS, "overview"),
+  tab: {
+    param: "tab",
+    defaultValue: "overview",
+    parse(raw) {
+      if (raw === "notes") return "overview";
+      if (raw === "relations" || raw === "files") return "links";
+      return raw && (PEOPLE_TABS as readonly string[]).includes(raw) ? raw as PeopleTab : undefined;
+    },
+    serialize: (value) => value,
+    omit: (value) => value === "overview"
+  },
   ai: {
     param: "ai",
     defaultValue: false,

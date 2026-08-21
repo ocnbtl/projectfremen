@@ -8,7 +8,7 @@ import {
   buildFollowUpCreationRoute,
   type FollowUpSourceRef
 } from "../lib/modules/personal-ops/follow-up-links";
-import { memoryCategoryLabel, sortPeopleMemories } from "../lib/modules/people/memories";
+import { sortPeopleMemories } from "../lib/modules/people/memories";
 import { peopleCreateInputToLegacy, peopleUpdateInputToLegacy } from "../lib/modules/people/legacy-adapter";
 import { birthdayForStorage, formatBirthday, parseBirthday } from "../lib/modules/people/birthday";
 import {
@@ -29,6 +29,7 @@ import type {
   PersonalContactEntryCategory,
   PersonalEmailEntry,
   PersonalEducationEntry,
+  PersonalInteractionApproach,
   PersonalLocationEntry,
   PersonalMemoryEntry,
   PersonalOccupationEntry,
@@ -61,6 +62,7 @@ type ProfilePhotoMetadata = {
 
 type PeopleWorkspaceProps = {
   initialPeople: PersonalRecord[];
+  initialInteractions: PersonalRecord[];
   totalRecords: number;
   initialSelectedId?: string;
   initialMode?: "directory" | "profile" | "new" | "edit";
@@ -72,7 +74,7 @@ type PeopleWorkspaceProps = {
 };
 
 type PeopleFilter = "all" | "due" | "week" | "active" | "dormant" | "orgs";
-type PeopleView = "overview" | "timeline" | "notes" | "relations" | "files" | "properties";
+type PeopleView = "overview" | "timeline" | "links" | "properties";
 type DetailMode = "profile" | "edit" | "timeline" | "workspace";
 type PeopleSidebarView =
   | "all"
@@ -99,7 +101,7 @@ type PeopleSidebarView =
   | "customize";
 type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up";
 type PeopleListMode = "list" | "compact" | "grid";
-type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "note" | "milestone";
+type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "note" | "memory" | "milestone";
 type ContactMethodId = "email" | "phone" | "website" | "instagram" | "tiktok" | "x" | "linkedin";
 
 type ContactMethod = {
@@ -122,6 +124,8 @@ type PeopleTimelineInteraction = {
   kind?: string;
   title: string;
   summary?: string;
+  approach?: PersonalInteractionApproach;
+  updatesLastContact?: boolean;
 };
 
 function ContactMethodIcon({ id }: { id: ContactMethodId }) {
@@ -153,20 +157,8 @@ function contactMethodHref(id: ContactMethodId, value: string): { href?: string;
 }
 
 type PeopleTimelineItem =
-  | { kind: "memory"; id: string; date?: string; memory: PersonalMemoryEntry }
-  | { kind: "interaction"; id: string; date?: string; interaction: PeopleTimelineInteraction };
-
-type MemoryCategory =
-  | "personal_context"
-  | "preferences"
-  | "important_dates"
-  | "shared_history"
-  | "work_context"
-  | "family_context"
-  | "follow_up_notes"
-  | "open_loops"
-  | "gifts_ideas"
-  | "sensitive_private";
+  | { kind: "memory"; id: string; date?: string; participantIds: string[]; memory: PersonalMemoryEntry }
+  | { kind: "interaction"; id: string; date?: string; participantIds: string[]; interaction: PeopleTimelineInteraction };
 
 type SidebarItemConfig = {
   id: PeopleSidebarView;
@@ -436,27 +428,12 @@ function organizationIndustryOptions(type: string): readonly string[] {
 const PEOPLE_VIEWS: Array<{ id: PeopleView; label: string }> = [
   { id: "overview", label: "Overview" },
   { id: "timeline", label: "Timeline" },
-  { id: "notes", label: "Notes & Memories" },
-  { id: "relations", label: "Relationships" },
-  { id: "files", label: "Files & Links" },
+  { id: "links", label: "Links" },
   { id: "properties", label: "Properties" }
 ];
 
 const PEOPLE_DIRTY_HISTORY_GUARD = "__unigentamosPeopleDirtyGuard";
 const PEOPLE_HISTORY_BACK_DESTINATION = "__people_history_back__";
-
-const MEMORY_CATEGORIES: Array<{ id: MemoryCategory; label: string; tone: string }> = [
-  { id: "personal_context", label: "Personal context", tone: "green" },
-  { id: "preferences", label: "Preferences", tone: "cyan" },
-  { id: "important_dates", label: "Important dates", tone: "orange" },
-  { id: "shared_history", label: "Shared history", tone: "purple" },
-  { id: "work_context", label: "Work context", tone: "blue" },
-  { id: "family_context", label: "Family/context", tone: "pink" },
-  { id: "follow_up_notes", label: "Follow-up notes", tone: "orange" },
-  { id: "open_loops", label: "Open loops", tone: "crimson" },
-  { id: "gifts_ideas", label: "Gifts/ideas", tone: "green" },
-  { id: "sensitive_private", label: "Sensitive/private", tone: "brown" }
-];
 
 const PEOPLE_SIDEBAR_SECTIONS: Array<{ title: string; items: SidebarItemConfig[] }> = [
   {
@@ -547,13 +524,11 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
     ]
   },
   {
-    title: "Memory",
+    title: "About them",
     tone: "green",
     fields: [
       { key: "interestingFact", label: "Interesting fact", type: "textarea" },
-      { key: "lifeDream", label: "Life dream", type: "textarea" },
-      { key: "notes", label: "Notes", type: "textarea" },
-      { key: "interactions", label: "Interactions", type: "textarea", placeholder: "One interaction per line" }
+      { key: "lifeDream", label: "Life dream", type: "textarea" }
     ]
   }
 ];
@@ -582,12 +557,9 @@ const ORGANIZATION_PROFILE_SECTIONS: Array<{ title: string; tone: string; fields
     ]
   },
   {
-    title: "Notes",
+    title: "About",
     tone: "green",
-    fields: [
-      { key: "notes", label: "Notes", type: "textarea" },
-      { key: "interactions", label: "Activity notes", type: "textarea", placeholder: "One activity per line" }
-    ]
+    fields: []
   }
 ];
 
@@ -738,27 +710,6 @@ function splitTextEntries(value: string) {
 
 function joinTextEntries(values?: string[]) {
   return values && values.length > 0 ? values.join("\n") : "";
-}
-
-function todayDateInputValue() {
-  const now = new Date();
-  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-}
-
-function newMemoryEntry(input: {
-  text?: string;
-  occurredOn?: string;
-  category?: string;
-  pinned?: boolean;
-} = {}): PersonalMemoryEntry {
-  return {
-    id: `memory-${crypto.randomUUID()}`,
-    text: input.text || "",
-    occurredOn: input.occurredOn || todayDateInputValue(),
-    category: input.category,
-    pinned: input.pinned ?? true,
-    createdAt: new Date().toISOString()
-  };
 }
 
 function newEducationEntry(input: Partial<PersonalEducationEntry> = {}): PersonalEducationEntry {
@@ -930,6 +881,7 @@ const INTERACTION_KIND_LABELS = new Set([
   "catch-up",
   "catch up",
   "note",
+  "memory",
   "milestone"
 ]);
 
@@ -956,6 +908,47 @@ function sortTimelineItems(items: PeopleTimelineItem[]): PeopleTimelineItem[] {
       return left.index - right.index;
     })
     .map(({ item }) => item);
+}
+
+function canonicalInteractionItem(record: PersonalRecord): PeopleTimelineItem | null {
+  if (record.className !== "interaction" || !record.interaction) return null;
+  return {
+    kind: "interaction",
+    id: record.id,
+    date: record.interaction.occurredOn,
+    participantIds: record.interaction.participantIds,
+    interaction: {
+      date: record.interaction.occurredOn,
+      kind: record.interaction.kind,
+      title: record.title,
+      summary: record.body || undefined,
+      approach: record.interaction.approach,
+      updatesLastContact: record.interaction.updatesLastContact
+    }
+  };
+}
+
+function legacyTimelineItems(record: PersonalRecord): PeopleTimelineItem[] {
+  const profile = getProfile(record);
+  return [
+    ...splitTextEntries(profile.interactions).map((text, index): PeopleTimelineItem => {
+      const interaction = parseTimelineInteraction(text);
+      return {
+        kind: "interaction",
+        id: `legacy-interaction-${record.id}-${index}`,
+        date: interaction.date || interactionOccurredOn(text),
+        participantIds: [record.id],
+        interaction: { ...interaction, updatesLastContact: false }
+      };
+    }),
+    ...sortPeopleMemories(profile.memories).map((memory): PeopleTimelineItem => ({
+      kind: "memory",
+      id: `legacy-memory-${record.id}-${memory.id}`,
+      date: memory.occurredOn,
+      participantIds: [record.id],
+      memory
+    }))
+  ];
 }
 
 function daysUntil(value?: string) {
@@ -1164,12 +1157,18 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
   };
 }
 
-function getLastContactValue(record: PersonalRecord): string {
-  return getProfile(record).lastContact || record.time.lastReview || "";
+function getLastContactValue(record: PersonalRecord, interactionDate = ""): string {
+  const profileDate = getProfile(record).lastContact || record.time.lastReview || "";
+  if (!interactionDate) return profileDate;
+  if (!profileDate) return interactionDate;
+  const profileTimestamp = parseDisplayDate(profileDate).getTime();
+  const interactionTimestamp = parseDisplayDate(interactionDate).getTime();
+  if (Number.isNaN(interactionTimestamp)) return profileDate;
+  return Number.isNaN(profileTimestamp) || interactionTimestamp > profileTimestamp ? interactionDate : profileDate;
 }
 
-function formatLastContact(record: PersonalRecord, full = false): string {
-  const value = getLastContactValue(record);
+function formatLastContact(record: PersonalRecord, full = false, interactionDate = ""): string {
+  const value = getLastContactValue(record, interactionDate);
   if (!value) return "N/A";
   if (full) return formatFullDate(value);
   const date = parseDisplayDate(value);
@@ -1177,8 +1176,8 @@ function formatLastContact(record: PersonalRecord, full = false): string {
   return date.getFullYear() === new Date().getFullYear() ? formatDate(value) : formatFullDate(value);
 }
 
-function lastContactTimestamp(record: PersonalRecord): number {
-  const value = getLastContactValue(record);
+function lastContactTimestamp(record: PersonalRecord, interactionDate = ""): number {
+  const value = getLastContactValue(record, interactionDate);
   if (!value) return Number.NEGATIVE_INFINITY;
   const timestamp = parseDisplayDate(value).getTime();
   return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
@@ -1246,11 +1245,11 @@ function getInitials(record?: PersonalRecord) {
   return `${words[0].slice(0, 1)}${words[words.length - 1].slice(0, 1)}`.toUpperCase();
 }
 
-function getRelationshipHealth(record?: PersonalRecord) {
+function getRelationshipHealth(record?: PersonalRecord, interactionDate = "") {
   if (!record) return "Unknown";
   if (isDormant(record)) return "Dormant";
   if (isDue(record) || record.status === "blocked") return "Needs attention";
-  if (!getLastContactValue(record)) return "Not enough history";
+  if (!getLastContactValue(record, interactionDate)) return "Not enough history";
   return "On track";
 }
 
@@ -1318,15 +1317,15 @@ function getLastName(record: PersonalRecord) {
   return name.toLowerCase();
 }
 
-function isRecentContact(record: PersonalRecord) {
-  const last = getLastContactValue(record);
+function isRecentContact(record: PersonalRecord, interactionDate = "") {
+  const last = getLastContactValue(record, interactionDate);
   if (!last) return false;
   const date = parseDisplayDate(last);
   return !Number.isNaN(date.getTime()) && Date.now() - date.getTime() <= 1000 * 60 * 60 * 24 * 30;
 }
 
-function isNoContact90(record: PersonalRecord) {
-  const last = record.time.lastReview || getProfile(record).lastContact;
+function isNoContact90(record: PersonalRecord, interactionDate = "") {
+  const last = getLastContactValue(record, interactionDate);
   if (!last) return true;
   const date = parseDisplayDate(last);
   return Number.isNaN(date.getTime()) || Date.now() - date.getTime() > 1000 * 60 * 60 * 24 * 90;
@@ -1375,10 +1374,10 @@ function hasGroupLike(record: PersonalRecord, terms: string[]) {
   return terms.some((term) => haystack.includes(term));
 }
 
-function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView) {
+function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView, interactionDate = "") {
   if (view === "all") return true;
   if (view === "starred") return record.starred === true;
-  if (view === "recent") return isRecentContact(record);
+  if (view === "recent") return isRecentContact(record, interactionDate);
   if (view === "upcoming") {
     const days = daysUntil(record.time.nextReview);
     return days !== null && days >= 0 && days <= 30;
@@ -1391,7 +1390,7 @@ function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView) {
   if (view === "advisors-mentors") return hasGroupLike(record, ["advisor", "mentor"]);
   if (view === "neighbors") return hasGroupLike(record, ["neighbor"]);
   if (view === "health-wellness") return hasGroupLike(record, ["health", "wellness", "doctor", "therapy", "trainer"]);
-  if (view === "no-contact-90") return isNoContact90(record);
+  if (view === "no-contact-90") return isNoContact90(record, interactionDate);
   if (view === "birthdays-month") return isBirthdayThisMonth(record);
   if (view === "new-people") return isNewPerson(record);
   if (view === "profile-gaps") return getProfileGaps(record).length > 0;
@@ -1399,10 +1398,10 @@ function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView) {
   return true;
 }
 
-function sortPeople(records: PersonalRecord[], sortMode: PeopleSortMode) {
+function sortPeople(records: PersonalRecord[], sortMode: PeopleSortMode, interactionDates: Map<string, string> = new Map()) {
   return [...records].sort((left, right) => {
     if (sortMode === "recent-contact") {
-      const difference = lastContactTimestamp(right) - lastContactTimestamp(left);
+      const difference = lastContactTimestamp(right, interactionDates.get(right.id)) - lastContactTimestamp(left, interactionDates.get(left.id));
       return !Number.isNaN(difference) && difference !== 0 ? difference : getLastName(left).localeCompare(getLastName(right));
     }
     if (sortMode === "next-follow-up") {
@@ -1884,8 +1883,66 @@ function PhoneEntriesEditor({
   );
 }
 
+function PeopleNotesEditor({
+  notes,
+  onChange,
+  title = "Notes about them"
+}: {
+  notes: string[];
+  onChange: (notes: string[]) => void;
+  title?: string;
+}) {
+  const rows = notes.length > 0 ? notes : [""];
+
+  function updateNote(index: number, value: string) {
+    onChange(rows.map((note, noteIndex) => noteIndex === index ? value : note));
+  }
+
+  function removeNote(index: number) {
+    const next = rows.filter((_, noteIndex) => noteIndex !== index);
+    onChange(next.length > 0 ? next : [""]);
+  }
+
+  function addNote() {
+    const next = [...rows, ""];
+    onChange(next);
+    window.setTimeout(() => document.getElementById(`people-about-note-${next.length - 1}`)?.focus(), 0);
+  }
+
+  return (
+    <section className="people-notes-editor" data-people-notes-editor>
+      <header className="people-repeatable-heading">
+        <div>
+          <h4>{title}</h4>
+          <p>Keep useful context as short, separate notes.</p>
+        </div>
+        <button type="button" onClick={addNote}>Add note</button>
+      </header>
+      <div className="people-notes-list">
+        {rows.map((note, index) => (
+          <div className="people-note-row" key={`people-note-${index}`}>
+            <span className="people-note-bullet" aria-hidden="true" />
+            <textarea
+              id={`people-about-note-${index}`}
+              aria-label={`${title} note ${index + 1}`}
+              rows={2}
+              value={note}
+              onChange={(event) => updateNote(index, event.target.value)}
+              placeholder="Add something worth remembering..."
+            />
+            <button type="button" className="people-note-remove" onClick={() => removeNote(index)} aria-label={`Remove note ${index + 1}`}>
+              <svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18" /></svg>
+            </button>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 export default function PeopleWorkspace({
   initialPeople,
+  initialInteractions,
   totalRecords,
   initialSelectedId,
   initialMode = "directory",
@@ -1900,6 +1957,7 @@ export default function PeopleWorkspace({
   const searchParams = useSearchParams();
   const initialUrlState = parsePeopleUrlState(searchParams);
   const [people, setPeople] = useState(initialPeople);
+  const [interactionRecords, setInteractionRecords] = useState(initialInteractions);
   const {
     followUps,
     error: followUpsError,
@@ -1925,6 +1983,7 @@ export default function PeopleWorkspace({
   const [groups, setGroups] = useState<string[]>(["Collaborator"]);
   const [status, setStatus] = useState<PersonalRecordStatus>("active");
   const [quickContext, setQuickContext] = useState("");
+  const [quickNotes, setQuickNotes] = useState<string[]>([""]);
   const [quickOrganizationType, setQuickOrganizationType] = useState("Business");
   const [quickIndustry, setQuickIndustry] = useState("");
   const [quickFoundedYear, setQuickFoundedYear] = useState("");
@@ -1969,21 +2028,14 @@ export default function PeopleWorkspace({
   const [lifecycleSaving, setLifecycleSaving] = useState<"" | "star" | "delete" | "restore">("");
   const [expandedContactMethod, setExpandedContactMethod] = useState<ContactMethodId | null>(null);
   const [utilityNotice, setUtilityNotice] = useState("");
-  const [memoryCategory, setMemoryCategory] = useState<MemoryCategory>("personal_context");
-  const [memoryDraft, setMemoryDraft] = useState("");
-  const [memoryDate, setMemoryDate] = useState(todayDateInputValue);
-  const [memoryPinned, setMemoryPinned] = useState(true);
-  const [memorySaving, setMemorySaving] = useState(false);
-  const [editingMemoryId, setEditingMemoryId] = useState("");
-  const [editingMemoryText, setEditingMemoryText] = useState("");
-  const [editingMemoryDate, setEditingMemoryDate] = useState("");
-  const [memoryEditSaving, setMemoryEditSaving] = useState(false);
   const [relationshipDraft, setRelationshipDraft] = useState("");
   const [relationshipType, setRelationshipType] = useState("collaborator");
   const [relationshipSaving, setRelationshipSaving] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
   const [interactionOpen, setInteractionOpen] = useState(false);
   const [interactionKind, setInteractionKind] = useState<InteractionKind>("meeting");
+  const [interactionApproach, setInteractionApproach] = useState<"" | PersonalInteractionApproach>("");
+  const [interactionParticipantIds, setInteractionParticipantIds] = useState<string[]>([]);
   const [interactionDate, setInteractionDate] = useState("");
   const [interactionTitle, setInteractionTitle] = useState("");
   const [interactionSummary, setInteractionSummary] = useState("");
@@ -2026,7 +2078,7 @@ export default function PeopleWorkspace({
       setDetailMode(
         next.tab === "timeline"
           ? "timeline"
-          : next.tab === "files"
+          : next.tab === "links"
             ? "workspace"
             : next.tab === "properties"
               ? "edit"
@@ -2152,6 +2204,24 @@ export default function PeopleWorkspace({
   }
 
   const activePeople = useMemo(() => people.filter((record) => !record.archivedAt), [people]);
+  const allInteractionItems = useMemo(() => sortTimelineItems([
+    ...interactionRecords.map(canonicalInteractionItem).filter((item): item is PeopleTimelineItem => Boolean(item)),
+    ...activePeople.flatMap(legacyTimelineItems)
+  ]), [activePeople, interactionRecords]);
+  const latestInteractionDateByParticipant = useMemo(() => {
+    const dates = new Map<string, string>();
+    for (const item of allInteractionItems) {
+      if (item.kind !== "interaction" || !item.date || item.interaction.updatesLastContact === false) continue;
+      for (const participantId of item.participantIds) {
+        const current = dates.get(participantId);
+        if (!current || parseDisplayDate(item.date).getTime() > parseDisplayDate(current).getTime()) {
+          dates.set(participantId, item.date);
+        }
+      }
+    }
+    return dates;
+  }, [allInteractionItems]);
+  const recentInteractionItems = allInteractionItems.slice(0, 8);
   const organizationOptions = useMemo<OrganizationOption[]>(
     () => activePeople
       .filter((record) => record.className === "org")
@@ -2176,13 +2246,13 @@ export default function PeopleWorkspace({
       return [];
     }
     const matches = activePeople.filter((record) => {
-      if (!matchesSidebarView(record, activeSidebarView)) return false;
+      if (!matchesSidebarView(record, activeSidebarView, latestInteractionDateByParticipant.get(record.id))) return false;
       if (!matchesFilter(record, activeFilter)) return false;
       if (!normalizedQuery) return true;
       return getSearchText(record).includes(normalizedQuery);
     });
-    return sortPeople(matches, sortMode);
-  }, [activeFilter, activePeople, activeSidebarView, query, sortMode]);
+    return sortPeople(matches, sortMode, latestInteractionDateByParticipant);
+  }, [activeFilter, activePeople, activeSidebarView, latestInteractionDateByParticipant, query, sortMode]);
 
   const locationSuggestions = useMemo(() => Array.from(new Set([
     ...activePeople.map((record) => record.profile?.livesIn || "").filter(Boolean),
@@ -2212,12 +2282,13 @@ export default function PeopleWorkspace({
   useEffect(() => {
     setProfileDraft(getProfile(selectedPerson));
     setProfileGroups(selectedPerson?.subjects || []);
-    setEditingMemoryId("");
     setExpandedContactMethod(null);
   }, [selectedPerson?.id]);
 
   const stats = useMemo(() => {
-    const countFor = (view: PeopleSidebarView) => activePeople.filter((record) => matchesSidebarView(record, view)).length;
+    const countFor = (view: PeopleSidebarView) => activePeople.filter((record) => (
+      matchesSidebarView(record, view, latestInteractionDateByParticipant.get(record.id))
+    )).length;
     return {
       total: activePeople.length,
       due: activePeople.filter(isDue).length,
@@ -2241,7 +2312,7 @@ export default function PeopleWorkspace({
       neighbors: countFor("neighbors"),
       healthWellness: countFor("health-wellness")
     };
-  }, [activePeople]);
+  }, [activePeople, latestInteractionDateByParticipant]);
 
   const selectedProfile = getProfile(selectedPerson);
   const organizationProfileSelectedPersonIds = selectedPerson?.className === "org"
@@ -2295,8 +2366,9 @@ export default function PeopleWorkspace({
     ? utilityNotice || `${activeViewLabel} is a read-only People utility in this checkpoint. Stored-data actions remain disabled until matching backend support exists.`
     : utilityNotice;
   const profileGaps = selectedPerson ? getProfileGaps(selectedPerson) : [];
-  const selectedMemories = sortPeopleMemories(selectedProfile.memories);
-  const selectedInteractions = splitTextEntries(selectedProfile.interactions);
+  const selectedInteractionItems = selectedPerson
+    ? allInteractionItems.filter((item) => item.participantIds.includes(selectedPerson.id))
+    : [];
   const selectedChildren = splitList(selectedProfile.children);
   const associatedPeople = splitList(selectedProfile.associatedPeople);
   const relationshipConnections = Array.from(new Map([
@@ -2317,27 +2389,11 @@ export default function PeopleWorkspace({
     [selectedPerson?.className === "org" ? "Founded" : "Birthday", selectedPerson?.className === "org"
       ? selectedProfile.foundedYear || "Not recorded"
       : selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "Not recorded"],
-    ["Last contact", selectedPerson ? formatLastContact(selectedPerson, true) : "N/A"],
+    ["Last contact", selectedPerson ? formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id)) : "N/A"],
     ["Next follow-up", selectedPerson ? getNextContactLabel(selectedPerson) : "-"],
     ["Added", selectedPerson ? formatFullDate(selectedPerson.createdAt) : "-"]
   ];
-  const timelineItems = sortTimelineItems([
-    ...selectedInteractions.map((text, index): PeopleTimelineItem => {
-      const interaction = parseTimelineInteraction(text);
-      return {
-        kind: "interaction",
-        id: `interaction-${index}-${text}`,
-        date: interaction.date || interactionOccurredOn(text),
-        interaction
-      };
-    }),
-    ...selectedMemories.map((memory): PeopleTimelineItem => ({
-      kind: "memory",
-      id: memory.id,
-      date: memory.occurredOn,
-      memory
-    }))
-  ]).slice(0, 20);
+  const timelineItems = selectedInteractionItems.slice(0, 20);
   const selectedTags = [
     ...(fallbackPerson?.subjects || []).slice(0, 3),
     ...(selectedPerson?.projects || []).slice(0, 2)
@@ -2364,6 +2420,7 @@ export default function PeopleWorkspace({
     quickNickname,
     quickBirthday,
     quickContext,
+    ...quickNotes,
     quickIndustry,
     quickFoundedYear,
     quickTeamSize,
@@ -2501,7 +2558,7 @@ export default function PeopleWorkspace({
         sidebar: item.id,
         filter: "all",
         person: "",
-        tab: item.surface === "profile" || item.id === "relationship-map" ? "relations" : "overview"
+        tab: item.surface === "profile" || item.id === "relationship-map" ? "links" : "overview"
       },
       { path: getModuleRoute("people") }
     );
@@ -2514,10 +2571,10 @@ export default function PeopleWorkspace({
     setAddingPerson(false);
     setActionNotice("");
     if (item.surface === "profile" || item.id === "relationship-map") {
-      setActiveView("relations");
+      setActiveView("links");
       setDetailMode("profile");
       updatePeopleUrl(
-        { sidebar: item.id, filter: "all", tab: "relations", person: "" },
+        { sidebar: item.id, filter: "all", tab: "links", person: "" },
         { path: getModuleRoute("people"), history: "push" }
       );
       return;
@@ -2560,7 +2617,7 @@ export default function PeopleWorkspace({
     setActionNotice("");
     if (view === "timeline") {
       setDetailMode("timeline");
-    } else if (view === "files") {
+    } else if (view === "links") {
       setDetailMode("workspace");
     } else if (view === "properties") {
       setDetailMode("edit");
@@ -2620,77 +2677,6 @@ export default function PeopleWorkspace({
     });
   }
 
-  async function saveMemory() {
-    if (!selectedPerson || !memoryDraft.trim()) return;
-    setMemorySaving(true);
-    const entry = newMemoryEntry({
-      text: memoryDraft.trim(),
-      occurredOn: memoryDate,
-      category: memoryCategory,
-      pinned: memoryPinned
-    });
-    const saved = await saveProfileDraft({
-      ...selectedProfile,
-      memories: [...selectedProfile.memories, entry]
-    });
-    setMemorySaving(false);
-    if (saved) {
-      setMemoryDraft("");
-      setMemoryDate(todayDateInputValue());
-      setMemoryPinned(true);
-      setActiveView("notes");
-      setDetailMode("profile");
-      setActionNotice("Memory saved to this profile.");
-    }
-  }
-
-  function startMemoryEdit(memory: PersonalMemoryEntry) {
-    setEditingMemoryId(memory.id);
-    setEditingMemoryText(memory.text);
-    setEditingMemoryDate(memory.occurredOn || "");
-    setActionNotice("");
-  }
-
-  function cancelMemoryEdit() {
-    setEditingMemoryId("");
-    setEditingMemoryText("");
-    setEditingMemoryDate("");
-  }
-
-  async function saveMemoryEdit() {
-    if (!selectedPerson || !editingMemoryId || !editingMemoryText.trim()) return;
-    setMemoryEditSaving(true);
-    const memories = selectedProfile.memories.map((memory) => memory.id === editingMemoryId
-      ? { ...memory, text: editingMemoryText.trim(), occurredOn: editingMemoryDate || undefined }
-      : memory);
-    const saved = await saveProfileDraft({ ...selectedProfile, memories });
-    setMemoryEditSaving(false);
-    if (saved) {
-      cancelMemoryEdit();
-      setActionNotice("Memory updated. Notes and Timeline have been reordered by date.");
-    }
-  }
-
-  function updateProfileMemory(id: string, patch: Partial<Pick<PersonalMemoryEntry, "text" | "occurredOn">>) {
-    setProfileDraft((current) => ({
-      ...current,
-      memories: current.memories.map((memory) => memory.id === id ? { ...memory, ...patch } : memory)
-    }));
-  }
-
-  function addProfileMemory() {
-    const memory = newMemoryEntry();
-    setProfileDraft((current) => ({ ...current, memories: [...current.memories, memory] }));
-    window.setTimeout(() => document.getElementById(`people-property-memory-${memory.id}`)?.focus(), 0);
-  }
-
-  function removeProfileMemory(id: string) {
-    setProfileDraft((current) => ({
-      ...current,
-      memories: current.memories.filter((memory) => memory.id !== id)
-    }));
-  }
-
   async function saveRelationship() {
     if (!selectedPerson || !relationshipDraft.trim()) return;
     setRelationshipSaving(true);
@@ -2704,18 +2690,19 @@ export default function PeopleWorkspace({
     setRelationshipSaving(false);
     if (saved) {
       setRelationshipDraft("");
-      setActiveView("relations");
-      setDetailMode("profile");
+      setActiveView("links");
+      setDetailMode("workspace");
       setActionNotice("Relationship link saved. This does not delete or alter either person.");
     }
   }
 
-  function openInteractionComposer() {
-    if (!selectedPerson) return;
+  function openInteractionComposer(record?: PersonalRecord) {
     const now = new Date();
     const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
     setInteractionDate(localDate);
     setInteractionKind("meeting");
+    setInteractionApproach("");
+    setInteractionParticipantIds(record ? [record.id] : []);
     setInteractionTitle("");
     setInteractionSummary("");
     setInteractionMeaningful(true);
@@ -2725,32 +2712,58 @@ export default function PeopleWorkspace({
 
   async function saveInteraction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedPerson || !interactionDate || !interactionTitle.trim()) return;
+    if (!interactionDate || !interactionTitle.trim() || interactionParticipantIds.length === 0) return;
     setInteractionSaving(true);
     const kindLabel = interactionKind === "catch-up" ? "Catch-up" : labelize(interactionKind);
-    const entry = [interactionDate, kindLabel, interactionTitle.trim(), interactionSummary.trim()]
-      .filter(Boolean)
-      .join(" • ");
-    const profile = buildProfilePayload({
-      ...selectedProfile,
-      interactions: joinTextEntries([...selectedInteractions, entry]),
-      lastContact: interactionMeaningful ? interactionDate : selectedProfile.lastContact
-    });
-    const saved = await patchPerson(selectedPerson.id, {
-      profile,
-      time: interactionMeaningful
-        ? {
-            lastReview: interactionDate,
-            reviewCadence: selectedPerson.time.reviewCadence || selectedProfile.contactCadence || undefined
+    try {
+      const response = await fetch("/api/personal/records", {
+        method: "POST",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({
+          domain: "notes-docs",
+          title: interactionTitle.trim(),
+          className: "interaction",
+          privacy: "private",
+          stage: "processed",
+          status: "completed",
+          body: interactionSummary.trim(),
+          happensOn: interactionDate,
+          areas: ["Relationships"],
+          subjects: [kindLabel, ...(interactionApproach ? [`${labelize(interactionApproach)} approach`] : [])],
+          intents: ["connect"],
+          interaction: {
+            participantIds: interactionParticipantIds,
+            kind: interactionKind,
+            occurredOn: interactionDate,
+            approach: interactionApproach || undefined,
+            updatesLastContact: interactionMeaningful
           }
-        : undefined
-    });
-    setInteractionSaving(false);
-    if (!saved) return;
-    setInteractionOpen(false);
-    setInteractionTitle("");
-    setInteractionSummary("");
-    setActionNotice("Interaction saved to this People profile and cadence refreshed.");
+        })
+      });
+      const payload = (await response.json().catch(() => ({ ok: false, error: "Invalid server response" }))) as RecordsResponse;
+      if (!response.ok || !payload.ok || !payload.items) {
+        setError(payload.error || "Failed to save interaction");
+        return;
+      }
+      const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
+      const nextInteractions = payload.items.filter((record) => record.className === "interaction" && record.interaction);
+      const createdInteraction = nextInteractions.find((record) => (
+        record.title === interactionTitle.trim() && record.interaction?.occurredOn === interactionDate
+      ));
+      setPeople(nextPeople);
+      setInteractionRecords(nextInteractions);
+      if (createdInteraction) await mirrorPersonalRecord(createdInteraction);
+      setInteractionOpen(false);
+      setInteractionTitle("");
+      setInteractionSummary("");
+      setInteractionParticipantIds([]);
+      setInteractionApproach("");
+      setActionNotice(`Interaction saved to ${interactionParticipantIds.length} ${interactionParticipantIds.length === 1 ? "profile" : "profiles"}.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "Unable to save the interaction. Your draft is still here.");
+    } finally {
+      setInteractionSaving(false);
+    }
   }
 
   async function submitPerson(event: React.FormEvent<HTMLFormElement>) {
@@ -2767,6 +2780,7 @@ export default function PeopleWorkspace({
       nickname: className === "person" ? quickNickname : "",
       birthday: className === "person" ? quickBirthday : "",
       context: quickContext,
+      notes: joinTextEntries(quickNotes.filter((note) => note.trim())),
       organizationType: className === "org" ? quickOrganizationType : "",
       industry: className === "org" ? quickIndustry : "",
       foundedYear: className === "org" ? quickFoundedYear : "",
@@ -2837,6 +2851,7 @@ export default function PeopleWorkspace({
       setGroups(["Collaborator"]);
       setStatus("active");
       setQuickContext("");
+      setQuickNotes([""]);
       setQuickOrganizationType("Business");
       setQuickIndustry("");
       setQuickFoundedYear("");
@@ -2999,6 +3014,7 @@ export default function PeopleWorkspace({
     setQuickNickname("");
     setQuickBirthday("");
     setQuickContext("");
+    setQuickNotes([""]);
     setQuickOrganizationType("Business");
     setQuickIndustry("");
     setQuickFoundedYear("");
@@ -3269,6 +3285,9 @@ export default function PeopleWorkspace({
           <textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={4} />
         </label>}
         {className === "person" && (
+          <PeopleNotesEditor notes={quickNotes} onChange={setQuickNotes} />
+        )}
+        {className === "person" && (
           <>
             <OccupationEntriesEditor
               entries={quickOccupations}
@@ -3421,6 +3440,9 @@ export default function PeopleWorkspace({
             <span>{visiblePeople.length} shown · {activePeople.length} People records · {totalRecords} total Personal Records</span>
           </div>
           <div className="people-header-actions">
+            <button type="button" aria-label="Log interaction" onClick={() => openInteractionComposer()}>
+              + Interaction
+            </button>
             <button type="button" aria-label="Show filters" onClick={() => setFiltersOpen(true)}>
               Filter
             </button>
@@ -3608,6 +3630,7 @@ export default function PeopleWorkspace({
             )}
           </section>
         ) : visiblePeople.length > 0 ? (
+          <>
           <div className={`people-directory-list is-${listMode}`}>
             {visiblePeople.map((record) => {
               const profile = getProfile(record);
@@ -3640,9 +3663,9 @@ export default function PeopleWorkspace({
                         ))}
                       </span>
                     </span>
-                    <span className={`people-row-date${getLastContactValue(record) ? "" : " is-unknown"}`}>
-                      {getLastContactValue(record) && <i />}
-                      {formatLastContact(record)}
+                    <span className={`people-row-date${getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) ? "" : " is-unknown"}`}>
+                      {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <i />}
+                      {formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}
                     </span>
                     <span className="people-row-next">{getDirectoryNextContactLabel(record)}</span>
                     {record.starred && <span className="people-row-star" data-people-starred aria-label="Starred">★</span>}
@@ -3651,6 +3674,41 @@ export default function PeopleWorkspace({
               );
             })}
           </div>
+          <section className="people-recent-interactions" aria-labelledby="people-recent-interactions-title">
+            <header>
+              <div>
+                <h2 id="people-recent-interactions-title">Recent interactions</h2>
+                <span>Shared activity across People</span>
+              </div>
+              <button type="button" onClick={() => openInteractionComposer()}>Log interaction</button>
+            </header>
+            <div className="people-recent-interaction-list">
+              {recentInteractionItems.length > 0 ? recentInteractionItems.map((item) => {
+                const interaction = item.kind === "interaction"
+                  ? item.interaction
+                  : { kind: "memory", title: item.memory.text, summary: "Legacy memory" };
+                const participants = item.participantIds
+                  .map((participantId) => activePeople.find((record) => record.id === participantId))
+                  .filter((record): record is PersonalRecord => Boolean(record));
+                return (
+                  <article key={`recent-${item.id}`}>
+                    <span className="people-recent-kind">{interaction.kind || "Interaction"}</span>
+                    <div>
+                      <strong>{interaction.title}</strong>
+                      <span>{participants.map((record) => record.title).join(" · ") || "Profile unavailable"}</span>
+                    </div>
+                    {item.kind === "interaction" && item.interaction.approach && (
+                      <span className={`people-approach-badge is-${item.interaction.approach}`}>{labelize(item.interaction.approach)}</span>
+                    )}
+                    <time dateTime={item.date}>{item.date ? formatFullDate(item.date) : "Date unknown"}</time>
+                  </article>
+                );
+              }) : (
+                <p>No interactions logged yet.</p>
+              )}
+            </div>
+          </section>
+          </>
         ) : (
           <div className="notes-empty-state">
             <h3>{activePeople.length === 0 ? "No people yet" : "No matching people"}</h3>
@@ -3831,55 +3889,12 @@ export default function PeopleWorkspace({
                       {section.title === "Identity" && selectedPerson.className === "person" && (
                         <BirthdayEditor value={profileDraft.birthday} onChange={(value) => updateProfileDraft("birthday", value)} />
                       )}
-                      {section.title === "Memory" && (
-                        <div className="people-memory-properties" aria-label="Dated memories">
-                          <div className="people-memory-properties-heading">
-                            <div>
-                              <strong>Memories</strong>
-                              <span>Each memory keeps its own date. Notes and Timeline show the newest first.</span>
-                            </div>
-                            <button type="button" onClick={addProfileMemory}>Add memory</button>
-                          </div>
-                          {profileDraft.memories.length > 0 ? profileDraft.memories.map((memory, index) => (
-                            <article className="people-memory-property-entry" data-memory-editor-id={memory.id} key={memory.id}>
-                              <div className="people-memory-property-entry-heading">
-                                <strong>Memory {index + 1}</strong>
-                                <div>
-                                  <button
-                                    type="button"
-                                    onClick={() => document.getElementById(`people-property-memory-${memory.id}`)?.focus()}
-                                    aria-label={`Edit memory ${index + 1}`}
-                                  >
-                                    Edit
-                                  </button>
-                                  <button type="button" onClick={() => removeProfileMemory(memory.id)}>
-                                    Remove
-                                  </button>
-                                </div>
-                              </div>
-                              <label>
-                                Memory
-                                <textarea
-                                  id={`people-property-memory-${memory.id}`}
-                                  value={memory.text}
-                                  onChange={(event) => updateProfileMemory(memory.id, { text: event.target.value })}
-                                  placeholder="What happened, what mattered, or what you want to remember..."
-                                  rows={3}
-                                />
-                              </label>
-                              <label>
-                                Date
-                                <input
-                                  type="date"
-                                  value={memory.occurredOn || ""}
-                                  onChange={(event) => updateProfileMemory(memory.id, { occurredOn: event.target.value || undefined })}
-                                />
-                              </label>
-                            </article>
-                          )) : (
-                            <p className="people-memory-properties-empty">No memories yet. Add one when there is a moment you want to keep.</p>
-                          )}
-                        </div>
+                      {(section.title === "About them" || section.title === "About") && (
+                        <PeopleNotesEditor
+                          title={selectedPerson.className === "org" ? "Organization notes" : "Notes about them"}
+                          notes={profileDraft.notes ? profileDraft.notes.split(/\r?\n/) : [""]}
+                          onChange={(notes) => updateProfileDraft("notes", notes.join("\n"))}
+                        />
                       )}
                     </section>
                     {(section.title === "Communication" || section.title === "Links") && (
@@ -3958,7 +3973,7 @@ export default function PeopleWorkspace({
             ) : detailMode === "timeline" ? (
               <section className="people-timeline-panel">
                 <div className="people-timeline-actions">
-                  <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
+                  <button type="button" onClick={() => openInteractionComposer(selectedPerson)}>Log Interaction</button>
                   <button
                     type="button"
                     onClick={() => router.push(followUpCreationRoute(selectedPerson))}
@@ -3966,55 +3981,42 @@ export default function PeopleWorkspace({
                   >
                     Schedule Follow-up
                   </button>
-                  <button type="button" onClick={() => selectProfileView("notes")}>Add Memory / Note</button>
                 </div>
                 <div className="people-timeline-layout">
                   <section className="people-timeline-stream" aria-label={`${selectedPerson.title} ${selectedPerson.className === "org" ? "organization" : "relationship"} history`}>
                     <header>
                       <div>
-                        <h3>Memories & interactions</h3>
+                        <h3>Interactions</h3>
                         <span>{timelineItems.length} saved {timelineItems.length === 1 ? "entry" : "entries"}</span>
                       </div>
                     </header>
                     <div className="people-timeline-list">
                       {timelineItems.length > 0 ? timelineItems.map((item) => item.kind === "memory" ? (
                         <article className="people-timeline-memory" data-memory-id={item.memory.id} data-memory-date={item.memory.occurredOn || ""} key={`memory-${item.id}`}>
-                          {editingMemoryId === item.memory.id ? (
-                            <div className="people-memory-inline-editor">
-                              <label>
-                                Memory
-                                <textarea value={editingMemoryText} onChange={(event) => setEditingMemoryText(event.target.value)} rows={3} />
-                              </label>
-                              <label>
-                                Date
-                                <input type="date" value={editingMemoryDate} onChange={(event) => setEditingMemoryDate(event.target.value)} />
-                              </label>
-                              <div>
-                                <button type="button" onClick={() => void saveMemoryEdit()} disabled={memoryEditSaving || !editingMemoryText.trim()}>
-                                  {memoryEditSaving ? "Saving..." : "Save"}
-                                </button>
-                                <button type="button" onClick={cancelMemoryEdit} disabled={memoryEditSaving}>Cancel</button>
-                              </div>
-                            </div>
-                          ) : (
-                            <>
-                              <div className="people-memory-card-heading">
-                                <span>{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
-                                <button type="button" onClick={() => startMemoryEdit(item.memory)}>Edit</button>
-                              </div>
-                              <strong className="people-timeline-entry-title">{item.memory.text}</strong>
-                              <p className="people-timeline-entry-body">{memoryCategoryLabel(item.memory.category)}</p>
-                            </>
-                          )}
+                          <div className="people-timeline-entry-meta">
+                            <span>{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
+                            <span className="people-timeline-kind">Memory</span>
+                          </div>
+                          <strong className="people-timeline-entry-title">{item.memory.text}</strong>
+                          <p className="people-timeline-entry-body">Legacy memory · now shown in the interaction history</p>
                         </article>
                       ) : (
                         <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
                           <div className="people-timeline-entry-meta">
-                            <span>{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson) ? formatLastContact(selectedPerson, true) : "Date unknown"}</span>
+                            <span>{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) ? formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id)) : "Date unknown"}</span>
                             {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind}</span>}
+                            {item.interaction.approach && <span className={`people-approach-badge is-${item.interaction.approach}`}>{labelize(item.interaction.approach)}</span>}
                           </div>
                           <strong className="people-timeline-entry-title">{item.interaction.title}</strong>
                           {item.interaction.summary && <p className="people-timeline-entry-body">{item.interaction.summary}</p>}
+                          {item.participantIds.length > 1 && (
+                            <div className="people-interaction-participants" aria-label="Tagged people">
+                              {item.participantIds.map((participantId) => {
+                                const participant = activePeople.find((record) => record.id === participantId);
+                                return participant ? <span key={participantId}>{participant.title}</span> : null;
+                              })}
+                            </div>
+                          )}
                         </article>
                       )) : (
                         <div className="notes-empty-state">
@@ -4041,10 +4043,10 @@ export default function PeopleWorkspace({
                     <section className="people-relationship-rhythm">
                       <h3>{selectedPerson.className === "org" ? "Organization rhythm" : "Relationship rhythm"}</h3>
                       {[
-                        ["Last contact", formatLastContact(selectedPerson, true)],
+                        ["Last contact", formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id))],
                         ["Next follow-up", getNextContactLabel(selectedPerson)],
                         ["Cadence", getCadenceLabel(selectedPerson.time.reviewCadence)],
-                        [selectedPerson.className === "org" ? "Status" : "Health", getRelationshipHealth(selectedPerson)]
+                        [selectedPerson.className === "org" ? "Status" : "Health", getRelationshipHealth(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id))]
                       ].map(([label, value]) => (
                         <div key={label}>
                           <span>{label}</span>
@@ -4056,289 +4058,67 @@ export default function PeopleWorkspace({
                 </div>
               </section>
             ) : detailMode === "workspace" ? (
-              <section className="people-linked-workspace">
-                <article>
-                  <header className="people-linked-card-header">
-                    <div><h3>Notes & memories</h3><span>{selectedMemories.length + selectedInteractions.length} timeline entries</span></div>
-                    <button type="button" onClick={() => selectProfileView("notes")}>Open</button>
-                  </header>
-                  {selectedProfile.notes
-                    ? selectedProfile.notes.split("\n").filter(Boolean).slice(0, 3).map((item) => <span key={item}>{item}</span>)
-                    : <span>No profile notes yet.</span>}
-                </article>
-                <article>
-                  <header className="people-linked-card-header">
-                    <div><h3>Files & media</h3><span>Browse this {selectedPerson.className === "org" ? "organization’s" : "person’s"} media context</span></div>
-                    <a href={`${getModuleRoute("media")}?query=${encodeURIComponent(selectedPerson.title)}`}>Search Media</a>
-                  </header>
-                  <span>No directly linked Media files are visible on this profile.</span>
-                </article>
-                <article>
-                  <header className="people-linked-card-header">
-                    <div><h3>Projects</h3><span>Current involvement</span></div>
-                    <div className="people-linked-card-tools">
-                      <button
-                        type="button"
-                        onClick={() => void refreshProjects()}
-                        disabled={projectsLoading}
-                        aria-label={`Refresh Projects involvement for ${selectedPerson.title}`}
-                      >
-                        {projectsLoading ? "Checking…" : "Check"}
-                      </button>
-                      <details className="people-inline-info">
-                        <summary aria-label="About project links">i</summary>
-                        <p>Projects keeps roles and project status. People keeps identity, contact history, and cadence.</p>
-                      </details>
-                    </div>
-                  </header>
-                  <LinkedProjectsPanel
-                    personId={selectedPerson.id}
-                    personLabel={selectedPerson.title}
-                    objectType={selectedPerson.className === "org" ? "organization" : "person"}
-                    state={projectsState}
-                    loading={projectsLoading}
-                    error={projectsError}
-                    onRefresh={() => void refreshProjects()}
-                    legacyProjectLabels={selectedPerson.projects}
-                    limit={3}
-                    compact
-                    showHeader={false}
-                    showBoundary={false}
-                  />
-                </article>
-                <article>
-                  <header className="people-linked-card-header">
-                    <div><h3>Resources</h3><span>Sources and saved references</span></div>
-                    <a href={`${getModuleRoute("resources")}?query=${encodeURIComponent(selectedPerson.title)}`}>Search Resources</a>
-                  </header>
-                  {selectedPerson.externalSources.length ? selectedPerson.externalSources.map((item) => <a href={`${getModuleRoute("resources")}?query=${encodeURIComponent(item)}`} key={item}>{item}</a>) : <span>No Resources linked.</span>}
-                </article>
-              </section>
-            ) : activeView === "notes" ? (
-              <section className="people-notes-panel">
+              <section className="people-links-hub" aria-label={`${selectedPerson.title} links`}>
                 <div className="people-section-toolbar">
                   <div>
-                    <h3>Notes & Memories</h3>
-                    <span>{selectedMemories.length} memories, {selectedInteractions.length} interactions</span>
+                    <h3>Links</h3>
+                    <span>{connectionItems.length + selectedPerson.externalSources.length + selectedPerson.projects.length} connected items</span>
                   </div>
-                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="Profile-local note search is not connected in this slice">
-                    Search unavailable
-                  </button>
+                  <button type="button" onClick={openEditProfile}>Edit links</button>
                 </div>
-
                 {actionNotice && <p className="people-notice">{actionNotice}</p>}
-
-                <div className="people-notes-grid">
-                  <section className="people-memory-composer module-ref-tone-green">
-                    <h4>Add memory or note</h4>
-                    <div className="people-memory-controls">
+                <div className="people-links-grid">
+                  <article className="people-links-section is-people">
+                    <header className="people-linked-card-header">
+                      <div><h4>People & organizations</h4><span>{connectionItems.length} connected</span></div>
+                    </header>
+                    <div className="people-links-directory">
+                      {relationshipConnections.length > 0 ? relationshipConnections.map((connection) => (
+                        connection.target ? (
+                          <button type="button" onClick={() => selectPerson(connection.target!)} key={connection.label}>
+                            <PeopleProfileAvatar
+                              label={connection.target.title}
+                              initials={getInitials(connection.target)}
+                              photoUrl={connection.target.profile?.photoUrl}
+                              photoUpdatedAt={connection.target.profile?.photoUpdatedAt}
+                              compact
+                            />
+                            <span><strong>{connection.target.title}</strong><small>{connection.target.className === "org" ? "Organization" : getPrimaryGroup(connection.target)}</small></span>
+                            <span aria-hidden="true">→</span>
+                          </button>
+                        ) : (
+                          <div className="people-link-context" key={connection.label}><strong>{connection.label}</strong><span>Saved context</span></div>
+                        )
+                      )) : <p>No people or organizations linked yet.</p>}
+                    </div>
+                    <div className="people-inline-link-form">
                       <label>
-                        Category
-                        <select value={memoryCategory} onChange={(event) => setMemoryCategory(event.target.value as MemoryCategory)}>
-                          {MEMORY_CATEGORIES.map((category) => (
-                            <option value={category.id} key={category.id}>{category.label}</option>
-                          ))}
+                        Person or context
+                        <input value={relationshipDraft} onChange={(event) => setRelationshipDraft(event.target.value)} placeholder="Name or relationship context" />
+                      </label>
+                      <label>
+                        Relationship
+                        <select value={relationshipType} onChange={(event) => setRelationshipType(event.target.value)}>
+                          <option value="family">Family</option>
+                          <option value="partner">Partner</option>
+                          <option value="child">Child</option>
+                          <option value="friend">Friend</option>
+                          <option value="collaborator">Collaborator</option>
+                          <option value="mentor">Advisor / Mentor</option>
+                          <option value="introduced-by">Introduced by</option>
+                          <option value="mutual">Mutual connection</option>
                         </select>
                       </label>
-                      <label>
-                        Date
-                        <input type="date" value={memoryDate} onChange={(event) => setMemoryDate(event.target.value)} />
-                      </label>
-                      <label className="people-check-row">
-                        <input type="checkbox" checked={memoryPinned} onChange={(event) => setMemoryPinned(event.target.checked)} />
-                        Pin as memory
-                      </label>
-                    </div>
-                    <textarea
-                      value={memoryDraft}
-                      onChange={(event) => setMemoryDraft(event.target.value)}
-                      placeholder="Preference, story, open loop, important context, or follow-up note..."
-                      rows={5}
-                    />
-                    <div className="people-memory-actions">
-                      <button type="button" onClick={saveMemory} disabled={memorySaving || !memoryDraft.trim()}>
-                        {memorySaving ? "Saving..." : "Save Memory"}
+                      <button type="button" onClick={saveRelationship} disabled={relationshipSaving || !relationshipDraft.trim()}>
+                        {relationshipSaving ? "Saving…" : "Add link"}
                       </button>
-                      <button type="button" onClick={() => setMemoryDraft("")}>Clear</button>
                     </div>
-                  </section>
-
-                  <section className="people-memory-list">
-                    <h4>Memories · newest first</h4>
-                    {selectedMemories.length ? selectedMemories.map((memory) => (
-                      <article className="people-memory-card" data-memory-id={memory.id} data-memory-date={memory.occurredOn || ""} key={memory.id}>
-                        {editingMemoryId === memory.id ? (
-                          <div className="people-memory-inline-editor">
-                            <label>
-                              Memory
-                              <textarea value={editingMemoryText} onChange={(event) => setEditingMemoryText(event.target.value)} rows={3} />
-                            </label>
-                            <label>
-                              Date
-                              <input type="date" value={editingMemoryDate} onChange={(event) => setEditingMemoryDate(event.target.value)} />
-                            </label>
-                            <div>
-                              <button type="button" onClick={() => void saveMemoryEdit()} disabled={memoryEditSaving || !editingMemoryText.trim()}>
-                                {memoryEditSaving ? "Saving..." : "Save"}
-                              </button>
-                              <button type="button" onClick={cancelMemoryEdit} disabled={memoryEditSaving}>Cancel</button>
-                            </div>
-                          </div>
-                        ) : (
-                          <>
-                            <div className="people-memory-card-heading">
-                              <span>{memoryCategoryLabel(memory.category)}</span>
-                              <div className="people-memory-card-heading-actions">
-                                <time dateTime={memory.occurredOn}>{memory.occurredOn ? formatFullDate(memory.occurredOn) : "Date not set"}</time>
-                                <button type="button" onClick={() => startMemoryEdit(memory)}>Edit</button>
-                              </div>
-                            </div>
-                            <p>{memory.text}</p>
-                            {!memory.pinned && <span>Saved note</span>}
-                          </>
-                        )}
-                      </article>
-                    )) : (
-                      <div className="notes-empty-state">
-                        <h3>No memories yet</h3>
-                        <p>Add a dated moment or piece of context you want to remember later.</p>
-                      </div>
-                    )}
-                  </section>
-
-                  <section className="people-memory-list">
-                    <h4>Recent notes</h4>
-                    {(selectedProfile.notes ? selectedProfile.notes.split("\n").filter(Boolean) : ["No profile notes yet."]).slice(0, 6).map((item, index) => (
-                      <article className="people-memory-card is-note" key={`${item}-${index}`}>
-                        <span>{index === 0 ? "Latest" : "Note"}</span>
-                        <p>{item}</p>
-                        <div>
-                          <button type="button" onClick={openEditProfile}>Open in profile editor</button>
-                          <button type="button" disabled aria-describedby="people-unavailable-actions" title="The Notes object picker is not connected in this slice">Link unavailable</button>
-                        </div>
-                      </article>
-                    ))}
-                  </section>
-
-                  <section className="people-memory-list">
-                    <h4>Important dates & open loops</h4>
-                    {importantDates.map(([label, value]) => (
-                      <article className="people-memory-row" key={label}>
-                        <span>{label}</span>
-                        <strong>{value}</strong>
-                      </article>
-                    ))}
-                    {(profileGaps.length ? profileGaps : ["No major profile gaps detected."]).map((gap) => (
-                      <article className="people-memory-row" key={gap}>
-                        <span>Profile gap</span>
-                        <strong>{gap}</strong>
-                      </article>
-                    ))}
-                  </section>
-                </div>
-              </section>
-            ) : activeView === "relations" ? (
-              <section className="people-relationships-panel">
-                <div className="people-section-toolbar">
-                  <div>
-                    <h3>{selectedPerson.className === "org" ? "People & relationships" : "Relationships"}</h3>
-                    <span>{connectionItems.length} linked people and context markers</span>
-                  </div>
-                </div>
-
-                {actionNotice && <p className="people-notice">{actionNotice}</p>}
-
-                <div className="people-relationships-grid">
-                  <section className="people-relation-map">
-                    <h4>Relationship map</h4>
-                    <div className="people-relation-node is-center">
-                      <strong>{selectedPerson.title}</strong>
-                      <span>{selectedPerson.className === "org" ? selectedProfile.organizationType || getPrimaryGroup(selectedPerson) : selectedProfile.nickname || getPrimaryGroup(selectedPerson)}</span>
-                    </div>
-                    <div className="people-relation-spokes">
-                      {connectionItems.length ? relationshipConnections.slice(0, 8).map((connection) => connection.target ? (
-                        <button type="button" className="people-relation-node" key={connection.label} onClick={() => selectPerson(connection.target!)}>
-                          <strong>{connection.label}</strong>
-                          <span>Open profile</span>
-                        </button>
-                      ) : (
-                        <div className="people-relation-node" key={connection.label}>
-                          <strong>{connection.label}</strong>
-                          <span>Saved context</span>
-                        </div>
-                      )) : (
-                        <div className="people-relation-node">
-                          <strong>No associated people yet</strong>
-                          <span>Add the first relationship beside the map.</span>
-                        </div>
-                      )}
-                    </div>
-                  </section>
-
-                  <section className="people-relation-form module-ref-tone-purple">
-                    <h4>Add relationship</h4>
-                    <label>
-                      Person or context
-                      <input value={relationshipDraft} onChange={(event) => setRelationshipDraft(event.target.value)} placeholder="Name, family member, collaborator, introduced by..." />
-                    </label>
-                    <label>
-                      Relationship type
-                      <select value={relationshipType} onChange={(event) => setRelationshipType(event.target.value)}>
-                        <option value="family">Family</option>
-                        <option value="partner">Partner</option>
-                        <option value="child">Child</option>
-                        <option value="friend">Friend</option>
-                        <option value="collaborator">Collaborator</option>
-                        <option value="mentor">Advisor / Mentor</option>
-                        <option value="introduced-by">Introduced by</option>
-                        <option value="mutual">Mutual connection</option>
-                      </select>
-                    </label>
-                    <button type="button" onClick={saveRelationship} disabled={relationshipSaving || !relationshipDraft.trim()}>
-                      {relationshipSaving ? "Saving..." : "Save Relationship"}
-                    </button>
-                  </section>
-
-                  <section className="people-relation-list">
-                    <h4>{selectedPerson.className === "org" ? "Organization details" : "Family and close context"}</h4>
-                    {(selectedPerson.className === "org" ? [
-                      ["Linked people", selectedOrganizationPeople.length ? selectedOrganizationPeople.map((person) => person.title).join(", ") : "Not recorded"],
-                      ["Industry", selectedProfile.industry || "Not recorded"],
-                      ["Headquarters", selectedProfile.headquarters || selectedProfile.livesIn || "Not recorded"],
-                      ["Description", selectedProfile.context || selectedPerson.body || "Not recorded"]
-                    ] : [
-                      ["Partner", selectedProfile.partner || "Not recorded"],
-                      ["Children", selectedChildren.length ? selectedChildren.join(", ") : "Not recorded"],
-                      ["How you know them", selectedProfile.context || selectedPerson.body || "Not recorded"],
-                      ["Introduced by", connectionItems.find((item) => item.toLowerCase().includes("introduced")) || "Not recorded"]
-                    ]).map(([label, value]) => (
-                      <article key={label}>
-                        <span>{label}</span>
-                        <strong>{value}</strong>
-                      </article>
-                    ))}
-                  </section>
-
-                  <section className="people-relation-list">
-                    <h4>Recent context</h4>
-                    {(selectedInteractions.length ? selectedInteractions : ["No relationship timeline entries yet"]).slice(0, 4).map((item) => (
-                      <article key={item}>
-                        <span>Timeline</span>
-                        <strong>{item}</strong>
-                      </article>
-                    ))}
-                  </section>
-
-                  <section className="people-relationship-projects">
+                  </article>
+                  <article className="people-links-section is-projects">
                     <header className="people-linked-card-header">
-                      <div><h4>Shared projects</h4><span>Current involvement</span></div>
-                      <button
-                        type="button"
-                        onClick={() => void refreshProjects()}
-                        disabled={projectsLoading}
-                        aria-label={`Refresh Projects involvement for ${selectedPerson.title}`}
-                      >
-                        {projectsLoading ? "Checking…" : "Check"}
+                      <div><h4>Projects</h4><span>Current involvement</span></div>
+                      <button type="button" onClick={() => void refreshProjects()} disabled={projectsLoading}>
+                        {projectsLoading ? "Checking…" : "Refresh"}
                       </button>
                     </header>
                     <LinkedProjectsPanel
@@ -4350,12 +4130,30 @@ export default function PeopleWorkspace({
                       error={projectsError}
                       onRefresh={() => void refreshProjects()}
                       legacyProjectLabels={selectedPerson.projects}
-                      limit={3}
+                      limit={4}
                       compact
                       showHeader={false}
                       showBoundary={false}
                     />
-                  </section>
+                  </article>
+                  <article className="people-links-section is-files">
+                    <header className="people-linked-card-header">
+                      <div><h4>Files & media</h4><span>Connected media context</span></div>
+                      <a href={`${getModuleRoute("media")}?query=${encodeURIComponent(selectedPerson.title)}`}>Browse</a>
+                    </header>
+                    <p>No directly linked files are visible on this profile yet.</p>
+                  </article>
+                  <article className="people-links-section is-resources">
+                    <header className="people-linked-card-header">
+                      <div><h4>Resources & web links</h4><span>{selectedPerson.externalSources.length} saved</span></div>
+                      <a href={`${getModuleRoute("resources")}?query=${encodeURIComponent(selectedPerson.title)}`}>Browse</a>
+                    </header>
+                    <div className="people-resource-links">
+                      {selectedPerson.externalSources.length > 0 ? selectedPerson.externalSources.map((item) => (
+                        <a href={/^https?:\/\//i.test(item) ? item : `${getModuleRoute("resources")}?query=${encodeURIComponent(item)}`} target={/^https?:\/\//i.test(item) ? "_blank" : undefined} rel={/^https?:\/\//i.test(item) ? "noreferrer" : undefined} key={item}>{item}</a>
+                      )) : <p>No resources or web links saved yet.</p>}
+                    </div>
+                  </article>
                 </div>
               </section>
             ) : (
@@ -4427,6 +4225,19 @@ export default function PeopleWorkspace({
                 <article className="people-overview-about" data-people-overview-card="about">
                   <h3>{selectedPerson.className === "org" ? "Description" : `About ${selectedPerson.title.split(" ")[0]}`}</h3>
                   <p>{selectedProfile.context || selectedPerson.body || (selectedPerson.className === "org" ? "No description recorded yet." : "No relationship context recorded yet.")}</p>
+                  <div className="people-about-notes">
+                    <header>
+                      <strong>{selectedPerson.className === "org" ? "Notes" : "About them"}</strong>
+                      <button type="button" onClick={openEditProfile} aria-label={`Edit notes for ${selectedPerson.title}`}>Edit</button>
+                    </header>
+                    {selectedProfile.notes ? (
+                      <ul>
+                        {selectedProfile.notes.split(/\r?\n/).filter((note) => note.trim()).map((note, index) => (
+                          <li key={`${note}-${index}`}>{note}</li>
+                        ))}
+                      </ul>
+                    ) : <span>No notes added yet.</span>}
+                  </div>
                 </article>
                 <article data-people-overview-card="projects">
                   <LinkedProjectsPanel
@@ -4518,17 +4329,20 @@ export default function PeopleWorkspace({
           </>
         ) : (
           <>
-            <button type="button" onClick={openInteractionComposer}>Log Interaction</button>
+            <button type="button" onClick={() => openInteractionComposer(selectedPerson)}>Log Interaction</button>
             <button type="button" onClick={openEditProfile}>Edit Profile</button>
           </>
         )}
       </nav>}
 
-      {interactionOpen && selectedPerson && (
+      {interactionOpen && (
         <div className="people-dialog-backdrop" role="presentation">
           <form ref={interactionDialogRef} className="people-interaction-dialog" role="dialog" aria-modal="true" aria-labelledby="log-interaction-title" onSubmit={saveInteraction}>
             <header>
-              <h2 id="log-interaction-title">Log interaction with {selectedPerson.title}</h2>
+              <div>
+                <h2 id="log-interaction-title">Log interaction</h2>
+                <p>Tag everyone involved once; the same entry appears on each profile.</p>
+              </div>
               <button className="people-dialog-close" type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}><span aria-hidden="true">×</span></button>
             </header>
             <div className="people-interaction-fields">
@@ -4541,6 +4355,7 @@ export default function PeopleWorkspace({
                   <option value="meeting">Meeting</option>
                   <option value="catch-up">Catch-up</option>
                   <option value="note">Note</option>
+                  <option value="memory">Memory</option>
                   <option value="milestone">Milestone</option>
                 </select>
               </label>
@@ -4556,15 +4371,57 @@ export default function PeopleWorkspace({
                 Summary
                 <textarea value={interactionSummary} onChange={(event) => setInteractionSummary(event.target.value)} rows={4} placeholder="What mattered, what changed, and any context worth remembering." />
               </label>
+              <fieldset className="people-interaction-participant-picker is-wide">
+                <legend>People and organizations</legend>
+                <div>
+                  {activePeople.map((record) => (
+                    <label key={record.id}>
+                      <input
+                        type="checkbox"
+                        value={record.id}
+                        checked={interactionParticipantIds.includes(record.id)}
+                        onChange={(event) => setInteractionParticipantIds((current) => event.target.checked
+                          ? Array.from(new Set([...current, record.id]))
+                          : current.filter((id) => id !== record.id))}
+                      />
+                      <PeopleProfileAvatar
+                        label={record.title}
+                        initials={getInitials(record)}
+                        photoUrl={record.profile?.photoUrl}
+                        photoUpdatedAt={record.profile?.photoUpdatedAt}
+                        compact
+                      />
+                      <span>{record.title}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="people-interaction-approach is-wide">
+                <legend>Approach</legend>
+                <div>
+                  {(["", "cold", "warm"] as const).map((value) => (
+                    <label key={value || "unset"}>
+                      <input
+                        type="radio"
+                        name="interaction-approach"
+                        value={value}
+                        checked={interactionApproach === value}
+                        onChange={() => setInteractionApproach(value)}
+                      />
+                      <span>{value ? labelize(value) : "Not specified"}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               <label className="people-check-row is-wide">
                 <input type="checkbox" checked={interactionMeaningful} onChange={(event) => setInteractionMeaningful(event.target.checked)} />
-                Refresh last-contact date and cadence
+                Use this as the latest contact date
               </label>
             </div>
             {error && <p className="personal-record-error">{error}</p>}
             <footer className="people-dialog-actions">
               <button className="people-dialog-action" type="button" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}>Cancel</button>
-              <button className="people-dialog-action is-primary" type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate}>
+              <button className="people-dialog-action is-primary" type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate || interactionParticipantIds.length === 0}>
                 {interactionSaving ? "Saving..." : "Save interaction"}
               </button>
             </footer>

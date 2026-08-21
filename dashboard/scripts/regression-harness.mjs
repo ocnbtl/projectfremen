@@ -5660,6 +5660,16 @@ async function checkPeopleMemoryBrowserState(
     ]) {
       const context = await contextFor({ width: viewport.width, height: viewport.height });
       const page = await context.newPage();
+      await page.goto(`${baseUrl}/admin/people`, { waitUntil: "networkidle" });
+      const recentInteractions = page.locator(".people-recent-interactions");
+      await recentInteractions.waitFor();
+      assert(
+        (await recentInteractions.innerText()).includes("Shared regression introduction") &&
+          (await recentInteractions.innerText()).includes(personTitle) &&
+          await recentInteractions.getByRole("button", { name: "Log interaction" }).count() === 1,
+        `People directory did not expose recent shared interactions at ${viewport.label}`
+      );
+      await assertNoOverflow(page, `People recent interactions ${viewport.label}`);
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=overview`, { waitUntil: "networkidle" });
       const overview = page.locator(".people-overview-grid");
       await overview.waitFor();
@@ -5733,50 +5743,25 @@ async function checkPeopleMemoryBrowserState(
           !(await overview.locator('[data-people-overview-card="contact"]').innerText()).includes(organizationTitle),
         `People Overview did not move employer and university into the fact list without duplicate work copy at ${viewport.label}`
       );
+      const aboutCardText = await overview.locator('[data-people-overview-card="about"]').innerText();
+      assert(
+        aboutCardText.includes("Prefers written project updates") &&
+          aboutCardText.includes("Collects field notebooks") &&
+          await overview.locator(".people-about-notes li").count() === 2,
+        `People Overview did not render separate About notes at ${viewport.label}`
+      );
+      assert(
+        await page.getByRole("tab", { name: "Notes & Memories" }).count() === 0 &&
+          await page.getByRole("tab", { name: "Relationships" }).count() === 0 &&
+          await page.getByRole("tab", { name: "Files & Links" }).count() === 0 &&
+          await page.getByRole("tab", { name: "Links", exact: true }).count() === 1,
+        `People profile retained duplicate Notes, Relationships, or Files tabs at ${viewport.label}`
+      );
       await assertNoOverflow(page, `People Overview ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-overview-${viewport.label}.png`),
         fullPage: true
       });
-
-      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=notes`, { waitUntil: "networkidle" });
-      const notesMemories = page.locator(".people-memory-list [data-memory-id]");
-      await notesMemories.first().waitFor();
-      assert(
-        JSON.stringify(await notesMemories.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-memory-id")))) === JSON.stringify(expectedMemoryIds),
-        `Notes & Memories did not sort memories newest first at ${viewport.label}`
-      );
-      assert(
-        await notesMemories.getByRole("button", { name: "Edit" }).count() === expectedMemoryIds.length,
-        `Notes & Memories omitted a per-memory Edit action at ${viewport.label}`
-      );
-      if (viewport.label === "desktop") {
-        await notesMemories.first().getByRole("button", { name: "Edit" }).click();
-        assert(
-          await notesMemories.first().locator('input[type="date"]').inputValue() === "2026-08-10" &&
-            await notesMemories.first().locator("textarea").inputValue() === "Newer regression memory",
-          "Notes & Memories Edit did not expose the selected memory text and date"
-        );
-        await notesMemories.first().getByRole("button", { name: "Cancel" }).click();
-      }
-      const memoryComposer = page.locator(".people-memory-composer");
-      const memoryDateInput = memoryComposer.locator('input[type="date"]');
-      const [memoryComposerRect, memoryDateRect] = await Promise.all([
-        memoryComposer.boundingBox(),
-        memoryDateInput.boundingBox()
-      ]);
-      assert(
-        memoryComposerRect && memoryDateRect &&
-          memoryDateRect.x >= memoryComposerRect.x &&
-          memoryDateRect.x + memoryDateRect.width <= memoryComposerRect.x + memoryComposerRect.width + 1,
-        `Notes & Memories date control overflowed its composer at ${viewport.label}`
-      );
-      await assertNoOverflow(page, `People memory Notes ${viewport.label}`);
-      await page.screenshot({
-        path: path.join(screenshotDir, `people-memory-notes-${viewport.label}.png`),
-        fullPage: true
-      });
-
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=timeline`, { waitUntil: "networkidle" });
       const timelineMemories = page.locator(".people-timeline-list [data-memory-id]");
       await timelineMemories.first().waitFor();
@@ -5785,10 +5770,11 @@ async function checkPeopleMemoryBrowserState(
         `Timeline did not keep memories in recency order at ${viewport.label}`
       );
       assert(
-        await timelineMemories.getByRole("button", { name: "Edit" }).count() === expectedMemoryIds.length,
-        `Timeline omitted a per-memory Edit action at ${viewport.label}`
+        await timelineMemories.getByText("Memory", { exact: true }).count() === expectedMemoryIds.length &&
+          await timelineMemories.getByRole("button", { name: "Edit" }).count() === 0,
+        `Timeline did not normalize legacy memories into read-only Memory interactions at ${viewport.label}`
       );
-      const timelineInteraction = page.locator(".people-timeline-interaction").first();
+      const timelineInteraction = page.locator(".people-timeline-interaction").filter({ hasText: "Regression persistence check" });
       await timelineInteraction.waitFor();
       assert(
         await timelineInteraction.locator(".people-timeline-entry-title").textContent() === "Regression persistence check",
@@ -5816,7 +5802,7 @@ async function checkPeopleMemoryBrowserState(
         elements.map((element) => element.getBoundingClientRect().width)
       );
       assert(
-        timelineActionWidths.length === 3 && timelineActionWidths.every((width) => width < 190),
+        timelineActionWidths.length === 2 && timelineActionWidths.every((width) => width < 190),
         `Timeline actions remained oversized at ${viewport.label}: ${JSON.stringify(timelineActionWidths)}`
       );
       if (viewport.label !== "mobile") {
@@ -5835,22 +5821,47 @@ async function checkPeopleMemoryBrowserState(
         fullPage: true
       });
 
-      await page.getByRole("button", { name: "Log Interaction" }).first().click();
-      const interactionDialog = page.getByRole("dialog", { name: new RegExp(`Log interaction with`, "i") });
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}?tab=timeline`, { waitUntil: "networkidle" });
+      const sharedOrganizationInteraction = page.locator(".people-timeline-interaction").filter({ hasText: "Shared regression introduction" });
+      await sharedOrganizationInteraction.waitFor();
+      assert(
+        (await sharedOrganizationInteraction.innerText()).includes(personTitle) &&
+          (await sharedOrganizationInteraction.innerText()).includes(organizationTitle) &&
+          (await sharedOrganizationInteraction.innerText()).includes("Warm"),
+        `Shared interaction did not sync to the Organization timeline with participants and approach at ${viewport.label}`
+      );
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=timeline`, { waitUntil: "networkidle" });
+
+      await page.locator(".people-timeline-actions").getByRole("button", { name: "Log Interaction" }).click();
+      const interactionDialog = page.getByRole("dialog", { name: "Log interaction", exact: true });
       await interactionDialog.waitFor();
       assert(
-        (await interactionDialog.locator('select option').allTextContents()).includes("Catch-up"),
-        `Interaction composer omitted Catch-up at ${viewport.label}`
+        (await interactionDialog.getByLabel("Type").locator("option").allTextContents()).includes("Catch-up") &&
+          (await interactionDialog.getByLabel("Type").locator("option").allTextContents()).includes("Memory"),
+        `Interaction composer omitted Catch-up or Memory at ${viewport.label}`
       );
+      const interactionComposerState = {
+        hasRemovedEyebrow: (await interactionDialog.textContent()).includes("Meaningful interaction"),
+        checkedParticipants: await interactionDialog.locator('.people-interaction-participant-picker input[type="checkbox"]:checked').count(),
+        checkedParticipantIds: await interactionDialog.locator('.people-interaction-participant-picker input[type="checkbox"]:checked').evaluateAll((inputs) => inputs.map((input) => input.value)),
+        coldOptions: await interactionDialog.locator('input[name="interaction-approach"][value="cold"]').count(),
+        warmOptions: await interactionDialog.locator('input[name="interaction-approach"][value="warm"]').count()
+      };
       assert(
-        !(await interactionDialog.textContent()).includes("Meaningful interaction"),
-        `Interaction composer retained the removed eyebrow at ${viewport.label}`
+        !interactionComposerState.hasRemovedEyebrow &&
+          interactionComposerState.checkedParticipants === 1 &&
+          interactionComposerState.checkedParticipantIds.includes(personId) &&
+          interactionComposerState.coldOptions === 1 &&
+          interactionComposerState.warmOptions === 1,
+        `Interaction composer did not preselect the profile or expose optional approach choices at ${viewport.label}: ${JSON.stringify(interactionComposerState)}`
       );
-      await interactionDialog.locator("select").selectOption("catch-up");
+      await interactionDialog.getByLabel("Type").selectOption("catch-up");
       await interactionDialog.getByLabel("Title").fill("Quick catch-up");
+      await interactionDialog.getByLabel("Warm").check();
       assert(
-        await interactionDialog.locator("select").inputValue() === "catch-up",
-        `Interaction composer did not accept Catch-up at ${viewport.label}`
+        await interactionDialog.getByLabel("Type").inputValue() === "catch-up" &&
+          await interactionDialog.getByLabel("Warm").isChecked(),
+        `Interaction composer did not accept Catch-up and Warm approach at ${viewport.label}`
       );
       const dialogActions = await interactionDialog.locator(".people-dialog-action").evaluateAll((elements) =>
         elements.map((element) => {
@@ -5880,26 +5891,26 @@ async function checkPeopleMemoryBrowserState(
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=relations`, { waitUntil: "networkidle" });
       assert(
-        await page.getByRole("heading", { name: "Add relationship", exact: true }).count() === 1 &&
-          await page.getByRole("heading", { name: "Add contextual link", exact: true }).count() === 0 &&
-          await page.getByRole("button", { name: "Add Relationship", exact: true }).count() === 0,
-        `Relationships retained duplicate add-relationship controls at ${viewport.label}`
+        await page.getByRole("heading", { name: "Links", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "People & organizations", exact: true }).count() === 1 &&
+          await page.getByRole("button", { name: "Add link", exact: true }).count() === 1,
+        `Legacy Relationships route did not resolve to the unified Links hub at ${viewport.label}`
       );
-      await assertNoOverflow(page, `People Relationships ${viewport.label}`);
+      await assertNoOverflow(page, `People Links ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-relationships-${viewport.label}.png`),
         fullPage: true
       });
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=files`, { waitUntil: "networkidle" });
-      const mediaSearch = page.getByRole("link", { name: "Search Media" });
-      const resourceSearch = page.getByRole("link", { name: "Search Resources" });
+      const mediaSearch = page.locator(`a[href^="/admin/media?query="]`);
+      const resourceSearch = page.locator(`a[href^="/admin/resources?query="]`);
       const profileTitle = (await page.locator(".people-profile-header h2").textContent())?.trim() || "";
       assert(
         (await mediaSearch.getAttribute("href"))?.includes(`/admin/media?query=${encodeURIComponent(profileTitle)}`) &&
           (await resourceSearch.getAttribute("href"))?.includes(`/admin/resources?query=${encodeURIComponent(profileTitle)}`) &&
-          !(await page.locator(".people-linked-workspace").innerText()).includes("unavailable"),
-        `Files & Links retained dead-end controls instead of real owner-module routes at ${viewport.label}`
+          !(await page.locator(".people-links-hub").innerText()).includes("unavailable"),
+        `Legacy Files route did not resolve to working owner-module links at ${viewport.label}`
       );
       await assertNoOverflow(page, `People Files & Links ${viewport.label}`);
       await page.screenshot({
@@ -5908,13 +5919,13 @@ async function checkPeopleMemoryBrowserState(
       });
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
-      const propertyMemories = page.locator("[data-memory-editor-id]");
-      await propertyMemories.first().waitFor();
+      const propertyNotes = page.locator("[data-people-notes-editor]");
+      await propertyNotes.waitFor();
       assert(
-        await propertyMemories.count() === expectedMemoryIds.length &&
-          await propertyMemories.locator("textarea").count() === expectedMemoryIds.length &&
-          await propertyMemories.locator('input[type="date"]').count() === expectedMemoryIds.length,
-        `Properties did not render one text and date editor per memory at ${viewport.label}`
+        await propertyNotes.locator("textarea").count() === 2 &&
+          await propertyNotes.locator("textarea").nth(0).inputValue() === "Prefers written project updates" &&
+          await propertyNotes.locator('input[type="date"]').count() === 0,
+        `Properties did not expose About notes as separate bullet editors at ${viewport.label}`
       );
       const propertyGroups = (await page.locator(".people-profile-group-picker label").allTextContents())
         .map((label) => label.trim());
@@ -6036,6 +6047,14 @@ async function checkPeopleMemoryBrowserState(
           await page.getByLabel("Full name").inputValue() === "Avery North" &&
           await page.getByLabel("Nickname").inputValue() === "June",
         `New People did not extract a quoted nickname while deriving the full name at ${viewport.label}`
+      );
+      const createNotes = page.locator("[data-people-notes-editor]");
+      await createNotes.getByLabel("Notes about them note 1").fill("Prefers afternoon calls");
+      await createNotes.getByRole("button", { name: "Add note" }).click();
+      await createNotes.getByLabel("Notes about them note 2").fill("Met through the design community");
+      assert(
+        await createNotes.locator("textarea").count() === 2,
+        `New People did not provide repeatable About notes at ${viewport.label}`
       );
       const birthdayEditor = page.locator("[data-people-birthday-editor]");
       await birthdayEditor.locator("select").nth(0).selectOption("3");
@@ -6378,14 +6397,6 @@ async function checkPeopleUnknownLastContactBrowserState(baseUrl, cookieJar, per
       assert(
         (await rhythmLastContact.innerText()).includes("N/A"),
         `People relationship rhythm invented a last-contact date at ${viewport.label}`
-      );
-
-      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=notes`, { waitUntil: "networkidle" });
-      const importantLastContact = page.locator(".people-memory-row").filter({ hasText: "Last contact" });
-      await importantLastContact.waitFor();
-      assert(
-        (await importantLastContact.innerText()).includes("N/A"),
-        `People important dates invented a last-contact date at ${viewport.label}`
       );
       await context.close();
     }
@@ -8877,17 +8888,17 @@ async function checkPeopleProjectConnections(
     await projectPage.waitForURL(
       (url) => url.pathname === `/admin/people/${encodeURIComponent(person.id)}`
     );
-    await projectPage.getByRole("tab", { name: "Relationships" }).click();
+    await projectPage.getByRole("tab", { name: "Links", exact: true }).click();
     await projectPage.waitForURL(
       (url) =>
         url.pathname === `/admin/people/${encodeURIComponent(person.id)}` &&
-        url.searchParams.get("tab") === "relations"
+        url.searchParams.get("tab") === "links"
     );
     const peopleUrl = new URL(projectPage.url());
     assert(
       peopleUrl.pathname === `/admin/people/${person.id}` &&
-        peopleUrl.searchParams.get("tab") === "relations",
-      "People Relationships tab did not persist its canonical URL state"
+        peopleUrl.searchParams.get("tab") === "links",
+      "People Links tab did not persist its canonical URL state"
     );
 
     const peopleProjectsPanel = projectPage.locator(
@@ -8921,8 +8932,8 @@ async function checkPeopleProjectConnections(
     await projectPage.goBack({ waitUntil: "networkidle" });
     assert(
       new URL(projectPage.url()).pathname === `/admin/people/${person.id}` &&
-        new URL(projectPage.url()).searchParams.get("tab") === "relations",
-      "Browser Back did not restore the People identity and Relationships tab"
+        new URL(projectPage.url()).searchParams.get("tab") === "links",
+      "Browser Back did not restore the People identity and Links tab"
     );
 
     await assertNoHorizontalOverflow(projectPage, "People-Projects desktop workflow");
@@ -8937,7 +8948,7 @@ async function checkPeopleProjectConnections(
       for (const route of [
         {
           key: "people",
-          path: `/admin/people/${encodeURIComponent(person.id)}?tab=relations`,
+          path: `/admin/people/${encodeURIComponent(person.id)}?tab=links`,
           selector: `[data-linked-projects="people:person:root:${person.id}"]`
         },
         {
@@ -14431,6 +14442,7 @@ async function main() {
             { id: "phone-regression-university", category: "university", number: "6145550142", countryCode: "+1" }
           ],
           birthday: "--03-14",
+          notes: "Prefers written project updates\nCollects field notebooks",
           education: [
             {
               id: "education-regression-1",
@@ -14501,6 +14513,45 @@ async function main() {
       "People birthday without a known year did not persist"
     );
     assert(persistedPerson?.profile?.interactions?.length === 1, "People interaction history did not persist");
+    const createSharedInteraction = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        domain: "notes-docs",
+        title: "Shared regression introduction",
+        className: "interaction",
+        status: "completed",
+        privacy: "private",
+        stage: "processed",
+        body: "One authoritative interaction linked to two People profiles.",
+        happensOn: "2026-08-11",
+        areas: ["Relationships"],
+        subjects: ["Meeting", "Warm approach"],
+        intents: ["connect"],
+        interaction: {
+          participantIds: [createdPerson.id, createdOrganization.id],
+          kind: "meeting",
+          occurredOn: "2026-08-11",
+          approach: "warm",
+          updatesLastContact: false
+        }
+      })
+    });
+    assert(
+      createSharedInteraction.response.ok && createSharedInteraction.payload?.ok,
+      `Shared People interaction create failed: ${JSON.stringify(createSharedInteraction.payload)}`
+    );
+    const sharedInteraction = createSharedInteraction.payload.items?.find((item) => item.title === "Shared regression introduction");
+    assert(
+      sharedInteraction?.className === "interaction" &&
+        JSON.stringify(sharedInteraction.interaction?.participantIds) === JSON.stringify([createdPerson.id, createdOrganization.id]) &&
+        sharedInteraction.interaction?.approach === "warm" &&
+        sharedInteraction.interaction?.kind === "meeting",
+      "People did not persist one shared interaction with both participant identities and its approach"
+    );
     assert(
       persistedPerson?.subjects?.includes("Colleague") &&
         persistedPerson.subjects.includes("Acquaintance") &&

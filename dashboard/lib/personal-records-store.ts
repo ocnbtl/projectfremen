@@ -100,6 +100,26 @@ export type PersonalMemoryEntry = {
   createdAt?: string;
 };
 
+export type PersonalInteractionKind =
+  | "call"
+  | "message"
+  | "email"
+  | "meeting"
+  | "catch-up"
+  | "note"
+  | "memory"
+  | "milestone";
+
+export type PersonalInteractionApproach = "cold" | "warm";
+
+export type PersonalInteractionDetails = {
+  participantIds: string[];
+  kind: PersonalInteractionKind;
+  occurredOn: string;
+  approach?: PersonalInteractionApproach;
+  updatesLastContact: boolean;
+};
+
 export type PersonalEducationEntry = {
   id: string;
   institution: string;
@@ -215,6 +235,7 @@ export type PersonalRecord = {
   relations: PersonalRecordRelations;
   time: PersonalRecordTime;
   profile?: PersonalContactProfile;
+  interaction?: PersonalInteractionDetails;
   createdMeta: PersonalRecordCreatedMeta;
   createdAt: string;
   updatedAt: string;
@@ -245,6 +266,7 @@ export type PersonalRecordInput = {
   relations?: Partial<PersonalRecordRelations>;
   time?: PersonalRecordTime;
   profile?: Partial<PersonalContactProfile>;
+  interaction?: Partial<PersonalInteractionDetails>;
 };
 
 export type PersonalRecordPatch = Partial<
@@ -519,6 +541,56 @@ function normalizeMemoryEntries(value: unknown, strict = false): PersonalMemoryE
     });
   }
   return entries;
+}
+
+const PERSONAL_INTERACTION_KINDS: readonly PersonalInteractionKind[] = [
+  "call",
+  "message",
+  "email",
+  "meeting",
+  "catch-up",
+  "note",
+  "memory",
+  "milestone"
+];
+
+function normalizeInteractionDetails(value: unknown, strict = false): PersonalInteractionDetails | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) {
+    if (strict) throw new Error("Interaction details are invalid");
+    return undefined;
+  }
+
+  const raw = value as Record<string, unknown>;
+  const participantIds = sanitizeRecordIds(
+    Array.isArray(raw.participantIds) ? raw.participantIds.map(String) : undefined
+  );
+  if (strict && participantIds.length === 0) {
+    throw new Error("An interaction needs at least one linked person");
+  }
+
+  const rawKind = typeof raw.kind === "string" ? raw.kind.trim().toLowerCase() : "";
+  const kind = PERSONAL_INTERACTION_KINDS.includes(rawKind as PersonalInteractionKind)
+    ? (rawKind as PersonalInteractionKind)
+    : "note";
+  const occurredOn = typeof raw.occurredOn === "string" ? raw.occurredOn.trim() : "";
+  if (strict && !isValidMemoryDate(occurredOn)) {
+    throw new Error("An interaction needs a valid date");
+  }
+  if (!occurredOn || !isValidMemoryDate(occurredOn)) return undefined;
+
+  const rawApproach = typeof raw.approach === "string" ? raw.approach.trim().toLowerCase() : "";
+  const approach = rawApproach === "cold" || rawApproach === "warm"
+    ? rawApproach as PersonalInteractionApproach
+    : undefined;
+
+  return {
+    participantIds,
+    kind,
+    occurredOn,
+    ...(approach ? { approach } : {}),
+    updatesLastContact: raw.updatesLastContact !== false
+  };
 }
 
 function deterministicProfileEntryId(prefix: string, value: string, index: number): string {
@@ -1628,6 +1700,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     relations,
     time: normalizeTime(raw.time, createdMeta, stage, className),
     profile,
+    interaction: className === "interaction" ? normalizeInteractionDetails(raw.interaction) : undefined,
     createdMeta,
     createdAt,
     updatedAt: typeof raw.updatedAt === "string" ? raw.updatedAt : createdAt,
@@ -1750,6 +1823,9 @@ export async function createPersonalRecord(
       className
     ),
     profile,
+    interaction: className === "interaction"
+      ? normalizeInteractionDetails(input.interaction, input.interaction !== undefined)
+      : undefined,
     createdMeta: meta,
     createdAt: meta.createdIso,
     updatedAt: meta.createdIso
@@ -1760,6 +1836,16 @@ export async function createPersonalRecord(
     const existing = stored.map(normalizeRecord).filter((record) => isAllowedDomain(record.domain));
     if (existing.some((record) => record.id === nextRecord.id)) {
       return { value: stored, result: existing.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), changed: false };
+    }
+    if (nextRecord.interaction) {
+      const participantIds = new Set(
+        existing
+          .filter((record) => (record.className === "person" || record.className === "org") && !record.archivedAt)
+          .map((record) => record.id)
+      );
+      if (nextRecord.interaction.participantIds.some((id) => !participantIds.has(id))) {
+        throw new Error("Every interaction participant must link to an active People profile");
+      }
     }
     nextRecord.profile = resolveOrganizationReferences(nextRecord.profile, existing, true);
     const next = applyReciprocalRelations([nextRecord, ...existing], nextRecord.id);

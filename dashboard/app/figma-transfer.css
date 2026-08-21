@@ -9608,3 +9608,508 @@ html[data-admin-preview="mobile"] .people-birthday-field {
 html[data-admin-preview="mobile"] .people-birthday-field label:last-child {
   grid-column: 1 / -1;
 }
+
+/* People: unified interaction history, About notes, and Links hub. */
+.people-notes-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.people-notes-list {
+  display: grid;
+  gap: 4px;
+}
+
+.people-note-row {
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr) 36px;
+  gap: 8px;
+  align-items: center;
+}
+
+.people-note-bullet {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: #477762;
+}
+
+.people-note-row textarea {
+  min-height: 44px;
+  padding: 8px 10px;
+  resize: vertical;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  font: inherit;
+  line-height: 1.4;
+}
+
+.people-note-remove {
+  display: grid;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-subtle);
+}
+
+.people-note-remove:hover {
+  border-color: var(--border-soft);
+  background: var(--surface-row-hover);
+  color: var(--accent-crimson);
+}
+
+.people-note-remove svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-width: 1.8;
+}
+
+.people-about-notes {
+  display: grid;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.people-about-notes > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.people-about-notes > header strong {
+  color: var(--text-strong);
+  font-size: 12px;
+}
+
+.people-about-notes > header button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--surface-panel);
+  color: var(--text-body);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.people-about-notes ul {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-body);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.people-about-notes > span {
+  color: var(--text-subtle);
+  font-size: 12px;
+}
+
+.people-links-hub {
+  display: grid;
+  gap: 12px;
+}
+
+.people-links-hub > .people-section-toolbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.people-links-hub > .people-section-toolbar > button {
+  flex: 0 0 auto;
+  width: auto;
+  min-height: 34px;
+  padding-inline: 10px;
+}
+
+.people-links-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.people-links-section {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel-soft);
+}
+
+.people-links-section.is-people {
+  grid-column: 1 / -1;
+}
+
+.people-links-section h4 {
+  margin: 0;
+  color: var(--text-strong);
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 13px;
+}
+
+.people-links-directory {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 6px;
+}
+
+.people-links-directory > button,
+.people-link-context {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  min-height: 50px;
+  padding: 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  text-align: left;
+}
+
+.people-links-directory > button > span:nth-child(2) {
+  display: grid;
+  min-width: 0;
+}
+
+.people-links-directory strong,
+.people-link-context strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-links-directory small,
+.people-link-context span {
+  color: var(--text-subtle);
+  font-size: 10px;
+}
+
+.people-link-context {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.people-inline-link-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(150px, 0.8fr) auto;
+  gap: 8px;
+  align-items: end;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.people-inline-link-form label {
+  display: grid;
+  gap: 4px;
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.people-inline-link-form input,
+.people-inline-link-form select,
+.people-inline-link-form button {
+  min-height: 38px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+}
+
+.people-inline-link-form input,
+.people-inline-link-form select {
+  width: 100%;
+  padding: 0 9px;
+}
+
+.people-inline-link-form button {
+  padding-inline: 12px;
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.people-resource-links {
+  display: grid;
+  gap: 5px;
+}
+
+.people-resource-links a {
+  overflow: hidden;
+  padding: 7px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 6px;
+  background: var(--surface-panel);
+  color: var(--text-body);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-recent-interactions {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.people-recent-interactions > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.people-recent-interactions > header div {
+  display: grid;
+  gap: 2px;
+}
+
+.people-recent-interactions h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 14px;
+}
+
+.people-recent-interactions > header span,
+.people-recent-interactions > header button {
+  flex: 0 0 auto;
+  width: auto;
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.people-recent-interactions > header button {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+}
+
+.people-recent-interaction-list {
+  display: grid;
+  gap: 3px;
+}
+
+.people-recent-interaction-list article {
+  display: grid;
+  grid-template-columns: 74px minmax(0, 1fr) auto minmax(94px, auto);
+  gap: 8px;
+  align-items: center;
+  min-height: 46px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+}
+
+.people-recent-interaction-list article > div {
+  display: grid;
+  min-width: 0;
+}
+
+.people-recent-interaction-list strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-recent-interaction-list article > div > span,
+.people-recent-interaction-list time {
+  color: var(--text-subtle);
+  font-size: 10px;
+}
+
+.people-recent-interaction-list time {
+  text-align: right;
+}
+
+.people-recent-kind {
+  overflow: hidden;
+  color: #315d74;
+  font-size: 10px;
+  font-weight: 900;
+  text-overflow: ellipsis;
+  text-transform: capitalize;
+  white-space: nowrap;
+}
+
+.people-approach-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 22px;
+  padding: 0 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  font-size: 9px;
+  font-weight: 900;
+}
+
+.people-approach-badge.is-cold {
+  background: #e8f2f7;
+  color: #285c77;
+}
+
+.people-approach-badge.is-warm {
+  background: #fff0df;
+  color: #86501d;
+}
+
+.people-interaction-participants {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.people-interaction-participants span {
+  padding: 3px 6px;
+  border-radius: 999px;
+  background: #edf3ef;
+  color: #365a49;
+  font-size: 9px;
+  font-weight: 850;
+}
+
+.people-interaction-dialog > header p {
+  margin: 3px 0 0;
+  color: var(--text-subtle);
+  font-size: 11px;
+}
+
+.people-interaction-participant-picker,
+.people-interaction-approach {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.people-interaction-participant-picker > legend,
+.people-interaction-approach > legend {
+  margin-bottom: 6px;
+  color: var(--text-subtle);
+  font-size: 11px;
+  font-weight: 850;
+}
+
+.people-interaction-participant-picker > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+  max-height: 180px;
+  overflow: auto;
+  padding: 5px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel-soft);
+}
+
+.people-interaction-participant-picker label {
+  display: grid;
+  grid-template-columns: 18px 28px minmax(0, 1fr);
+  gap: 6px;
+  align-items: center;
+  min-height: 38px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  font-size: 11px;
+}
+
+.people-interaction-participant-picker input,
+.people-interaction-approach input,
+.people-interaction-fields .people-check-row input {
+  width: 16px;
+  min-height: 16px;
+  margin: 0;
+  padding: 0;
+}
+
+.people-interaction-approach > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.people-interaction-approach label {
+  display: inline-flex;
+  grid-template-columns: none;
+  gap: 6px;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: var(--surface-panel);
+  color: var(--text-body);
+  font-size: 10px;
+}
+
+@media (max-width: 760px) {
+  .people-links-grid,
+  .people-links-directory,
+  .people-interaction-participant-picker > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .people-inline-link-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .people-inline-link-form button {
+    min-height: 44px;
+  }
+
+  .people-recent-interaction-list article {
+    grid-template-columns: 64px minmax(0, 1fr) auto;
+  }
+
+  .people-recent-interaction-list time {
+    grid-column: 2 / -1;
+    text-align: left;
+  }
+
+  .people-note-remove {
+    width: 40px;
+    min-height: 40px;
+  }
+}
+
+html[data-admin-preview="mobile"] .people-links-grid,
+html[data-admin-preview="mobile"] .people-links-directory,
+html[data-admin-preview="mobile"] .people-interaction-participant-picker > div,
+html[data-admin-preview="mobile"] .people-inline-link-form {
+  grid-template-columns: minmax(0, 1fr);
+}

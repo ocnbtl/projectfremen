@@ -45,6 +45,9 @@ export default async function PeopleRoutePage({
   const people = records.filter(
     (record): record is PersonalRecord => record.className === "person" || record.className === "org"
   );
+  const interactions = records.filter(
+    (record): record is PersonalRecord => record.className === "interaction" && Boolean(record.interaction)
+  );
 
   if (!loadError && personId && !people.some((record) => record.id === personId && !record.archivedAt)) {
     notFound();
@@ -61,6 +64,7 @@ export default async function PeopleRoutePage({
       />
       <PeopleWorkspace
         initialPeople={people}
+        initialInteractions={interactions}
         totalRecords={records.length}
         initialSelectedId={personId}
         initialMode={mode}
