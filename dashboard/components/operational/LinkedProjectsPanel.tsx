@@ -30,6 +30,7 @@ type LinkedProjectsPanelProps = {
   manageLifecycle?: boolean;
   manageHealth?: boolean;
   showHeader?: boolean;
+  showSummary?: boolean;
   showBoundary?: boolean;
   title?: string;
   ownerTab?: "people" | "notes-decisions" | "files-links";
@@ -89,6 +90,7 @@ export default function LinkedProjectsPanel({
   manageLifecycle = false,
   manageHealth = false,
   showHeader = true,
+  showSummary = true,
   showBoundary = true,
   title = "Project involvement",
   ownerTab,
@@ -325,12 +327,12 @@ export default function LinkedProjectsPanel({
           </p>
         )}
 
-        <div className={styles.summary}>
+        {showSummary && <div className={styles.summary}>
           <span>{sourceIdentity.module === "people"
             ? `${activeCount} active · ${connections.length} exact project ${connections.length === 1 ? "identity" : "identities"}`
             : `${activeCount} active · ${connections.length} exact Project ${connections.length === 1 ? "destination" : "destinations"}`
           }</span>
-        </div>
+        </div>}
 
         {manageLifecycle && managedLinks.length > 0 && (
           <section className={styles.lifecycleSection} aria-label="Project association lifecycle">

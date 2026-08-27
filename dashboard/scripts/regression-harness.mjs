@@ -5670,6 +5670,50 @@ async function checkPeopleMemoryBrowserState(
         `People directory did not expose recent shared interactions at ${viewport.label}`
       );
       await assertNoOverflow(page, `People recent interactions ${viewport.label}`);
+      if (viewport.label === "desktop") {
+        const initialHeading = (await page.locator(".people-profile-header h2").textContent())?.trim();
+        const switchTarget = initialHeading === organizationTitle
+          ? { id: personId, title: personTitle }
+          : { id: organizationId, title: organizationTitle };
+        const switchRow = page.locator(".people-directory-row").filter({
+          has: page.getByText(switchTarget.title, { exact: true })
+        }).first();
+        await page.evaluate(() => {
+          window.__peoplePaneWasBlank = false;
+          const shell = document.querySelector(".people-redesign-shell");
+          const observer = new MutationObserver(() => {
+            if (!document.querySelector(".people-profile-panel .people-profile-header") || document.querySelector(".people-loading-shell")) {
+              window.__peoplePaneWasBlank = true;
+            }
+          });
+          if (shell) observer.observe(shell, { childList: true, subtree: true });
+          window.__peoplePaneObserver = observer;
+        });
+        const profileFetches = [];
+        const profileSwitchErrors = [];
+        page.on("request", (request) => {
+          if (request.resourceType() === "fetch" && request.url().includes("/admin/people/")) profileFetches.push(request.url());
+        });
+        page.on("pageerror", (error) => profileSwitchErrors.push(error.message));
+        await switchRow.locator(".people-directory-row-body").click();
+        await page.waitForTimeout(220);
+        const navigationState = await page.evaluate(() => {
+          window.__peoplePaneObserver?.disconnect();
+          return {
+            blank: window.__peoplePaneWasBlank === true,
+            pathname: window.location.pathname,
+            heading: document.querySelector(".people-profile-header h2")?.textContent?.trim() || ""
+          };
+        });
+        assert(
+          navigationState.pathname.endsWith(`/admin/people/${encodeURIComponent(switchTarget.id)}`) &&
+            !navigationState.blank &&
+            navigationState.heading === switchTarget.title &&
+            profileFetches.length === 0 &&
+            profileSwitchErrors.length === 0,
+          `People profile switching blanked or fetched a replacement route: ${JSON.stringify({ switchTarget, navigationState, profileFetches, profileSwitchErrors })}`
+        );
+      }
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=overview`, { waitUntil: "networkidle" });
       const overview = page.locator(".people-overview-grid");
       await overview.waitFor();
@@ -5694,8 +5738,13 @@ async function checkPeopleMemoryBrowserState(
       const overviewCards = overview.locator(":scope > [data-people-overview-card]");
       assert(
         JSON.stringify(await overviewCards.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-people-overview-card")))) ===
-          JSON.stringify(["contact", "quick-info", "about", "projects", "connections"]),
+          JSON.stringify(["contact", "quick-info", "about"]),
         `People Overview card hierarchy drifted at ${viewport.label}`
+      );
+      assert(
+        await overview.getByText("Projects-owned references", { exact: true }).count() === 0 &&
+          await overview.getByRole("heading", { name: "Key Connections", exact: true }).count() === 0,
+        `People Overview retained duplicate Project or connection content at ${viewport.label}`
       );
       assert(
         await overview.getByRole("heading", { name: "Cadence", exact: true }).count() === 0,
@@ -5771,7 +5820,8 @@ async function checkPeopleMemoryBrowserState(
       );
       assert(
         await timelineMemories.getByText("Memory", { exact: true }).count() === expectedMemoryIds.length &&
-          await timelineMemories.getByRole("button", { name: "Edit" }).count() === 0,
+          await timelineMemories.getByRole("button", { name: "Edit" }).count() === 0 &&
+          !(await timelineMemories.allTextContents()).some((text) => text.includes("Legacy memory")),
         `Timeline did not normalize legacy memories into read-only Memory interactions at ${viewport.label}`
       );
       const timelineInteraction = page.locator(".people-timeline-interaction").filter({ hasText: "Regression persistence check" });
@@ -5892,7 +5942,9 @@ async function checkPeopleMemoryBrowserState(
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=relations`, { waitUntil: "networkidle" });
       assert(
         await page.getByRole("heading", { name: "Links", exact: true }).count() === 1 &&
-          await page.getByRole("heading", { name: "People & organizations", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "People", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "Organizations", exact: true }).count() === 1 &&
+          await page.getByText("connected media context", { exact: false }).count() === 0 &&
           await page.getByRole("button", { name: "Add link", exact: true }).count() === 1,
         `Legacy Relationships route did not resolve to the unified Links hub at ${viewport.label}`
       );
@@ -5921,6 +5973,10 @@ async function checkPeopleMemoryBrowserState(
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
       const propertyNotes = page.locator("[data-people-notes-editor]");
       await propertyNotes.waitFor();
+      assert(
+        await page.locator(".people-profile-section-heading svg").count() >= 5,
+        `Properties did not provide compact icon-led sections at ${viewport.label}`
+      );
       assert(
         await propertyNotes.locator("textarea").count() === 2 &&
           await propertyNotes.locator("textarea").nth(0).inputValue() === "Prefers written project updates" &&
@@ -6213,15 +6269,23 @@ async function checkPeopleMemoryBrowserState(
       assert(
         await page.locator(".people-profile-header h2").textContent() === organizationTitle &&
           await page.getByText("Business", { exact: true }).count() > 0 &&
-          await page.getByRole("heading", { name: "Linked people" }).count() === 1 &&
-          (await page.locator(".people-overview-grid").innerText()).includes(personTitle),
-        `Organization profile did not render organization facts and linked People at ${viewport.label}`
+          await page.getByRole("heading", { name: "Linked people" }).count() === 0 &&
+          await page.locator(".people-info-row", { hasText: "Linked people" }).count() === 1,
+        `Organization profile did not render its compact facts without duplicating linked People at ${viewport.label}`
       );
       await assertNoOverflow(page, `Organization profile ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-organization-profile-${viewport.label}.png`),
         fullPage: true
       });
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}?tab=links`, { waitUntil: "networkidle" });
+      assert(
+        await page.getByRole("heading", { name: "People", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "Organizations", exact: true }).count() === 1 &&
+          (await page.locator(".people-links-section.is-people").innerText()).includes(personTitle),
+        `Organization Links did not render linked People in its dedicated section at ${viewport.label}`
+      );
+      await assertNoOverflow(page, `Organization Links ${viewport.label}`);
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}/edit?tab=properties`, { waitUntil: "networkidle" });
       const organizationEditForm = page.locator(".people-edit-form");
       assert(
@@ -6465,7 +6529,51 @@ async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, 
     assert(restarResponse.ok() && restarredPerson?.starred === true, "People profile could not be starred again before lifecycle testing");
 
     await page.getByRole("button", { name: "More profile actions" }).click();
-    await page.getByRole("button", { name: "Delete profile", exact: true }).click();
+    const actionMenu = page.getByRole("menu", { name: "Profile actions" });
+    await actionMenu.waitFor();
+    assert(
+      await actionMenu.getByRole("menuitem", { name: "Edit profile" }).count() === 1 &&
+        await actionMenu.getByRole("menuitem", { name: "Add to object" }).count() === 1 &&
+        await actionMenu.getByRole("menuitem", { name: "Set dormant" }).count() === 1 &&
+        await actionMenu.getByRole("menuitem", { name: "Export contact" }).count() === 1,
+      "People profile menu did not expose the compact functional action set"
+    );
+    await actionMenu.getByRole("menuitem", { name: "Add to object" }).click();
+    const objectDialog = page.getByRole("dialog", { name: new RegExp(`Add ${personTitle} to an object`) });
+    await objectDialog.waitFor();
+    assert(
+      await objectDialog.getByLabel("Object").locator("option").count() > 1 &&
+        await objectDialog.getByLabel("Relationship").locator("option").count() >= 5,
+      "People Add to object did not expose real object and relationship choices"
+    );
+    await objectDialog.getByRole("button", { name: "Close object picker" }).click();
+    await page.getByRole("button", { name: "More profile actions" }).click();
+    await page.getByRole("menuitem", { name: "Set dormant" }).click();
+    const dormantConfirmation = page.getByRole("dialog", { name: `Set dormant ${personTitle}?` });
+    const [dormantResponse] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
+      dormantConfirmation.getByRole("button", { name: "Set dormant", exact: true }).click()
+    ]);
+    assert((await responseRecord(dormantResponse))?.status === "inactive", "People Set dormant action did not persist");
+
+    await page.getByRole("button", { name: "More profile actions" }).click();
+    await page.getByRole("menuitem", { name: "Set active" }).click();
+    const activeConfirmation = page.getByRole("dialog", { name: `Reactivate ${personTitle}?` });
+    const [activeResponse] = await Promise.all([
+      page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
+      activeConfirmation.getByRole("button", { name: "Set active", exact: true }).click()
+    ]);
+    assert((await responseRecord(activeResponse))?.status === "active", "People Set active action did not persist");
+
+    await page.getByRole("button", { name: "More profile actions" }).click();
+    const [contactDownload] = await Promise.all([
+      page.waitForEvent("download"),
+      page.getByRole("menuitem", { name: "Export contact" }).click()
+    ]);
+    assert(contactDownload.suggestedFilename().endsWith(".vcf"), "People Export contact did not create a vCard download");
+
+    await page.getByRole("button", { name: "More profile actions" }).click();
+    await page.getByRole("menuitem", { name: "Delete profile", exact: true }).click();
     const confirmation = page.getByRole("dialog", { name: `Delete ${personTitle}?` });
     await confirmation.waitFor();
     const confirmationText = await confirmation.innerText();
@@ -8913,13 +9021,14 @@ async function checkPeopleProjectConnections(
       "People rendered duplicate Project identities for owner and advisor roles"
     );
     const peopleProjectText = await peopleProjectRow.innerText();
-    const peoplePanelText = await peopleProjectsPanel.innerText();
+    const peopleProjectCount = await projectPage.locator(
+      ".people-links-section.is-projects .people-section-count"
+    ).textContent();
     assert(
       peopleProjectText.includes(project.name) &&
         peopleProjectText.includes(projectRole) &&
         peopleProjectText.includes(refreshedRelationshipNote) &&
-        peoplePanelText.includes("1 active") &&
-        peoplePanelText.includes("1 exact project identity"),
+        peopleProjectCount?.trim() === "1",
       "People did not derive the current Project status, role, context, and deduplicated count"
     );
 
@@ -14527,6 +14636,62 @@ async function main() {
     assert(
       persistedPerson?.profile?.birthday === "--03-14",
       "People birthday without a known year did not persist"
+    );
+    const nativeObjectLinkInput = {
+      source: {
+        module: "people",
+        objectType: "person",
+        objectId: createdPerson.id,
+        label: updatedPersonTitle,
+        route: `/admin/people/${encodeURIComponent(createdPerson.id)}`
+      },
+      target: {
+        module: "personal_ops",
+        objectType: "record",
+        objectId: savedPersonalRecord.id,
+        label: personalRecordTitle,
+        route: `/admin/personal/records/${encodeURIComponent(savedPersonalRecord.id)}`
+      },
+      relationship: "participant"
+    };
+    const rejectNativeObjectLinkWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/native-links", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(nativeObjectLinkInput)
+    });
+    assert(
+      rejectNativeObjectLinkWithoutCsrf.response.status === 403 &&
+        rejectNativeObjectLinkWithoutCsrf.response.headers.get("cache-control")?.includes("private") &&
+        rejectNativeObjectLinkWithoutCsrf.response.headers.get("cache-control")?.includes("no-store"),
+      "Native object links did not reject a missing CSRF token with private no-store headers"
+    );
+    const createNativeObjectLink = await requestJson(server.baseUrl, cookieJar, "/api/native-links", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": csrfToken },
+      body: JSON.stringify(nativeObjectLinkInput)
+    });
+    assert(
+      createNativeObjectLink.response.ok &&
+        createNativeObjectLink.payload?.ok &&
+        createNativeObjectLink.payload?.item?.source?.objectId === createdPerson.id &&
+        createNativeObjectLink.payload?.item?.target?.objectId === savedPersonalRecord.id,
+      `Native People-to-object link did not persist: ${JSON.stringify(createNativeObjectLink.payload)}`
+    );
+    const readNativeObjectLinks = await requestJson(server.baseUrl, cookieJar, "/api/native-links");
+    assert(
+      readNativeObjectLinks.response.ok &&
+        readNativeObjectLinks.response.headers.get("cache-control")?.includes("private") &&
+        readNativeObjectLinks.payload?.items?.some((item) => item.id === createNativeObjectLink.payload.item.id),
+      "Native object link was not privately readable after creation"
+    );
+    const removeNativeObjectLink = await requestJson(server.baseUrl, cookieJar, "/api/native-links", {
+      method: "DELETE",
+      headers: { "content-type": "application/json", "x-csrf-token": csrfToken },
+      body: JSON.stringify({ id: createNativeObjectLink.payload.item.id, reason: "Regression cleanup" })
+    });
+    assert(
+      removeNativeObjectLink.response.ok && removeNativeObjectLink.payload?.item?.status === "removed",
+      `Native People-to-object link could not be removed safely: ${JSON.stringify(removeNativeObjectLink.payload)}`
     );
     assert(persistedPerson?.profile?.interactions?.length === 1, "People interaction history did not persist");
     const createSharedInteraction = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {

@@ -1,12 +1,16 @@
 import { notFound } from "next/navigation";
 import AdminChrome from "../../../components/AdminChrome";
 import PeopleWorkspace from "../../../components/PeopleWorkspace";
+import { readFinanceState } from "../../../lib/modules/finance/store";
+import { readPersonalLifeState } from "../../../lib/modules/personal-life/store";
 import { listPersonalOpsObjects } from "../../../lib/modules/personal-ops/store";
 import {
   createEmptyProjectsState,
   readProjectsState
 } from "../../../lib/modules/projects/store";
 import { readPersonalRecords, type PersonalRecord } from "../../../lib/personal-records-store";
+import { readNativeObjectLinks } from "../../../lib/native-objects/link-store";
+import { createNativeObjectRef } from "../../../lib/native-objects/routes";
 import { requireAdminSession } from "../../../lib/require-admin";
 
 export type PeopleRouteMode = "directory" | "profile" | "new" | "edit";
@@ -19,7 +23,7 @@ export default async function PeopleRoutePage({
   personId?: string;
 }) {
   await requireAdminSession();
-  const [recordsResult, followUpsResult, projectsResult] = await Promise.all([
+  const [recordsResult, followUpsResult, projectsResult, objectLinksResult, personalLifeResult, financeResult] = await Promise.all([
     readPersonalRecords()
       .then((records) => ({ ok: true as const, records }))
       .catch((error: unknown) => ({
@@ -38,7 +42,16 @@ export default async function PeopleRoutePage({
         ok: false as const,
         state: createEmptyProjectsState(),
         error: error instanceof Error ? error.message : "Projects involvement could not be loaded."
-      }))
+      })),
+    readNativeObjectLinks()
+      .then((items) => ({ ok: true as const, items }))
+      .catch(() => ({ ok: false as const, items: [] })),
+    readPersonalLifeState()
+      .then((state) => ({ ok: true as const, state }))
+      .catch(() => ({ ok: false as const, state: { lists: [] } })),
+    readFinanceState()
+      .then((state) => ({ ok: true as const, state }))
+      .catch(() => ({ ok: false as const, state: { accounts: [] } }))
   ]);
   const records: PersonalRecord[] = recordsResult.ok ? recordsResult.records : [];
   const loadError = recordsResult.ok ? "" : recordsResult.error;
@@ -48,6 +61,51 @@ export default async function PeopleRoutePage({
   const interactions = records.filter(
     (record): record is PersonalRecord => record.className === "interaction" && Boolean(record.interaction)
   );
+  const objectTargets = [
+    ...people
+      .filter((record) => !record.archivedAt && record.className === "org")
+      .map((record) => createNativeObjectRef({
+        module: "people",
+        objectType: "organization",
+        objectId: record.id,
+        label: record.title,
+        versionId: record.updatedAt
+      })),
+    ...records
+      .filter((record) => !record.archivedAt && record.className === "note")
+      .map((record) => createNativeObjectRef({
+        module: "notes",
+        objectType: "note",
+        objectId: record.id,
+        label: record.title,
+        versionId: record.updatedAt
+      })),
+    ...projectsResult.state.projects
+      .filter((project) => project.lifecycle !== "archived")
+      .map((project) => createNativeObjectRef({
+        module: "projects",
+        objectType: "project",
+        objectId: project.id,
+        label: project.name,
+        versionId: project.updatedAt
+      })),
+    ...personalLifeResult.state.lists.map((list) => createNativeObjectRef({
+      module: "personal_ops",
+      objectType: "list",
+      objectId: list.id,
+      label: list.title,
+      versionId: list.updatedAt
+    })),
+    ...financeResult.state.accounts
+      .filter((account) => !account.archivedAt)
+      .map((account) => createNativeObjectRef({
+        module: "finance",
+        objectType: "account",
+        objectId: account.id,
+        label: account.name,
+        versionId: account.updatedAt
+      }))
+  ].sort((left, right) => left.label.localeCompare(right.label));
 
   if (!loadError && personId && !people.some((record) => record.id === personId && !record.archivedAt)) {
     notFound();
@@ -73,6 +131,8 @@ export default async function PeopleRoutePage({
         initialFollowUpsError={followUpsResult.ok ? "" : followUpsResult.error}
         initialProjectsState={projectsResult.state}
         initialProjectsError={projectsResult.ok ? "" : projectsResult.error}
+        initialObjectLinks={objectLinksResult.items}
+        initialObjectTargets={objectTargets}
       />
     </div>
   );

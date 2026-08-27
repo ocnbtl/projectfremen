@@ -66,7 +66,11 @@ const PERSONAL_OPS_COLLECTIONS: Readonly<Record<string, string>> = {
   follow_up: "follow-ups",
   routine: "routines",
   capture_item: "inbox",
-  template: "templates"
+  template: "templates",
+  list: "lists",
+  trip: "travel",
+  build_item: "personal-build",
+  vehicle: "car"
 };
 
 const FINANCE_VIEWS: Readonly<Record<string, string>> = {

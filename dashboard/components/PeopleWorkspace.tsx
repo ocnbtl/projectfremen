@@ -9,6 +9,8 @@ import {
   type FollowUpSourceRef
 } from "../lib/modules/personal-ops/follow-up-links";
 import { sortPeopleMemories } from "../lib/modules/people/memories";
+import { getSourceProjectConnections } from "../lib/modules/projects/people-links";
+import { createProjectsRepository } from "../lib/modules/projects/repository";
 import { peopleCreateInputToLegacy, peopleUpdateInputToLegacy } from "../lib/modules/people/legacy-adapter";
 import { birthdayForStorage, formatBirthday, parseBirthday } from "../lib/modules/people/birthday";
 import {
@@ -22,7 +24,9 @@ import {
 } from "../lib/modules/people/phone";
 import type { PersonalOpsFollowUp } from "../lib/modules/personal-ops/types";
 import type { ProjectsState } from "../lib/modules/projects/types";
-import { getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/routes";
+import { isUsableObjectLink, type ObjectLink } from "../lib/native-objects/links";
+import { createNativeObjectRef, getModuleRoute, getNativeObjectRoute } from "../lib/native-objects/routes";
+import type { NativeObjectRef } from "../lib/native-objects/types";
 import { parsePeopleUrlState, serializePeopleUrlState } from "../lib/native-objects/url-state";
 import type {
   PersonalContactProfile,
@@ -71,6 +75,8 @@ type PeopleWorkspaceProps = {
   initialFollowUpsError?: string;
   initialProjectsState: ProjectsState;
   initialProjectsError?: string;
+  initialObjectLinks: ObjectLink[];
+  initialObjectTargets: NativeObjectRef[];
 };
 
 type PeopleFilter = "all" | "due" | "week" | "active" | "dormant" | "orgs";
@@ -128,6 +134,66 @@ type PeopleTimelineInteraction = {
   updatesLastContact?: boolean;
 };
 
+type PeopleIconName =
+  | "birthday"
+  | "location"
+  | "hometown"
+  | "occupation"
+  | "employer"
+  | "university"
+  | "partner"
+  | "children"
+  | "organization"
+  | "industry"
+  | "founded"
+  | "team"
+  | "edit"
+  | "object"
+  | "dormant"
+  | "export"
+  | "delete"
+  | "chevron"
+  | "search"
+  | "filter"
+  | "close";
+
+function PeopleIcon({ name }: { name: PeopleIconName }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
+      {name === "birthday" && <><path d="M5 10h14v10H5z" /><path d="M7 10V7h10v3M12 7V4M10.5 4.5 12 3l1.5 1.5" /><path d="M5 14c2 1.5 4.5 1.5 7 0 2.5 1.5 5 1.5 7 0" /></>}
+      {name === "location" && <><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z" /><circle cx="12" cy="10" r="2" /></>}
+      {name === "hometown" && <><path d="m4 11 8-7 8 7" /><path d="M6.5 10v10h11V10M10 20v-6h4v6" /></>}
+      {name === "occupation" && <><rect x="3.5" y="7" width="17" height="12" rx="2" /><path d="M9 7V4.5h6V7M3.5 12h17M10 12v2h4v-2" /></>}
+      {name === "employer" && <><path d="M4 20V7l8-3v16M12 9l8-2v13" /><path d="M7 10h2M7 14h2M15 11h2M15 15h2" /></>}
+      {name === "university" && <><path d="m3 9 9-5 9 5-9 5-9-5Z" /><path d="M6 11.5V16c3.5 2.4 8.5 2.4 12 0v-4.5M21 9v6" /></>}
+      {name === "partner" && <><path d="M8.5 12.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM15.5 19.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="m11.4 9.8 1.2 1.2" /></>}
+      {name === "children" && <><circle cx="8" cy="8" r="3" /><circle cx="16" cy="9" r="2.5" /><path d="M3.5 20c.3-4 1.8-6 4.5-6s4.2 2 4.5 6M12.5 20c.2-3.2 1.4-4.8 3.5-4.8s3.3 1.6 3.5 4.8" /></>}
+      {name === "organization" && <><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 8h3M8 12h3M14 8h2M14 12h2M9 20v-4h6v4" /></>}
+      {name === "industry" && <><path d="M4 20V9l5 3V8l5 3V5l6 4v11Z" /><path d="M8 16h2M14 16h2" /></>}
+      {name === "founded" && <><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></>}
+      {name === "team" && <><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2" /><path d="M3.5 20c.3-4 2.1-6 5.5-6s5.2 2 5.5 6M14 15c3.6-.3 5.5 1.4 6 5" /></>}
+      {name === "edit" && <><path d="m5 19 3.8-.8L19 8a2.1 2.1 0 0 0-3-3L5.8 15.2 5 19Z" /><path d="m14.5 6.5 3 3" /></>}
+      {name === "object" && <><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /><path d="M11 7.5h3.5A2.5 2.5 0 0 1 17 10v3M13 16.5H9.5A2.5 2.5 0 0 1 7 14v-3" /></>}
+      {name === "dormant" && <><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5Z" /></>}
+      {name === "export" && <><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5" /><path d="M5 13v7h14v-7" /></>}
+      {name === "delete" && <><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13" /><path d="M10 11v5M14 11v5" /></>}
+      {name === "chevron" && <path d="m9 6 6 6-6 6" />}
+      {name === "search" && <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></>}
+      {name === "filter" && <path d="M4 6h16M7 12h10M10 18h4" />}
+      {name === "close" && <path d="M6 6l12 12M18 6 6 18" />}
+    </svg>
+  );
+}
+
+function profileSectionIcon(title: string): PeopleIconName {
+  const normalizedTitle = title.toLowerCase();
+  if (normalizedTitle.includes("identity")) return "organization";
+  if (normalizedTitle === "communication" || normalizedTitle === "links") return "object";
+  if (normalizedTitle.includes("place")) return "location";
+  if (normalizedTitle === "cadence") return "founded";
+  return "birthday";
+}
+
 function ContactMethodIcon({ id }: { id: ContactMethodId }) {
   if (id === "linkedin") return <span aria-hidden="true">in</span>;
   if (id === "x") return <span aria-hidden="true">X</span>;
@@ -154,6 +220,18 @@ function contactMethodHref(id: ContactMethodId, value: string): { href?: string;
   if (id === "tiktok") return { href: `https://tiktok.com/@${username}`, actionLabel: "Open" };
   if (id === "x") return { href: `https://x.com/${username}`, actionLabel: "Open" };
   return {};
+}
+
+function vCardText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\r?\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+}
+
+function vCardBirthday(value: string) {
+  const parsed = parseBirthday(value);
+  if (!parsed) return "";
+  const month = String(parsed.month).padStart(2, "0");
+  const day = String(parsed.day).padStart(2, "0");
+  return parsed.year ? `${parsed.year}${month}${day}` : `--${month}${day}`;
 }
 
 type PeopleTimelineItem =
@@ -1950,12 +2028,15 @@ export default function PeopleWorkspace({
   initialFollowUps,
   initialFollowUpsError = "",
   initialProjectsState,
-  initialProjectsError = ""
+  initialProjectsError = "",
+  initialObjectLinks,
+  initialObjectTargets
 }: PeopleWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const initialUrlState = parsePeopleUrlState(searchParams);
+  const projectsRepository = useMemo(() => createProjectsRepository(), []);
   const [people, setPeople] = useState(initialPeople);
   const [interactionRecords, setInteractionRecords] = useState(initialInteractions);
   const {
@@ -2023,9 +2104,15 @@ export default function PeopleWorkspace({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [objectLinkOpen, setObjectLinkOpen] = useState(false);
+  const [objectLinkTargetId, setObjectLinkTargetId] = useState("");
+  const [objectLinkRelationship, setObjectLinkRelationship] = useState("related");
+  const [objectLinkSaving, setObjectLinkSaving] = useState(false);
+  const [objectLinks, setObjectLinks] = useState(initialObjectLinks);
+  const [dormantConfirmOpen, setDormantConfirmOpen] = useState(false);
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState("");
-  const [lifecycleSaving, setLifecycleSaving] = useState<"" | "star" | "delete" | "restore">("");
+  const [lifecycleSaving, setLifecycleSaving] = useState<"" | "star" | "dormant" | "delete" | "restore">("");
   const [expandedContactMethod, setExpandedContactMethod] = useState<ContactMethodId | null>(null);
   const [utilityNotice, setUtilityNotice] = useState("");
   const [relationshipDraft, setRelationshipDraft] = useState("");
@@ -2051,6 +2138,43 @@ export default function PeopleWorkspace({
   const filterSheetRef = useRef<HTMLElement>(null);
   const dirtyHistoryGuardRef = useRef<string | null>(null);
   const suppressDirtyPopRef = useRef(false);
+
+  useEffect(() => {
+    const handleProfileHistory = (event: PopStateEvent) => {
+      if (suppressDirtyPopRef.current) return;
+      if (window.location.pathname === `${getModuleRoute("people")}/new`) {
+        setAddingPerson(true);
+        setDetailMode("edit");
+        setProfileMenuOpen(false);
+        return;
+      }
+      const state = event.state?.__unigentamosPeopleRoute as {
+        selectedId?: string;
+        view?: PeopleView;
+        mode?: DetailMode;
+      } | undefined;
+      const pathMatch = window.location.pathname.match(/^\/admin\/people\/([^/]+)(?:\/edit)?$/);
+      const nextSelectedId = state?.selectedId || (pathMatch ? decodeURIComponent(pathMatch[1]) : "");
+      const nextView = state?.view || parsePeopleUrlState(new URLSearchParams(window.location.search)).tab;
+      if (nextSelectedId && people.some((record) => record.id === nextSelectedId && !record.archivedAt)) {
+        setSelectedId(nextSelectedId);
+      }
+      setActiveView(nextView);
+      setDetailMode(state?.mode || (
+        window.location.pathname.endsWith("/edit") || nextView === "properties"
+          ? "edit"
+          : nextView === "timeline"
+            ? "timeline"
+            : nextView === "links"
+              ? "workspace"
+              : "profile"
+      ));
+      setAddingPerson(false);
+      setProfileMenuOpen(false);
+    };
+    window.addEventListener("popstate", handleProfileHistory);
+    return () => window.removeEventListener("popstate", handleProfileHistory);
+  }, [people]);
 
   const searchParamKey = searchParams.toString();
 
@@ -2129,6 +2253,24 @@ export default function PeopleWorkspace({
   }, [interactionSaving]);
 
   useEffect(() => {
+    if (!profileMenuOpen) return;
+    const closeMenu = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (target?.closest("#people-profile-action-menu, .people-profile-more")) return;
+      setProfileMenuOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setProfileMenuOpen(false);
+    };
+    document.addEventListener("mousedown", closeMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeMenu);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [profileMenuOpen]);
+
+  useEffect(() => {
     const container = mobileMenuOpen ? mobileMenuRef.current : filtersOpen ? filterSheetRef.current : null;
     if (!container) return;
     const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -2201,6 +2343,20 @@ export default function PeopleWorkspace({
     } else {
       router.replace(destination, { scroll: false });
     }
+  }
+
+  function commitPeopleRoute(
+    destination: string,
+    state: { selectedId: string; view: PeopleView; mode: DetailMode },
+    history: "push" | "replace" = "push"
+  ) {
+    if (typeof window === "undefined") return;
+    const nextState = {
+      ...(window.history.state || {}),
+      __unigentamosPeopleRoute: state
+    };
+    if (history === "replace") window.history.replaceState(nextState, "", destination);
+    else window.history.pushState(nextState, "", destination);
   }
 
   const activePeople = useMemo(() => people.filter((record) => !record.archivedAt), [people]);
@@ -2384,36 +2540,69 @@ export default function PeopleWorkspace({
     }),
     ...selectedOrganizationPeople.map((target) => [target.title.toLowerCase(), { label: target.title, target }] as const)
   ]).values());
-  const connectionItems = relationshipConnections.map((connection) => connection.label);
-  const importantDates = [
-    [selectedPerson?.className === "org" ? "Founded" : "Birthday", selectedPerson?.className === "org"
-      ? selectedProfile.foundedYear || "Not recorded"
-      : selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "Not recorded"],
-    ["Last contact", selectedPerson ? formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id)) : "N/A"],
-    ["Next follow-up", selectedPerson ? getNextContactLabel(selectedPerson) : "-"],
-    ["Added", selectedPerson ? formatFullDate(selectedPerson.createdAt) : "-"]
-  ];
+  const peopleConnections = relationshipConnections.filter((connection) => connection.target?.className === "person");
+  const organizationConnections = relationshipConnections.filter((connection) => connection.target?.className === "org");
+  const unresolvedConnections = relationshipConnections.filter((connection) => !connection.target);
+  const selectedPersonRef = selectedPerson ? createNativeObjectRef({
+    module: "people",
+    objectType: selectedPerson.className === "org" ? "organization" : "person",
+    objectId: selectedPerson.id,
+    label: selectedPerson.title,
+    versionId: selectedPerson.updatedAt
+  }) : null;
+  const selectedNativeObjectLinks = selectedPersonRef ? objectLinks
+    .filter(isUsableObjectLink)
+    .filter((link) => (
+      link.source.module === selectedPersonRef.module &&
+      link.source.objectType === selectedPersonRef.objectType &&
+      link.source.objectId === selectedPersonRef.objectId
+    ) || (
+      link.target.module === selectedPersonRef.module &&
+      link.target.objectType === selectedPersonRef.objectType &&
+      link.target.objectId === selectedPersonRef.objectId
+    ))
+    .map((link) => ({
+      link,
+      object: link.source.objectId === selectedPersonRef.objectId && link.source.module === "people"
+        ? link.target
+        : link.source
+    }))
+    : [];
+  const selectedProjectConnections = selectedPersonRef
+    ? getSourceProjectConnections(projectsState, selectedPersonRef, { includeOwner: true })
+    : [];
+  const linkedNativeTargetKeys = new Set([
+    ...selectedNativeObjectLinks.map(({ object }) => `${object.module}:${object.objectType}:${object.objectId}`),
+    ...relationshipConnections.flatMap((connection) => connection.target
+      ? [`people:${connection.target.className === "org" ? "organization" : "person"}:${connection.target.id}`]
+      : []),
+    ...selectedProjectConnections.map((connection) => `projects:project:${connection.projectId}`)
+  ]);
+  const availableObjectTargets = initialObjectTargets.filter((target) => (
+    !selectedPersonRef ||
+    !(target.module === selectedPersonRef.module && target.objectType === selectedPersonRef.objectType && target.objectId === selectedPersonRef.objectId)
+  ) && !linkedNativeTargetKeys.has(`${target.module}:${target.objectType}:${target.objectId}`));
   const timelineItems = selectedInteractionItems.slice(0, 20);
-  const selectedTags = [
+  const selectedTags = Array.from(new Set([
     ...(fallbackPerson?.subjects || []).slice(0, 3),
     ...(selectedPerson?.projects || []).slice(0, 2)
-  ].filter(Boolean);
-  const overviewFacts = selectedPerson?.className === "org" ? [
-    ["Type", selectedProfile.organizationType],
-    ["Industry", selectedProfile.industry],
-    ["Headquarters", selectedProfile.headquarters || selectedProfile.livesIn],
-    ["Founded", selectedProfile.foundedYear],
-    ["Team size", selectedProfile.teamSize],
-    ["Linked people", selectedOrganizationPeople.length ? String(selectedOrganizationPeople.length) : "None yet"]
+  ].filter(Boolean)));
+  const overviewFacts: Array<{ label: string; value: string; icon: PeopleIconName; group: "life" | "work" | "relationships" }> = selectedPerson?.className === "org" ? [
+    { label: "Type", value: selectedProfile.organizationType, icon: "organization", group: "work" },
+    { label: "Industry", value: selectedProfile.industry, icon: "industry", group: "work" },
+    { label: "Headquarters", value: selectedProfile.headquarters || selectedProfile.livesIn, icon: "location", group: "life" },
+    { label: "Founded", value: selectedProfile.foundedYear, icon: "founded", group: "life" },
+    { label: "Team size", value: selectedProfile.teamSize, icon: "team", group: "relationships" },
+    { label: "Linked people", value: selectedOrganizationPeople.length ? String(selectedOrganizationPeople.length) : "-", icon: "children", group: "relationships" }
   ] : [
-    ["Birthday", selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "-"],
-    ["Location", selectedProfile.livesIn],
-    ["Hometown", selectedProfile.comesFrom],
-    ["Occupation", selectedProfile.primaryOccupation],
-    ["Employer", selectedProfile.primaryEmployer],
-    ["University", educationSummary(selectedProfile.education, selectedProfile.universityAffiliation)],
-    ["Partner", selectedProfile.partner],
-    ["Children", selectedProfile.children]
+    { label: "Birthday", value: selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "-", icon: "birthday", group: "life" },
+    { label: "Location", value: selectedProfile.livesIn, icon: "location", group: "life" },
+    { label: "Hometown", value: selectedProfile.comesFrom, icon: "hometown", group: "life" },
+    { label: "Occupation", value: selectedProfile.primaryOccupation, icon: "occupation", group: "work" },
+    { label: "Employer", value: selectedProfile.primaryEmployer, icon: "employer", group: "work" },
+    { label: "University", value: educationSummary(selectedProfile.education, selectedProfile.universityAffiliation), icon: "university", group: "work" },
+    { label: "Partner", value: selectedProfile.partner, icon: "partner", group: "relationships" },
+    { label: "Children", value: selectedProfile.children, icon: "children", group: "relationships" }
   ];
   const addFormDirty = [
     name,
@@ -2624,7 +2813,11 @@ export default function PeopleWorkspace({
     } else {
       setDetailMode("profile");
     }
-    router.push(destination, { scroll: false });
+    commitPeopleRoute(destination, {
+      selectedId: selectedPerson.id,
+      view,
+      mode: view === "timeline" ? "timeline" : view === "links" ? "workspace" : view === "properties" ? "edit" : "profile"
+    });
   }
 
   function selectPerson(record: PersonalRecord) {
@@ -2643,7 +2836,9 @@ export default function PeopleWorkspace({
     setAddingPerson(false);
     setDetailMode("profile");
     setActiveView("overview");
-    router.push(destination, { scroll: false });
+    setActionNotice("");
+    setProfileMenuOpen(false);
+    commitPeopleRoute(destination, { selectedId: record.id, view: "overview", mode: "profile" });
   }
 
   async function saveProfileDraft(nextDraft: ContactProfileDraft) {
@@ -2966,6 +3161,125 @@ export default function PeopleWorkspace({
     setLifecycleSaving("");
   }
 
+  async function toggleDormant() {
+    if (!selectedPerson || lifecycleSaving) return;
+    setLifecycleSaving("dormant");
+    const nextDormant = selectedPerson.status !== "inactive";
+    const saved = await patchPerson(selectedPerson.id, { status: nextDormant ? "inactive" : "active" });
+    setLifecycleSaving("");
+    if (!saved) return;
+    setDormantConfirmOpen(false);
+    setProfileMenuOpen(false);
+    setActionNotice(`${selectedPerson.title} is now ${nextDormant ? "dormant" : "active"}.`);
+  }
+
+  function exportContact() {
+    if (!selectedPerson) return;
+    const profile = getProfile(selectedPerson);
+    const nameParts = [profile.lastName, profile.firstName, profile.middleName].map((value) => vCardText(value || ""));
+    const lines = [
+      "BEGIN:VCARD",
+      "VERSION:4.0",
+      `FN:${vCardText(selectedPerson.title)}`,
+      `N:${nameParts.join(";")};;`,
+      ...(profile.nickname ? [`NICKNAME:${vCardText(profile.nickname)}`] : []),
+      ...(vCardBirthday(profile.birthday || "") ? [`BDAY:${vCardBirthday(profile.birthday || "")}`] : []),
+      ...profile.emails.filter((entry) => entry.address).map((entry) => `EMAIL;TYPE=${entry.category.toUpperCase()}:${vCardText(entry.address)}`),
+      ...profile.phones.filter((entry) => entry.number).map((entry) => `TEL;TYPE=${entry.category.toUpperCase()}:${vCardText(formatInternationalPhone(entry.number, entry.countryCode))}`),
+      ...(profile.primaryOccupation ? [`TITLE:${vCardText(profile.primaryOccupation)}`] : []),
+      ...(profile.primaryEmployer ? [`ORG:${vCardText(profile.primaryEmployer)}`] : []),
+      ...(profile.livesIn ? [`ADR;TYPE=HOME:;;${vCardText(profile.livesIn)};;;;`] : []),
+      ...(profile.context ? [`NOTE:${vCardText(profile.context)}`] : []),
+      ...(profile.website ? [`URL:${vCardText(profile.website)}`] : []),
+      "END:VCARD"
+    ];
+    const blob = new Blob([`${lines.join("\r\n")}\r\n`], { type: "text/vcard;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `${selectedPerson.title.replace(/[^a-z0-9]+/gi, "-").replace(/^-|-$/g, "").toLowerCase() || "contact"}.vcf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    setProfileMenuOpen(false);
+    setActionNotice(`Exported ${selectedPerson.title} as a vCard.`);
+  }
+
+  async function saveObjectLink(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedPersonRef || objectLinkSaving) return;
+    const target = availableObjectTargets.find((candidate) => `${candidate.module}:${candidate.objectType}:${candidate.objectId}` === objectLinkTargetId);
+    if (!target) {
+      setError("Choose an object to link.");
+      return;
+    }
+    setObjectLinkSaving(true);
+    setError("");
+    try {
+      if (target.module === "projects" && target.objectType === "project") {
+        const result = await projectsRepository.create("links", {
+          projectId: target.objectId,
+          source: selectedPersonRef,
+          relationship: "project_person",
+          relationshipStrength: "normal",
+          role: objectLinkRelationship === "related" ? undefined : labelize(objectLinkRelationship),
+          projectSpecificNote: "Linked from People"
+        });
+        if (!result.ok) throw new Error(result.error.message);
+        await refreshProjects();
+      } else if (target.module === "people" && target.objectType === "organization") {
+        const saved = await saveProfileDraft({
+          ...selectedProfile,
+          associatedPeople: [...splitList(selectedProfile.associatedPeople), `${target.label} (${labelize(objectLinkRelationship)})`].join(", ")
+        });
+        if (!saved) throw new Error("The organization relationship could not be saved.");
+      } else {
+      const response = await fetch("/api/native-links", {
+        method: "POST",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({ source: selectedPersonRef, target, relationship: objectLinkRelationship })
+      });
+      const payload = await response.json().catch(() => ({ ok: false, error: "Invalid server response" })) as {
+        ok?: boolean;
+        item?: ObjectLink;
+        error?: string;
+      };
+      if (!response.ok || !payload.ok || !payload.item) throw new Error(payload.error || "The object link could not be saved.");
+      setObjectLinks((current) => current.some((link) => link.id === payload.item!.id) ? current : [...current, payload.item!]);
+      }
+      setObjectLinkOpen(false);
+      setObjectLinkTargetId("");
+      setObjectLinkRelationship("related");
+      setActionNotice(`${selectedPerson.title} was linked to ${target.label}.`);
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "The object link could not be saved.");
+    } finally {
+      setObjectLinkSaving(false);
+    }
+  }
+
+  async function removeObjectLink(link: ObjectLink) {
+    if (objectLinkSaving) return;
+    setObjectLinkSaving(true);
+    setError("");
+    try {
+      const response = await fetch("/api/native-links", {
+        method: "DELETE",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({ id: link.id, reason: "Removed from People Links" })
+      });
+      const payload = await response.json().catch(() => ({ ok: false, error: "Invalid server response" })) as { ok?: boolean; error?: string };
+      if (!response.ok || !payload.ok) throw new Error(payload.error || "The object link could not be removed.");
+      setObjectLinks((current) => current.map((item) => item.id === link.id ? { ...item, status: "removed" } : item));
+      setActionNotice("Object link removed. The linked object was not deleted.");
+    } catch (requestError) {
+      setError(requestError instanceof Error ? requestError.message : "The object link could not be removed.");
+    } finally {
+      setObjectLinkSaving(false);
+    }
+  }
+
   async function deleteProfile() {
     if (!deleteTarget || lifecycleSaving) return;
     setLifecycleSaving("delete");
@@ -3070,7 +3384,10 @@ export default function PeopleWorkspace({
     setDetailMode("edit");
     setActiveView("properties");
     setProfileMenuOpen(false);
-    router.push(`${getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id, mode: "edit" })}?tab=${activeView}`);
+    commitPeopleRoute(
+      `${getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id, mode: "edit" })}?tab=${activeView}`,
+      { selectedId: selectedPerson.id, view: "properties", mode: "edit" }
+    );
   }
 
   async function releaseDirtyHistoryGuard() {
@@ -3370,12 +3687,12 @@ export default function PeopleWorkspace({
           ? addingPerson
             ? className === "org" ? "New Organization" : "New Person"
             : selectedPerson?.className === "org" ? "Edit Organization" : "Edit Person"
-          : mobileSurface === "profile" ? selectedPerson?.title || "Profile" : "People"}</strong>
+          : mobileSurface === "profile" ? labelize(activeView) : "People"}</strong>
         <button type="button" aria-label="Search people" onClick={() => setFiltersOpen(true)}>
-          /
+          <PeopleIcon name="search" />
         </button>
         <button type="button" aria-label="Open filters" onClick={() => setFiltersOpen(true)}>
-          ::
+          <PeopleIcon name="filter" />
         </button>
       </div>
 
@@ -3686,7 +4003,7 @@ export default function PeopleWorkspace({
               {recentInteractionItems.length > 0 ? recentInteractionItems.map((item) => {
                 const interaction = item.kind === "interaction"
                   ? item.interaction
-                  : { kind: "memory", title: item.memory.text, summary: "Legacy memory" };
+                  : { kind: "memory", title: item.memory.text, summary: "" };
                 const participants = item.participantIds
                   .map((participantId) => activePeople.find((record) => record.id === participantId))
                   .filter((record): record is PersonalRecord => Boolean(record));
@@ -3736,7 +4053,7 @@ export default function PeopleWorkspace({
           <>
             {!addingPerson && (
               <>
-              <header className="people-profile-header">
+              <header className="people-profile-header" data-profile-status={selectedPerson.status}>
               <PeopleProfileAvatar
                 label={selectedPerson.title}
                 initials={getInitials(selectedPerson)}
@@ -3744,18 +4061,20 @@ export default function PeopleWorkspace({
                 photoUpdatedAt={selectedProfile.photoUpdatedAt}
                 onSelect={() => setPhotoDialogOpen(true)}
               />
-              <div>
-                <h2>{selectedPerson.title}</h2>
+              <div className="people-profile-identity">
+                <div className="people-profile-title-line">
+                  <h2>{selectedPerson.title}</h2>
+                  <span className="people-status-marker"><i aria-hidden="true" />{STATUS_LABELS[selectedPerson.status]}</span>
+                </div>
                 <p>{selectedPerson.className === "org"
-                  ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || getPrimaryGroup(selectedPerson)
-                  : selectedProfile.nickname || selectedProfile.primaryOccupation || getPrimaryGroup(selectedPerson)}</p>
+                  ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || "Organization"
+                  : [selectedProfile.nickname ? `“${selectedProfile.nickname}”` : "", selectedProfile.primaryOccupation, selectedProfile.primaryEmployer ? `at ${selectedProfile.primaryEmployer}` : ""].filter(Boolean).join(" ") || getPrimaryGroup(selectedPerson)}</p>
                 <div className="people-tag-row">
                   {selectedTags.map((tag) => (
-                    <span key={tag}>{tag}</span>
+                    <span data-tone={tag.length % 4} key={tag}><i aria-hidden="true" />{tag}</span>
                   ))}
                 </div>
               </div>
-              <span className="people-status-pill">{STATUS_LABELS[selectedPerson.status]}</span>
               <div className="people-profile-actions">
                 <button
                   type="button"
@@ -3768,29 +4087,30 @@ export default function PeopleWorkspace({
                 >
                   <span aria-hidden="true">{selectedPerson.starred ? "★" : "☆"}</span>
                 </button>
-                <button type="button" aria-label="Edit profile" onClick={openEditProfile}>Edit</button>
                 <button
                   type="button"
+                  className="people-profile-more"
                   aria-label="More profile actions"
                   aria-expanded={profileMenuOpen}
                   aria-controls="people-profile-action-menu"
                   onClick={() => setProfileMenuOpen((current) => !current)}
-                >...</button>
+                ><span aria-hidden="true">•••</span></button>
               </div>
               {profileMenuOpen && (
-                <div id="people-profile-action-menu" className="people-action-menu" role="group" aria-label="Profile actions">
-                  <button type="button" onClick={openEditProfile}>Open properties</button>
-                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="List membership persistence is not connected yet">Add to list unavailable</button>
-                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="Lifecycle changes require a confirmation and undo path">Set dormant unavailable</button>
-                  <button type="button" disabled aria-describedby="people-unavailable-actions" title="People export is not connected yet">Export contact unavailable</button>
+                <div id="people-profile-action-menu" className="people-action-menu" role="menu" aria-label="Profile actions">
+                  <button type="button" role="menuitem" onClick={openEditProfile}><PeopleIcon name="edit" /><span>Edit profile</span></button>
+                  <button type="button" role="menuitem" onClick={() => { setObjectLinkOpen(true); setProfileMenuOpen(false); }}><PeopleIcon name="object" /><span>Add to object</span></button>
+                  <button type="button" role="menuitem" onClick={() => { setDormantConfirmOpen(true); setProfileMenuOpen(false); }}><PeopleIcon name="dormant" /><span>{selectedPerson.status === "inactive" ? "Set active" : "Set dormant"}</span></button>
+                  <button type="button" role="menuitem" onClick={exportContact}><PeopleIcon name="export" /><span>Export contact</span></button>
                   <button
                     type="button"
+                    role="menuitem"
                     className="is-danger"
                     onClick={() => {
                       setProfileMenuOpen(false);
                       setDeleteTargetId(selectedPerson.id);
                     }}
-                  >Delete profile</button>
+                  ><PeopleIcon name="delete" /><span>Delete profile</span></button>
                 </div>
               )}
               </header>
@@ -3834,7 +4154,10 @@ export default function PeopleWorkspace({
                   {(selectedPerson.className === "org" ? ORGANIZATION_PROFILE_SECTIONS : PROFILE_SECTIONS).map((section) => (
                     <Fragment key={section.title}>
                     <section className={`people-profile-section module-ref-tone-${section.tone}`}>
-                      <h4>{section.title}</h4>
+                      <header className="people-profile-section-heading">
+                        <span><PeopleIcon name={profileSectionIcon(section.title)} /></span>
+                        <h4>{section.title}</h4>
+                      </header>
                       <div className="people-profile-field-grid">
                         {section.fields.map((field) => (
                           <label className={field.type === "textarea" ? "is-wide" : ""} key={field.key}>
@@ -3987,8 +4310,8 @@ export default function PeopleWorkspace({
                     <header>
                       <div>
                         <h3>Interactions</h3>
-                        <span>{timelineItems.length} saved {timelineItems.length === 1 ? "entry" : "entries"}</span>
                       </div>
+                      <strong className="people-section-count" aria-label={`${timelineItems.length} interactions`}>{timelineItems.length}</strong>
                     </header>
                     <div className="people-timeline-list">
                       {timelineItems.length > 0 ? timelineItems.map((item) => item.kind === "memory" ? (
@@ -3998,7 +4321,6 @@ export default function PeopleWorkspace({
                             <span className="people-timeline-kind">Memory</span>
                           </div>
                           <strong className="people-timeline-entry-title">{item.memory.text}</strong>
-                          <p className="people-timeline-entry-body">Legacy memory · now shown in the interaction history</p>
                         </article>
                       ) : (
                         <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
@@ -4062,35 +4384,65 @@ export default function PeopleWorkspace({
                 <div className="people-section-toolbar">
                   <div>
                     <h3>Links</h3>
-                    <span>{connectionItems.length + selectedPerson.externalSources.length + selectedPerson.projects.length} connected items</span>
                   </div>
-                  <button type="button" onClick={openEditProfile}>Edit links</button>
+                  <div className="people-links-toolbar-actions">
+                    <strong className="people-section-count" aria-label={`${peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length} linked items`}>
+                      {peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length}
+                    </strong>
+                    <button type="button" onClick={() => setObjectLinkOpen(true)}><PeopleIcon name="object" /><span>Add object</span></button>
+                  </div>
                 </div>
                 {actionNotice && <p className="people-notice">{actionNotice}</p>}
                 <div className="people-links-grid">
                   <article className="people-links-section is-people">
                     <header className="people-linked-card-header">
-                      <div><h4>People & organizations</h4><span>{connectionItems.length} connected</span></div>
+                      <div><h4>People</h4></div>
+                      <strong className="people-section-count" aria-label={`${peopleConnections.length} linked people`}>{peopleConnections.length}</strong>
                     </header>
                     <div className="people-links-directory">
-                      {relationshipConnections.length > 0 ? relationshipConnections.map((connection) => (
-                        connection.target ? (
+                      {peopleConnections.length > 0 ? peopleConnections.map((connection) => (
                           <button type="button" onClick={() => selectPerson(connection.target!)} key={connection.label}>
                             <PeopleProfileAvatar
-                              label={connection.target.title}
-                              initials={getInitials(connection.target)}
-                              photoUrl={connection.target.profile?.photoUrl}
-                              photoUpdatedAt={connection.target.profile?.photoUpdatedAt}
+                              label={connection.target!.title}
+                              initials={getInitials(connection.target!)}
+                              photoUrl={connection.target!.profile?.photoUrl}
+                              photoUpdatedAt={connection.target!.profile?.photoUpdatedAt}
                               compact
                             />
-                            <span><strong>{connection.target.title}</strong><small>{connection.target.className === "org" ? "Organization" : getPrimaryGroup(connection.target)}</small></span>
-                            <span aria-hidden="true">→</span>
+                            <span><strong>{connection.target!.title}</strong><small>{getPrimaryGroup(connection.target!)}</small></span>
+                            <PeopleIcon name="chevron" />
                           </button>
-                        ) : (
-                          <div className="people-link-context" key={connection.label}><strong>{connection.label}</strong><span>Saved context</span></div>
-                        )
-                      )) : <p>No people or organizations linked yet.</p>}
+                      )) : <p>No people yet.</p>}
                     </div>
+                  </article>
+                  <article className="people-links-section is-organizations">
+                    <header className="people-linked-card-header">
+                      <div><h4>Organizations</h4></div>
+                      <strong className="people-section-count" aria-label={`${organizationConnections.length} linked organizations`}>{organizationConnections.length}</strong>
+                    </header>
+                    <div className="people-links-directory is-organizations">
+                      {organizationConnections.length > 0 ? organizationConnections.map((connection) => (
+                        <button type="button" onClick={() => selectPerson(connection.target!)} key={connection.label}>
+                          <PeopleProfileAvatar
+                            label={connection.target!.title}
+                            initials={getInitials(connection.target!)}
+                            photoUrl={connection.target!.profile?.photoUrl}
+                            photoUpdatedAt={connection.target!.profile?.photoUpdatedAt}
+                            compact
+                          />
+                          <span><strong>{connection.target!.title}</strong><small>{connection.target!.profile?.organizationType || "Organization"}</small></span>
+                          <PeopleIcon name="chevron" />
+                        </button>
+                      )) : <p>No organizations yet.</p>}
+                    </div>
+                    {unresolvedConnections.length > 0 && <div className="people-link-context-list">
+                      {unresolvedConnections.map((connection) => <div className="people-link-context" key={connection.label}><strong>{connection.label}</strong><span>Context</span></div>)}
+                    </div>}
+                  </article>
+                  <article className="people-links-section is-connections">
+                    <header className="people-linked-card-header">
+                      <div><h4>Add relationship</h4></div>
+                    </header>
                     <div className="people-inline-link-form">
                       <label>
                         Person or context
@@ -4116,7 +4468,8 @@ export default function PeopleWorkspace({
                   </article>
                   <article className="people-links-section is-projects">
                     <header className="people-linked-card-header">
-                      <div><h4>Projects</h4><span>Current involvement</span></div>
+                      <div><h4>Projects</h4></div>
+                      <strong className="people-section-count" aria-label={`${selectedProjectConnections.length} linked projects`}>{selectedProjectConnections.length}</strong>
                       <button type="button" onClick={() => void refreshProjects()} disabled={projectsLoading}>
                         {projectsLoading ? "Checking…" : "Refresh"}
                       </button>
@@ -4133,25 +4486,46 @@ export default function PeopleWorkspace({
                       limit={4}
                       compact
                       showHeader={false}
+                      showSummary={false}
                       showBoundary={false}
+                      emptyDescription="No projects yet."
                     />
+                  </article>
+                  <article className="people-links-section is-objects">
+                    <header className="people-linked-card-header">
+                      <div><h4>Objects</h4></div>
+                      <strong className="people-section-count" aria-label={`${selectedNativeObjectLinks.length} linked objects`}>{selectedNativeObjectLinks.length}</strong>
+                    </header>
+                    <div className="people-object-links">
+                      {selectedNativeObjectLinks.length > 0 ? selectedNativeObjectLinks.map(({ link, object }) => (
+                        <div key={link.id}>
+                          <a href={object.route}>
+                            <span className="people-object-glyph"><PeopleIcon name="object" /></span>
+                            <span><strong>{object.label}</strong><small>{labelize(object.objectType)} · {labelize(link.relationship)}</small></span>
+                          </a>
+                          <button type="button" onClick={() => void removeObjectLink(link)} disabled={objectLinkSaving} aria-label={`Remove link to ${object.label}`}><PeopleIcon name="close" /></button>
+                        </div>
+                      )) : <p>No other objects yet.</p>}
+                    </div>
                   </article>
                   <article className="people-links-section is-files">
                     <header className="people-linked-card-header">
-                      <div><h4>Files & media</h4><span>Connected media context</span></div>
+                      <div><h4>Files & media</h4></div>
+                      <strong className="people-section-count" aria-label="0 linked files and media">0</strong>
                       <a href={`${getModuleRoute("media")}?query=${encodeURIComponent(selectedPerson.title)}`}>Browse</a>
                     </header>
-                    <p>No directly linked files are visible on this profile yet.</p>
+                    <p>No files yet.</p>
                   </article>
                   <article className="people-links-section is-resources">
                     <header className="people-linked-card-header">
-                      <div><h4>Resources & web links</h4><span>{selectedPerson.externalSources.length} saved</span></div>
+                      <div><h4>Resources & web links</h4></div>
+                      <strong className="people-section-count" aria-label={`${selectedPerson.externalSources.length} saved resources and web links`}>{selectedPerson.externalSources.length}</strong>
                       <a href={`${getModuleRoute("resources")}?query=${encodeURIComponent(selectedPerson.title)}`}>Browse</a>
                     </header>
                     <div className="people-resource-links">
                       {selectedPerson.externalSources.length > 0 ? selectedPerson.externalSources.map((item) => (
                         <a href={/^https?:\/\//i.test(item) ? item : `${getModuleRoute("resources")}?query=${encodeURIComponent(item)}`} target={/^https?:\/\//i.test(item) ? "_blank" : undefined} rel={/^https?:\/\//i.test(item) ? "noreferrer" : undefined} key={item}>{item}</a>
-                      )) : <p>No resources or web links saved yet.</p>}
+                      )) : <p>No resources yet.</p>}
                     </div>
                   </article>
                 </div>
@@ -4205,21 +4579,30 @@ export default function PeopleWorkspace({
                 </section>
                 <article className="people-overview-facts" data-people-overview-card="quick-info">
                   <h3 className="people-visually-hidden">Profile details</h3>
-                  {overviewFacts.map(([label, value]) => {
-                    const organizationId = label === "Employer"
-                      ? selectedProfile.occupations.find((entry) => entry.status === "current")?.organizationId
-                      : label === "University"
-                        ? selectedProfile.education[0]?.organizationId
-                        : undefined;
-                    const organization = organizationId ? activePeople.find((record) => record.id === organizationId && record.className === "org") : undefined;
-                    return (
-                      <div className="people-info-row" key={label}>
-                        <strong>{label}</strong>
-                        {organization
-                          ? <button type="button" className="people-inline-object-link" onClick={() => selectPerson(organization)}>{value || organization.title}</button>
-                          : <span>{value || "-"}</span>}
-                      </div>
-                    );
+                  {(["life", "work", "relationships"] as const).map((group) => {
+                    const facts = overviewFacts.filter((fact) => fact.group === group);
+                    if (!facts.length) return null;
+                    return <section className={`people-fact-cluster is-${group}`} aria-label={labelize(group)} key={group}>
+                      {facts.map(({ label, value, icon }) => {
+                        const organizationId = label === "Employer"
+                          ? selectedProfile.occupations.find((entry) => entry.status === "current")?.organizationId
+                          : label === "University"
+                            ? selectedProfile.education[0]?.organizationId
+                            : undefined;
+                        const organization = organizationId ? activePeople.find((record) => record.id === organizationId && record.className === "org") : undefined;
+                        return (
+                          <div className="people-info-row" key={label} title={label}>
+                            <span className="people-info-icon"><PeopleIcon name={icon} /></span>
+                            <span className="people-info-copy">
+                              <strong>{label}</strong>
+                              {organization
+                                ? <button type="button" className="people-inline-object-link" onClick={() => selectPerson(organization)}>{value || organization.title}</button>
+                                : <span>{value || "-"}</span>}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </section>;
                   })}
                 </article>
                 <article className="people-overview-about" data-people-overview-card="about">
@@ -4228,7 +4611,7 @@ export default function PeopleWorkspace({
                   <div className="people-about-notes">
                     <header>
                       <strong>{selectedPerson.className === "org" ? "Notes" : "About them"}</strong>
-                      <button type="button" onClick={openEditProfile} aria-label={`Edit notes for ${selectedPerson.title}`}>Edit</button>
+                      <button type="button" onClick={openEditProfile} aria-label={`Edit notes for ${selectedPerson.title}`} title="Edit notes"><PeopleIcon name="edit" /></button>
                     </header>
                     {selectedProfile.notes ? (
                       <ul>
@@ -4238,57 +4621,6 @@ export default function PeopleWorkspace({
                       </ul>
                     ) : <span>No notes added yet.</span>}
                   </div>
-                </article>
-                <article data-people-overview-card="projects">
-                  <LinkedProjectsPanel
-                    personId={selectedPerson.id}
-                    personLabel={selectedPerson.title}
-                    objectType={selectedPerson.className === "org" ? "organization" : "person"}
-                    state={projectsState}
-                    loading={projectsLoading}
-                    error={projectsError}
-                    onRefresh={() => void refreshProjects()}
-                    legacyProjectLabels={selectedPerson.projects}
-                    limit={2}
-                    compact
-                    showBoundary={false}
-                  />
-                </article>
-                <article data-people-overview-card="connections">
-                  <h3>{selectedPerson.className === "org" ? "Linked people" : "Key Connections"}</h3>
-                  {selectedPerson.className === "org" ? (
-                    <div className="people-organization-members">
-                      {selectedOrganizationPeople.length > 0 ? selectedOrganizationPeople.slice(0, 6).map((person) => {
-                        const roles = [
-                          ...(person.profile?.occupations || [])
-                            .filter((entry) => entry.organizationId === selectedPerson.id)
-                            .map((entry) => entry.title),
-                          ...(person.profile?.education || [])
-                            .filter((entry) => entry.organizationId === selectedPerson.id)
-                            .map((entry) => entry.degree || "Education")
-                        ].filter(Boolean);
-                        return (
-                          <button type="button" onClick={() => selectPerson(person)} key={person.id}>
-                            <PeopleProfileAvatar
-                              label={person.title}
-                              initials={getInitials(person)}
-                              photoUrl={person.profile?.photoUrl}
-                              photoUpdatedAt={person.profile?.photoUpdatedAt}
-                              compact
-                            />
-                            <span><strong>{person.title}</strong><small>{roles.join(" · ") || (selectedOrganizationDirectPersonIds.includes(person.id) ? "Direct link" : getPrimaryGroup(person))}</small></span>
-                            <span aria-hidden="true">→</span>
-                          </button>
-                        );
-                      }) : <small>No people are linked to this organization yet.</small>}
-                    </div>
-                  ) : (
-                    <div className="people-connection-row">
-                      {connectionItems.length > 0
-                        ? connectionItems.slice(0, 5).map((name) => <span title={name} key={name}>{name.slice(0, 1)}</span>)
-                        : <small>No linked connections.</small>}
-                    </div>
-                  )}
                 </article>
               </section>
             )}
@@ -4330,7 +4662,7 @@ export default function PeopleWorkspace({
         ) : (
           <>
             <button type="button" onClick={() => openInteractionComposer(selectedPerson)}>Log Interaction</button>
-            <button type="button" onClick={openEditProfile}>Edit Profile</button>
+            <button type="button" onClick={() => setProfileMenuOpen(true)}>More</button>
           </>
         )}
       </nav>}
@@ -4429,6 +4761,56 @@ export default function PeopleWorkspace({
         </div>
       )}
 
+      {objectLinkOpen && selectedPerson && (
+        <div className="people-dialog-backdrop" role="presentation" onMouseDown={(event) => {
+          if (event.target === event.currentTarget && !objectLinkSaving) setObjectLinkOpen(false);
+        }}>
+          <form className="people-object-link-dialog" role="dialog" aria-modal="true" aria-labelledby="people-object-link-title" onSubmit={saveObjectLink}>
+            <header>
+              <div>
+                <h2 id="people-object-link-title">Add {selectedPerson.title} to an object</h2>
+                <p>Create one durable relationship without copying either record.</p>
+              </div>
+              <button className="people-dialog-close" type="button" aria-label="Close object picker" onClick={() => setObjectLinkOpen(false)} disabled={objectLinkSaving}><PeopleIcon name="close" /></button>
+            </header>
+            <div className="people-object-link-fields">
+              <label>
+                Object
+                <select value={objectLinkTargetId} onChange={(event) => setObjectLinkTargetId(event.target.value)} required>
+                  <option value="">Choose an object</option>
+                  {Array.from(new Set(availableObjectTargets.map((target) => target.module))).map((module) => (
+                    <optgroup label={module === "personal_ops" ? "Lists" : labelize(module)} key={module}>
+                      {availableObjectTargets.filter((target) => target.module === module).map((target) => (
+                        <option value={`${target.module}:${target.objectType}:${target.objectId}`} key={`${target.module}:${target.objectType}:${target.objectId}`}>
+                          {target.label}
+                        </option>
+                      ))}
+                    </optgroup>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Relationship
+                <select value={objectLinkRelationship} onChange={(event) => setObjectLinkRelationship(event.target.value)}>
+                  <option value="related">Related</option>
+                  <option value="member">Member</option>
+                  <option value="participant">Participant</option>
+                  <option value="owner">Owner</option>
+                  <option value="client">Client</option>
+                  <option value="advisor">Advisor</option>
+                  <option value="subject">Subject</option>
+                </select>
+              </label>
+            </div>
+            {error && <p className="personal-record-error">{error}</p>}
+            <footer className="people-dialog-actions">
+              <button className="people-dialog-action" type="button" onClick={() => setObjectLinkOpen(false)} disabled={objectLinkSaving}>Cancel</button>
+              <button className="people-dialog-action is-primary" type="submit" disabled={objectLinkSaving || !objectLinkTargetId}>{objectLinkSaving ? "Linking…" : "Add to object"}</button>
+            </footer>
+          </form>
+        </div>
+      )}
+
       <aside className="people-smart-panel">
         <header>
           <h2>Active Filters</h2>
@@ -4460,6 +4842,22 @@ export default function PeopleWorkspace({
           onRemoved={clearProfilePhoto}
         />
       )}
+
+      <ConfirmationSheet
+        open={dormantConfirmOpen}
+        onOpenChange={(open) => {
+          if (!open && lifecycleSaving !== "dormant") setDormantConfirmOpen(false);
+        }}
+        onConfirm={toggleDormant}
+        title={`${selectedPerson?.status === "inactive" ? "Reactivate" : "Set dormant"} ${selectedPerson?.title || "this profile"}?`}
+        description={selectedPerson?.status === "inactive" ? "This profile will return to active People views." : "This profile stays intact but leaves active relationship views."}
+        consequences={selectedPerson?.status === "inactive"
+          ? ["Links and history remain unchanged.", "The profile will be included in active views again."]
+          : ["Links and history remain unchanged.", "You can reactivate the profile from Dormant at any time."]}
+        confirmLabel={selectedPerson?.status === "inactive" ? "Set active" : "Set dormant"}
+        busy={lifecycleSaving === "dormant"}
+        dismissible={lifecycleSaving !== "dormant"}
+      />
 
       <ConfirmationSheet
         open={Boolean(deleteTarget)}
