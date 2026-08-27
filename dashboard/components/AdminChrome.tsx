@@ -377,6 +377,14 @@ export default function AdminChrome({
             grid-template-columns: 1fr;
           }
         }
+
+        @media (max-width: 760px) {
+          .people-module-shell.admin-chrome-main {
+            width: 100%;
+            margin-left: 0;
+            margin-right: 0;
+          }
+        }
       `}</style>
       {showLocalAi && (
         <SharedAIDock
