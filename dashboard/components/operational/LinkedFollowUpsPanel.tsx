@@ -62,7 +62,7 @@ export default function LinkedFollowUpsPanel({
   createHref?: string;
   limit?: number;
   compact?: boolean;
-  presentation?: "default" | "rail";
+  presentation?: "default" | "rail" | "people";
   showHeader?: boolean;
   showBoundary?: boolean;
   hideWhenEmpty?: boolean;
@@ -91,18 +91,22 @@ export default function LinkedFollowUpsPanel({
       {showHeader && (
         <header className={styles.header}>
           <div className={styles.heading}>
-            <span>{presentation === "rail" ? "Linked to this person" : "Personal Ops owner"}</span>
+            {presentation !== "people" && <span>{presentation === "rail" ? "Linked to this person" : "Personal Ops owner"}</span>}
             <strong>{title}</strong>
           </div>
-          <button
-            type="button"
-            className={styles.refresh}
-            onClick={onRefresh}
-            disabled={loading}
-            aria-label={`Refresh linked Follow-ups for ${source.label}`}
-          >
-            {loading ? "Checking…" : presentation === "rail" ? "Check" : "Refresh status"}
-          </button>
+          {presentation === "people" ? (
+            <strong className={styles.count} aria-label={`${linked.length} linked follow-ups`}>{linked.length}</strong>
+          ) : (
+            <button
+              type="button"
+              className={styles.refresh}
+              onClick={onRefresh}
+              disabled={loading}
+              aria-label={`Refresh linked Follow-ups for ${source.label}`}
+            >
+              {loading ? "Checking…" : presentation === "rail" ? "Check" : "Refresh status"}
+            </button>
+          )}
         </header>
       )}
 
@@ -138,7 +142,7 @@ export default function LinkedFollowUpsPanel({
             </li>
           )}
         </ul>
-      ) : (
+      ) : presentation !== "people" ? (
         <p className={styles.empty}>
           {error
             ? "Current linked Follow-up status is unavailable. Retry before creating new work."
@@ -146,9 +150,9 @@ export default function LinkedFollowUpsPanel({
               ? "No follow-ups for this person."
               : "No Personal Ops Follow-up uses this exact source."}
         </p>
-      )}
+      ) : null}
 
-      <div className={styles.summary}>
+      {presentation !== "people" && <div className={styles.summary}>
         <span>
           {error ? "Last loaded: " : ""}
           {activeCount} active · {linked.length} total
@@ -158,7 +162,7 @@ export default function LinkedFollowUpsPanel({
             Create in Personal Ops
           </Link>
         )}
-      </div>
+      </div>}
 
       {showBoundary && (
         <p className={styles.boundary}>

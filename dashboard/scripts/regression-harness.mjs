@@ -5661,6 +5661,22 @@ async function checkPeopleMemoryBrowserState(
       const context = await contextFor({ width: viewport.width, height: viewport.height });
       const page = await context.newPage();
       await page.goto(`${baseUrl}/admin/people`, { waitUntil: "networkidle" });
+      const directoryHeader = page.locator(".people-directory-header");
+      const viewSwitch = page.locator(".people-view-switch");
+      assert(
+        !(await directoryHeader.innerText()).includes("People records") &&
+          await directoryHeader.locator('button[aria-label="Log interaction"]').count() === 1 &&
+          await directoryHeader.locator('button[aria-label="Add organization"]').count() === 1 &&
+          await directoryHeader.locator('button[aria-label="Add person"]').count() === 1 &&
+          await page.locator(".people-primary-search .people-search-filter").count() === 1 &&
+          await viewSwitch.locator("button").count() === 3,
+        `People directory retained redundant counts or the old toolbar at ${viewport.label}`
+      );
+      const nicknameDirectoryRow = page.locator(".people-directory-row").filter({ hasText: personTitle });
+      assert(
+        (await nicknameDirectoryRow.locator(".people-row-name").innerText()).includes("a.k.a. Reg"),
+        `People directory did not expose the profile nickname at ${viewport.label}`
+      );
       const recentInteractions = page.locator(".people-recent-interactions");
       await recentInteractions.waitFor();
       assert(
@@ -5708,7 +5724,7 @@ async function checkPeopleMemoryBrowserState(
         assert(
           navigationState.pathname.endsWith(`/admin/people/${encodeURIComponent(switchTarget.id)}`) &&
             !navigationState.blank &&
-            navigationState.heading === switchTarget.title &&
+            navigationState.heading.startsWith(switchTarget.title) &&
             profileFetches.length === 0 &&
             profileSwitchErrors.length === 0,
           `People profile switching blanked or fetched a replacement route: ${JSON.stringify({ switchTarget, navigationState, profileFetches, profileSwitchErrors })}`
@@ -5717,6 +5733,11 @@ async function checkPeopleMemoryBrowserState(
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=overview`, { waitUntil: "networkidle" });
       const overview = page.locator(".people-overview-grid");
       await overview.waitFor();
+      const profileHeadingText = (await page.locator(".people-profile-header h2").innerText()).replace(/\s+/g, " ");
+      assert(
+        profileHeadingText.includes(`${personTitle}, a.k.a. Reg`),
+        `People profile title did not use the requested a.k.a. nickname treatment at ${viewport.label}: ${JSON.stringify({ profileHeadingText, expected: `${personTitle}, a.k.a. Reg` })}`
+      );
       const profilePhoto = page.getByRole("button", { name: new RegExp(`profile picture for ${personTitle}`, "i") });
       await profilePhoto.waitFor();
       assert(
@@ -5738,7 +5759,7 @@ async function checkPeopleMemoryBrowserState(
       const overviewCards = overview.locator(":scope > [data-people-overview-card]");
       assert(
         JSON.stringify(await overviewCards.evaluateAll((elements) => elements.map((element) => element.getAttribute("data-people-overview-card")))) ===
-          JSON.stringify(["contact", "quick-info", "about"]),
+          JSON.stringify(["contact", "about", "quick-info"]),
         `People Overview card hierarchy drifted at ${viewport.label}`
       );
       assert(
@@ -5783,8 +5804,8 @@ async function checkPeopleMemoryBrowserState(
         ]);
         assert(gridRect && contactRect && quickRect && aboutRect, `People Overview cards were not measurable at ${viewport.label}`);
         assert(
-          contactRect.y < quickRect.y && quickRect.y < aboutRect.y && contactRect.width >= gridRect.width - 2 && quickRect.width >= gridRect.width - 2,
-          `People Overview did not lead with the compact contact rail and full-width fact list at ${viewport.label}`
+          contactRect.y < aboutRect.y && aboutRect.y < quickRect.y && contactRect.width >= gridRect.width - 2 && quickRect.width >= gridRect.width - 2,
+          `People Overview did not lead with About and Notes before the fact list at ${viewport.label}`
         );
       }
       assert(
@@ -5796,9 +5817,23 @@ async function checkPeopleMemoryBrowserState(
       assert(
         aboutCardText.includes("Prefers written project updates") &&
           aboutCardText.includes("Collects field notebooks") &&
-          await overview.locator(".people-about-notes li").count() === 2,
+          await overview.locator(".people-about-notes li").count() >= 2 &&
+          !aboutCardText.includes("About them") &&
+          !aboutCardText.includes("No notes added yet") &&
+          await overview.getByRole("button", { name: `Add note for ${personTitle}` }).count() === 1,
         `People Overview did not render separate About notes at ${viewport.label}`
       );
+      const quickNoteButton = overview.getByRole("button", { name: `Add note for ${personTitle}` });
+      await quickNoteButton.click();
+      const quickNoteForm = overview.locator(".people-quick-note-form");
+      await quickNoteForm.waitFor();
+      if (viewport.label === "desktop") {
+        await quickNoteForm.getByLabel(`New note for ${personTitle}`).fill("Saved from the compact Overview composer");
+        await quickNoteForm.getByRole("button", { name: "Add", exact: true }).click();
+        await overview.getByText("Saved from the compact Overview composer", { exact: true }).waitFor();
+      } else {
+        await quickNoteForm.getByRole("button", { name: "Cancel", exact: true }).click();
+      }
       assert(
         await page.getByRole("tab", { name: "Notes & Memories" }).count() === 0 &&
           await page.getByRole("tab", { name: "Relationships" }).count() === 0 &&
@@ -5854,6 +5889,17 @@ async function checkPeopleMemoryBrowserState(
       assert(
         timelineActionWidths.length === 2 && timelineActionWidths.every((width) => width < 190),
         `Timeline actions remained oversized at ${viewport.label}: ${JSON.stringify(timelineActionWidths)}`
+      );
+      const followUpPanel = page.locator('[data-people-follow-up-bridge]');
+      const followUpText = await followUpPanel.innerText();
+      assert(
+        followUpText.includes("Follow-ups") &&
+          !followUpText.includes("Linked to this person") &&
+          !followUpText.includes("No follow-ups for this person") &&
+          !followUpText.includes("Create in Personal Ops") &&
+          !followUpText.includes("active ·") &&
+          await followUpPanel.locator("button").count() === 0,
+        `Timeline retained the verbose Follow-up rail at ${viewport.label}`
       );
       if (viewport.label !== "mobile") {
         const [streamRect, sideRect] = await Promise.all([
@@ -5948,6 +5994,17 @@ async function checkPeopleMemoryBrowserState(
           await page.getByRole("button", { name: "Add link", exact: true }).count() === 1,
         `Legacy Relationships route did not resolve to the unified Links hub at ${viewport.label}`
       );
+      const linkedHeaderGeometry = await page.locator(".people-linked-card-header").evaluateAll((headers) => headers.flatMap((header) => {
+        const count = header.querySelector(".people-section-count");
+        if (!count) return [];
+        const headerRect = header.getBoundingClientRect();
+        const countRect = count.getBoundingClientRect();
+        return [{ rightGap: Math.abs(headerRect.right - countRect.right), topGap: Math.abs(headerRect.top - countRect.top) }];
+      }));
+      assert(
+        linkedHeaderGeometry.length >= 5 && linkedHeaderGeometry.every((item) => item.rightGap < 3 && item.topGap < 3),
+        `Links counts did not stay in the top-right corner at ${viewport.label}: ${JSON.stringify(linkedHeaderGeometry)}`
+      );
       await assertNoOverflow(page, `People Links ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-relationships-${viewport.label}.png`),
@@ -5957,10 +6014,9 @@ async function checkPeopleMemoryBrowserState(
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=files`, { waitUntil: "networkidle" });
       const mediaSearch = page.locator(`a[href^="/admin/media?query="]`);
       const resourceSearch = page.locator(`a[href^="/admin/resources?query="]`);
-      const profileTitle = (await page.locator(".people-profile-header h2").textContent())?.trim() || "";
       assert(
-        (await mediaSearch.getAttribute("href"))?.includes(`/admin/media?query=${encodeURIComponent(profileTitle)}`) &&
-          (await resourceSearch.getAttribute("href"))?.includes(`/admin/resources?query=${encodeURIComponent(profileTitle)}`) &&
+        (await mediaSearch.getAttribute("href"))?.includes(`/admin/media?query=${encodeURIComponent(personTitle)}`) &&
+          (await resourceSearch.getAttribute("href"))?.includes(`/admin/resources?query=${encodeURIComponent(personTitle)}`) &&
           !(await page.locator(".people-links-hub").innerText()).includes("unavailable"),
         `Legacy Files route did not resolve to working owner-module links at ${viewport.label}`
       );
@@ -5977,8 +6033,18 @@ async function checkPeopleMemoryBrowserState(
         await page.locator(".people-profile-section-heading svg").count() >= 5,
         `Properties did not provide compact icon-led sections at ${viewport.label}`
       );
+      const propertySectionOrder = await page.locator("[data-profile-section]").evaluateAll((sections) => sections.map((section) => section.getAttribute("data-profile-section")));
       assert(
-        await propertyNotes.locator("textarea").count() === 2 &&
+        propertySectionOrder.indexOf("identity") < propertySectionOrder.indexOf("groups") &&
+          propertySectionOrder.indexOf("groups") < propertySectionOrder.indexOf("communication") &&
+          propertySectionOrder.includes("occupations") &&
+          propertySectionOrder.includes("education") &&
+          propertySectionOrder.includes("locations") &&
+          !propertySectionOrder.includes("place-and-relationships"),
+        `Properties did not keep the requested section order or retained Relationships at ${viewport.label}: ${JSON.stringify(propertySectionOrder)}`
+      );
+      assert(
+        await propertyNotes.locator("textarea").count() >= 2 &&
           await propertyNotes.locator("textarea").nth(0).inputValue() === "Prefers written project updates" &&
           await propertyNotes.locator('input[type="date"]').count() === 0,
         `Properties did not expose About notes as separate bullet editors at ${viewport.label}`
@@ -6025,6 +6091,14 @@ async function checkPeopleMemoryBrowserState(
           await page.getByLabel("Email 3 category").inputValue() === "custom" &&
           await page.getByLabel("Custom category").first().inputValue() === "Alumni",
         `Properties did not render every labeled email and phone number at ${viewport.label}`
+      );
+      assert(
+        await page.getByRole("button", { name: /^Remove (email|phone|job|university|location)/ }).count() > 0 &&
+          !(await page.locator(".people-edit-form").innerText()).includes("A person can belong to several groups") &&
+          !(await page.locator(".people-edit-form").innerText()).includes("Keep current and past work together") &&
+          !(await page.locator(".people-edit-form").innerText()).includes("Add another only when") &&
+          !(await page.locator(".people-edit-form").innerText()).includes("Save a city"),
+        `Properties retained verbose helper copy or lost accessible trash actions at ${viewport.label}`
       );
       assert(
         await page.locator('[data-location-entry="location-regression-1"] textarea').inputValue() === "123 Test Street, Columbus, Ohio 43215, USA",
@@ -6105,9 +6179,9 @@ async function checkPeopleMemoryBrowserState(
         `New People did not extract a quoted nickname while deriving the full name at ${viewport.label}`
       );
       const createNotes = page.locator("[data-people-notes-editor]");
-      await createNotes.getByLabel("Notes about them note 1").fill("Prefers afternoon calls");
+      await createNotes.getByLabel("Notes note 1").fill("Prefers afternoon calls");
       await createNotes.getByRole("button", { name: "Add note" }).click();
-      await createNotes.getByLabel("Notes about them note 2").fill("Met through the design community");
+      await createNotes.getByLabel("Notes note 2").fill("Met through the design community");
       assert(
         await createNotes.locator("textarea").count() === 2,
         `New People did not provide repeatable About notes at ${viewport.label}`
@@ -6779,8 +6853,9 @@ async function checkPeopleFollowUpBridgeBrowserState(
     assert(
       (await row.innerText()).includes(followUp.title) &&
         (await row.innerText()).includes("Scheduled") &&
-        (await bridge.innerText()).includes("Linked to this person"),
-      "People did not render the linked Follow-up title, current state, and person-specific rail context"
+        (await bridge.innerText()).includes("Follow-ups") &&
+        !(await bridge.innerText()).includes("Linked to this person"),
+      "People did not render the linked Follow-up title, current state, and streamlined section context"
     );
 
     const updatedFollowUp = await requestJson(baseUrl, cookieJar, "/api/personal/ops", {
@@ -6800,14 +6875,13 @@ async function checkPeopleFollowUpBridgeBrowserState(
       updatedFollowUp.response.ok && updatedFollowUp.payload?.item?.followUpState === "waiting",
       `Personal Ops status update for the People bridge failed: ${JSON.stringify(updatedFollowUp.payload)}`
     );
-    await bridge.getByRole("button", { name: `Refresh linked Follow-ups for ${person.title}` }).click();
-    await page
-      .locator(`[data-people-follow-up-id="${followUp.id}"][data-follow-up-state="waiting"]`)
-      .waitFor();
+    await page.reload({ waitUntil: "networkidle" });
+    const waitingRow = page.locator(`[data-people-follow-up-id="${followUp.id}"][data-follow-up-state="waiting"]`);
+    await waitingRow.waitFor();
     assert(
-      await row.getAttribute("data-follow-up-state") === "waiting" &&
-        (await row.innerText()).includes("Waiting"),
-      "People refresh did not load the current Personal Ops Follow-up state"
+      await waitingRow.getAttribute("data-follow-up-state") === "waiting" &&
+        (await waitingRow.innerText()).includes("Waiting"),
+      "People reload did not load the current Personal Ops Follow-up state"
     );
 
     await page.reload({ waitUntil: "networkidle" });
@@ -11706,7 +11780,10 @@ async function main() {
 
     const peoplePage = await requestText(server.baseUrl, cookieJar, "/admin/people");
     assert(peoplePage.response.ok, `People page failed: ${describeStatus(peoplePage.response)}`);
-    assert(peoplePage.body.includes("People records"), "People page missing native People record scope");
+    assert(
+      peoplePage.body.includes("All People") && !peoplePage.body.includes("total Personal Records"),
+      "People page missing the streamlined native directory scope"
+    );
     pass("People hub loads");
 
     const mediaPage = await requestText(server.baseUrl, cookieJar, "/admin/media");
@@ -14556,6 +14633,7 @@ async function main() {
         time: { lastReview: "2026-07-14", reviewCadence: "NONE" },
         profile: {
           fullName: updatedPersonTitle,
+          nickname: "Reg",
           contactCadence: "NONE",
           emails: [
             { id: "email-regression-primary", category: "primary", address: "regression-person@example.com" },

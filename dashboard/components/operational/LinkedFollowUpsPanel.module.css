@@ -19,6 +19,12 @@
   background: var(--surface-panel-soft, #f7fafb);
 }
 
+.panel[data-presentation="people"] {
+  gap: 8px;
+  padding: 12px;
+  background: var(--surface-panel-soft, #fbfcfb);
+}
+
 .header,
 .actions,
 .summary {
@@ -48,6 +54,21 @@
   color: var(--text-strong, #102026);
   font-size: 14px;
   line-height: 1.25;
+}
+
+.count {
+  display: inline-grid;
+  min-width: 27px;
+  height: 27px;
+  padding: 0 7px;
+  place-items: center;
+  border: 1px solid var(--border-soft, #d5e2e7);
+  border-radius: 9px;
+  background: var(--surface-panel, #fff);
+  color: var(--text-strong, #102026);
+  font-family: "Inconsolata Variable", monospace;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
 }
 
 .refresh,
@@ -168,6 +189,15 @@
 
 .panel[data-presentation="rail"] .summary {
   font-weight: 750;
+}
+
+.panel[data-presentation="people"] .row {
+  padding: 8px;
+  border-color: color-mix(in srgb, var(--accent-purple, #7657c8) 16%, var(--border-soft, #d5e2e7));
+}
+
+.panel[data-presentation="people"] .ownerLink {
+  display: none;
 }
 
 .empty {

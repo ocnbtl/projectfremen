@@ -10748,3 +10748,639 @@ html[data-admin-preview="mobile"] .people-fact-cluster.is-relationships {
     animation: none;
   }
 }
+
+/* People dossier refinement: reading-first overview, restrained house palette, and compact editors. */
+.people-profile-header {
+  border-color: color-mix(in srgb, var(--accent-blue) 14%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent-blue) 3%, var(--surface-panel)) !important;
+  box-shadow: var(--shadow-panel);
+}
+
+.people-profile-title-line h2 > span {
+  color: var(--text-muted);
+  font-size: .58em;
+  font-weight: 650;
+  letter-spacing: -.015em;
+  white-space: nowrap;
+}
+
+.people-tag-row {
+  gap: 6px;
+}
+
+.people-tag-row span,
+.people-tag-row span:nth-child(2n),
+.people-tag-row span:nth-child(3n) {
+  min-height: 24px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, var(--accent-crimson) 18%, var(--border-soft));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-crimson) 6%, var(--surface-panel));
+  color: color-mix(in srgb, var(--accent-crimson) 68%, var(--text-strong));
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 10px;
+  font-weight: 720;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.people-overview-grid {
+  gap: 10px;
+}
+
+.people-overview-about {
+  padding: 14px !important;
+  border-color: color-mix(in srgb, var(--accent-crimson) 14%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--accent-crimson) 3%, var(--surface-panel)) !important;
+}
+
+.people-about-notes header strong {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.people-about-notes header strong span {
+  display: inline-grid;
+  min-width: 24px;
+  height: 24px;
+  padding: 0 6px;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent-crimson) 18%, var(--border-soft));
+  border-radius: 8px;
+  background: var(--surface-panel);
+  color: var(--accent-crimson);
+  font-family: "Inconsolata Variable", monospace;
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.people-about-notes header button {
+  color: var(--accent-crimson);
+}
+
+.people-quick-note-form {
+  display: grid;
+  gap: 7px;
+  padding-top: 8px;
+}
+
+.people-quick-note-form textarea {
+  width: 100%;
+  min-height: 68px;
+  padding: 9px 10px;
+  resize: vertical;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  outline: 0;
+  background: color-mix(in srgb, var(--text-strong) 2%, var(--surface-panel));
+  color: var(--text-strong);
+  font: 500 12px/1.45 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-quick-note-form textarea:focus-visible {
+  border-color: color-mix(in srgb, var(--accent-crimson) 48%, var(--border-soft));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-crimson) 12%, transparent);
+}
+
+.people-quick-note-form > div {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.people-quick-note-form button {
+  width: auto;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.people-quick-note-form button[type="submit"] {
+  border-color: var(--text-strong);
+  background: var(--text-strong);
+  color: var(--surface-panel);
+}
+
+.people-overview-facts {
+  background: var(--surface-panel-soft) !important;
+}
+
+.people-fact-cluster.is-life {
+  background: color-mix(in srgb, var(--accent-cyan) 6%, var(--surface-panel));
+}
+
+.people-fact-cluster.is-work {
+  background: color-mix(in srgb, var(--accent-blue) 5%, var(--surface-panel));
+}
+
+.people-fact-cluster.is-relationships {
+  background: color-mix(in srgb, var(--accent-purple) 6%, var(--surface-panel));
+}
+
+.people-info-icon,
+.people-fact-cluster.is-work .people-info-icon,
+.people-fact-cluster.is-relationships .people-info-icon {
+  border-color: color-mix(in srgb, currentColor 16%, transparent);
+  background: color-mix(in srgb, currentColor 6%, var(--surface-panel));
+}
+
+.people-fact-cluster.is-life .people-info-icon { color: var(--accent-cyan); }
+.people-fact-cluster.is-work .people-info-icon { color: var(--accent-blue); }
+.people-fact-cluster.is-relationships .people-info-icon { color: var(--accent-purple); }
+
+.people-directory-header > div:first-child {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+}
+
+.people-header-actions button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.people-header-actions button:last-child {
+  border-color: var(--text-strong);
+  background: var(--text-strong);
+  color: var(--surface-panel);
+}
+
+.people-header-actions svg,
+.people-primary-search > svg,
+.people-primary-search button svg,
+.people-view-switch svg,
+.people-repeatable-title svg,
+.people-remove-icon svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+}
+
+.people-directory-tools {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.people-primary-search {
+  position: relative;
+  min-height: 40px;
+  padding: 0 5px 0 11px;
+}
+
+.people-primary-search > svg {
+  flex: 0 0 auto;
+  color: var(--text-muted);
+}
+
+.people-primary-search input {
+  align-self: stretch;
+  min-height: 38px;
+  padding: 0;
+  line-height: 38px;
+}
+
+.people-primary-search button {
+  display: grid;
+  flex: 0 0 auto;
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  place-items: center;
+}
+
+.people-primary-search .people-search-filter {
+  position: relative;
+  width: 38px;
+  border-left: 1px solid var(--border-soft);
+  border-radius: 0 6px 6px 0;
+}
+
+.people-search-filter span {
+  position: absolute;
+  top: 1px;
+  right: 0;
+  display: grid;
+  min-width: 15px;
+  height: 15px;
+  padding: 0 3px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--accent-crimson);
+  color: #fff;
+  font: 800 9px/1 "Inconsolata Variable", monospace;
+}
+
+.people-view-switch {
+  display: grid;
+  grid-template-columns: repeat(3, 36px);
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text-strong) 3%, var(--surface-panel));
+}
+
+.people-view-switch button {
+  display: grid;
+  width: 36px;
+  min-width: 36px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.people-view-switch button:hover {
+  background: color-mix(in srgb, var(--accent-blue) 6%, var(--surface-panel));
+  color: var(--text-strong);
+}
+
+.people-view-switch button[aria-pressed="true"] {
+  background: var(--surface-panel);
+  color: var(--accent-blue);
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent-blue) 14%, var(--border-soft)), 0 1px 2px rgba(16, 32, 38, .06);
+}
+
+.people-view-switch button:focus-visible,
+.people-primary-search button:focus-visible,
+.people-remove-icon:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent-blue) 20%, transparent);
+  outline-offset: 2px;
+}
+
+.people-row-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 7px;
+  min-width: 0;
+}
+
+.people-row-name > em {
+  color: var(--text-muted);
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 650;
+}
+
+.people-edit-toolbar {
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-panel) 92%, var(--surface-app));
+  box-shadow: 0 4px 16px rgba(16, 32, 38, .055);
+}
+
+.people-edit-toolbar > strong {
+  color: var(--text-strong);
+  font: 750 14px/1.2 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-edit-toolbar > div {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.people-edit-toolbar button {
+  width: auto;
+  min-width: 76px;
+  min-height: 36px;
+  padding: 0 12px;
+}
+
+.people-edit-toolbar button[type="submit"] {
+  border-color: var(--text-strong);
+  background: var(--text-strong);
+  color: var(--surface-panel);
+}
+
+.people-edit-toolbar button:not([type="submit"]) {
+  border-color: var(--border-strong);
+  background: var(--surface-panel);
+  color: var(--text-strong);
+}
+
+.people-themed-section {
+  --people-section-accent: var(--accent-blue);
+  color: var(--people-section-accent);
+  border-color: color-mix(in srgb, var(--people-section-accent) 18%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--people-section-accent) 3%, var(--surface-panel)) !important;
+}
+
+.people-themed-section.module-ref-tone-pink { --people-section-accent: var(--accent-pink); }
+.people-themed-section.module-ref-tone-purple { --people-section-accent: var(--accent-purple); }
+.people-themed-section.module-ref-tone-blue { --people-section-accent: var(--accent-blue); }
+.people-themed-section.module-ref-tone-green { --people-section-accent: var(--accent-green); }
+.people-themed-section.module-ref-tone-cyan { --people-section-accent: var(--accent-cyan); }
+.people-themed-section.module-ref-tone-orange { --people-section-accent: var(--accent-orange); }
+.people-themed-section.module-ref-tone-crimson { --people-section-accent: var(--accent-crimson); }
+
+.people-profile-section-heading,
+.people-repeatable-heading {
+  color: var(--people-section-accent);
+  background: color-mix(in srgb, var(--people-section-accent) 5%, var(--surface-panel));
+}
+
+.people-profile-section-heading h4,
+.people-repeatable-heading h4 {
+  color: var(--text-strong);
+}
+
+.people-profile-section[data-profile-section="identity"] .people-profile-field-fullName {
+  grid-column: span 2;
+}
+
+.people-profile-section > .people-birthday-field {
+  margin: 0 10px 10px;
+}
+
+.people-birthday-field {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.people-birthday-field legend {
+  margin-bottom: 5px;
+  padding: 0;
+  color: var(--text-subtle);
+  font-size: 10px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.people-birthday-field label {
+  gap: 0;
+}
+
+.people-contact-channel-grid {
+  margin: 0 10px 10px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--people-section-accent) 14%, var(--border-soft));
+}
+
+.people-contact-channel-section {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--people-section-accent) 14%, var(--border-soft));
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--people-section-accent) 2%, var(--surface-panel));
+  color: var(--people-section-accent);
+}
+
+.people-contact-channel-section .people-repeatable-heading {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.people-contact-channel-section .people-repeatable-heading h4 {
+  font-size: 11px;
+}
+
+.people-repeatable-section.people-themed-section {
+  padding: 0;
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.people-repeatable-section.people-themed-section > .people-repeatable-heading {
+  padding: 9px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--people-section-accent) 14%, var(--border-soft));
+}
+
+.people-repeatable-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.people-repeatable-title > span {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--people-section-accent) 10%, transparent);
+}
+
+.people-repeatable-section.people-themed-section > .people-repeatable-entry,
+.people-repeatable-section.people-themed-section > .people-repeatable-empty,
+.people-repeatable-section.people-themed-section > .people-comes-from-field {
+  margin-inline: 10px;
+}
+
+.people-repeatable-section.people-themed-section > :last-child {
+  margin-bottom: 10px;
+}
+
+.people-repeatable-entry-heading {
+  justify-content: flex-end;
+}
+
+.people-repeatable-entry-heading strong {
+  margin-right: auto;
+}
+
+.people-remove-icon,
+.people-repeatable-entry-heading .people-remove-icon,
+.people-contact-channel-fields .people-remove-icon,
+.people-organization-linked-list article > .people-remove-icon {
+  display: grid;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent-crimson) 18%, var(--border-soft));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-crimson) 4%, var(--surface-panel));
+  color: var(--accent-crimson);
+}
+
+.people-remove-icon:hover,
+.people-repeatable-entry-heading .people-remove-icon:hover {
+  border-color: color-mix(in srgb, var(--accent-crimson) 42%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent-crimson) 8%, var(--surface-panel));
+}
+
+.people-repeatable-fields-job {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 112px;
+}
+
+.people-comes-from-field {
+  display: grid;
+  gap: 5px;
+  padding-top: 10px;
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.people-comes-from-field input {
+  min-height: 38px;
+  padding: 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text-strong) 2%, var(--surface-panel));
+  color: var(--text-strong);
+}
+
+.people-section-count {
+  font-variant-numeric: tabular-nums;
+}
+
+.people-linked-card-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+}
+
+.people-linked-card-header .people-section-count {
+  grid-column: 2;
+  grid-row: 1;
+  justify-self: end;
+}
+
+.people-links-section-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: end;
+  width: auto;
+  min-height: 32px;
+  margin-top: 8px;
+  padding: 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
+.people-links-section {
+  border-top-width: 2px !important;
+  background: var(--surface-panel) !important;
+}
+
+.people-links-section.is-people { border-top-color: var(--accent-pink); }
+.people-links-section.is-organizations { border-top-color: var(--accent-blue); }
+.people-links-section.is-connections { border-top-color: var(--accent-crimson); }
+.people-links-section.is-projects { border-top-color: var(--accent-green); }
+.people-links-section.is-objects { border-top-color: var(--accent-purple); }
+.people-links-section.is-files { border-top-color: var(--accent-cyan); }
+.people-links-section.is-resources { border-top-color: var(--accent-orange); }
+
+.people-links-section.is-connections .people-inline-link-form {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.people-links-section.is-connections .people-inline-link-form > label:first-child {
+  grid-column: 1 / -1;
+}
+
+@media (max-width: 980px) {
+  .people-profile-section[data-profile-section="identity"] .people-profile-field-fullName {
+    grid-column: span 1;
+  }
+
+  .people-repeatable-fields-job {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 104px;
+  }
+}
+
+@media (max-width: 760px) {
+  .people-directory-header {
+    align-items: center;
+  }
+
+  .people-header-actions button span {
+    display: none;
+  }
+
+  .people-header-actions button {
+    width: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    justify-content: center;
+  }
+
+  .people-directory-tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .people-view-switch {
+    justify-self: end;
+  }
+
+  .people-profile-title-line h2 > span {
+    display: block;
+    margin-top: 3px;
+    white-space: normal;
+  }
+
+  .people-edit-toolbar {
+    position: static;
+  }
+
+  .people-edit-toolbar button {
+    min-width: 68px;
+  }
+
+  .people-repeatable-fields-job {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .people-remove-icon,
+  .people-repeatable-entry-heading .people-remove-icon,
+  .people-contact-channel-fields .people-remove-icon,
+  .people-organization-linked-list article > .people-remove-icon {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+}
+
+html[data-admin-preview="mobile"] .people-directory-tools,
+html[data-admin-preview="mobile"] .people-repeatable-fields-job {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+html[data-admin-preview="mobile"] .people-view-switch {
+  justify-self: end;
+}
+
+html[data-admin-preview="mobile"] .people-header-actions button span {
+  display: none;
+}
+
+html[data-admin-preview="mobile"] .people-header-actions button {
+  width: 40px;
+  min-width: 40px;
+  min-height: 40px;
+  padding: 0;
+  justify-content: center;
+}
