@@ -12074,6 +12074,8 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
 .shared-ai-dock__body {
   gap: 8px;
   padding: 12px;
+  align-content: start;
+  grid-auto-rows: max-content;
   background: color-mix(in srgb, var(--text-strong) 1.5%, var(--surface-panel));
 }
 

@@ -5728,6 +5728,15 @@ async function checkPeopleMemoryBrowserState(
         const panelBefore = await aiPanel.boundingBox();
         const panelResize = await aiPanel.evaluate((element) => getComputedStyle(element).resize);
         assert(panelBefore && panelResize === "both", `People AI panel was not resizable: ${JSON.stringify({ panelBefore, panelResize })}`);
+        const panelDensity = await aiPanel.evaluate((element) => ({
+          contextHeight: element.querySelector(".shared-ai-dock__context")?.getBoundingClientRect().height || 0,
+          emptyHeight: element.querySelector(".shared-ai-dock__empty-state")?.getBoundingClientRect().height || 0
+        }));
+        assert(
+          panelDensity.contextHeight > 0 && panelDensity.contextHeight < 72 &&
+            panelDensity.emptyHeight > 0 && panelDensity.emptyHeight < 120,
+          `People AI panel content cards stretched vertically: ${JSON.stringify(panelDensity)}`
+        );
         const aiHeader = aiPanel.locator(".shared-ai-dock__header");
         const headerBox = await aiHeader.boundingBox();
         assert(headerBox, "People AI panel header was not measurable");
