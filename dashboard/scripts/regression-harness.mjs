@@ -5697,7 +5697,7 @@ async function checkPeopleMemoryBrowserState(
       await page.locator("#people-filter-sheet").getByRole("button", { name: /Show \d+ Results/ }).click();
       const nicknameDirectoryRow = page.locator(".people-directory-row").filter({ hasText: personTitle });
       assert(
-        (await nicknameDirectoryRow.locator(".people-row-name").innerText()).includes("a.k.a. Reg"),
+        (await nicknameDirectoryRow.locator(".people-row-name").innerText()).includes("AKA Reg"),
         `People directory did not expose the profile nickname at ${viewport.label}`
       );
       const recentInteractions = page.locator(".people-recent-interactions");
@@ -5709,6 +5709,49 @@ async function checkPeopleMemoryBrowserState(
         `People directory did not expose recent shared interactions at ${viewport.label}`
       );
       await assertNoOverflow(page, `People recent interactions ${viewport.label}`);
+      if (viewport.label === "desktop") {
+        const aiLauncher = page.getByRole("button", { name: "Open AI assistant" });
+        const launcherBefore = await aiLauncher.boundingBox();
+        assert(launcherBefore, "People AI launcher was not measurable before dragging");
+        await page.mouse.move(launcherBefore.x + (launcherBefore.width / 2), launcherBefore.y + (launcherBefore.height / 2));
+        await page.mouse.down();
+        await page.mouse.move(launcherBefore.x - 80, launcherBefore.y - 60, { steps: 6 });
+        await page.mouse.up();
+        const launcherAfter = await aiLauncher.boundingBox();
+        assert(
+          launcherAfter && launcherAfter.x < launcherBefore.x - 30 && launcherAfter.y < launcherBefore.y - 30,
+          `People AI launcher did not move by drag: ${JSON.stringify({ launcherBefore, launcherAfter })}`
+        );
+        await aiLauncher.click();
+        const aiPanel = page.getByRole("dialog", { name: "Unigentamos AI" });
+        await aiPanel.waitFor();
+        const panelBefore = await aiPanel.boundingBox();
+        const panelResize = await aiPanel.evaluate((element) => getComputedStyle(element).resize);
+        assert(panelBefore && panelResize === "both", `People AI panel was not resizable: ${JSON.stringify({ panelBefore, panelResize })}`);
+        const aiHeader = aiPanel.locator(".shared-ai-dock__header");
+        const headerBox = await aiHeader.boundingBox();
+        assert(headerBox, "People AI panel header was not measurable");
+        await page.mouse.move(headerBox.x + 9, headerBox.y + (headerBox.height / 2));
+        await page.mouse.down();
+        await page.mouse.move(headerBox.x - 110, headerBox.y - 50, { steps: 6 });
+        await page.mouse.up();
+        const panelAfterDrag = await aiPanel.boundingBox();
+        assert(
+          panelAfterDrag && panelAfterDrag.x < panelBefore.x - 40 && panelAfterDrag.y < panelBefore.y - 20,
+          `People AI panel did not move by its drag handle: ${JSON.stringify({ panelBefore, panelAfterDrag })}`
+        );
+        await page.mouse.move(panelAfterDrag.x + panelAfterDrag.width - 2, panelAfterDrag.y + panelAfterDrag.height - 2);
+        await page.mouse.down();
+        await page.mouse.move(panelAfterDrag.x + panelAfterDrag.width - 62, panelAfterDrag.y + panelAfterDrag.height - 42, { steps: 6 });
+        await page.mouse.up();
+        await page.waitForTimeout(80);
+        const panelAfterResize = await aiPanel.boundingBox();
+        assert(
+          panelAfterResize && panelAfterResize.width < panelAfterDrag.width - 20 && panelAfterResize.height < panelAfterDrag.height - 15,
+          `People AI panel did not resize from its native resize handle: ${JSON.stringify({ panelAfterDrag, panelAfterResize })}`
+        );
+        await aiPanel.getByRole("button", { name: "Close AI assistant" }).click();
+      }
       if (viewport.label === "desktop") {
         const initialHeading = (await page.locator(".people-profile-header h2").textContent())?.trim();
         const switchTarget = initialHeading === organizationTitle
@@ -5758,8 +5801,8 @@ async function checkPeopleMemoryBrowserState(
       await overview.waitFor();
       const profileHeadingText = (await page.locator(".people-profile-header h2").innerText()).replace(/\s+/g, " ");
       assert(
-        profileHeadingText.includes(`${personTitle}, a.k.a. Reg`),
-        `People profile title did not use the requested a.k.a. nickname treatment at ${viewport.label}: ${JSON.stringify({ profileHeadingText, expected: `${personTitle}, a.k.a. Reg` })}`
+        profileHeadingText.includes(`${personTitle}, AKA Reg`),
+        `People profile title did not use the requested AKA nickname treatment at ${viewport.label}: ${JSON.stringify({ profileHeadingText, expected: `${personTitle}, AKA Reg` })}`
       );
       assert(
         await page.locator(".people-profile-actions > .people-status-marker").count() === 1 &&
@@ -5857,6 +5900,24 @@ async function checkPeopleMemoryBrowserState(
           !(await overview.locator('[data-people-overview-card="contact"]').innerText()).includes(organizationTitle),
         `People Overview did not expand every education entry while keeping work current-only at ${viewport.label}`
       );
+      const educationOverview = overview.locator(".people-education-overview");
+      const educationGeometry = await educationOverview.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const parentRect = element.parentElement?.getBoundingClientRect();
+        const cards = Array.from(element.querySelectorAll(".people-education-overview-list > article"));
+        return {
+          width: rect.width,
+          parentWidth: parentRect?.width || 0,
+          cardRows: new Set(cards.map((card) => Math.round(card.getBoundingClientRect().top))).size,
+          background: getComputedStyle(element).backgroundColor
+        };
+      });
+      assert(
+        educationGeometry.width >= educationGeometry.parentWidth - 3 &&
+          educationGeometry.background !== "rgb(255, 255, 255)" &&
+          (viewport.label === "mobile" || educationGeometry.cardRows === 1),
+        `People Education did not use the full-width tinted horizontal history treatment at ${viewport.label}: ${JSON.stringify(educationGeometry)}`
+      );
       const aboutCardText = await overview.locator('[data-people-overview-card="about"]').innerText();
       assert(
         aboutCardText.includes("Prefers written project updates") &&
@@ -5930,8 +5991,12 @@ async function checkPeopleMemoryBrowserState(
       const timelineActionWidths = await page.locator(".people-timeline-actions button").evaluateAll((elements) =>
         elements.map((element) => element.getBoundingClientRect().width)
       );
+      const timelineActionLabels = await page.locator(".people-timeline-actions .people-add-action span").allTextContents();
       assert(
-        timelineActionWidths.length === 2 && timelineActionWidths.every((width) => width < 190),
+        timelineActionWidths.length === 2 &&
+          timelineActionWidths.every((width) => width < 190) &&
+          JSON.stringify(timelineActionLabels) === JSON.stringify(["Interaction", "Follow-up"]) &&
+          await page.locator('.people-timeline-actions .people-add-action path[d="M12 5v14M5 12h14"]').count() === 2,
         `Timeline actions remained oversized at ${viewport.label}: ${JSON.stringify(timelineActionWidths)}`
       );
       const followUpPanel = page.locator('[data-people-follow-up-bridge]');
@@ -6038,6 +6103,8 @@ async function checkPeopleMemoryBrowserState(
           await page.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
           await page.getByText("connected media context", { exact: false }).count() === 0 &&
           await page.getByRole("button", { name: "Add object", exact: true }).count() === 1 &&
+          await page.locator('.people-links-toolbar-actions .people-add-action path[d="M12 5v14M5 12h14"]').count() === 1 &&
+          (await page.getByRole("button", { name: "Add object", exact: true }).innerText()).trim() === "Objects" &&
           await page.getByRole("heading", { name: "Add relationship", exact: true }).count() === 0 &&
           await page.getByRole("button", { name: /^(Browse|Refresh)$/ }).count() === 0,
         `Legacy Relationships route did not resolve to the unified Links hub at ${viewport.label}`
@@ -6074,8 +6141,10 @@ async function checkPeopleMemoryBrowserState(
       });
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
-      const propertyNotes = page.locator("[data-people-notes-editor]");
+      const propertyNotes = page.locator('[data-people-notes-editor="notes"]');
+      const propertyFacts = page.locator('[data-people-notes-editor="interesting-facts"]');
       await propertyNotes.waitFor();
+      await propertyFacts.waitFor();
       assert(
         await page.locator(".people-profile-section-heading svg").count() >= 5,
         `Properties did not provide compact icon-led sections at ${viewport.label}`
@@ -6098,6 +6167,14 @@ async function checkPeopleMemoryBrowserState(
           await propertyNotes.getByRole("button", { name: /^Add note after note / }).count() === await propertyNotes.locator("textarea").count() &&
           await propertyNotes.getByRole("button", { name: /^Remove note / }).count() === await propertyNotes.locator("textarea").count(),
         `Properties did not expose About notes as separate bullet editors at ${viewport.label}`
+      );
+      assert(
+        await propertyFacts.locator("textarea").count() === 2 &&
+          await propertyFacts.getByLabel("Interesting facts note 1").inputValue() === "Collects vintage maps" &&
+          await propertyFacts.getByLabel("Interesting facts note 2").inputValue() === "Writes field notes by hand" &&
+          await propertyFacts.getByRole("button", { name: /^Add note after note / }).count() === 2 &&
+          await propertyFacts.getByRole("button", { name: /^Remove note / }).count() === 2,
+        `Properties did not place repeatable Interesting facts below Life dream at ${viewport.label}`
       );
       const propertyGroups = (await page.locator(".people-profile-group-picker label").allTextContents())
         .map((label) => label.trim());
@@ -6144,6 +6221,11 @@ async function checkPeopleMemoryBrowserState(
       );
       assert(
         await page.getByRole("button", { name: /^Remove (email|phone|job|university|location)/ }).count() > 0 &&
+          await page.getByRole("button", { name: "Add email" }).count() === 1 &&
+          await page.getByRole("button", { name: "Add phone" }).count() === 1 &&
+          await page.getByRole("button", { name: "Add occupation" }).count() === 1 &&
+          await page.getByRole("button", { name: "Add university" }).count() === 1 &&
+          await page.getByRole("button", { name: "Add location" }).count() === 1 &&
           await page.getByRole("heading", { name: "Occupations", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "Education", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "Places", exact: true }).count() === 1 &&
@@ -6154,6 +6236,39 @@ async function checkPeopleMemoryBrowserState(
           !(await page.locator(".people-edit-form").innerText()).includes("Add another only when") &&
           !(await page.locator(".people-edit-form").innerText()).includes("Save a city"),
         `Properties retained verbose helper copy or lost accessible trash actions at ${viewport.label}`
+      );
+      const repeatableLabels = await page.locator(".people-repeatable-fields .people-field-label").allTextContents();
+      assert(
+        repeatableLabels.filter((label) => label === "Employer").length === 1 &&
+          repeatableLabels.filter((label) => label === "University").length === 1 &&
+          repeatableLabels.filter((label) => label === "Degree").length === 1 &&
+          repeatableLabels.filter((label) => label === "Field of study").length === 1,
+        `Properties repeated visible occupation or education column labels at ${viewport.label}: ${JSON.stringify(repeatableLabels)}`
+      );
+      const propertyControlGeometry = await page.evaluate(() => {
+        const removeButtons = Array.from(document.querySelectorAll(".people-edit-form .people-remove-icon"));
+        const addButtons = Array.from(document.querySelectorAll(".people-edit-form .people-add-action"));
+        const phoneFields = document.querySelector("[data-phone-entry] .people-contact-channel-fields");
+        const phoneRemove = phoneFields?.querySelector(".people-contact-remove");
+        const fieldRect = phoneFields?.getBoundingClientRect();
+        const removeRect = phoneRemove?.getBoundingClientRect();
+        const comesFrom = document.querySelector(".people-comes-from-field");
+        return {
+          removeColors: Array.from(new Set(removeButtons.map((button) => getComputedStyle(button).backgroundColor))),
+          addColors: Array.from(new Set(addButtons.map((button) => getComputedStyle(button).backgroundColor))),
+          removeIconWidths: removeButtons.map((button) => button.querySelector("svg")?.getBoundingClientRect().width || 0),
+          phoneBottomGap: fieldRect && removeRect ? Math.abs(fieldRect.bottom - removeRect.bottom) : 999,
+          comesFromOverflow: comesFrom ? comesFrom.scrollWidth - comesFrom.clientWidth : 999
+        };
+      });
+      assert(
+        propertyControlGeometry.removeColors.length === 1 &&
+          propertyControlGeometry.addColors.length === 1 &&
+          propertyControlGeometry.removeColors[0] !== propertyControlGeometry.addColors[0] &&
+          propertyControlGeometry.removeIconWidths.every((width) => width >= 18) &&
+          propertyControlGeometry.phoneBottomGap < 2 &&
+          propertyControlGeometry.comesFromOverflow <= 0,
+        `Properties add/remove controls or Comes from alignment drifted at ${viewport.label}: ${JSON.stringify(propertyControlGeometry)}`
       );
       assert(
         await page.locator('[data-location-entry="location-regression-1"] textarea').inputValue() === "123 Test Street, Columbus, Ohio 43215, USA",
@@ -6244,10 +6359,18 @@ async function checkPeopleMemoryBrowserState(
       const birthdayEditor = page.locator("[data-people-birthday-editor]");
       await birthdayEditor.locator("select").nth(0).selectOption("3");
       await birthdayEditor.locator("select").nth(1).selectOption("14");
+      const unknownYearBirthdayState = {
+        year: await birthdayEditor.locator("input").inputValue(),
+        legend: (await birthdayEditor.locator("legend").innerText()).trim(),
+        month: await birthdayEditor.locator("select").nth(0).inputValue(),
+        day: await birthdayEditor.locator("select").nth(1).inputValue()
+      };
       assert(
-        await birthdayEditor.locator("input").inputValue() === "" &&
-          (await birthdayEditor.locator("legend").innerText()).trim() === "Birthday",
-        `New People did not accept a month and day with an unknown birth year at ${viewport.label}`
+        unknownYearBirthdayState.year === "" &&
+          unknownYearBirthdayState.legend.toLowerCase() === "birthday" &&
+          unknownYearBirthdayState.month === "3" &&
+          unknownYearBirthdayState.day === "14",
+        `New People did not accept a month and day with an unknown birth year at ${viewport.label}: ${JSON.stringify(unknownYearBirthdayState)}`
       );
       const createGroups = (await classification.locator(".people-group-picker label").allTextContents())
         .map((label) => label.trim());
@@ -6302,7 +6425,7 @@ async function checkPeopleMemoryBrowserState(
         `New People repeatable labeled contact controls failed at ${viewport.label}`
       );
       const addUniversityButton = page.getByRole("button", { name: "Add university" });
-      const addJobButton = page.getByRole("button", { name: "Add job" });
+      const addJobButton = page.getByRole("button", { name: "Add occupation" });
       const addLocationButton = page.getByRole("button", { name: "Add location" });
       if (viewport.label === "mobile") {
         await addUniversityButton.dispatchEvent("click");
@@ -14700,6 +14823,8 @@ async function main() {
             { id: "phone-regression-university", category: "university", number: "6145550142", countryCode: "+1" }
           ],
           birthday: "--03-14",
+          lifeDream: "Open a small design school",
+          interestingFact: "Collects vintage maps\nWrites field notes by hand",
           notes: "Prefers written project updates\nCollects field notebooks",
           education: [
             {

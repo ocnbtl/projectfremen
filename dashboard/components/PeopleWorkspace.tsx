@@ -227,6 +227,33 @@ function RemoveIconButton({ label, onClick, className = "" }: { label: string; o
   );
 }
 
+function PeopleAddButton({
+  label,
+  onClick,
+  className = "",
+  disabled = false,
+  ariaLabel
+}: {
+  label: string;
+  onClick: () => void;
+  className?: string;
+  disabled?: boolean;
+  ariaLabel?: string;
+}) {
+  return (
+    <button
+      type="button"
+      className={`people-add-action ${className}`.trim()}
+      onClick={onClick}
+      disabled={disabled}
+      aria-label={ariaLabel || `Add ${label.toLowerCase()}`}
+    >
+      <PeopleIcon name="plus" />
+      <span>{label}</span>
+    </button>
+  );
+}
+
 function ContactMethodIcon({ id }: { id: ContactMethodId }) {
   if (id === "linkedin") return <span aria-hidden="true">in</span>;
   if (id === "x") return <span aria-hidden="true">X</span>;
@@ -616,7 +643,6 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
     tone: "crimson",
     fields: [
       { key: "context", label: "About", type: "textarea", placeholder: "How you know them, why they matter, and the current relationship context." },
-      { key: "interestingFact", label: "Interesting fact", type: "textarea" },
       { key: "lifeDream", label: "Life dream", type: "textarea" }
     ]
   },
@@ -1630,13 +1656,13 @@ function EducationEntriesEditor({
     <section className="people-repeatable-section people-themed-section module-ref-tone-purple" data-people-education-editor data-profile-section="education">
       <header className="people-repeatable-heading">
         <div className="people-repeatable-title"><span><PeopleIcon name="university" /></span><h4>Education</h4></div>
-        <button type="button" onClick={onAdd}>Add university</button>
+        <PeopleAddButton label="University" onClick={onAdd} />
       </header>
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-education-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-education">
             <label>
-              University
+              <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>University</span>
               <select
                 aria-label={`Education ${index + 1} organization`}
                 value={entry.organizationId || ""}
@@ -1652,8 +1678,8 @@ function EducationEntriesEditor({
                 {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.title}</option>)}
               </select>
             </label>
-            <label>Degree<input value={entry.degree || ""} onChange={(event) => onChange(entry.id, { degree: event.target.value })} placeholder="Bachelor’s, Master’s, PhD..." /></label>
-            <label>Field of study<input value={entry.fieldOfStudy || ""} onChange={(event) => onChange(entry.id, { fieldOfStudy: event.target.value })} placeholder="Economics, design, engineering..." /></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Degree</span><input aria-label={`Education ${index + 1} degree`} value={entry.degree || ""} onChange={(event) => onChange(entry.id, { degree: event.target.value })} placeholder="Bachelor’s, Master’s, PhD..." /></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Field of study</span><input aria-label={`Education ${index + 1} field of study`} value={entry.fieldOfStudy || ""} onChange={(event) => onChange(entry.id, { fieldOfStudy: event.target.value })} placeholder="Economics, design, engineering..." /></label>
             <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove university ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
         </article>
@@ -1679,14 +1705,14 @@ function OccupationEntriesEditor({
     <section className="people-repeatable-section people-themed-section module-ref-tone-green" data-people-occupation-editor data-profile-section="occupations">
       <header className="people-repeatable-heading">
         <div className="people-repeatable-title"><span><PeopleIcon name="occupation" /></span><h4>Occupations</h4></div>
-        <button type="button" onClick={onAdd}>Add job</button>
+        <PeopleAddButton label="Occupation" onClick={onAdd} />
       </header>
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-occupation-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-job">
-            <label>Occupation or title<input value={entry.title} onChange={(event) => onChange(entry.id, { title: event.target.value })} placeholder="Product designer" /></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Occupation</span><input aria-label={`Occupation ${index + 1} title`} value={entry.title} onChange={(event) => onChange(entry.id, { title: event.target.value })} placeholder="Product designer" /></label>
             <label>
-              Employer
+              <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Employer</span>
               <select
                 aria-label={`Job ${index + 1} organization`}
                 value={entry.organizationId || ""}
@@ -1702,7 +1728,7 @@ function OccupationEntriesEditor({
                 {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.title}</option>)}
               </select>
             </label>
-            <label>When<select value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></select></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>When</span><select aria-label={`Occupation ${index + 1} timing`} value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></select></label>
             <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove job ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
         </article>
@@ -1732,7 +1758,7 @@ function LocationEntriesEditor({
     <section className="people-repeatable-section people-themed-section module-ref-tone-cyan" data-people-location-editor data-profile-section="locations">
       <header className="people-repeatable-heading">
         <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>{organization ? "Locations" : "Places"}</h4></div>
-        <button type="button" onClick={onAdd}>Add location</button>
+        <PeopleAddButton label="Location" onClick={onAdd} />
       </header>
       {!organization && onComesFromChange && (
         <label className="people-comes-from-field">Comes from<input list="people-location-suggestions" value={comesFrom} onChange={(event) => onComesFromChange(event.target.value)} placeholder="Hometown or place of origin" /></label>
@@ -1740,10 +1766,10 @@ function LocationEntriesEditor({
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-location">
-            <label>Label<input value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? "Relevant location" : index === 0 ? "Primary home" : "Second home"} /></label>
-            <label>City / region<input list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing a city" /></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Label</span><input aria-label={`Location ${index + 1} label`} value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? "Relevant location" : index === 0 ? "Primary home" : "Second home"} /></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City / region</span><input aria-label={`Location ${index + 1} city or region`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing a city" /></label>
             <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove location ${index + 1}`} onClick={() => onRemove(entry.id)} />
-            <label className="is-wide">Street address<textarea value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={2} /></label>
+            <label className="is-wide"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><textarea aria-label={`Location ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={2} /></label>
           </div>
         </article>
       )) : <p className="people-repeatable-empty">No location added.</p>}
@@ -1857,7 +1883,7 @@ function EmailEntriesEditor({
     <section className="people-contact-channel-section" data-people-email-editor>
       <header className="people-repeatable-heading">
         <div><h4>Email addresses</h4></div>
-        <button type="button" onClick={onAdd}>Add email</button>
+        <PeopleAddButton label="Email" onClick={onAdd} />
       </header>
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-contact-channel-entry" data-email-entry={entry.id} key={entry.id}>
@@ -1917,7 +1943,7 @@ function PhoneEntriesEditor({
     <section className="people-contact-channel-section" data-people-phone-editor>
       <header className="people-repeatable-heading">
         <div><h4>Phone numbers</h4></div>
-        <button type="button" onClick={onAdd}>Add phone</button>
+        <PeopleAddButton label="Phone" onClick={onAdd} />
       </header>
       {entries.length > 0 ? entries.map((entry, index) => {
         const phoneError = entry.number.trim() && canonicalCountryCode(entry.countryCode, "")
@@ -2004,11 +2030,15 @@ function PhoneEntriesEditor({
 function PeopleNotesEditor({
   notes,
   onChange,
-  title = "Notes"
+  title = "Notes",
+  idPrefix = "people-about-note",
+  editorKind = "notes"
 }: {
   notes: string[];
   onChange: (notes: string[]) => void;
   title?: string;
+  idPrefix?: string;
+  editorKind?: string;
 }) {
   const rows = notes.length > 0 ? notes : [""];
 
@@ -2024,11 +2054,11 @@ function PeopleNotesEditor({
   function addNote(afterIndex: number) {
     const next = [...rows.slice(0, afterIndex + 1), "", ...rows.slice(afterIndex + 1)];
     onChange(next);
-    window.setTimeout(() => document.getElementById(`people-about-note-${afterIndex + 1}`)?.focus(), 0);
+    window.setTimeout(() => document.getElementById(`${idPrefix}-${afterIndex + 1}`)?.focus(), 0);
   }
 
   return (
-    <section className="people-notes-editor" data-people-notes-editor>
+    <section className="people-notes-editor" data-people-notes-editor={editorKind}>
       <header className="people-repeatable-heading">
         <div><h4>{title}</h4></div>
       </header>
@@ -2037,7 +2067,7 @@ function PeopleNotesEditor({
           <div className="people-note-row" key={`people-note-${index}`}>
             <span className="people-note-bullet" aria-hidden="true" />
             <textarea
-              id={`people-about-note-${index}`}
+              id={`${idPrefix}-${index}`}
               aria-label={`${title} note ${index + 1}`}
               rows={2}
               value={note}
@@ -4052,7 +4082,7 @@ export default function PeopleWorkspace({
                       compact={listMode === "compact"}
                     />
                     <span className="people-row-main">
-                      <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>a.k.a. {profile.nickname}</em>}</span>
+                      <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>AKA {profile.nickname}</em>}</span>
                       <small>{record.className === "org"
                         ? [profile.organizationType, profile.industry].filter(Boolean).join(" · ") || profile.context || getPrimaryGroup(record)
                         : [profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at ") || profile.context || getPrimaryGroup(record)}</small>
@@ -4145,7 +4175,7 @@ export default function PeopleWorkspace({
               />
               <div className="people-profile-identity">
                 <div className="people-profile-title-line">
-                  <h2>{selectedPerson.title}{selectedPerson.className === "person" && selectedProfile.nickname && <>, <span>a.k.a. {selectedProfile.nickname}</span></>}</h2>
+                  <h2>{selectedPerson.title}{selectedPerson.className === "person" && selectedProfile.nickname && <>, <span>AKA {selectedProfile.nickname}</span></>}</h2>
                 </div>
                 <p>{selectedPerson.className === "org"
                   ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || "Organization"
@@ -4312,11 +4342,24 @@ export default function PeopleWorkspace({
                         />
                       </div>}
                       {section.title === "About" && (
-                        <PeopleNotesEditor
-                          title={selectedPerson.className === "org" ? "Organization notes" : "Notes"}
-                          notes={profileDraft.notes ? profileDraft.notes.split(/\r?\n/) : [""]}
-                          onChange={(notes) => updateProfileDraft("notes", notes.join("\n"))}
-                        />
+                        <>
+                          {selectedPerson.className === "person" && (
+                            <PeopleNotesEditor
+                              title="Interesting facts"
+                              idPrefix="people-interesting-fact"
+                              editorKind="interesting-facts"
+                              notes={profileDraft.interestingFact ? profileDraft.interestingFact.split(/\r?\n/) : [""]}
+                              onChange={(facts) => updateProfileDraft("interestingFact", facts.join("\n"))}
+                            />
+                          )}
+                          <PeopleNotesEditor
+                            title={selectedPerson.className === "org" ? "Organization notes" : "Notes"}
+                            idPrefix="people-about-note"
+                            editorKind="notes"
+                            notes={profileDraft.notes ? profileDraft.notes.split(/\r?\n/) : [""]}
+                            onChange={(notes) => updateProfileDraft("notes", notes.join("\n"))}
+                          />
+                        </>
                       )}
                     </section>
                     {section.title === "About" && selectedPerson.className === "person" && (
@@ -4389,14 +4432,12 @@ export default function PeopleWorkspace({
             ) : detailMode === "timeline" ? (
               <section className="people-timeline-panel">
                 <div className="people-timeline-actions">
-                  <button type="button" onClick={() => openInteractionComposer(selectedPerson)}>Log Interaction</button>
-                  <button
-                    type="button"
+                  <PeopleAddButton label="Interaction" ariaLabel="Log interaction" onClick={() => openInteractionComposer(selectedPerson)} />
+                  <PeopleAddButton
+                    label="Follow-up"
                     onClick={() => router.push(followUpCreationRoute(selectedPerson))}
-                    aria-label={`Schedule a Personal Ops follow-up for ${selectedPerson.title}`}
-                  >
-                    Schedule Follow-up
-                  </button>
+                    ariaLabel={`Schedule a Personal Ops follow-up for ${selectedPerson.title}`}
+                  />
                 </div>
                 <div className="people-timeline-layout">
                   <section className="people-timeline-stream" aria-label={`${selectedPerson.title} ${selectedPerson.className === "org" ? "organization" : "relationship"} history`}>
@@ -4481,7 +4522,7 @@ export default function PeopleWorkspace({
                     <strong className="people-section-count" aria-label={`${peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length} linked items`}>
                       {peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length}
                     </strong>
-                    <button type="button" aria-label="Add object" title="Add object" onClick={() => setObjectLinkOpen(true)}><PeopleIcon name="object" /><span>Add object</span></button>
+                    <PeopleAddButton label="Objects" ariaLabel="Add object" onClick={() => setObjectLinkOpen(true)} />
                   </div>
                 </div>
                 {actionNotice && <p className="people-notice">{actionNotice}</p>}
@@ -4675,8 +4716,7 @@ export default function PeopleWorkspace({
                   <h3 className="people-visually-hidden">Profile details</h3>
                   {(["life", "work", "relationships"] as const).map((group) => {
                     const facts = overviewFacts.filter((fact) => fact.group === group);
-                    const showEducation = group === "work" && selectedPerson.className === "person";
-                    if (!facts.length && !showEducation) return null;
+                    if (!facts.length) return null;
                     return <section className={`people-fact-cluster is-${group}`} aria-label={labelize(group)} key={group}>
                       {facts.map(({ label, value, icon }) => {
                         const organizationId = label === "Employer"
@@ -4697,36 +4737,36 @@ export default function PeopleWorkspace({
                           </div>
                         );
                       })}
-                      {showEducation && (
-                        <div className="people-education-overview">
-                          <span className="people-info-icon"><PeopleIcon name="university" /></span>
-                          <div className="people-education-overview-copy">
-                            <strong>Education</strong>
-                            {overviewEducation.length > 0 ? (
-                              <div className="people-education-overview-list">
-                                {overviewEducation.map((entry) => {
-                                  const organization = entry.organizationId
-                                    ? activePeople.find((record) => record.id === entry.organizationId && record.className === "org")
-                                    : undefined;
-                                  return (
-                                    <article key={entry.id}>
-                                      {organization
-                                        ? <button type="button" className="people-inline-object-link" onClick={() => selectPerson(organization)}>{organization.title}</button>
-                                        : <span className="people-education-name">{entry.institution || "University not added"}</span>}
-                                      <div className="people-education-meta">
-                                        <span><small>Degree</small>{entry.degree || "—"}</span>
-                                        <span><small>Field</small>{entry.fieldOfStudy || "—"}</span>
-                                      </div>
-                                    </article>
-                                  );
-                                })}
-                              </div>
-                            ) : <span className="people-education-empty">—</span>}
-                          </div>
-                        </div>
-                      )}
                     </section>;
                   })}
+                  {selectedPerson.className === "person" && (
+                    <section className="people-education-overview" aria-label="Education">
+                      <span className="people-info-icon"><PeopleIcon name="university" /></span>
+                      <div className="people-education-overview-copy">
+                        <strong>Education</strong>
+                        {overviewEducation.length > 0 ? (
+                          <div className="people-education-overview-list">
+                            {overviewEducation.map((entry) => {
+                              const organization = entry.organizationId
+                                ? activePeople.find((record) => record.id === entry.organizationId && record.className === "org")
+                                : undefined;
+                              return (
+                                <article key={entry.id}>
+                                  {organization
+                                    ? <button type="button" className="people-inline-object-link" onClick={() => selectPerson(organization)}>{organization.title}</button>
+                                    : <span className="people-education-name">{entry.institution || "University not added"}</span>}
+                                  <div className="people-education-meta">
+                                    <span><small>Degree</small>{entry.degree || "—"}</span>
+                                    <span><small>Field</small>{entry.fieldOfStudy || "—"}</span>
+                                  </div>
+                                </article>
+                              );
+                            })}
+                          </div>
+                        ) : <span className="people-education-empty">—</span>}
+                      </div>
+                    </section>
+                  )}
                 </article>
               </section>
             )}

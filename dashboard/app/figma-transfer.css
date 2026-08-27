@@ -11685,3 +11685,614 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location {
 html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   grid-column: auto;
 }
+
+/* People: horizontal education history and one reusable add/remove language. */
+.people-overview-facts {
+  grid-template-columns: minmax(0, .85fr) minmax(0, 1.35fr) minmax(0, .85fr) !important;
+}
+
+.people-education-overview {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 10px 14px 12px;
+  border-top: 1px solid color-mix(in srgb, var(--accent-blue) 16%, var(--border-soft));
+  border-radius: 0;
+  background: color-mix(in srgb, var(--accent-blue) 5%, var(--surface-panel));
+}
+
+.people-education-overview:hover {
+  background: color-mix(in srgb, var(--accent-blue) 5%, var(--surface-panel));
+}
+
+.people-education-overview-list {
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 7px;
+}
+
+.people-education-overview-list article {
+  align-content: start;
+  padding: 7px 8px;
+  border-color: color-mix(in srgb, var(--accent-blue) 15%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent-blue) 3%, var(--surface-panel));
+}
+
+.people-add-action,
+.people-repeatable-heading .people-add-action,
+.people-timeline-actions .people-add-action,
+.people-links-toolbar-actions .people-add-action {
+  display: inline-flex;
+  flex: 0 0 auto;
+  width: auto;
+  min-width: 0;
+  min-height: 36px;
+  padding: 0 11px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--text-strong) !important;
+  border-radius: 8px;
+  background: var(--text-strong) !important;
+  color: var(--surface-panel) !important;
+  font: 760 11px/1 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  white-space: nowrap;
+}
+
+.people-add-action:hover,
+.people-repeatable-heading .people-add-action:hover,
+.people-timeline-actions .people-add-action:hover,
+.people-links-toolbar-actions .people-add-action:hover {
+  border-color: color-mix(in srgb, var(--text-strong) 84%, white) !important;
+  background: color-mix(in srgb, var(--text-strong) 88%, white) !important;
+}
+
+.people-add-action:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--accent-blue) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.people-add-action svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.75;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.people-repeatable-section.people-themed-section > .people-repeatable-entry {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.people-field-label {
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 850;
+}
+
+.people-repeatable-fields label,
+.people-contact-channel-fields label {
+  min-width: 0;
+}
+
+.people-repeatable-fields input,
+.people-repeatable-fields select,
+.people-repeatable-fields textarea,
+.people-contact-channel-fields input,
+.people-contact-channel-fields select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.people-repeatable-fields input,
+.people-repeatable-fields select,
+.people-contact-channel-fields input,
+.people-contact-channel-fields select {
+  min-height: 40px;
+}
+
+.people-remove-icon,
+.people-repeatable-entry-heading .people-remove-icon,
+.people-contact-channel-fields .people-remove-icon,
+.people-organization-linked-list article > .people-remove-icon,
+.people-contact-remove,
+.people-contact-channel-fields .people-contact-remove {
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+  padding: 0 !important;
+  align-self: end;
+  border-color: var(--accent-crimson) !important;
+  background: var(--accent-crimson) !important;
+  color: #fff !important;
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--accent-crimson) 18%, transparent);
+}
+
+.people-remove-icon:hover,
+.people-repeatable-entry-heading .people-remove-icon:hover,
+.people-contact-channel-fields .people-remove-icon:hover {
+  border-color: color-mix(in srgb, var(--accent-crimson) 86%, black) !important;
+  background: color-mix(in srgb, var(--accent-crimson) 86%, black) !important;
+  color: #fff !important;
+}
+
+.people-remove-icon svg,
+.people-contact-remove svg,
+.people-note-remove svg {
+  width: 18px !important;
+  min-width: 18px !important;
+  height: 18px !important;
+  min-height: 18px !important;
+  flex: 0 0 18px !important;
+  stroke-width: 1.8 !important;
+}
+
+.people-repeatable-inline-remove {
+  align-self: end;
+}
+
+.people-comes-from-field,
+.people-comes-from-field input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.people-birthday-field {
+  gap: 8px;
+}
+
+.people-birthday-field legend {
+  margin-bottom: 4px;
+  color: var(--text-subtle);
+  font: 750 9px/1.35 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+.people-birthday-field input,
+.people-birthday-field select {
+  min-height: 36px;
+  font: 500 12px/1.35 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-notes-editor {
+  gap: 6px;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.people-notes-editor + .people-notes-editor {
+  margin-top: 2px;
+}
+
+.people-notes-editor > .people-repeatable-heading h4 {
+  color: var(--text-subtle);
+  font: 750 9px/1.35 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  letter-spacing: .035em;
+  text-transform: uppercase;
+}
+
+.people-note-row {
+  align-items: stretch;
+}
+
+.people-note-row textarea {
+  min-height: 52px;
+  box-sizing: border-box;
+}
+
+.people-note-actions {
+  align-self: stretch;
+}
+
+.people-note-actions > button,
+.people-note-remove,
+.people-note-add {
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 100% !important;
+  min-height: 40px !important;
+}
+
+.people-note-remove {
+  border-color: var(--accent-crimson) !important;
+  background: var(--accent-crimson) !important;
+  color: #fff !important;
+}
+
+.people-note-add {
+  border-color: var(--text-strong) !important;
+  background: var(--text-strong) !important;
+  color: var(--surface-panel) !important;
+}
+
+.people-note-add:hover {
+  border-color: color-mix(in srgb, var(--text-strong) 84%, white) !important;
+  background: color-mix(in srgb, var(--text-strong) 88%, white) !important;
+}
+
+.people-note-add svg {
+  width: 18px;
+  height: 18px;
+  stroke-width: 1.8;
+}
+
+/* Shared assistant: movable launcher, draggable header, and resizable workspace. */
+.shared-ai-dock__launcher {
+  min-height: 48px;
+  padding: 0 14px 0 8px;
+  gap: 8px;
+  border-color: var(--text-strong);
+  background: var(--text-strong);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .08), 0 10px 28px rgba(16, 32, 38, .18);
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 11px;
+  font-weight: 760;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.shared-ai-dock.is-dragging-launcher .shared-ai-dock__launcher,
+.shared-ai-dock.is-dragging-panel .shared-ai-dock__header {
+  cursor: grabbing;
+}
+
+.shared-ai-dock__launcher-mark {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+}
+
+.shared-ai-dock__launcher-mark svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shared-ai-dock__panel {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(420px, calc(100vw - 24px));
+  height: min(600px, calc(100dvh - 110px));
+  min-width: min(320px, calc(100vw - 24px));
+  min-height: min(360px, calc(100dvh - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  resize: both;
+  border-color: color-mix(in srgb, var(--text-strong) 18%, var(--border-soft));
+  border-radius: 14px;
+  background: var(--surface-panel);
+  box-shadow: 0 0 0 1px rgba(16, 32, 38, .04), 0 18px 48px rgba(16, 32, 38, .18);
+}
+
+.shared-ai-dock__header {
+  grid-template-columns: 18px minmax(0, 1fr) 36px;
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border-bottom-color: var(--border-soft);
+  background: color-mix(in srgb, var(--text-strong) 3%, var(--surface-panel));
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+
+.shared-ai-dock__drag-handle {
+  display: grid;
+  grid-template-columns: repeat(2, 3px);
+  gap: 3px;
+  place-content: center;
+  width: 18px;
+  height: 28px;
+  color: var(--text-subtle);
+}
+
+.shared-ai-dock__drag-handle i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.shared-ai-dock__heading {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.shared-ai-dock__heading > span {
+  color: var(--text-subtle);
+  font-size: 9px;
+  font-weight: 820;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.shared-ai-dock__heading > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  align-items: center;
+}
+
+.shared-ai-dock__heading h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font: 760 16px/1.2 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  letter-spacing: -.02em;
+}
+
+.shared-ai-dock__connection-state {
+  display: inline-flex;
+  min-height: 22px;
+  padding: 0 7px;
+  gap: 5px;
+  align-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent-orange) 22%, var(--border-soft));
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent-orange) 6%, var(--surface-panel));
+  color: color-mix(in srgb, var(--accent-orange) 82%, var(--text-strong));
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.shared-ai-dock__connection-state > i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent-orange);
+}
+
+.shared-ai-dock__header > button {
+  display: grid;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  place-items: center;
+  border-color: var(--border-soft);
+  border-radius: 9px;
+  background: var(--surface-panel);
+  color: var(--text-muted);
+}
+
+.shared-ai-dock__body {
+  gap: 8px;
+  padding: 12px;
+  background: color-mix(in srgb, var(--text-strong) 1.5%, var(--surface-panel));
+}
+
+.shared-ai-dock__context,
+.shared-ai-dock__empty-state,
+.shared-ai-dock__permissions {
+  border-color: var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-panel);
+}
+
+.shared-ai-dock__context {
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+}
+
+.shared-ai-dock__context strong {
+  overflow: hidden;
+  color: var(--text-body);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shared-ai-dock__empty-state {
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: start;
+  gap: 10px;
+  padding: 12px;
+}
+
+.shared-ai-dock__empty-icon {
+  display: grid;
+  width: 38px;
+  height: 38px;
+  place-items: center;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--accent-purple) 9%, var(--surface-panel));
+  color: var(--accent-purple);
+}
+
+.shared-ai-dock__empty-icon svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shared-ai-dock__empty-state > div {
+  display: grid;
+  gap: 4px;
+}
+
+.shared-ai-dock__empty-state h3 {
+  color: var(--text-strong);
+  font: 730 13px/1.3 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.shared-ai-dock__empty-state p {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.shared-ai-dock__permissions ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shared-ai-dock__permissions li {
+  min-height: 24px;
+  padding: 4px 7px;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent-blue) 6%, var(--surface-panel));
+  color: var(--text-body);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.shared-ai-dock__footer {
+  gap: 6px;
+  padding: 12px;
+  border-top-color: var(--border-soft);
+  background: var(--surface-panel);
+}
+
+.shared-ai-dock__footer > label {
+  color: var(--text-subtle);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.shared-ai-dock__footer > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 7px;
+  align-items: end;
+}
+
+.shared-ai-dock__footer textarea {
+  min-height: 60px;
+  padding: 9px 10px;
+  resize: none;
+  border-color: var(--border-soft);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--text-strong) 2%, var(--surface-panel));
+  font: 500 11px/1.45 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.shared-ai-dock__footer button {
+  display: grid;
+  width: 40px;
+  min-height: 40px;
+  padding: 0;
+  place-items: center;
+  border-color: var(--border-soft);
+  border-radius: 9px;
+  background: var(--surface-panel-soft);
+}
+
+.shared-ai-dock__footer button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+@media (max-width: 760px) {
+  .people-overview-facts {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .people-education-overview {
+    grid-column: auto;
+    grid-template-columns: 28px minmax(0, 1fr);
+    padding: 9px 10px 11px;
+  }
+
+  .people-education-overview-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .people-note-row {
+    align-items: start;
+  }
+
+  .people-note-actions {
+    align-self: auto;
+  }
+
+  .people-note-actions > button,
+  .people-note-remove,
+  .people-note-add {
+    height: 44px !important;
+  }
+
+  .shared-ai-dock__launcher {
+    padding: 0;
+    touch-action: auto;
+  }
+
+  .shared-ai-dock__launcher-mark {
+    width: 34px;
+    height: 34px;
+    background: transparent;
+  }
+
+  .shared-ai-dock__panel {
+    width: auto;
+    height: auto;
+    min-width: 0;
+    min-height: 0;
+    max-width: none;
+    resize: none;
+  }
+
+  .shared-ai-dock__header {
+    cursor: default;
+    touch-action: auto;
+  }
+
+  .shared-ai-dock__drag-handle {
+    visibility: hidden;
+  }
+}
+
+html[data-admin-preview="mobile"] .people-overview-facts,
+html[data-admin-preview="mobile"] .people-education-overview-list {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+html[data-admin-preview="mobile"] .people-education-overview {
+  grid-column: auto;
+}
+
+html[data-admin-preview="mobile"] .shared-ai-dock__panel {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  max-width: none;
+  resize: none;
+}
+
+@media (max-width: 760px) {
+  .people-links-toolbar-actions .people-add-action span {
+    display: inline;
+  }
+}
