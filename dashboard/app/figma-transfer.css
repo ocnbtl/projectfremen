@@ -11384,3 +11384,304 @@ html[data-admin-preview="mobile"] .people-header-actions button {
   padding: 0;
   justify-content: center;
 }
+
+/* People: functional filters and compact profile maintenance. */
+.people-filter-fields {
+  display: grid;
+  gap: 8px;
+}
+
+.people-filter-fields label {
+  display: grid;
+  grid-template-columns: minmax(0, .8fr) minmax(160px, 1.2fr);
+  gap: 10px;
+  align-items: center;
+  min-height: 42px;
+  padding: 6px 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--text-strong) 2%, var(--surface-panel));
+}
+
+.people-filter-fields label > span {
+  color: var(--text-strong);
+  font: 750 11px/1.3 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-filter-fields select {
+  width: 100%;
+  min-width: 0;
+  min-height: 34px;
+  padding: 0 30px 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.people-filter-sheet footer {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.people-filter-sheet footer button:last-child {
+  justify-content: center;
+  text-align: center;
+}
+
+.people-primary-search .people-search-filter,
+.people-mobile-topbar button[aria-controls="people-filter-sheet"] {
+  position: relative;
+  z-index: 26;
+}
+
+.people-profile-actions {
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.people-profile-actions .people-status-marker {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .7);
+  white-space: nowrap;
+}
+
+.people-contact-methods-compact button,
+.people-contact-methods-compact button:hover,
+.people-contact-methods-compact button.is-active {
+  overflow: hidden;
+  border-radius: 50% !important;
+  box-shadow: 0 3px 10px rgba(16, 32, 38, .08);
+}
+
+.people-contact-methods-compact button:hover,
+.people-contact-methods-compact button.is-active {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-green) 12%, transparent), 0 3px 10px rgba(16, 32, 38, .1);
+}
+
+.people-fact-cluster.is-life {
+  background: color-mix(in srgb, var(--accent-crimson) 6%, var(--surface-panel));
+}
+
+.people-fact-cluster.is-work {
+  background: color-mix(in srgb, var(--accent-blue) 5%, var(--surface-panel));
+}
+
+.people-fact-cluster.is-relationships {
+  background: color-mix(in srgb, var(--accent-purple) 6%, var(--surface-panel));
+}
+
+.people-fact-cluster.is-life .people-info-icon { color: var(--accent-crimson); }
+.people-fact-cluster.is-work .people-info-icon { color: var(--accent-blue); }
+.people-fact-cluster.is-relationships .people-info-icon { color: var(--accent-purple); }
+
+.people-education-overview {
+  display: grid;
+  grid-template-columns: 30px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  padding: 6px 7px;
+  border-radius: 8px;
+}
+
+.people-education-overview:hover {
+  background: rgba(255, 255, 255, .72);
+}
+
+.people-education-overview-copy {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.people-education-overview-copy > strong {
+  color: #7b8581;
+  font-size: 9px;
+  letter-spacing: .045em;
+  text-transform: uppercase;
+}
+
+.people-education-overview-list {
+  display: grid;
+  gap: 6px;
+}
+
+.people-education-overview-list article {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 12%, var(--border-soft));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--surface-panel) 82%, transparent);
+}
+
+.people-education-name,
+.people-education-empty {
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 780;
+  line-height: 1.3;
+}
+
+.people-education-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 5px;
+}
+
+.people-education-meta > span {
+  display: grid;
+  gap: 1px;
+  min-width: 0;
+  color: var(--text-body);
+  font-size: 10px;
+  font-weight: 650;
+  line-height: 1.3;
+}
+
+.people-education-meta small {
+  color: var(--text-subtle);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+
+.people-repeatable-heading h4,
+.people-profile-section-heading h4,
+.people-notes-editor h4 {
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 12px;
+  font-weight: 760;
+  letter-spacing: -.01em;
+}
+
+.people-repeatable-fields {
+  align-items: end;
+}
+
+.people-repeatable-fields-education {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .8fr) minmax(0, 1fr) 36px;
+}
+
+.people-repeatable-fields-job {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 112px 36px;
+}
+
+.people-repeatable-fields-location {
+  grid-template-columns: minmax(120px, .55fr) minmax(180px, 1fr) 36px;
+}
+
+.people-repeatable-fields-location .is-wide {
+  grid-column: 1 / 3;
+}
+
+.people-repeatable-inline-remove {
+  align-self: end;
+}
+
+.people-contact-remove,
+.people-contact-channel-fields .people-contact-remove {
+  align-self: end;
+  width: 38px !important;
+  min-width: 38px !important;
+  height: 38px !important;
+  min-height: 38px !important;
+  border-color: color-mix(in srgb, var(--accent-crimson) 20%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--accent-crimson) 4%, var(--surface-panel)) !important;
+  color: var(--accent-crimson) !important;
+}
+
+.people-notes-editor > .people-repeatable-heading {
+  padding-inline: 0;
+  background: transparent;
+}
+
+.people-note-row {
+  grid-template-columns: 8px minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.people-note-row textarea {
+  font: 500 12px/1.45 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-note-actions {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.people-note-add {
+  display: grid;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid color-mix(in srgb, var(--accent-blue) 16%, var(--border-soft));
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--accent-blue) 4%, var(--surface-panel));
+  color: var(--accent-blue);
+}
+
+.people-note-add:hover {
+  border-color: color-mix(in srgb, var(--accent-blue) 38%, var(--border-soft));
+  background: color-mix(in srgb, var(--accent-blue) 8%, var(--surface-panel));
+}
+
+.people-note-add svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.75;
+}
+
+@media (max-width: 760px) {
+  .people-filter-fields label {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 5px;
+  }
+
+  .people-repeatable-fields-education,
+  .people-repeatable-fields-job,
+  .people-repeatable-fields-location {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .people-repeatable-fields-location .is-wide {
+    grid-column: auto;
+  }
+
+  .people-repeatable-inline-remove {
+    justify-self: end;
+  }
+
+  .people-note-row {
+    grid-template-columns: 6px minmax(0, 1fr);
+  }
+
+  .people-note-actions {
+    grid-column: 2;
+    justify-self: end;
+  }
+}
+
+html[data-admin-preview="mobile"] .people-repeatable-fields-education,
+html[data-admin-preview="mobile"] .people-repeatable-fields-location {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
+html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
+  grid-column: auto;
+}

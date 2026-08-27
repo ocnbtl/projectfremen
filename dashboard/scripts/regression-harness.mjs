@@ -5672,6 +5672,29 @@ async function checkPeopleMemoryBrowserState(
           await viewSwitch.locator("button").count() === 3,
         `People directory retained redundant counts or the old toolbar at ${viewport.label}`
       );
+      const filterTrigger = viewport.label === "mobile"
+        ? page.locator('.people-mobile-topbar button[aria-controls="people-filter-sheet"]').last()
+        : page.locator(".people-primary-search .people-search-filter");
+      await filterTrigger.click();
+      const filterSheet = page.locator("#people-filter-sheet");
+      await filterSheet.waitFor();
+      assert(
+        await filterSheet.locator("select").count() === 3 &&
+          await filterSheet.getByText("Save as view", { exact: false }).count() === 0,
+        `People filters did not expose three editable controls or retained Save as view at ${viewport.label}`
+      );
+      await filterSheet.getByLabel("Relationship type").selectOption("Advisor");
+      await filterSheet.getByLabel("Location").selectOption("Columbus, Ohio, USA");
+      await filterSheet.getByLabel("Last contact").selectOption("90d");
+      assert(
+        await page.locator(".people-directory-row").filter({ hasText: personTitle }).count() === 1,
+        `People relationship, location, and last-contact filters did not retain the matching profile at ${viewport.label}`
+      );
+      await filterTrigger.click();
+      assert(await filterSheet.count() === 0, `People filter trigger did not close the open filter sheet at ${viewport.label}`);
+      await filterTrigger.click();
+      await page.locator("#people-filter-sheet").getByRole("button", { name: "Reset" }).click();
+      await page.locator("#people-filter-sheet").getByRole("button", { name: /Show \d+ Results/ }).click();
       const nicknameDirectoryRow = page.locator(".people-directory-row").filter({ hasText: personTitle });
       assert(
         (await nicknameDirectoryRow.locator(".people-row-name").innerText()).includes("a.k.a. Reg"),
@@ -5738,6 +5761,11 @@ async function checkPeopleMemoryBrowserState(
         profileHeadingText.includes(`${personTitle}, a.k.a. Reg`),
         `People profile title did not use the requested a.k.a. nickname treatment at ${viewport.label}: ${JSON.stringify({ profileHeadingText, expected: `${personTitle}, a.k.a. Reg` })}`
       );
+      assert(
+        await page.locator(".people-profile-actions > .people-status-marker").count() === 1 &&
+          await page.locator(".people-profile-title-line > .people-status-marker").count() === 0,
+        `People profile status did not move beside Star and More at ${viewport.label}`
+      );
       const profilePhoto = page.getByRole("button", { name: new RegExp(`profile picture for ${personTitle}`, "i") });
       await profilePhoto.waitFor();
       assert(
@@ -5778,6 +5806,15 @@ async function checkPeopleMemoryBrowserState(
           await overview.locator('[data-contact-method="tiktok"]:disabled').count() === 1,
         `People Overview did not keep every contact method visible with unavailable methods disabled at ${viewport.label}`
       );
+      await contactButtons.first().hover();
+      const contactHoverGeometry = await contactButtons.first().evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return { width: rect.width, radius: Number.parseFloat(getComputedStyle(element).borderRadius) };
+      });
+      assert(
+        contactHoverGeometry.radius >= contactHoverGeometry.width / 2 - 1,
+        `People contact hover surface was not circular at ${viewport.label}: ${JSON.stringify(contactHoverGeometry)}`
+      );
       const emailButton = overview.getByRole("button", { name: "Show Email" });
       await emailButton.click();
       const emailDisclosure = overview.locator('[data-contact-disclosure="email"]');
@@ -5808,10 +5845,17 @@ async function checkPeopleMemoryBrowserState(
           `People Overview did not lead with About and Notes before the fact list at ${viewport.label}`
         );
       }
+      const quickInfoText = await overview.locator('[data-people-overview-card="quick-info"]').innerText();
       assert(
-        (await overview.locator('[data-people-overview-card="quick-info"]').innerText()).includes(organizationTitle) &&
+        quickInfoText.includes(organizationTitle) &&
+          quickInfoText.includes("Bachelor of Arts") &&
+          quickInfoText.includes("Economics") &&
+          quickInfoText.includes("Columbus College of Art & Design") &&
+          quickInfoText.includes("Certificate") &&
+          quickInfoText.includes("Interaction design") &&
+          !quickInfoText.includes("Research advisor") &&
           !(await overview.locator('[data-people-overview-card="contact"]').innerText()).includes(organizationTitle),
-        `People Overview did not move employer and university into the fact list without duplicate work copy at ${viewport.label}`
+        `People Overview did not expand every education entry while keeping work current-only at ${viewport.label}`
       );
       const aboutCardText = await overview.locator('[data-people-overview-card="about"]').innerText();
       assert(
@@ -5990,8 +6034,12 @@ async function checkPeopleMemoryBrowserState(
         await page.getByRole("heading", { name: "Links", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "People", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "Organizations", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "Files", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
           await page.getByText("connected media context", { exact: false }).count() === 0 &&
-          await page.getByRole("button", { name: "Add link", exact: true }).count() === 1,
+          await page.getByRole("button", { name: "Add object", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "Add relationship", exact: true }).count() === 0 &&
+          await page.getByRole("button", { name: /^(Browse|Refresh)$/ }).count() === 0,
         `Legacy Relationships route did not resolve to the unified Links hub at ${viewport.label}`
       );
       const linkedHeaderGeometry = await page.locator(".people-linked-card-header").evaluateAll((headers) => headers.flatMap((header) => {
@@ -6012,13 +6060,12 @@ async function checkPeopleMemoryBrowserState(
       });
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=files`, { waitUntil: "networkidle" });
-      const mediaSearch = page.locator(`a[href^="/admin/media?query="]`);
-      const resourceSearch = page.locator(`a[href^="/admin/resources?query="]`);
       assert(
-        (await mediaSearch.getAttribute("href"))?.includes(`/admin/media?query=${encodeURIComponent(personTitle)}`) &&
-          (await resourceSearch.getAttribute("href"))?.includes(`/admin/resources?query=${encodeURIComponent(personTitle)}`) &&
+        await page.getByRole("heading", { name: "Files", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
+          await page.getByRole("button", { name: /^(Browse|Refresh)$/ }).count() === 0 &&
           !(await page.locator(".people-links-hub").innerText()).includes("unavailable"),
-        `Legacy Files route did not resolve to working owner-module links at ${viewport.label}`
+        `Legacy Files route did not resolve to the streamlined Links hub at ${viewport.label}`
       );
       await assertNoOverflow(page, `People Files & Links ${viewport.label}`);
       await page.screenshot({
@@ -6035,7 +6082,8 @@ async function checkPeopleMemoryBrowserState(
       );
       const propertySectionOrder = await page.locator("[data-profile-section]").evaluateAll((sections) => sections.map((section) => section.getAttribute("data-profile-section")));
       assert(
-        propertySectionOrder.indexOf("identity") < propertySectionOrder.indexOf("groups") &&
+        propertySectionOrder.indexOf("identity") < propertySectionOrder.indexOf("about") &&
+          propertySectionOrder.indexOf("about") < propertySectionOrder.indexOf("groups") &&
           propertySectionOrder.indexOf("groups") < propertySectionOrder.indexOf("communication") &&
           propertySectionOrder.includes("occupations") &&
           propertySectionOrder.includes("education") &&
@@ -6046,7 +6094,9 @@ async function checkPeopleMemoryBrowserState(
       assert(
         await propertyNotes.locator("textarea").count() >= 2 &&
           await propertyNotes.locator("textarea").nth(0).inputValue() === "Prefers written project updates" &&
-          await propertyNotes.locator('input[type="date"]').count() === 0,
+          await propertyNotes.locator('input[type="date"]').count() === 0 &&
+          await propertyNotes.getByRole("button", { name: /^Add note after note / }).count() === await propertyNotes.locator("textarea").count() &&
+          await propertyNotes.getByRole("button", { name: /^Remove note / }).count() === await propertyNotes.locator("textarea").count(),
         `Properties did not expose About notes as separate bullet editors at ${viewport.label}`
       );
       const propertyGroups = (await page.locator(".people-profile-group-picker label").allTextContents())
@@ -6094,6 +6144,11 @@ async function checkPeopleMemoryBrowserState(
       );
       assert(
         await page.getByRole("button", { name: /^Remove (email|phone|job|university|location)/ }).count() > 0 &&
+          await page.getByRole("heading", { name: "Occupations", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "Education", exact: true }).count() === 1 &&
+          await page.getByRole("heading", { name: "Places", exact: true }).count() === 1 &&
+          await page.locator(".people-repeatable-entry-heading").count() === 0 &&
+          await page.locator(".people-repeatable-fields > .people-repeatable-inline-remove").count() === 7 &&
           !(await page.locator(".people-edit-form").innerText()).includes("A person can belong to several groups") &&
           !(await page.locator(".people-edit-form").innerText()).includes("Keep current and past work together") &&
           !(await page.locator(".people-edit-form").innerText()).includes("Add another only when") &&
@@ -6180,7 +6235,7 @@ async function checkPeopleMemoryBrowserState(
       );
       const createNotes = page.locator("[data-people-notes-editor]");
       await createNotes.getByLabel("Notes note 1").fill("Prefers afternoon calls");
-      await createNotes.getByRole("button", { name: "Add note" }).click();
+      await createNotes.getByRole("button", { name: "Add note after note 1" }).click();
       await createNotes.getByLabel("Notes note 2").fill("Met through the design community");
       assert(
         await createNotes.locator("textarea").count() === 2,

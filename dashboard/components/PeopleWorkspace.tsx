@@ -107,6 +107,7 @@ type PeopleSidebarView =
   | "customize";
 type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up";
 type PeopleListMode = "list" | "compact" | "grid";
+type PeopleLastContactFilter = "any" | "7d" | "30d" | "90d" | "none";
 type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "note" | "memory" | "milestone";
 type ContactMethodId = "email" | "phone" | "website" | "instagram" | "tiktok" | "x" | "linkedin";
 
@@ -379,6 +380,14 @@ const GROUP_OPTIONS = [
   "Other"
 ];
 
+const LAST_CONTACT_FILTER_OPTIONS: Array<{ value: PeopleLastContactFilter; label: string }> = [
+  { value: "any", label: "Any time" },
+  { value: "7d", label: "Past 7 days" },
+  { value: "30d", label: "Past 30 days" },
+  { value: "90d", label: "Past 90 days" },
+  { value: "none", label: "No contact recorded" }
+];
+
 const COMMON_LOCATIONS = [
   "Columbus, Ohio, USA",
   "Cincinnati, Ohio, USA",
@@ -603,6 +612,15 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
     ]
   },
   {
+    title: "About",
+    tone: "crimson",
+    fields: [
+      { key: "context", label: "About", type: "textarea", placeholder: "How you know them, why they matter, and the current relationship context." },
+      { key: "interestingFact", label: "Interesting fact", type: "textarea" },
+      { key: "lifeDream", label: "Life dream", type: "textarea" }
+    ]
+  },
+  {
     title: "Communication",
     tone: "blue",
     fields: [
@@ -620,15 +638,6 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
       { key: "lastContact", label: "Last contact", type: "date" },
       { key: "nextContact", label: "Next contact", type: "date" },
       { key: "contactCadence", label: "Contact cadence" }
-    ]
-  },
-  {
-    title: "About",
-    tone: "crimson",
-    fields: [
-      { key: "context", label: "About", type: "textarea", placeholder: "How you know them, why they matter, and the current relationship context." },
-      { key: "interestingFact", label: "Interesting fact", type: "textarea" },
-      { key: "lifeDream", label: "Life dream", type: "textarea" }
     ]
   }
 ];
@@ -1096,6 +1105,35 @@ function matchesFilter(record: PersonalRecord, filter: PeopleFilter) {
   return true;
 }
 
+function matchesRelationshipFilter(record: PersonalRecord, relationship: string) {
+  if (!relationship) return true;
+  const normalized = relationship.toLowerCase();
+  return [...record.subjects, ...record.areas].some((value) => value.toLowerCase() === normalized);
+}
+
+function matchesLocationFilter(record: PersonalRecord, location: string) {
+  if (!location) return true;
+  const normalized = location.toLowerCase();
+  const profile = getProfile(record);
+  return [
+    profile.livesIn,
+    profile.comesFrom,
+    profile.headquarters,
+    ...profile.locations.flatMap((entry) => [entry.location || "", entry.address || ""])
+  ].some((value) => value.toLowerCase().includes(normalized));
+}
+
+function matchesLastContactFilter(record: PersonalRecord, filter: PeopleLastContactFilter, interactionDate = "") {
+  if (filter === "any") return true;
+  const value = getLastContactValue(record, interactionDate);
+  if (filter === "none") return !value;
+  if (!value) return false;
+  const timestamp = parseDisplayDate(value).getTime();
+  if (Number.isNaN(timestamp)) return false;
+  const days = filter === "7d" ? 7 : filter === "30d" ? 30 : 90;
+  return timestamp >= Date.now() - days * 24 * 60 * 60 * 1000;
+}
+
 function getSearchText(record: PersonalRecord) {
   const profile = record.profile;
   return [
@@ -1133,17 +1171,6 @@ function getCadenceLabel(value?: string) {
 
 function displayList(values: string[], fallback = "-") {
   return values.length > 0 ? values.join(", ") : fallback;
-}
-
-function educationSummary(entries: PersonalEducationEntry[], fallback: string) {
-  const summaries = entries
-    .filter((entry) => entry.institution.trim())
-    .map((entry) => {
-      const study = [entry.degree, entry.fieldOfStudy].filter(Boolean).join(" · ");
-      return study ? `${entry.institution} — ${study}` : entry.institution;
-    });
-  if (summaries.length === 0) return fallback;
-  return summaries.length === 1 ? summaries[0] : `${summaries[0]} +${summaries.length - 1} more`;
 }
 
 function relationshipName(value: string) {
@@ -1602,14 +1629,11 @@ function EducationEntriesEditor({
   return (
     <section className="people-repeatable-section people-themed-section module-ref-tone-purple" data-people-education-editor data-profile-section="education">
       <header className="people-repeatable-heading">
-        <div className="people-repeatable-title"><span><PeopleIcon name="university" /></span><h4>University & education</h4></div>
+        <div className="people-repeatable-title"><span><PeopleIcon name="university" /></span><h4>Education</h4></div>
         <button type="button" onClick={onAdd}>Add university</button>
       </header>
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-education-entry={entry.id} key={entry.id}>
-          <div className="people-repeatable-entry-heading">
-            <RemoveIconButton label={`Remove university ${index + 1}`} onClick={() => onRemove(entry.id)} />
-          </div>
           <div className="people-repeatable-fields people-repeatable-fields-education">
             <label>
               University
@@ -1630,6 +1654,7 @@ function EducationEntriesEditor({
             </label>
             <label>Degree<input value={entry.degree || ""} onChange={(event) => onChange(entry.id, { degree: event.target.value })} placeholder="Bachelor’s, Master’s, PhD..." /></label>
             <label>Field of study<input value={entry.fieldOfStudy || ""} onChange={(event) => onChange(entry.id, { fieldOfStudy: event.target.value })} placeholder="Economics, design, engineering..." /></label>
+            <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove university ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
         </article>
       )) : <p className="people-repeatable-empty">No university added.</p>}
@@ -1653,14 +1678,11 @@ function OccupationEntriesEditor({
   return (
     <section className="people-repeatable-section people-themed-section module-ref-tone-green" data-people-occupation-editor data-profile-section="occupations">
       <header className="people-repeatable-heading">
-        <div className="people-repeatable-title"><span><PeopleIcon name="occupation" /></span><h4>Jobs & occupations</h4></div>
+        <div className="people-repeatable-title"><span><PeopleIcon name="occupation" /></span><h4>Occupations</h4></div>
         <button type="button" onClick={onAdd}>Add job</button>
       </header>
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-occupation-entry={entry.id} key={entry.id}>
-          <div className="people-repeatable-entry-heading">
-            <RemoveIconButton label={`Remove job ${index + 1}`} onClick={() => onRemove(entry.id)} />
-          </div>
           <div className="people-repeatable-fields people-repeatable-fields-job">
             <label>Occupation or title<input value={entry.title} onChange={(event) => onChange(entry.id, { title: event.target.value })} placeholder="Product designer" /></label>
             <label>
@@ -1681,6 +1703,7 @@ function OccupationEntriesEditor({
               </select>
             </label>
             <label>When<select value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></select></label>
+            <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove job ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
         </article>
       )) : <p className="people-repeatable-empty">No jobs added.</p>}
@@ -1708,7 +1731,7 @@ function LocationEntriesEditor({
   return (
     <section className="people-repeatable-section people-themed-section module-ref-tone-cyan" data-people-location-editor data-profile-section="locations">
       <header className="people-repeatable-heading">
-        <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>{organization ? "Locations" : "Homes & locations"}</h4></div>
+        <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>{organization ? "Locations" : "Places"}</h4></div>
         <button type="button" onClick={onAdd}>Add location</button>
       </header>
       {!organization && onComesFromChange && (
@@ -1716,13 +1739,10 @@ function LocationEntriesEditor({
       )}
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
-          <div className="people-repeatable-entry-heading">
-            {entry.label?.trim() && <strong>{entry.label.trim()}</strong>}
-            <RemoveIconButton label={`Remove location ${index + 1}`} onClick={() => onRemove(entry.id)} />
-          </div>
           <div className="people-repeatable-fields people-repeatable-fields-location">
             <label>Label<input value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? "Relevant location" : index === 0 ? "Primary home" : "Second home"} /></label>
             <label>City / region<input list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing a city" /></label>
+            <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove location ${index + 1}`} onClick={() => onRemove(entry.id)} />
             <label className="is-wide">Street address<textarea value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={2} /></label>
           </div>
         </article>
@@ -2001,20 +2021,16 @@ function PeopleNotesEditor({
     onChange(next.length > 0 ? next : [""]);
   }
 
-  function addNote() {
-    const next = [...rows, ""];
+  function addNote(afterIndex: number) {
+    const next = [...rows.slice(0, afterIndex + 1), "", ...rows.slice(afterIndex + 1)];
     onChange(next);
-    window.setTimeout(() => document.getElementById(`people-about-note-${next.length - 1}`)?.focus(), 0);
+    window.setTimeout(() => document.getElementById(`people-about-note-${afterIndex + 1}`)?.focus(), 0);
   }
 
   return (
     <section className="people-notes-editor" data-people-notes-editor>
       <header className="people-repeatable-heading">
-        <div>
-          <h4>{title}</h4>
-          <p>Keep useful context as short, separate notes.</p>
-        </div>
-        <button type="button" onClick={addNote}>Add note</button>
+        <div><h4>{title}</h4></div>
       </header>
       <div className="people-notes-list">
         {rows.map((note, index) => (
@@ -2026,9 +2042,12 @@ function PeopleNotesEditor({
               rows={2}
               value={note}
               onChange={(event) => updateNote(index, event.target.value)}
-              placeholder="Add something worth remembering..."
+              placeholder="Write a note…"
             />
-            <RemoveIconButton className="people-note-remove" label={`Remove note ${index + 1}`} onClick={() => removeNote(index)} />
+            <div className="people-note-actions">
+              <RemoveIconButton className="people-note-remove" label={`Remove note ${index + 1}`} onClick={() => removeNote(index)} />
+              <button className="people-note-add" type="button" aria-label={`Add note after note ${index + 1}`} title="Add note" onClick={() => addNote(index)}><PeopleIcon name="plus" /></button>
+            </div>
           </div>
         ))}
       </div>
@@ -2071,6 +2090,9 @@ export default function PeopleWorkspace({
   } = useProjectsState(initialProjectsState, initialProjectsError);
   const [query, setQuery] = useState(initialUrlState.query);
   const [activeFilter, setActiveFilter] = useState<PeopleFilter>(initialUrlState.filter);
+  const [relationshipFilter, setRelationshipFilter] = useState("");
+  const [locationFilter, setLocationFilter] = useState("");
+  const [lastContactFilter, setLastContactFilter] = useState<PeopleLastContactFilter>("any");
   const [activeSidebarView, setActiveSidebarView] = useState<PeopleSidebarView>(initialUrlState.sidebar);
   const [sortMode, setSortMode] = useState<PeopleSortMode>(initialUrlState.sort);
   const [listMode, setListMode] = useState<PeopleListMode>(initialUrlState.view);
@@ -2136,9 +2158,6 @@ export default function PeopleWorkspace({
   const [quickNoteDraft, setQuickNoteDraft] = useState("");
   const [quickNoteSaving, setQuickNoteSaving] = useState(false);
   const [utilityNotice, setUtilityNotice] = useState("");
-  const [relationshipDraft, setRelationshipDraft] = useState("");
-  const [relationshipType, setRelationshipType] = useState("collaborator");
-  const [relationshipSaving, setRelationshipSaving] = useState(false);
   const [actionNotice, setActionNotice] = useState("");
   const [interactionOpen, setInteractionOpen] = useState(false);
   const [interactionKind, setInteractionKind] = useState<InteractionKind>("meeting");
@@ -2425,11 +2444,19 @@ export default function PeopleWorkspace({
     const matches = activePeople.filter((record) => {
       if (!matchesSidebarView(record, activeSidebarView, latestInteractionDateByParticipant.get(record.id))) return false;
       if (!matchesFilter(record, activeFilter)) return false;
+      if (!matchesRelationshipFilter(record, relationshipFilter)) return false;
+      if (!matchesLocationFilter(record, locationFilter)) return false;
+      if (!matchesLastContactFilter(record, lastContactFilter, latestInteractionDateByParticipant.get(record.id))) return false;
       if (!normalizedQuery) return true;
       return getSearchText(record).includes(normalizedQuery);
     });
     return sortPeople(matches, sortMode, latestInteractionDateByParticipant);
-  }, [activeFilter, activePeople, activeSidebarView, latestInteractionDateByParticipant, query, sortMode]);
+  }, [activeFilter, activePeople, activeSidebarView, lastContactFilter, latestInteractionDateByParticipant, locationFilter, query, relationshipFilter, sortMode]);
+
+  const filterLocationOptions = useMemo(() => Array.from(new Set(activePeople.flatMap((record) => {
+    const profile = getProfile(record);
+    return [profile.livesIn, profile.comesFrom, profile.headquarters, ...profile.locations.map((entry) => entry.location || "")].filter(Boolean);
+  }))).sort((left, right) => left.localeCompare(right)), [activePeople]);
 
   const locationSuggestions = useMemo(() => Array.from(new Set([
     ...activePeople.map((record) => record.profile?.livesIn || "").filter(Boolean),
@@ -2528,7 +2555,11 @@ export default function PeopleWorkspace({
   }));
   const expandedContact = selectedContactMethods.find((method) => method.available && method.id === expandedContactMethod);
   const fallbackPerson = selectedPerson || visiblePeople[0];
-  const activeFilterCount = (activeFilter === "all" ? 0 : 1) + (query.trim() ? 1 : 0);
+  const activeFilterCount = (activeFilter === "all" ? 0 : 1)
+    + (relationshipFilter ? 1 : 0)
+    + (locationFilter ? 1 : 0)
+    + (lastContactFilter === "any" ? 0 : 1)
+    + (query.trim() ? 1 : 0);
   const filteringActive = detailMode === "profile" && activeFilterCount > 0;
   const mobileSurface = addingPerson || initialMode === "new" || detailMode === "edit" || initialMode === "edit"
     ? "editor"
@@ -2624,10 +2655,14 @@ export default function PeopleWorkspace({
     { label: "Hometown", value: selectedProfile.comesFrom, icon: "hometown", group: "life" },
     { label: "Occupation", value: selectedProfile.primaryOccupation, icon: "occupation", group: "work" },
     { label: "Employer", value: selectedProfile.primaryEmployer, icon: "employer", group: "work" },
-    { label: "University", value: educationSummary(selectedProfile.education, selectedProfile.universityAffiliation), icon: "university", group: "work" },
     { label: "Partner", value: selectedProfile.partner, icon: "partner", group: "relationships" },
     { label: "Children", value: selectedProfile.children, icon: "children", group: "relationships" }
   ];
+  const overviewEducation: PersonalEducationEntry[] = selectedProfile.education.length > 0
+    ? selectedProfile.education
+    : selectedProfile.universityAffiliation
+      ? [{ id: "legacy-overview-education", institution: selectedProfile.universityAffiliation }]
+      : [];
   const addFormDirty = [
     name,
     quickNickname,
@@ -2894,25 +2929,6 @@ export default function PeopleWorkspace({
       subjects: profileGroups,
       profile
     });
-  }
-
-  async function saveRelationship() {
-    if (!selectedPerson || !relationshipDraft.trim()) return;
-    setRelationshipSaving(true);
-    const label = labelize(relationshipType);
-    const currentPeople = splitList(selectedProfile.associatedPeople);
-    const entry = `${relationshipDraft.trim()} (${label})`;
-    const saved = await saveProfileDraft({
-      ...selectedProfile,
-      associatedPeople: [...currentPeople, entry].join(", ")
-    });
-    setRelationshipSaving(false);
-    if (saved) {
-      setRelationshipDraft("");
-      setActiveView("links");
-      setDetailMode("workspace");
-      setActionNotice("Relationship link saved. This does not delete or alter either person.");
-    }
   }
 
   async function saveQuickNote(event: React.FormEvent<HTMLFormElement>) {
@@ -3728,10 +3744,10 @@ export default function PeopleWorkspace({
             ? className === "org" ? "New Organization" : "New Person"
             : selectedPerson?.className === "org" ? "Edit Organization" : "Edit Person"
           : mobileSurface === "profile" ? labelize(activeView) : "People"}</strong>
-        <button type="button" aria-label="Search people" onClick={() => setFiltersOpen(true)}>
+        <button type="button" aria-label="Search people" aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
           <PeopleIcon name="search" />
         </button>
-        <button type="button" aria-label="Open filters" onClick={() => setFiltersOpen(true)}>
+        <button type="button" aria-label={filtersOpen ? "Close filters" : "Open filters"} aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
           <PeopleIcon name="filter" />
         </button>
       </div>
@@ -3825,7 +3841,7 @@ export default function PeopleWorkspace({
                 <PeopleIcon name="close" />
               </button>
             )}
-            <button type="button" className="people-search-filter" aria-label="Show filters" onClick={() => setFiltersOpen(true)}>
+            <button type="button" className="people-search-filter" aria-label={filtersOpen ? "Hide filters" : "Show filters"} aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
               <PeopleIcon name="filter" />
               {activeFilterCount > 0 && <span>{activeFilterCount}</span>}
             </button>
@@ -3864,7 +3880,7 @@ export default function PeopleWorkspace({
               {filter.label}
             </button>
           ))}
-          <button type="button" onClick={() => setFiltersOpen(true)}>
+          <button type="button" aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
             More
           </button>
           <label className="people-sort-control">
@@ -3882,30 +3898,44 @@ export default function PeopleWorkspace({
         </div>
 
         {filtersOpen && (
-          <section ref={filterSheetRef} className="people-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="people-filter-title">
+          <section id="people-filter-sheet" ref={filterSheetRef} className="people-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="people-filter-title">
             <div className="people-sheet-handle" />
             <header>
               <h2 id="people-filter-title">Filters</h2>
-              <button type="button" onClick={() => { setActiveFilter("all"); setQuery(""); updatePeopleUrl({ filter: "all", query: "" }); }}>
+              <button type="button" onClick={() => {
+                setActiveFilter("all");
+                setRelationshipFilter("");
+                setLocationFilter("");
+                setLastContactFilter("any");
+                setQuery("");
+                updatePeopleUrl({ filter: "all", query: "" });
+              }}>
                 Reset
               </button>
             </header>
-            {[
-              ["Relationship type", fallbackPerson ? getPrimaryGroup(fallbackPerson) : "Any"],
-              ["Cadence / Follow-up", activeFilter === "due" ? "Due soon" : "Anytime"],
-              ["Tags / Groups", `${selectedTags.length} selected`],
-              ["Location", selectedProfile.livesIn || "Any"],
-              ["Employer / Project", selectedProfile.primaryEmployer || selectedPerson?.projects[0] || "Any"],
-              ["Last contact", "Anytime"],
-              ["Next contact", "Due within 30 days"]
-            ].map(([label, value]) => (
-              <button type="button" disabled aria-describedby="people-unavailable-actions" title="Advanced filter editing is not connected in this slice" key={label}>
-                <span>{label}</span>
-                <strong>{value}</strong>
-              </button>
-            ))}
+            <div className="people-filter-fields">
+              <label>
+                <span>Relationship type</span>
+                <select value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}>
+                  <option value="">Any relationship</option>
+                  {GROUP_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Location</span>
+                <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
+                  <option value="">Any location</option>
+                  {filterLocationOptions.map((option) => <option value={option} key={option}>{option}</option>)}
+                </select>
+              </label>
+              <label>
+                <span>Last contact</span>
+                <select value={lastContactFilter} onChange={(event) => setLastContactFilter(event.target.value as PeopleLastContactFilter)}>
+                  {LAST_CONTACT_FILTER_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
+                </select>
+              </label>
+            </div>
             <footer>
-              <button type="button" disabled aria-describedby="people-unavailable-actions" title="Saved views are not connected yet">Save as view unavailable</button>
               <button type="button" onClick={() => setFiltersOpen(false)}>
                 Show {visiblePeople.length} Results
               </button>
@@ -4116,7 +4146,6 @@ export default function PeopleWorkspace({
               <div className="people-profile-identity">
                 <div className="people-profile-title-line">
                   <h2>{selectedPerson.title}{selectedPerson.className === "person" && selectedProfile.nickname && <>, <span>a.k.a. {selectedProfile.nickname}</span></>}</h2>
-                  <span className="people-status-marker"><i aria-hidden="true" />{STATUS_LABELS[selectedPerson.status]}</span>
                 </div>
                 <p>{selectedPerson.className === "org"
                   ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || "Organization"
@@ -4128,6 +4157,7 @@ export default function PeopleWorkspace({
                 </div>
               </div>
               <div className="people-profile-actions">
+                <span className="people-status-marker"><i aria-hidden="true" />{STATUS_LABELS[selectedPerson.status]}</span>
                 <button
                   type="button"
                   className={`people-profile-star${selectedPerson.starred ? " is-starred" : ""}`}
@@ -4289,7 +4319,7 @@ export default function PeopleWorkspace({
                         />
                       )}
                     </section>
-                    {section.title === "Identity" && selectedPerson.className === "person" && (
+                    {section.title === "About" && selectedPerson.className === "person" && (
                       <section className="people-profile-section people-themed-section module-ref-tone-purple" data-profile-section="groups">
                         <header className="people-profile-section-heading">
                           <span><PeopleIcon name="groups" /></span>
@@ -4451,7 +4481,7 @@ export default function PeopleWorkspace({
                     <strong className="people-section-count" aria-label={`${peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length} linked items`}>
                       {peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length}
                     </strong>
-                    <button type="button" onClick={() => setObjectLinkOpen(true)}><PeopleIcon name="object" /><span>Add object</span></button>
+                    <button type="button" aria-label="Add object" title="Add object" onClick={() => setObjectLinkOpen(true)}><PeopleIcon name="object" /><span>Add object</span></button>
                   </div>
                 </div>
                 {actionNotice && <p className="people-notice">{actionNotice}</p>}
@@ -4501,57 +4531,29 @@ export default function PeopleWorkspace({
                       {unresolvedConnections.map((connection) => <div className="people-link-context" key={connection.label}><strong>{connection.label}</strong><span>Context</span></div>)}
                     </div>}
                   </article>
-                  <article className="people-links-section is-connections">
-                    <header className="people-linked-card-header">
-                      <div><h4>Add relationship</h4></div>
-                    </header>
-                    <div className="people-inline-link-form">
-                      <label>
-                        Person or context
-                        <input value={relationshipDraft} onChange={(event) => setRelationshipDraft(event.target.value)} placeholder="Name or relationship context" />
-                      </label>
-                      <label>
-                        Relationship
-                        <select value={relationshipType} onChange={(event) => setRelationshipType(event.target.value)}>
-                          <option value="family">Family</option>
-                          <option value="partner">Partner</option>
-                          <option value="child">Child</option>
-                          <option value="friend">Friend</option>
-                          <option value="collaborator">Collaborator</option>
-                          <option value="mentor">Advisor / Mentor</option>
-                          <option value="introduced-by">Introduced by</option>
-                          <option value="mutual">Mutual connection</option>
-                        </select>
-                      </label>
-                      <button type="button" onClick={saveRelationship} disabled={relationshipSaving || !relationshipDraft.trim()}>
-                        {relationshipSaving ? "Saving…" : "Add link"}
-                      </button>
-                    </div>
-                  </article>
                   <article className="people-links-section is-projects">
                     <header className="people-linked-card-header">
                       <div><h4>Projects</h4></div>
                       <strong className="people-section-count" aria-label={`${selectedProjectConnections.length} linked projects`}>{selectedProjectConnections.length}</strong>
                     </header>
-                    <button className="people-links-section-action" type="button" onClick={() => void refreshProjects()} disabled={projectsLoading}>
-                      {projectsLoading ? "Checking…" : "Refresh"}
-                    </button>
-                    <LinkedProjectsPanel
-                      personId={selectedPerson.id}
-                      personLabel={selectedPerson.title}
-                      objectType={selectedPerson.className === "org" ? "organization" : "person"}
-                      state={projectsState}
-                      loading={projectsLoading}
-                      error={projectsError}
-                      onRefresh={() => void refreshProjects()}
-                      legacyProjectLabels={selectedPerson.projects}
-                      limit={4}
-                      compact
-                      showHeader={false}
-                      showSummary={false}
-                      showBoundary={false}
-                      emptyDescription="No projects yet."
-                    />
+                    {projectsError && <p className="people-notice" role="alert">{projectsError}</p>}
+                    {projectsLoading ? <p>Loading projects…</p> : selectedProjectConnections.length > 0 ? (
+                      <LinkedProjectsPanel
+                        personId={selectedPerson.id}
+                        personLabel={selectedPerson.title}
+                        objectType={selectedPerson.className === "org" ? "organization" : "person"}
+                        state={projectsState}
+                        loading={projectsLoading}
+                        error={projectsError}
+                        onRefresh={() => void refreshProjects()}
+                        legacyProjectLabels={selectedPerson.projects}
+                        limit={4}
+                        compact
+                        showHeader={false}
+                        showSummary={false}
+                        showBoundary={false}
+                      />
+                    ) : <p>No projects yet.</p>}
                   </article>
                   <article className="people-links-section is-objects">
                     <header className="people-linked-card-header">
@@ -4567,28 +4569,26 @@ export default function PeopleWorkspace({
                           </a>
                           <button type="button" onClick={() => void removeObjectLink(link)} disabled={objectLinkSaving} aria-label={`Remove link to ${object.label}`}><PeopleIcon name="close" /></button>
                         </div>
-                      )) : <p>No other objects yet.</p>}
+                      )) : <p>No objects yet.</p>}
                     </div>
                   </article>
                   <article className="people-links-section is-files">
                     <header className="people-linked-card-header">
-                      <div><h4>Files & media</h4></div>
-                      <strong className="people-section-count" aria-label="0 linked files and media">0</strong>
+                      <div><h4>Files</h4></div>
+                      <strong className="people-section-count" aria-label="0 linked files">0</strong>
                     </header>
                     <p>No files yet.</p>
-                    <a className="people-links-section-action" href={`${getModuleRoute("media")}?query=${encodeURIComponent(selectedPerson.title)}`}>Browse</a>
                   </article>
                   <article className="people-links-section is-resources">
                     <header className="people-linked-card-header">
-                      <div><h4>Resources & web links</h4></div>
-                      <strong className="people-section-count" aria-label={`${selectedPerson.externalSources.length} saved resources and web links`}>{selectedPerson.externalSources.length}</strong>
+                      <div><h4>Resources</h4></div>
+                      <strong className="people-section-count" aria-label={`${selectedPerson.externalSources.length} saved resources`}>{selectedPerson.externalSources.length}</strong>
                     </header>
                     <div className="people-resource-links">
                       {selectedPerson.externalSources.length > 0 ? selectedPerson.externalSources.map((item) => (
                         <a href={/^https?:\/\//i.test(item) ? item : `${getModuleRoute("resources")}?query=${encodeURIComponent(item)}`} target={/^https?:\/\//i.test(item) ? "_blank" : undefined} rel={/^https?:\/\//i.test(item) ? "noreferrer" : undefined} key={item}>{item}</a>
                       )) : <p>No resources yet.</p>}
                     </div>
-                    <a className="people-links-section-action" href={`${getModuleRoute("resources")}?query=${encodeURIComponent(selectedPerson.title)}`}>Browse</a>
                   </article>
                 </div>
               </section>
@@ -4655,7 +4655,7 @@ export default function PeopleWorkspace({
                     </header>
                     {quickNoteOpen && (
                       <form className="people-quick-note-form" onSubmit={saveQuickNote}>
-                        <textarea autoFocus rows={2} value={quickNoteDraft} onChange={(event) => setQuickNoteDraft(event.target.value)} placeholder="Add something worth remembering..." aria-label={`New note for ${selectedPerson.title}`} />
+                        <textarea autoFocus rows={2} value={quickNoteDraft} onChange={(event) => setQuickNoteDraft(event.target.value)} placeholder="Write a note…" aria-label={`New note for ${selectedPerson.title}`} />
                         <div>
                           <button type="button" onClick={() => { setQuickNoteDraft(""); setQuickNoteOpen(false); }}>Cancel</button>
                           <button type="submit" disabled={!quickNoteDraft.trim() || quickNoteSaving}>{quickNoteSaving ? "Adding…" : "Add"}</button>
@@ -4675,7 +4675,8 @@ export default function PeopleWorkspace({
                   <h3 className="people-visually-hidden">Profile details</h3>
                   {(["life", "work", "relationships"] as const).map((group) => {
                     const facts = overviewFacts.filter((fact) => fact.group === group);
-                    if (!facts.length) return null;
+                    const showEducation = group === "work" && selectedPerson.className === "person";
+                    if (!facts.length && !showEducation) return null;
                     return <section className={`people-fact-cluster is-${group}`} aria-label={labelize(group)} key={group}>
                       {facts.map(({ label, value, icon }) => {
                         const organizationId = label === "Employer"
@@ -4696,6 +4697,34 @@ export default function PeopleWorkspace({
                           </div>
                         );
                       })}
+                      {showEducation && (
+                        <div className="people-education-overview">
+                          <span className="people-info-icon"><PeopleIcon name="university" /></span>
+                          <div className="people-education-overview-copy">
+                            <strong>Education</strong>
+                            {overviewEducation.length > 0 ? (
+                              <div className="people-education-overview-list">
+                                {overviewEducation.map((entry) => {
+                                  const organization = entry.organizationId
+                                    ? activePeople.find((record) => record.id === entry.organizationId && record.className === "org")
+                                    : undefined;
+                                  return (
+                                    <article key={entry.id}>
+                                      {organization
+                                        ? <button type="button" className="people-inline-object-link" onClick={() => selectPerson(organization)}>{organization.title}</button>
+                                        : <span className="people-education-name">{entry.institution || "University not added"}</span>}
+                                      <div className="people-education-meta">
+                                        <span><small>Degree</small>{entry.degree || "—"}</span>
+                                        <span><small>Field</small>{entry.fieldOfStudy || "—"}</span>
+                                      </div>
+                                    </article>
+                                  );
+                                })}
+                              </div>
+                            ) : <span className="people-education-empty">—</span>}
+                          </div>
+                        </div>
+                      )}
                     </section>;
                   })}
                 </article>
@@ -4894,18 +4923,17 @@ export default function PeopleWorkspace({
           <strong>{activeFilterCount}</strong>
         </header>
         {[
-          ["Relationship", fallbackPerson ? getPrimaryGroup(fallbackPerson) : "Any"],
-          ["Location", selectedProfile.livesIn || "Any"],
+          ["Relationship", relationshipFilter || "Any"],
+          ["Location", locationFilter || "Any"],
           ["Cadence status", activeFilter === "due" ? "Due soon" : "Anytime"],
-          ["Next follow-up", getNextContactLabel(selectedPerson)]
+          ["Last contact", LAST_CONTACT_FILTER_OPTIONS.find((option) => option.value === lastContactFilter)?.label || "Any time"]
         ].map(([label, value]) => (
-          <button type="button" onClick={() => setFiltersOpen(true)} key={label}>
+          <button type="button" onClick={() => setFiltersOpen((current) => !current)} key={label}>
             <span>{label}</span>
             <strong>{value}</strong>
           </button>
         ))}
-        <button type="button" onClick={() => setFiltersOpen(true)}>+ Add filter</button>
-        <button type="button" disabled aria-describedby="people-unavailable-actions" title="Saved views are not connected yet">+ Save as view unavailable</button>
+        <button type="button" onClick={() => setFiltersOpen((current) => !current)}>+ Add filter</button>
       </aside>
 
       {selectedPerson && (
