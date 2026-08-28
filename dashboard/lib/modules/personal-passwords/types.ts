@@ -24,15 +24,18 @@ export type CredentialInput = {
   title: string;
   username: string;
   email: string;
+  phone: string;
+  phoneCountryCode: string;
   secret: string;
+  pin: string;
   website: string;
   notes: string;
 };
 
-export type CredentialSummary = Omit<CredentialInput, "secret"> & {
+export type CredentialSummary = Omit<CredentialInput, "secret" | "pin"> & {
   id: string;
   createdAt: string;
   updatedAt: string;
 };
 
-export type CredentialDetail = CredentialSummary & Pick<CredentialInput, "secret">;
+export type CredentialDetail = CredentialSummary & Pick<CredentialInput, "secret" | "pin">;

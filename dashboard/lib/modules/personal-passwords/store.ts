@@ -8,6 +8,11 @@ import {
 import { getAdminSessionSecret } from "../../auth";
 import { mutateJsonFile, readJsonFile } from "../../file-store";
 import {
+  canonicalCountryCode,
+  formatInternationalPhone,
+  validateInternationalPhone
+} from "../people/phone";
+import {
   PERSONAL_PASSWORDS_SCHEMA_VERSION,
   type CredentialDetail,
   type CredentialInput,
@@ -63,6 +68,11 @@ function cleanSecret(value: unknown): string {
 function normalizeInput(value: unknown): CredentialInput {
   if (!isRecord(value)) throw new PersonalPasswordsStoreError("Credential input must be an object");
   const website = cleanText(value.website, "Website", 2_000);
+  const phone = cleanText(value.phone, "Phone", 100);
+  const phoneCountryCode = canonicalCountryCode(
+    cleanText(value.phoneCountryCode, "Country code", 8),
+    phone ? "" : "+1"
+  );
   if (website) {
     let parsed: URL;
     try {
@@ -74,11 +84,19 @@ function normalizeInput(value: unknown): CredentialInput {
       throw new PersonalPasswordsStoreError("Website must use http or https");
     }
   }
+  if (phone && !phoneCountryCode) {
+    throw new PersonalPasswordsStoreError("Phone country code is required");
+  }
+  const phoneError = phone ? validateInternationalPhone(phone, phoneCountryCode) : null;
+  if (phoneError) throw new PersonalPasswordsStoreError(phoneError);
   return {
     title: cleanText(value.title, "Account", 240, true),
     username: cleanText(value.username, "Username", 1_000),
     email: cleanText(value.email, "Email", 1_000),
+    phone: phone ? formatInternationalPhone(phone, phoneCountryCode) : "",
+    phoneCountryCode: phoneCountryCode || "+1",
     secret: cleanSecret(value.secret),
+    pin: cleanText(value.pin, "PIN", 500),
     website,
     notes: cleanText(value.notes, "Notes", 12_000)
   };
@@ -193,7 +211,7 @@ function detail(item: EncryptedCredentialRecord): CredentialDetail {
 }
 
 function summary(item: EncryptedCredentialRecord): CredentialSummary {
-  const { secret: _secret, ...safe } = detail(item);
+  const { secret: _secret, pin: _pin, ...safe } = detail(item);
   return safe;
 }
 

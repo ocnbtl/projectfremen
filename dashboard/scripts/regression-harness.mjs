@@ -8671,6 +8671,128 @@ async function checkArchivedReviewFollowUpOwnerBrowserState(
   }
 }
 
+async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credentialTitle) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const browserMutations = [];
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "personal-passwords-checkpoint");
+  await mkdir(screenshotDir, { recursive: true });
+
+  try {
+    for (const viewport of [
+      { label: "desktop-1440x900", width: 1440, height: 900 },
+      { label: "mobile-390x844", width: 390, height: 844 }
+    ]) {
+      const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+      await context.addCookies([
+        {
+          name: "admin_session",
+          value: cookieJar.get("admin_session"),
+          url: baseUrl,
+          httpOnly: true,
+          sameSite: "Lax"
+        },
+        {
+          name: "admin_csrf",
+          value: cookieJar.get("admin_csrf"),
+          url: baseUrl,
+          sameSite: "Lax"
+        }
+      ]);
+      const page = await context.newPage();
+      page.on("console", (message) => {
+        if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) {
+          browserErrors.push(`${viewport.label} console: ${message.text()}`);
+        }
+      });
+      page.on("pageerror", (error) => browserErrors.push(`${viewport.label} page: ${error.message}`));
+      page.on("request", (request) => {
+        if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) {
+          browserMutations.push(`${viewport.label} ${request.method()} ${new URL(request.url()).pathname}`);
+        }
+      });
+      page.on("response", (response) => {
+        const pathname = new URL(response.url()).pathname;
+        if (response.status() >= 400 && pathname !== "/_vercel/insights/script.js") {
+          failedResponses.push(`${viewport.label} ${response.status()} ${pathname}`);
+        }
+      });
+
+      await page.goto(`${baseUrl}/admin/personal/passwords`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { name: "Passwords", exact: true }).waitFor();
+      const bodyText = await page.locator("body").innerText();
+      assert(!bodyText.includes("Personal Ops / Command"), "Password page retained the removed eyebrow");
+      assert(!bodyText.includes("Protected at rest"), "Password page retained removed protection helper copy");
+      const keyring = page.locator('section[aria-label="Encrypted password keyring"]');
+      assert(await keyring.locator(":scope > header svg").count() === 0, "Password keyring header retained the removed global key icon");
+      const row = keyring.locator("article").filter({ hasText: credentialTitle }).first();
+      await row.waitFor();
+      assert(await row.locator(":scope > span svg").count() === 1, "Credential row lost its account key icon");
+      assert(await row.locator('[title="Username"] svg, [title="Email"] svg, [title="Phone"] svg, [title="Website"] svg').count() === 4, "Credential metadata did not replace all visible labels with icons");
+      const rowText = await row.innerText();
+      assert(!/Username|Email|Website/.test(rowText), `Credential row retained visible metadata labels: ${rowText}`);
+      const deleteStyle = await row.getByRole("button", { name: `Delete ${credentialTitle}` }).evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { backgroundColor: style.backgroundColor, color: style.color };
+      });
+      assert(deleteStyle.backgroundColor !== "rgba(0, 0, 0, 0)" && deleteStyle.color === "rgb(255, 255, 255)", `Credential delete action is not the filled red treatment: ${JSON.stringify(deleteStyle)}`);
+      const layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      assert(layout.scrollWidth <= layout.innerWidth, `Password ledger overflowed horizontally at ${viewport.label}: ${JSON.stringify(layout)}`);
+      await page.screenshot({ path: path.join(screenshotDir, `passwords-${viewport.label}.png`), fullPage: true });
+
+      await page.getByRole("button", { name: "Password", exact: true }).click();
+      const editor = page.locator("form[data-credential-editor]");
+      await editor.waitFor();
+      const countryCode = editor.getByLabel("Country code");
+      assert(await countryCode.inputValue() === "+1", "New credential did not default to the +1 country code");
+      await countryCode.fill("");
+      await countryCode.fill("+51");
+      await editor.getByLabel("Phone", { exact: true }).fill("987654321");
+      await editor.getByLabel("Account").focus();
+      assert(await editor.getByLabel("Phone", { exact: true }).inputValue() === "+51 987-654-321", "Credential phone did not apply Peru-aware formatting");
+
+      const passwordInput = editor.getByLabel("Password", { exact: true });
+      await passwordInput.fill("synthetic-visible-password");
+      assert(await passwordInput.getAttribute("type") === "password", "Credential password was not masked by default");
+      await editor.getByRole("button", { name: "Show password" }).click();
+      assert(await passwordInput.getAttribute("type") === "text", "Credential password reveal control did not unmask the field");
+      await editor.getByRole("button", { name: "Hide password" }).click();
+
+      const pinInput = editor.getByLabel("PIN", { exact: true });
+      await pinInput.fill("012345");
+      assert(await pinInput.getAttribute("type") === "password", "Credential PIN was not masked by default");
+      await editor.getByRole("button", { name: "Show PIN" }).click();
+      assert(await pinInput.getAttribute("type") === "text", "Credential PIN reveal control did not unmask the field");
+      await editor.getByRole("button", { name: "Hide PIN" }).click();
+
+      const closeAlignment = await editor.getByRole("button", { name: "Close password editor" }).evaluate((element) => {
+        const button = element.getBoundingClientRect();
+        const icon = element.querySelector("svg")?.getBoundingClientRect();
+        return icon ? {
+          x: Math.abs((button.left + button.width / 2) - (icon.left + icon.width / 2)),
+          y: Math.abs((button.top + button.height / 2) - (icon.top + icon.height / 2)),
+          withinViewport: button.top >= 0 && button.bottom <= window.innerHeight
+        } : null;
+      });
+      assert(closeAlignment && closeAlignment.x <= 1 && closeAlignment.y <= 1 && closeAlignment.withinViewport, `Password editor close icon is not centered and reachable: ${JSON.stringify(closeAlignment)}`);
+      const modalLayout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      assert(modalLayout.scrollWidth <= modalLayout.innerWidth, `Password editor overflowed horizontally at ${viewport.label}: ${JSON.stringify(modalLayout)}`);
+      await page.screenshot({ path: path.join(screenshotDir, `password-editor-${viewport.label}.png`), fullPage: true });
+      await editor.getByRole("button", { name: "Close password editor" }).click();
+      await editor.waitFor({ state: "detached" });
+      await context.close();
+    }
+
+    assert(browserMutations.length === 0, `Password browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`);
+    assert(browserErrors.length === 0, `Password browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Password browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await browser.close();
+  }
+}
+
 async function checkProjectCreationWorkflow(
   baseUrl,
   cookieJar,
@@ -11281,11 +11403,13 @@ async function main() {
     }
     pass("Media local intake contains no file-content read, transport, preview URL, or browser-persistence path");
 
-    const [personalLifeTypes, personalLifeWorkspace, personalPasswordsStore, personalPasswordsApi, travelMapSource, projectsWorkspaceSource, peopleWorkspaceSource] = await Promise.all([
+    const [personalLifeTypes, personalLifeWorkspace, personalPasswordsTypes, personalPasswordsStore, personalPasswordsApi, personalOpsIconSource, travelMapSource, projectsWorkspaceSource, peopleWorkspaceSource] = await Promise.all([
       readFile(path.join(dashboardDir, "lib/modules/personal-life/types.ts"), "utf8"),
       readFile(path.join(dashboardDir, "components/personal-ops/PersonalLifeWorkspace.tsx"), "utf8"),
+      readFile(path.join(dashboardDir, "lib/modules/personal-passwords/types.ts"), "utf8"),
       readFile(path.join(dashboardDir, "lib/modules/personal-passwords/store.ts"), "utf8"),
       readFile(path.join(dashboardDir, "app/api/personal/passwords/route.ts"), "utf8"),
+      readFile(path.join(dashboardDir, "components/personal-ops/PersonalOpsIcon.tsx"), "utf8"),
       readFile(path.join(dashboardDir, "components/personal-ops/TravelWorldMap.tsx"), "utf8"),
       readFile(path.join(dashboardDir, "components/projects/ProjectsWorkspace.tsx"), "utf8"),
       readFile(path.join(dashboardDir, "components/PeopleWorkspace.tsx"), "utf8")
@@ -11296,19 +11420,29 @@ async function main() {
         personalLifeWorkspace.includes('/api/personal/passwords?includeSecrets=true') &&
         personalLifeWorkspace.includes("togglePasswordPrivacy") &&
         personalLifeWorkspace.includes('input("Email", "email"') &&
+        personalLifeWorkspace.includes('name="phoneCountryCode"') &&
+        personalLifeWorkspace.includes('name="pin"') &&
+        personalLifeWorkspace.includes('aria-label={passwordFieldVisible ? "Hide password" : "Show password"}') &&
+        personalLifeWorkspace.includes('<PersonalOpsIcon name="plus" />') &&
+        !personalLifeWorkspace.includes("Encrypted credentials available inside your authenticated admin session.") &&
+        !personalLifeWorkspace.includes("Protected at rest · available in this admin session") &&
+        personalPasswordsTypes.includes('Omit<CredentialInput, "secret" | "pin">') &&
         personalLifeTypes.includes('"rating", "person", "object"') &&
         personalLifeWorkspace.includes("renderListCell") &&
         personalPasswordsStore.includes('createCipheriv("aes-256-gcm"') &&
         personalPasswordsStore.includes("cipher.setAAD") &&
+        personalPasswordsStore.includes("validateInternationalPhone") &&
         personalPasswordsApi.includes("hasAdminSession") &&
         personalPasswordsApi.includes("isCsrfRequestValid") &&
+        personalOpsIconSource.includes('M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13') &&
+        personalOpsIconSource.includes('M12 5v14M5 12h14') &&
         travelMapSource.includes("geoNaturalEarth1") &&
         travelMapSource.includes("world-atlas/countries-110m.json") &&
         !projectsWorkspaceSource.includes("batchSelection") &&
         !peopleWorkspaceSource.includes("batchSelectedIds"),
       "Personal systems crossed the encrypted credential boundary, retained the placeholder map, or retained Project/People batch-selection state"
     );
-    pass("Passwords use an admin-authenticated AES-GCM store, Travel uses geographic world data, and Project/People directories contain no batch-selection state");
+    pass("Passwords use an admin-authenticated AES-GCM store with encrypted phone/PIN fields and the shared action icon language; Travel uses geographic world data; Project/People directories contain no batch-selection state");
 
     logStep("Running typecheck");
     await runCommand(["run", "typecheck"], {
@@ -11762,7 +11896,7 @@ async function main() {
       {
         pathname: "/admin/personal/passwords",
         label: "Passwords",
-        expected: ["Passwords", "Encrypted credentials available inside your authenticated admin session.", "Add password", "Unblur"]
+        expected: ["Passwords", "Password", "Unblur"]
       },
       {
         pathname: "/admin/personal/lists",
@@ -11797,6 +11931,14 @@ async function main() {
           "Personal Ops Decisions retained the removed explanatory header copy"
         );
       }
+      if (route.label === "Passwords") {
+        assert(
+          !page.body.includes("Encrypted credentials available inside your authenticated admin session.") &&
+            !page.body.includes("Protected at rest") &&
+            !page.body.includes("Personal Ops / Command"),
+          "Personal Ops Passwords retained removed explanatory copy"
+        );
+      }
     }
     pass("All canonical Personal Ops routes load through one shared shell with explicit advanced safety boundaries");
 
@@ -11808,40 +11950,46 @@ async function main() {
     });
     assert(passwordWithoutCsrf.response.status === 403, "Encrypted password API accepted a write without CSRF proof");
     const syntheticPassword = `  ${testRunId}-secret with intentional spaces  `;
+    const syntheticPin = `0${testRunId.slice(-5)}`;
+    const syntheticPhone = "+51 987-654-321";
     const syntheticCredentialTitle = `${testRunId} encrypted credential`;
     const createdCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "POST",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
-      body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}-user`, email: `${testRunId}@example.com`, secret: syntheticPassword, website: "https://example.com/account", notes: "Synthetic credential context." } })
+      body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}-user`, email: `${testRunId}@example.com`, phone: "987654321", phoneCountryCode: "+51", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com/account", notes: "Synthetic credential context." } })
     });
     assert(
-      createdCredential.response.ok && createdCredential.payload?.ok && createdCredential.payload.item?.id && !("secret" in createdCredential.payload.item),
+      createdCredential.response.ok && createdCredential.payload?.ok && createdCredential.payload.item?.id && !("secret" in createdCredential.payload.item) && !("pin" in createdCredential.payload.item),
       `Encrypted credential create failed or returned plaintext: ${JSON.stringify(createdCredential.payload)}`
     );
     const credentialSummary = createdCredential.payload.item;
     const listedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords");
     assert(
-      listedCredentials.response.ok && listedCredentials.payload?.items?.some((item) => item.id === credentialSummary.id && item.username === `${testRunId}-user` && item.email === `${testRunId}@example.com` && !("secret" in item)),
-      "Default encrypted password list exposed a secret or omitted separate username/email fields"
+      listedCredentials.response.ok && listedCredentials.payload?.items?.some((item) => item.id === credentialSummary.id && item.username === `${testRunId}-user` && item.email === `${testRunId}@example.com` && item.phone === syntheticPhone && item.phoneCountryCode === "+51" && !("secret" in item) && !("pin" in item)),
+      "Default encrypted password list exposed a secret or omitted separate username/email/phone fields"
     );
     const revealedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords?includeSecrets=true");
     assert(
-      revealedCredentials.response.ok && revealedCredentials.payload?.items?.find((item) => item.id === credentialSummary.id)?.secret === syntheticPassword,
-      "Explicit authenticated password reveal did not preserve the credential secret exactly"
+      revealedCredentials.response.ok && revealedCredentials.payload?.items?.find((item) => item.id === credentialSummary.id)?.secret === syntheticPassword && revealedCredentials.payload?.items?.find((item) => item.id === credentialSummary.id)?.pin === syntheticPin,
+      "Explicit authenticated password reveal did not preserve the credential password and PIN exactly"
     );
     const encryptedPasswordFile = await readFile(path.join(serverEnv.FREMEN_DATA_DIR, "personal-passwords.json"), "utf8");
     assert(
       encryptedPasswordFile.includes('"algorithm": "aes-256-gcm"') &&
         !encryptedPasswordFile.includes(syntheticCredentialTitle) &&
         !encryptedPasswordFile.includes(syntheticPassword.trim()) &&
+        !encryptedPasswordFile.includes(syntheticPin) &&
+        !encryptedPasswordFile.includes(syntheticPhone) &&
         !encryptedPasswordFile.includes(`${testRunId}-user`) &&
         !encryptedPasswordFile.includes(`${testRunId}@example.com`),
       "Encrypted password persistence leaked plaintext fields or omitted its authenticated-encryption marker"
     );
+    await checkPersonalPasswordsBrowserState(server.baseUrl, cookieJar, syntheticCredentialTitle);
+    pass("Password ledger and editor preserve the compact icon language, responsive layout, editable international phone code, masked secret fields, and centered close control");
     const updatedCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "PATCH",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
-      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: `${syntheticCredentialTitle} updated`, username: `${testRunId}-user-2`, email: `${testRunId}-updated@example.com`, secret: syntheticPassword, website: "https://example.com/account", notes: "Updated synthetic context." } })
+      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: `${syntheticCredentialTitle} updated`, username: `${testRunId}-user-2`, email: `${testRunId}-updated@example.com`, phone: "6147963848", phoneCountryCode: "+1", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com/account", notes: "Updated synthetic context." } })
     });
     assert(updatedCredential.response.ok && updatedCredential.payload?.item?.updatedAt !== credentialSummary.updatedAt, "Encrypted password update did not persist");
     const staleCredentialUpdate = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
@@ -11856,7 +12004,7 @@ async function main() {
       body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: updatedCredential.payload.item.updatedAt })
     });
     assert(deletedCredential.response.ok && deletedCredential.payload?.ok, "Encrypted password delete failed");
-    pass("Encrypted passwords require admin auth and CSRF, preserve exact secrets, persist only AES-GCM ciphertext, and enforce stale-write protection");
+    pass("Encrypted passwords require admin auth and CSRF, preserve exact passwords/PINs plus formatted phone metadata, persist only AES-GCM ciphertext, and enforce stale-write protection");
 
     const personalLifeWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/life", {
       method: "POST",

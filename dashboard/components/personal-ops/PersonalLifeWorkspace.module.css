@@ -11,6 +11,8 @@
 .workspace { min-height: calc(100dvh - 190px); padding: 16px 22px 32px; }
 .primaryButton { display: inline-flex; width: auto; min-height: 34px; align-items: center; justify-content: center; padding: 0 13px; border: 1px solid var(--action-primary); border-radius: 6px; background: var(--action-primary); color: #fff; font: 800 11px var(--font-heading); text-decoration: none; cursor: pointer; }
 .primaryButton:disabled { opacity: .55; cursor: not-allowed; }
+.addAction, .mobileAddAction { gap: 6px; }
+.addAction svg, .mobileAddAction svg { width: 16px; height: 16px; flex: 0 0 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .notice, .error { margin: 10px 22px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
 .notice { background: color-mix(in srgb, #21845f 8%, var(--panel-bg)); color: #176848; }
 .error { background: color-mix(in srgb, #c92d3f 7%, var(--panel-bg)); color: #a61f33; }
@@ -22,12 +24,9 @@
 
 /* Passwords: a dense encrypted ledger with a page-level privacy shutter. */
 .keyring { min-height: 360px; overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-bg); }
-.keyringHeader { display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 9px; min-height: 48px; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--border); background: var(--panel-bg-subtle); }
-.keyringHeader > div { display: grid; gap: 1px; }
+.keyringHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; min-height: 44px; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--border); background: var(--panel-bg-subtle); }
 .keyringHeader strong { color: var(--text-strong); font: 780 12px var(--font-heading); }
-.keyringHeader small { color: var(--text-muted); font-size: 10px; }
-.keyringMark { display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid var(--border); border-radius: 6px; color: var(--action-primary); background: var(--panel-bg); }
-.keyringMark svg, .keyIcon svg { width: 16px; height: 16px; }
+.keyIcon svg { width: 16px; height: 16px; }
 .keyringCount { display: grid; min-width: 28px; height: 26px; place-items: center; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); background: var(--panel-bg); font: 700 10px var(--font-mono); }
 .credentialList { display: grid; align-content: start; }
 .credentialRow { display: grid; grid-template-columns: 26px minmax(220px, 1.4fr) minmax(170px, .72fr) auto; gap: 9px; align-items: center; min-height: 52px; padding: 6px 10px; border-bottom: 1px solid var(--border); content-visibility: auto; contain-intrinsic-size: 0 52px; }
@@ -35,8 +34,8 @@
 .credentialIdentity { display: grid; min-width: 0; gap: 3px; }
 .credentialIdentity > strong { overflow: hidden; color: var(--text-strong); font: 780 12px var(--font-heading); text-overflow: ellipsis; white-space: nowrap; }
 .credentialMeta { display: flex; min-width: 0; gap: 9px; overflow: hidden; color: var(--text-muted); font-size: 9px; }
-.credentialMeta span { display: inline-flex; min-width: 0; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.credentialMeta b { color: var(--text-muted); font: 750 8px var(--font-heading); letter-spacing: .04em; text-transform: uppercase; }
+.credentialMeta span { display: inline-flex; min-width: 0; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.credentialMeta svg { width: 12px; height: 12px; flex: 0 0 12px; }
 .credentialRow code { padding: 6px 8px; overflow: hidden; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg-subtle); color: var(--text-strong); font: 680 14px/1 var(--font-mono); letter-spacing: .025em; text-overflow: ellipsis; white-space: nowrap; }
 .credentialPrivate { transition: filter 150ms ease, opacity 150ms ease; }
 .keyring[data-masked] .credentialPrivate { filter: blur(6px); opacity: .66; pointer-events: none; user-select: none; }
@@ -45,6 +44,8 @@
 .iconActions button, .squareAction { display: inline-grid; width: 30px; height: 30px; min-height: 30px; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer; }
 .iconActions button:hover, .squareAction:hover { border-color: var(--border); background: var(--panel-bg-subtle); color: var(--text-strong); }
 .iconActions svg, .squareAction svg { width: 15px; height: 15px; }
+.iconActions .dangerAction { border-color: var(--accent-crimson, #b73343); background: var(--accent-crimson, #b73343); color: #fff; }
+.iconActions .dangerAction:hover { border-color: color-mix(in srgb, var(--accent-crimson, #b73343) 86%, black); background: color-mix(in srgb, var(--accent-crimson, #b73343) 86%, black); color: #fff; }
 
 /* Lists: notebook index and ruled working page. */
 .notebook { display: grid; grid-template-columns: minmax(170px, 220px) minmax(0, 1fr); min-height: 520px; overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-bg); }
@@ -179,15 +180,27 @@
 .editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: min(660px, 100%); max-height: calc(100dvh - 104px); overflow: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--panel-bg); box-shadow: 0 18px 60px color-mix(in srgb, #000 22%, transparent); }
 .editor header, .editor footer, .editor .full { grid-column: 1 / -1; }
 .editor header { display: flex; align-items: start; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+.editor[data-credential-editor] > header { position: sticky; z-index: 2; top: 0; background: var(--panel-bg); }
 .editor header h2 { margin: 3px 0 0; font: 820 18px var(--font-heading); }
 .editor header h2:first-child { margin-top: 0; }
-.editor header button { width: 30px; height: 30px; border: 0; background: transparent; color: var(--text-muted); font-size: 20px; cursor: pointer; }
-.editor label { display: grid; align-content: start; gap: 5px; color: var(--text-muted); font: 750 10px var(--font-heading); }
+.editor header button { display: inline-grid; width: 30px; height: 30px; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--text-muted); font-size: 20px; line-height: 0; cursor: pointer; }
+.editor header button:hover { border-color: var(--border); background: var(--panel-bg-subtle); color: var(--text-strong); }
+.editor header button svg { width: 16px; height: 16px; }
+.editor label, .editorField { display: grid; align-content: start; gap: 5px; color: var(--text-muted); font: 750 10px var(--font-heading); }
+.editorField > label { display: block; color: inherit; font: inherit; }
 .editor input, .editor select, .editor textarea { width: 100%; min-height: 36px; padding: 7px 9px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg); color: var(--text); font: 12px var(--font-body); }
 .editor textarea { resize: vertical; }
 .editor footer { display: flex; justify-content: flex-end; gap: 6px; padding-top: 9px; border-top: 1px solid var(--border); }
+.editor[data-credential-editor] > footer { position: sticky; z-index: 2; bottom: 0; background: var(--panel-bg); }
 .editor footer button { display: inline-flex; width: 96px; min-width: 96px; min-height: 34px; align-items: center; justify-content: center; }
 .editor footer .primaryButton { border-color: var(--action-primary); background: var(--action-primary); color: #fff; }
+.credentialPhoneFields { grid-column: 1 / -1; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; }
+.credentialPhoneFields p { grid-column: 1 / -1; margin: -5px 0 0; color: var(--accent-crimson, #b73343); font: 650 10px/1.35 var(--font-body); }
+.secretControl { position: relative; }
+.secretControl input { padding-right: 42px; }
+.secretControl button { position: absolute; right: 4px; bottom: 4px; display: grid; width: 28px; height: 28px; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.secretControl button:hover { border-color: var(--border); background: var(--panel-bg-subtle); color: var(--text-strong); }
+.secretControl button svg { width: 15px; height: 15px; }
 .coordinateFields { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
 .coordinateFields legend { padding: 0 5px; color: var(--text-muted); font: 750 9px var(--font-heading); letter-spacing: .05em; text-transform: uppercase; }
 
@@ -226,6 +239,7 @@
   .modLanes { grid-template-columns: 1fr; }
   .editor { grid-template-columns: 1fr; }
   .editor header, .editor footer, .editor .full { grid-column: 1; }
+  .credentialPhoneFields { grid-column: 1; grid-template-columns: 108px minmax(0, 1fr); gap: 10px; }
   .coordinateFields { grid-column: 1; grid-template-columns: 1fr; }
 }
 
@@ -286,6 +300,8 @@
 :global(html[data-personal-preview="mobile"]) .editor header,
 :global(html[data-personal-preview="mobile"]) .editor footer,
 :global(html[data-personal-preview="mobile"]) .editor .full { grid-column: 1; }
+:global(html[data-admin-preview="mobile"]) .credentialPhoneFields,
+:global(html[data-personal-preview="mobile"]) .credentialPhoneFields { grid-column: 1; grid-template-columns: 108px minmax(0, 1fr); gap: 10px; }
 :global(html[data-admin-preview="mobile"]) .coordinateFields,
 :global(html[data-personal-preview="mobile"]) .coordinateFields { grid-column: 1; grid-template-columns: 1fr; }
 

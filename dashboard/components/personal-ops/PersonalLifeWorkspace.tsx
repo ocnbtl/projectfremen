@@ -22,6 +22,14 @@ import type {
 } from "../../lib/modules/personal-life/types";
 import type { PersonalOpsState } from "../../lib/modules/personal-ops/types";
 import type { CredentialDetail, CredentialSummary } from "../../lib/modules/personal-passwords/types";
+import {
+  PHONE_COUNTRY_FORMATS,
+  canonicalCountryCode,
+  formatInternationalPhone,
+  normalizeCountryCodeInput,
+  rebasePhoneCountryCode,
+  validateInternationalPhone
+} from "../../lib/modules/people/phone";
 import PersonalOpsSidebar, { type PersonalOpsSidebarCounts } from "./PersonalOpsSidebar";
 import PersonalOpsIcon from "./PersonalOpsIcon";
 import baseStyles from "./PersonalOpsWorkspace.module.css";
@@ -51,13 +59,16 @@ type CredentialDraft = {
   title: string;
   username: string;
   email: string;
+  phone: string;
+  phoneCountryCode: string;
   secret: string;
+  pin: string;
   website: string;
   notes: string;
 };
 
 const VIEW_COPY: Record<PersonalLifeView, { title: string; description: string; action: string }> = {
-  passwords: { title: "Passwords", description: "Encrypted credentials available inside your authenticated admin session.", action: "Add password" },
+  passwords: { title: "Passwords", description: "", action: "Password" },
   lists: { title: "Lists", description: "Flexible notebooks for things to buy, watch, pack, remember, or rank.", action: "New list" },
   travel: { title: "Travel", description: "A personal atlas of places lived, visited, planned, and wanted.", action: "Add trip" },
   "personal-build": { title: "Personal Build", description: "The long-term loadout you are deliberately assembling.", action: "Add item" },
@@ -146,6 +157,8 @@ export default function PersonalLifeWorkspace({
   const [credentialSecrets, setCredentialSecrets] = useState<Record<string, string>>({});
   const [passwordsMasked, setPasswordsMasked] = useState(true);
   const [credentialDraft, setCredentialDraft] = useState<CredentialDraft | null>(null);
+  const [passwordFieldVisible, setPasswordFieldVisible] = useState(false);
+  const [pinFieldVisible, setPinFieldVisible] = useState(false);
   const copy = VIEW_COPY[initialView];
 
   async function requestCredentials(url = "/api/personal/passwords") {
@@ -172,7 +185,7 @@ export default function PersonalLifeWorkspace({
     try {
       const payload = await requestCredentials("/api/personal/passwords?includeSecrets=true");
       const details = (payload.items || []) as CredentialDetail[];
-      setCredentials(details.map(({ secret: _secret, ...summary }) => summary));
+      setCredentials(details.map(({ secret: _secret, pin: _pin, ...summary }) => summary));
       setCredentialSecrets(Object.fromEntries(details.map((item) => [item.id, item.secret])));
       setPasswordsMasked(false);
     } catch (cause) {
@@ -237,7 +250,9 @@ export default function PersonalLifeWorkspace({
 
   function openCreate(preset: Record<string, string> = {}) {
     if (initialView === "passwords") {
-      setCredentialDraft({ title: "", username: "", email: "", secret: "", website: "", notes: "" });
+      setCredentialDraft({ title: "", username: "", email: "", phone: "", phoneCountryCode: "+1", secret: "", pin: "", website: "", notes: "" });
+      setPasswordFieldVisible(false);
+      setPinFieldVisible(false);
       return;
     }
     if (initialView === "lists") setEditor({ collection: "lists", values: { title: "", description: "", kind: "custom", ...preset } });
@@ -333,6 +348,8 @@ export default function PersonalLifeWorkspace({
     try {
       const detail = await revealCredential(item.id);
       setCredentialDraft(detail);
+      setPasswordFieldVisible(false);
+      setPinFieldVisible(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "The credential could not be opened.");
     } finally {
@@ -475,8 +492,7 @@ export default function PersonalLifeWorkspace({
     return (
       <section className={styles.keyring} data-masked={passwordsMasked || undefined} aria-label="Encrypted password keyring">
         <header className={styles.keyringHeader}>
-          <span className={styles.keyringMark}><PersonalOpsIcon name="password" /></span>
-          <div><strong>Encrypted credentials</strong><small>Protected at rest · available in this admin session</small></div>
+          <strong>Encrypted credentials</strong>
           <span className={styles.keyringCount}>{credentials.length}</span>
         </header>
         <div className={styles.credentialList}>
@@ -486,17 +502,18 @@ export default function PersonalLifeWorkspace({
               <div className={`${styles.credentialIdentity} ${styles.credentialPrivate}`}>
                 <strong>{item.title || "Untitled credential"}</strong>
                 <div className={styles.credentialMeta}>
-                  {item.username && <span><b>Username</b>{item.username}</span>}
-                  {item.email && <span><b>Email</b>{item.email}</span>}
-                  {item.website && <span><b>Website</b>{item.website}</span>}
-                  {!item.username && !item.email && !item.website && <span>No account details</span>}
+                  {item.username && <span aria-label={`Username: ${item.username}`} title="Username"><PersonalOpsIcon name="username" />{item.username}</span>}
+                  {item.email && <span aria-label={`Email: ${item.email}`} title="Email"><PersonalOpsIcon name="email" />{item.email}</span>}
+                  {item.phone && <span aria-label={`Phone: ${item.phone}`} title="Phone"><PersonalOpsIcon name="phone" />{item.phone}</span>}
+                  {item.website && <span aria-label={`Website: ${item.website}`} title="Website"><PersonalOpsIcon name="website" />{item.website}</span>}
+                  {!item.username && !item.email && !item.phone && !item.website && <span>No account details</span>}
                 </div>
               </div>
               <code className={styles.credentialPrivate} aria-label={passwordsMasked ? "Hidden password" : "Revealed password"}>{passwordsMasked ? "••••••••••••" : credentialSecrets[item.id] || ""}</code>
               <div className={styles.iconActions} aria-label={`${item.title} actions`}>
                 <button type="button" aria-label={`Copy password for ${item.title}`} title="Copy password" onClick={() => void copyCredential(item)}><PersonalOpsIcon name="copy" /></button>
                 <button type="button" aria-label={`Edit ${item.title}`} title="Edit" onClick={() => void editCredential(item)}><PersonalOpsIcon name="edit" /></button>
-                <button type="button" aria-label={`Delete ${item.title}`} title="Delete" onClick={() => void deleteCredential(item)}><PersonalOpsIcon name="delete" /></button>
+                <button type="button" className={styles.dangerAction} aria-label={`Delete ${item.title}`} title="Delete" onClick={() => void deleteCredential(item)}><PersonalOpsIcon name="delete" /></button>
               </div>
             </article>
           )) : <div className={styles.empty}><strong>No passwords yet</strong><span>Add a credential when you are ready.</span></div>}
@@ -595,12 +612,24 @@ export default function PersonalLifeWorkspace({
           ? "Plan a trip"
           : "Add somewhere you want to go";
 
+  const credentialPhoneError = credentialDraft?.phone.trim()
+    ? canonicalCountryCode(credentialDraft.phoneCountryCode, "")
+      ? validateInternationalPhone(credentialDraft.phone, credentialDraft.phoneCountryCode)
+      : "Add a country code before saving this phone number."
+    : null;
+
+  function closeCredentialEditor() {
+    setCredentialDraft(null);
+    setPasswordFieldVisible(false);
+    setPinFieldVisible(false);
+  }
+
   return <div className={baseStyles.shell}>
     <PersonalOpsSidebar activeView={initialView} filter="" pathname={`/admin/personal/${initialView}`} counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
     <main className={baseStyles.directory}>
-      <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}>☰ Personal Ops</button><button type="button" onClick={() => openCreate()}>+ {copy.action}</button></div>
+      <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}>☰ Personal Ops</button><button type="button" className={initialView === "passwords" ? styles.mobileAddAction : undefined} onClick={() => openCreate()}>{initialView === "passwords" ? <><PersonalOpsIcon name="plus" /><span>{copy.action}</span></> : <>+ {copy.action}</>}</button></div>
       <div className={styles.scroll}>
-        <header className={styles.pageHeader}><div><span>Personal Ops / Command</span><h1>{copy.title}</h1><p>{copy.description}</p></div><div className={styles.headerActions}>{initialView === "passwords" && <button type="button" className={styles.privacyToggle} aria-label={passwordsMasked ? "Unblur password page" : "Blur password page"} aria-pressed={!passwordsMasked} onClick={() => void togglePasswordPrivacy()} disabled={busy} title={passwordsMasked ? "Unblur page" : "Blur page"}>{passwordsMasked ? <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12s3.4-6 9.5-6 9.5 6 9.5 6-3.4 6-9.5 6-9.5-6-9.5-6Z" /><circle cx="12" cy="12" r="2.8" /></svg> : <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 3 18 18M10.6 6.1A10 10 0 0 1 12 6c6.1 0 9.5 6 9.5 6a15 15 0 0 1-2.1 2.8M6.6 6.7A15.2 15.2 0 0 0 2.5 12s3.4 6 9.5 6a9.8 9.8 0 0 0 3.3-.6M9.9 9.9a3 3 0 0 0 4.2 4.2" /></svg>}<span>{passwordsMasked ? "Unblur" : "Blur"}</span></button>}<button type="button" className={styles.primaryButton} onClick={() => openCreate()}>+ {copy.action}</button></div></header>
+        <header className={styles.pageHeader}><div>{initialView !== "passwords" && <span>Personal Ops / Command</span>}<h1>{copy.title}</h1>{copy.description && <p>{copy.description}</p>}</div><div className={styles.headerActions}>{initialView === "passwords" && <button type="button" className={styles.privacyToggle} aria-label={passwordsMasked ? "Unblur password page" : "Blur password page"} aria-pressed={!passwordsMasked} onClick={() => void togglePasswordPrivacy()} disabled={busy} title={passwordsMasked ? "Unblur page" : "Blur page"}>{passwordsMasked ? <PersonalOpsIcon name="show" /> : <PersonalOpsIcon name="hide" />}<span>{passwordsMasked ? "Unblur" : "Blur"}</span></button>}<button type="button" className={`${styles.primaryButton} ${initialView === "passwords" ? styles.addAction : ""}`} onClick={() => openCreate()}>{initialView === "passwords" ? <><PersonalOpsIcon name="plus" /><span>{copy.action}</span></> : <>+ {copy.action}</>}</button></div></header>
         {error && <p className={styles.error} role="alert">{error}</p>}
         {notice && <p className={styles.notice} role="status">{notice}</p>}
         <div className={styles.workspace} data-view={initialView}>
@@ -613,7 +642,76 @@ export default function PersonalLifeWorkspace({
       </div>
     </main>
 
-    {credentialDraft && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCredentialDraft(null); }}><form className={styles.editor} onSubmit={saveCredential}><header><div><h2>{credentialDraft.id ? "Edit password" : "Add password"}</h2></div><button type="button" aria-label="Close password editor" onClick={() => setCredentialDraft(null)}>×</button></header>{input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}{input("Username", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "Optional username" })}{input("Email", "email", credentialDraft.email, (value) => setCredentialDraft((current) => current ? { ...current, email: value } : current), { type: "email", placeholder: "name@example.com" })}{input("Password", "secret", credentialDraft.secret, (value) => setCredentialDraft((current) => current ? { ...current, secret: value } : current), { type: "password", required: true })}{input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}<label className={styles.full}><span>Notes</span><textarea value={credentialDraft.notes} onChange={(event) => setCredentialDraft((current) => current ? { ...current, notes: event.target.value } : current)} rows={4} /></label><footer><button type="button" onClick={() => setCredentialDraft(null)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy}>{busy ? "Saving…" : "Save"}</button></footer></form></div>}
+    {credentialDraft && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCredentialEditor(); }}>
+      <form className={styles.editor} data-credential-editor onSubmit={saveCredential}>
+        <header>
+          <div><h2>{credentialDraft.id ? "Edit password" : "Add password"}</h2></div>
+          <button type="button" className={styles.editorClose} aria-label="Close password editor" title="Close" onClick={closeCredentialEditor}><PersonalOpsIcon name="close" /></button>
+        </header>
+        {input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}
+        {input("Username", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "Optional username" })}
+        {input("Email", "email", credentialDraft.email, (value) => setCredentialDraft((current) => current ? { ...current, email: value } : current), { type: "email", placeholder: "name@example.com" })}
+        {input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}
+        <div className={styles.credentialPhoneFields}>
+          <label>
+            <span>Country code</span>
+            <input
+              name="phoneCountryCode"
+              inputMode="tel"
+              list="credential-country-code-suggestions"
+              value={credentialDraft.phoneCountryCode}
+              onChange={(event) => {
+                const nextCode = normalizeCountryCodeInput(event.target.value);
+                setCredentialDraft((current) => current ? {
+                  ...current,
+                  phoneCountryCode: nextCode,
+                  phone: /^\+\d{1,4}$/.test(nextCode) && nextCode !== current.phoneCountryCode
+                    ? rebasePhoneCountryCode(current.phone, current.phoneCountryCode, nextCode)
+                    : current.phone
+                } : current);
+              }}
+              onBlur={(event) => {
+                const nextCode = canonicalCountryCode(event.target.value, "");
+                if (nextCode) setCredentialDraft((current) => current ? { ...current, phoneCountryCode: nextCode } : current);
+              }}
+              placeholder="+1"
+              required={Boolean(credentialDraft.phone.trim())}
+            />
+          </label>
+          <label>
+            <span>Phone</span>
+            <input
+              name="phone"
+              type="tel"
+              inputMode="tel"
+              value={credentialDraft.phone}
+              onChange={(event) => setCredentialDraft((current) => current ? { ...current, phone: event.target.value } : current)}
+              onBlur={() => setCredentialDraft((current) => current ? { ...current, phone: formatInternationalPhone(current.phone, current.phoneCountryCode) } : current)}
+              placeholder={credentialDraft.phoneCountryCode === "+51" ? "987-654-321" : "614-796-3848"}
+              aria-describedby={credentialPhoneError ? "credential-phone-error" : undefined}
+            />
+          </label>
+          <datalist id="credential-country-code-suggestions">{PHONE_COUNTRY_FORMATS.map((country) => <option value={country.code} label={`${country.country} · ${country.localDigits} digits`} key={country.code} />)}</datalist>
+          {credentialPhoneError && <p id="credential-phone-error" role="status">{credentialPhoneError}</p>}
+        </div>
+        <div className={styles.editorField}>
+          <label htmlFor="credential-secret">Password</label>
+          <div className={styles.secretControl}>
+            <input id="credential-secret" name="secret" type={passwordFieldVisible ? "text" : "password"} autoComplete="new-password" value={credentialDraft.secret} onChange={(event) => setCredentialDraft((current) => current ? { ...current, secret: event.target.value } : current)} required />
+            <button type="button" aria-label={passwordFieldVisible ? "Hide password" : "Show password"} title={passwordFieldVisible ? "Hide password" : "Show password"} aria-pressed={passwordFieldVisible} onClick={() => setPasswordFieldVisible((current) => !current)}>{passwordFieldVisible ? <PersonalOpsIcon name="hide" /> : <PersonalOpsIcon name="show" />}</button>
+          </div>
+        </div>
+        <div className={styles.editorField}>
+          <label htmlFor="credential-pin">PIN</label>
+          <div className={styles.secretControl}>
+            <input id="credential-pin" name="pin" type={pinFieldVisible ? "text" : "password"} inputMode="numeric" autoComplete="off" value={credentialDraft.pin} onChange={(event) => setCredentialDraft((current) => current ? { ...current, pin: event.target.value } : current)} placeholder="Optional" />
+            <button type="button" aria-label={pinFieldVisible ? "Hide PIN" : "Show PIN"} title={pinFieldVisible ? "Hide PIN" : "Show PIN"} aria-pressed={pinFieldVisible} onClick={() => setPinFieldVisible((current) => !current)}>{pinFieldVisible ? <PersonalOpsIcon name="hide" /> : <PersonalOpsIcon name="show" />}</button>
+          </div>
+        </div>
+        <label className={styles.full}><span>Notes</span><textarea value={credentialDraft.notes} onChange={(event) => setCredentialDraft((current) => current ? { ...current, notes: event.target.value } : current)} rows={4} /></label>
+        <footer><button type="button" onClick={closeCredentialEditor}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy || Boolean(credentialPhoneError)}>{busy ? "Saving…" : "Save"}</button></footer>
+      </form>
+    </div>}
 
     {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} onSubmit={submitEditor}><header><div>{editor.collection !== "trips" && <span>Personal Ops record</span>}<h2>{editor.collection === "trips" ? tripEditorTitle : `${editor.id ? "Edit" : "Add"} ${editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}`}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)}>×</button></header>
       {editor.collection === "lists" && <>{input("Title", "title", editorValue("title"), (value) => setEditorValue("title", value), { required: true })}<label><span>Type</span><select value={editorValue("kind")} onChange={(event) => setEditorValue("kind", event.target.value)}><option value="shopping">Things to buy</option><option value="watchlist">Watchlist</option><option value="favorites">Favorites</option><option value="packing">Packing</option><option value="custom">Custom</option></select></label><label className={styles.full}><span>Description</span><textarea value={editorValue("description")} onChange={(event) => setEditorValue("description", event.target.value)} rows={3} /></label></>}
