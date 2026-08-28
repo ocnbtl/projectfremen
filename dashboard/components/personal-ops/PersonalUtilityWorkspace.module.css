@@ -436,6 +436,10 @@
   flex: 1 1 auto;
 }
 
+.resourcePicker select + select {
+  flex: 0 1 180px;
+}
+
 .componentCard {
   position: relative;
   display: grid;
@@ -459,6 +463,17 @@
   font-size: 10px;
   line-height: 1.4;
   text-align: center;
+}
+
+.componentVisual svg {
+  width: 28px;
+  height: 28px;
+  color: var(--action-primary);
+}
+
+.componentVisual strong {
+  color: var(--text-strong);
+  font: 760 10px/1.25 var(--font-heading);
 }
 
 .componentCopy {

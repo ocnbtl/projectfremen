@@ -8,6 +8,7 @@ import { createResourcesRepository } from "../../lib/modules/resources/repositor
 import { inspectResourceSourceValue } from "../../lib/modules/resources/source-evidence";
 import type { ResourceRecord } from "../../lib/modules/resources/types";
 import ConfirmationSheet from "../operational/ConfirmationSheet";
+import { STYLE_GUIDE_AREA } from "../../lib/modules/style-guide/component-resource";
 import styles from "./ResourceEditorSheet.module.css";
 
 type ResourceEditorSheetProps = {
@@ -28,13 +29,34 @@ type ResourceEditorForm = {
   title: string;
   url: string;
   body: string;
+  collection: "reference" | "design-library" | "component";
 };
 
 const EMPTY_FORM: ResourceEditorForm = {
   title: "",
   url: "",
-  body: ""
+  body: "",
+  collection: "reference"
 };
+
+const DESIGN_LIBRARY_AREA = "Design Library";
+
+function collectionForResource(resource: ResourceRecord | null): ResourceEditorForm["collection"] {
+  if (!resource) return "reference";
+  if (resource.provenance.areas.some((area) => area.toLowerCase() === STYLE_GUIDE_AREA.toLowerCase())) return "component";
+  if (resource.provenance.areas.some((area) => area.toLowerCase() === DESIGN_LIBRARY_AREA.toLowerCase())) return "design-library";
+  return "reference";
+}
+
+function areasForCollection(resource: ResourceRecord | null, collection: ResourceEditorForm["collection"]) {
+  const retained = (resource?.provenance.areas || []).filter((area) => {
+    const normalized = area.toLowerCase();
+    return normalized !== STYLE_GUIDE_AREA.toLowerCase() && normalized !== DESIGN_LIBRARY_AREA.toLowerCase();
+  });
+  if (collection === "component") return [...retained, STYLE_GUIDE_AREA];
+  if (collection === "design-library") return [...retained, DESIGN_LIBRARY_AREA];
+  return retained;
+}
 
 const FOCUSABLE_SELECTOR = [
   "button:not([disabled])",
@@ -58,7 +80,8 @@ function formForResource(
   return {
     title: resource.title,
     url: resource.provenance.rawUrl || resource.source.canonicalUrl || "",
-    body: resource.body
+    body: resource.body,
+    collection: collectionForResource(resource)
   };
 }
 
@@ -66,7 +89,8 @@ function formsEqual(left: ResourceEditorForm, right: ResourceEditorForm) {
   return (
     left.title === right.title &&
     left.url === right.url &&
-    left.body === right.body
+    left.body === right.body &&
+    left.collection === right.collection
   );
 }
 
@@ -191,13 +215,16 @@ export default function ResourceEditorSheet({
   }, [resource?.id, resources, sourceEvidence.matchKey]);
 
   const titleValid = Boolean(form.title.trim());
+  const urlRequired = form.collection !== "component";
   const urlValid =
     resource && !urlEditable
       ? true
-      : Boolean(form.url.trim()) && sourceEvidence.state === "syntax_accepted";
+      : !form.url.trim()
+        ? !urlRequired
+        : sourceEvidence.state === "syntax_accepted";
   const canSave = dirty && titleValid && urlValid && exactMatches.length === 0 && !busy;
 
-  function updateField(field: keyof ResourceEditorForm, value: string) {
+  function updateField<Field extends keyof ResourceEditorForm>(field: Field, value: ResourceEditorForm[Field]) {
     setForm((current) => ({ ...current, [field]: value }));
     setError("");
   }
@@ -217,7 +244,8 @@ export default function ResourceEditorSheet({
     const repository = createResourcesRepository();
     const input = {
       title: form.title.trim(),
-      body: form.body.trim()
+      body: form.body.trim(),
+      areas: areasForCollection(resource, form.collection)
     };
     const result = resource
       ? await repository.update(resource.id, {
@@ -271,7 +299,7 @@ export default function ResourceEditorSheet({
                   {handoff
                     ? "Media → Resources handoff"
                     : mode === "create"
-                      ? "New external source"
+                      ? "New Resource"
                       : "Edit Resource"}
                 </span>
                 <h2 id={titleId}>
@@ -284,7 +312,7 @@ export default function ResourceEditorSheet({
                 <p id={descriptionId}>
                   {handoff
                     ? "Create one Resources-owned external source while the Media asset and its pending relationship remain unchanged."
-                    : "Save a source identity and compact context through the current audited adapter."}
+                    : "Keep the source and the context you will need later."}
                 </p>
               </div>
               <button
@@ -308,18 +336,37 @@ export default function ResourceEditorSheet({
             <div className={styles.body}>
               <section className={styles.section}>
                 <div className={styles.sectionHeading}>
-                  <div>
-                    <h3>Source identity</h3>
-                    <p>User-authored title and stored source URL remain separate from fetched metadata.</p>
-                  </div>
-                  <span className={styles.required}>Required</span>
+                  <div><h3>Details</h3></div>
+                  <span className={styles.required}>Title required</span>
+                </div>
+
+                <div className={styles.compactGrid}>
+                  <label className={styles.field}>
+                    <span>Resource title</span>
+                    <input
+                      data-autofocus="true"
+                      autoFocus
+                      type="text"
+                      value={form.title}
+                      onChange={(event) => updateField("title", event.target.value)}
+                      placeholder="A title you will recognize"
+                      aria-invalid={Boolean(form.title) && !titleValid}
+                      required
+                    />
+                  </label>
+                  <label className={styles.field}>
+                    <span>Collection</span>
+                    <select aria-label="Collection" value={form.collection} onChange={(event) => updateField("collection", event.target.value as ResourceEditorForm["collection"])}>
+                      <option value="reference">Reference</option>
+                      <option value="design-library">Design library</option>
+                      <option value="component">Component</option>
+                    </select>
+                  </label>
                 </div>
 
                 <label className={styles.field}>
-                  <span>Source URL</span>
+                  <span>Source URL{urlRequired ? "" : " · optional"}</span>
                   <input
-                    data-autofocus="true"
-                    autoFocus
                     type={urlEditable || handoff ? "url" : "text"}
                     inputMode="url"
                     autoComplete="url"
@@ -332,7 +379,7 @@ export default function ResourceEditorSheet({
                     }
                     aria-invalid={urlEditable && Boolean(form.url.trim()) && !urlValid}
                     aria-describedby={`${descriptionId}-url-state`}
-                    required={urlEditable}
+                    required={urlEditable && urlRequired}
                     disabled={!urlEditable}
                   />
                   <small
@@ -351,7 +398,7 @@ export default function ResourceEditorSheet({
                         : "The adapter cannot safely expose this stored value. Title and context can still be edited without replacing or deleting it."
                       : form.url.trim()
                       ? sourceStateMessage(sourceEvidence.state)
-                      : "A complete HTTP or HTTPS URL is required."}
+                      : urlRequired ? "Enter a complete HTTP or HTTPS URL." : "Add a URL when this component has an external reference."}
                   </small>
                 </label>
 
@@ -380,31 +427,14 @@ export default function ResourceEditorSheet({
                 )}
 
                 <label className={styles.field}>
-                  <span>Resource title</span>
-                  <input
-                    type="text"
-                    value={form.title}
-                    onChange={(event) => updateField("title", event.target.value)}
-                    placeholder="A title you will recognize"
-                    aria-invalid={Boolean(form.title) && !titleValid}
-                    required
-                  />
-                  <small data-tone="muted">
-                    This is your title. A fetched source title is not connected and will not overwrite it.
-                  </small>
-                </label>
-
-                <label className={styles.field}>
-                  <span>Source context</span>
+                  <span>Context</span>
                   <textarea
-                    rows={6}
+                    rows={4}
+                    aria-label="Source context"
                     value={form.body}
                     onChange={(event) => updateField("body", event.target.value)}
                     placeholder="Why this source matters, what it supports, or what to revisit."
                   />
-                  <small data-tone="muted">
-                    Compact context persists on the legacy Resource record. Author longer knowledge in Notes.
-                  </small>
                 </label>
               </section>
 
@@ -455,43 +485,6 @@ export default function ResourceEditorSheet({
                   </dl>
                 </section>
               )}
-
-              <section className={styles.section}>
-                <div className={styles.sectionHeading}>
-                  <div>
-                    <h3>Responsibility and capture</h3>
-                    <p>Unresolved native controls remain visible without implying persistence.</p>
-                  </div>
-                </div>
-                <div className={styles.boundaryRows}>
-                  <div>
-                    <span>Owner</span>
-                    <strong>Current admin · native owner unavailable</strong>
-                  </div>
-                  <div>
-                    <span>Capture method</span>
-                    <strong>Manual URL · Personal Records adapter</strong>
-                  </div>
-                  <div>
-                    <span>Lifecycle</span>
-                    <strong>Active on create · editing unavailable</strong>
-                  </div>
-                </div>
-              </section>
-
-              <section className={styles.boundary}>
-                <strong>What this save does</strong>
-                <p>
-                  Persists title, URL, and source context through the existing protected Personal
-                  Records route and appends its current audit event.
-                </p>
-                <strong>Still intentionally unavailable</strong>
-                <p>
-                  {handoff
-                    ? "The Media record is not modified. Source confirmation, native Media↔Resource linking, binary identity, rights, readiness, review completion, and background fetching remain unavailable."
-                    : "Metadata fetch, fetched source title, owner selection, native ResourceLinks, URL health, snapshots, citations, extraction, lifecycle changes, and review state."}
-                </p>
-              </section>
 
               {error && (
                 <div className={styles.error} role="alert">

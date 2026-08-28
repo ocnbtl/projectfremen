@@ -63,10 +63,10 @@ export default async function PeopleRoutePage({
   );
   const objectTargets = [
     ...people
-      .filter((record) => !record.archivedAt && record.className === "org")
+      .filter((record) => !record.archivedAt)
       .map((record) => createNativeObjectRef({
         module: "people",
-        objectType: "organization",
+        objectType: record.className === "org" ? "organization" : "person",
         objectId: record.id,
         label: record.title,
         versionId: record.updatedAt
@@ -76,6 +76,15 @@ export default async function PeopleRoutePage({
       .map((record) => createNativeObjectRef({
         module: "notes",
         objectType: "note",
+        objectId: record.id,
+        label: record.title,
+        versionId: record.updatedAt
+      })),
+    ...records
+      .filter((record) => !record.archivedAt && record.className === "resource")
+      .map((record) => createNativeObjectRef({
+        module: "resources",
+        objectType: "resource",
         objectId: record.id,
         label: record.title,
         versionId: record.updatedAt

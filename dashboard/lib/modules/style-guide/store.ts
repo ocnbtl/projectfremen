@@ -28,17 +28,33 @@ export function defaultStyleGuideState(): StyleGuideState {
     ],
     colors: [
       { id: "ink", label: "Ink", value: "#102026", usage: "Primary text and actions" },
-      { id: "eucalyptus", label: "Eucalyptus", value: "#2F6F64", usage: "Brand and selected state" },
-      { id: "paper", label: "Paper", value: "#FBFCFB", usage: "Primary surface" },
-      { id: "slate", label: "Slate", value: "#64777E", usage: "Supporting text" },
+      { id: "text", label: "Text", value: "#23383F", usage: "Default body text" },
+      { id: "muted", label: "Muted", value: "#60747C", usage: "Secondary labels and supporting text" },
+      { id: "faint", label: "Faint", value: "#7C8E95", usage: "Placeholder and unavailable states" },
+      { id: "canvas", label: "Canvas", value: "#F4F7F5", usage: "Application background" },
+      { id: "canvas-alt", label: "Canvas alternate", value: "#F6F8F7", usage: "Directory and secondary workspace background" },
+      { id: "panel", label: "Panel", value: "#FFFFFF", usage: "Cards, sheets, and controls" },
+      { id: "paper", label: "Paper", value: "#FBFCFB", usage: "Quiet inset surface" },
+      { id: "border", label: "Border", value: "#D5E2E7", usage: "Default dividers and outlines" },
+      { id: "border-strong", label: "Border strong", value: "#BFD2DB", usage: "Interactive control outlines" },
+      { id: "selected", label: "Selected", value: "#F7FBFF", usage: "Selected rows and focused navigation" },
+      { id: "navy", label: "Navy", value: "#0D252D", usage: "Primary actions" },
+      { id: "eucalyptus", label: "Eucalyptus", value: "#2F6F64", usage: "People and positive relationship accents" },
+      { id: "blue", label: "Blue", value: "#347998", usage: "Links, resources, and information" },
       { id: "amber", label: "Amber", value: "#C47B19", usage: "Attention and upcoming work" },
-      { id: "crimson", label: "Crimson", value: "#B73343", usage: "Destructive and urgent" }
+      { id: "crimson", label: "Crimson", value: "#B73343", usage: "Destructive and urgent" },
+      { id: "violet", label: "Violet", value: "#76566B", usage: "Notes and authored knowledge" },
+      { id: "clay", label: "Clay", value: "#8A5C4A", usage: "Media and physical assets" }
     ],
     modules: [
       { id: "people", module: "People", accent: "#2F6F64", surface: "#F1F6F4" },
       { id: "projects", module: "Projects", accent: "#516B83", surface: "#F1F4F7" },
       { id: "personal-ops", module: "Personal Ops", accent: "#102026", surface: "#F4F7F6" },
-      { id: "finance", module: "Finance", accent: "#7B6441", surface: "#F7F4EE" }
+      { id: "finance", module: "Finance", accent: "#7B6441", surface: "#F7F4EE" },
+      { id: "notes", module: "Notes", accent: "#76566B", surface: "#F7F3F6" },
+      { id: "resources", module: "Resources", accent: "#2F6B78", surface: "#F0F6F7" },
+      { id: "media", module: "Media", accent: "#8A5C4A", surface: "#F8F3F0" },
+      { id: "reviews", module: "Reviews", accent: "#665A82", surface: "#F5F3F8" }
     ],
     icons: [],
     createdAt: "",
@@ -90,9 +106,9 @@ function typography(value: unknown): StyleGuideTypographyRole[] {
   });
 }
 
-function colors(value: unknown): StyleGuideColorToken[] {
+function colors(value: unknown, backfillDefaults = false): StyleGuideColorToken[] {
   if (!Array.isArray(value)) return defaultStyleGuideState().colors;
-  return value.slice(0, 40).map((candidate, index) => {
+  const normalized = value.slice(0, 40).map((candidate, index) => {
     const item = isRecord(candidate) ? candidate : {};
     return {
       id: id(item.id, `color-${index + 1}`),
@@ -101,11 +117,14 @@ function colors(value: unknown): StyleGuideColorToken[] {
       usage: text(item.usage, `Color ${index + 1} usage`, 240)
     };
   });
+  if (!backfillDefaults) return normalized;
+  const existingIds = new Set(normalized.map((item) => item.id));
+  return [...normalized, ...defaultStyleGuideState().colors.filter((item) => !existingIds.has(item.id))].slice(0, 40);
 }
 
-function modules(value: unknown): StyleGuideModulePalette[] {
+function modules(value: unknown, backfillDefaults = false): StyleGuideModulePalette[] {
   if (!Array.isArray(value)) return defaultStyleGuideState().modules;
-  return value.slice(0, 40).map((candidate, index) => {
+  const normalized = value.slice(0, 40).map((candidate, index) => {
     const item = isRecord(candidate) ? candidate : {};
     return {
       id: id(item.id, `module-${index + 1}`),
@@ -114,6 +133,9 @@ function modules(value: unknown): StyleGuideModulePalette[] {
       surface: color(item.surface, `Module ${index + 1} surface`, "#F4F7F6")
     };
   });
+  if (!backfillDefaults) return normalized;
+  const existingIds = new Set(normalized.map((item) => item.id));
+  return [...normalized, ...defaultStyleGuideState().modules.filter((item) => !existingIds.has(item.id))].slice(0, 40);
 }
 
 function icons(value: unknown): StyleGuideIconAssignment[] {
@@ -131,14 +153,15 @@ function icons(value: unknown): StyleGuideIconAssignment[] {
 function normalize(value: unknown): StyleGuideState {
   const fallback = defaultStyleGuideState();
   if (!isRecord(value)) return fallback;
+  const backfillDefaults = value.schemaVersion !== STYLE_GUIDE_SCHEMA_VERSION;
   return {
     schemaVersion: STYLE_GUIDE_SCHEMA_VERSION,
     id: "personal-style-guide",
     title: text(value.title, "Style guide title", 120) || fallback.title,
     description: text(value.description, "Style guide description", 500),
     typography: typography(value.typography),
-    colors: colors(value.colors),
-    modules: modules(value.modules),
+    colors: colors(value.colors, backfillDefaults),
+    modules: modules(value.modules, backfillDefaults),
     icons: icons(value.icons),
     createdAt: text(value.createdAt, "createdAt", 40),
     updatedAt: text(value.updatedAt, "updatedAt", 40)
@@ -157,6 +180,7 @@ export async function saveStyleGuideState(input: StyleGuideInput, expectedUpdate
     }
     const now = new Date().toISOString();
     const next = normalize({
+      schemaVersion: STYLE_GUIDE_SCHEMA_VERSION,
       ...input,
       createdAt: current.createdAt || now,
       updatedAt: now

@@ -27,6 +27,7 @@ import ResourceEditorSheet from "./resources/ResourceEditorSheet";
 import ResourceNotePromotionSheet from "./resources/ResourceNotePromotionSheet";
 import ResourcePropertiesView from "./resources/ResourcePropertiesView";
 import ResourceReviewScheduleEditorSheet from "./resources/ResourceReviewScheduleEditorSheet";
+import PersonalOpsIcon from "./personal-ops/PersonalOpsIcon";
 import {
   contentTargetGroupsForObject,
   unresolvedReferencesForObject,
@@ -51,6 +52,7 @@ import { formatResourceReviewCadence } from "../lib/modules/resources/review-sch
 import { buildReviewSourceHandoffRoute } from "../lib/modules/reviews/source-context";
 import type { ReviewRunView } from "../lib/modules/reviews/types";
 import { buildResourceSourceEvidenceReport } from "../lib/modules/resources/source-evidence";
+import { isStyleGuideComponent } from "../lib/modules/style-guide/component-resource";
 import {
   buildFollowUpCreationRoute,
   type FollowUpSourceRef
@@ -85,6 +87,7 @@ type ResourcesWorkspaceProps = {
 type ResourcesView = ResourcesUrlState["view"];
 type ResourcesSort = ResourcesUrlState["sort"];
 type ResourcesTab = ResourcesUrlState["tab"];
+type ResourceCollection = "all" | "components" | "design-libraries";
 
 const TABS: readonly DetailTab[] = [
   { id: "overview", label: "Overview" },
@@ -164,20 +167,20 @@ const VIEW_LIMITATIONS: Readonly<Partial<Record<ResourcesView, string>>> = {
   archived: "Legacy statuses cannot be safely inferred as native Resource archive state."
 };
 
-const QUICK_FILTERS = [
-  ["all", "All", ""],
-  ["type", "Type", "Native Resource type is not available in the legacy adapter."],
-  ["source", "Source", "Source taxonomy is not available in the legacy adapter."],
-  ["status", "Status", "Native lifecycle state cannot be safely inferred from most legacy statuses."],
-  ["linked-module", "Linked module", "Legacy relation IDs are not typed native ObjectLinks."],
-  ["owner", "Owner", "Resource owner is not stored by the legacy adapter."],
-  ["recency", "Recency", "The recency window is an open product decision."],
-  ["usefulness", "Usefulness", "Usefulness is not stored by the legacy adapter."],
-  ["review-state", "Review state", "Native Resource review state is not connected yet."]
-] as const;
-
 function displayLabel(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function hasResourceMarker(resource: ResourceRecord, marker: string) {
+  const normalized = marker.toLowerCase();
+  return [...resource.provenance.areas, ...resource.provenance.subjects]
+    .some((value) => value.toLowerCase() === normalized);
+}
+
+function matchesCollection(resource: ResourceRecord, collection: ResourceCollection) {
+  if (collection === "components") return isStyleGuideComponent(resource);
+  if (collection === "design-libraries") return hasResourceMarker(resource, "Design Library");
+  return true;
 }
 
 function linkedContextModuleForView(
@@ -331,7 +334,7 @@ export default function ResourcesWorkspace({
   );
   const [activeTab, setActiveTab] = useState<ResourcesTab>(firstUrlState.tab);
   const [selectedEvidenceId, setSelectedEvidenceId] = useState(firstUrlState.item);
-  const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
+  const [collection, setCollection] = useState<ResourceCollection>("all");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(firstUrlState.ai);
@@ -420,6 +423,7 @@ export default function ResourcesWorkspace({
           resources.filter(
             (resource) =>
               matchesQuery(resource, query) &&
+              matchesCollection(resource, collection) &&
               (view !== "needs-review" || reviewQueue.byResourceId.has(resource.id)) &&
               (view !== "duplicate-urls" || duplicateEvidence.byResourceId.has(resource.id)) &&
               (!linkedContextModule ||
@@ -433,7 +437,7 @@ export default function ResourcesWorkspace({
           sort,
           reviewPriorityById
         ),
-    [duplicateEvidence, linkedContextByResourceId, linkedContextModule, query, resources, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
+    [collection, duplicateEvidence, linkedContextByResourceId, linkedContextModule, query, resources, reviewPriorityById, reviewQueue, sort, unavailableViewReason, view]
   );
 
   useEffect(() => {
@@ -525,15 +529,6 @@ export default function ResourcesWorkspace({
       return;
     }
     updateUrl({ selected: resource.id, tab: nextTab, item: "" }, { history: "push" });
-  }
-
-  function setBatch(id: string, checked: boolean) {
-    setBatchSelection((current) => {
-      const next = new Set(current);
-      if (checked) next.add(id);
-      else next.delete(id);
-      return next;
-    });
   }
 
   async function copySourceUrl(value: string, evidenceId: string) {
@@ -1961,25 +1956,20 @@ export default function ResourcesWorkspace({
         <div className={styles.mainScroll}>
           <header className={styles.directoryHeader}>
             <div>
-              <h1>{VIEW_LABELS[view]}</h1>
-              <p>
-                {unavailableViewReason ? "View unavailable" : `${visibleResources.length} shown`} ·{" "}
-                {resources.length} total external {resources.length === 1 ? "reference" : "references"}
-                {view === "needs-review" ? " · evidence-derived queue" : ""}
-                {view === "duplicate-urls" ? " · exact collision evidence only" : ""}
-                {linkedContextModule ? " · exact owner-reference evidence" : ""}
-              </p>
+              <div className={styles.resourceTitleLine}>
+                <h1>{VIEW_LABELS[view]}</h1>
+                <span>{unavailableViewReason ? "–" : visibleResources.length}</span>
+              </div>
             </div>
             <div className={styles.headerActions}>
-              <button type="button" className={styles.button} disabled title="The complete native filter model is not connected yet.">Filter</button>
-              <button type="button" className={styles.button} disabled title="The directory is already using the only implemented compact density.">Compact</button>
               <button
                 type="button"
                 className={styles.button}
                 data-primary="true"
+                aria-label="Add Resource"
                 onClick={() => openResourceEditor("create")}
               >
-                + Add Resource
+                <PersonalOpsIcon name="plus" /> Resource
               </button>
             </div>
           </header>
@@ -2108,39 +2098,30 @@ export default function ResourcesWorkspace({
             </section>
           )}
 
-          <label className={styles.search}>
-            <span aria-hidden="true">/</span>
-            <input
-              value={query}
-              onChange={(event) => {
-                setQuery(event.target.value);
-                updateUrl({ query: event.target.value });
-              }}
-              placeholder="Search resources, source, context..."
-              aria-label="Search Resources"
-            />
-            <kbd>url · id · refs</kbd>
-          </label>
-
-          <div className={styles.chipRow} aria-label="Resource filters">
-            {QUICK_FILTERS.map(([id, label, reason], index) => (
-              <button
-                type="button"
-                className={styles.chip}
-                data-tone={index % 3 === 0 ? "blue" : index % 3 === 1 ? "green" : "amber"}
-                data-active={id === "all" || undefined}
-                disabled={Boolean(reason)}
-                title={reason || undefined}
-                key={id}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          <div className={styles.sortRow}>
-            <span>Sort</span>
-            <label className={styles.field}>
+          <div className={styles.resourceToolbar}>
+            <label className={styles.resourceSearch}>
+              <PersonalOpsIcon name="search" />
+              <input
+                value={query}
+                onChange={(event) => {
+                  setQuery(event.target.value);
+                  updateUrl({ query: event.target.value });
+                }}
+                placeholder="Search…"
+                aria-label="Search Resources"
+              />
+            </label>
+            <div className={styles.resourceCollectionTabs} role="group" aria-label="Resource collection">
+              {([
+                ["all", "All"],
+                ["components", "Components"],
+                ["design-libraries", "Design libraries"]
+              ] as const).map(([id, label]) => (
+                <button type="button" aria-pressed={collection === id} onClick={() => setCollection(id)} key={id}>{label}</button>
+              ))}
+            </div>
+            <label className={styles.resourceSort}>
+              <PersonalOpsIcon name="sort" />
               <span className="sr-only">Sort Resources</span>
               <select
                 value={sort}
@@ -2156,17 +2137,7 @@ export default function ResourcesWorkspace({
                 <option value="review">Evidence gaps first</option>
               </select>
             </label>
-            <strong>{unavailableViewReason ? "View unavailable" : `${visibleResources.length} shown`}</strong>
           </div>
-
-          {batchSelection.size > 0 && (
-            <div className={styles.batchBar} role="toolbar" aria-label="Selected Resources actions">
-              <strong>{batchSelection.size} selected</strong>
-              <button type="button" className={styles.button} onClick={() => setBatchSelection(new Set())}>Clear</button>
-              <button type="button" className={styles.button} disabled title="Batch review requires native Resource review persistence.">Review unavailable</button>
-              <button type="button" className={styles.button} disabled title="Batch archive requires consequence preview, retention, and audit.">Archive unavailable</button>
-            </div>
-          )}
 
           {initialLoadError ? (
             <SystemState variant="error" title="Resources could not be loaded" description={initialLoadError} />
@@ -2190,7 +2161,7 @@ export default function ResourcesWorkspace({
                     id={resource.id}
                     title={resource.title}
                     description={`${resource.source.displayDomain || "Source not identified"} · ${TYPE_LABELS[resource.type]}`}
-                    metadata={`saved ${formatDate(resource.source.savedAt)} · ${resource.id}`}
+                    metadata={[formatDate(resource.source.savedAt), ...resource.provenance.areas.slice(0, 2)].filter(Boolean).join(" · ")}
                     trailing={
                       view === "needs-review" && queueItem ? (
                         <>
@@ -2249,11 +2220,6 @@ export default function ResourcesWorkspace({
                     }
                     selected={selectedResource?.id === resource.id}
                     onSelect={() => selectResource(resource)}
-                    checkbox={{
-                      checked: batchSelection.has(resource.id),
-                      onCheckedChange: (checked) => setBatch(resource.id, checked),
-                      label: `Select ${resource.title} for batch actions`
-                    }}
                     className={
                       view === "needs-review" ||
                       view === "duplicate-urls" ||
@@ -2277,7 +2243,7 @@ export default function ResourcesWorkspace({
                   : linkedContextModule && !query
                     ? `No exact ${displayLabel(linkedContextModule)} owner-route evidence`
                   : resources.length
-                    ? "No Resources match this search"
+                    ? "No matching Resources"
                     : "No Resources yet"
               }
               description={
@@ -2290,8 +2256,8 @@ export default function ResourcesWorkspace({
                       ? `The connected ${displayLabel(linkedContextModule)} read model contains no exact Resource references. This is not proof that no relationship exists.`
                       : `The ${displayLabel(linkedContextModule)} reference source is unavailable or disconnected. Absence cannot establish that no relationship exists.`
                   : resources.length
-                  ? "Adjust the query without losing the selected Resource or active detail tab."
-                  : "No legacy Resource records were returned. Add the first external source through the audited adapter."
+                  ? "Try another search or collection."
+                  : "Add your first source, component, or design library."
               }
             />
           )}

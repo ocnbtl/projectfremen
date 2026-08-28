@@ -152,6 +152,21 @@
   margin-top: 15px;
 }
 
+.compactGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(150px, .6fr);
+  gap: 10px;
+  align-items: end;
+}
+
+.compactGrid + .field {
+  margin-top: 15px;
+}
+
+.compactGrid .field + .field {
+  margin-top: 0;
+}
+
 .field input,
 .field select,
 .field textarea {
@@ -175,9 +190,15 @@
 }
 
 .field textarea {
-  min-height: 132px;
+  min-height: 96px;
   resize: vertical;
   padding: 10px 11px;
+}
+
+@media (max-width: 620px) {
+  .compactGrid {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .field input[aria-invalid="true"] {

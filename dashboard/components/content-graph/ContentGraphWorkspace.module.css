@@ -203,6 +203,132 @@
   color: #fff;
 }
 
+.button svg {
+  width: 16px;
+  height: 16px;
+}
+
+.resourceTitleLine {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+
+.resourceTitleLine > span {
+  display: grid;
+  min-width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--panel-bg);
+  color: var(--text-muted);
+  font: 800 11px/1 var(--font-mono);
+}
+
+.resourceToolbar {
+  display: grid;
+  grid-template-columns: minmax(210px, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.resourceSearch,
+.resourceSort {
+  display: flex;
+  min-width: 0;
+  min-height: 40px;
+  gap: 8px;
+  align-items: center;
+  padding: 0 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel-bg);
+  color: var(--text-muted);
+}
+
+.resourceSearch svg,
+.resourceSort svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.resourceSearch input,
+.resourceSort select {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--text-strong);
+  font: 560 12px/1.35 var(--font-body);
+}
+
+.resourceSort {
+  width: 180px;
+}
+
+.resourceCollectionTabs {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  min-height: 40px;
+  padding: 3px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--panel-bg-subtle);
+}
+
+.resourceCollectionTabs button {
+  width: auto;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: 760 10px/1 var(--font-heading);
+  white-space: nowrap;
+}
+
+.resourceCollectionTabs button[aria-pressed="true"] {
+  background: var(--panel-bg);
+  color: var(--text-strong);
+  box-shadow: 0 1px 4px rgba(16, 32, 38, .1);
+}
+
+@media (max-width: 960px) {
+  .resourceToolbar {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .resourceCollectionTabs {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    width: fit-content;
+    max-width: 100%;
+    overflow-x: auto;
+  }
+}
+
+@media (max-width: 620px) {
+  .resourceToolbar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resourceSort,
+  .resourceCollectionTabs {
+    grid-column: 1;
+    width: 100%;
+  }
+
+  .resourceCollectionTabs button {
+    flex: 1 0 auto;
+  }
+}
+
 .button:disabled,
 .iconButton:disabled,
 .chip:disabled,

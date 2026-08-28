@@ -17,6 +17,7 @@ type ComponentDraft = {
   title: string;
   url: string;
   tags: string;
+  icon: PersonalOpsIconName | "";
   visual: string;
   code: string;
   animation: string;
@@ -30,6 +31,34 @@ function unique(values: string[]) {
   return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)));
 }
 
+const COMPONENT_ICON_PREFIX = "Icon:";
+const FONT_PREVIEW_STACKS: Readonly<Record<string, string>> = {
+  "Plus Jakarta Sans": '"Plus Jakarta Sans Variable", "Avenir Next", "Segoe UI", sans-serif',
+  "Plus Jakarta Sans Variable": '"Plus Jakarta Sans Variable", "Avenir Next", "Segoe UI", sans-serif',
+  Inter: '"Inter Variable", "Segoe UI", sans-serif',
+  "Inter Variable": '"Inter Variable", "Segoe UI", sans-serif',
+  Inconsolata: '"Inconsolata Variable", "SFMono-Regular", Consolas, monospace',
+  "Inconsolata Variable": '"Inconsolata Variable", "SFMono-Regular", Consolas, monospace'
+};
+
+function previewFontFamily(family: string) {
+  return FONT_PREVIEW_STACKS[family.trim()] || family;
+}
+
+function isPersonalOpsIconName(value: string): value is PersonalOpsIconName {
+  return PERSONAL_OPS_ICON_LIBRARY.some((item) => item.name === value);
+}
+
+function componentIcon(resource: ResourceRecord): PersonalOpsIconName | "" {
+  const marker = resource.provenance.subjects.find((subject) => subject.toLowerCase().startsWith(COMPONENT_ICON_PREFIX.toLowerCase()));
+  const icon = marker?.slice(COMPONENT_ICON_PREFIX.length).trim() || "";
+  return isPersonalOpsIconName(icon) ? icon : "";
+}
+
+function componentTags(resource: ResourceRecord) {
+  return resource.provenance.subjects.filter((subject) => !subject.toLowerCase().startsWith(COMPONENT_ICON_PREFIX.toLowerCase()));
+}
+
 function fieldLabel(label: string, control: React.ReactNode, className = "") {
   return <label className={[styles.field, className].filter(Boolean).join(" ")}><span>{label}</span>{control}</label>;
 }
@@ -40,7 +69,8 @@ function componentDraft(resource?: ResourceRecord): ComponentDraft {
     id: resource?.id,
     title: resource?.title || "",
     url: resource?.source.canonicalUrl || "",
-    tags: resource?.provenance.subjects.join(", ") || "",
+    tags: resource ? componentTags(resource).join(", ") : "",
+    icon: resource ? componentIcon(resource) : "",
     ...content
   };
 }
@@ -63,6 +93,7 @@ export default function PersonalStyleGuideWorkspace({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [editor, setEditor] = useState<ComponentDraft | null>(null);
   const [existingResourceId, setExistingResourceId] = useState("");
+  const [existingResourceIcon, setExistingResourceIcon] = useState<PersonalOpsIconName | "">("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState(initialLoadError || "");
@@ -122,7 +153,10 @@ export default function PersonalStyleGuideWorkspace({
       url: editor.url,
       body: encodeStyleGuideComponent(editor),
       areas: unique([...(current?.provenance.areas || []), STYLE_GUIDE_AREA]),
-      subjects: unique(editor.tags.split(","))
+      subjects: unique([
+        ...editor.tags.split(","),
+        ...(editor.icon ? [`${COMPONENT_ICON_PREFIX}${editor.icon}`] : [])
+      ])
     };
     const result = current ? await repository.update(current.id, values) : await repository.create(values);
     setBusy(false);
@@ -136,18 +170,26 @@ export default function PersonalStyleGuideWorkspace({
     const current = resources.find((item) => item.id === existingResourceId);
     if (!current) return;
     setBusy(true);
-    const result = await repository.update(current.id, { areas: unique([...current.provenance.areas, STYLE_GUIDE_AREA]) });
+    const subjects = unique([
+      ...componentTags(current),
+      ...(existingResourceIcon ? [`${COMPONENT_ICON_PREFIX}${existingResourceIcon}`] : [])
+    ]);
+    const result = await repository.update(current.id, { areas: unique([...current.provenance.areas, STYLE_GUIDE_AREA]), subjects });
     setBusy(false);
     if (!result.ok) return setError(result.error.message);
     setResources((items) => items.map((item) => item.id === result.data.id ? result.data : item));
     setExistingResourceId("");
+    setExistingResourceIcon("");
     setNotice("Resource added to the Style Guide.");
   }
 
   async function removeComponent(resource: ResourceRecord) {
     if (!window.confirm(`Remove “${resource.title}” from the Style Guide? The Resource itself will be preserved.`)) return;
     setBusy(true);
-    const result = await repository.update(resource.id, { areas: resource.provenance.areas.filter((area) => area.toLowerCase() !== STYLE_GUIDE_AREA.toLowerCase()) });
+    const result = await repository.update(resource.id, {
+      areas: resource.provenance.areas.filter((area) => area.toLowerCase() !== STYLE_GUIDE_AREA.toLowerCase()),
+      subjects: componentTags(resource)
+    });
     setBusy(false);
     if (!result.ok) return setError(result.error.message);
     setResources((items) => items.map((item) => item.id === result.data.id ? result.data : item));
@@ -181,7 +223,7 @@ export default function PersonalStyleGuideWorkspace({
             <div className={styles.specimenRail}>
               {draft.typography.map((item) => (
                 <article className={styles.typeSpecimen} key={item.id}>
-                  <div className={styles.specimenPreview} style={{ fontFamily: item.family, fontSize: `${item.size}px`, fontWeight: item.weight, lineHeight: item.lineHeight, letterSpacing: `${item.letterSpacing}em` } as CSSProperties}>Aa <span>{item.label}</span></div>
+                  <div className={styles.specimenPreview} style={{ fontFamily: previewFontFamily(item.family), fontSize: `${item.size}px`, fontWeight: item.weight, lineHeight: item.lineHeight, letterSpacing: `${item.letterSpacing}em` } as CSSProperties}>Aa <span>{item.label}</span></div>
                   <div className={styles.typeControls}>
                     {fieldLabel("Role", <input value={item.label} onChange={(event) => updateTypography(item.id, { label: event.target.value })} />)}
                     {fieldLabel("Font", <input list="style-fonts" value={item.family} onChange={(event) => updateTypography(item.id, { family: event.target.value })} />)}
@@ -209,8 +251,8 @@ export default function PersonalStyleGuideWorkspace({
 
           <section id="components" className={styles.guideSection}>
             <header><div className={styles.sectionIcon}><PersonalOpsIcon name="component" /></div><div><h2>Components</h2><p>{components.length} tagged Resource{components.length === 1 ? "" : "s"}. Resources remain authoritative.</p></div><button type="button" className={styles.addButton} onClick={() => setEditor(componentDraft())}><PersonalOpsIcon name="plus" /> Component</button></header>
-            <div className={styles.resourcePicker}><select aria-label="Existing Resource" value={existingResourceId} onChange={(event) => setExistingResourceId(event.target.value)}><option value="">Add an existing Resource…</option>{availableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.title}</option>)}</select><button type="button" className={styles.secondaryButton} disabled={!existingResourceId || busy} onClick={addExistingResource}><PersonalOpsIcon name="plus" /> Add</button></div>
-            {components.length ? <div className={styles.componentGrid}>{components.map((resource) => { const content = decodeStyleGuideComponent(resource.body); return <article className={styles.componentCard} key={resource.id}><div className={styles.componentVisual}><span>{content.visual || "Visual notes not added"}</span></div><div className={styles.componentCopy}><span className={styles.resourceMarker}>Resource</span><h3>{resource.title}</h3><div className={styles.tagRow}>{resource.provenance.subjects.map((tag) => <span key={tag}>{tag}</span>)}</div>{content.animation && <p><PersonalOpsIcon name="motion" /> {content.animation}</p>}</div><div className={styles.cardActions}><button type="button" onClick={() => setEditor(componentDraft(resource))} aria-label={`Edit ${resource.title}`}><PersonalOpsIcon name="edit" /></button><Link href={`/admin/resources/${resource.id}`} aria-label={`Open ${resource.title}`}><PersonalOpsIcon name="open" /></Link><button type="button" className={styles.deleteIcon} onClick={() => removeComponent(resource)} aria-label={`Remove ${resource.title} from Style Guide`}><PersonalOpsIcon name="close" /></button></div></article>; })}</div> : <div className={styles.emptyState}><PersonalOpsIcon name="component" /><strong>No components yet</strong><span>Tag an existing Resource or save the first specimen.</span></div>}
+            <div className={styles.resourcePicker}><select aria-label="Existing Resource" value={existingResourceId} onChange={(event) => setExistingResourceId(event.target.value)}><option value="">Add an existing Resource…</option>{availableResources.map((resource) => <option value={resource.id} key={resource.id}>{resource.title}</option>)}</select><select aria-label="Component icon" value={existingResourceIcon} onChange={(event) => setExistingResourceIcon(event.target.value as PersonalOpsIconName | "")}><option value="">No icon</option>{PERSONAL_OPS_ICON_LIBRARY.map((item) => <option value={item.name} key={item.name}>{item.label}</option>)}</select><button type="button" className={styles.secondaryButton} disabled={!existingResourceId || busy} onClick={addExistingResource}><PersonalOpsIcon name="plus" /> Add</button></div>
+            {components.length ? <div className={styles.componentGrid}>{components.map((resource) => { const content = decodeStyleGuideComponent(resource.body); const assignedIcon = componentIcon(resource); const tags = componentTags(resource); return <article className={styles.componentCard} key={resource.id}><div className={styles.componentVisual}>{assignedIcon ? <><PersonalOpsIcon name={assignedIcon} /><strong>{PERSONAL_OPS_ICON_LIBRARY.find((item) => item.name === assignedIcon)?.label}</strong></> : <span>{content.visual || "Visual notes not added"}</span>}</div><div className={styles.componentCopy}><span className={styles.resourceMarker}>Resource</span><h3>{resource.title}</h3><div className={styles.tagRow}>{tags.map((tag) => <span key={tag}>{tag}</span>)}</div>{content.animation && <p><PersonalOpsIcon name="motion" /> {content.animation}</p>}</div><div className={styles.cardActions}><button type="button" onClick={() => setEditor(componentDraft(resource))} aria-label={`Edit ${resource.title}`}><PersonalOpsIcon name="edit" /></button><Link href={`/admin/resources/${resource.id}`} aria-label={`Open ${resource.title}`}><PersonalOpsIcon name="open" /></Link><button type="button" className={styles.deleteIcon} onClick={() => removeComponent(resource)} aria-label={`Remove ${resource.title} from Style Guide`}><PersonalOpsIcon name="close" /></button></div></article>; })}</div> : <div className={styles.emptyState}><PersonalOpsIcon name="component" /><strong>No components yet</strong><span>Tag an existing Resource or save the first specimen.</span></div>}
           </section>
 
           <section id="icons" className={styles.guideSection}>
@@ -220,7 +262,7 @@ export default function PersonalStyleGuideWorkspace({
         </div>
       </main>
 
-      {editor && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editorDialog} onSubmit={saveComponent}><header><div><span className={styles.kicker}>Resource component</span><h2>{editor.id ? "Edit component" : "New component"}</h2></div><button type="button" className={styles.iconButton} onClick={() => setEditor(null)} aria-label="Close"><PersonalOpsIcon name="close" /></button></header><div className={styles.editorFields}>{fieldLabel("Name", <input required value={editor.title} onChange={(event) => setEditor({ ...editor, title: event.target.value })} />)}{fieldLabel("Reference URL", <input type="url" value={editor.url} onChange={(event) => setEditor({ ...editor, url: event.target.value })} placeholder="Optional" />)}{fieldLabel("Tags", <input value={editor.tags} onChange={(event) => setEditor({ ...editor, tags: event.target.value })} placeholder="button, action, navigation" />, styles.fullField)}{fieldLabel("Visual", <textarea value={editor.visual} onChange={(event) => setEditor({ ...editor, visual: event.target.value })} placeholder="Describe the specimen and its states." />, styles.fullField)}{fieldLabel("Code", <textarea className={styles.codeField} value={editor.code} onChange={(event) => setEditor({ ...editor, code: event.target.value })} placeholder="Paste the implementation or usage snippet." />, styles.fullField)}{fieldLabel("Animation", <textarea value={editor.animation} onChange={(event) => setEditor({ ...editor, animation: event.target.value })} placeholder="Duration, easing, trigger, and reduced-motion behavior." />, styles.fullField)}</div><footer><button type="button" className={styles.secondaryButton} onClick={() => setEditor(null)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy}>Save component</button></footer></form></div>}
+      {editor && <div className={styles.dialogBackdrop} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editorDialog} onSubmit={saveComponent}><header><div><span className={styles.kicker}>Resource component</span><h2>{editor.id ? "Edit component" : "New component"}</h2></div><button type="button" className={styles.iconButton} onClick={() => setEditor(null)} aria-label="Close"><PersonalOpsIcon name="close" /></button></header><div className={styles.editorFields}>{fieldLabel("Name", <input required value={editor.title} onChange={(event) => setEditor({ ...editor, title: event.target.value })} />)}{fieldLabel("Reference URL", <input type="url" value={editor.url} onChange={(event) => setEditor({ ...editor, url: event.target.value })} placeholder="Optional" />)}{fieldLabel("Icon", <select aria-label="Icon" data-component-icon-select value={editor.icon} onChange={(event) => setEditor({ ...editor, icon: event.target.value as PersonalOpsIconName | "" })}><option value="">No icon</option>{PERSONAL_OPS_ICON_LIBRARY.map((item) => <option value={item.name} key={item.name}>{item.label}</option>)}</select>)}{fieldLabel("Tags", <input value={editor.tags} onChange={(event) => setEditor({ ...editor, tags: event.target.value })} placeholder="button, action, navigation" />)}{fieldLabel("Visual", <textarea value={editor.visual} onChange={(event) => setEditor({ ...editor, visual: event.target.value })} placeholder="Describe the specimen and its states." />, styles.fullField)}{fieldLabel("Code", <textarea className={styles.codeField} value={editor.code} onChange={(event) => setEditor({ ...editor, code: event.target.value })} placeholder="Paste the implementation or usage snippet." />, styles.fullField)}{fieldLabel("Animation", <textarea value={editor.animation} onChange={(event) => setEditor({ ...editor, animation: event.target.value })} placeholder="Duration, easing, trigger, and reduced-motion behavior." />, styles.fullField)}</div><footer><button type="button" className={styles.secondaryButton} onClick={() => setEditor(null)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={busy}>Save component</button></footer></form></div>}
     </div>
   );
 }

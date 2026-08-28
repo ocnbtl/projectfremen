@@ -3969,6 +3969,15 @@ body.people-ai-panel-open .local-ai-widget {
   min-height: 70px;
 }
 
+.people-repeatable-fields-location .people-location-inline-remove {
+  align-self: start;
+  margin-top: 0;
+}
+
+.people-repeatable-fields-location .people-location-inline-remove.has-visible-label {
+  margin-top: 24px;
+}
+
 .people-derived-name {
   display: flex;
   flex-wrap: wrap;
@@ -12528,6 +12537,180 @@ html[data-admin-preview="mobile"] .shared-ai-dock__panel {
 .people-capture-form .people-profile-field-grid textarea {
   color: var(--text-strong);
   font: 560 12px/1.35 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-capture-form .people-profile-field-grid input::placeholder,
+.people-capture-form .people-profile-field-grid textarea::placeholder,
+.people-repeatable-fields input::placeholder,
+.people-repeatable-fields textarea::placeholder,
+.people-organization-link-controls select {
+  color: var(--text-subtle);
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-weight: 520;
+  opacity: 1;
+}
+
+.people-create-full-name {
+  grid-column: span 2;
+}
+
+.people-org-founded {
+  grid-column: 1;
+}
+
+.people-org-team {
+  grid-column: 2;
+}
+
+.people-create-social-grid-no-divider {
+  border-top: 0;
+}
+
+.people-repeatable-fields label,
+.people-repeatable-fields .people-field-label,
+.people-organization-link-controls label,
+.people-object-create-controls label {
+  color: var(--text-subtle);
+  font: 720 10px/1.3 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.people-repeatable-fields input,
+.people-repeatable-fields select,
+.people-repeatable-fields textarea,
+.people-organization-link-controls select,
+.people-object-create-controls select {
+  min-height: 40px;
+  color: var(--text-strong);
+  font: 560 12px/1.35 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-repeatable-fields textarea {
+  height: 40px;
+  padding-block: 10px;
+  resize: vertical;
+}
+
+.people-notes-editor > .people-repeatable-heading h4 {
+  color: var(--text-subtle);
+  font: 720 10px/1.3 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.people-note-row textarea {
+  height: 40px;
+  min-height: 40px;
+  padding-block: 10px;
+  resize: vertical;
+}
+
+.people-note-row .people-note-bullet {
+  align-self: center;
+}
+
+.people-note-actions > button,
+.people-note-remove,
+.people-note-add {
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px !important;
+  min-height: 40px !important;
+}
+
+.people-object-create-editor {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--people-section-accent) 18%, var(--border-soft));
+  border-radius: 12px;
+}
+
+.people-object-create-editor > .people-repeatable-heading {
+  padding: 9px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--people-section-accent) 14%, var(--border-soft));
+}
+
+.people-object-create-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  margin: 10px;
+}
+
+.people-object-create-controls label {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.people-object-create-controls select {
+  width: 100%;
+  min-width: 0;
+  padding: 0 9px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+}
+
+.people-object-create-list {
+  display: grid;
+  gap: 6px;
+  margin: 0 10px 10px;
+}
+
+.people-object-create-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: center;
+  min-height: 48px;
+  padding: 4px 4px 4px 10px;
+  border: 1px solid color-mix(in srgb, var(--people-section-accent) 14%, var(--border-soft));
+  border-radius: 8px;
+  background: var(--surface-panel);
+}
+
+.people-object-create-list article > span {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.people-object-create-list small {
+  color: var(--text-subtle);
+  font: 720 9px/1.2 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-object-create-list strong {
+  overflow: hidden;
+  color: var(--text-strong);
+  font: 720 12px/1.3 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .people-create-full-name,
+  .people-org-founded,
+  .people-org-team {
+    grid-column: auto;
+  }
+
+  .people-object-create-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .people-object-create-controls .people-add-action {
+    justify-self: start;
+  }
+
+  .people-repeatable-fields-location .people-location-inline-remove,
+  .people-repeatable-fields-location .people-location-inline-remove.has-visible-label {
+    justify-self: end;
+    margin-top: 0;
+  }
 }
 
 @media (max-width: 760px) {

@@ -1799,10 +1799,10 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     ]) {
       assert(duplicateUrlState.searchParams.get(key) === value, `Resources Duplicate URLs dropped ${key} URL state`);
     }
-    await resourceRow(desktop, duplicateResourceId).locator('input[type="checkbox"]').check();
     assert(
-      new URL(desktop.url()).searchParams.get("selected") === resourceId,
-      "Resources Duplicate URLs batch checkbox changed inspector selection"
+      await resourceRow(desktop, duplicateResourceId).locator('input[type="checkbox"]').count() === 0 &&
+        new URL(desktop.url()).searchParams.get("selected") === resourceId,
+      "Resources Duplicate URLs retained batch selection or changed inspector selection"
     );
     await desktop.screenshot({ path: path.join(screenshotDir, "resources-duplicate-urls-1440x900.png") });
     await resourceRow(desktop, duplicateResourceId).locator(".dense-object-row__body").click();
@@ -1864,10 +1864,10 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     ]) {
       assert(linkedNotesUrl.searchParams.get(key) === value, `Resources Linked to Notes dropped ${key} URL state`);
     }
-    await resourceRow(desktop, duplicateResourceId).locator('input[type="checkbox"]').check();
     assert(
-      new URL(desktop.url()).searchParams.get("selected") === resourceId,
-      "Resources Linked to Notes batch checkbox changed inspector selection"
+      await resourceRow(desktop, duplicateResourceId).locator('input[type="checkbox"]').count() === 0 &&
+        new URL(desktop.url()).searchParams.get("selected") === resourceId,
+      "Resources Linked to Notes retained batch selection or changed inspector selection"
     );
     await desktop.screenshot({ path: path.join(screenshotDir, "resources-linked-notes-1440x900.png") });
     await resourceRow(desktop, duplicateResourceId).locator(".dense-object-row__body").click();
@@ -1912,11 +1912,10 @@ async function checkResourcesReviewAndPropertiesBrowserState(
     ]) {
       assert(initialUrl.searchParams.get(key) === value, `Resources Needs Review dropped ${key} URL state`);
     }
-    const selectedBeforeCheckbox = initialUrl.searchParams.get("selected");
-    await selectedResourceRow(desktop).locator('input[type="checkbox"]').check();
     assert(
-      new URL(desktop.url()).searchParams.get("selected") === selectedBeforeCheckbox,
-      "Resources batch checkbox changed inspector selection"
+      await selectedResourceRow(desktop).locator('input[type="checkbox"]').count() === 0 &&
+        new URL(desktop.url()).searchParams.get("selected") === initialUrl.searchParams.get("selected"),
+      "Resources Needs Review retained batch selection or changed inspector selection"
     );
     await desktop.screenshot({ path: path.join(screenshotDir, "resources-needs-review-1440x900.png") });
 
@@ -2783,9 +2782,15 @@ async function checkResourceCreateEditBrowserState(
       waitUntil: "domcontentloaded"
     });
     await page.getByRole("heading", { level: 1, name: "All Resources" }).waitFor();
+    const collectionFilters = page.getByRole("group", { name: "Resource collection" });
+    for (const label of ["All", "Components", "Design libraries"]) {
+      assert(await collectionFilters.getByRole("button", { name: label, exact: true }).count() === 1, `Resources toolbar omitted the functional ${label} collection filter`);
+    }
+    assert(await page.locator('[role="list"][aria-label="Resources"] input[type="checkbox"]').count() === 0, "Resources directory retained batch-selection checkboxes");
     await page.getByRole("button", { name: "Add Resource", exact: false }).click();
     const dialog = page.getByRole("dialog", { name: "Add Resource" });
     await dialog.waitFor();
+    assert(await dialog.getByLabel("Collection", { exact: true }).count() === 1, "Resource editor omitted its collection selector");
     assert(
       await page.getByRole("button", { name: "Open AI assistant" }).count() === 0,
       "Resources AI dock remained exposed beneath the editor"
@@ -6259,7 +6264,7 @@ async function checkPeopleMemoryBrowserState(
           await page.getByRole("button", { name: "Add email" }).count() === 1 &&
           await page.getByRole("button", { name: "Add phone" }).count() === 1 &&
           await page.getByRole("button", { name: "Add occupation" }).count() === 1 &&
-          await page.getByRole("button", { name: "Add university" }).count() === 1 &&
+          await page.getByRole("button", { name: "Add school" }).count() === 1 &&
           await page.getByRole("button", { name: "Add location" }).count() === 1 &&
           await page.getByRole("heading", { name: "Occupations", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "Education", exact: true }).count() === 1 &&
@@ -6331,7 +6336,7 @@ async function checkPeopleMemoryBrowserState(
       assert(await page.locator(".people-edit-toolbar strong").textContent() === "New Organization", `New People did not reflect Organization type at ${viewport.label}`);
       const organizationForm = page.locator(".people-capture-form");
       assert(
-        await page.getByRole("heading", { name: "Organization details" }).count() === 1 &&
+        await page.getByRole("heading", { name: "Details", exact: true }).count() === 1 &&
           await page.getByLabel("Organization type").count() === 1 &&
           await page.getByLabel("Industry or field").count() === 1 &&
           await organizationForm.locator(".people-group-picker").count() === 0 &&
@@ -6368,6 +6373,33 @@ async function checkPeopleMemoryBrowserState(
           organizationLabelTypography.teamTransform === "none",
         `Organization create labels did not share one sentence-case type style at ${viewport.label}: ${JSON.stringify(organizationLabelTypography)}`
       );
+      const organizationLayout = await organizationForm.evaluate(() => {
+        const founded = document.querySelector('[class~="people-org-founded"] input')?.getBoundingClientRect();
+        const team = document.querySelector('[class~="people-org-team"] input')?.getBoundingClientRect();
+        const location = document.querySelector("[data-location-entry]");
+        const locationInputs = location ? Array.from(location.querySelectorAll("input")) : [];
+        const remove = location?.querySelector(".people-remove-icon")?.getBoundingClientRect();
+        const city = locationInputs[1]?.getBoundingClientRect();
+        const cityLabel = location?.querySelector(".people-field-label:nth-of-type(1)") || location?.querySelectorAll(".people-field-label")[1];
+        const teamLabel = document.querySelector('[class~="people-org-team"]');
+        return {
+          foundedTop: founded?.top || 0,
+          teamTop: team?.top || 0,
+          removeTop: remove?.top || 0,
+          cityTop: city?.top || 0,
+          removeHeight: remove?.height || 0,
+          cityHeight: city?.height || 0,
+          cityFamily: cityLabel ? getComputedStyle(cityLabel).fontFamily : "",
+          teamFamily: teamLabel ? getComputedStyle(teamLabel).fontFamily : ""
+        };
+      });
+      assert(
+        organizationLayout &&
+          (viewport.label === "mobile" || Math.abs(organizationLayout.foundedTop - organizationLayout.teamTop) < 2) &&
+          (viewport.label === "mobile" || Math.abs(organizationLayout.removeTop - organizationLayout.cityTop) < 2) &&
+          organizationLayout.cityFamily === organizationLayout.teamFamily,
+        `Organization details or Location alignment drifted at ${viewport.label}: ${JSON.stringify(organizationLayout)}`
+      );
       const organizationTypeSelect = organizationForm.locator("[data-organization-type]");
       const organizationIndustrySelect = organizationForm.locator("[data-organization-industry]");
       assert(
@@ -6401,11 +6433,22 @@ async function checkPeopleMemoryBrowserState(
       await page.getByLabel("Full name").fill('Avery "June" North');
       await page.getByLabel("YouTube", { exact: true }).fill("https://youtube.com/@avery-north");
       assert(
-        await page.locator("[data-derived-first-name]").textContent() === "Avery" &&
-          await page.locator("[data-derived-last-name]").textContent() === "North" &&
+        await page.locator("[data-derived-first-name]").inputValue() === "Avery" &&
+          await page.locator("[data-derived-last-name]").inputValue() === "North" &&
           await page.getByLabel("Full name").inputValue() === "Avery North" &&
           await page.getByLabel("Nickname").inputValue() === "June",
         `New People did not extract a quoted nickname while deriving the full name at ${viewport.label}`
+      );
+      assert(
+        await page.locator("[data-people-create-objects]").count() === 1 &&
+          await page.getByLabel("Object to link").count() === 1,
+        `New People did not expose the create-time Objects section at ${viewport.label}`
+      );
+      await page.getByLabel("Object to link").selectOption(`people:organization:${organizationId}`);
+      await page.getByRole("button", { name: "Add object" }).click();
+      assert(
+        await page.locator("[data-people-create-objects]").getByText(organizationTitle, { exact: true }).count() === 1,
+        `New People did not stage the selected Object at ${viewport.label}`
       );
       const createNotes = page.locator("[data-people-notes-editor]");
       await createNotes.getByLabel("Notes note 1").fill("Prefers afternoon calls");
@@ -6414,6 +6457,20 @@ async function checkPeopleMemoryBrowserState(
       assert(
         await createNotes.locator("textarea").count() === 2,
         `New People did not provide repeatable About notes at ${viewport.label}`
+      );
+      const noteGeometry = await createNotes.locator(".people-note-row").first().evaluate((row) => {
+        const textarea = row.querySelector("textarea")?.getBoundingClientRect();
+        const bullet = row.querySelector(".people-note-bullet")?.getBoundingClientRect();
+        const buttons = Array.from(row.querySelectorAll("button")).map((button) => button.getBoundingClientRect());
+        return {
+          textareaHeight: textarea?.height || 0,
+          bulletDelta: textarea && bullet ? Math.abs((textarea.top + textarea.height / 2) - (bullet.top + bullet.height / 2)) : 99,
+          buttonHeights: buttons.map((button) => button.height)
+        };
+      });
+      assert(
+        noteGeometry.textareaHeight <= 42 && noteGeometry.bulletDelta < 2 && noteGeometry.buttonHeights.every((height) => Math.abs(height - noteGeometry.textareaHeight) < 2),
+        `New People notes did not use compact aligned controls at ${viewport.label}: ${JSON.stringify(noteGeometry)}`
       );
       const birthdayEditor = page.locator("[data-people-birthday-editor]");
       await birthdayEditor.locator("select").nth(0).selectOption("3");
@@ -6483,7 +6540,7 @@ async function checkPeopleMemoryBrowserState(
           await page.getByLabel("Custom category").inputValue() === "Alumni",
         `New People repeatable labeled contact controls failed at ${viewport.label}`
       );
-      const addUniversityButton = page.getByRole("button", { name: "Add university" });
+      const addUniversityButton = page.getByRole("button", { name: "Add school" });
       const addJobButton = page.getByRole("button", { name: "Add occupation" });
       const addLocationButton = page.getByRole("button", { name: "Add location" });
       if (viewport.label === "mobile") {
@@ -6515,15 +6572,23 @@ async function checkPeopleMemoryBrowserState(
         fullPage: true
       });
       if (viewport.label === "desktop") {
-        const [createResponse] = await Promise.all([
+        const [createResponse, nativeLinkResponse] = await Promise.all([
           page.waitForResponse((response) =>
             response.url().endsWith("/api/personal/records") && response.request().method() === "POST"
+          ),
+          page.waitForResponse((response) =>
+            response.url().endsWith("/api/native-links") && response.request().method() === "POST"
           ),
           page.getByRole("button", { name: "Save", exact: true }).click()
         ]);
         const createdPayload = await createResponse.json();
         const createdFromQuickEntry = createdPayload?.items?.find((item) => item.title === "Avery North");
         assert(createResponse.ok() && createdFromQuickEntry, "People quick entry did not save through the canonical Personal Records route");
+        const nativeLinkPayload = await nativeLinkResponse.json();
+        assert(
+          nativeLinkResponse.ok() && nativeLinkPayload?.item?.target?.objectId === organizationId,
+          "People quick entry did not persist its staged native Object link"
+        );
         assert(
           createdFromQuickEntry.profile?.firstName === "Avery" &&
             !createdFromQuickEntry.profile?.middleName &&
@@ -9071,10 +9136,29 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       assert(await page.getByText("Resources remain authoritative.", { exact: false }).count() >= 1, `Style Guide did not disclose the Resource ownership boundary at ${viewport.label}`);
       assert(await page.locator('section[aria-label="Guide identity"] input').count() === 2, `Style Guide identity was not editable at ${viewport.label}`);
       assert(await page.locator('input[aria-label$=" usage"]').count() >= 30, `Style Guide did not expose the canonical icon usage registry at ${viewport.label}`);
+      const typographyFamilies = await page.locator('[class*="specimenPreview"]').evaluateAll((elements) => elements.slice(0, 6).map((element) => getComputedStyle(element).fontFamily));
+      assert(
+        typographyFamilies.some((family) => family.includes("Plus Jakarta Sans Variable")) &&
+          typographyFamilies.some((family) => family.includes("Inter Variable")) &&
+          typographyFamilies.some((family) => family.includes("Inconsolata Variable")),
+        `Style Guide specimens did not render their selected font families at ${viewport.label}: ${JSON.stringify(typographyFamilies)}`
+      );
+      assert(
+        await page.locator('[class*="swatchCard"]').count() >= 18 && await page.locator('[class*="moduleCard"]').count() >= 8,
+        `Style Guide did not expose the expanded foundation and module palettes at ${viewport.label}`
+      );
       const componentButton = page.locator("button:visible").filter({ hasText: "Component" }).first();
       await componentButton.click();
       await page.getByRole("heading", { name: "New component", exact: true }).waitFor();
-      assert(await page.getByLabel("Code", { exact: true }).count() === 1 && await page.getByLabel("Animation", { exact: true }).count() === 1, `Component editor omitted code or animation at ${viewport.label}`);
+      const componentEditorState = {
+        code: await page.getByLabel("Code", { exact: true }).count(),
+        animation: await page.getByLabel("Animation", { exact: true }).count(),
+        iconOptions: await page.locator("[data-component-icon-select] option").count()
+      };
+      assert(
+        componentEditorState.code === 1 && componentEditorState.animation === 1 && componentEditorState.iconOptions >= 30,
+        `Component editor omitted code, animation, or the extensible icon selector at ${viewport.label}: ${JSON.stringify(componentEditorState)}`
+      );
       await page.getByRole("button", { name: "Close", exact: true }).click();
       await page.locator('main[aria-label="Style Guide"]').evaluate((main) => { main.scrollTop = 0; main.querySelectorAll("*").forEach((element) => { element.scrollTop = 0; }); });
       let layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
@@ -9085,8 +9169,24 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       }
       await page.screenshot({ path: path.join(screenshotDir, `style-guide-${viewport.label}.png`), fullPage: true });
 
-      await page.goto(`${baseUrl}/admin/personal/dog`, { waitUntil: "networkidle" });
+      await page.goto(`${baseUrl}/admin/personal`, { waitUntil: "networkidle" });
+      await page.evaluate(() => {
+        window.__personalTransitionLoadingFrames = [];
+        const observer = new MutationObserver(() => {
+          if (document.body.innerText.includes("Loading operating queue") || document.querySelector('[data-ui-state="loading"]')) {
+            window.__personalTransitionLoadingFrames.push(performance.now());
+          }
+        });
+        observer.observe(document.body, { subtree: true, childList: true, characterData: true });
+        window.__personalTransitionObserver = observer;
+      });
+      await page.getByRole("navigation", { name: "Personal systems" }).getByRole("link", { name: "Dog", exact: true }).click();
       await page.getByRole("heading", { name: "Dog", exact: true }).waitFor();
+      const loadingFrames = await page.evaluate(() => {
+        window.__personalTransitionObserver?.disconnect();
+        return window.__personalTransitionLoadingFrames || [];
+      });
+      assert(loadingFrames.length === 0, `Personal Ops route transition rendered a loading skeleton at ${viewport.label}: ${JSON.stringify(loadingFrames)}`);
       for (const label of ["Walk", "Feed", "Pee", "Poop"]) {
         assert(await page.locator('section[aria-label="Latest dog care"]', { hasText: label }).count() === 1, `Dog care pulse omitted ${label} at ${viewport.label}`);
       }
@@ -12432,7 +12532,14 @@ async function main() {
     });
     assert(styleWithoutCsrf.response.status === 403, "Style Guide API accepted a write without CSRF proof");
     const initialStyleGuide = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide");
-    assert(initialStyleGuide.response.ok && initialStyleGuide.payload?.state?.typography?.length >= 6 && initialStyleGuide.payload?.state?.colors?.length >= 6, "Style Guide defaults did not expose the expected design foundation");
+    assert(
+      initialStyleGuide.response.ok &&
+        initialStyleGuide.payload?.state?.schemaVersion === 2 &&
+        initialStyleGuide.payload?.state?.typography?.length >= 6 &&
+        initialStyleGuide.payload?.state?.colors?.length >= 18 &&
+        initialStyleGuide.payload?.state?.modules?.length >= 8,
+      "Style Guide defaults did not expose the expanded design foundation"
+    );
     const styleInput = {
       title: initialStyleGuide.payload.state.title,
       description: "Calm operations desk · regression verified",
@@ -12458,9 +12565,9 @@ async function main() {
     const createdComponentResource = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
       method: "POST",
       headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
-      body: JSON.stringify({ domain: "notes-docs", title: componentTitle, className: "resource", knowledgeShape: "reference", privacy: "private", stage: "processed", status: "active", body: "## Visual\nCompact navy action\n\n## Code\n<Button />\n\n## Animation\n120ms ease-out", url: "", areas: ["Style Guide"], subjects: ["button", "action"], intents: ["retain"] })
+      body: JSON.stringify({ domain: "notes-docs", title: componentTitle, className: "resource", knowledgeShape: "reference", privacy: "private", stage: "processed", status: "active", body: "## Visual\nCompact navy action\n\n## Code\n<Button />\n\n## Animation\n120ms ease-out", url: "", areas: ["Style Guide"], subjects: ["button", "action", "Icon:travel"], intents: ["retain"] })
     });
-    assert(createdComponentResource.response.ok && createdComponentResource.payload?.items?.some((item) => item.title === componentTitle && item.areas?.includes("Style Guide") && item.subjects?.includes("button")), "Style Guide component did not persist as a tagged Resource");
+    assert(createdComponentResource.response.ok && createdComponentResource.payload?.items?.some((item) => item.title === componentTitle && item.areas?.includes("Style Guide") && item.subjects?.includes("button") && item.subjects?.includes("Icon:travel")), "Style Guide component did not persist as an icon-associated Resource");
 
     const dogWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/dog", {
       method: "POST",
@@ -12757,8 +12864,9 @@ async function main() {
     const resourcesPage = await requestText(server.baseUrl, cookieJar, "/admin/resources");
     assert(resourcesPage.response.ok, `Resources page failed: ${describeStatus(resourcesPage.response)}`);
     assert(resourcesPage.body.includes("All Resources"), "Resources page missing its native directory heading");
-    assert(resourcesPage.body.includes("Search resources, source, context"), "Resources page missing its source search");
-    pass("Resources directory loads through the external-source adapter");
+    assert(resourcesPage.body.includes("Search…"), "Resources page missing its streamlined source search");
+    assert(resourcesPage.body.includes("Components") && resourcesPage.body.includes("Design libraries"), "Resources page missing its functional collection filters");
+    pass("Resources directory loads through the streamlined source and collection adapter");
 
     const nativeFinanceState = await checkNativeFinanceLifecycle(server.baseUrl, cookieJar);
     assert(nativeFinanceState.accounts.length === 5 && nativeFinanceState.rules.length === 1, "Native Finance lifecycle returned incomplete persisted state");

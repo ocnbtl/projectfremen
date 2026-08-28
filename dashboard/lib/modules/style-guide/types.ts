@@ -1,4 +1,4 @@
-export const STYLE_GUIDE_SCHEMA_VERSION = 1 as const;
+export const STYLE_GUIDE_SCHEMA_VERSION = 2 as const;
 
 export type StyleGuideTypographyRole = {
   id: string;

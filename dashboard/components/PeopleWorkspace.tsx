@@ -1663,7 +1663,7 @@ function EducationEntriesEditor({
     <section className="people-repeatable-section people-themed-section module-ref-tone-purple" data-people-education-editor data-profile-section="education">
       <header className="people-repeatable-heading">
         <div className="people-repeatable-title"><span><PeopleIcon name="university" /></span><h4>Education</h4></div>
-        <PeopleAddButton label="University" onClick={onAdd} />
+        <PeopleAddButton label="School" onClick={onAdd} />
       </header>
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-education-entry={entry.id} key={entry.id}>
@@ -1678,7 +1678,7 @@ function EducationEntriesEditor({
                   onChange(entry.id, { organizationId: organization?.id, institution: organization?.title || entry.institution });
                 }}
               >
-                <option value="">Select an Organization object</option>
+                <option value="">Select university</option>
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.institution || "Unavailable organization"} · unavailable</option>
                 )}
@@ -1728,7 +1728,7 @@ function OccupationEntriesEditor({
                   onChange(entry.id, { organizationId: organization?.id, employer: organization?.title || entry.employer });
                 }}
               >
-                <option value="">Select an Organization object</option>
+                <option value="">Select an organization</option>
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.employer || "Unavailable organization"} · unavailable</option>
                 )}
@@ -1774,9 +1774,9 @@ function LocationEntriesEditor({
         <article className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-location">
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Label</span><input aria-label={`Location ${index + 1} label`} value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? "Relevant location" : index === 0 ? "Primary home" : "Second home"} /></label>
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City / region</span><input aria-label={`Location ${index + 1} city or region`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing a city" /></label>
-            <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove location ${index + 1}`} onClick={() => onRemove(entry.id)} />
-            <label className="is-wide"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><textarea aria-label={`Location ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={2} /></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City</span><input aria-label={`Location ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing…" /></label>
+            <RemoveIconButton className={`people-repeatable-inline-remove people-location-inline-remove${index === 0 ? " has-visible-label" : ""}`} label={`Remove location ${index + 1}`} onClick={() => onRemove(entry.id)} />
+            <label className="is-wide"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><textarea aria-label={`Location ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={1} /></label>
           </div>
         </article>
       )) : <p className="people-repeatable-empty">No location added.</p>}
@@ -1836,7 +1836,6 @@ function OrganizationPeopleEditor({
       <header>
         <div>
           <h4>People</h4>
-          <p>Link people directly or let employer and education links add them automatically.</p>
         </div>
       </header>
       <div className="people-organization-link-controls">
@@ -1847,7 +1846,7 @@ function OrganizationPeopleEditor({
             {availablePeople.map((person) => <option value={person.id} key={person.id}>{person.title}</option>)}
           </select>
         </label>
-        <button type="button" onClick={addPerson} disabled={!pendingId}>Add person</button>
+        <PeopleAddButton label="Person" onClick={addPerson} disabled={!pendingId} />
       </div>
       <div className="people-organization-linked-list" aria-label="Linked people">
         {linkedPeople.length ? linkedPeople.map((person) => {
@@ -1871,6 +1870,68 @@ function OrganizationPeopleEditor({
           );
         }) : <p>No people linked yet.</p>}
       </div>
+    </section>
+  );
+}
+
+function QuickObjectsEditor({
+  targets,
+  selectedIds,
+  onChange
+}: {
+  targets: NativeObjectRef[];
+  selectedIds: string[];
+  onChange: (selectedIds: string[]) => void;
+}) {
+  const [pendingId, setPendingId] = useState("");
+  const selected = new Set(selectedIds);
+  const availableTargets = targets.filter((target) => !selected.has(`${target.module}:${target.objectType}:${target.objectId}`));
+  const selectedTargets = selectedIds.flatMap((targetId) => {
+    const target = targets.find((candidate) => `${candidate.module}:${candidate.objectType}:${candidate.objectId}` === targetId);
+    return target ? [target] : [];
+  });
+
+  function addObject() {
+    if (!pendingId || selected.has(pendingId)) return;
+    onChange([...selectedIds, pendingId]);
+    setPendingId("");
+  }
+
+  return (
+    <section className="people-object-create-editor people-themed-section module-ref-tone-blue" data-people-create-objects>
+      <header className="people-repeatable-heading">
+        <div className="people-repeatable-title"><span><PeopleIcon name="object" /></span><h4>Objects</h4></div>
+      </header>
+      <div className="people-object-create-controls">
+        <label>
+          Object
+          <select aria-label="Object to link" value={pendingId} onChange={(event) => setPendingId(event.target.value)}>
+            <option value="">Select an object</option>
+            {Array.from(new Set(availableTargets.map((target) => target.module))).map((module) => (
+              <optgroup label={labelize(module)} key={module}>
+                {availableTargets.filter((target) => target.module === module).map((target) => {
+                  const key = `${target.module}:${target.objectType}:${target.objectId}`;
+                  return <option value={key} key={key}>{target.label}</option>;
+                })}
+              </optgroup>
+            ))}
+          </select>
+        </label>
+        <PeopleAddButton label="Object" onClick={addObject} disabled={!pendingId} />
+      </div>
+      {selectedTargets.length > 0 && (
+        <div className="people-object-create-list" aria-label="Objects to link">
+          {selectedTargets.map((target) => {
+            const key = `${target.module}:${target.objectType}:${target.objectId}`;
+            return (
+              <article key={key}>
+                <span><small>{labelize(target.module)}</small><strong>{target.label}</strong></span>
+                <RemoveIconButton label={`Remove ${target.label}`} onClick={() => onChange(selectedIds.filter((id) => id !== key))} />
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
@@ -2076,7 +2137,7 @@ function PeopleNotesEditor({
             <textarea
               id={`${idPrefix}-${index}`}
               aria-label={`${title} note ${index + 1}`}
-              rows={2}
+              rows={1}
               value={note}
               onChange={(event) => updateNote(index, event.target.value)}
               placeholder="Write a note…"
@@ -2136,6 +2197,9 @@ export default function PeopleWorkspace({
   const [selectedId, setSelectedId] = useState(initialSelectedId || initialUrlState.person || initialPeople[0]?.id || "");
   const [name, setName] = useState("");
   const [quickNickname, setQuickNickname] = useState("");
+  const [quickFirstName, setQuickFirstName] = useState("");
+  const [quickMiddleName, setQuickMiddleName] = useState("");
+  const [quickLastName, setQuickLastName] = useState("");
   const [quickBirthday, setQuickBirthday] = useState("");
   const [className, setClassName] = useState<Extract<PersonalRecordClass, "person" | "org">>("person");
   const [groups, setGroups] = useState<string[]>(["Collaborator"]);
@@ -2147,6 +2211,7 @@ export default function PeopleWorkspace({
   const [quickFoundedYear, setQuickFoundedYear] = useState("");
   const [quickTeamSize, setQuickTeamSize] = useState("");
   const [quickOrganizationPeople, setQuickOrganizationPeople] = useState<string[]>([]);
+  const [quickObjectTargetIds, setQuickObjectTargetIds] = useState<string[]>([]);
   const [quickEmails, setQuickEmails] = useState<PersonalEmailEntry[]>([
     newEmailEntry({ id: "new-contact-email-1", category: "primary" })
   ]);
@@ -2676,6 +2741,12 @@ export default function PeopleWorkspace({
     !selectedPersonRef ||
     !(target.module === selectedPersonRef.module && target.objectType === selectedPersonRef.objectType && target.objectId === selectedPersonRef.objectId)
   ) && !linkedNativeTargetKeys.has(`${target.module}:${target.objectType}:${target.objectId}`));
+  const quickObjectTargets = initialObjectTargets.filter((target) => (
+    target.module === "projects" ||
+    target.module === "people" ||
+    target.module === "resources" ||
+    target.module === "notes"
+  ));
   const timelineItems = selectedInteractionItems.slice(0, 20);
   const selectedTags = Array.from(new Set([
     ...(fallbackPerson?.subjects || []).slice(0, 3),
@@ -2705,6 +2776,9 @@ export default function PeopleWorkspace({
   const addFormDirty = [
     name,
     quickNickname,
+    quickFirstName,
+    quickMiddleName,
+    quickLastName,
     quickBirthday,
     quickContext,
     ...quickNotes,
@@ -2727,6 +2801,7 @@ export default function PeopleWorkspace({
     || cleanOccupationEntries(quickOccupations).length > 0
     || cleanLocationEntries(quickLocations).length > 0
     || quickOrganizationPeople.length > 0
+    || quickObjectTargetIds.length > 0
     || className !== "person"
     || groups.length !== 1
     || groups[0] !== "Collaborator"
@@ -3063,11 +3138,16 @@ export default function PeopleWorkspace({
     setError("");
 
     const derivedName = className === "person" ? derivePersonNameParts(name) : { firstName: "", middleName: "", lastName: "" };
+    const resolvedName = className === "person" ? {
+      firstName: quickFirstName.trim() || derivedName.firstName,
+      middleName: quickMiddleName.trim() || derivedName.middleName,
+      lastName: quickLastName.trim() || derivedName.lastName
+    } : derivedName;
     const organizationLocation = className === "org" ? cleanLocationEntries(quickLocations)[0] : undefined;
     const profile = buildProfilePayload({
       ...EMPTY_PROFILE_DRAFT,
       fullName: name,
-      ...derivedName,
+      ...resolvedName,
       nickname: className === "person" ? quickNickname : "",
       birthday: className === "person" ? quickBirthday : "",
       context: quickContext,
@@ -3128,9 +3208,64 @@ export default function PeopleWorkspace({
         return;
       }
 
+      const previousIds = new Set(people.map((record) => record.id));
       const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
       const createdPerson =
-        nextPeople.find((record) => record.title.toLowerCase() === name.trim().toLowerCase()) || nextPeople[0];
+        nextPeople.find((record) => !previousIds.has(record.id)) ||
+        nextPeople.find((record) => record.title.toLowerCase() === name.trim().toLowerCase()) ||
+        nextPeople[0];
+
+      let linkedObjectCount = 0;
+      let failedObjectCount = 0;
+      if (createdPerson && className === "person" && quickObjectTargetIds.length > 0) {
+        const source = createNativeObjectRef({
+          module: "people",
+          objectType: "person",
+          objectId: createdPerson.id,
+          label: createdPerson.title,
+          versionId: createdPerson.updatedAt
+        });
+        const selectedTargets = quickObjectTargetIds.flatMap((targetId) => {
+          const target = quickObjectTargets.find((candidate) => `${candidate.module}:${candidate.objectType}:${candidate.objectId}` === targetId);
+          return target ? [target] : [];
+        });
+        const results = await Promise.all(selectedTargets.map(async (target) => {
+          try {
+            if (target.module === "projects" && target.objectType === "project") {
+              const result = await projectsRepository.create("links", {
+                projectId: target.objectId,
+                source,
+                relationship: "project_person",
+                relationshipStrength: "normal",
+                projectSpecificNote: "Linked during People creation"
+              });
+              if (!result.ok) throw new Error(result.error.message);
+              return null;
+            }
+            const linkResponse = await fetch("/api/native-links", {
+              method: "POST",
+              headers: buildJsonHeadersWithCsrf(),
+              body: JSON.stringify({ source, target, relationship: "related" })
+            });
+            const linkPayload = await linkResponse.json().catch(() => ({ ok: false, error: "Invalid server response" })) as {
+              ok?: boolean;
+              item?: ObjectLink;
+              error?: string;
+            };
+            if (!linkResponse.ok || !linkPayload.ok || !linkPayload.item) throw new Error(linkPayload.error || "Link failed");
+            return linkPayload.item;
+          } catch {
+            failedObjectCount += 1;
+            return false;
+          }
+        }));
+        const createdLinks = results.filter((result): result is ObjectLink => typeof result === "object" && result !== null);
+        linkedObjectCount = results.filter((result) => result !== false).length;
+        if (createdLinks.length) {
+          setObjectLinks((current) => [...current, ...createdLinks.filter((link) => !current.some((item) => item.id === link.id))]);
+        }
+        if (selectedTargets.some((target) => target.module === "projects")) await refreshProjects();
+      }
       setPeople(nextPeople);
       setSelectedId(createdPerson?.id || "");
       setAddingPerson(false);
@@ -3138,6 +3273,9 @@ export default function PeopleWorkspace({
       setActiveView("overview");
       setName("");
       setQuickNickname("");
+      setQuickFirstName("");
+      setQuickMiddleName("");
+      setQuickLastName("");
       setQuickBirthday("");
       setClassName("person");
       setGroups(["Collaborator"]);
@@ -3149,6 +3287,7 @@ export default function PeopleWorkspace({
       setQuickFoundedYear("");
       setQuickTeamSize("");
       setQuickOrganizationPeople([]);
+      setQuickObjectTargetIds([]);
       setQuickEmails([newEmailEntry({ id: "new-contact-email-1", category: "primary" })]);
       setQuickPhones([newPhoneEntry({ id: "new-contact-phone-1", category: "primary", countryCode: "+1" })]);
       setQuickEducation([]);
@@ -3164,6 +3303,11 @@ export default function PeopleWorkspace({
       setQuickX("");
       setQuickLinkedIn("");
       setQuickYouTube("");
+      if (quickObjectTargetIds.length > 0) {
+        setActionNotice(failedObjectCount
+          ? `${createdPerson?.title || "Person"} was created. ${linkedObjectCount} object ${linkedObjectCount === 1 ? "link" : "links"} saved; ${failedObjectCount} could not be attached.`
+          : `${createdPerson?.title || "Person"} was created with ${linkedObjectCount} object ${linkedObjectCount === 1 ? "link" : "links"}.`);
+      }
       if (createdPerson) {
         await mirrorPersonalRecord(createdPerson);
         await releaseDirtyHistoryGuard();
@@ -3424,6 +3568,9 @@ export default function PeopleWorkspace({
     setClassName(type);
     setName("");
     setQuickNickname("");
+    setQuickFirstName("");
+    setQuickMiddleName("");
+    setQuickLastName("");
     setQuickBirthday("");
     setQuickContext("");
     setQuickNotes([""]);
@@ -3432,6 +3579,7 @@ export default function PeopleWorkspace({
     setQuickFoundedYear("");
     setQuickTeamSize("");
     setQuickOrganizationPeople([]);
+    setQuickObjectTargetIds([]);
     setQuickYouTube("");
     setQuickEmails([newEmailEntry({ id: "new-contact-email-1", category: "primary" })]);
     setQuickPhones([newPhoneEntry({ id: "new-contact-phone-1", category: "primary", countryCode: "+1" })]);
@@ -3457,9 +3605,17 @@ export default function PeopleWorkspace({
     if (parsed) {
       setName(parsed.fullName);
       setQuickNickname(parsed.nickname);
+      const derived = derivePersonNameParts(parsed.fullName);
+      setQuickFirstName(derived.firstName);
+      setQuickMiddleName(derived.middleName);
+      setQuickLastName(derived.lastName);
       return;
     }
     setName(value);
+    const derived = derivePersonNameParts(value);
+    setQuickFirstName(derived.firstName);
+    setQuickMiddleName(derived.middleName);
+    setQuickLastName(derived.lastName);
   }
 
   function switchQuickProfileType(nextClassName: "person" | "org") {
@@ -3609,8 +3765,6 @@ export default function PeopleWorkspace({
   }
 
   function renderAddPersonForm(extraClass = "") {
-    const derivedQuickName = className === "person" ? derivePersonNameParts(name) : null;
-    const showDerivedQuickName = Boolean(derivedQuickName?.firstName && derivedQuickName.lastName);
     return (
       <form className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
         <div className="people-edit-toolbar">
@@ -3633,13 +3787,12 @@ export default function PeopleWorkspace({
                 <h4 id="people-create-identity-title">Identity</h4>
               </header>
               <div className="people-profile-field-grid">
-                <label className="is-wide people-create-name-field">
+                <label className="people-create-name-field people-create-full-name">
                   Full name
                   <input
                     value={name}
                     onChange={(event) => updateQuickName(event.target.value)}
                     placeholder="First, middle, and last name"
-                    aria-describedby={showDerivedQuickName ? "people-derived-name" : undefined}
                     required
                   />
                 </label>
@@ -3647,14 +3800,10 @@ export default function PeopleWorkspace({
                   Nickname
                   <input value={quickNickname} onChange={(event) => setQuickNickname(event.target.value)} placeholder="Also filled from quoted names" />
                 </label>
+                <label>First name<input data-derived-first-name value={quickFirstName} onChange={(event) => setQuickFirstName(event.target.value)} placeholder="First" /></label>
+                <label>Middle name<input value={quickMiddleName} onChange={(event) => setQuickMiddleName(event.target.value)} placeholder="Middle" /></label>
+                <label>Last name<input data-derived-last-name value={quickLastName} onChange={(event) => setQuickLastName(event.target.value)} placeholder="Last" /></label>
               </div>
-              {showDerivedQuickName && derivedQuickName && (
-                <div id="people-derived-name" className="people-derived-name people-create-derived-name" aria-live="polite" data-people-derived-name>
-                  <span><small>First</small><strong data-derived-first-name>{derivedQuickName.firstName}</strong></span>
-                  {derivedQuickName.middleName && <span><small>Middle</small><strong>{derivedQuickName.middleName}</strong></span>}
-                  <span><small>Last</small><strong data-derived-last-name>{derivedQuickName.lastName}</strong></span>
-                </div>
-              )}
               <BirthdayEditor value={quickBirthday} onChange={setQuickBirthday} />
             </section>
             <section className="people-profile-section people-themed-section module-ref-tone-crimson people-capture-section" aria-labelledby="people-create-about-title">
@@ -3732,6 +3881,7 @@ export default function PeopleWorkspace({
               onAdd={() => setQuickLocations((current) => [...current, newLocationEntry({ label: current.length === 0 ? "Primary home" : "" })])}
               onRemove={(id) => setQuickLocations((current) => removeEntry(current, id))}
             />
+            <QuickObjectsEditor targets={quickObjectTargets} selectedIds={quickObjectTargetIds} onChange={setQuickObjectTargetIds} />
             <section className="people-profile-section people-themed-section module-ref-tone-orange people-capture-section" aria-labelledby="people-create-cadence-title">
               <header className="people-profile-section-heading">
                 <span><PeopleIcon name="cadence" /></span>
@@ -3752,7 +3902,7 @@ export default function PeopleWorkspace({
           <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" aria-labelledby="people-organization-details-title">
             <header className="people-profile-section-heading">
               <span><PeopleIcon name="organization" /></span>
-              <h4 id="people-organization-details-title">Organization details</h4>
+              <h4 id="people-organization-details-title">Details</h4>
             </header>
             <div className="people-profile-field-grid">
               <label className="is-wide people-create-name-field">
@@ -3770,8 +3920,8 @@ export default function PeopleWorkspace({
                 </select>
               </label>
               <label>Industry or field<OrganizationIndustrySelect organizationType={quickOrganizationType} value={quickIndustry} onChange={setQuickIndustry} /></label>
-              <label>Founded year<input inputMode="numeric" pattern="\d{4}" value={quickFoundedYear} onChange={(event) => setQuickFoundedYear(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1998" /></label>
-              <label>Team size<input value={quickTeamSize} onChange={(event) => setQuickTeamSize(event.target.value)} placeholder="1–10, 50, global network..." /></label>
+              <label className="people-org-founded">Founded year<input inputMode="numeric" pattern="\d{4}" value={quickFoundedYear} onChange={(event) => setQuickFoundedYear(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1998" /></label>
+              <label className="people-org-team">Team size<input value={quickTeamSize} onChange={(event) => setQuickTeamSize(event.target.value)} placeholder="1–10, 50, global network..." /></label>
               <label className="is-wide">Description<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={3} placeholder="What this organization is and why it is relevant." /></label>
             </div>
           </section>
@@ -3780,7 +3930,7 @@ export default function PeopleWorkspace({
               <span><PeopleIcon name="communication" /></span>
               <h4 id="people-organization-links-title">Links</h4>
             </header>
-            <div className="people-profile-field-grid people-create-social-grid">
+            <div className="people-profile-field-grid people-create-social-grid people-create-social-grid-no-divider">
               <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
               <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(event.target.value)} placeholder="https://youtube.com/@..." /></label>
               <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(event.target.value)} placeholder="https://instagram.com/..." /></label>
