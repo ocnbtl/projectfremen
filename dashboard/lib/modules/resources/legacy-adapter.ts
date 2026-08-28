@@ -186,6 +186,8 @@ export function resourceCreateInputToLegacy(input: ResourceCreateInput): Persona
     status: "active",
     body: input.body?.trim() || "",
     url: input.url.trim(),
+    areas: input.areas?.map((item) => item.trim()).filter(Boolean),
+    subjects: input.subjects?.map((item) => item.trim()).filter(Boolean),
     intents: ["retain"]
   };
 }
@@ -196,6 +198,8 @@ export function resourceUpdateInputToLegacy(input: ResourceUpdateInput): Persona
     title: input.title?.trim(),
     body: input.body?.trim(),
     url: input.url?.trim(),
+    areas: input.areas?.map((item) => item.trim()).filter(Boolean),
+    subjects: input.subjects?.map((item) => item.trim()).filter(Boolean),
     time: hasTimeUpdate
       ? {
           reviewCadence: input.reviewCadence,

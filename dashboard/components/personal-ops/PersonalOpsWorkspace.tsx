@@ -48,7 +48,6 @@ import ConfirmationSheet from "../operational/ConfirmationSheet";
 import DetailTabs, { type DetailTab } from "../operational/DetailTabs";
 import SystemState from "../operational/SystemState";
 import {
-  PersonalOpsFilterRail,
   PersonalOpsMetricRail,
   PersonalOpsPanel,
   PersonalOpsStateGrid,
@@ -179,7 +178,16 @@ const PERSONAL_SYSTEM_LINKS: ReadonlyArray<{ label: string; href: string; icon: 
   { label: "Lists", href: "/admin/personal/lists", icon: "list" },
   { label: "Travel", href: "/admin/personal/travel", icon: "travel" },
   { label: "Personal Build", href: "/admin/personal/personal-build", icon: "build" },
-  { label: "Car", href: "/admin/personal/car", icon: "car" }
+  { label: "Car", href: "/admin/personal/car", icon: "car" },
+  { label: "Style Guide", href: "/admin/personal/style-guide", icon: "style-guide" },
+  { label: "Dog", href: "/admin/personal/dog", icon: "dog" }
+];
+
+const PERSONAL_OPS_SORT_OPTIONS: ReadonlyArray<{ id: PersonalOpsSort; label: string }> = [
+  { id: "priority", label: "Priority" },
+  { id: "due", label: "Due date" },
+  { id: "updated", label: "Recently updated" },
+  { id: "title", label: "Title" }
 ];
 
 const FAMILY_LABELS: Record<PersonalOpsFamily, string> = {
@@ -1054,7 +1062,6 @@ export default function PersonalOpsWorkspace({
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [archiveReason, setArchiveReason] = useState("");
   const [queryDraft, setQueryDraft] = useState(urlState.query);
-  const [filtersOpen, setFiltersOpen] = useState(urlState.filter !== "all");
   const queryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateUrl = useCallback(
@@ -1543,29 +1550,25 @@ export default function PersonalOpsWorkspace({
                   placeholder="Search..."
                 />
               </span>
-              <select
-                className={styles.button}
-                value={urlState.sort}
-                onChange={(event) => updateUrl({ sort: event.target.value as PersonalOpsSort })}
-                aria-label="Sort ledger"
-              >
-                <option value="priority">Priority</option>
-                <option value="due">Due date</option>
-                <option value="updated">Recently updated</option>
-                <option value="title">Title</option>
-              </select>
-              <button
-                type="button"
-                className={styles.filterToggle}
-                data-active={urlState.filter !== "all" || undefined}
-                aria-label={filtersOpen ? "Hide filters" : "Show filters"}
-                aria-expanded={filtersOpen}
-                aria-controls="personal-ops-filter-rail"
-                onClick={() => setFiltersOpen((current) => !current)}
-              >
-                <PersonalOpsIcon name="filter" />
-                {urlState.filter !== "all" && <span>1</span>}
-              </button>
+              <details className={styles.controlMenu}>
+                <summary className={styles.filterToggle} aria-label={`Sort: ${PERSONAL_OPS_SORT_OPTIONS.find((item) => item.id === urlState.sort)?.label || "Priority"}`} title="Sort">
+                  <PersonalOpsIcon name="sort" />
+                </summary>
+                <div className={styles.controlPopover} role="menu" aria-label="Sort ledger">
+                  <span>Sort by</span>
+                  {PERSONAL_OPS_SORT_OPTIONS.map((item) => <button type="button" role="menuitemradio" aria-checked={urlState.sort === item.id} data-active={urlState.sort === item.id || undefined} key={item.id} onClick={(event) => { updateUrl({ sort: item.id }); event.currentTarget.closest("details")?.removeAttribute("open"); }}>{item.label}{urlState.sort === item.id && <PersonalOpsIcon name="check" />}</button>)}
+                </div>
+              </details>
+              <details className={styles.controlMenu}>
+                <summary className={styles.filterToggle} data-active={urlState.filter !== "all" || undefined} aria-label={`Filter: ${filterItems.find((item) => item.id === urlState.filter)?.label || "All"}`} title="Filter">
+                  <PersonalOpsIcon name="filter" />
+                  {urlState.filter !== "all" && <span>1</span>}
+                </summary>
+                <div className={styles.controlPopover} role="menu" aria-label="Filter ledger">
+                  <span>Filter</span>
+                  {filterItems.map((item) => <button type="button" role="menuitemradio" aria-checked={item.active} data-active={item.active || undefined} key={item.id} onClick={(event) => { item.onSelect(); event.currentTarget.closest("details")?.removeAttribute("open"); }}><span>{item.label}</span><b>{item.count}</b></button>)}
+                </div>
+              </details>
               {initialView === "command" ? (
                 <div className={styles.commandCreateActions} aria-label="Create Personal Ops object">
                   <button type="button" className={styles.primaryButton} onClick={() => openCreate("followUps")}><PersonalOpsIcon name="plus" />Follow-up</button>
@@ -1599,7 +1602,6 @@ export default function PersonalOpsWorkspace({
           )}
 
           <PersonalOpsMetricRail items={metrics} />
-          {filtersOpen && <div id="personal-ops-filter-rail"><PersonalOpsFilterRail items={filterItems} /></div>}
 
           {error && <div className={styles.error} role="alert" style={{ margin: "0 16px 10px" }}>{error}</div>}
           {notice && <div className={styles.notice} role="status" style={{ margin: "0 16px 10px" }}>{notice}</div>}

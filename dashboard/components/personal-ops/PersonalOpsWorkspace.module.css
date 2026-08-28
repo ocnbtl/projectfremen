@@ -198,7 +198,8 @@
   display: grid;
   width: clamp(164px, 16vw, 230px);
   min-width: 164px;
-  min-height: 34px;
+  height: 36px;
+  min-height: 36px;
   grid-template-columns: 16px minmax(0, 1fr);
   gap: 7px;
   align-items: center;
@@ -217,7 +218,9 @@
 .searchControl input {
   width: 100%;
   min-width: 0;
-  height: 32px;
+  height: 34px;
+  min-height: 0;
+  margin: 0;
   padding: 0;
   border: 0;
   outline: 0;
@@ -235,9 +238,10 @@
 .filterToggle {
   position: relative;
   display: grid;
-  width: 34px;
-  min-width: 34px;
-  min-height: 34px;
+  width: 36px;
+  min-width: 36px;
+  height: 36px;
+  min-height: 36px;
   place-items: center;
   padding: 0;
   border: 1px solid var(--border-strong);
@@ -245,7 +249,11 @@
   background: var(--panel-bg);
   color: var(--text-muted);
   cursor: pointer;
-  transform: translateY(-3px);
+  list-style: none;
+}
+
+.filterToggle::-webkit-details-marker {
+  display: none;
 }
 
 .filterToggle[data-active] {
@@ -279,7 +287,80 @@
   display: flex;
   gap: 5px;
   align-items: center;
-  transform: translateY(-3px);
+}
+
+.headerActions > .button,
+.headerActions > .primaryButton,
+.commandCreateActions > .button,
+.commandCreateActions > .primaryButton {
+  height: 36px;
+  min-height: 36px;
+}
+
+.controlMenu {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.controlMenu[open] .filterToggle {
+  border-color: var(--action-primary);
+  color: var(--action-primary);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--action-primary) 12%, transparent);
+}
+
+.controlPopover {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  right: 0;
+  display: grid;
+  width: 196px;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: #fbfcfb;
+  box-shadow: 0 14px 36px rgba(16, 32, 38, .16);
+}
+
+.controlPopover > span:first-child {
+  padding: 6px 7px 5px;
+  color: var(--text-muted);
+  font: 800 9px/1 var(--font-body);
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.controlPopover > button {
+  display: flex;
+  width: 100%;
+  min-height: 34px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-strong);
+  font: 680 11px/1.2 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.controlPopover > button:hover,
+.controlPopover > button[data-active] {
+  background: var(--selected-bg);
+  color: var(--action-primary);
+}
+
+.controlPopover > button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.controlPopover > button b {
+  font: 650 10px/1 var(--font-mono);
 }
 
 .commandCreateActions button svg,
@@ -1962,12 +2043,35 @@ button.metric {
 
   .searchControl,
   .filterToggle {
+    height: 44px;
     min-height: 44px;
   }
 
   .filterToggle {
     width: 44px;
     min-width: 44px;
+  }
+
+  .headerActions > .button,
+  .headerActions > .primaryButton,
+  .commandCreateActions > .button,
+  .commandCreateActions > .primaryButton {
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .controlPopover {
+    position: fixed;
+    top: auto;
+    right: 12px;
+    bottom: calc(72px + env(safe-area-inset-bottom));
+    left: 12px;
+    width: auto;
+    padding: 8px;
+  }
+
+  .controlPopover > button {
+    min-height: 44px;
   }
 
   .personalSystemsDock {

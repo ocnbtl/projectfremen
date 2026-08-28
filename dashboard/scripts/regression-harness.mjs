@@ -8863,18 +8863,18 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
       assert(!bodyText.includes("operating view for today") && !bodyText.includes("across goals, decisions, obligations, and follow-ups"), `Personal Ops Command retained removed explanatory copy at ${viewport.label}`);
       const systemDock = page.getByRole("navigation", { name: "Personal systems" });
       await systemDock.waitFor();
-      for (const label of ["Passwords", "Lists", "Travel", "Personal Build", "Car"]) {
+      for (const label of ["Passwords", "Lists", "Travel", "Personal Build", "Car", "Style Guide", "Dog"]) {
         assert(await systemDock.getByRole("link", { name: label, exact: true }).count() === 1, `Personal systems dock omitted ${label} at ${viewport.label}`);
       }
       const sidebarLabels = await page.locator(".module-sidebar__navigation .module-sidebar__item-label").allInnerTexts();
-      for (const label of ["Passwords", "Lists", "Travel", "Personal Build", "Car"]) {
+      for (const label of ["Passwords", "Lists", "Travel", "Personal Build", "Car", "Style Guide", "Dog"]) {
         assert(!sidebarLabels.includes(label), `Personal Ops sidebar retained ${label} at ${viewport.label}`);
       }
 
       const header = page.locator('main[aria-label="Personal Ops Command ledger"] header').first();
       const search = header.getByPlaceholder("Search...");
-      const sort = header.getByLabel("Sort ledger");
-      const filter = header.getByRole("button", { name: "Show filters" });
+      const sort = header.locator('summary[aria-label^="Sort:"]');
+      const filter = header.locator('summary[aria-label^="Filter:"]');
       for (const label of ["Follow-up", "Decision", "Obligation", "Goal"]) {
         assert(await header.getByRole("button", { name: label, exact: true }).count() === 1, `Top action strip omitted + ${label} at ${viewport.label}`);
       }
@@ -8884,10 +8884,19 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
         return rect.top + rect.height / 2;
       })));
       assert(Math.max(...controlCenters) - Math.min(...controlCenters) <= 2, `Personal Ops command controls are not vertically aligned at ${viewport.label}: ${JSON.stringify(controlCenters)}`);
+      await sort.click();
+      const sortMenu = header.getByRole("menu", { name: "Sort ledger" });
+      await sortMenu.waitFor();
+      for (const label of ["Priority", "Due date", "Recently updated", "Title"]) {
+        assert(await sortMenu.getByRole("menuitemradio", { name: label, exact: true }).count() === 1, `Sort menu omitted ${label} at ${viewport.label}`);
+      }
+      await sort.click();
       await filter.click();
-      assert(await page.locator("#personal-ops-filter-rail").count() === 1, `Filter icon did not open the Personal Ops filter rail at ${viewport.label}`);
-      await header.getByRole("button", { name: "Hide filters" }).click();
-      assert(await page.locator("#personal-ops-filter-rail").count() === 0, `Filter icon did not close the Personal Ops filter rail at ${viewport.label}`);
+      const filterMenu = header.getByRole("menu", { name: "Filter ledger" });
+      await filterMenu.waitFor();
+      assert(await filterMenu.getByRole("menuitemradio").count() >= 5, `Filter icon did not open an anchored filter menu at ${viewport.label}`);
+      await filter.click();
+      assert(await page.locator("#personal-ops-filter-rail").count() === 0, `Personal Ops retained the detached filter rail at ${viewport.label}`);
 
       const aiLauncher = page.getByRole("button", { name: "Open AI assistant" });
       const launcherPath = await aiLauncher.locator("svg path").first().getAttribute("d");
@@ -8899,7 +8908,7 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
         const style = getComputedStyle(element);
         return { backgroundColor: style.backgroundColor, backdropFilter: style.backdropFilter || style.webkitBackdropFilter };
       });
-      assert(aiSurface.backgroundColor !== "rgba(0, 0, 0, 0)" && aiSurface.backgroundColor !== "transparent", `AI panel is not an opaque surface at ${viewport.label}: ${JSON.stringify(aiSurface)}`);
+      assert(aiSurface.backgroundColor === "rgb(251, 252, 251)", `AI panel is not the expected solid liquid-glass surface at ${viewport.label}: ${JSON.stringify(aiSurface)}`);
 
       const layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
       assert(layout.scrollWidth <= layout.innerWidth, `Personal Ops Command overflowed horizontally at ${viewport.label}: ${JSON.stringify(layout)}`);
@@ -8909,6 +8918,85 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
     assert(browserMutations.length === 0, `Personal Ops Command browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`);
     assert(browserErrors.length === 0, `Personal Ops Command browser checks emitted errors: ${browserErrors.join(" | ")}`);
     assert(failedResponses.length === 0, `Personal Ops Command browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const browserMutations = [];
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "personal-utility-checkpoint");
+  await mkdir(screenshotDir, { recursive: true });
+
+  try {
+    for (const viewport of [
+      { label: "desktop-1440x900", width: 1440, height: 900 },
+      { label: "mobile-390x844", width: 390, height: 844 }
+    ]) {
+      const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+      await context.addCookies([
+        { name: "admin_session", value: cookieJar.get("admin_session"), url: baseUrl, httpOnly: true, sameSite: "Lax" },
+        { name: "admin_csrf", value: cookieJar.get("admin_csrf"), url: baseUrl, sameSite: "Lax" }
+      ]);
+      const page = await context.newPage();
+      page.on("console", (message) => {
+        if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) browserErrors.push(`${viewport.label} console: ${message.text()}`);
+      });
+      page.on("pageerror", (error) => browserErrors.push(`${viewport.label} page: ${error.message}`));
+      page.on("request", (request) => {
+        if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) browserMutations.push(`${viewport.label} ${request.method()} ${new URL(request.url()).pathname}`);
+      });
+      page.on("response", (response) => {
+        const pathname = new URL(response.url()).pathname;
+        if (response.status() >= 400 && pathname !== "/_vercel/insights/script.js") failedResponses.push(`${viewport.label} ${response.status()} ${pathname}`);
+      });
+
+      await page.goto(`${baseUrl}/admin/personal/style-guide`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { name: "Style Guide", exact: true }).waitFor();
+      for (const label of ["Type", "Color", "Modules", "Components", "Icons"]) {
+        assert(await page.getByRole("navigation", { name: "Style Guide sections" }).getByRole("link", { name: label, exact: true }).count() === 1, `Style Guide navigation omitted ${label} at ${viewport.label}`);
+      }
+      assert(await page.getByText("Resources remain authoritative.", { exact: false }).count() >= 1, `Style Guide did not disclose the Resource ownership boundary at ${viewport.label}`);
+      assert(await page.locator('section[aria-label="Guide identity"] input').count() === 2, `Style Guide identity was not editable at ${viewport.label}`);
+      assert(await page.locator('input[aria-label$=" usage"]').count() >= 30, `Style Guide did not expose the canonical icon usage registry at ${viewport.label}`);
+      const componentButton = page.locator("button:visible").filter({ hasText: "Component" }).first();
+      await componentButton.click();
+      await page.getByRole("heading", { name: "New component", exact: true }).waitFor();
+      assert(await page.getByLabel("Code", { exact: true }).count() === 1 && await page.getByLabel("Animation", { exact: true }).count() === 1, `Component editor omitted code or animation at ${viewport.label}`);
+      await page.getByRole("button", { name: "Close", exact: true }).click();
+      await page.locator('main[aria-label="Style Guide"]').evaluate((main) => { main.scrollTop = 0; main.querySelectorAll("*").forEach((element) => { element.scrollTop = 0; }); });
+      let layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      assert(layout.scrollWidth <= layout.innerWidth, `Style Guide overflowed horizontally at ${viewport.label}: ${JSON.stringify(layout)}`);
+      if (viewport.width <= 760) {
+        const launcherTop = await page.getByRole("button", { name: "Open AI assistant" }).evaluate((element) => element.getBoundingClientRect().top);
+        assert(launcherTop > viewport.height / 2, `AI launcher overlaps the mobile utility toolbar at ${viewport.label}: top=${launcherTop}`);
+      }
+      await page.screenshot({ path: path.join(screenshotDir, `style-guide-${viewport.label}.png`), fullPage: true });
+
+      await page.goto(`${baseUrl}/admin/personal/dog`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { name: "Dog", exact: true }).waitFor();
+      for (const label of ["Walk", "Feed", "Pee", "Poop"]) {
+        assert(await page.locator('section[aria-label="Latest dog care"]', { hasText: label }).count() === 1, `Dog care pulse omitted ${label} at ${viewport.label}`);
+      }
+      const walkButton = page.locator("button:visible").filter({ hasText: "Walk" }).first();
+      await walkButton.focus();
+      await walkButton.press("Enter");
+      await page.getByRole("heading", { name: /Log walk|Edit walk/ }).waitFor();
+      assert(await page.getByLabel("Peed", { exact: true }).count() === 1 && await page.getByLabel("Pooped", { exact: true }).count() === 1, `Walk editor omitted bathroom outcomes at ${viewport.label}`);
+      await page.getByRole("button", { name: "Close", exact: true }).click();
+      await page.locator('main[aria-label="Dog care"]').evaluate((main) => { main.scrollTop = 0; main.querySelectorAll("*").forEach((element) => { element.scrollTop = 0; }); });
+      layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      assert(layout.scrollWidth <= layout.innerWidth, `Dog tracker overflowed horizontally at ${viewport.label}: ${JSON.stringify(layout)}`);
+      await page.screenshot({ path: path.join(screenshotDir, `dog-${viewport.label}.png`), fullPage: true });
+      await context.close();
+    }
+    assert(browserMutations.length === 0, `Personal utility browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`);
+    assert(browserErrors.length === 0, `Personal utility browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Personal utility browser checks received failed responses: ${failedResponses.join(" | ")}`);
   } finally {
     await browser.close();
   }
@@ -11657,6 +11745,13 @@ async function main() {
     assert(unauthPersonalLife.response.headers.get("cache-control")?.includes("private") && unauthPersonalLife.response.headers.get("cache-control")?.includes("no-store"), "Unauthenticated personal life response did not preserve the private no-store cache boundary");
     pass("Unauthenticated personal life systems API is blocked");
 
+    for (const pathname of ["/api/personal/style-guide", "/api/personal/dog"]) {
+      const unauthenticatedUtility = await requestJson(server.baseUrl, cookieJar, pathname);
+      assert(unauthenticatedUtility.response.status === 401, `Expected ${pathname} to return 401, got ${describeStatus(unauthenticatedUtility.response)}`);
+      assert(unauthenticatedUtility.response.headers.get("cache-control")?.includes("private") && unauthenticatedUtility.response.headers.get("cache-control")?.includes("no-store"), `${pathname} did not preserve the private no-store cache boundary`);
+    }
+    pass("Unauthenticated Style Guide and Dog APIs are blocked with private no-store responses");
+
     const unauthPersonalPasswords = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords?includeSecrets=true");
     assert(unauthPersonalPasswords.response.status === 401, `Expected /api/personal/passwords to return 401, got ${describeStatus(unauthPersonalPasswords.response)}`);
     pass("Unauthenticated encrypted password reads are blocked");
@@ -11743,7 +11838,9 @@ async function main() {
       "/admin/personal/lists",
       "/admin/personal/travel",
       "/admin/personal/personal-build",
-      "/admin/personal/car"
+      "/admin/personal/car",
+      "/admin/personal/style-guide",
+      "/admin/personal/dog"
     ]) {
       const unauthenticatedPage = await requestText(server.baseUrl, cookieJar, pathname);
       assert(
@@ -12219,6 +12316,80 @@ async function main() {
       `Personal life systems did not persist one object per working surface: ${JSON.stringify(personalLifeState.payload)}`
     );
     pass("Lists persist typed columns plus canonical People/Object references; Travel, Personal Build, and Car retain typed records; passwords remain in their separate encrypted store");
+
+    const styleWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide", {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: {}, expectedUpdatedAt: "" })
+    });
+    assert(styleWithoutCsrf.response.status === 403, "Style Guide API accepted a write without CSRF proof");
+    const initialStyleGuide = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide");
+    assert(initialStyleGuide.response.ok && initialStyleGuide.payload?.state?.typography?.length >= 6 && initialStyleGuide.payload?.state?.colors?.length >= 6, "Style Guide defaults did not expose the expected design foundation");
+    const styleInput = {
+      title: initialStyleGuide.payload.state.title,
+      description: "Calm operations desk · regression verified",
+      typography: initialStyleGuide.payload.state.typography,
+      colors: initialStyleGuide.payload.state.colors,
+      modules: initialStyleGuide.payload.state.modules,
+      icons: [{ id: "icon-delete", icon: "delete", usage: "Destructive actions" }]
+    };
+    const savedStyleGuide = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide", {
+      method: "PUT",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ input: styleInput, expectedUpdatedAt: initialStyleGuide.payload.state.updatedAt })
+    });
+    assert(savedStyleGuide.response.ok && savedStyleGuide.payload?.state?.icons?.[0]?.usage === "Destructive actions" && savedStyleGuide.payload.state.updatedAt, `Style Guide tokens did not persist: ${JSON.stringify(savedStyleGuide.payload)}`);
+    const staleStyleGuide = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide", {
+      method: "PUT",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ input: styleInput, expectedUpdatedAt: initialStyleGuide.payload.state.updatedAt })
+    });
+    assert(staleStyleGuide.response.status === 409, "Style Guide optimistic concurrency accepted a stale overwrite");
+
+    const componentTitle = `${testRunId} action component`;
+    const createdComponentResource = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ domain: "notes-docs", title: componentTitle, className: "resource", knowledgeShape: "reference", privacy: "private", stage: "processed", status: "active", body: "## Visual\nCompact navy action\n\n## Code\n<Button />\n\n## Animation\n120ms ease-out", url: "", areas: ["Style Guide"], subjects: ["button", "action"], intents: ["retain"] })
+    });
+    assert(createdComponentResource.response.ok && createdComponentResource.payload?.items?.some((item) => item.title === componentTitle && item.areas?.includes("Style Guide") && item.subjects?.includes("button")), "Style Guide component did not persist as a tagged Resource");
+
+    const dogWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/dog", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ input: { kind: "walk", occurredAt: new Date().toISOString(), peed: true, pooped: false, notes: "Rejected" } })
+    });
+    assert(dogWithoutCsrf.response.status === 403, "Dog care API accepted a write without CSRF proof");
+    const dogOccurredAt = new Date(Date.now() - 15 * 60_000).toISOString();
+    const createdDogEntry = await requestJson(server.baseUrl, cookieJar, "/api/personal/dog", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ input: { kind: "walk", occurredAt: dogOccurredAt, peed: true, pooped: true, notes: "Regression walk" } })
+    });
+    assert(createdDogEntry.response.ok && createdDogEntry.payload?.item?.peed === true && createdDogEntry.payload?.item?.pooped === true, `Dog walk did not persist both bathroom outcomes: ${JSON.stringify(createdDogEntry.payload)}`);
+    const dogEntry = createdDogEntry.payload.item;
+    const updatedDogEntry = await requestJson(server.baseUrl, cookieJar, "/api/personal/dog", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ id: dogEntry.id, expectedUpdatedAt: dogEntry.updatedAt, input: { notes: "Regression walk updated" } })
+    });
+    assert(updatedDogEntry.response.ok && updatedDogEntry.payload?.item?.notes === "Regression walk updated", "Dog care update did not persist");
+    const staleDogEntry = await requestJson(server.baseUrl, cookieJar, "/api/personal/dog", {
+      method: "PATCH",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ id: dogEntry.id, expectedUpdatedAt: dogEntry.updatedAt, input: { notes: "Stale overwrite" } })
+    });
+    assert(staleDogEntry.response.status === 409, "Dog care optimistic concurrency accepted a stale overwrite");
+    const dogState = await requestJson(server.baseUrl, cookieJar, "/api/personal/dog");
+    assert(dogState.response.ok && dogState.response.headers.get("cache-control")?.includes("private") && dogState.payload?.state?.events?.some((item) => item.id === dogEntry.id && item.peed && item.pooped), "Dog care state did not retain the walk and private cache boundary");
+    await checkPersonalUtilityBrowserState(server.baseUrl, cookieJar);
+    const deletedDogEntry = await requestJson(server.baseUrl, cookieJar, "/api/personal/dog", {
+      method: "DELETE",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ id: dogEntry.id, expectedUpdatedAt: updatedDogEntry.payload.item.updatedAt })
+    });
+    assert(deletedDogEntry.response.ok && deletedDogEntry.payload?.ok, "Dog care delete failed");
+    pass("Style Guide persists editable design tokens with stale-write protection, components remain tagged Resources, and Dog care securely persists editable walk/feed history");
 
     const personalOpsAfterRouteReads = await readFile(personalOpsDataPath, "utf8");
     assert(

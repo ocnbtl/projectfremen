@@ -10,6 +10,16 @@ export type PersonalOpsIconName =
   | "travel"
   | "build"
   | "car"
+  | "style-guide"
+  | "dog"
+  | "sort"
+  | "font"
+  | "palette"
+  | "component"
+  | "motion"
+  | "walk"
+  | "feed"
+  | "droplet"
   | "copy"
   | "edit"
   | "delete"
@@ -29,6 +39,49 @@ export type PersonalOpsIconName =
   | "person"
   | "object"
   | "check";
+
+export const PERSONAL_OPS_ICON_LIBRARY: ReadonlyArray<{ name: PersonalOpsIconName; label: string }> = [
+  { name: "today", label: "Today" },
+  { name: "week", label: "Week" },
+  { name: "goal", label: "Goal" },
+  { name: "follow-up", label: "Follow-up" },
+  { name: "decision", label: "Decision" },
+  { name: "routine", label: "Routine" },
+  { name: "password", label: "Password" },
+  { name: "list", label: "List" },
+  { name: "travel", label: "Travel" },
+  { name: "build", label: "Personal build" },
+  { name: "car", label: "Car" },
+  { name: "style-guide", label: "Style guide" },
+  { name: "dog", label: "Dog" },
+  { name: "sort", label: "Sort" },
+  { name: "font", label: "Typography" },
+  { name: "palette", label: "Color" },
+  { name: "component", label: "Component" },
+  { name: "motion", label: "Motion" },
+  { name: "walk", label: "Walk" },
+  { name: "feed", label: "Feed" },
+  { name: "droplet", label: "Bathroom" },
+  { name: "copy", label: "Copy" },
+  { name: "edit", label: "Edit" },
+  { name: "delete", label: "Delete" },
+  { name: "plus", label: "Add" },
+  { name: "username", label: "Person" },
+  { name: "email", label: "Email" },
+  { name: "website", label: "Website" },
+  { name: "phone", label: "Phone" },
+  { name: "pin", label: "PIN" },
+  { name: "search", label: "Search" },
+  { name: "filter", label: "Filter" },
+  { name: "show", label: "Show" },
+  { name: "hide", label: "Hide" },
+  { name: "close", label: "Close" },
+  { name: "add-column", label: "Add column" },
+  { name: "open", label: "Open" },
+  { name: "person", label: "Person" },
+  { name: "object", label: "Object" },
+  { name: "check", label: "Complete" }
+];
 
 export default function PersonalOpsIcon({ name, className }: { name: PersonalOpsIconName; className?: string }) {
   const common = {
@@ -53,6 +106,16 @@ export default function PersonalOpsIcon({ name, className }: { name: PersonalOps
   if (name === "travel") return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>;
   if (name === "build") return <svg {...common}><path d="m12 3 8 4-8 4-8-4 8-4Z" /><path d="m4 12 8 4 8-4M4 17l8 4 8-4" /></svg>;
   if (name === "car") return <svg {...common}><path d="m5 16-1.5-1.5V11l2-5h13l2 5v3.5L19 16" /><path d="M5 11h14M7 16v2m10-2v2" /><circle cx="7" cy="14" r="1" /><circle cx="17" cy="14" r="1" /></svg>;
+  if (name === "style-guide") return <svg {...common}><path d="M5 5h14M5 12h14M5 19h14" /><circle cx="9" cy="5" r="2" fill="var(--icon-fill, #fff)" /><circle cx="15" cy="12" r="2" fill="var(--icon-fill, #fff)" /><circle cx="11" cy="19" r="2" fill="var(--icon-fill, #fff)" /></svg>;
+  if (name === "dog") return <svg {...common}><circle cx="8" cy="7" r="2" /><circle cx="16" cy="7" r="2" /><circle cx="5" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /><path d="M8 18.3c0-2.6 1.8-4.8 4-4.8s4 2.2 4 4.8c0 1.7-1.3 2.7-4 2.7s-4-1-4-2.7Z" /></svg>;
+  if (name === "sort") return <svg {...common}><path d="M8 4v16m0-16L5 7m3-3 3 3M16 20V4m0 16-3-3m3 3 3-3" /></svg>;
+  if (name === "font") return <svg {...common}><path d="M5 19 10.5 5h3L19 19M7 14h10" /></svg>;
+  if (name === "palette") return <svg {...common}><path d="M12 3a9 9 0 1 0 0 18h1.5a1.8 1.8 0 0 0 0-3.6H12a1.8 1.8 0 0 1 0-3.6h3.4A5.6 5.6 0 0 0 21 8.2C21 5.3 17 3 12 3Z" /><circle cx="7.5" cy="9" r=".8" fill="currentColor" stroke="none" /><circle cx="11" cy="6.5" r=".8" fill="currentColor" stroke="none" /><circle cx="15.5" cy="7.5" r=".8" fill="currentColor" stroke="none" /></svg>;
+  if (name === "component") return <svg {...common}><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="4" width="7" height="7" rx="1.5" /><rect x="4" y="13" width="7" height="7" rx="1.5" /><path d="M16.5 14v5M14 16.5h5" /></svg>;
+  if (name === "motion") return <svg {...common}><path d="M3 12c2.2-5 4.3-5 6.5 0s4.3 5 6.5 0 4.2-5 5.5-1" /></svg>;
+  if (name === "walk") return <svg {...common}><circle cx="13" cy="4.5" r="2" /><path d="m11 8-2.5 4 3 2 1.5 6M11 8l4 3 3-1M8.5 12 5 17m6.5-3 4 3" /></svg>;
+  if (name === "feed") return <svg {...common}><path d="M4 14h16l-2 6H6l-2-6Z" /><path d="M8 10c0-1.2 1-2.2 2.2-2.2M12 10c0-1.7 1.3-3 3-3" /></svg>;
+  if (name === "droplet") return <svg {...common}><path d="M12 3S6.5 9.3 6.5 14a5.5 5.5 0 0 0 11 0C17.5 9.3 12 3 12 3Z" /></svg>;
   if (name === "copy") return <svg {...common}><rect x="8" y="8" width="11" height="11" rx="2" /><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" /></svg>;
   if (name === "edit") return <svg {...common}><path d="M13.5 6.5 17.5 10.5M5 19l3.2-.7L19 7.5a2.1 2.1 0 0 0-3-3L5.3 15.3 5 19Z" /></svg>;
   if (name === "delete") return <svg {...common}><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13" /><path d="M10 11v5M14 11v5" /></svg>;

@@ -214,9 +214,9 @@ export function createResourcesRepository(
         resources.find(
           (resource) =>
             resource.title === normalizedTitle &&
-            resource.source.candidates.some(
-              (candidate) => candidate.matchKey === normalizedUrl
-            )
+            (normalizedUrl
+              ? resource.source.candidates.some((candidate) => candidate.matchKey === normalizedUrl)
+              : resource.source.candidates.length === 0)
         ) || resources[0];
       const rawCreated = created ? result.data.find((record) => record.id === created.id) : undefined;
       if (rawCreated) await mirrorPersonalRecord(rawCreated);

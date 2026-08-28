@@ -271,12 +271,16 @@ export type ResourceCreateInput = {
   title: string;
   url: string;
   body?: string;
+  areas?: string[];
+  subjects?: string[];
 };
 
 export type ResourceUpdateInput = {
   title?: string;
   url?: string;
   body?: string;
+  areas?: string[];
+  subjects?: string[];
   reviewCadence?: string;
   nextReviewAt?: string;
 };

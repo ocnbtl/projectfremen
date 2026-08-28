@@ -19,6 +19,8 @@ export type PersonalOpsSidebarView =
   | "travel"
   | "personal-build"
   | "car"
+  | "style-guide"
+  | "dog"
   | "inbox"
   | "templates";
 
@@ -37,6 +39,8 @@ export type PersonalOpsSidebarCounts = {
   travel?: number;
   personalBuild?: number;
   car?: number;
+  styleGuide?: number;
+  dog?: number;
 };
 
 export const PERSONAL_OPS_DOMAIN_LABELS = [
@@ -61,6 +65,8 @@ const VIEW_ROUTES: Record<PersonalOpsSidebarView, string> = {
   travel: "/admin/personal/travel",
   "personal-build": "/admin/personal/personal-build",
   car: "/admin/personal/car",
+  "style-guide": "/admin/personal/style-guide",
+  dog: "/admin/personal/dog",
   inbox: "/admin/personal/inbox",
   templates: "/admin/personal/templates"
 };
@@ -121,7 +127,7 @@ export default function PersonalOpsSidebar({
   mobileOpen: boolean;
   onClose: () => void;
 }) {
-  const isPersonalSystemView = ["passwords", "lists", "travel", "personal-build", "car"].includes(activeView);
+  const isPersonalSystemView = ["passwords", "lists", "travel", "personal-build", "car", "style-guide", "dog"].includes(activeView);
   const domainItems: ModuleSidebarItem[] = PERSONAL_OPS_DOMAIN_LABELS.map((domain) => {
     const id = `domain-${domain.toLowerCase().replace(/\s+/g, "-")}`;
     return {
