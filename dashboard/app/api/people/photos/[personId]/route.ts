@@ -13,6 +13,13 @@ export const runtime = "nodejs";
 
 type RouteContext = { params: Promise<{ personId: string }> };
 
+function privateJson(body: unknown, init?: ResponseInit) {
+  const response = NextResponse.json(body, init);
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
+  response.headers.set("Pragma", "no-cache");
+  return response;
+}
+
 async function requirePeopleProfile(context: RouteContext) {
   const { personId } = await context.params;
   const records = await readPersonalRecords();
@@ -22,11 +29,11 @@ async function requirePeopleProfile(context: RouteContext) {
 }
 
 export async function GET(_request: Request, context: RouteContext) {
-  if (!(await hasAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!(await hasAdminSession())) return privateJson({ ok: false, error: "Unauthorized" }, { status: 401 });
   try {
     const { personId } = await requirePeopleProfile(context);
     const photo = await readPeopleProfilePhoto(personId);
-    if (!photo) return NextResponse.json({ ok: false, error: "Profile picture not found" }, { status: 404 });
+    if (!photo) return privateJson({ ok: false, error: "Profile picture not found" }, { status: 404 });
     return new NextResponse(Buffer.from(photo.bytesBase64, "base64"), {
       status: 200,
       headers: {
@@ -38,13 +45,13 @@ export async function GET(_request: Request, context: RouteContext) {
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Profile picture could not be loaded";
-    return NextResponse.json({ ok: false, error: message }, { status: message === "People profile not found" ? 404 : 400 });
+    return privateJson({ ok: false, error: message }, { status: message === "People profile not found" ? 404 : 400 });
   }
 }
 
 export async function POST(request: Request, context: RouteContext) {
-  if (!(await hasAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  if (!isCsrfRequestValid(request)) return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
+  if (!(await hasAdminSession())) return privateJson({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!isCsrfRequestValid(request)) return privateJson({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
   try {
     const { personId } = await requirePeopleProfile(context);
     const formData = await request.formData();
@@ -61,7 +68,7 @@ export async function POST(request: Request, context: RouteContext) {
       status: "ok",
       detail: personId
     });
-    return NextResponse.json({
+    return privateJson({
       ok: true,
       photo: {
         url: `/api/people/photos/${encodeURIComponent(personId)}`,
@@ -70,7 +77,7 @@ export async function POST(request: Request, context: RouteContext) {
       }
     });
   } catch (error) {
-    return NextResponse.json(
+    return privateJson(
       { ok: false, error: error instanceof Error ? error.message : "Profile picture could not be saved" },
       { status: 400 }
     );
@@ -78,8 +85,8 @@ export async function POST(request: Request, context: RouteContext) {
 }
 
 export async function DELETE(request: Request, context: RouteContext) {
-  if (!(await hasAdminSession())) return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
-  if (!isCsrfRequestValid(request)) return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
+  if (!(await hasAdminSession())) return privateJson({ ok: false, error: "Unauthorized" }, { status: 401 });
+  if (!isCsrfRequestValid(request)) return privateJson({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
   try {
     const { personId } = await requirePeopleProfile(context);
     await removePeopleProfilePhoto(personId);
@@ -92,9 +99,9 @@ export async function DELETE(request: Request, context: RouteContext) {
       status: "ok",
       detail: personId
     });
-    return NextResponse.json({ ok: true });
+    return privateJson({ ok: true });
   } catch (error) {
-    return NextResponse.json(
+    return privateJson(
       { ok: false, error: error instanceof Error ? error.message : "Profile picture could not be removed" },
       { status: 400 }
     );

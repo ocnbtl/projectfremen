@@ -15728,13 +15728,19 @@ async function main() {
       body: photoWithoutCsrf
     });
     assert(
-      rejectPhotoWithoutCsrf.response.status === 403 && !rejectPhotoWithoutCsrf.payload?.ok,
+      rejectPhotoWithoutCsrf.response.status === 403 &&
+        !rejectPhotoWithoutCsrf.payload?.ok &&
+        rejectPhotoWithoutCsrf.response.headers.get("cache-control")?.includes("private") &&
+        rejectPhotoWithoutCsrf.response.headers.get("cache-control")?.includes("no-store"),
       "People profile picture upload accepted a request without CSRF protection"
     );
 
     const unauthenticatedPhoto = await requestJson(server.baseUrl, new CookieJar(), photoPath);
     assert(
-      unauthenticatedPhoto.response.status === 401 && !unauthenticatedPhoto.payload?.ok,
+      unauthenticatedPhoto.response.status === 401 &&
+        !unauthenticatedPhoto.payload?.ok &&
+        unauthenticatedPhoto.response.headers.get("cache-control")?.includes("private") &&
+        unauthenticatedPhoto.response.headers.get("cache-control")?.includes("no-store"),
       "People profile picture was readable without an admin session"
     );
 
