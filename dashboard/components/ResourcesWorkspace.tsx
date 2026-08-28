@@ -87,7 +87,7 @@ type ResourcesWorkspaceProps = {
 type ResourcesView = ResourcesUrlState["view"];
 type ResourcesSort = ResourcesUrlState["sort"];
 type ResourcesTab = ResourcesUrlState["tab"];
-type ResourceCollection = "all" | "components" | "design-libraries";
+type ResourceCollection = "all" | "components";
 
 const TABS: readonly DetailTab[] = [
   { id: "overview", label: "Overview" },
@@ -139,14 +139,15 @@ const VIEW_LABELS: Readonly<Record<ResourcesView, string>> = {
 
 const TYPE_ROWS = [
   "Articles",
-  "Websites",
+  "Books",
+  "Components",
+  "Contracts / Invoices",
+  "Datasets",
+  "Documents",
   "Tools",
   "Vendors",
-  "Documents",
-  "Datasets",
   "Video / Media",
-  "Books",
-  "Contracts / Invoices"
+  "Websites"
 ] as const;
 
 const CONTEXT_ROWS: ReadonlyArray<
@@ -171,15 +172,8 @@ function displayLabel(value: string) {
   return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
-function hasResourceMarker(resource: ResourceRecord, marker: string) {
-  const normalized = marker.toLowerCase();
-  return [...resource.provenance.areas, ...resource.provenance.subjects]
-    .some((value) => value.toLowerCase() === normalized);
-}
-
 function matchesCollection(resource: ResourceRecord, collection: ResourceCollection) {
   if (collection === "components") return isStyleGuideComponent(resource);
-  if (collection === "design-libraries") return hasResourceMarker(resource, "Design Library");
   return true;
 }
 
@@ -565,6 +559,7 @@ export default function ResourcesWorkspace({
           ? "title"
           : sort;
     setView(nextView);
+    setCollection("all");
     setSort(nextSort);
     setActiveTab(nextTab);
     if (
@@ -611,7 +606,7 @@ export default function ResourcesWorkspace({
               ? reviewQueue.summary.queuedResources
               : undefined,
         tone: id === "needs-review" && reviewQueue.summary.queuedResources ? "attention" : undefined,
-        active: view === id,
+        active: view === id && collection === "all",
         onSelect: () => selectLibraryView(id)
       }))
     },
@@ -621,8 +616,15 @@ export default function ResourcesWorkspace({
       items: TYPE_ROWS.map((label) => ({
         id: `type-${label.toLowerCase().replace(/[^a-z]+/g, "-")}`,
         label,
-        disabled: true,
-        disabledReason: "Native Resource type is not available in the legacy adapter; records are not guessed from titles."
+        count: label === "Components" ? resources.filter(isStyleGuideComponent).length : undefined,
+        active: label === "Components" && collection === "components",
+        onSelect: label === "Components" ? () => {
+          setCollection("components");
+          setMobileSidebarOpen(false);
+          setInspectorOpen(false);
+        } : undefined,
+        disabled: label !== "Components",
+        disabledReason: label === "Components" ? undefined : "Native Resource type is not available in the legacy adapter; records are not guessed from titles."
       }))
     },
     {
@@ -767,6 +769,7 @@ export default function ResourcesWorkspace({
 
   const aiDock = (
     <SharedAIDock
+      hidden={Boolean(editorMode || notePromotionMode || reviewScheduleOpen || projectAssociationOpen || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen))}
       open={aiOpen}
       onOpenChange={(open) => {
         setAiOpen(open);
@@ -1871,7 +1874,7 @@ export default function ResourcesWorkspace({
       module="resources"
       sidebar={sidebar}
       inspector={inspector}
-      aiDock={editorMode || notePromotionMode || reviewScheduleOpen || projectAssociationOpen || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? undefined : aiDock}
+      aiDock={aiDock}
       mode={initialMode === "detail" ? "detail" : "directory"}
       ariaLabel="Resources directory"
       className={`${styles.shell} ${initialMode === "detail" ? styles.detailShell : ""}`}
@@ -1957,7 +1960,7 @@ export default function ResourcesWorkspace({
           <header className={styles.directoryHeader}>
             <div>
               <div className={styles.resourceTitleLine}>
-                <h1>{VIEW_LABELS[view]}</h1>
+                <h1>{collection === "components" ? "Components" : VIEW_LABELS[view]}</h1>
                 <span>{unavailableViewReason ? "–" : visibleResources.length}</span>
               </div>
             </div>
@@ -2099,7 +2102,7 @@ export default function ResourcesWorkspace({
           )}
 
           <div className={styles.resourceToolbar}>
-            <label className={styles.resourceSearch}>
+            <div className={styles.resourceSearch} role="search">
               <PersonalOpsIcon name="search" />
               <input
                 value={query}
@@ -2110,33 +2113,33 @@ export default function ResourcesWorkspace({
                 placeholder="Search…"
                 aria-label="Search Resources"
               />
-            </label>
-            <div className={styles.resourceCollectionTabs} role="group" aria-label="Resource collection">
-              {([
-                ["all", "All"],
-                ["components", "Components"],
-                ["design-libraries", "Design libraries"]
-              ] as const).map(([id, label]) => (
-                <button type="button" aria-pressed={collection === id} onClick={() => setCollection(id)} key={id}>{label}</button>
-              ))}
+              <details className={styles.resourceToolbarMenu}>
+                <summary><PersonalOpsIcon name="filter" /><span>Filter</span></summary>
+                <div role="menu" aria-label="Filter Resources">
+                  <button type="button" aria-pressed={collection === "all" && view === "all"} onClick={(event) => { setCollection("all"); selectLibraryView("all"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>All Resources</button>
+                  <button type="button" aria-pressed={collection === "components"} onClick={(event) => { setCollection("components"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>Components</button>
+                  <button type="button" aria-pressed={collection === "all" && view === "needs-review"} onClick={(event) => { setCollection("all"); selectLibraryView("needs-review"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>Needs Review</button>
+                  <button type="button" aria-pressed={collection === "all" && view === "duplicate-urls"} onClick={(event) => { setCollection("all"); selectLibraryView("duplicate-urls"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>Duplicate URLs</button>
+                </div>
+              </details>
+              <details className={styles.resourceToolbarMenu}>
+                <summary><PersonalOpsIcon name="sort" /><span>Sort</span></summary>
+                <div role="menu" aria-label="Sort Resources">
+                  {([
+                    ["updated-desc", "Recently Updated"],
+                    ["updated-asc", "Oldest Update"],
+                    ["title", "Title"],
+                    ["review", "Evidence Gaps First"]
+                  ] as const).map(([id, label]) => (
+                    <button type="button" aria-pressed={sort === id} onClick={(event) => {
+                      setSort(id);
+                      updateUrl({ sort: id });
+                      event.currentTarget.closest("details")?.removeAttribute("open");
+                    }} key={id}>{label}</button>
+                  ))}
+                </div>
+              </details>
             </div>
-            <label className={styles.resourceSort}>
-              <PersonalOpsIcon name="sort" />
-              <span className="sr-only">Sort Resources</span>
-              <select
-                value={sort}
-                onChange={(event) => {
-                  const next = event.target.value as ResourcesSort;
-                  setSort(next);
-                  updateUrl({ sort: next });
-                }}
-              >
-                <option value="updated-desc">Recently updated</option>
-                <option value="updated-asc">Oldest update</option>
-                <option value="title">Title</option>
-                <option value="review">Evidence gaps first</option>
-              </select>
-            </label>
           </div>
 
           {initialLoadError ? (
@@ -2256,7 +2259,7 @@ export default function ResourcesWorkspace({
                       ? `The connected ${displayLabel(linkedContextModule)} read model contains no exact Resource references. This is not proof that no relationship exists.`
                       : `The ${displayLabel(linkedContextModule)} reference source is unavailable or disconnected. Absence cannot establish that no relationship exists.`
                   : resources.length
-                  ? "Try another search or collection."
+                  ? "Try another search or filter."
                   : "Add your first source, component, or design library."
               }
             />

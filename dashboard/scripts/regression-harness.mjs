@@ -1073,18 +1073,21 @@ async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
         const dock = document.querySelector('[aria-label="Open AI assistant"]');
         const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
         const dockRect = dock instanceof HTMLElement ? dock.getBoundingClientRect() : null;
-        const dataCells = Array.from(document.querySelectorAll("[data-finance-transaction-id] strong, [data-finance-transaction-id] span"))
+        const dataCellElements = Array.from(document.querySelectorAll("[data-finance-transaction-id] strong, [data-finance-transaction-id] span"))
           .filter((element) => element instanceof HTMLElement && window.getComputedStyle(element).display !== "none")
-          .map((element) => element.getBoundingClientRect());
+        const dataCells = dataCellElements.map((element) => element.getBoundingClientRect());
         return {
           overflow: document.documentElement.scrollWidth > window.innerWidth,
           dockOverlap: actionBar instanceof HTMLElement && dockRect ? intersects(actionBar.getBoundingClientRect(), dockRect) : false,
-          dockDataOverlap: Boolean(dockRect && dataCells.some((rect) => intersects(rect, dockRect)))
+          dockDataOverlap: Boolean(dockRect && dataCells.some((rect) => intersects(rect, dockRect))),
+          dockClass: dock instanceof HTMLElement ? dock.closest(".shared-ai-dock")?.className : "",
+          dockRect: dockRect ? { left: dockRect.left, right: dockRect.right, top: dockRect.top, bottom: dockRect.bottom } : null,
+          overlappingData: dockRect ? dataCellElements.filter((element) => intersects(element.getBoundingClientRect(), dockRect)).slice(0, 3).map((element) => element.textContent?.trim()) : []
         };
       });
       assert(!diagnostics.overflow, `Finance ${viewport.label} has horizontal overflow`);
       assert(!diagnostics.dockOverlap, `Finance ${viewport.label} action bar overlaps the AI dock`);
-      assert(!diagnostics.dockDataOverlap, `Finance ${viewport.label} ledger data overlaps the AI dock`);
+      assert(!diagnostics.dockDataOverlap, `Finance ${viewport.label} ledger data overlaps the AI dock: ${JSON.stringify(diagnostics)}`);
       await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}-transactions.png`), fullPage: true });
       if (viewport.width === 390) {
         const undersized = await page.locator("button:visible, a[href]:visible, input:visible, select:visible").evaluateAll((elements) => elements.map((element) => {
@@ -2782,10 +2785,11 @@ async function checkResourceCreateEditBrowserState(
       waitUntil: "domcontentloaded"
     });
     await page.getByRole("heading", { level: 1, name: "All Resources" }).waitFor();
-    const collectionFilters = page.getByRole("group", { name: "Resource collection" });
-    for (const label of ["All", "Components", "Design libraries"]) {
-      assert(await collectionFilters.getByRole("button", { name: label, exact: true }).count() === 1, `Resources toolbar omitted the functional ${label} collection filter`);
-    }
+    assert(await page.getByRole("group", { name: "Resource collection" }).count() === 0, "Resources retained the superseded collection tab strip");
+    const componentsType = page.locator('#resources-module-sidebar .module-sidebar__item').filter({ has: page.getByText("Components", { exact: true }) });
+    assert(await componentsType.count() === 1 && await componentsType.getAttribute("aria-disabled") !== "true", "Resources Types omitted Components");
+    assert(await page.getByText("Filter", { exact: true }).count() >= 1, "Resources search omitted its compact Filter control");
+    assert(await page.getByText("Sort", { exact: true }).count() >= 1, "Resources search omitted its compact Sort control");
     assert(await page.locator('[role="list"][aria-label="Resources"] input[type="checkbox"]').count() === 0, "Resources directory retained batch-selection checkboxes");
     await page.getByRole("button", { name: "Add Resource", exact: false }).click();
     const dialog = page.getByRole("dialog", { name: "Add Resource" });
@@ -6270,7 +6274,7 @@ async function checkPeopleMemoryBrowserState(
           await page.getByRole("heading", { name: "Education", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "Places", exact: true }).count() === 1 &&
           await page.locator(".people-repeatable-entry-heading").count() === 0 &&
-          await page.locator(".people-repeatable-fields > .people-repeatable-inline-remove").count() === 7 &&
+          await page.locator(".people-repeatable-fields > .people-repeatable-inline-remove, .people-repeatable-inline-actions > .people-repeatable-inline-remove").count() === 7 &&
           !(await page.locator(".people-edit-form").innerText()).includes("A person can belong to several groups") &&
           !(await page.locator(".people-edit-form").innerText()).includes("Keep current and past work together") &&
           !(await page.locator(".people-edit-form").innerText()).includes("Add another only when") &&
@@ -6668,6 +6672,8 @@ async function checkPeopleMemoryBrowserState(
       await assertNoOverflow(page, `Organization Links ${viewport.label}`);
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}/edit?tab=properties`, { waitUntil: "networkidle" });
       const organizationEditForm = page.locator(".people-edit-form");
+      const organizationSectionOrder = await organizationEditForm.locator(":scope > .people-profile-section, :scope > [data-profile-section]").evaluateAll((sections) => sections.map((section) => section.getAttribute("data-profile-section")).filter(Boolean));
+      const linkedOrganizationPersonText = await organizationEditForm.locator(`[data-linked-person="${personId}"]`).innerText();
       assert(
         await organizationEditForm.locator(".people-profile-group-picker").count() === 0 &&
           await organizationEditForm.locator("[data-people-email-editor]").count() === 0 &&
@@ -6675,7 +6681,10 @@ async function checkPeopleMemoryBrowserState(
           await organizationEditForm.locator("[data-people-cadence-select]").count() === 0 &&
           await organizationEditForm.getByLabel("Description").count() === 1 &&
           await organizationEditForm.locator(`[data-linked-person="${personId}"]`).count() === 1 &&
-          (await organizationEditForm.locator(`[data-linked-person="${personId}"]`).innerText()).includes("Direct + profile link"),
+          organizationSectionOrder.indexOf("identity") < organizationSectionOrder.indexOf("about") &&
+          organizationSectionOrder.indexOf("about") < organizationSectionOrder.indexOf("links") &&
+          linkedOrganizationPersonText.includes("Works here") &&
+          linkedOrganizationPersonText.includes("Going to school here"),
         `Organization Properties did not retain its streamlined fields and bidirectional People map at ${viewport.label}`
       );
       await assertNoOverflow(page, `Organization Properties ${viewport.label}`);
@@ -9081,11 +9090,33 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
         const style = getComputedStyle(element);
         return { backgroundColor: style.backgroundColor, backdropFilter: style.backdropFilter || style.webkitBackdropFilter };
       });
-      assert(aiSurface.backgroundColor === "rgb(251, 252, 251)", `AI panel is not the expected solid liquid-glass surface at ${viewport.label}: ${JSON.stringify(aiSurface)}`);
+      const aiSurfaceAlpha = Number(aiSurface.backgroundColor.match(/rgba?\([^,]+,[^,]+,[^,]+(?:,\s*([\d.]+))?\)/)?.[1] || "1");
+      assert(aiSurfaceAlpha >= 0.82 && aiSurfaceAlpha < 1, `AI panel is not the expected readable liquid-glass surface at ${viewport.label}: ${JSON.stringify(aiSurface)}`);
 
       const layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
       assert(layout.scrollWidth <= layout.innerWidth, `Personal Ops Command overflowed horizontally at ${viewport.label}: ${JSON.stringify(layout)}`);
       await page.screenshot({ path: path.join(screenshotDir, `command-${viewport.label}.png`), fullPage: true });
+      if (viewport.label === "desktop-1440x900") {
+        const assistantDraft = "Keep this draft through module navigation";
+        const panelBeforeNavigation = await aiPanel.boundingBox();
+        await aiPanel.getByLabel("Ask about this workspace").fill(assistantDraft);
+        await page.getByRole("link", { name: "Resources", exact: true }).click();
+        await page.getByRole("heading", { level: 1, name: "All Resources" }).waitFor();
+        const persistentPanel = page.getByRole("dialog", { name: "Unigentamos AI" });
+        await persistentPanel.waitFor();
+        await page.waitForFunction(() => document.querySelector(".shared-ai-dock__context")?.textContent?.includes("Resources"));
+        const panelAfterNavigation = await persistentPanel.boundingBox();
+        const persistedDraft = await persistentPanel.getByLabel("Ask about this workspace").inputValue();
+        const persistedContext = await persistentPanel.locator(".shared-ai-dock__context").innerText();
+        assert(
+          persistedDraft === assistantDraft &&
+            persistedContext.includes("Resources") &&
+            panelBeforeNavigation && panelAfterNavigation &&
+            Math.abs(panelBeforeNavigation.x - panelAfterNavigation.x) <= 2 &&
+            Math.abs(panelBeforeNavigation.y - panelAfterNavigation.y) <= 2,
+          `AI assistant did not preserve its draft, context, and position through module navigation: ${JSON.stringify({ panelBeforeNavigation, panelAfterNavigation, persistedDraft, persistedContext })}`
+        );
+      }
       await context.close();
     }
     assert(browserMutations.length === 0, `Personal Ops Command browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`);
@@ -11864,7 +11895,7 @@ async function main() {
         !personalOpsSidebarSource.includes('label: "Passwords"') &&
         sharedAiDockSource.includes('M5 5.5h14v11H9l-4 3v-14Z') &&
         !sharedAiDockSource.includes('m12 3 1.3 4.1') &&
-        sharedAiDockStyles.includes("backdrop-filter: blur(24px) saturate(128%)") &&
+        sharedAiDockStyles.includes("backdrop-filter: blur(32px) saturate(150%)") &&
         travelMapSource.includes("geoNaturalEarth1") &&
         travelMapSource.includes("world-atlas/countries-110m.json") &&
         !projectsWorkspaceSource.includes("batchSelection") &&
@@ -12865,8 +12896,8 @@ async function main() {
     assert(resourcesPage.response.ok, `Resources page failed: ${describeStatus(resourcesPage.response)}`);
     assert(resourcesPage.body.includes("All Resources"), "Resources page missing its native directory heading");
     assert(resourcesPage.body.includes("Search…"), "Resources page missing its streamlined source search");
-    assert(resourcesPage.body.includes("Components") && resourcesPage.body.includes("Design libraries"), "Resources page missing its functional collection filters");
-    pass("Resources directory loads through the streamlined source and collection adapter");
+    assert(resourcesPage.body.includes("Components") && resourcesPage.body.includes("Filter") && resourcesPage.body.includes("Sort") && !resourcesPage.body.includes("Design libraries"), "Resources page missing its streamlined type and search controls");
+    pass("Resources directory loads through the streamlined type and search controls");
 
     const nativeFinanceState = await checkNativeFinanceLifecycle(server.baseUrl, cookieJar);
     assert(nativeFinanceState.accounts.length === 5 && nativeFinanceState.rules.length === 1, "Native Finance lifecycle returned incomplete persisted state");
@@ -15513,9 +15544,10 @@ async function main() {
               institution: organizationTitle,
               organizationId: createdOrganization.id,
               degree: "Bachelor of Arts",
-              fieldOfStudy: "Economics"
+              fieldOfStudy: "Economics",
+              status: "current"
             },
-            { id: "education-regression-2", institution: "Columbus College of Art & Design", degree: "Certificate", fieldOfStudy: "Interaction design" }
+            { id: "education-regression-2", institution: "Columbus College of Art & Design", degree: "Certificate", fieldOfStudy: "Interaction design", status: "past" }
           ],
           occupations: [
             {
@@ -15691,8 +15723,10 @@ async function main() {
       persistedPerson?.profile?.education?.length === 2 &&
         persistedPerson.profile.education[0].organizationId === createdOrganization.id &&
         persistedPerson.profile.education[0].institution === organizationTitle &&
-        persistedPerson.profile.education[1].fieldOfStudy === "Interaction design",
-      "People repeatable university history did not retain its Organization object link"
+        persistedPerson.profile.education[0].status === "current" &&
+        persistedPerson.profile.education[1].fieldOfStudy === "Interaction design" &&
+        persistedPerson.profile.education[1].status === "past",
+      "People repeatable university history did not retain its Organization object link and timing"
     );
     assert(
       persistedPerson?.profile?.occupations?.length === 3 &&

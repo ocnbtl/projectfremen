@@ -444,7 +444,10 @@ try {
   assert.match(styleGuideStore, /backfillDefaults/i);
   const resourcesWorkspace = await readFile("components/ResourcesWorkspace.tsx", "utf8");
   assert.match(resourcesWorkspace, /ResourceCollection/i);
-  assert.match(resourcesWorkspace, /Design libraries/i);
+  assert.match(resourcesWorkspace, /"Articles",\s*"Books",\s*"Components",\s*"Contracts \/ Invoices",\s*"Datasets",\s*"Documents",\s*"Tools",\s*"Vendors",\s*"Video \/ Media",\s*"Websites"/i);
+  assert.match(resourcesWorkspace, /<span>Filter<\/span>/i);
+  assert.match(resourcesWorkspace, /<span>Sort<\/span>/i);
+  assert.doesNotMatch(resourcesWorkspace, /Design libraries/i);
   assert.doesNotMatch(resourcesWorkspace, /QUICK_FILTERS/i);
   const personalLoadingBoundary = path.join(process.cwd(), "app/admin/personal/loading.tsx");
   await assert.rejects(access(personalLoadingBoundary), /ENOENT/i);

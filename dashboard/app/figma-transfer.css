@@ -11735,7 +11735,7 @@ html[data-admin-preview="mobile"] .people-header-actions button {
 }
 
 .people-repeatable-fields-education {
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, .8fr) minmax(0, 1fr) 36px;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .8fr) minmax(0, 1fr) 104px 40px;
 }
 
 .people-repeatable-fields-job {
@@ -11743,11 +11743,29 @@ html[data-admin-preview="mobile"] .people-header-actions button {
 }
 
 .people-repeatable-fields-location {
-  grid-template-columns: minmax(120px, .55fr) minmax(180px, 1fr) 36px;
+  grid-template-columns: minmax(120px, .55fr) minmax(180px, 1fr) auto;
 }
 
 .people-repeatable-fields-location .is-wide {
   grid-column: 1 / 3;
+}
+
+.people-repeatable-inline-actions {
+  display: flex;
+  height: 40px;
+  align-self: end;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.people-repeatable-inline-actions > .people-location-inline-remove {
+  align-self: flex-start !important;
+}
+
+@media (min-width: 761px) {
+  .people-repeatable-fields-location .people-repeatable-inline-actions.has-visible-label {
+    transform: translateY(-12px);
+  }
 }
 
 .people-repeatable-inline-remove {
@@ -11921,6 +11939,15 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   outline-offset: 2px;
 }
 
+.people-add-action.is-icon-only {
+  width: 40px !important;
+  min-width: 40px !important;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 !important;
+  justify-content: center;
+}
+
 .people-add-action svg {
   width: 16px;
   height: 16px;
@@ -12038,6 +12065,39 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   border-top: 0;
 }
 
+.people-profile-section[data-profile-section="about"] > .people-notes-editor:first-of-type {
+  padding-top: 10px;
+}
+
+.people-organization-link-editor.people-themed-section {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-color: color-mix(in srgb, var(--people-section-accent) 18%, var(--border-soft));
+  border-left-width: 1px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--people-section-accent) 3%, var(--surface-panel));
+  color: var(--people-section-accent);
+}
+
+.people-organization-link-editor > .people-repeatable-heading {
+  padding: 9px 11px;
+  border-bottom: 1px solid color-mix(in srgb, var(--people-section-accent) 14%, var(--border-soft));
+}
+
+.people-organization-link-editor > .people-organization-link-controls,
+.people-organization-link-editor > .people-organization-linked-list {
+  margin-inline: 10px;
+}
+
+.people-organization-link-editor > .people-organization-link-controls {
+  margin-top: 10px;
+}
+
+.people-organization-link-editor > .people-organization-linked-list {
+  margin-bottom: 10px;
+}
+
 .people-notes-editor + .people-notes-editor {
   margin-top: 2px;
 }
@@ -12143,12 +12203,14 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   max-width: calc(100vw - 24px);
   max-height: calc(100dvh - 24px);
   resize: both;
-  border-color: #bfcac6;
+  overflow: hidden;
+  isolation: isolate;
+  border-color: rgba(170, 188, 181, .72);
   border-radius: 14px;
-  background: #fbfcfb;
-  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(255, 255, 255, .72), 0 22px 64px rgba(16, 32, 38, .24);
-  backdrop-filter: blur(24px) saturate(128%);
-  -webkit-backdrop-filter: blur(24px) saturate(128%);
+  background: rgba(246, 250, 248, .88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .92), inset 0 0 0 1px rgba(255, 255, 255, .34), 0 24px 72px rgba(16, 32, 38, .28);
+  backdrop-filter: blur(32px) saturate(150%);
+  -webkit-backdrop-filter: blur(32px) saturate(150%);
 }
 
 .shared-ai-dock__header {
@@ -12157,7 +12219,7 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   align-items: center;
   padding: 12px;
   border-bottom-color: var(--border-soft);
-  background: #f3f7f5;
+  background: rgba(239, 246, 243, .82);
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -12246,7 +12308,7 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   padding: 12px;
   align-content: start;
   grid-auto-rows: max-content;
-  background: #f8faf9;
+  background: rgba(246, 250, 248, .74);
 }
 
 .shared-ai-dock__context,
@@ -12254,21 +12316,65 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
 .shared-ai-dock__permissions {
   border-color: var(--border-soft);
   border-radius: 10px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, .76);
 }
 
 .shared-ai-dock__context {
   grid-template-columns: auto minmax(0, 1fr);
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
 }
 
 .shared-ai-dock__context strong {
-  overflow: hidden;
+  display: flex;
+  min-width: 0;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
   color: var(--text-body);
   font-size: 11px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.45;
+}
+
+.shared-ai-dock__context strong span {
+  display: inline-flex;
+  gap: 3px;
+  align-items: center;
+  color: inherit;
+  font: inherit;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.shared-ai-dock__context-eye {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--accent-blue) 8%, rgba(255, 255, 255, .68));
+  color: var(--accent-blue) !important;
+}
+
+.shared-ai-dock__context-eye svg,
+.shared-ai-dock__context-arrow {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.shared-ai-dock__context-eye svg {
+  width: 15px;
+  height: 15px;
+  stroke-width: 1.6;
+}
+
+.shared-ai-dock__context-arrow {
+  width: 11px;
+  height: 11px;
+  color: var(--text-faint);
+  stroke-width: 1.7;
 }
 
 .shared-ai-dock__empty-state {
@@ -12314,6 +12420,57 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   line-height: 1.5;
 }
 
+.shared-ai-dock__local-setup {
+  display: grid;
+  gap: 9px;
+  padding: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .68);
+}
+
+.shared-ai-dock__local-setup ol {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.shared-ai-dock__local-setup li {
+  padding-left: 2px;
+  color: var(--text-body);
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.shared-ai-dock__local-setup li strong,
+.shared-ai-dock__local-setup li span {
+  display: block;
+}
+
+.shared-ai-dock__local-setup li strong {
+  color: var(--text-strong);
+  font-weight: 760;
+}
+
+.shared-ai-dock__local-setup li span,
+.shared-ai-dock__local-setup > p {
+  color: var(--text-muted);
+}
+
+.shared-ai-dock__local-setup code {
+  color: var(--text-strong);
+  font: 650 9px/1.4 var(--font-mono);
+}
+
+.shared-ai-dock__local-setup > p {
+  margin: 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--border-soft);
+  font-size: 9px;
+  line-height: 1.45;
+}
+
 .shared-ai-dock__permissions ul {
   display: flex;
   flex-wrap: wrap;
@@ -12337,7 +12494,7 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   gap: 6px;
   padding: 12px;
   border-top-color: var(--border-soft);
-  background: #f3f7f5;
+  background: rgba(239, 246, 243, .82);
 }
 
 .shared-ai-dock__footer > label {
@@ -12361,7 +12518,8 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   resize: none;
   border-color: var(--border-soft);
   border-radius: 9px;
-  background: #ffffff;
+  background: rgba(255, 255, 255, .78);
+  color: var(--text-strong);
   font: 500 11px/1.45 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
 }
 
@@ -12384,6 +12542,30 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   stroke-width: 1.5;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+@media (max-width: 1100px) {
+  .shared-ai-dock--finance {
+    display: none;
+  }
+}
+
+@media (min-width: 1101px) {
+  .shared-ai-dock--finance .shared-ai-dock__launcher {
+    width: 52px;
+    min-width: 52px;
+    padding-inline: 0;
+    justify-content: center;
+  }
+
+  .shared-ai-dock--finance .shared-ai-dock__launcher-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
 
 @media (max-width: 760px) {

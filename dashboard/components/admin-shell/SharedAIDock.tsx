@@ -1,7 +1,8 @@
 "use client";
 
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { useEffect, useId, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import type { ModuleId, NativeObjectRef } from "../../lib/native-objects/types";
 
 export type SharedAIContext = {
@@ -19,6 +20,7 @@ export type SharedAIDockProps = {
   title?: string;
   footer?: ReactNode;
   className?: string;
+  hidden?: boolean;
 };
 
 const MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
@@ -44,6 +46,22 @@ type DockDrag = {
 };
 
 const DOCK_VIEWPORT_GAP = 12;
+const AI_DOCK_OPEN_STORAGE_KEY = "unigentamos:assistant:open";
+
+type SharedAIDockRegistration = SharedAIDockProps & { ownerId: string };
+type SharedAIDockHost = {
+  register: (registration: SharedAIDockRegistration) => void;
+  unregister: (ownerId: string, ownerPathname: string) => void;
+};
+
+const SharedAIDockHostContext = createContext<SharedAIDockHost | null>(null);
+
+function titleCaseContext(value: string) {
+  return value
+    .trim()
+    .replace(/[-_]+/g, " ")
+    .replace(/\b\p{L}/gu, (letter) => letter.toUpperCase());
+}
 
 function clampLauncher(point: DockPoint, width: number, height: number): DockPoint {
   return {
@@ -63,13 +81,14 @@ function clampPanel(rect: DockRect): DockRect {
   };
 }
 
-export default function SharedAIDock({
+function SharedAIDockSurface({
   open,
   onOpenChange,
   context,
   title = "Unigentamos AI",
   footer,
-  className
+  className,
+  hidden = false
 }: SharedAIDockProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -86,6 +105,7 @@ export default function SharedAIDock({
   const [launcherPosition, setLauncherPosition] = useState<DockPoint | null>(null);
   const [panelRect, setPanelRect] = useState<DockRect | null>(null);
   const [dragging, setDragging] = useState<"launcher" | "panel" | null>(null);
+  const [draft, setDraft] = useState("");
 
   useEffect(() => {
     if (open) {
@@ -147,14 +167,12 @@ export default function SharedAIDock({
     setPanelRect(clampPanel({ x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height }));
   }, [compactViewport, open, panelRect]);
 
-  const contextSummary = [
+  const contextSegments = [
     MODULE_LABELS[context.module],
     context.object?.label,
-    context.activeTab ? `${context.activeTab} tab` : undefined,
-    context.visibleScope
-  ]
-    .filter(Boolean)
-    .join(" · ");
+    context.activeTab ? titleCaseContext(context.activeTab) : undefined,
+    context.visibleScope ? titleCaseContext(context.visibleScope) : undefined
+  ].filter((value): value is string => Boolean(value));
 
   const launcherStyle: CSSProperties | undefined = !compactViewport && launcherPosition
     ? { left: launcherPosition.x, top: launcherPosition.y, right: "auto", bottom: "auto" }
@@ -240,8 +258,10 @@ export default function SharedAIDock({
     setPanelRect(clampPanel({ x: bounds.left, y: bounds.top, width: bounds.width, height: bounds.height }));
   }
 
+  if (hidden) return null;
+
   return (
-    <div className={["shared-ai-dock", open && "is-open", dragging && `is-dragging-${dragging}`, className].filter(Boolean).join(" ")} style={launcherStyle}>
+    <div className={["shared-ai-dock", `shared-ai-dock--${context.module.replace(/_/g, "-")}`, open && "is-open", dragging && `is-dragging-${dragging}`, className].filter(Boolean).join(" ")} style={launcherStyle}>
       <button
         ref={launcherRef}
         type="button"
@@ -304,12 +324,27 @@ export default function SharedAIDock({
 
           <div className="shared-ai-dock__body">
             <div className="shared-ai-dock__context" aria-label="Current AI context">
-              <span>Viewing</span>
-              <strong>{contextSummary}</strong>
+              <span className="shared-ai-dock__context-eye" aria-label="Viewing">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 12s3.4-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.4 5.5-9.2 5.5S2.8 12 2.8 12Z" /><circle cx="12" cy="12" r="2.5" /></svg>
+              </span>
+              <strong>{contextSegments.map((segment, index) => (
+                <span key={`${segment}-${index}`}>
+                  {index > 0 && <svg className="shared-ai-dock__context-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5" /></svg>}
+                  <span>{segment}</span>
+                </span>
+              ))}</strong>
             </div>
             <div className="shared-ai-dock__empty-state">
               <span className="shared-ai-dock__empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 5.5h14v11H9l-4 3v-14Z" /><path d="M8.5 9.5h7M8.5 12.5h4.5" /></svg></span>
-              <div><h3>AI connection is off</h3><p id={descriptionId}>This panel can see the current workspace context, but chat and record changes remain unavailable.</p></div>
+              <div><h3>Connect a local model</h3><p id={descriptionId}>This panel is ready to hold context, but a model connector has not been configured.</p></div>
+            </div>
+            <div className="shared-ai-dock__local-setup" aria-label="Local AI connection brief">
+              <ol>
+                <li><strong>Run Ollama locally.</strong><span>Install Ollama, download a model, and confirm it responds on your device.</span></li>
+                <li><strong>Add a server-side bridge.</strong><span>Connect the app server to the private Ollama endpoint, normally <code>127.0.0.1:11434</code>. This connector is not included yet.</span></li>
+                <li><strong>Keep access private.</strong><span>For the hosted site, use an authenticated local relay or private network. Do not expose Ollama directly to the public internet.</span></li>
+              </ol>
+              <p>Until that bridge is implemented and authorized, the assistant cannot read records, send prompts, or write changes.</p>
             </div>
             {context.allowedActions && context.allowedActions.length > 0 && (
               <div className="shared-ai-dock__permissions">
@@ -324,7 +359,7 @@ export default function SharedAIDock({
           <footer className="shared-ai-dock__footer">
             <label htmlFor={promptId}>Ask about this workspace</label>
             <div>
-              <textarea id={promptId} rows={2} placeholder="Connect the assistant to begin" disabled />
+              <textarea id={promptId} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Draft a prompt while disconnected…" />
               <button type="button" disabled title="AI assistant is disconnected" aria-label="Send message">
                 <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m3 10 13-6-4.2 12-2.1-4.1L3 10Z" /><path d="m9.7 11.9 2.8-3" /></svg>
               </button>
@@ -335,4 +370,89 @@ export default function SharedAIDock({
       )}
     </div>
   );
+}
+
+export function PersistentSharedAIDockProvider({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
+  const [registration, setRegistration] = useState<SharedAIDockRegistration | null>(null);
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem(AI_DOCK_OPEN_STORAGE_KEY) === "true") setOpen(true);
+    } catch {
+      // Persistence is an enhancement; the dock remains usable without storage access.
+    }
+  }, []);
+
+  const register = useCallback((nextRegistration: SharedAIDockRegistration) => {
+    setRegistration(nextRegistration);
+    if (nextRegistration.open) setOpen(true);
+  }, []);
+
+  const unregister = useCallback((ownerId: string, ownerPathname: string) => {
+    setRegistration((current) => {
+      if (!current || current.ownerId !== ownerId) return current;
+      return window.location.pathname === ownerPathname ? { ...current, hidden: true } : current;
+    });
+  }, []);
+
+  const host = useMemo<SharedAIDockHost>(() => ({ register, unregister }), [register, unregister]);
+
+  const handleOpenChange = useCallback((nextOpen: boolean) => {
+    setOpen(nextOpen);
+    registration?.onOpenChange(nextOpen);
+    try {
+      window.localStorage.setItem(AI_DOCK_OPEN_STORAGE_KEY, String(nextOpen));
+    } catch {
+      // Keep the session behavior even if storage is unavailable.
+    }
+  }, [registration]);
+
+  const hideForRoute = pathname === "/admin/login";
+
+  return (
+    <SharedAIDockHostContext.Provider value={host}>
+      {children}
+      {registration && !hideForRoute && (
+        <SharedAIDockSurface
+          {...registration}
+          open={open}
+          onOpenChange={handleOpenChange}
+        />
+      )}
+    </SharedAIDockHostContext.Provider>
+  );
+}
+
+export default function SharedAIDock(props: SharedAIDockProps) {
+  const host = useContext(SharedAIDockHostContext);
+  const ownerId = useId();
+  const ownerPathname = usePathname();
+  const allowedActionsKey = props.context.allowedActions?.join("\u0000") || "";
+  const registration = useMemo<SharedAIDockRegistration>(() => ({ ...props, ownerId }), [
+    ownerId,
+    props.className,
+    props.context.activeTab,
+    props.context.module,
+    props.context.object?.label,
+    props.context.object?.module,
+    props.context.object?.objectId,
+    props.context.visibleScope,
+    props.footer,
+    props.hidden,
+    props.onOpenChange,
+    props.open,
+    props.title,
+    allowedActionsKey
+  ]);
+
+  useEffect(() => {
+    if (!host) return;
+    host.register(registration);
+    return () => host.unregister(ownerId, ownerPathname);
+  }, [host, ownerId, ownerPathname, registration]);
+
+  if (host) return null;
+  return <SharedAIDockSurface {...props} />;
 }

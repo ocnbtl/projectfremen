@@ -126,6 +126,7 @@ export type PersonalEducationEntry = {
   organizationId?: string;
   degree?: string;
   fieldOfStudy?: string;
+  status?: "current" | "past";
 };
 
 export type PersonalOccupationEntry = {
@@ -798,6 +799,11 @@ function normalizeEducationEntries(value: unknown, strict = false): PersonalEduc
     const institution = profileEntryText(raw.institution, 240, strict, `Education entry ${index + 1} university`);
     const degree = profileEntryText(raw.degree, 240, strict, `Education entry ${index + 1} degree`);
     const fieldOfStudy = profileEntryText(raw.fieldOfStudy, 240, strict, `Education entry ${index + 1} field of study`);
+    const rawStatus = typeof raw.status === "string" ? raw.status.trim().toLowerCase() : "";
+    if (strict && rawStatus && rawStatus !== "current" && rawStatus !== "past") {
+      throw new Error(`Education entry ${index + 1} status is invalid`);
+    }
+    const status = rawStatus === "current" || rawStatus === "past" ? rawStatus : undefined;
     if (!institution && !organizationId && !degree && !fieldOfStudy) {
       if (strict) throw new Error(`Education entry ${index + 1} needs a university, degree, or field of study`);
       continue;
@@ -807,7 +813,8 @@ function normalizeEducationEntries(value: unknown, strict = false): PersonalEduc
       institution,
       organizationId: organizationId || undefined,
       degree: degree || undefined,
-      fieldOfStudy: fieldOfStudy || undefined
+      fieldOfStudy: fieldOfStudy || undefined,
+      status
     });
   }
   return entries;
