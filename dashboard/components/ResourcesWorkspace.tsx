@@ -26,6 +26,11 @@ import { useNoteLinksState } from "./operational/useNoteLinksState";
 import ResourceEditorSheet from "./resources/ResourceEditorSheet";
 import ResourceNotePromotionSheet from "./resources/ResourceNotePromotionSheet";
 import ResourcePropertiesView from "./resources/ResourcePropertiesView";
+import ResourceOverviewView from "./resources/ResourceOverviewView";
+import ResourceTimelineView from "./resources/ResourceTimelineView";
+import ResourceLinksView from "./resources/ResourceLinksView";
+import { ResourceIconButton, ResourceMark } from "./resources/ResourceVisual";
+import resourceStyles from "./resources/ResourceExperience.module.css";
 import ResourceReviewScheduleEditorSheet from "./resources/ResourceReviewScheduleEditorSheet";
 import PersonalOpsIcon from "./personal-ops/PersonalOpsIcon";
 import {
@@ -39,6 +44,8 @@ import type {
   ResourceType
 } from "../lib/modules/resources/types";
 import type { NoteLinksState } from "../lib/modules/notes/links-types";
+import type { ObjectLink } from "../lib/native-objects/links";
+import type { NativeObjectRef } from "../lib/native-objects/types";
 import { buildResourceDuplicateEvidenceIndex } from "../lib/modules/resources/duplicate-evidence";
 import {
   RESOURCE_LINKED_CONTEXT_MODULE_BY_VIEW,
@@ -49,9 +56,10 @@ import {
 import { buildResourceReviewEvidence } from "../lib/modules/resources/review-evidence";
 import { buildResourceReviewQueue } from "../lib/modules/resources/review-queue";
 import { formatResourceReviewCadence } from "../lib/modules/resources/review-schedule";
-import { buildReviewSourceHandoffRoute } from "../lib/modules/reviews/source-context";
+import { buildReviewSourceHandoffRoute, getLinkedReviewContexts } from "../lib/modules/reviews/source-context";
 import type { ReviewRunView } from "../lib/modules/reviews/types";
 import { buildResourceSourceEvidenceReport } from "../lib/modules/resources/source-evidence";
+import { createResourcesRepository } from "../lib/modules/resources/repository";
 import { isStyleGuideComponent } from "../lib/modules/style-guide/component-resource";
 import {
   buildFollowUpCreationRoute,
@@ -82,6 +90,8 @@ type ResourcesWorkspaceProps = {
   initialLoadError?: string;
   initialReviewViews: ReviewRunView[];
   initialReviewsError?: string;
+  initialObjectLinks: ObjectLink[];
+  initialObjectTargets: NativeObjectRef[];
 };
 
 type ResourcesView = ResourcesUrlState["view"];
@@ -91,10 +101,8 @@ type ResourceCollection = "all" | "components";
 
 const TABS: readonly DetailTab[] = [
   { id: "overview", label: "Overview" },
-  { id: "source", label: "Source" },
+  { id: "timeline", label: "Timeline" },
   { id: "links", label: "Links" },
-  { id: "notes", label: "Notes" },
-  { id: "review", label: "Review" },
   { id: "properties", label: "Properties" }
 ];
 
@@ -109,7 +117,7 @@ const TYPE_LABELS: Readonly<Record<ResourceType, string>> = {
   book: "Book",
   contract_invoice: "Contract / Invoice",
   external_account: "External account",
-  unknown: "Type unverified"
+  unknown: "Unspecified"
 };
 
 const LIBRARY_VIEWS: ReadonlyArray<[ResourcesView, string]> = [
@@ -162,14 +170,11 @@ const CONTEXT_ROWS: ReadonlyArray<
 ] as const;
 
 const VIEW_LIMITATIONS: Readonly<Partial<Record<ResourcesView, string>>> = {
-  pinned: "Pinned state is not stored by the legacy Resources adapter.",
-  recent: "The recency window is an open product decision, so this view is not inferred from timestamps.",
-  cited: "Citation and active-use records are not connected yet.",
-  archived: "Legacy statuses cannot be safely inferred as native Resource archive state."
+  cited: "Citation and active-use records are not connected yet."
 };
 
-function displayLabel(value: string) {
-  return value.replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+function displayLabel(value?: string | null) {
+  return (value || "Unknown").replace(/_/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
 }
 
 function matchesCollection(resource: ResourceRecord, collection: ResourceCollection) {
@@ -311,6 +316,8 @@ export default function ResourcesWorkspace({
   initialPersonalOpsFollowUpsError = "",
   initialReviewViews,
   initialReviewsError = "",
+  initialObjectLinks,
+  initialObjectTargets,
   initialMode = "index",
   initialSelectedId,
   initialLoadError = ""
@@ -336,6 +343,9 @@ export default function ResourcesWorkspace({
   const [notePromotionMode, setNotePromotionMode] = useState<"create" | "existing" | null>(null);
   const [reviewScheduleOpen, setReviewScheduleOpen] = useState(false);
   const [projectAssociationOpen, setProjectAssociationOpen] = useState(false);
+  const [propertiesEditRequest, setPropertiesEditRequest] = useState(0);
+  const [headerBusy, setHeaderBusy] = useState(false);
+  const [objectLinks, setObjectLinks] = useState(initialObjectLinks);
   const [reviewScheduleFeedback, setReviewScheduleFeedback] = useState<{
     resourceId: string;
     message: string;
@@ -370,8 +380,8 @@ export default function ResourcesWorkspace({
     refresh: refreshNoteLinks
   } = useNoteLinksState(initialNoteLinksState, initialNoteLinksError);
 
-  const selectedResource = useMemo(
-    () => resources.find((resource) => resource.id === selectedId) || null,
+  const selectedResource = useMemo<ResourceRecord>(
+    () => resources.find((resource) => resource.id === selectedId) || null as unknown as ResourceRecord,
     [resources, selectedId]
   );
   const selectedSourceEvidence = useMemo(
@@ -416,8 +426,11 @@ export default function ResourcesWorkspace({
       : sortResources(
           resources.filter(
             (resource) =>
+              !resource.deletedAt &&
               matchesQuery(resource, query) &&
               matchesCollection(resource, collection) &&
+              (view === "archived" ? resource.lifecycleState === "archived" : resource.lifecycleState !== "archived") &&
+              (view !== "pinned" || resource.pinned === true) &&
               (view !== "needs-review" || reviewQueue.byResourceId.has(resource.id)) &&
               (view !== "duplicate-urls" || duplicateEvidence.byResourceId.has(resource.id)) &&
               (!linkedContextModule ||
@@ -504,13 +517,7 @@ export default function ResourcesWorkspace({
 
   function selectResource(resource: ResourceRecord) {
     const nextTab: ResourcesTab =
-      view === "needs-review"
-        ? "review"
-        : view === "duplicate-urls"
-          ? "source"
-          : linkedContextModule
-            ? "links"
-            : "overview";
+      linkedContextModule ? "links" : view === "duplicate-urls" ? "properties" : "overview";
     setSelectedId(resource.id);
     setActiveTab(nextTab);
     setSelectedEvidenceId("");
@@ -542,16 +549,15 @@ export default function ResourcesWorkspace({
 
   function selectLibraryView(nextView: ResourcesView) {
     const nextLinkedContextModule = linkedContextModuleForView(nextView);
-    const nextTab: ResourcesTab =
-      nextView === "needs-review"
-        ? "review"
-        : nextView === "duplicate-urls"
-          ? "source"
-          : nextLinkedContextModule
-            ? "links"
-          : initialMode === "detail"
-            ? "overview"
-            : activeTab;
+    const nextTab: ResourcesTab = nextLinkedContextModule
+      ? "links"
+      : nextView === "duplicate-urls"
+        ? "properties"
+        : initialMode === "detail"
+          ? "overview"
+          : (["overview", "timeline", "links", "properties"] as string[]).includes(activeTab)
+            ? activeTab
+            : "overview";
     const nextSort: ResourcesSort =
       nextView === "needs-review"
         ? "review"
@@ -665,16 +671,11 @@ export default function ResourcesWorkspace({
     <ModuleSidebar
       id="resources-module-sidebar"
       title="Resources"
-      description="Canonical external sources, citations, freshness, trust, and source lifecycle."
+      description="Saved references and useful source material."
       sections={sidebarSections}
       mobileOpen={mobileSidebarOpen}
       onClose={() => setMobileSidebarOpen(false)}
       className={styles.sidebar}
-      footer={
-        <p className={styles.sidebarFootnote}>
-          Legacy Personal Records adapter · title, URL, context, and review-timing writes use the protected audit path · linked-context views are exact owner-reference evidence, not ResourceLinks · source health remains disconnected
-        </p>
-      }
     />
   );
 
@@ -747,6 +748,13 @@ export default function ResourcesWorkspace({
           { path: getModuleRoute("resources"), history: "push" }
         );
       }
+      if (saved.source.canonicalUrl) {
+        void createResourcesRepository().runAutomation(saved.id, "metadata_refresh").then((result) => {
+          if (result.ok) {
+            setResources((current) => current.map((resource) => resource.id === result.data.resource.id ? result.data.resource : resource));
+          }
+        });
+      }
     }
 
     router.refresh();
@@ -765,6 +773,45 @@ export default function ResourcesWorkspace({
         : "Resource review timing removed. Review completion and evidence state are unchanged."
     });
     router.refresh();
+  }
+
+  function handleInlineSaved(saved: ResourceRecord) {
+    setResources((current) => current.map((resource) => resource.id === saved.id ? saved : resource));
+    setSelectedId(saved.id);
+    router.refresh();
+  }
+
+  function handleArchived(saved: ResourceRecord, removed = false) {
+    setResources((current) => removed
+      ? current.filter((resource) => resource.id !== saved.id)
+      : current.map((resource) => resource.id === saved.id ? saved : resource));
+    if (view !== "archived" || removed) {
+      const next = resources.find((resource) => resource.id !== saved.id && resource.lifecycleState !== "archived");
+      setSelectedId(next?.id || "");
+      setInspectorOpen(Boolean(next));
+      updateUrl({ selected: next?.id || "", tab: "overview" }, { history: "replace" });
+    }
+    router.refresh();
+  }
+
+  function openInlineEditor() {
+    setActiveTab("properties");
+    setSelectedEvidenceId("");
+    setPropertiesEditRequest((current) => current + 1);
+    updateUrl({ tab: "properties", item: "" }, { history: "push" });
+  }
+
+  async function updateHeaderResource(input: Parameters<ReturnType<typeof createResourcesRepository>["update"]>[1], removed = false) {
+    if (!selectedResource || headerBusy) return;
+    setHeaderBusy(true);
+    const result = await createResourcesRepository().update(selectedResource.id, {
+      ...input,
+      expectedUpdatedAt: selectedResource.updatedAt
+    });
+    setHeaderBusy(false);
+    if (!result.ok) return;
+    if (input.action === "archive") handleArchived(result.data, removed);
+    else handleInlineSaved(result.data);
   }
 
   const aiDock = (
@@ -787,52 +834,37 @@ export default function ResourcesWorkspace({
 
   const inspectorTitle = selectedResource ? (
     <ObjectHeader
-      objectType="External resource"
+      objectType=""
       title={selectedResource.title}
-      subtitle={selectedResource.source.displayDomain || "Source identity not fetched"}
-      identity={initials(selectedResource.title)}
-      states={
-        <>
-          <span className={styles.stateChip} data-tone="amber">Legacy URL unverified</span>
-          <span className={styles.stateChip}>{TYPE_LABELS[selectedResource.type]}</span>
-          <span className={styles.stateChip}>{displayLabel(selectedResource.review.state)}</span>
-        </>
-      }
+      identity={<ResourceMark gradient={selectedResource.gradient} className={resourceStyles.headerMark} />}
       actions={
-        <>
+        <div className={resourceStyles.headerActions}>
           {isInspectorOverlay && (
-            <button
-              type="button"
-              className={`${styles.button} ${styles.closeButton}`}
-              onClick={() => setInspectorOpen(false)}
-            >
-              Close
-            </button>
+            <ResourceIconButton icon="close" label="Close" onClick={() => setInspectorOpen(false)} />
           )}
           {selectedResource.source.canonicalUrl ? (
             <a
-              className={`${styles.button} ${styles.linkButton}`}
-              data-primary="true"
+              className={resourceStyles.iconButton}
               href={selectedResource.source.canonicalUrl}
               target="_blank"
               rel="noreferrer"
+              aria-label="Open source"
+              title="Open source"
             >
-              Open source ↗
+              <PersonalOpsIcon name="open" />
             </a>
-          ) : (
-            <button type="button" className={styles.button} data-primary="true" disabled title="No validated HTTP or HTTPS URL is stored.">
-              Open source ↗
-            </button>
-          )}
-          <button
-            type="button"
-            className={styles.button}
-            onClick={() => openResourceEditor("edit")}
-          >
-            Edit
-          </button>
-          <button type="button" className={styles.button} disabled title="Pinned state is not stored by the legacy adapter.">Pin</button>
-        </>
+          ) : null}
+          <ResourceIconButton icon="review" label="Mark reviewed" disabled={headerBusy} onClick={() => void updateHeaderResource({ action: "review" })} />
+          <ResourceIconButton icon="star" label={selectedResource.pinned ? "Unpin resource" : "Pin resource"} active={selectedResource.pinned === true} disabled={headerBusy} onClick={() => void updateHeaderResource({ starred: !selectedResource.pinned })} />
+          <details className={resourceStyles.menu}>
+            <summary className={resourceStyles.iconButton} aria-label="More resource actions" title="More resource actions"><PersonalOpsIcon name="more" /></summary>
+            <div className={resourceStyles.menuPanel}>
+              <button type="button" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); openInlineEditor(); }}><PersonalOpsIcon name="edit" />Edit</button>
+              <button type="button" disabled={headerBusy} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); if (window.confirm("Archive this resource? Its links and history will stay intact.")) void updateHeaderResource({ action: "archive", archiveReason: "Archived from Resources" }); }}><PersonalOpsIcon name="archive" />Archive</button>
+              <button type="button" data-destructive="true" disabled={headerBusy} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); if (window.confirm("Delete this resource from active and archived views? Its underlying record will remain recoverable.")) void updateHeaderResource({ action: "archive", archiveReason: "Deleted from Resources", deletedAt: new Date().toISOString() }, true); }}><PersonalOpsIcon name="delete" />Delete</button>
+            </div>
+          </details>
+        </div>
       }
     />
   ) : undefined;
@@ -853,7 +885,7 @@ export default function ResourcesWorkspace({
 
   function renderInspectorPanel() {
     if (!selectedResource) {
-      return (
+      if (objectLinks.length >= 0) return (
         <div className={styles.emptyInspector}>
           <h2>No Resource selected</h2>
           <p>Select a row to inspect its preserved external-source identity.</p>
@@ -869,6 +901,41 @@ export default function ResourcesWorkspace({
     );
     const linkedContextRecord =
       linkedContextByResourceId.get(selectedResource.id) || null;
+
+    if (activeTab === "overview") {
+      return (
+        <DetailTabPanel tabsId={tabsId} tabId="overview" active>
+          <ResourceOverviewView
+            resource={selectedResource}
+            onSaved={handleInlineSaved}
+            followUpPanel={
+              <LinkedFollowUpsPanel
+                source={resourceFollowUpSource(selectedResource)}
+                followUps={personalOpsFollowUps}
+                loading={personalOpsFollowUpsLoading}
+                error={personalOpsFollowUpsError}
+                onRefresh={() => void refreshPersonalOpsFollowUps()}
+                createHref={resourceFollowUpCreationRoute(selectedResource)}
+                limit={3}
+                compact
+                showHeader={false}
+                showBoundary={false}
+                hideWhenEmpty
+                title="Follow-ups"
+              />
+            }
+          />
+        </DetailTabPanel>
+      );
+    }
+
+    if (activeTab === "timeline") {
+      return (
+        <DetailTabPanel tabsId={tabsId} tabId="timeline" active>
+          <ResourceTimelineView resource={selectedResource} />
+        </DetailTabPanel>
+      );
+    }
 
     if (activeTab === "review") {
       const noteSourceTargets = targetGroups.filter(
@@ -1101,6 +1168,80 @@ export default function ResourcesWorkspace({
     }
 
     if (activeTab === "links") {
+      return (
+        <DetailTabPanel tabsId={tabsId} tabId="links" active>
+          <ResourceLinksView
+            resource={selectedResource}
+            links={objectLinks}
+            targets={initialObjectTargets}
+            evidenceTargets={[
+              ...(linkedContextRecord?.placements || []).map((placement) => placement.ownerRef),
+              ...targetGroups.map((group) => group.target)
+            ]}
+            projectPanel={
+              <LinkedProjectsPanel
+                source={selectedResource.nativeRef}
+                sourceLabel={selectedResource.title}
+                state={projectsState}
+                loading={projectsLoading}
+                error={projectsError}
+                onRefresh={refreshProjects}
+                manageLifecycle
+                manageHealth
+                legacyProjectLabels={selectedResource.provenance.projects}
+                title="Projects"
+                ownerTab="files-links"
+                limit={6}
+                compact
+                embedded
+                showHeader={false}
+                showConnections={false}
+                showLifecycleHeader={false}
+                showSummary={false}
+                showBoundary={false}
+              />
+            }
+            projectCount={projectsState.links.filter((link) =>
+              link.source.module === selectedResource.nativeRef.module &&
+              link.source.objectType === selectedResource.nativeRef.objectType &&
+              link.source.objectId === selectedResource.nativeRef.objectId &&
+              link.linkState !== "removed"
+            ).length}
+            notePanel={
+              <LinkedNotesPanel
+                source={selectedResource.nativeRef}
+                state={noteLinksState}
+                loading={noteLinksLoading}
+                error={noteLinksError}
+                onRefresh={refreshNoteLinks}
+                title="Notes"
+                limit={6}
+                compact
+              />
+            }
+            noteCount={noteLinksState.links.filter((link) =>
+              link.targetRef.module === selectedResource.nativeRef.module &&
+              link.targetRef.objectType === selectedResource.nativeRef.objectType &&
+              link.targetRef.objectId === selectedResource.nativeRef.objectId &&
+              link.state !== "removed"
+            ).length}
+            reviewPanel={
+              <LinkedReviewsPanel
+                source={selectedResource.nativeRef}
+                initialReviewViews={initialReviewViews}
+                initialError={initialReviewsError}
+                title="Reviews"
+                wide={false}
+                compact
+              />
+            }
+            reviewCount={getLinkedReviewContexts(initialReviewViews, selectedResource.nativeRef).length}
+            onAssociateProject={openProjectAssociation}
+            onLinksChange={setObjectLinks}
+            onResourceSaved={handleInlineSaved}
+          />
+        </DetailTabPanel>
+      );
       const allOwnerPlacements = linkedContextRecord?.placements || [];
       const ownerPlacements = linkedContextModule
         ? allOwnerPlacements.filter(
@@ -1113,9 +1254,7 @@ export default function ResourcesWorkspace({
       const mediaSourceTargets = targetGroups.filter(
         (group) => group.candidates.some((candidate) => candidate.relationship === "media_source_reference_candidate")
       );
-      const activeCoverage = linkedContextModule
-        ? linkedContextEvidence.coverage[linkedContextModule]
-        : null;
+      const activeCoverage = linkedContextEvidence.coverage[linkedContextModule || "people"];
       const evidenceSignalCount =
         ownerPlacements.reduce(
           (total, placement) => total + placement.evidenceSignalCount,
@@ -1464,32 +1603,15 @@ export default function ResourcesWorkspace({
         <DetailTabPanel tabsId={tabsId} tabId="properties" active>
           <ResourcePropertiesView
             resource={selectedResource}
-            selectedRuleId={selectedEvidenceId}
-            onSelectRule={(ruleId) => {
-              setSelectedEvidenceId(ruleId);
-              updateUrl({ tab: "properties", item: ruleId }, { history: "push" });
-            }}
-            onOpenTab={(tab) => {
-              setActiveTab(tab);
-              setSelectedEvidenceId("");
-              updateUrl({ tab, item: "" }, { history: "push" });
-            }}
-            onEditResource={() => openResourceEditor("edit")}
-            onScheduleReview={openReviewSchedule}
-            onCreateNote={() => openNotePromotion("create")}
-            onAttachExistingNote={() => openNotePromotion("existing")}
-            onAssociateProject={openProjectAssociation}
-            reviewTimingFeedback={
-              reviewScheduleFeedback?.resourceId === selectedResource.id
-                ? reviewScheduleFeedback.message
-                : undefined
-            }
+            editRequest={propertiesEditRequest}
+            onSaved={handleInlineSaved}
+            onArchived={handleArchived}
           />
         </DetailTabPanel>
       );
     }
 
-    if (activeTab !== "overview" && activeTab !== "source") return stagedTab(activeTab);
+    if (activeTab !== "source") return stagedTab(activeTab);
 
     if (activeTab === "source") {
       const sourceEvidence = selectedSourceEvidence || buildResourceSourceEvidenceReport(
@@ -2163,8 +2285,14 @@ export default function ResourcesWorkspace({
                   <DenseObjectRow
                     id={resource.id}
                     title={resource.title}
-                    description={`${resource.source.displayDomain || "Source not identified"} · ${TYPE_LABELS[resource.type]}`}
-                    metadata={[formatDate(resource.source.savedAt), ...resource.provenance.areas.slice(0, 2)].filter(Boolean).join(" · ")}
+                    leading={<ResourceMark gradient={resource.gradient} className={resourceStyles.directoryMark} />}
+                    description={resource.body || resource.metadata.description || (resource.source.canonicalUrl ? resource.source.canonicalUrl : "No description")}
+                    metadata={<span className={resourceStyles.directoryMeta}>
+                      {resource.source.canonicalUrl ? <span>{resource.source.displayDomain || resource.source.canonicalUrl}</span> : null}
+                      <span>Added {formatDate(resource.createdAt)}</span>
+                      <span>Last review {formatDate(resource.review.lastReviewedAt, "Not yet")}</span>
+                      <span>Next {formatDate(resource.review.nextReviewAt, "Not set")}</span>
+                    </span>}
                     trailing={
                       view === "needs-review" && queueItem ? (
                         <>
@@ -2205,30 +2333,22 @@ export default function ResourcesWorkspace({
                           </span>
                         </>
                       ) : (
-                        <>
-                          <strong>
-                            {resource.review.nextReviewAt
-                              ? `Review ${formatDate(resource.review.nextReviewAt)}`
-                              : displayLabel(resource.review.state)}
-                          </strong>
-                          <span>
-                            {resource.review.nextReviewAt
-                              ? formatResourceReviewCadence(resource.provenance.time.reviewCadence)
-                              : resource.source.canonicalUrl
-                                ? "URL unverified"
-                                : "URL missing"}
-                          </span>
-                        </>
+                        <span className={resourceStyles.typePill}>{TYPE_LABELS[resource.type]}</span>
                       )
                     }
+                    actions={<ResourceIconButton icon="star" label={resource.pinned ? "Unpin resource" : "Pin resource"} active={resource.pinned === true} onClick={() => {
+                      void createResourcesRepository().update(resource.id, { starred: !resource.pinned, expectedUpdatedAt: resource.updatedAt }).then((result) => {
+                        if (result.ok) handleInlineSaved(result.data);
+                      });
+                    }} />}
                     selected={selectedResource?.id === resource.id}
                     onSelect={() => selectResource(resource)}
                     className={
                       view === "needs-review" ||
                       view === "duplicate-urls" ||
                       linkedContextModule
-                        ? styles.reviewQueueRow
-                        : undefined
+                        ? `${styles.reviewQueueRow} ${resourceStyles.resourceRow}`
+                        : resourceStyles.resourceRow
                     }
                     key={resource.id}
                   />

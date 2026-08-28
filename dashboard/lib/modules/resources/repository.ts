@@ -12,6 +12,8 @@ import {
 } from "./legacy-adapter";
 import { normalizeResourceExternalUrl } from "./source-evidence";
 import type {
+  ResourceAutomationKind,
+  ResourceAutomationResult,
   ResourceCreateInput,
   ResourceRecord,
   ResourcesRepositoryError,
@@ -32,6 +34,7 @@ export type ResourcesRepository = {
   get(id: string): Promise<ResourcesRepositoryResult<ResourceRecord>>;
   create(input: ResourceCreateInput): Promise<ResourcesRepositoryResult<ResourceRecord>>;
   update(id: string, input: ResourceUpdateInput): Promise<ResourcesRepositoryResult<ResourceRecord>>;
+  runAutomation(id: string, kind: ResourceAutomationKind): Promise<ResourcesRepositoryResult<ResourceAutomationResult>>;
 };
 
 export type ResourcesRepositoryOptions = {
@@ -233,7 +236,11 @@ export function createResourcesRepository(
       const result = await requestRecords(fetcher, endpoint, {
         method: "PATCH",
         headers: buildJsonHeadersWithCsrf(),
-        body: JSON.stringify({ id: normalizedId, ...resourceUpdateInputToLegacy(input) })
+        body: JSON.stringify({
+          id: normalizedId,
+          ...resourceUpdateInputToLegacy(input),
+          ...(input.expectedUpdatedAt ? { expectedUpdatedAt: input.expectedUpdatedAt } : {})
+        })
       });
       if (!result.ok) return result;
 
@@ -243,6 +250,25 @@ export function createResourcesRepository(
       return updated
         ? { ok: true, data: updated }
         : failure("not_found", "The updated Resource was missing from the response", { status: 404 });
+    },
+
+    async runAutomation(id, kind) {
+      const normalizedId = id.trim();
+      if (!normalizedId) return failure("validation", "Resource id is required");
+      const result = await requestRecords(fetcher, "/api/resources/automations", {
+        method: "POST",
+        headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({ id: normalizedId, kind })
+      });
+      if (!result.ok) return result;
+      const resource = toResources(result.data).find((item) => item.id === normalizedId);
+      if (!resource) return failure("not_found", "The automated Resource was missing from the response", { status: 404 });
+      const run = kind === "url_health"
+        ? resource.automations.urlHealth
+        : kind === "duplicate_scan"
+          ? resource.automations.duplicateScan
+          : resource.automations.metadataRefresh;
+      return { ok: true, data: { resource, run } };
     }
   };
 }

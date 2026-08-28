@@ -74,6 +74,7 @@ export async function POST(request: Request) {
       relations: typeof body.relations === "object" && body.relations ? body.relations : {},
       time: typeof body.time === "object" && body.time ? body.time : {},
       profile: typeof body.profile === "object" && body.profile ? body.profile : {},
+      resourceProfile: typeof body.resourceProfile === "object" && body.resourceProfile ? body.resourceProfile : undefined,
       interaction: typeof body.interaction === "object" && body.interaction ? body.interaction : undefined
     });
 
@@ -141,6 +142,10 @@ export async function PATCH(request: Request) {
       profile:
         typeof body.profile === "object" && body.profile && !Array.isArray(body.profile)
           ? body.profile
+          : undefined,
+      resourceProfile:
+        typeof body.resourceProfile === "object" && body.resourceProfile && !Array.isArray(body.resourceProfile)
+          ? body.resourceProfile
           : undefined
     }, expectedUpdatedAt ? { expectedUpdatedAt } : undefined);
 

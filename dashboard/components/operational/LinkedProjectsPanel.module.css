@@ -13,6 +13,19 @@
   padding: 10px;
 }
 
+.panel[data-embedded="true"] {
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.panel[data-embedded="true"] .lifecycleSection {
+  padding-top: 0;
+  border-top: 0;
+}
+
 .header,
 .summary {
   display: flex;

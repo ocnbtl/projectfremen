@@ -17,6 +17,7 @@ export type DenseObjectRowProps = {
   leading?: ReactNode;
   metadata?: ReactNode;
   trailing?: ReactNode;
+  actions?: ReactNode;
   selected?: boolean;
   onSelect?: () => void;
   href?: string;
@@ -33,6 +34,7 @@ export default function DenseObjectRow({
   leading,
   metadata,
   trailing,
+  actions,
   selected = false,
   onSelect,
   href,
@@ -107,6 +109,7 @@ export default function DenseObjectRow({
           )}
         </button>
       )}
+      {actions && <div className="dense-object-row__actions">{actions}</div>}
     </div>
   );
 }

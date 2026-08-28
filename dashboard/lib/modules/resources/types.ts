@@ -1,5 +1,12 @@
 import type { MutationError, MutationResult } from "../../native-objects/mutation-result";
 import type { NativeObjectRef } from "../../native-objects/types";
+import type {
+  PersonalResourceAutomationRun,
+  PersonalResourceGradient,
+  PersonalResourceMetadata,
+  PersonalResourceProfile,
+  PersonalResourceTimelineEvent
+} from "../../personal-records-store";
 
 export type ResourceType =
   | "article"
@@ -36,6 +43,7 @@ export type ResourceReviewCadence =
   | "weekly"
   | "monthly"
   | "quarterly"
+  | "semiannual"
   | "annual"
   | "unknown";
 
@@ -44,6 +52,12 @@ export type ResourceFreshness = "stable" | "time_sensitive" | "stale" | "unknown
 export type ResourceHealthState = "ok" | "redirected" | "broken" | "unreachable" | "unknown";
 export type ResourceDuplicateState = "none" | "possible" | "confirmed" | "unknown";
 export type ResourceSnapshotState = "attached" | "missing" | "unknown";
+export type ResourceGradient = PersonalResourceGradient;
+export type ResourceMetadata = PersonalResourceMetadata;
+export type ResourceAutomationRun = PersonalResourceAutomationRun;
+export type ResourceTimelineEvent = PersonalResourceTimelineEvent;
+export type ResourceProfile = PersonalResourceProfile;
+export type ResourceAutomationKind = "url_health" | "duplicate_scan" | "metadata_refresh";
 
 export type ResourceLegacyStatus =
   | "idea"
@@ -229,11 +243,19 @@ export type ResourceRecord = {
   review: ResourceReviewSummary;
   citationCount: number | null;
   linkedObjectCount: number | null;
+  usefulness: number;
+  trust: number;
+  notes: string[];
+  gradient: ResourceGradient;
+  metadata: ResourceMetadata;
+  automations: ResourceProfile["automations"];
+  timeline: ResourceTimelineEvent[];
+  deletedAt: string | null;
   relations: ResourceRelations;
   createdAt: string;
   updatedAt: string;
-  readOnly: true;
-  migrationState: "legacy_unverified";
+  readOnly: boolean;
+  migrationState: "legacy_unverified" | "native_profile";
   provenance: ResourceLegacyProvenance;
 };
 
@@ -273,6 +295,13 @@ export type ResourceCreateInput = {
   body?: string;
   areas?: string[];
   subjects?: string[];
+  type?: ResourceType;
+  lifecycle?: ResourceLifecycleState;
+  sourceDomain?: string;
+  usefulness?: number;
+  trust?: number;
+  notes?: string[];
+  gradient?: ResourceGradient;
 };
 
 export type ResourceUpdateInput = {
@@ -283,6 +312,25 @@ export type ResourceUpdateInput = {
   subjects?: string[];
   reviewCadence?: string;
   nextReviewAt?: string;
+  type?: ResourceType;
+  lifecycle?: ResourceLifecycleState;
+  sourceDomain?: string;
+  usefulness?: number;
+  trust?: number;
+  notes?: string[];
+  gradient?: ResourceGradient;
+  metadata?: ResourceMetadata;
+  action?: "review" | "archive" | "restore";
+  archiveReason?: string;
+  starred?: boolean;
+  expectedUpdatedAt?: string;
+  deletedAt?: string;
+  timeline?: ResourceTimelineEvent[];
+};
+
+export type ResourceAutomationResult = {
+  resource: ResourceRecord;
+  run: ResourceAutomationRun;
 };
 
 export type ResourcesRepositoryError = MutationError;

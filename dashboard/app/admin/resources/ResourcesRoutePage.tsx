@@ -24,6 +24,8 @@ import {
 import { readReviewsState, toReviewRunView } from "../../../lib/modules/reviews/store";
 import type { ReviewsState } from "../../../lib/modules/reviews/types";
 import { readPersonalRecords, type PersonalRecord } from "../../../lib/personal-records-store";
+import { readNativeObjectLinks } from "../../../lib/native-objects/link-store";
+import { createNativeObjectRef } from "../../../lib/native-objects/routes";
 import { requireAdminSession } from "../../../lib/require-admin";
 
 export type ResourcesRouteMode = "index" | "detail";
@@ -50,7 +52,7 @@ export default async function ResourcesRoutePage({
   resourceId?: string;
 }) {
   await requireAdminSession();
-  const [recordsResult, ownerStateResults] = await Promise.all([
+  const [recordsResult, ownerStateResults, objectLinksResult] = await Promise.all([
     readPersonalRecords()
       .then((records) => ({ ok: true as const, records }))
       .catch((error: unknown) => ({
@@ -65,7 +67,8 @@ export default async function ResourcesRoutePage({
       readReviewsState(),
       readPersonalOpsState(),
       readNoteLinksState()
-    ] as const)
+    ] as const),
+    readNativeObjectLinks().then((items) => ({ ok: true as const, items })).catch(() => ({ ok: false as const, items: [] }))
   ]);
   const records: PersonalRecord[] = recordsResult.ok
     ? recordsResult.records
@@ -100,6 +103,31 @@ export default async function ResourcesRoutePage({
     )
   });
   const clientResources = resources.map(resourceForClient);
+  const objectTargets = [
+    ...records
+      .filter((record) => !record.archivedAt && ["person", "org", "note", "resource"].includes(record.className))
+      .map((record) => createNativeObjectRef({
+        module: record.className === "resource" ? "resources" : record.className === "note" ? "notes" : "people",
+        objectType: record.className === "org" ? "organization" : record.className,
+        objectId: record.id,
+        label: record.title,
+        versionId: record.updatedAt
+      })),
+    ...(projectsResult.status === "fulfilled" ? projectsResult.value.projects.filter((project) => project.lifecycle !== "archived").map((project) => createNativeObjectRef({
+      module: "projects",
+      objectType: "project",
+      objectId: project.id,
+      label: project.name,
+      versionId: project.updatedAt
+    })) : []),
+    ...(reviewsResult.status === "fulfilled" ? reviewsResult.value.runs.filter((run) => run.lifecycle !== "archived").map((run) => createNativeObjectRef({
+      module: "reviews",
+      objectType: "review_run",
+      objectId: run.id,
+      label: run.title,
+      versionId: run.updatedAt
+    })) : [])
+  ].sort((left, right) => left.label.localeCompare(right.label));
   if (!loadError && resourceId && !resources.some((resource) => resource.id === resourceId)) {
     notFound();
   }
@@ -153,6 +181,8 @@ export default async function ResourcesRoutePage({
             ? ""
             : "Reviews-owned context could not be loaded."
         }
+        initialObjectLinks={objectLinksResult.items}
+        initialObjectTargets={objectTargets}
         initialMode={mode}
         initialSelectedId={resourceId}
         initialLoadError={loadError}

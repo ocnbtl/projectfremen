@@ -1,408 +1,247 @@
 "use client";
 
-import MetricStrip from "../operational/MetricStrip";
-import QuickActionBar from "../operational/QuickActionBar";
-import SystemState from "../operational/SystemState";
-import type { ResourceRecord } from "../../lib/modules/resources/types";
-import styles from "../content-graph/ContentGraphWorkspace.module.css";
+import { useEffect, useMemo, useState, type PointerEvent } from "react";
+import { createResourcesRepository } from "../../lib/modules/resources/repository";
+import type { ResourceAutomationKind, ResourceGradient, ResourceLifecycleState, ResourceRecord, ResourceType } from "../../lib/modules/resources/types";
+import PersonalOpsIcon from "../personal-ops/PersonalOpsIcon";
+import { resourceGradientStyle } from "./ResourceVisual";
+import styles from "./ResourceExperience.module.css";
 
-type ResourcePropertyRule = {
-  id: string;
-  label: string;
-  summary: string;
-  appliesWhen: string;
-  preserves: readonly string[];
-  consequence: string;
+const RESOURCE_TYPES: ReadonlyArray<[ResourceType, string]> = [
+  ["article", "Article"], ["book", "Book"], ["contract_invoice", "Contract / Invoice"], ["dataset", "Dataset"],
+  ["document", "Document"], ["external_account", "External account"], ["tool", "Tool"], ["vendor", "Vendor"],
+  ["video_media", "Video / Media"], ["website", "Website"], ["unknown", "Unspecified"]
+];
+const LIFECYCLES: ReadonlyArray<[ResourceLifecycleState, string]> = [
+  ["active", "Active"], ["unavailable", "Unavailable"], ["replaced", "Replaced"], ["merged", "Merged"],
+  ["archived", "Archived"], ["unknown", "Unspecified"]
+];
+const CADENCES = [["NONE", "No cadence"], ["P1W", "Weekly"], ["P1M", "Monthly"], ["P3M", "Quarterly"], ["P6M", "Every six months"], ["P1Y", "Yearly"]] as const;
+const PATTERNS: ResourceGradient["pattern"][] = ["aurora", "linear", "radial", "conic"];
+
+type FormState = {
+  title: string;
+  url: string;
+  type: ResourceType;
+  lifecycle: ResourceLifecycleState;
+  sourceDomain: string;
+  cadence: string;
+  nextReviewAt: string;
+  usefulness: number;
+  trust: number;
+  gradient: ResourceGradient;
 };
 
-const PROPERTY_RULES: readonly ResourcePropertyRule[] = [
-  {
-    id: "archive-preserves-history",
-    label: "Archive preserves citations and linked history",
-    summary: "Archive changes source lifecycle while retaining source cards, citations, link evidence, provenance, and audit history.",
-    appliesWhen: "A Resource is cited, linked, or used as active evidence.",
-    preserves: ["Resource identity", "Citation references", "Owner-module links", "Last-known source metadata"],
-    consequence: "The source becomes read-only until restored; no linked object is deleted."
-  },
-  {
-    id: "replace-canonical-with-diff",
-    label: "Canonical replacement requires a diff",
-    summary: "A canonical URL change must preview identity, metadata, citation, and source-card consequences.",
-    appliesWhen: "A replacement URL is proposed for an existing Resource.",
-    preserves: ["Original URL provenance", "Resource ID", "Prior source metadata", "Existing Note wording"],
-    consequence: "Citation patches remain proposed until explicitly confirmed."
-  },
-  {
-    id: "merge-keeps-survivor",
-    label: "Duplicate merge keeps a canonical survivor",
-    summary: "A future merge must combine references and history without losing either source identity.",
-    appliesWhen: "A reviewed duplicate decision identifies one canonical surviving Resource.",
-    preserves: ["Both legacy IDs", "All provenance", "Relationship history", "Redirect mapping"],
-    consequence: "No exact URL match is auto-merged; ambiguous candidates remain separate."
-  },
-  {
-    id: "broken-source-retains-evidence",
-    label: "Broken source retains last-known evidence",
-    summary: "An unavailable source remains visible with last-known metadata, citations, and repair routing.",
-    appliesWhen: "A persisted URL-health result establishes an unreachable or broken source.",
-    preserves: ["Last-known metadata", "Citations", "Review evidence", "Fallback references"],
-    consequence: "A broken source does not invalidate authored Notes or silently archive the Resource."
-  }
-];
-
-function displayLabel(value: string): string {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (character) => character.toUpperCase());
+function formFor(resource: ResourceRecord): FormState {
+  return {
+    title: resource.title,
+    url: resource.source.canonicalUrl || "",
+    type: resource.type,
+    lifecycle: resource.lifecycleState,
+    sourceDomain: resource.source.displayDomain || "",
+    cadence: resource.provenance.time.reviewCadence || "NONE",
+    nextReviewAt: resource.review.nextReviewAt?.slice(0, 10) || "",
+    usefulness: resource.usefulness,
+    trust: resource.trust,
+    gradient: resource.gradient
+  };
 }
 
-function formatDate(value: string | null): string {
-  if (!value) return "Not recorded";
+function formatDate(value?: string | null, withTime = false) {
+  if (!value) return "Not yet";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "numeric",
-    year: "numeric"
-  }).format(date);
+  return new Intl.DateTimeFormat("en-US", withTime ? { dateStyle: "medium", timeStyle: "short" } : { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
-function currentPropertyRule(selectedId: string): ResourcePropertyRule {
-  return PROPERTY_RULES.find((rule) => rule.id === selectedId) || PROPERTY_RULES[0];
+function stateForCheck(value: string) {
+  if (["ok", "redirected", "none", "success"].includes(value)) return "pass";
+  if (["broken", "unreachable", "possible", "confirmed", "failed"].includes(value)) return "fail";
+  return "idle";
 }
 
-export default function ResourcePropertiesView({
-  resource,
-  selectedRuleId,
-  onSelectRule,
-  onOpenTab,
-  onEditResource,
-  onScheduleReview,
-  onCreateNote,
-  onAttachExistingNote,
-  onAssociateProject,
-  reviewTimingFeedback
-}: {
+function checkLabel(value: string, fallback: string) {
+  if (["ok", "redirected", "none", "success"].includes(value)) return value === "none" ? "Clear" : "Passed";
+  if (["broken", "unreachable", "possible", "confirmed", "failed"].includes(value)) return value === "possible" ? "Possible match" : "Needs attention";
+  return fallback;
+}
+
+export default function ResourcePropertiesView({ resource, editRequest = 0, onSaved, onArchived }: {
   resource: ResourceRecord;
-  selectedRuleId: string;
-  onSelectRule: (ruleId: string) => void;
-  onOpenTab: (tab: "source" | "links" | "notes" | "review") => void;
-  onEditResource: () => void;
-  onScheduleReview: () => void;
-  onCreateNote: () => void;
-  onAttachExistingNote: () => void;
-  onAssociateProject: () => void;
-  reviewTimingFeedback?: string;
+  editRequest?: number;
+  onSaved: (resource: ResourceRecord) => void;
+  onArchived: (resource: ResourceRecord) => void;
 }) {
-  const selectedRule = currentPropertyRule(selectedRuleId);
-  const sourceOpenable = Boolean(resource.source.canonicalUrl);
-  const snapshotVerified = resource.health.snapshotState === "attached";
-  const currentLifecycle = displayLabel(resource.lifecycleState);
-  const propertyMetrics = [
-    { id: "id", label: "Resource ID", value: resource.id, detail: "stable legacy mapping" },
-    { id: "owner", label: "Owner", value: "Not stored", detail: "no owner identity inferred", tone: "attention" as const },
-    { id: "lifecycle", label: "Lifecycle", value: currentLifecycle, detail: "adapter-derived only" },
-    {
-      id: "cadence",
-      label: "Review cadence",
-      value: resource.review.nextReviewAt ? displayLabel(resource.review.cadence) : "Not scheduled",
-      detail: "protected legacy timing"
-    },
-    { id: "citation", label: "Citation", value: resource.citationCount ?? "Not connected", detail: "no citation registry", tone: "attention" as const },
-    { id: "privacy", label: "Privacy", value: displayLabel(resource.provenance.privacy), detail: "legacy record privacy" },
-    { id: "automation", label: "Automation", value: "Not connected", detail: "no run or audit", tone: "attention" as const },
-    { id: "archive", label: "Archive rule", value: "Preserve", detail: "approved policy preview" }
+  const [form, setForm] = useState<FormState>(() => formFor(resource));
+  const [editing, setEditing] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [running, setRunning] = useState<ResourceAutomationKind | null>(null);
+  const [feedback, setFeedback] = useState<{ text: string; error?: boolean } | null>(null);
+  const changed = useMemo(() => JSON.stringify(form) !== JSON.stringify(formFor(resource)), [form, resource]);
+
+  useEffect(() => { setForm(formFor(resource)); setEditing(false); setFeedback(null); }, [resource.id]);
+  useEffect(() => { if (editRequest > 0) setEditing(true); }, [editRequest]);
+
+  function update<Key extends keyof FormState>(key: Key, value: FormState[Key]) {
+    setForm((current) => ({ ...current, [key]: value }));
+    setFeedback(null);
+  }
+
+  async function save() {
+    if (!form.title.trim() || busy) return;
+    setBusy(true);
+    setFeedback(null);
+    const result = await createResourcesRepository().update(resource.id, {
+      title: form.title, url: form.url, type: form.type, lifecycle: form.lifecycle, sourceDomain: form.sourceDomain,
+      reviewCadence: form.cadence, nextReviewAt: form.nextReviewAt, usefulness: form.usefulness, trust: form.trust,
+      gradient: form.gradient, expectedUpdatedAt: resource.updatedAt
+    });
+    setBusy(false);
+    if (!result.ok) return setFeedback({ text: result.error.message, error: true });
+    setForm(formFor(result.data));
+    setEditing(false);
+    setFeedback({ text: "Resource saved." });
+    onSaved(result.data);
+  }
+
+  async function runAutomation(kind: ResourceAutomationKind) {
+    if (running) return;
+    setRunning(kind);
+    setFeedback(null);
+    const result = await createResourcesRepository().runAutomation(resource.id, kind);
+    setRunning(null);
+    if (!result.ok) return setFeedback({ text: result.error.message, error: true });
+    onSaved(result.data.resource);
+    setForm(formFor(result.data.resource));
+    setFeedback({ text: result.data.run.message || "Automation finished.", error: result.data.run.status === "failed" });
+  }
+
+  async function archive() {
+    if (busy || !window.confirm("Archive this resource? Its links and history will stay intact.")) return;
+    setBusy(true);
+    const result = await createResourcesRepository().update(resource.id, { action: "archive", archiveReason: "Archived from Resources", expectedUpdatedAt: resource.updatedAt });
+    setBusy(false);
+    if (!result.ok) return setFeedback({ text: result.error.message, error: true });
+    onArchived(result.data);
+  }
+
+  function moveFocal(event: PointerEvent<HTMLDivElement>) {
+    if (!editing) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const focalX = Math.round(Math.min(100, Math.max(0, ((event.clientX - bounds.left) / bounds.width) * 100)));
+    const focalY = Math.round(Math.min(100, Math.max(0, ((event.clientY - bounds.top) / bounds.height) * 100)));
+    update("gradient", { ...form.gradient, focalX, focalY });
+  }
+
+  function updateColor(index: number, color: string) {
+    if (!/^#[0-9a-f]{6}$/i.test(color)) return;
+    update("gradient", { ...form.gradient, colors: form.gradient.colors.map((current, itemIndex) => itemIndex === index ? color.toUpperCase() : current) });
+  }
+
+  const automationRows = [
+    { kind: "url_health" as const, name: "URL health", run: resource.automations.urlHealth },
+    { kind: "duplicate_scan" as const, name: "Duplicate scan", run: resource.automations.duplicateScan },
+    { kind: "metadata_refresh" as const, name: "Metadata", run: resource.automations.metadataRefresh }
   ];
 
   return (
-    <div className={styles.propertiesSurface}>
-      <MetricStrip ariaLabel="Resource property summary" items={propertyMetrics} />
-
-      <div className={styles.propertiesBoundary}>
-        <strong>Properties control plane · live adapters and policy previews</strong>
-        <span>
-          Retained Resource fields, review timing, exact Note source handoffs, and Project associations use the existing
-          protected writers. Native owner assignment, lifecycle, citation policy, automation, and ResourceProperties
-          audit records remain unavailable.
-        </span>
+    <div className={styles.properties}>
+      <div className={styles.editBar}>
+        <h2>Resource properties</h2>
+        <div className={styles.editActions}>
+          {editing ? <>
+            <button type="button" className={styles.secondaryButton} disabled={busy} onClick={() => { setForm(formFor(resource)); setEditing(false); setFeedback(null); }}>Cancel</button>
+            <button type="button" className={styles.primaryButton} disabled={busy || !changed || !form.title.trim()} onClick={() => void save()}>{busy ? "Saving…" : "Save"}</button>
+          </> : <button type="button" className={styles.secondaryButton} onClick={() => setEditing(true)}>Edit Resource</button>}
+        </div>
       </div>
 
-      <div className={styles.propertiesGrid}>
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.eyebrow}>External identity</span>
-              <h2>Resource identity</h2>
-            </div>
-            <span className={styles.stateChip} data-tone="amber">Legacy mapped</span>
-          </div>
-          <div className={styles.factGrid}>
-            <div className={styles.fact}><span>User title</span><strong>{resource.title}</strong></div>
-            <div className={styles.fact}><span>Fetched source title</span><strong>{resource.source.sourceTitle || "Not fetched"}</strong></div>
-            <div className={styles.fact}><span>Resource type</span><strong>{displayLabel(resource.type)}</strong></div>
-            <div className={styles.fact}><span>Source domain</span><strong>{resource.source.displayDomain || "Not available"}</strong></div>
-            <div className={styles.fact}><span>Publisher</span><strong>{resource.source.publisher || "Not available"}</strong></div>
-            <div className={styles.fact}><span>Author</span><strong>{resource.source.author || "Not available"}</strong></div>
-            <div className={styles.fact}><span>Saved</span><strong>{formatDate(resource.source.savedAt)}</strong></div>
-            <div className={styles.fact}><span>Last fetched</span><strong>{formatDate(resource.source.lastFetchedAt)}</strong></div>
-            <div className={styles.fact} data-mono="true"><span>Resource ID</span><strong>{resource.id}</strong></div>
-            <div className={styles.fact}><span>Source / import ID</span><strong>{resource.source.sourceImportId || "Not available"}</strong></div>
-            <div className={styles.fact}><span>Capture method</span><strong>{displayLabel(resource.source.captureMethod)}</strong></div>
-            <div className={styles.fact}><span>Canonical state</span><strong>{displayLabel(resource.source.canonicalState)}</strong></div>
-          </div>
-          <QuickActionBar
-            ariaLabel="Resource identity navigation"
-            actions={[
-              { id: "edit-resource", label: "Edit retained fields", onSelect: onEditResource, intent: "primary" },
-              { id: "inspect-source", label: "Inspect source", onSelect: () => onOpenTab("source") },
-              { id: "refresh-metadata", label: "Refresh metadata", disabled: true, disabledReason: "No isolated fetch policy, metadata diff, persistence path, or audit writer is connected." }
-            ]}
-          />
-        </section>
+      {feedback ? <p className={styles.feedback} data-error={feedback.error || undefined} role="status">{feedback.text}</p> : null}
 
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.eyebrow}>Lifecycle</span>
-              <h2>Lifecycle state</h2>
-            </div>
-            <span className={styles.stateChip}>{currentLifecycle}</span>
-          </div>
-          <div className={styles.factGrid}>
-            <div className={styles.fact}><span>Active mapping</span><strong>{resource.lifecycleState === "active" ? "Yes · legacy active" : "Not established"}</strong></div>
-            <div className={styles.fact}><span>Pinned</span><strong>{resource.pinned === null ? "Not stored" : resource.pinned ? "Yes" : "No"}</strong></div>
-            <div className={styles.fact}><span>Archived</span><strong>{resource.lifecycleState === "archived" ? "Yes" : resource.lifecycleState === "active" ? "No" : "Unknown"}</strong></div>
-            <div className={styles.fact}><span>Review state</span><strong>{displayLabel(resource.review.state)}</strong></div>
-            <div className={styles.fact}><span>Usefulness</span><strong>{displayLabel(resource.review.usefulness)}</strong></div>
-            <div className={styles.fact}><span>Trust</span><strong>{displayLabel(resource.review.trustLevel)}</strong></div>
-            <div className={styles.fact}><span>Freshness</span><strong>{displayLabel(resource.review.freshness)}</strong></div>
-            <div className={styles.fact}><span>Confidence</span><strong>{displayLabel(resource.review.confidence)}</strong></div>
-            <div className={styles.fact}><span>Source health</span><strong>{resource.health.lastCheckedAt ? displayLabel(resource.health.state) : "Not checked"}</strong></div>
-            <div className={styles.fact}><span>Duplicate state</span><strong>{resource.health.duplicateState === "unknown" ? "Not scanned" : displayLabel(resource.health.duplicateState)}</strong></div>
-          </div>
-          <QuickActionBar
-            ariaLabel="Resource lifecycle actions"
-            actions={[
-              { id: "review-evidence", label: "Review evidence", onSelect: () => onOpenTab("review"), intent: "primary" },
-              { id: "preview-lifecycle", label: "Preview lifecycle", disabled: true, disabledReason: "Lifecycle previews require persisted citations, links, active-use evidence, retention rules, and a reversible archive contract." },
-              { id: "archive", label: "Archive", intent: "destructive", disabled: true, disabledReason: "Archive is unavailable until consequence preview, restore, actor, version, and append-only audit semantics are connected." }
-            ]}
-          />
-        </section>
+      <section className={styles.section}>
+        <header className={styles.sectionHeading}><div><PersonalOpsIcon name="resource" /><h3>Details</h3></div></header>
+        <div className={styles.fieldGrid}>
+          <label className={`${styles.field} ${styles.wide}`}><span>Title</span><input value={form.title} disabled={!editing} onChange={(event) => update("title", event.target.value)} /></label>
+          <label className={styles.field}><span>Type</span><select value={form.type} disabled={!editing} onChange={(event) => update("type", event.target.value as ResourceType)}>{RESOURCE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <label className={styles.field}><span>Lifecycle</span><select value={form.lifecycle} disabled={!editing} onChange={(event) => update("lifecycle", event.target.value as ResourceLifecycleState)}>{LIFECYCLES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <label className={`${styles.field} ${styles.wide}`}><span>URL</span><input type="url" value={form.url} disabled={!editing} placeholder="https://" onChange={(event) => update("url", event.target.value)} /></label>
+          <label className={`${styles.field} ${styles.wide}`}><span>Source domain <small>(optional)</small></span><input value={form.sourceDomain} disabled={!editing} placeholder="example.com" onChange={(event) => update("sourceDomain", event.target.value)} /></label>
+        </div>
+      </section>
 
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.eyebrow}>Operating cadence</span>
-              <h2>Review and cadence</h2>
-            </div>
-            <span className={styles.stateChip} data-tone={resource.review.nextReviewAt ? "green" : "amber"}>
-              {resource.review.nextReviewAt ? "Scheduled" : "Not scheduled"}
-            </span>
+      <section className={styles.section} data-tone="plum">
+        <header className={styles.sectionHeading}><div><PersonalOpsIcon name="palette" /><h3>Resource mark</h3></div><span>{form.gradient.colors.length} colors</span></header>
+        <div className={styles.gradientLayout}>
+          <div className={styles.gradientStage} style={resourceGradientStyle(form.gradient)} onPointerDown={moveFocal} onPointerMove={(event) => event.currentTarget.hasPointerCapture(event.pointerId) && moveFocal(event)} aria-label="Gradient focal point">
+            <span className={styles.gradientFocal} style={{ left: `${form.gradient.focalX}%`, top: `${form.gradient.focalY}%` }} />
           </div>
-          <div className={styles.factGrid}>
-            <div className={styles.fact}><span>Cadence</span><strong>{displayLabel(resource.review.cadence)}</strong></div>
-            <div className={styles.fact}><span>Next review</span><strong>{formatDate(resource.review.nextReviewAt)}</strong></div>
-            <div className={styles.fact}><span>Last reviewed</span><strong>{formatDate(resource.review.lastReviewedAt)}</strong></div>
-            <div className={styles.fact}><span>Review owner</span><strong>Not stored</strong></div>
-          </div>
-          <ul className={styles.propertyRows}>
-            <li><span><strong>Review triggers</strong><small>Active evidence and recurring queue</small></span><span className={styles.stateChip}>Not connected</span></li>
-            <li><span><strong>Stale-source conditions</strong><small>Canonical change, title drift, broken URL</small></span><span className={styles.stateChip}>Policy preview</span></li>
-            <li><span><strong>Metadata changes</strong><small>Create review issue and citation diff</small></span><span className={styles.stateChip}>No writer</span></li>
-            <li><span><strong>Escalation target</strong><small>Resource review evidence; Broken Links only after a health result</small></span><span className={styles.stateChip}>Route only</span></li>
-          </ul>
-          <QuickActionBar
-            actions={[
-              {
-                id: "set-cadence",
-                label: resource.review.nextReviewAt ? "Edit review timing" : "Schedule review",
-                onSelect: onScheduleReview,
-                intent: "primary"
-              },
-              {
-                id: "create-note",
-                label: "Create Note draft",
-                onSelect: sourceOpenable ? onCreateNote : undefined,
-                disabled: !sourceOpenable,
-                disabledReason: "A safe HTTP(S) Resource URL is required."
-              },
-              {
-                id: "attach-note",
-                label: "Attach to existing Note",
-                onSelect: sourceOpenable ? onAttachExistingNote : undefined,
-                disabled: !sourceOpenable,
-                disabledReason: "A safe HTTP(S) Resource URL is required."
-              }
-            ]}
-          />
-          {reviewTimingFeedback ? (
-            <div className={styles.sourceBoundary} role="status" aria-live="polite">
-              {reviewTimingFeedback}
+          <div className={styles.gradientControls}>
+            <div className={styles.patternRow} aria-label="Gradient pattern">
+              {PATTERNS.map((pattern) => <button type="button" key={pattern} disabled={!editing} data-active={form.gradient.pattern === pattern || undefined} onClick={() => update("gradient", { ...form.gradient, pattern })}>{pattern[0].toUpperCase() + pattern.slice(1)}</button>)}
             </div>
-          ) : null}
-        </section>
+            <div className={styles.colorList}>
+              {form.gradient.colors.map((color, index) => <div className={styles.colorRow} key={`${index}-${color}`}>
+                <input aria-label={`Color ${index + 1}`} type="color" value={color} disabled={!editing} onChange={(event) => updateColor(index, event.target.value)} />
+                <input aria-label={`Color ${index + 1} hex`} type="text" defaultValue={color} disabled={!editing} onBlur={(event) => updateColor(index, event.target.value)} />
+                <button type="button" aria-label={`Remove color ${index + 1}`} disabled={!editing || form.gradient.colors.length <= 2} onClick={() => update("gradient", { ...form.gradient, colors: form.gradient.colors.filter((_, itemIndex) => itemIndex !== index) })}><PersonalOpsIcon name="delete" /></button>
+              </div>)}
+            </div>
+            <button type="button" className={styles.addColor} disabled={!editing || form.gradient.colors.length >= 7} onClick={() => update("gradient", { ...form.gradient, colors: [...form.gradient.colors, "#D9CABD"] })}>+ Color</button>
+          </div>
+        </div>
+      </section>
 
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.eyebrow}>Note boundary</span>
-              <h2>Citation and extraction defaults</h2>
-            </div>
-            <span className={styles.stateChip} data-tone="purple">Approved behavior</span>
-          </div>
-          <ul className={styles.propertyRows}>
-            <li><span><strong>Citation storage</strong><small>Format remains an open product decision</small></span><span className={styles.stateChip}>Unresolved</span></li>
-            <li><span><strong>Quote / snippet policy</strong><small>Short source-derived excerpts only</small></span><span className={styles.stateChip}>Boundary</span></li>
-            <li><span><strong>Promotion</strong><small>Create or attach a Note through exact source evidence</small></span><span className={styles.stateChip} data-tone="green">Protected handoff</span></li>
-            <li><span><strong>Citation updates</strong><small>Preview per-Note patches and require confirmation</small></span><span className={styles.stateChip}>Explicit</span></li>
-          </ul>
-          <p>Resource source context never becomes authored Note wording silently.</p>
-          <QuickActionBar
-            actions={[
-              { id: "configure-citations", label: "Configure defaults", disabled: true, disabledReason: "Citation format, anchor storage, extraction policy, and Note insertion contracts are unresolved." },
-              { id: "search-notes", label: "Inspect Note evidence", onSelect: () => onOpenTab("notes") }
-            ]}
-          />
-        </section>
+      <section className={styles.section} data-tone="sand">
+        <header className={styles.sectionHeading}><div><PersonalOpsIcon name="review" /><h3>Freshness</h3></div></header>
+        <div className={styles.sliderGrid}>
+          <div className={styles.slider}><label>Usefulness<input type="range" min="1" max="10" value={form.usefulness} disabled={!editing} onChange={(event) => update("usefulness", Number(event.target.value))} /></label><output>{form.usefulness}</output></div>
+          <div className={styles.slider}><label>Trust<input type="range" min="1" max="10" value={form.trust} disabled={!editing} onChange={(event) => update("trust", Number(event.target.value))} /></label><output>{form.trust}</output></div>
+        </div>
+        <div className={styles.fieldGrid}>
+          <label className={styles.field}><span>Cadence</span><select value={form.cadence} disabled={!editing} onChange={(event) => update("cadence", event.target.value)}>{CADENCES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <label className={styles.field}><span>Next review</span><input type="date" value={form.nextReviewAt} disabled={!editing} onChange={(event) => update("nextReviewAt", event.target.value)} /></label>
+        </div>
+        <div className={styles.freshnessFacts}>
+          <div className={styles.fact}><span>Last review</span><strong>{formatDate(resource.review.lastReviewedAt)}</strong></div>
+          <div className={styles.fact}><span>Review state</span><strong>{resource.review.lastReviewedAt ? "Reviewed" : "Not reviewed"}</strong></div>
+          <div className={styles.fact}><span>Source health</span><strong className={styles.state} data-state={stateForCheck(resource.health.state)}><PersonalOpsIcon name={stateForCheck(resource.health.state) === "fail" ? "close" : "check"} />{checkLabel(resource.health.state, "Not checked")}</strong></div>
+          <div className={styles.fact}><span>Duplicates</span><strong className={styles.state} data-state={stateForCheck(resource.health.duplicateState)}><PersonalOpsIcon name={stateForCheck(resource.health.duplicateState) === "fail" ? "close" : "check"} />{checkLabel(resource.health.duplicateState, "Not checked")}</strong></div>
+        </div>
+      </section>
 
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.eyebrow}>Module ownership</span>
-              <h2>Link and relationship policies</h2>
-            </div>
-            <span className={styles.stateChip} data-tone="blue">Read-only contract</span>
-          </div>
-          <ul className={styles.propertyRows}>
-            <li><span><strong>Projects</strong><small>Source / evidence; Projects owns project state</small></span><span>reference</span></li>
-            <li><span><strong>Notes</strong><small>Citation / source; Notes owns authored body</small></span><span>reference</span></li>
-            <li><span><strong>Reviews</strong><small>Evidence input; Reviews owns ReviewRun state</small></span><span>reference</span></li>
-            <li><span><strong>Media</strong><small>Snapshot relation; Media owns the binary</small></span><span>reference</span></li>
-            <li><span><strong>Finance</strong><small>Vendor, pricing, or contract context only</small></span><span>reference</span></li>
-            <li><span><strong>People</strong><small>Author, owner, stakeholder, or expert context</small></span><span>reference</span></li>
-            <li><span><strong>Personal Ops</strong><small>Supporting context; Personal Ops owns action loops</small></span><span>reference</span></li>
-          </ul>
-          <QuickActionBar
-            actions={[
-              { id: "associate-project", label: "Associate Project", onSelect: onAssociateProject, intent: "primary" },
-              { id: "inspect-links", label: "Inspect link evidence", onSelect: () => onOpenTab("links") },
-              { id: "configure-links", label: "Configure policy", disabled: true, disabledReason: "Per-module ResourceLink policies and native ObjectLink persistence are not connected." }
-            ]}
-          />
-        </section>
+      <section className={styles.section} data-tone="slate">
+        <header className={styles.sectionHeading}><div><PersonalOpsIcon name="run" /><h3>Automation</h3></div></header>
+        <div className={styles.automationList}>
+          {automationRows.map((item) => {
+            const isRunning = running === item.kind;
+            const complete = !isRunning && item.run.status === "success";
+            return <div className={styles.automationRow} data-complete={complete || undefined} key={item.kind}>
+              <div className={styles.automationCopy}><strong>{item.name}</strong><span>{isRunning ? "Running…" : item.run.lastRunAt ? `${formatDate(item.run.lastRunAt, true)} · ${item.run.message || item.run.status}` : "Not run yet"}</span></div>
+              <button type="button" className={styles.runButton} disabled={Boolean(running)} onClick={() => void runAutomation(item.kind)}>{complete ? <PersonalOpsIcon name="check" /> : <PersonalOpsIcon name="run" />}{isRunning ? "Running" : "Run"}</button>
+              {(isRunning || item.run.lastRunAt) ? <div className={styles.progressTrack} aria-hidden="true"><div className={styles.progressBar} /></div> : null}
+            </div>;
+          })}
+        </div>
+      </section>
 
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.eyebrow}>Lifecycle impact</span>
-              <h2>Archive, replace, and merge</h2>
-            </div>
-            <span className={styles.stateChip} data-tone="amber">Preview only</span>
-          </div>
-          <div className={styles.propertyRuleList} role="list" aria-label="Resource lifecycle policy previews">
-            {PROPERTY_RULES.map((rule) => (
-              <button
-                type="button"
-                role="listitem"
-                className={styles.propertyRuleButton}
-                data-resource-property-rule={rule.id}
-                data-selected={selectedRule.id === rule.id || undefined}
-                aria-pressed={selectedRule.id === rule.id}
-                onClick={() => onSelectRule(rule.id)}
-                key={rule.id}
-              >
-                <strong>{rule.label}</strong>
-                <span>{rule.summary}</span>
-              </button>
-            ))}
-          </div>
-          <QuickActionBar
-            actions={[
-              { id: "duplicate-check", label: "Run duplicate check", disabled: true, disabledReason: "No duplicate job, reviewed decision, survivor mapping, or merge audit is connected." },
-              { id: "replace-canonical", label: "Replace canonical", disabled: true, disabledReason: "Canonical replacement requires a source diff and explicit citation-patch confirmation." }
-            ]}
-          />
-        </section>
+      <details className={`${styles.section} ${styles.metadataDetails}`}>
+        <summary>Properties</summary>
+        <div className={styles.metadataGrid}>
+          <div className={`${styles.fact} ${styles.wide}`}><span>Resource ID</span><strong>{resource.id}</strong></div>
+          <div className={styles.fact}><span>Created</span><strong>{formatDate(resource.createdAt, true)}</strong></div>
+          <div className={styles.fact}><span>Updated</span><strong>{formatDate(resource.updatedAt, true)}</strong></div>
+          <div className={styles.fact}><span>Last reviewed</span><strong>{formatDate(resource.review.lastReviewedAt, true)}</strong></div>
+          <div className={styles.fact}><span>Metadata fetched</span><strong>{formatDate(resource.metadata.fetchedAt, true)}</strong></div>
+          {Object.entries(resource.metadata).filter(([, value]) => value !== undefined && value !== "").map(([key, value]) => <div className={styles.fact} key={key}><span>{key.replace(/([A-Z])/g, " $1").replace(/^./, (character) => character.toUpperCase())}</span><strong>{String(value)}</strong></div>)}
+        </div>
+      </details>
 
-        <section className={`${styles.panel} ${styles.propertyRuleInspector}`} data-wide="true">
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.eyebrow}>Selected policy preview</span>
-              <h2>{selectedRule.label}</h2>
-            </div>
-            <span className={styles.stateChip} data-tone="amber">Not persisted</span>
-          </div>
-          <p>{selectedRule.summary}</p>
-          <div className={styles.factGrid}>
-            <div className={styles.fact}><span>Applies when</span><strong>{selectedRule.appliesWhen}</strong></div>
-            <div className={styles.fact}><span>Consequence</span><strong>{selectedRule.consequence}</strong></div>
-          </div>
-          <div>
-            <span className={styles.eyebrow}>Preserves</span>
-            <div className={styles.stateChips}>
-              {selectedRule.preserves.map((item) => <span className={styles.stateChip} data-tone="green" key={item}>{item}</span>)}
-            </div>
-          </div>
-          <SystemState
-            variant="read_only"
-            compact
-            title="Consequence policy is not executable"
-            description="This preview communicates the approved ownership boundary. It does not prove current citations, links, active use, retention, actor permission, rollback readiness, or an archive audit writer."
-          />
-        </section>
-
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.eyebrow}>External behavior</span>
-              <h2>Access and opening</h2>
-            </div>
-            <span className={styles.stateChip}>{sourceOpenable ? "Candidate available" : "No safe URL"}</span>
-          </div>
-          <div className={styles.factGrid}>
-            <div className={styles.fact}><span>Open behavior</span><strong>{sourceOpenable ? "New tab · user initiated" : "Unavailable"}</strong></div>
-            <div className={styles.fact}><span>Access state</span><strong>Not checked</strong></div>
-            <div className={styles.fact}><span>Paywall / login</span><strong>Unknown</strong></div>
-            <div className={styles.fact}><span>Privacy</span><strong>{displayLabel(resource.provenance.privacy)}</strong></div>
-            <div className={styles.fact}><span>Snapshot fallback</span><strong>{snapshotVerified ? "Verified relation" : "None verified"}</strong></div>
-            <div className={styles.fact}><span>If source breaks</span><strong>Preserve last-known metadata</strong></div>
-          </div>
-          {resource.source.canonicalUrl ? (
-            <a className={`${styles.button} ${styles.linkButton}`} data-primary="true" href={resource.source.canonicalUrl} target="_blank" rel="noreferrer">
-              Open source ↗
-            </a>
-          ) : null}
-          <QuickActionBar
-            actions={[
-              { id: "attach-snapshot", label: "Attach snapshot", disabled: true, disabledReason: "No approved Media snapshot write path, rights state, version, or native Resource-to-Media link persistence exists." }
-            ]}
-          />
-        </section>
-
-        <section className={styles.panel}>
-          <div className={styles.panelHeader}>
-            <div>
-              <span className={styles.eyebrow}>Automation</span>
-              <h2>Health and cleanup rules</h2>
-            </div>
-            <span className={styles.stateChip} data-tone="amber">Disconnected</span>
-          </div>
-          <ul className={styles.propertyRows}>
-            <li><span><strong>URL health checks</strong><small>Manual and scheduled reachability evidence</small></span><span className={styles.stateChip}>No job</span></li>
-            <li><span><strong>Duplicate scans</strong><small>On canonical change and import</small></span><span className={styles.stateChip}>No job</span></li>
-            <li><span><strong>Metadata refresh</strong><small>Diff before any identity patch</small></span><span className={styles.stateChip}>No job</span></li>
-            <li><span><strong>Review queue triggers</strong><small>Evidence gaps are derived locally in Needs Review</small></span><span className={styles.stateChip}>Read only</span></li>
-            <li><span><strong>Citation drift checks</strong><small>Would compare Note citations with confirmed source identity</small></span><span className={styles.stateChip}>No job</span></li>
-            <li><span><strong>Snapshot reminders</strong><small>Would route time-sensitive sources without a fallback</small></span><span className={styles.stateChip}>No job</span></li>
-            <li><span><strong>Broken-link handling</strong><small>Requires persisted health evidence before routing</small></span><span className={styles.stateChip}>No job</span></li>
-          </ul>
-          <QuickActionBar
-            actions={[
-              { id: "run-cleanup", label: "Run cleanup", disabled: true, disabledReason: "No automation definition, actor permission, source access policy, operation receipt, or audit path exists." },
-              { id: "edit-automation", label: "Configure automation", disabled: true, disabledReason: "Automation persistence and risk policy remain unresolved." }
-            ]}
-          />
-        </section>
-      </div>
+      <section className={styles.section} data-tone="danger">
+        <header className={styles.sectionHeading}><div><PersonalOpsIcon name="archive" /><h3>Archive</h3></div></header>
+        <p className={styles.archiveCopy}>Archiving removes this resource from active views while preserving its links, notes, metadata, and timeline.</p>
+        <button type="button" className={styles.archiveButton} disabled={busy || resource.lifecycleState === "archived"} onClick={() => void archive()}>{resource.lifecycleState === "archived" ? "Archived" : "Archive Resource"}</button>
+      </section>
     </div>
   );
 }

@@ -39,7 +39,14 @@ export type PersonalOpsIconName =
   | "open"
   | "person"
   | "object"
-  | "check";
+  | "check"
+  | "star"
+  | "more"
+  | "archive"
+  | "review"
+  | "run"
+  | "timeline"
+  | "resource";
 
 export const PERSONAL_OPS_ICON_LIBRARY: ReadonlyArray<{ name: PersonalOpsIconName; label: string }> = [
   { name: "today", label: "Today" },
@@ -82,7 +89,14 @@ export const PERSONAL_OPS_ICON_LIBRARY: ReadonlyArray<{ name: PersonalOpsIconNam
   { name: "open", label: "Open" },
   { name: "person", label: "Person" },
   { name: "object", label: "Object" },
-  { name: "check", label: "Complete" }
+  { name: "check", label: "Complete" },
+  { name: "star", label: "Star" },
+  { name: "more", label: "More" },
+  { name: "archive", label: "Archive" },
+  { name: "review", label: "Review" },
+  { name: "run", label: "Run" },
+  { name: "timeline", label: "Timeline" },
+  { name: "resource", label: "Resource" }
 ];
 
 export default function PersonalOpsIcon({ name, className }: { name: PersonalOpsIconName; className?: string }) {
@@ -137,5 +151,12 @@ export default function PersonalOpsIcon({ name, className }: { name: PersonalOps
   if (name === "open") return <svg {...common}><path d="M14 4h6v6M20 4l-9 9" /><path d="M18 13v5a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h5" /></svg>;
   if (name === "person") return <svg {...common}><circle cx="12" cy="8" r="3.5" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg>;
   if (name === "object") return <svg {...common}><path d="m12 3 8 4.5v9L12 21l-8-4.5v-9L12 3Z" /><path d="m4.5 7.8 7.5 4.3 7.5-4.3M12 12v9" /></svg>;
+  if (name === "star") return <svg {...common}><path d="m12 3 2.8 5.7 6.2.9-4.5 4.4 1.1 6.2-5.6-3-5.6 3 1.1-6.2L3 9.6l6.2-.9L12 3Z" /></svg>;
+  if (name === "more") return <svg {...common}><circle cx="5" cy="12" r="1.2" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none" /><circle cx="19" cy="12" r="1.2" fill="currentColor" stroke="none" /></svg>;
+  if (name === "archive") return <svg {...common}><path d="M4 7h16M6 7v12h12V7M5 4h14l1 3H4l1-3Z" /><path d="M9.5 11.5h5" /></svg>;
+  if (name === "review") return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="m8 12 2.5 2.5L16.5 8.5" /></svg>;
+  if (name === "run") return <svg {...common}><path d="m9 6 8 6-8 6V6Z" /></svg>;
+  if (name === "timeline") return <svg {...common}><path d="M7 4v16" /><circle cx="7" cy="7" r="2" /><circle cx="7" cy="15" r="2" /><path d="M11 7h8M11 15h6" /></svg>;
+  if (name === "resource") return <svg {...common}><path d="M7 3.5h8l4 4V20H7V3.5Z" /><path d="M15 3.5V8h4M10 12h6M10 16h5" /></svg>;
   return <svg {...common}><path d="m5 12 4.2 4.2L19 6.5" /></svg>;
 }

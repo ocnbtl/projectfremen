@@ -30,8 +30,11 @@ type LinkedProjectsPanelProps = {
   manageLifecycle?: boolean;
   manageHealth?: boolean;
   showHeader?: boolean;
+  showConnections?: boolean;
+  showLifecycleHeader?: boolean;
   showSummary?: boolean;
   showBoundary?: boolean;
+  embedded?: boolean;
   title?: string;
   ownerTab?: "people" | "notes-decisions" | "files-links";
   emptyDescription?: string;
@@ -90,8 +93,11 @@ export default function LinkedProjectsPanel({
   manageLifecycle = false,
   manageHealth = false,
   showHeader = true,
+  showConnections = true,
+  showLifecycleHeader = true,
   showSummary = true,
   showBoundary = true,
+  embedded = false,
   title = "Project involvement",
   ownerTab,
   emptyDescription,
@@ -258,6 +264,7 @@ export default function LinkedProjectsPanel({
         className={styles.panel}
         data-linked-projects={sourceKey}
         data-compact={compact || undefined}
+        data-embedded={embedded || undefined}
         aria-live="polite"
       >
         {showHeader && (
@@ -285,7 +292,7 @@ export default function LinkedProjectsPanel({
         {error && <p className={styles.error} role="alert">{error}</p>}
         {mutationNotice && <p className={styles.notice} role="status">{mutationNotice}</p>}
 
-        {visible.length ? (
+        {showConnections && (visible.length ? (
           <ul className={styles.list}>
             {visible.map((connection) => {
               const roles = [
@@ -325,7 +332,8 @@ export default function LinkedProjectsPanel({
                 : "No active typed Project association references this source object."
             )}
           </p>
-        )}
+        ))}
+        {!showConnections && managedLinks.length === 0 ? <p className={styles.empty}>None yet</p> : null}
 
         {showSummary && <div className={styles.summary}>
           <span>{sourceIdentity.module === "people"
@@ -336,7 +344,7 @@ export default function LinkedProjectsPanel({
 
         {manageLifecycle && managedLinks.length > 0 && (
           <section className={styles.lifecycleSection} aria-label="Project association lifecycle">
-            <header className={styles.lifecycleHeader}>
+            {showLifecycleHeader ? <header className={styles.lifecycleHeader}>
               <div>
                 <strong>Association lifecycle</strong>
                 <span>
@@ -344,7 +352,7 @@ export default function LinkedProjectsPanel({
                 </span>
               </div>
               <small>Managed by Projects</small>
-            </header>
+            </header> : null}
             <ul className={styles.lifecycleList}>
               {managedLinks.map(({ link, project }) => {
                 const projectName = project?.name || `Unavailable Project ${link.projectId}`;
@@ -364,6 +372,7 @@ export default function LinkedProjectsPanel({
                   <li
                     key={link.id}
                     className={styles.lifecycleRow}
+                    data-project-id={!showConnections ? link.projectId : undefined}
                     data-project-lifecycle-project-id={link.projectId}
                     data-project-link-id={link.id}
                     data-project-link-relationship={link.relationship}

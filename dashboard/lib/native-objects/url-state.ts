@@ -573,7 +573,7 @@ const RESOURCE_VIEWS = [
   "duplicate-urls"
 ] as const;
 const RESOURCE_SORTS = ["updated-desc", "updated-asc", "title", "review"] as const;
-const RESOURCE_TABS = ["overview", "source", "links", "notes", "review", "properties"] as const;
+const RESOURCE_TABS = ["overview", "timeline", "links", "properties", "source", "notes", "review"] as const;
 
 export type ResourcesUrlState = {
   view: (typeof RESOURCE_VIEWS)[number];
@@ -602,7 +602,18 @@ export const RESOURCES_URL_STATE_SCHEMA: UrlStateSchema<ResourcesUrlState> = {
     serialize: (value) => value.trim(),
     omit: (value) => value.trim() === ""
   },
-  tab: enumCodec("tab", RESOURCE_TABS, "overview"),
+  tab: {
+    param: "tab",
+    defaultValue: "overview",
+    parse(raw) {
+      if (raw === "source" || raw === "notes" || raw === "review") return "overview";
+      return raw && (RESOURCE_TABS as readonly string[]).includes(raw)
+        ? raw as ResourcesUrlState["tab"]
+        : undefined;
+    },
+    serialize: (value) => value,
+    omit: (value) => value === "overview"
+  },
   item: {
     param: "item",
     defaultValue: "",

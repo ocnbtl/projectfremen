@@ -9,6 +9,14 @@
   background: color-mix(in srgb, var(--surface, #fff) 96%, #edf4fb);
 }
 
+.panel[data-compact="true"] {
+  gap: 0.45rem;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
 .header,
 .summary {
   display: flex;

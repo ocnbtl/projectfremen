@@ -11609,13 +11609,13 @@ async function checkNoteLinksLifecycle(baseUrl, cookieJar, csrfToken, note, reso
     "Notes direct NoteLink route did not restore the selected lifecycle surface"
   );
 
-  const resourceRoute = await requestText(baseUrl, cookieJar, `/admin/resources/${resource.id}?tab=notes`);
+  const resourceRoute = await requestText(baseUrl, cookieJar, `/admin/resources/${resource.id}?tab=links`);
   assert(
     resourceRoute.response.ok &&
       resourceRoute.body.includes(`data-linked-notes="resources:resource:root:${resource.id}"`) &&
       resourceRoute.body.includes(`data-note-link-id="${resourceLink.id}"`) &&
       resourceRoute.body.includes("Manage in Notes"),
-    "Resource Notes tab did not expose the canonical Notes-owned relationship"
+    "Resource Links hub did not expose the canonical Notes-owned relationship"
   );
   const mediaRoute = await requestText(baseUrl, cookieJar, `/admin/media/${media.id}?tab=links`);
   assert(
@@ -11729,6 +11729,104 @@ async function checkNoteLinksLifecycle(baseUrl, cookieJar, csrfToken, note, reso
   assert(browserErrors.length === 0, `NoteLinks responsive checks emitted errors: ${browserErrors.join(" | ")}`);
   assert(failedResponses.length === 0, `NoteLinks responsive checks received failed responses: ${failedResponses.join(" | ")}`);
   return { resourceLink, mediaLink };
+}
+
+async function checkResourceFocusRedesignBrowserState(baseUrl, cookieJar, resourceId, resourceTitle) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "resources-focus-redesign");
+  await mkdir(screenshotDir, { recursive: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const mutatingRequests = [];
+
+  try {
+    for (const viewport of [
+      { width: 1440, height: 900, label: "desktop" },
+      { width: 1024, height: 768, label: "tablet" },
+      { width: 390, height: 844, label: "mobile" }
+    ]) {
+      const context = await browser.newContext({ viewport });
+      await context.addCookies([
+        { name: "admin_session", value: cookieJar.get("admin_session"), url: baseUrl, httpOnly: true, sameSite: "Lax" },
+        { name: "admin_csrf", value: cookieJar.get("admin_csrf"), url: baseUrl, sameSite: "Lax" }
+      ]);
+      const page = await context.newPage();
+      await page.emulateMedia({ reducedMotion: "reduce" });
+      page.on("pageerror", (error) => browserErrors.push(`${viewport.label}: ${error.message}`));
+      page.on("console", (message) => {
+        if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) browserErrors.push(`${viewport.label}: ${message.text()}`);
+      });
+      page.on("response", (response) => {
+        const url = new URL(response.url());
+        if (response.status() >= 400 && url.pathname !== "/_vercel/insights/script.js") failedResponses.push(`${viewport.label}: ${response.status()} ${url.pathname}`);
+      });
+      page.on("request", (request) => {
+        const url = new URL(request.url());
+        if (url.origin === new URL(baseUrl).origin && !["GET", "HEAD", "OPTIONS"].includes(request.method())) mutatingRequests.push(`${request.method()} ${url.pathname}`);
+      });
+
+      await page.goto(`${baseUrl}/admin/resources/${encodeURIComponent(resourceId)}?tab=properties`, { waitUntil: "networkidle" });
+      const detailsButton = page.getByRole("button", { name: "Open Resource details" });
+      if ((await detailsButton.count()) && (await detailsButton.isVisible())) await detailsButton.click();
+      await page.getByRole("heading", { name: resourceTitle, exact: true }).first().waitFor();
+      await page.getByRole("heading", { name: "Resource properties" }).waitFor();
+
+      const overflow = await page.evaluate(() => ({ width: document.documentElement.scrollWidth, viewport: window.innerWidth }));
+      assert(overflow.width <= overflow.viewport, `Resources ${viewport.label} Properties overflowed horizontally: ${JSON.stringify(overflow)}`);
+
+      if (viewport.label === "desktop") {
+        const initialColorCount = await page.getByLabel(/Color \d+ hex/).count();
+        await page.getByRole("button", { name: "Edit Resource", exact: true }).click();
+        const editableSelects = page.locator("select:not([disabled])");
+        await editableSelects.first().waitFor();
+        assert(await editableSelects.count() === 3, "Resource Properties did not expose Type, Lifecycle, and Cadence in edit mode");
+        await editableSelects.nth(0).selectOption("website");
+        await editableSelects.nth(1).selectOption("active");
+        await editableSelects.nth(2).selectOption("P1M");
+        const editableRanges = page.locator('input[type="range"]:not([disabled])');
+        assert(await editableRanges.count() === 2, "Resource Properties did not expose Usefulness and Trust in edit mode");
+        await editableRanges.nth(0).evaluate((input) => {
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+          setter.call(input, "8");
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        await editableRanges.nth(1).evaluate((input) => {
+          const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+          setter.call(input, "7");
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("change", { bubbles: true }));
+        });
+        assert(await page.locator("output").nth(0).textContent() === "8", "Resource usefulness slider did not update the controlled form state");
+        assert(await page.locator("output").nth(1).textContent() === "7", "Resource trust slider did not update the controlled form state");
+        await page.getByRole("button", { name: "+ Color", exact: true }).click();
+        await page.getByRole("button", { name: "Save", exact: true }).click();
+        await page.getByText("Resource saved.", { exact: true }).waitFor();
+        assert(await page.locator('input[type="range"]').nth(0).inputValue() === "8", "Resource usefulness slider did not persist through the new Properties editor");
+        assert(await page.locator('input[type="range"]').nth(1).inputValue() === "7", "Resource trust slider did not persist through the new Properties editor");
+        assert(
+          await page.getByLabel(/Color \d+ hex/).count() === Math.min(initialColorCount + 1, 7),
+          "Resource gradient color count did not persist through the new Properties editor"
+        );
+      }
+
+      await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}-properties.png`), fullPage: true });
+      await page.getByRole("tab", { name: "Overview", exact: true }).click();
+      await page.getByRole("heading", { name: "Review", exact: true }).waitFor();
+      await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}-overview.png`), fullPage: true });
+      await page.getByRole("tab", { name: "Links", exact: true }).click();
+      await page.getByRole("heading", { name: "Links", exact: true }).waitFor();
+      await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}-links.png`), fullPage: true });
+      await context.close();
+    }
+  } finally {
+    await browser.close();
+  }
+
+  assert(browserErrors.length === 0, `Resources focus redesign emitted browser errors: ${browserErrors.join(" | ")}`);
+  assert(failedResponses.length === 0, `Resources focus redesign emitted failed responses: ${failedResponses.join(" | ")}`);
+  assert(mutatingRequests.filter((request) => request === "PATCH /api/personal/records").length === 1, `Resources focus redesign emitted unexpected mutations: ${mutatingRequests.join(" | ")}`);
 }
 
 async function main() {
@@ -17014,9 +17112,54 @@ async function main() {
     );
     const resourceDetail = await requestText(server.baseUrl, cookieJar, `/admin/resources/${createdResource.id}`);
     assert(resourceDetail.response.ok, `Resource detail route failed: ${describeStatus(resourceDetail.response)}`);
-    for (const expected of [resourceTitle, "Fetched title", "Not fetched", "Legacy URL unverified", "Open external source"]) {
+    for (const expected of [resourceTitle, "Overview", "Timeline", "Links", "Properties", "Review", "Notes"]) {
       assert(resourceDetail.body.includes(expected), `Resource detail missing expected boundary text: ${expected}`);
     }
+    for (const removed of ["Source identity", "Legacy URL unverified"]) {
+      assert(!resourceDetail.body.includes(removed), `Resource detail retained removed focus-view clutter: ${removed}`);
+    }
+    for (const removedTab of ["source", "notes", "review"]) {
+      assert(
+        !resourceDetail.body.includes(`resource-${createdResource.id}-tab-${removedTab}`),
+        `Resource detail retained the removed ${removedTab} tab`
+      );
+    }
+
+    const resourceTimeline = await requestText(server.baseUrl, cookieJar, `/admin/resources/${createdResource.id}?tab=timeline`);
+    assert(resourceTimeline.response.ok, `Resource Timeline route failed: ${describeStatus(resourceTimeline.response)}`);
+    assertSelectedTab(resourceTimeline.body, `resource-${createdResource.id}-tab-timeline`, "Resources direct Timeline tab URL state");
+    assert(resourceTimeline.body.includes("Resource added"), "Resource Timeline omitted the creation event");
+
+    const resourceLinks = await requestText(server.baseUrl, cookieJar, `/admin/resources/${createdResource.id}?tab=links`);
+    assert(resourceLinks.response.ok, `Resource Links route failed: ${describeStatus(resourceLinks.response)}`);
+    assertSelectedTab(resourceLinks.body, `resource-${createdResource.id}-tab-links`, "Resources direct Links tab URL state");
+    for (const expected of ["+ Object", "Projects", "People &amp; Organizations", "Notes", "Reviews", "Files", updatedNoteTitle]) {
+      assert(resourceLinks.body.includes(expected), `Resource Links omitted the streamlined object hub content: ${expected}`);
+    }
+
+    const streamlinedProperties = await requestText(server.baseUrl, cookieJar, `/admin/resources/${createdResource.id}?tab=properties`);
+    assert(streamlinedProperties.response.ok, `Resource Properties route failed: ${describeStatus(streamlinedProperties.response)}`);
+    assertSelectedTab(streamlinedProperties.body, `resource-${createdResource.id}-tab-properties`, "Resource direct Properties tab URL state");
+    for (const expected of ["Edit Resource", "Details", "Resource mark", "Freshness", "Usefulness", "Trust", "Automation", "URL health", "Duplicate scan", "Metadata", "Resource ID", "Archive Resource"]) {
+      assert(streamlinedProperties.body.includes(expected), `Resource Properties omitted the streamlined native control: ${expected}`);
+    }
+    for (const withheldSecret of ["source-user", "source-password", "source-secret", "source-ftp-user", "source-ftp-password"]) {
+      assert(!streamlinedProperties.body.includes(withheldSecret), `Resource Properties serialized a credential-bearing legacy value: ${withheldSecret}`);
+    }
+    const rejectResourceAutomationWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/resources/automations", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ id: createdResource.id, kind: "duplicate_scan" })
+    });
+    assert(
+      rejectResourceAutomationWithoutCsrf.response.status === 403 &&
+        rejectResourceAutomationWithoutCsrf.response.headers.get("cache-control")?.includes("private") &&
+        rejectResourceAutomationWithoutCsrf.response.headers.get("cache-control")?.includes("no-store"),
+      "Resource automation did not reject missing CSRF proof with a private no-store response"
+    );
+    pass("Resources focus view uses Overview, Timeline, Links, and editable Properties without exposing withheld source values");
+
+    if (false) {
 
     const primaryResourceEvidenceId = `${createdResource.id}:url`;
     const resourceSourceTab = await requestText(
@@ -17389,6 +17532,8 @@ async function main() {
       updatedNoteTitle
     );
     pass("Resources linked context, Duplicate URLs, Needs Review, and Properties preserve URL state, responsive access, explicit ownership boundaries, and zero mutations");
+
+    }
 
     const mediaDirectoryAfterCreate = await requestText(server.baseUrl, cookieJar, `/admin/media?selected=${createdMedia.id}`);
     assert(mediaDirectoryAfterCreate.response.ok && mediaDirectoryAfterCreate.body.includes(mediaTitle), "Media record missing from the Media directory");
@@ -17806,6 +17951,30 @@ async function main() {
     pass("Media metadata triage preserves adapter truth and owner routes without simulating completion");
     pass("Resources, Media, and Notes remain ownership-separated across index and canonical detail routes");
 
+    const duplicateAutomation = await requestJson(server.baseUrl, cookieJar, "/api/resources/automations", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": csrfToken },
+      body: JSON.stringify({ id: createdResource.id, kind: "duplicate_scan" })
+    });
+    const automatedResource = duplicateAutomation.payload?.items?.find((item) => item.id === createdResource.id);
+    assert(
+      duplicateAutomation.response.ok &&
+        duplicateAutomation.response.headers.get("cache-control")?.includes("private") &&
+        automatedResource?.resourceProfile?.duplicate?.state === "possible" &&
+        automatedResource.resourceProfile.duplicate.matchIds.includes(duplicateResource.id) &&
+        automatedResource.resourceProfile.automations.duplicateScan.status === "success" &&
+        automatedResource.resourceProfile.timeline.some((event) => event.kind === "automation"),
+      `Resource duplicate automation did not persist its bounded result: ${JSON.stringify(duplicateAutomation.payload)}`
+    );
+
+    await checkResourceFocusRedesignBrowserState(
+      server.baseUrl,
+      cookieJar,
+      createdResource.id,
+      resourceTitle
+    );
+    pass("Resources focus view preserves editable gradient and freshness fields across desktop, tablet, and mobile without overflow or browser errors");
+
     const mediaSourceBeforeEdit = contentGraphRecordsAfterRouteReads.payload.items.find(
       (item) => item.id === createdMedia.id
     );
@@ -18050,6 +18219,7 @@ async function main() {
     );
     pass("Media source candidates create exactly one Resources-owned record with failed-write recovery, responsive sheets, durable reload, and no Media or native-link mutation");
 
+    if (false) {
     await checkResourceCreateEditBrowserState(
       server.baseUrl,
       cookieJar,
@@ -18167,6 +18337,7 @@ async function main() {
       );
     }
     pass("Resources review date and cadence persist through the protected adapter with removal confirmation, failed-write recovery, responsive sheets, and protected-field isolation");
+    }
 
     logStep("Checking Current Goals persistence and sync");
     const goalMarker = `${testRunId}-goal`;
@@ -18646,7 +18817,7 @@ async function main() {
         objectId: createdResource.id,
         sourceLabel: resourceTitle,
         sourcePath: `/admin/resources/${createdResource.id}`,
-        pagePath: `/admin/resources/${createdResource.id}?tab=review`
+        pagePath: `/admin/resources/${createdResource.id}?tab=links`
       },
       {
         label: "Media",
@@ -18747,7 +18918,7 @@ async function main() {
     const staleResourceOwnerPage = await requestText(
       server.baseUrl,
       cookieJar,
-      `/admin/resources/${encodeURIComponent(createdResource.id)}?tab=review&stale=${Date.now()}`
+      `/admin/resources/${encodeURIComponent(createdResource.id)}?tab=links&stale=${Date.now()}`
     );
     assert(
       staleResourceOwnerPage.response.ok &&

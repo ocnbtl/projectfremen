@@ -43,11 +43,36 @@ function lifecycleState(status: LegacyResourceRecord["status"]): {
   return { state: "unknown", mapping: "not_inferred" };
 }
 
+function gradientForLegacy(seed: string) {
+  const palettes = [
+    ["#193B42", "#86AEB0", "#E5D7C8"],
+    ["#292D4F", "#8076A3", "#D9CABD"],
+    ["#503542", "#B27C78", "#E9D7C6"],
+    ["#23413D", "#6F9B86", "#D8D0B4"]
+  ];
+  let hash = 0;
+  for (const character of seed) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0;
+  return {
+    pattern: "aurora" as const,
+    colors: palettes[Math.abs(hash) % palettes.length],
+    focalX: 48,
+    focalY: 42,
+    angle: Math.abs(hash) % 360
+  };
+}
+
+function numericLevel(value: number) {
+  if (value >= 8) return "high" as const;
+  if (value >= 4) return "medium" as const;
+  return "low" as const;
+}
+
 function reviewCadence(value?: string): ResourceReviewCadence {
   const normalized = value?.trim().toUpperCase();
   if (normalized === "P1W" || normalized === "WEEKLY") return "weekly";
   if (normalized === "P1M" || normalized === "MONTHLY") return "monthly";
   if (normalized === "P3M" || normalized === "QUARTERLY") return "quarterly";
+  if (normalized === "P6M" || normalized === "SEMIANNUAL") return "semiannual";
   if (normalized === "P1Y" || normalized === "ANNUAL" || normalized === "YEARLY") return "annual";
   if (normalized === "MANUAL") return "manual";
   return "unknown";
@@ -73,6 +98,21 @@ export function legacyPersonalRecordToResource(record: LegacyResourceRecord): Re
       : "missing";
   const lifecycle = lifecycleState(record.status);
   const relations = copyRelations(record);
+  const profile = record.resourceProfile;
+  const timeline = profile?.timeline || [{
+    id: `resource-created-${record.id}`,
+    kind: "created" as const,
+    title: "Resource added",
+    occurredAt: record.createdAt
+  }];
+  const lastReviewedAt = [...timeline]
+    .reverse()
+    .find((event) => event.kind === "reviewed")?.occurredAt || null;
+  const currentLifecycle = record.archivedAt
+    ? "archived"
+    : profile?.lifecycle || lifecycle.state;
+  const usefulness = profile?.usefulness ?? 5;
+  const trust = profile?.trust ?? 5;
 
   return {
     id: record.id,
@@ -84,54 +124,66 @@ export function legacyPersonalRecordToResource(record: LegacyResourceRecord): Re
     }),
     title: record.title,
     body: record.body,
-    type: "unknown",
-    lifecycleState: lifecycle.state,
-    pinned: null,
+    type: profile?.resourceType || "unknown",
+    lifecycleState: currentLifecycle,
+    pinned: record.starred === true,
     source: {
       canonicalUrl,
       canonicalState,
-      sourceTitle: null,
+      sourceTitle: profile?.metadata.title || null,
       sourceTitleState: "not_available",
-      displayDomain: primaryEvidence?.displayDomain || null,
-      publisher: null,
-      author: null,
-      publishedAt: null,
+      displayDomain: profile?.sourceDomain || primaryEvidence?.displayDomain || null,
+      publisher: profile?.metadata.siteName || null,
+      author: profile?.metadata.author || null,
+      publishedAt: profile?.metadata.publishedAt || null,
       savedAt: record.createdAt,
-      lastFetchedAt: null,
+      lastFetchedAt: profile?.metadata.fetchedAt || null,
       sourceImportId: null,
       captureMethod: "legacy_unknown",
       candidates,
       evidence
     },
     health: {
-      state: "unknown",
-      httpStatus: null,
-      lastCheckedAt: null,
-      redirectTarget: null,
-      duplicateState: "unknown",
+      state: profile?.health.state || "unknown",
+      httpStatus: profile?.health.httpStatus ?? null,
+      lastCheckedAt: profile?.health.lastCheckedAt || null,
+      redirectTarget: profile?.health.redirectTarget || null,
+      duplicateState: profile?.duplicate.state || "unknown",
       snapshotState: "unknown"
     },
     review: {
       state: "unknown",
       cadence: reviewCadence(record.time.reviewCadence),
-      usefulness: "unknown",
-      trustLevel: "unknown",
+      usefulness: numericLevel(usefulness),
+      trustLevel: numericLevel(trust),
       freshness: "unknown",
       confidence: "unknown",
       // The legacy normalizer may synthesize review dates from createdAt, so
       // last review remains provenance-only until an explicit review record
       // exists. nextReview is exposed strictly as legacy-backed queue timing;
       // it never establishes review completion.
-      lastReviewedAt: null,
+      lastReviewedAt,
       nextReviewAt: record.time.nextReview || null
     },
     citationCount: null,
     linkedObjectCount: null,
+    usefulness,
+    trust,
+    notes: profile?.notes || [],
+    gradient: profile?.gradient || gradientForLegacy(record.id),
+    metadata: profile?.metadata || {},
+    automations: profile?.automations || {
+      urlHealth: { status: "idle" },
+      duplicateScan: { status: "idle" },
+      metadataRefresh: { status: "idle" }
+    },
+    timeline,
+    deletedAt: profile?.deletedAt || null,
     relations,
     createdAt: record.createdAt,
     updatedAt: record.updatedAt,
-    readOnly: true,
-    migrationState: "legacy_unverified",
+    readOnly: false,
+    migrationState: profile ? "native_profile" : "legacy_unverified",
     provenance: {
       kind: "legacy_personal_record",
       recordId: record.id,
@@ -188,7 +240,17 @@ export function resourceCreateInputToLegacy(input: ResourceCreateInput): Persona
     url: input.url.trim(),
     areas: input.areas?.map((item) => item.trim()).filter(Boolean),
     subjects: input.subjects?.map((item) => item.trim()).filter(Boolean),
-    intents: ["retain"]
+    intents: ["retain"],
+    resourceProfile: {
+      version: 1,
+      resourceType: input.type || "unknown",
+      lifecycle: input.lifecycle || "active",
+      sourceDomain: input.sourceDomain?.trim(),
+      usefulness: input.usefulness ?? 5,
+      trust: input.trust ?? 5,
+      notes: input.notes || [],
+      ...(input.gradient ? { gradient: input.gradient } : {})
+    }
   };
 }
 
@@ -200,6 +262,21 @@ export function resourceUpdateInputToLegacy(input: ResourceUpdateInput): Persona
     url: input.url?.trim(),
     areas: input.areas?.map((item) => item.trim()).filter(Boolean),
     subjects: input.subjects?.map((item) => item.trim()).filter(Boolean),
+    action: input.action,
+    archiveReason: input.archiveReason,
+    starred: input.starred,
+    resourceProfile: {
+      ...(input.type !== undefined ? { resourceType: input.type } : {}),
+      ...(input.lifecycle !== undefined ? { lifecycle: input.lifecycle } : {}),
+      ...(input.sourceDomain !== undefined ? { sourceDomain: input.sourceDomain } : {}),
+      ...(input.usefulness !== undefined ? { usefulness: input.usefulness } : {}),
+      ...(input.trust !== undefined ? { trust: input.trust } : {}),
+      ...(input.notes !== undefined ? { notes: input.notes } : {}),
+      ...(input.gradient !== undefined ? { gradient: input.gradient } : {}),
+      ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+      ...(input.deletedAt !== undefined ? { deletedAt: input.deletedAt } : {}),
+      ...(input.timeline !== undefined ? { timeline: input.timeline } : {})
+    },
     time: hasTimeUpdate
       ? {
           reviewCadence: input.reviewCadence,

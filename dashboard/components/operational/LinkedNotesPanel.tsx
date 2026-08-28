@@ -20,7 +20,8 @@ export default function LinkedNotesPanel({
   error,
   onRefresh,
   limit = 5,
-  title = "Notes using this object"
+  title = "Notes using this object",
+  compact = false
 }: {
   source: NativeObjectRef;
   state: NoteLinksState;
@@ -29,6 +30,7 @@ export default function LinkedNotesPanel({
   onRefresh: () => void;
   limit?: number;
   title?: string;
+  compact?: boolean;
 }) {
   const links = state.links
     .filter((link) => sameNoteLinkTarget(link.targetRef, source))
@@ -39,12 +41,13 @@ export default function LinkedNotesPanel({
   return (
     <section
       className={styles.panel}
+      data-compact={compact ? "true" : undefined}
       data-linked-notes={sourceKey(source)}
       data-source-module={source.module}
       data-source-object-id={source.objectId}
       aria-live="polite"
     >
-      <header className={styles.header}>
+      {!compact ? <header className={styles.header}>
         <div>
           <span>Notes owner</span>
           <strong>{title}</strong>
@@ -52,7 +55,7 @@ export default function LinkedNotesPanel({
         <button type="button" onClick={onRefresh} disabled={loading}>
           {loading ? "Refreshing..." : "Refresh links"}
         </button>
-      </header>
+      </header> : null}
 
       {error && <p className={styles.error} role="alert">{error}</p>}
       {visible.length ? (
@@ -80,17 +83,17 @@ export default function LinkedNotesPanel({
         <p className={styles.empty}>
           {error
             ? "Current NoteLink state is unavailable. Refresh before assuming this object is unlinked."
-            : "No Notes-owned link targets this exact object."}
+            : compact ? "None yet" : "No Notes-owned link targets this exact object."}
         </p>
       )}
 
-      <div className={styles.summary}>
+      {!compact ? <div className={styles.summary}>
         <span>{error ? "Last loaded: " : ""}{links.length} total - {attention} need attention</span>
         {links.length > visible.length && <span>{links.length - visible.length} more in Notes</span>}
-      </div>
-      <p className={styles.boundary}>
+      </div> : null}
+      {!compact ? <p className={styles.boundary}>
         Notes owns these relationships. This {source.module === "resources" ? "Resource" : "Media object"} keeps its native lifecycle and content.
-      </p>
+      </p> : null}
     </section>
   );
 }

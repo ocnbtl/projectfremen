@@ -26,7 +26,8 @@ export default function LinkedReviewsPanel({
   initialError = "",
   title = "ReviewRun context",
   className = "",
-  wide = true
+  wide = true,
+  compact = false
 }: {
   source: NativeObjectRef;
   initialReviewViews: ReviewRunView[];
@@ -34,6 +35,7 @@ export default function LinkedReviewsPanel({
   title?: string;
   className?: string;
   wide?: boolean;
+  compact?: boolean;
 }) {
   const repository = useMemo(() => createReviewsRepository(), []);
   const [reviewViews, setReviewViews] = useState(initialReviewViews);
@@ -70,10 +72,11 @@ export default function LinkedReviewsPanel({
       data-source-module={source.module}
       data-source-object-id={source.objectId}
       data-wide={wide || undefined}
+      data-compact={compact ? "true" : undefined}
       aria-live="polite"
       aria-busy={loading || undefined}
     >
-      <header className={styles.header}>
+      {!compact ? <header className={styles.header}>
         <div className={styles.heading}>
           <span>Reviews owner</span>
           <strong>{title}</strong>
@@ -93,7 +96,16 @@ export default function LinkedReviewsPanel({
             Link in Reviews
           </Link>
         </div>
-      </header>
+      </header> : (
+        <Link
+          className={styles.compactAction}
+          href={buildReviewSourceHandoffRoute(source)}
+          aria-label="Link in Reviews"
+          title="Link in Reviews"
+        >
+          <span aria-hidden="true">+</span>
+        </Link>
+      )}
 
       {error && (
         <p className={styles.error} role="alert">
@@ -138,13 +150,13 @@ export default function LinkedReviewsPanel({
         <p className={styles.empty}>
           {error
             ? "Current ReviewRun ownership could not be confirmed."
-            : "No ReviewRun uses this exact source. Link it only after selecting the owning run in Reviews."}
+            : compact ? "None yet" : "No ReviewRun uses this exact source. Link it only after selecting the owning run in Reviews."}
         </p>
       )}
 
-      <p className={styles.boundary}>
+      {!compact ? <p className={styles.boundary}>
         Reviews owns run lifecycle, checklist, evidence use, completion blockers, and audit. This module owns its local readiness state.
-      </p>
+      </p> : null}
     </section>
   );
 }

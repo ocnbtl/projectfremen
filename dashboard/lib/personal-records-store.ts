@@ -91,6 +91,83 @@ export type PersonalRecordTime = {
   processedOn?: string;
 };
 
+export type PersonalResourceGradient = {
+  pattern: "linear" | "radial" | "conic" | "aurora";
+  colors: string[];
+  focalX: number;
+  focalY: number;
+  angle: number;
+};
+
+export type PersonalResourceMetadata = {
+  title?: string;
+  description?: string;
+  canonicalUrl?: string;
+  siteName?: string;
+  language?: string;
+  contentType?: string;
+  imageUrl?: string;
+  author?: string;
+  publishedAt?: string;
+  fetchedAt?: string;
+  httpStatus?: number;
+};
+
+export type PersonalResourceAutomationRun = {
+  status: "idle" | "success" | "failed";
+  lastRunAt?: string;
+  message?: string;
+};
+
+export type PersonalResourceTimelineEvent = {
+  id: string;
+  kind: "created" | "updated" | "reviewed" | "linked" | "automation" | "archived";
+  title: string;
+  detail?: string;
+  occurredAt: string;
+};
+
+export type PersonalResourceProfile = {
+  version: 1;
+  resourceType:
+    | "article"
+    | "website"
+    | "tool"
+    | "vendor"
+    | "document"
+    | "dataset"
+    | "video_media"
+    | "book"
+    | "contract_invoice"
+    | "external_account"
+    | "unknown";
+  lifecycle: "active" | "archived" | "unavailable" | "merged" | "replaced" | "unknown";
+  sourceDomain?: string;
+  deletedAt?: string;
+  usefulness: number;
+  trust: number;
+  notes: string[];
+  gradient: PersonalResourceGradient;
+  metadata: PersonalResourceMetadata;
+  health: {
+    state: "ok" | "redirected" | "broken" | "unreachable" | "unknown";
+    httpStatus?: number;
+    lastCheckedAt?: string;
+    redirectTarget?: string;
+  };
+  duplicate: {
+    state: "none" | "possible" | "confirmed" | "unknown";
+    lastCheckedAt?: string;
+    matchIds: string[];
+  };
+  automations: {
+    urlHealth: PersonalResourceAutomationRun;
+    duplicateScan: PersonalResourceAutomationRun;
+    metadataRefresh: PersonalResourceAutomationRun;
+  };
+  timeline: PersonalResourceTimelineEvent[];
+};
+
 export type PersonalMemoryEntry = {
   id: string;
   text: string;
@@ -237,6 +314,7 @@ export type PersonalRecord = {
   relations: PersonalRecordRelations;
   time: PersonalRecordTime;
   profile?: PersonalContactProfile;
+  resourceProfile?: PersonalResourceProfile;
   interaction?: PersonalInteractionDetails;
   createdMeta: PersonalRecordCreatedMeta;
   createdAt: string;
@@ -268,6 +346,7 @@ export type PersonalRecordInput = {
   relations?: Partial<PersonalRecordRelations>;
   time?: PersonalRecordTime;
   profile?: Partial<PersonalContactProfile>;
+  resourceProfile?: Partial<PersonalResourceProfile>;
   interaction?: Partial<PersonalInteractionDetails>;
 };
 
@@ -281,6 +360,7 @@ export type PersonalRecordPatch = Partial<
   archiveReason?: string;
   time?: Partial<PersonalRecordTime>;
   profile?: Partial<PersonalContactProfile>;
+  resourceProfile?: Partial<PersonalResourceProfile>;
 };
 
 const FILE_NAME = "personal-records.json";
@@ -1449,6 +1529,208 @@ function sanitizeList(values: string[] | undefined, limit = 24): string[] {
   return next.slice(0, limit);
 }
 
+const RESOURCE_TYPES: PersonalResourceProfile["resourceType"][] = [
+  "article", "website", "tool", "vendor", "document", "dataset", "video_media",
+  "book", "contract_invoice", "external_account", "unknown"
+];
+const RESOURCE_LIFECYCLES: PersonalResourceProfile["lifecycle"][] = [
+  "active", "archived", "unavailable", "merged", "replaced", "unknown"
+];
+const RESOURCE_GRADIENT_PATTERNS: PersonalResourceGradient["pattern"][] = [
+  "linear", "radial", "conic", "aurora"
+];
+const RESOURCE_HEALTH_STATES: PersonalResourceProfile["health"]["state"][] = [
+  "ok", "redirected", "broken", "unreachable", "unknown"
+];
+const RESOURCE_DUPLICATE_STATES: PersonalResourceProfile["duplicate"]["state"][] = [
+  "none", "possible", "confirmed", "unknown"
+];
+const RESOURCE_AUTOMATION_STATES: PersonalResourceAutomationRun["status"][] = [
+  "idle", "success", "failed"
+];
+const RESOURCE_EVENT_KINDS: PersonalResourceTimelineEvent["kind"][] = [
+  "created", "updated", "reviewed", "linked", "automation", "archived"
+];
+const RESOURCE_GRADIENT_SETS = [
+  ["#193b42", "#86aeb0", "#e5d7c8"],
+  ["#292d4f", "#8076a3", "#d9cabd"],
+  ["#503542", "#b27c78", "#e9d7c6"],
+  ["#23413d", "#6f9b86", "#d8d0b4"]
+] as const;
+
+function clampNumber(value: unknown, fallback: number, min: number, max: number): number {
+  const number = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : fallback;
+}
+
+function cleanOptionalText(value: unknown, limit = 500): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const clean = value.trim().slice(0, limit);
+  return clean || undefined;
+}
+
+function cleanIso(value: unknown): string | undefined {
+  const clean = cleanOptionalText(value, 80);
+  return clean && Number.isFinite(Date.parse(clean)) ? new Date(clean).toISOString() : undefined;
+}
+
+function defaultResourceGradient(seed: string): PersonalResourceGradient {
+  let hash = 0;
+  for (const character of seed) hash = ((hash << 5) - hash + character.charCodeAt(0)) | 0;
+  const colors = RESOURCE_GRADIENT_SETS[Math.abs(hash) % RESOURCE_GRADIENT_SETS.length];
+  return {
+    pattern: "aurora",
+    colors: [...colors],
+    focalX: 48,
+    focalY: 42,
+    angle: Math.abs(hash) % 360
+  };
+}
+
+function normalizeResourceGradient(raw: unknown, seed: string): PersonalResourceGradient {
+  const fallback = defaultResourceGradient(seed);
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return fallback;
+  const value = raw as Partial<PersonalResourceGradient>;
+  const colors = Array.isArray(value.colors)
+    ? value.colors
+        .filter((color): color is string => typeof color === "string" && /^#[0-9a-f]{6}$/i.test(color.trim()))
+        .map((color) => color.toUpperCase())
+        .slice(0, 7)
+    : [];
+  return {
+    pattern: RESOURCE_GRADIENT_PATTERNS.includes(value.pattern as PersonalResourceGradient["pattern"])
+      ? value.pattern as PersonalResourceGradient["pattern"]
+      : fallback.pattern,
+    colors: colors.length >= 2 ? colors : fallback.colors,
+    focalX: clampNumber(value.focalX, fallback.focalX, 0, 100),
+    focalY: clampNumber(value.focalY, fallback.focalY, 0, 100),
+    angle: clampNumber(value.angle, fallback.angle, 0, 360)
+  };
+}
+
+function normalizeResourceAutomationRun(raw: unknown): PersonalResourceAutomationRun {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return { status: "idle" };
+  const value = raw as Partial<PersonalResourceAutomationRun>;
+  return {
+    status: RESOURCE_AUTOMATION_STATES.includes(value.status as PersonalResourceAutomationRun["status"])
+      ? value.status as PersonalResourceAutomationRun["status"]
+      : "idle",
+    lastRunAt: cleanIso(value.lastRunAt),
+    message: cleanOptionalText(value.message, 240)
+  };
+}
+
+function normalizeResourceProfile(
+  raw: unknown,
+  seed: string,
+  createdAt: string
+): PersonalResourceProfile | undefined {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return undefined;
+  const value = raw as Partial<PersonalResourceProfile>;
+  const metadata = value.metadata && typeof value.metadata === "object" && !Array.isArray(value.metadata)
+    ? value.metadata
+    : {};
+  const health: Partial<PersonalResourceProfile["health"]> = value.health && typeof value.health === "object" && !Array.isArray(value.health)
+    ? value.health
+    : {};
+  const duplicate: Partial<PersonalResourceProfile["duplicate"]> = value.duplicate && typeof value.duplicate === "object" && !Array.isArray(value.duplicate)
+    ? value.duplicate
+    : {};
+  const automations: Partial<PersonalResourceProfile["automations"]> = value.automations && typeof value.automations === "object" && !Array.isArray(value.automations)
+    ? value.automations
+    : {};
+  const timeline = Array.isArray(value.timeline)
+    ? value.timeline.flatMap((event) => {
+        if (!event || typeof event !== "object" || Array.isArray(event)) return [];
+        const candidate = event as Partial<PersonalResourceTimelineEvent>;
+        const title = cleanOptionalText(candidate.title, 160);
+        const occurredAt = cleanIso(candidate.occurredAt);
+        if (!title || !occurredAt || !RESOURCE_EVENT_KINDS.includes(candidate.kind as PersonalResourceTimelineEvent["kind"])) return [];
+        return [{
+          id: cleanOptionalText(candidate.id, 100) || `resource-event-${crypto.randomUUID()}`,
+          kind: candidate.kind as PersonalResourceTimelineEvent["kind"],
+          title,
+          detail: cleanOptionalText(candidate.detail, 500),
+          occurredAt
+        }];
+      }).slice(-100)
+    : [];
+  return {
+    version: 1,
+    resourceType: RESOURCE_TYPES.includes(value.resourceType as PersonalResourceProfile["resourceType"])
+      ? value.resourceType as PersonalResourceProfile["resourceType"]
+      : "unknown",
+    lifecycle: RESOURCE_LIFECYCLES.includes(value.lifecycle as PersonalResourceProfile["lifecycle"])
+      ? value.lifecycle as PersonalResourceProfile["lifecycle"]
+      : "active",
+    sourceDomain: cleanOptionalText(value.sourceDomain, 160),
+    deletedAt: cleanIso(value.deletedAt),
+    usefulness: Math.round(clampNumber(value.usefulness, 5, 1, 10)),
+    trust: Math.round(clampNumber(value.trust, 5, 1, 10)),
+    notes: sanitizeList(Array.isArray(value.notes) ? value.notes.filter((item): item is string => typeof item === "string") : [], 40),
+    gradient: normalizeResourceGradient(value.gradient, seed),
+    metadata: {
+      title: cleanOptionalText(metadata.title, 240),
+      description: cleanOptionalText(metadata.description, 800),
+      canonicalUrl: cleanOptionalText(metadata.canonicalUrl, 2048),
+      siteName: cleanOptionalText(metadata.siteName, 240),
+      language: cleanOptionalText(metadata.language, 40),
+      contentType: cleanOptionalText(metadata.contentType, 120),
+      imageUrl: cleanOptionalText(metadata.imageUrl, 2048),
+      author: cleanOptionalText(metadata.author, 240),
+      publishedAt: cleanIso(metadata.publishedAt),
+      fetchedAt: cleanIso(metadata.fetchedAt),
+      httpStatus: typeof metadata.httpStatus === "number" ? Math.round(clampNumber(metadata.httpStatus, 0, 0, 599)) : undefined
+    },
+    health: {
+      state: RESOURCE_HEALTH_STATES.includes(health.state as PersonalResourceProfile["health"]["state"])
+        ? health.state as PersonalResourceProfile["health"]["state"]
+        : "unknown",
+      httpStatus: typeof health.httpStatus === "number" ? Math.round(clampNumber(health.httpStatus, 0, 0, 599)) : undefined,
+      lastCheckedAt: cleanIso(health.lastCheckedAt),
+      redirectTarget: cleanOptionalText(health.redirectTarget, 2048)
+    },
+    duplicate: {
+      state: RESOURCE_DUPLICATE_STATES.includes(duplicate.state as PersonalResourceProfile["duplicate"]["state"])
+        ? duplicate.state as PersonalResourceProfile["duplicate"]["state"]
+        : "unknown",
+      lastCheckedAt: cleanIso(duplicate.lastCheckedAt),
+      matchIds: sanitizeRecordIds(Array.isArray(duplicate.matchIds) ? duplicate.matchIds.filter((item): item is string => typeof item === "string") : [])
+    },
+    automations: {
+      urlHealth: normalizeResourceAutomationRun(automations.urlHealth),
+      duplicateScan: normalizeResourceAutomationRun(automations.duplicateScan),
+      metadataRefresh: normalizeResourceAutomationRun(automations.metadataRefresh)
+    },
+    timeline: timeline.length ? timeline : [{
+      id: `resource-created-${seed}`,
+      kind: "created",
+      title: "Resource added",
+      occurredAt: createdAt
+    }]
+  };
+}
+
+function mergeResourceProfile(
+  current: PersonalResourceProfile | undefined,
+  patch: Partial<PersonalResourceProfile> | undefined,
+  seed: string,
+  createdAt: string
+): PersonalResourceProfile | undefined {
+  if (!patch || typeof patch !== "object" || Array.isArray(patch)) return current;
+  const base = current || normalizeResourceProfile({ version: 1 }, seed, createdAt);
+  return normalizeResourceProfile({
+    ...base,
+    ...patch,
+    gradient: patch.gradient ? { ...base?.gradient, ...patch.gradient } : base?.gradient,
+    metadata: patch.metadata ? { ...base?.metadata, ...patch.metadata } : base?.metadata,
+    health: patch.health ? { ...base?.health, ...patch.health } : base?.health,
+    duplicate: patch.duplicate ? { ...base?.duplicate, ...patch.duplicate } : base?.duplicate,
+    automations: patch.automations ? { ...base?.automations, ...patch.automations } : base?.automations,
+    timeline: patch.timeline ?? base?.timeline
+  }, seed, createdAt);
+}
+
 function sanitizeSubjectsForClass(
   values: string[] | undefined,
   className: PersonalRecordClass
@@ -1676,6 +1958,7 @@ function applyReciprocalRelations(records: PersonalRecord[], sourceId: string) {
 
 function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>): PersonalRecord {
   const createdAt = typeof raw.createdAt === "string" ? raw.createdAt : new Date().toISOString();
+  const recordId = typeof raw.id === "string" ? raw.id : `personal-${crypto.randomUUID()}`;
   const createdDate = new Date(createdAt);
   const createdMeta = raw.createdMeta || buildCreatedMeta(createdDate);
   const className = pickClass(typeof raw.className === "string" ? raw.className : typeof raw.kind === "string" ? raw.kind : undefined);
@@ -1683,6 +1966,9 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
   const relations = normalizeRelations(raw.relations);
   const body = typeof raw.body === "string" ? raw.body : "";
   const profile = normalizeContactProfile(raw.profile);
+  const resourceProfile = className === "resource"
+    ? normalizeResourceProfile(raw.resourceProfile, recordId, createdAt)
+    : undefined;
   const starred = raw.starred === true;
   const archivedAt = typeof raw.archivedAt === "string" && raw.archivedAt.trim() ? raw.archivedAt.trim() : undefined;
   const archiveReason = typeof raw.archiveReason === "string" && raw.archiveReason.trim()
@@ -1692,7 +1978,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     ? (raw.statusBeforeArchive as PersonalRecordStatus)
     : undefined;
   const record: PersonalRecord = {
-    id: typeof raw.id === "string" ? raw.id : `personal-${crypto.randomUUID()}`,
+    id: recordId,
     domain: typeof raw.domain === "string" ? raw.domain : "notes-docs",
     title: typeof raw.title === "string" ? raw.title : "Untitled",
     className,
@@ -1713,6 +1999,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     relations,
     time: normalizeTime(raw.time, createdMeta, stage, className),
     profile,
+    resourceProfile,
     interaction: className === "interaction" ? normalizeInteractionDetails(raw.interaction) : undefined,
     createdMeta,
     createdAt,
@@ -1805,8 +2092,9 @@ export async function createPersonalRecord(
     throw new Error("Invalid requested personal record id");
   }
   const className = pickClass(input.className || input.kind);
+  const recordId = requestedId || `personal-${crypto.randomUUID()}`;
   const nextRecord: PersonalRecord = {
-    id: requestedId || `personal-${crypto.randomUUID()}`,
+    id: recordId,
     domain,
     title,
     className,
@@ -1836,6 +2124,9 @@ export async function createPersonalRecord(
       className
     ),
     profile,
+    resourceProfile: className === "resource"
+      ? normalizeResourceProfile(input.resourceProfile || { version: 1 }, recordId, meta.createdIso)
+      : undefined,
     interaction: className === "interaction"
       ? normalizeInteractionDetails(input.interaction, input.interaction !== undefined)
       : undefined,
@@ -1887,8 +2178,8 @@ export async function updatePersonalRecord(
   if (current.archivedAt && patch.action !== "restore") {
     throw new Error("Restore this profile from Recently Deleted before editing it.");
   }
-  if ((patch.action === "archive" || patch.action === "restore") && current.className !== "person" && current.className !== "org") {
-    throw new Error("Only People profiles can use this lifecycle action.");
+  if ((patch.action === "archive" || patch.action === "restore") && current.className !== "person" && current.className !== "org" && current.className !== "resource") {
+    throw new Error("This record type cannot use this lifecycle action.");
   }
   if (patch.action === "restore" && !current.archivedAt) {
     throw new Error("This profile is not in Recently Deleted.");
@@ -1917,6 +2208,40 @@ export async function updatePersonalRecord(
   const nextStarred = typeof patch.starred === "boolean" ? patch.starred : current.starred === true;
 
   const nextProfile = resolveOrganizationReferences(mergeContactProfile(current.profile, profilePatch), existing, true);
+  let nextResourceProfile = current.className === "resource"
+    ? mergeResourceProfile(current.resourceProfile, patch.resourceProfile, current.id, current.createdAt)
+    : current.resourceProfile;
+  if (current.className === "resource" && nextResourceProfile && !patch.resourceProfile?.timeline) {
+    const eventKind: PersonalResourceTimelineEvent["kind"] = patch.action === "review"
+      ? "reviewed"
+      : patch.action === "archive"
+        ? "archived"
+        : "updated";
+    const eventTitle = patch.action === "review"
+      ? "Marked reviewed"
+      : patch.action === "archive"
+        ? "Resource archived"
+        : patch.action === "restore"
+          ? "Resource restored"
+          : "Resource updated";
+    nextResourceProfile = normalizeResourceProfile({
+      ...nextResourceProfile,
+      lifecycle: patch.action === "archive"
+        ? "archived"
+        : patch.action === "restore"
+          ? "active"
+          : nextResourceProfile.lifecycle,
+      timeline: [
+        ...nextResourceProfile.timeline,
+        {
+          id: `resource-event-${crypto.randomUUID()}`,
+          kind: eventKind,
+          title: eventTitle,
+          occurredAt: now
+        }
+      ]
+    }, current.id, current.createdAt);
+  }
   next[idx] = {
     ...current,
     title: typeof patch.title === "string" ? sanitizeTitle(patch.title) : current.title,
@@ -1933,6 +2258,7 @@ export async function updatePersonalRecord(
     status: nextStatus,
     time,
     profile: nextProfile,
+    resourceProfile: nextResourceProfile,
     updatedAt: now,
     ...(nextStarred ? { starred: true } : { starred: undefined }),
     ...(patch.action === "archive"

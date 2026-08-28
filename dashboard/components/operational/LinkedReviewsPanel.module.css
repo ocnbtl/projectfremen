@@ -8,6 +8,48 @@
   background: var(--panel-bg, #f7fafb);
 }
 
+.panel[data-compact="true"] {
+  position: relative;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.compactAction {
+  position: absolute;
+  top: -42px;
+  right: 38px;
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--border-soft, #c8d7dc);
+  border-radius: 999px;
+  background: var(--surface-panel, #fff);
+  color: var(--text-strong, #102026);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+  text-decoration: none;
+}
+
+.compactAction:hover,
+.compactAction:focus-visible {
+  border-color: #6e8290;
+  background: #f2f6f7;
+}
+
+@media (max-width: 640px) {
+  .compactAction {
+    top: -49px;
+    right: 42px;
+    width: 44px;
+    height: 44px;
+  }
+}
+
 .panel[data-wide="true"] {
   grid-column: 1 / -1;
 }
