@@ -24,6 +24,18 @@ import type {
 
 export const runtime = "nodejs";
 
+const PRIVATE_RESPONSE_HEADERS = {
+  "Cache-Control": "private, no-store, max-age=0",
+  Pragma: "no-cache",
+  Vary: "Cookie"
+} as const;
+
+function privateJson(body: unknown, init: ResponseInit = {}) {
+  const headers = new Headers(init.headers);
+  for (const [name, value] of Object.entries(PRIVATE_RESPONSE_HEADERS)) headers.set(name, value);
+  return NextResponse.json(body, { ...init, headers });
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
@@ -34,7 +46,7 @@ function parseFamily(value: unknown): ProjectObjectFamily | null {
 
 function errorResponse(error: unknown) {
   if (error instanceof ProjectsStoreError) {
-    return NextResponse.json(
+    return privateJson(
       {
         ok: false,
         error: error.message,
@@ -44,7 +56,7 @@ function errorResponse(error: unknown) {
       { status: error.status }
     );
   }
-  return NextResponse.json(
+  return privateJson(
     { ok: false, error: error instanceof Error ? error.message : "Projects request failed" },
     { status: 500 }
   );
@@ -77,12 +89,12 @@ async function csrfFailure(request: Request, action: string, method: "POST" | "P
     ip: getRequestIp(request),
     status: "denied"
   });
-  return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
+  return privateJson({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
 }
 
 export async function GET(request: Request) {
   if (!(await hasAdminSession())) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return privateJson({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
 
   try {
@@ -93,24 +105,24 @@ export async function GET(request: Request) {
     const projectId = url.searchParams.get("projectId")?.trim() || "";
 
     if (familyParam && !family) {
-      return NextResponse.json({ ok: false, error: "Invalid Projects family" }, { status: 400 });
+      return privateJson({ ok: false, error: "Invalid Projects family" }, { status: 400 });
     }
     if (!family) {
       if (id || projectId) {
-        return NextResponse.json(
+        return privateJson(
           { ok: false, error: "family is required when filtering Projects objects" },
           { status: 400 }
         );
       }
-      return NextResponse.json({ ok: true, state: await readProjectsState() });
+      return privateJson({ ok: true, state: await readProjectsState() });
     }
     if (id) {
       const item = await readProjectsObject(family, id);
       return item
-        ? NextResponse.json({ ok: true, item })
-        : NextResponse.json({ ok: false, error: "Projects object not found" }, { status: 404 });
+        ? privateJson({ ok: true, item })
+        : privateJson({ ok: false, error: "Projects object not found" }, { status: 404 });
     }
-    return NextResponse.json({
+    return privateJson({
       ok: true,
       items: await listProjectsObjects(family, projectId ? { projectId } : {})
     });
@@ -121,7 +133,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   if (!(await hasAdminSession())) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return privateJson({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   if (!isCsrfRequestValid(request)) return csrfFailure(request, "create", "POST");
 
@@ -130,7 +142,7 @@ export async function POST(request: Request) {
   try {
     const body: unknown = await request.json();
     if (!isRecord(body)) {
-      return NextResponse.json({ ok: false, error: "Request body must be an object" }, { status: 400 });
+      return privateJson({ ok: false, error: "Request body must be an object" }, { status: 400 });
     }
     operation = typeof body.operation === "string" ? body.operation.trim() : "";
     if (operation === "retire_legacy_metadata") {
@@ -143,10 +155,10 @@ export async function POST(request: Request) {
         ip: getRequestIp(request),
         status: "ok"
       });
-      return NextResponse.json({ ok: true, updated: result.updated });
+      return privateJson({ ok: true, updated: result.updated });
     }
     if (!isRecord(body.input)) {
-      return NextResponse.json({ ok: false, error: "input must be an object" }, { status: 400 });
+      return privateJson({ ok: false, error: "input must be an object" }, { status: 400 });
     }
 
     if (operation === "promote_legacy") {
@@ -164,7 +176,7 @@ export async function POST(request: Request) {
         status: "ok",
         detail: result.item.id
       });
-      return NextResponse.json({
+      return privateJson({
         ok: true,
         ...result,
         auditEventId: result.auditEvent?.id
@@ -172,14 +184,14 @@ export async function POST(request: Request) {
     }
 
     if (operation !== "create") {
-      return NextResponse.json(
+      return privateJson(
         { ok: false, error: "operation must be create, promote_legacy, or retire_legacy_metadata" },
         { status: 400 }
       );
     }
     family = parseFamily(body.family);
     if (!family) {
-      return NextResponse.json({ ok: false, error: "Invalid Projects family" }, { status: 400 });
+      return privateJson({ ok: false, error: "Invalid Projects family" }, { status: 400 });
     }
     const result = await createProjectsObject(
       family,
@@ -197,7 +209,7 @@ export async function POST(request: Request) {
       status: "ok",
       detail: result.item.id
     });
-    return NextResponse.json({
+    return privateJson({
       ok: true,
       ...result,
       auditEventId: result.auditEvent?.id
@@ -210,7 +222,7 @@ export async function POST(request: Request) {
 
 export async function PATCH(request: Request) {
   if (!(await hasAdminSession())) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return privateJson({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   if (!isCsrfRequestValid(request)) return csrfFailure(request, "update", "PATCH");
 
@@ -218,21 +230,21 @@ export async function PATCH(request: Request) {
   try {
     const body: unknown = await request.json();
     if (!isRecord(body)) {
-      return NextResponse.json({ ok: false, error: "Request body must be an object" }, { status: 400 });
+      return privateJson({ ok: false, error: "Request body must be an object" }, { status: 400 });
     }
     const operation = typeof body.operation === "string" ? body.operation.trim() : "update";
     const id = typeof body.id === "string" ? body.id.trim() : "";
     const expectedUpdatedAt =
       typeof body.expectedUpdatedAt === "string" ? body.expectedUpdatedAt.trim() : "";
-    if (!id) return NextResponse.json({ ok: false, error: "id is required" }, { status: 400 });
+    if (!id) return privateJson({ ok: false, error: "id is required" }, { status: 400 });
     if (!expectedUpdatedAt) {
-      return NextResponse.json(
+      return privateJson(
         { ok: false, error: "expectedUpdatedAt is required to prevent stale overwrites" },
         { status: 400 }
       );
     }
     if (!isRecord(body.patch)) {
-      return NextResponse.json({ ok: false, error: "patch must be an object" }, { status: 400 });
+      return privateJson({ ok: false, error: "patch must be an object" }, { status: 400 });
     }
     if (operation === "update_timeline_event") {
       const result = await updateProjectTimelineEvent(
@@ -249,14 +261,14 @@ export async function PATCH(request: Request) {
         status: "ok",
         detail: result.item.id
       });
-      return NextResponse.json({ ok: true, ...result, auditEventId: result.auditEvent.id });
+      return privateJson({ ok: true, ...result, auditEventId: result.auditEvent.id });
     }
     if (operation !== "update") {
-      return NextResponse.json({ ok: false, error: "Unsupported Projects update operation" }, { status: 400 });
+      return privateJson({ ok: false, error: "Unsupported Projects update operation" }, { status: 400 });
     }
     family = parseFamily(body.family);
     if (!family) {
-      return NextResponse.json({ ok: false, error: "Invalid Projects family" }, { status: 400 });
+      return privateJson({ ok: false, error: "Invalid Projects family" }, { status: 400 });
     }
 
     const result = await updateProjectsObject(
@@ -274,7 +286,7 @@ export async function PATCH(request: Request) {
       status: "ok",
       detail: result.item.id
     });
-    return NextResponse.json({ ok: true, ...result, auditEventId: result.auditEvent.id });
+    return privateJson({ ok: true, ...result, auditEventId: result.auditEvent.id });
   } catch (error) {
     await auditFailure(request, "PATCH", "update", family, error);
     return errorResponse(error);

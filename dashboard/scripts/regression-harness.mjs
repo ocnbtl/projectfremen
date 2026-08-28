@@ -12014,10 +12014,13 @@ async function main() {
 
     const unauthProjects = await requestJson(server.baseUrl, cookieJar, "/api/projects");
     assert(
-      unauthProjects.response.status === 401,
+      unauthProjects.response.status === 401 &&
+        unauthProjects.response.headers.get("cache-control")?.includes("private") &&
+        unauthProjects.response.headers.get("cache-control")?.includes("no-store") &&
+        unauthProjects.response.headers.get("vary")?.toLowerCase().includes("cookie"),
       `Expected /api/projects to return 401, got ${describeStatus(unauthProjects.response)}`
     );
-    pass("Unauthenticated native Projects API is blocked");
+    pass("Unauthenticated native Projects API is blocked with a private no-store boundary");
 
     const unauthReviewRuns = await requestJson(server.baseUrl, cookieJar, "/api/reviews/runs");
     assert(
