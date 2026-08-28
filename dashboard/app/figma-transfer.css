@@ -11977,8 +11977,10 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   resize: both;
   border-color: color-mix(in srgb, var(--text-strong) 18%, var(--border-soft));
   border-radius: 14px;
-  background: var(--surface-panel);
-  box-shadow: 0 0 0 1px rgba(16, 32, 38, .04), 0 18px 48px rgba(16, 32, 38, .18);
+  background: color-mix(in srgb, var(--panel-bg) 96%, #dce8e5);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, .5), 0 22px 64px rgba(16, 32, 38, .24);
+  backdrop-filter: blur(24px) saturate(128%);
+  -webkit-backdrop-filter: blur(24px) saturate(128%);
 }
 
 .shared-ai-dock__header {
@@ -11987,7 +11989,7 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   align-items: center;
   padding: 12px;
   border-bottom-color: var(--border-soft);
-  background: color-mix(in srgb, var(--text-strong) 3%, var(--surface-panel));
+  background: color-mix(in srgb, var(--panel-bg) 94%, #e3ece9);
   cursor: grab;
   touch-action: none;
   user-select: none;
@@ -12076,7 +12078,7 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   padding: 12px;
   align-content: start;
   grid-auto-rows: max-content;
-  background: color-mix(in srgb, var(--text-strong) 1.5%, var(--surface-panel));
+  background: color-mix(in srgb, var(--panel-bg) 92%, #e9f0ee);
 }
 
 .shared-ai-dock__context,
@@ -12084,7 +12086,7 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
 .shared-ai-dock__permissions {
   border-color: var(--border-soft);
   border-radius: 10px;
-  background: var(--surface-panel);
+  background: color-mix(in srgb, var(--panel-bg) 97%, #e2ece9);
 }
 
 .shared-ai-dock__context {
@@ -12167,7 +12169,7 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   gap: 6px;
   padding: 12px;
   border-top-color: var(--border-soft);
-  background: var(--surface-panel);
+  background: color-mix(in srgb, var(--panel-bg) 96%, #e4ecea);
 }
 
 .shared-ai-dock__footer > label {

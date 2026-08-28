@@ -263,7 +263,7 @@ export default function SharedAIDock({
         title={compactViewport ? "Open assistant" : "Open assistant · drag to reposition"}
       >
         <span className="shared-ai-dock__launcher-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false"><path d="m12 3 1.3 4.1L17.5 8.5l-4.2 1.4L12 14l-1.3-4.1-4.2-1.4 4.2-1.4L12 3Z" /><path d="m18.5 14 .7 2.3 2.3.7-2.3.8-.7 2.2-.8-2.2-2.2-.8 2.2-.7.8-2.3Z" /></svg>
+          <svg viewBox="0 0 24 24" focusable="false"><path d="M5 5.5h14v11H9l-4 3v-14Z" /><path d="M8.5 9.5h7M8.5 12.5h4.5" /></svg>
         </span>
         <span className="shared-ai-dock__launcher-label">Assistant</span>
       </button>
@@ -308,7 +308,7 @@ export default function SharedAIDock({
               <strong>{contextSummary}</strong>
             </div>
             <div className="shared-ai-dock__empty-state">
-              <span className="shared-ai-dock__empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="m12 3 1.3 4.1L17.5 8.5l-4.2 1.4L12 14l-1.3-4.1-4.2-1.4 4.2-1.4L12 3Z" /><path d="M5 15.5h7M5 19h10" /></svg></span>
+              <span className="shared-ai-dock__empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 5.5h14v11H9l-4 3v-14Z" /><path d="M8.5 9.5h7M8.5 12.5h4.5" /></svg></span>
               <div><h3>AI connection is off</h3><p id={descriptionId}>This panel can see the current workspace context, but chat and record changes remain unavailable.</p></div>
             </div>
             {context.allowedActions && context.allowedActions.length > 0 && (

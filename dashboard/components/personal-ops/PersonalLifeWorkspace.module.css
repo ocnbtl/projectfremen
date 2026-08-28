@@ -14,7 +14,10 @@
 .addAction, .mobileAddAction { gap: 6px; }
 .addAction svg, .mobileAddAction svg { width: 16px; height: 16px; flex: 0 0 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .notice, .error { margin: 10px 22px 0; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 12px; }
-.notice { background: color-mix(in srgb, #21845f 8%, var(--panel-bg)); color: #176848; }
+.notice { display: flex; min-height: 36px; align-items: center; justify-content: space-between; gap: 10px; background: color-mix(in srgb, #21845f 8%, var(--panel-bg)); color: #176848; }
+.notice button { display: grid; width: 24px; height: 24px; flex: 0 0 24px; place-items: center; padding: 0; border: 0; border-radius: 5px; background: transparent; color: currentColor; cursor: pointer; }
+.notice button:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+.notice button svg { width: 14px; height: 14px; }
 .error { background: color-mix(in srgb, #c92d3f 7%, var(--panel-bg)); color: #a61f33; }
 .rowActions { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
 .rowActions button, .inlineComposer button, .modComposer button, .editor footer button, .iconOnly { min-height: 28px; padding: 0 8px; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg); color: var(--text); font: 750 10px var(--font-heading); cursor: pointer; }
@@ -28,14 +31,20 @@
 .keyringHeader strong { color: var(--text-strong); font: 780 12px var(--font-heading); }
 .keyIcon svg { width: 16px; height: 16px; }
 .keyringCount { display: grid; min-width: 28px; height: 26px; place-items: center; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); background: var(--panel-bg); font: 700 10px var(--font-mono); }
-.credentialList { display: grid; align-content: start; }
-.credentialRow { display: grid; grid-template-columns: 26px minmax(220px, 1.4fr) minmax(170px, .72fr) auto; gap: 9px; align-items: center; min-height: 52px; padding: 6px 10px; border-bottom: 1px solid var(--border); content-visibility: auto; contain-intrinsic-size: 0 52px; }
+.credentialLedger { overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
+.credentialGridHeader,
+.credentialRow { display: grid; grid-template-columns: 26px minmax(140px, 1.05fr) minmax(96px, .68fr) minmax(130px, 1fr) minmax(112px, .78fr) minmax(128px, .86fr) minmax(104px, .7fr) minmax(54px, .38fr) 96px; gap: 8px; align-items: center; min-width: 1040px; }
+.credentialGridHeader { min-height: 34px; padding: 0 10px; border-bottom: 1px solid var(--border); color: var(--text-muted); }
+.credentialGridHeader > span { display: grid; min-width: 0; place-items: center start; }
+.credentialGridHeader > span:not(.credentialAccountHeading) { place-items: center; }
+.credentialGridHeader svg { width: 13px; height: 13px; }
+.credentialAccountHeading { color: var(--text-muted); font: 760 9px/1 var(--font-heading); letter-spacing: .05em; text-transform: uppercase; }
+.credentialList { display: grid; min-width: 1040px; align-content: start; }
+.credentialRow { min-height: 50px; padding: 6px 10px; border-bottom: 1px solid var(--border); content-visibility: auto; contain-intrinsic-size: 0 50px; }
 .credentialRow:last-child { border-bottom: 0; }
 .credentialIdentity { display: grid; min-width: 0; gap: 3px; }
 .credentialIdentity > strong { overflow: hidden; color: var(--text-strong); font: 780 12px var(--font-heading); text-overflow: ellipsis; white-space: nowrap; }
-.credentialMeta { display: flex; min-width: 0; gap: 9px; overflow: hidden; color: var(--text-muted); font-size: 9px; }
-.credentialMeta span { display: inline-flex; min-width: 0; align-items: center; gap: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.credentialMeta svg { width: 12px; height: 12px; flex: 0 0 12px; }
+.credentialCell { min-width: 0; overflow: hidden; color: var(--text-muted); font-size: 10px; line-height: 1.3; text-overflow: ellipsis; white-space: nowrap; }
 .credentialRow code { padding: 6px 8px; overflow: hidden; border: 1px solid var(--border); border-radius: 5px; background: var(--panel-bg-subtle); color: var(--text-strong); font: 680 14px/1 var(--font-mono); letter-spacing: .025em; text-overflow: ellipsis; white-space: nowrap; }
 .credentialPrivate { transition: filter 150ms ease, opacity 150ms ease; }
 .keyring[data-masked] .credentialPrivate { filter: blur(6px); opacity: .66; pointer-events: none; user-select: none; }
@@ -44,8 +53,8 @@
 .iconActions button, .squareAction { display: inline-grid; width: 30px; height: 30px; min-height: 30px; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer; }
 .iconActions button:hover, .squareAction:hover { border-color: var(--border); background: var(--panel-bg-subtle); color: var(--text-strong); }
 .iconActions svg, .squareAction svg { width: 15px; height: 15px; }
-.iconActions .dangerAction { border-color: var(--accent-crimson, #b73343); background: var(--accent-crimson, #b73343); color: #fff; }
-.iconActions .dangerAction:hover { border-color: color-mix(in srgb, var(--accent-crimson, #b73343) 86%, black); background: color-mix(in srgb, var(--accent-crimson, #b73343) 86%, black); color: #fff; }
+.iconActions .dangerAction { border-color: transparent; background: transparent; color: var(--accent-crimson, #b73343); }
+.iconActions .dangerAction:hover { border-color: color-mix(in srgb, var(--accent-crimson, #b73343) 24%, var(--border)); background: color-mix(in srgb, var(--accent-crimson, #b73343) 7%, transparent); color: color-mix(in srgb, var(--accent-crimson, #b73343) 86%, black); }
 
 /* Lists: notebook index and ruled working page. */
 .notebook { display: grid; grid-template-columns: minmax(170px, 220px) minmax(0, 1fr); min-height: 520px; overflow: hidden; border: 1px solid var(--border); border-radius: 9px; background: var(--panel-bg); }
@@ -196,9 +205,9 @@
 .editor footer .primaryButton { border-color: var(--action-primary); background: var(--action-primary); color: #fff; }
 .credentialPhoneFields { grid-column: 1 / -1; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; }
 .credentialPhoneFields p { grid-column: 1 / -1; margin: -5px 0 0; color: var(--accent-crimson, #b73343); font: 650 10px/1.35 var(--font-body); }
-.secretControl { position: relative; }
-.secretControl input { padding-right: 42px; }
-.secretControl button { position: absolute; right: 4px; bottom: 4px; display: grid; width: 28px; height: 28px; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.secretControl { position: relative; display: grid; height: 36px; grid-template-columns: minmax(0, 1fr) 36px; align-items: center; }
+.secretControl input { grid-column: 1 / -1; grid-row: 1; padding-right: 42px; }
+.secretControl button { position: relative; z-index: 1; top: 0; right: auto; bottom: auto; display: grid; width: 28px; height: 28px; grid-column: 2; grid-row: 1; place-items: center; align-self: center; justify-self: center; padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer; transform: translateY(-3px); }
 .secretControl button:hover { border-color: var(--border); background: var(--panel-bg-subtle); color: var(--text-strong); }
 .secretControl button svg { width: 15px; height: 15px; }
 .coordinateFields { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 0; padding: 10px; border: 1px solid var(--border); border-radius: 6px; }
@@ -219,10 +228,18 @@
   .pageHeader { grid-template-columns: 1fr; padding: 14px 12px 10px; }
   .headerActions { justify-content: flex-start; }
   .headerActions .primaryButton { display: none; }
-  .credentialRow { grid-template-columns: 26px minmax(0, 1fr) auto; }
-  .credentialRow code { grid-column: 2 / -1; grid-row: 2; }
+  .credentialGridHeader { display: none; }
+  .credentialList { min-width: 0; }
+  .credentialRow { grid-template-columns: 26px minmax(0, 1fr) auto; min-width: 0; gap: 5px 8px; padding-block: 9px; }
+  .credentialRow .keyIcon { grid-column: 1; grid-row: 1; }
+  .credentialRow .credentialIdentity { grid-column: 2; grid-row: 1; }
   .credentialRow .iconActions { grid-column: 3; grid-row: 1; }
-  .credentialMeta { flex-wrap: wrap; gap: 3px 8px; }
+  .credentialRow .credentialCell,
+  .credentialRow code { display: grid; grid-column: 2 / -1; grid-template-columns: 64px minmax(0, 1fr); min-height: 28px; align-items: center; padding: 5px 7px; }
+  .credentialRow .credentialCell:empty,
+  .credentialRow code:empty { display: none; }
+  .credentialRow .credentialCell::before,
+  .credentialRow code::before { color: var(--text-muted); content: attr(data-label); font: 730 8px/1 var(--font-heading); letter-spacing: .04em; text-transform: uppercase; }
   .notebook { grid-template-columns: 1fr; }
   .listIndex { display: flex; overflow-x: auto; border-right: 0; border-bottom: 1px solid var(--border); }
   .listIndex button { min-width: 130px; }
@@ -252,14 +269,30 @@
 :global(html[data-personal-preview="mobile"]) .headerActions { justify-content: flex-start; }
 :global(html[data-admin-preview="mobile"]) .headerActions .primaryButton,
 :global(html[data-personal-preview="mobile"]) .headerActions .primaryButton { display: none; }
+:global(html[data-admin-preview="mobile"]) .credentialGridHeader,
+:global(html[data-personal-preview="mobile"]) .credentialGridHeader { display: none; }
+:global(html[data-admin-preview="mobile"]) .credentialList,
+:global(html[data-personal-preview="mobile"]) .credentialList { min-width: 0; }
 :global(html[data-admin-preview="mobile"]) .credentialRow,
-:global(html[data-personal-preview="mobile"]) .credentialRow { grid-template-columns: 26px minmax(0, 1fr) auto; }
-:global(html[data-admin-preview="mobile"]) .credentialRow code,
-:global(html[data-personal-preview="mobile"]) .credentialRow code { grid-column: 2 / -1; grid-row: 2; }
+:global(html[data-personal-preview="mobile"]) .credentialRow { grid-template-columns: 26px minmax(0, 1fr) auto; min-width: 0; gap: 5px 8px; padding-block: 9px; }
+:global(html[data-admin-preview="mobile"]) .credentialRow .keyIcon,
+:global(html[data-personal-preview="mobile"]) .credentialRow .keyIcon { grid-column: 1; grid-row: 1; }
+:global(html[data-admin-preview="mobile"]) .credentialRow .credentialIdentity,
+:global(html[data-personal-preview="mobile"]) .credentialRow .credentialIdentity { grid-column: 2; grid-row: 1; }
 :global(html[data-admin-preview="mobile"]) .credentialRow .iconActions,
 :global(html[data-personal-preview="mobile"]) .credentialRow .iconActions { grid-column: 3; grid-row: 1; }
-:global(html[data-admin-preview="mobile"]) .credentialMeta,
-:global(html[data-personal-preview="mobile"]) .credentialMeta { flex-wrap: wrap; gap: 3px 8px; }
+:global(html[data-admin-preview="mobile"]) .credentialRow .credentialCell,
+:global(html[data-admin-preview="mobile"]) .credentialRow code,
+:global(html[data-personal-preview="mobile"]) .credentialRow .credentialCell,
+:global(html[data-personal-preview="mobile"]) .credentialRow code { display: grid; grid-column: 2 / -1; grid-template-columns: 64px minmax(0, 1fr); min-height: 28px; align-items: center; padding: 5px 7px; }
+:global(html[data-admin-preview="mobile"]) .credentialRow .credentialCell:empty,
+:global(html[data-admin-preview="mobile"]) .credentialRow code:empty,
+:global(html[data-personal-preview="mobile"]) .credentialRow .credentialCell:empty,
+:global(html[data-personal-preview="mobile"]) .credentialRow code:empty { display: none; }
+:global(html[data-admin-preview="mobile"]) .credentialRow .credentialCell::before,
+:global(html[data-admin-preview="mobile"]) .credentialRow code::before,
+:global(html[data-personal-preview="mobile"]) .credentialRow .credentialCell::before,
+:global(html[data-personal-preview="mobile"]) .credentialRow code::before { color: var(--text-muted); content: attr(data-label); font: 730 8px/1 var(--font-heading); letter-spacing: .04em; text-transform: uppercase; }
 :global(html[data-admin-preview="mobile"]) .notebook,
 :global(html[data-personal-preview="mobile"]) .notebook { grid-template-columns: 1fr; }
 :global(html[data-admin-preview="mobile"]) .listIndex,

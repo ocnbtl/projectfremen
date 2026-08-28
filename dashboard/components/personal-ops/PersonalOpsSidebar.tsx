@@ -196,46 +196,6 @@ export default function PersonalOpsSidebar({
           count: counts.routines,
           icon: "routine",
           unavailableReason: unavailableViews?.routines
-        }),
-        viewItem({
-          id: "passwords",
-          label: "Passwords",
-          view: "passwords",
-          activeView,
-          count: counts.passwords || 0,
-          icon: "password"
-        }),
-        viewItem({
-          id: "lists",
-          label: "Lists",
-          view: "lists",
-          activeView,
-          count: counts.lists || 0,
-          icon: "list"
-        }),
-        viewItem({
-          id: "travel",
-          label: "Travel",
-          view: "travel",
-          activeView,
-          count: counts.travel || 0,
-          icon: "travel"
-        }),
-        viewItem({
-          id: "personal-build",
-          label: "Personal Build",
-          view: "personal-build",
-          activeView,
-          count: counts.personalBuild || 0,
-          icon: "build"
-        }),
-        viewItem({
-          id: "car",
-          label: "Car",
-          view: "car",
-          activeView,
-          count: counts.car || 0,
-          icon: "car"
         })
       ]
     };

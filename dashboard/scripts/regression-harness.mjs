@@ -8685,7 +8685,10 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       { label: "desktop-1440x900", width: 1440, height: 900 },
       { label: "mobile-390x844", width: 390, height: 844 }
     ]) {
-      const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+      const context = await browser.newContext({
+        viewport: { width: viewport.width, height: viewport.height },
+        permissions: ["clipboard-read", "clipboard-write"]
+      });
       await context.addCookies([
         {
           name: "admin_session",
@@ -8727,17 +8730,34 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       assert(!bodyText.includes("Protected at rest"), "Password page retained removed protection helper copy");
       const keyring = page.locator('section[aria-label="Encrypted password keyring"]');
       assert(await keyring.locator(":scope > header svg").count() === 0, "Password keyring header retained the removed global key icon");
+      assert(await keyring.locator('[role="columnheader"][title="Username"], [role="columnheader"][title="Email"], [role="columnheader"][title="Phone"], [role="columnheader"][title="Website"], [role="columnheader"][title="Password"], [role="columnheader"][title="PIN"]').count() === 6, "Credential ledger did not expose the six icon-only column headings");
       const row = keyring.locator("article").filter({ hasText: credentialTitle }).first();
       await row.waitFor();
       assert(await row.locator(":scope > span svg").count() === 1, "Credential row lost its account key icon");
-      assert(await row.locator('[title="Username"] svg, [title="Email"] svg, [title="Phone"] svg, [title="Website"] svg').count() === 4, "Credential metadata did not replace all visible labels with icons");
       const rowText = await row.innerText();
       assert(!/Username|Email|Website/.test(rowText), `Credential row retained visible metadata labels: ${rowText}`);
       const deleteStyle = await row.getByRole("button", { name: `Delete ${credentialTitle}` }).evaluate((element) => {
         const style = getComputedStyle(element);
         return { backgroundColor: style.backgroundColor, color: style.color };
       });
-      assert(deleteStyle.backgroundColor !== "rgba(0, 0, 0, 0)" && deleteStyle.color === "rgb(255, 255, 255)", `Credential delete action is not the filled red treatment: ${JSON.stringify(deleteStyle)}`);
+      assert(deleteStyle.backgroundColor === "rgba(0, 0, 0, 0)" && deleteStyle.color !== "rgb(255, 255, 255)", `Credential delete action is not red on a transparent background: ${JSON.stringify(deleteStyle)}`);
+      if (viewport.width > 760) {
+        const columnAlignment = await keyring.evaluate((element) => {
+          const header = Array.from(element.querySelector('[role="row"]')?.children || []);
+          const row = Array.from(element.querySelector("article")?.children || []);
+          return header.slice(0, 8).map((cell, index) => {
+            const headerRect = cell.getBoundingClientRect();
+            const rowRect = row[index]?.getBoundingClientRect();
+            return rowRect ? Math.abs(headerRect.left - rowRect.left) : 999;
+          });
+        });
+        assert(columnAlignment.every((offset) => offset <= 1), `Credential ledger columns are not vertically aligned: ${JSON.stringify(columnAlignment)}`);
+      }
+      await row.getByRole("button", { name: `Copy password for ${credentialTitle}` }).click();
+      const notice = page.getByRole("status").filter({ hasText: "Password copied." });
+      await notice.waitFor();
+      await notice.getByRole("button", { name: "Dismiss notification" }).click();
+      await notice.waitFor({ state: "detached" });
       const layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
       assert(layout.scrollWidth <= layout.innerWidth, `Password ledger overflowed horizontally at ${viewport.label}: ${JSON.stringify(layout)}`);
       await page.screenshot({ path: path.join(screenshotDir, `passwords-${viewport.label}.png`), fullPage: true });
@@ -8767,6 +8787,18 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       assert(await pinInput.getAttribute("type") === "text", "Credential PIN reveal control did not unmask the field");
       await editor.getByRole("button", { name: "Hide PIN" }).click();
 
+      const revealAlignment = await editor.locator('button[aria-label="Show password"], button[aria-label="Show PIN"]').evaluateAll((buttons) => buttons.map((button) => {
+        const control = button.parentElement?.querySelector("input");
+        const buttonRect = button.getBoundingClientRect();
+        const inputRect = control?.getBoundingClientRect();
+        return inputRect ? {
+          offset: Math.abs((buttonRect.top + buttonRect.height / 2) - (inputRect.top + inputRect.height / 2)),
+          button: { top: buttonRect.top, height: buttonRect.height },
+          input: { top: inputRect.top, height: inputRect.height }
+        } : { offset: 999 };
+      }));
+      assert(revealAlignment.every((item) => item.offset <= 1), `Password/PIN reveal controls are not centered with their fields: ${JSON.stringify(revealAlignment)}`);
+
       const closeAlignment = await editor.getByRole("button", { name: "Close password editor" }).evaluate((element) => {
         const button = element.getBoundingClientRect();
         const icon = element.querySelector("svg")?.getBoundingClientRect();
@@ -8788,6 +8820,95 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
     assert(browserMutations.length === 0, `Password browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`);
     assert(browserErrors.length === 0, `Password browser checks emitted errors: ${browserErrors.join(" | ")}`);
     assert(failedResponses.length === 0, `Password browser checks received failed responses: ${failedResponses.join(" | ")}`);
+  } finally {
+    await browser.close();
+  }
+}
+
+async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
+  const { chromium } = await import("@playwright/test");
+  const browser = await chromium.launch({ headless: true });
+  const browserErrors = [];
+  const failedResponses = [];
+  const browserMutations = [];
+  const screenshotDir = path.join(dashboardDir, "output", "playwright", "personal-ops-command-checkpoint");
+  await mkdir(screenshotDir, { recursive: true });
+
+  try {
+    for (const viewport of [
+      { label: "desktop-1440x900", width: 1440, height: 900 },
+      { label: "mobile-390x844", width: 390, height: 844 }
+    ]) {
+      const context = await browser.newContext({ viewport: { width: viewport.width, height: viewport.height } });
+      await context.addCookies([
+        { name: "admin_session", value: cookieJar.get("admin_session"), url: baseUrl, httpOnly: true, sameSite: "Lax" },
+        { name: "admin_csrf", value: cookieJar.get("admin_csrf"), url: baseUrl, sameSite: "Lax" }
+      ]);
+      const page = await context.newPage();
+      page.on("console", (message) => {
+        if (message.type() === "error" && !message.text().startsWith("Failed to load resource:")) browserErrors.push(`${viewport.label} console: ${message.text()}`);
+      });
+      page.on("pageerror", (error) => browserErrors.push(`${viewport.label} page: ${error.message}`));
+      page.on("request", (request) => {
+        if (["POST", "PATCH", "PUT", "DELETE"].includes(request.method())) browserMutations.push(`${viewport.label} ${request.method()} ${new URL(request.url()).pathname}`);
+      });
+      page.on("response", (response) => {
+        const pathname = new URL(response.url()).pathname;
+        if (response.status() >= 400 && pathname !== "/_vercel/insights/script.js") failedResponses.push(`${viewport.label} ${response.status()} ${pathname}`);
+      });
+
+      await page.goto(`${baseUrl}/admin/personal`, { waitUntil: "networkidle" });
+      await page.getByRole("heading", { name: "Personal Ops Command", exact: true }).waitFor();
+      const bodyText = await page.locator("body").innerText();
+      assert(!bodyText.includes("operating view for today") && !bodyText.includes("across goals, decisions, obligations, and follow-ups"), `Personal Ops Command retained removed explanatory copy at ${viewport.label}`);
+      const systemDock = page.getByRole("navigation", { name: "Personal systems" });
+      await systemDock.waitFor();
+      for (const label of ["Passwords", "Lists", "Travel", "Personal Build", "Car"]) {
+        assert(await systemDock.getByRole("link", { name: label, exact: true }).count() === 1, `Personal systems dock omitted ${label} at ${viewport.label}`);
+      }
+      const sidebarLabels = await page.locator(".module-sidebar__navigation .module-sidebar__item-label").allInnerTexts();
+      for (const label of ["Passwords", "Lists", "Travel", "Personal Build", "Car"]) {
+        assert(!sidebarLabels.includes(label), `Personal Ops sidebar retained ${label} at ${viewport.label}`);
+      }
+
+      const header = page.locator('main[aria-label="Personal Ops Command ledger"] header').first();
+      const search = header.getByPlaceholder("Search...");
+      const sort = header.getByLabel("Sort ledger");
+      const filter = header.getByRole("button", { name: "Show filters" });
+      for (const label of ["Follow-up", "Decision", "Obligation", "Goal"]) {
+        assert(await header.getByRole("button", { name: label, exact: true }).count() === 1, `Top action strip omitted + ${label} at ${viewport.label}`);
+      }
+      assert(await page.locator('nav[aria-label="Personal Ops quick actions"]').count() === 0, `Personal Ops retained the bottom action rail at ${viewport.label}`);
+      const controlCenters = await Promise.all([search, sort, filter, header.getByRole("button", { name: "Follow-up", exact: true })].map((locator) => locator.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        return rect.top + rect.height / 2;
+      })));
+      assert(Math.max(...controlCenters) - Math.min(...controlCenters) <= 2, `Personal Ops command controls are not vertically aligned at ${viewport.label}: ${JSON.stringify(controlCenters)}`);
+      await filter.click();
+      assert(await page.locator("#personal-ops-filter-rail").count() === 1, `Filter icon did not open the Personal Ops filter rail at ${viewport.label}`);
+      await header.getByRole("button", { name: "Hide filters" }).click();
+      assert(await page.locator("#personal-ops-filter-rail").count() === 0, `Filter icon did not close the Personal Ops filter rail at ${viewport.label}`);
+
+      const aiLauncher = page.getByRole("button", { name: "Open AI assistant" });
+      const launcherPath = await aiLauncher.locator("svg path").first().getAttribute("d");
+      assert(launcherPath === "M5 5.5h14v11H9l-4 3v-14Z", `AI launcher retained the sparkle mark at ${viewport.label}`);
+      await aiLauncher.click();
+      const aiPanel = page.getByRole("dialog", { name: "Unigentamos AI" });
+      await aiPanel.waitFor();
+      const aiSurface = await aiPanel.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return { backgroundColor: style.backgroundColor, backdropFilter: style.backdropFilter || style.webkitBackdropFilter };
+      });
+      assert(aiSurface.backgroundColor !== "rgba(0, 0, 0, 0)" && aiSurface.backgroundColor !== "transparent", `AI panel is not an opaque surface at ${viewport.label}: ${JSON.stringify(aiSurface)}`);
+
+      const layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
+      assert(layout.scrollWidth <= layout.innerWidth, `Personal Ops Command overflowed horizontally at ${viewport.label}: ${JSON.stringify(layout)}`);
+      await page.screenshot({ path: path.join(screenshotDir, `command-${viewport.label}.png`), fullPage: true });
+      await context.close();
+    }
+    assert(browserMutations.length === 0, `Personal Ops Command browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`);
+    assert(browserErrors.length === 0, `Personal Ops Command browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Personal Ops Command browser checks received failed responses: ${failedResponses.join(" | ")}`);
   } finally {
     await browser.close();
   }
@@ -11403,13 +11524,17 @@ async function main() {
     }
     pass("Media local intake contains no file-content read, transport, preview URL, or browser-persistence path");
 
-    const [personalLifeTypes, personalLifeWorkspace, personalPasswordsTypes, personalPasswordsStore, personalPasswordsApi, personalOpsIconSource, travelMapSource, projectsWorkspaceSource, peopleWorkspaceSource] = await Promise.all([
+    const [personalLifeTypes, personalLifeWorkspace, personalPasswordsTypes, personalPasswordsStore, personalPasswordsApi, personalOpsIconSource, personalOpsWorkspaceSource, personalOpsSidebarSource, sharedAiDockSource, sharedAiDockStyles, travelMapSource, projectsWorkspaceSource, peopleWorkspaceSource] = await Promise.all([
       readFile(path.join(dashboardDir, "lib/modules/personal-life/types.ts"), "utf8"),
       readFile(path.join(dashboardDir, "components/personal-ops/PersonalLifeWorkspace.tsx"), "utf8"),
       readFile(path.join(dashboardDir, "lib/modules/personal-passwords/types.ts"), "utf8"),
       readFile(path.join(dashboardDir, "lib/modules/personal-passwords/store.ts"), "utf8"),
       readFile(path.join(dashboardDir, "app/api/personal/passwords/route.ts"), "utf8"),
       readFile(path.join(dashboardDir, "components/personal-ops/PersonalOpsIcon.tsx"), "utf8"),
+      readFile(path.join(dashboardDir, "components/personal-ops/PersonalOpsWorkspace.tsx"), "utf8"),
+      readFile(path.join(dashboardDir, "components/personal-ops/PersonalOpsSidebar.tsx"), "utf8"),
+      readFile(path.join(dashboardDir, "components/admin-shell/SharedAIDock.tsx"), "utf8"),
+      readFile(path.join(dashboardDir, "app/figma-transfer.css"), "utf8"),
       readFile(path.join(dashboardDir, "components/personal-ops/TravelWorldMap.tsx"), "utf8"),
       readFile(path.join(dashboardDir, "components/projects/ProjectsWorkspace.tsx"), "utf8"),
       readFile(path.join(dashboardDir, "components/PeopleWorkspace.tsx"), "utf8")
@@ -11427,6 +11552,7 @@ async function main() {
         !personalLifeWorkspace.includes("Encrypted credentials available inside your authenticated admin session.") &&
         !personalLifeWorkspace.includes("Protected at rest · available in this admin session") &&
         personalPasswordsTypes.includes('Omit<CredentialInput, "secret" | "pin">') &&
+        personalPasswordsTypes.includes("hasPin: boolean") &&
         personalLifeTypes.includes('"rating", "person", "object"') &&
         personalLifeWorkspace.includes("renderListCell") &&
         personalPasswordsStore.includes('createCipheriv("aes-256-gcm"') &&
@@ -11436,6 +11562,13 @@ async function main() {
         personalPasswordsApi.includes("isCsrfRequestValid") &&
         personalOpsIconSource.includes('M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13') &&
         personalOpsIconSource.includes('M12 5v14M5 12h14') &&
+        personalOpsWorkspaceSource.includes('placeholder="Search..."') &&
+        personalOpsWorkspaceSource.includes('aria-label="Personal systems"') &&
+        !personalOpsWorkspaceSource.includes('aria-label="Personal Ops quick actions"') &&
+        !personalOpsSidebarSource.includes('label: "Passwords"') &&
+        sharedAiDockSource.includes('M5 5.5h14v11H9l-4 3v-14Z') &&
+        !sharedAiDockSource.includes('m12 3 1.3 4.1') &&
+        sharedAiDockStyles.includes("backdrop-filter: blur(24px) saturate(128%)") &&
         travelMapSource.includes("geoNaturalEarth1") &&
         travelMapSource.includes("world-atlas/countries-110m.json") &&
         !projectsWorkspaceSource.includes("batchSelection") &&
@@ -11806,7 +11939,6 @@ async function main() {
     for (const expected of [
       "Personal Ops",
       "Personal Ops Command",
-      "Your operating view for today across goals, decisions, obligations, and follow-ups.",
       "Current Goals bridge",
       "Routines",
       "Capture Inbox",
@@ -11834,7 +11966,7 @@ async function main() {
           "Current Goals",
           "Outcomes and measurable key results",
           "Current Goals bridge",
-          "Add native goal"
+          "Goal"
         ]
       },
       {
@@ -11842,7 +11974,7 @@ async function main() {
         label: "Decisions",
         expected: [
           "Decisions",
-          "File decision"
+          "Decision"
         ]
       },
       {
@@ -11851,7 +11983,7 @@ async function main() {
         expected: [
           "Obligations",
           "Commitments whose completion depends on criteria and evidence, not a bare checkbox.",
-          "Add obligation"
+          "Obligation"
         ]
       },
       {
@@ -11860,7 +11992,7 @@ async function main() {
         expected: [
           "Follow-ups",
           "Actionable next contact and carry-forward work, linked back to its native source.",
-          "New follow-up"
+          "Follow-up"
         ]
       },
       {
@@ -11959,13 +12091,13 @@ async function main() {
       body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}-user`, email: `${testRunId}@example.com`, phone: "987654321", phoneCountryCode: "+51", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com/account", notes: "Synthetic credential context." } })
     });
     assert(
-      createdCredential.response.ok && createdCredential.payload?.ok && createdCredential.payload.item?.id && !("secret" in createdCredential.payload.item) && !("pin" in createdCredential.payload.item),
+      createdCredential.response.ok && createdCredential.payload?.ok && createdCredential.payload.item?.id && createdCredential.payload.item?.hasPin === true && !("secret" in createdCredential.payload.item) && !("pin" in createdCredential.payload.item),
       `Encrypted credential create failed or returned plaintext: ${JSON.stringify(createdCredential.payload)}`
     );
     const credentialSummary = createdCredential.payload.item;
     const listedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords");
     assert(
-      listedCredentials.response.ok && listedCredentials.payload?.items?.some((item) => item.id === credentialSummary.id && item.username === `${testRunId}-user` && item.email === `${testRunId}@example.com` && item.phone === syntheticPhone && item.phoneCountryCode === "+51" && !("secret" in item) && !("pin" in item)),
+      listedCredentials.response.ok && listedCredentials.payload?.items?.some((item) => item.id === credentialSummary.id && item.username === `${testRunId}-user` && item.email === `${testRunId}@example.com` && item.phone === syntheticPhone && item.phoneCountryCode === "+51" && item.hasPin === true && !("secret" in item) && !("pin" in item)),
       "Default encrypted password list exposed a secret or omitted separate username/email/phone fields"
     );
     const revealedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords?includeSecrets=true");
@@ -11986,6 +12118,8 @@ async function main() {
     );
     await checkPersonalPasswordsBrowserState(server.baseUrl, cookieJar, syntheticCredentialTitle);
     pass("Password ledger and editor preserve the compact icon language, responsive layout, editable international phone code, masked secret fields, and centered close control");
+    await checkPersonalOpsCommandBrowserState(server.baseUrl, cookieJar);
+    pass("Personal Ops Command keeps secondary systems in an icon dock, aligns concise top actions with search/filter/sort, and renders the AI assistant as opaque frosted workspace chrome");
     const updatedCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "PATCH",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },

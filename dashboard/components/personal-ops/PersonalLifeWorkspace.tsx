@@ -154,7 +154,7 @@ export default function PersonalLifeWorkspace({
   const [modDraft, setModDraft] = useState("");
   const [modStatus, setModStatus] = useState<VehicleModificationStatus>("idea");
   const [credentials, setCredentials] = useState<CredentialSummary[]>(initialCredentials);
-  const [credentialSecrets, setCredentialSecrets] = useState<Record<string, string>>({});
+  const [credentialSecrets, setCredentialSecrets] = useState<Record<string, { secret: string; pin: string }>>({});
   const [passwordsMasked, setPasswordsMasked] = useState(true);
   const [credentialDraft, setCredentialDraft] = useState<CredentialDraft | null>(null);
   const [passwordFieldVisible, setPasswordFieldVisible] = useState(false);
@@ -186,7 +186,7 @@ export default function PersonalLifeWorkspace({
       const payload = await requestCredentials("/api/personal/passwords?includeSecrets=true");
       const details = (payload.items || []) as CredentialDetail[];
       setCredentials(details.map(({ secret: _secret, pin: _pin, ...summary }) => summary));
-      setCredentialSecrets(Object.fromEntries(details.map((item) => [item.id, item.secret])));
+      setCredentialSecrets(Object.fromEntries(details.map((item) => [item.id, { secret: item.secret, pin: item.pin }])));
       setPasswordsMasked(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Passwords could not be revealed.");
@@ -495,28 +495,39 @@ export default function PersonalLifeWorkspace({
           <strong>Encrypted credentials</strong>
           <span className={styles.keyringCount}>{credentials.length}</span>
         </header>
-        <div className={styles.credentialList}>
-          {credentials.length ? credentials.map((item) => (
-            <article className={styles.credentialRow} key={item.id}>
-              <span className={styles.keyIcon}><PersonalOpsIcon name="password" /></span>
-              <div className={`${styles.credentialIdentity} ${styles.credentialPrivate}`}>
+        <div className={styles.credentialLedger} role="table" aria-label="Credentials">
+          <div className={styles.credentialGridHeader} role="row">
+            <span role="columnheader" aria-label="Account icon" />
+            <span className={styles.credentialAccountHeading} role="columnheader">Account</span>
+            <span role="columnheader" aria-label="Username" title="Username"><PersonalOpsIcon name="username" /></span>
+            <span role="columnheader" aria-label="Email" title="Email"><PersonalOpsIcon name="email" /></span>
+            <span role="columnheader" aria-label="Phone" title="Phone"><PersonalOpsIcon name="phone" /></span>
+            <span role="columnheader" aria-label="Website" title="Website"><PersonalOpsIcon name="website" /></span>
+            <span role="columnheader" aria-label="Password" title="Password"><PersonalOpsIcon name="password" /></span>
+            <span role="columnheader" aria-label="PIN" title="PIN"><PersonalOpsIcon name="pin" /></span>
+            <span role="columnheader" aria-label="Actions" />
+          </div>
+          <div className={styles.credentialList} role="rowgroup">
+            {credentials.length ? credentials.map((item) => (
+            <article className={styles.credentialRow} role="row" key={item.id}>
+              <span className={styles.keyIcon} role="cell"><PersonalOpsIcon name="password" /></span>
+              <div className={`${styles.credentialIdentity} ${styles.credentialPrivate}`} role="cell">
                 <strong>{item.title || "Untitled credential"}</strong>
-                <div className={styles.credentialMeta}>
-                  {item.username && <span aria-label={`Username: ${item.username}`} title="Username"><PersonalOpsIcon name="username" />{item.username}</span>}
-                  {item.email && <span aria-label={`Email: ${item.email}`} title="Email"><PersonalOpsIcon name="email" />{item.email}</span>}
-                  {item.phone && <span aria-label={`Phone: ${item.phone}`} title="Phone"><PersonalOpsIcon name="phone" />{item.phone}</span>}
-                  {item.website && <span aria-label={`Website: ${item.website}`} title="Website"><PersonalOpsIcon name="website" />{item.website}</span>}
-                  {!item.username && !item.email && !item.phone && !item.website && <span>No account details</span>}
-                </div>
               </div>
-              <code className={styles.credentialPrivate} aria-label={passwordsMasked ? "Hidden password" : "Revealed password"}>{passwordsMasked ? "••••••••••••" : credentialSecrets[item.id] || ""}</code>
-              <div className={styles.iconActions} aria-label={`${item.title} actions`}>
+              <span className={`${styles.credentialCell} ${styles.credentialPrivate}`} role="cell" data-field="username" data-label="Username">{item.username}</span>
+              <span className={`${styles.credentialCell} ${styles.credentialPrivate}`} role="cell" data-field="email" data-label="Email">{item.email}</span>
+              <span className={`${styles.credentialCell} ${styles.credentialPrivate}`} role="cell" data-field="phone" data-label="Phone">{item.phone}</span>
+              <span className={`${styles.credentialCell} ${styles.credentialPrivate}`} role="cell" data-field="website" data-label="Website">{item.website}</span>
+              <code className={styles.credentialPrivate} role="cell" data-field="password" data-label="Password" aria-label={passwordsMasked ? "Hidden password" : "Revealed password"}>{passwordsMasked ? "••••••••" : credentialSecrets[item.id]?.secret || ""}</code>
+              <code className={styles.credentialPrivate} role="cell" data-field="pin" data-label="PIN" aria-label={!item.hasPin ? "No PIN" : passwordsMasked ? "Hidden PIN" : "Revealed PIN"}>{item.hasPin ? passwordsMasked ? "••••" : credentialSecrets[item.id]?.pin || "" : ""}</code>
+              <div className={styles.iconActions} role="cell" aria-label={`${item.title} actions`}>
                 <button type="button" aria-label={`Copy password for ${item.title}`} title="Copy password" onClick={() => void copyCredential(item)}><PersonalOpsIcon name="copy" /></button>
                 <button type="button" aria-label={`Edit ${item.title}`} title="Edit" onClick={() => void editCredential(item)}><PersonalOpsIcon name="edit" /></button>
                 <button type="button" className={styles.dangerAction} aria-label={`Delete ${item.title}`} title="Delete" onClick={() => void deleteCredential(item)}><PersonalOpsIcon name="delete" /></button>
               </div>
             </article>
-          )) : <div className={styles.empty}><strong>No passwords yet</strong><span>Add a credential when you are ready.</span></div>}
+            )) : <div className={styles.empty}><strong>No passwords yet</strong><span>Add a credential when you are ready.</span></div>}
+          </div>
         </div>
       </section>
     );
@@ -631,7 +642,7 @@ export default function PersonalLifeWorkspace({
       <div className={styles.scroll}>
         <header className={styles.pageHeader}><div>{initialView !== "passwords" && <span>Personal Ops / Command</span>}<h1>{copy.title}</h1>{copy.description && <p>{copy.description}</p>}</div><div className={styles.headerActions}>{initialView === "passwords" && <button type="button" className={styles.privacyToggle} aria-label={passwordsMasked ? "Unblur password page" : "Blur password page"} aria-pressed={!passwordsMasked} onClick={() => void togglePasswordPrivacy()} disabled={busy} title={passwordsMasked ? "Unblur page" : "Blur page"}>{passwordsMasked ? <PersonalOpsIcon name="show" /> : <PersonalOpsIcon name="hide" />}<span>{passwordsMasked ? "Unblur" : "Blur"}</span></button>}<button type="button" className={`${styles.primaryButton} ${initialView === "passwords" ? styles.addAction : ""}`} onClick={() => openCreate()}>{initialView === "passwords" ? <><PersonalOpsIcon name="plus" /><span>{copy.action}</span></> : <>+ {copy.action}</>}</button></div></header>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        {notice && <p className={styles.notice} role="status">{notice}</p>}
+        {notice && <div className={styles.notice} role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" title="Dismiss" onClick={() => setNotice("")}><PersonalOpsIcon name="close" /></button></div>}
         <div className={styles.workspace} data-view={initialView}>
           {initialView === "passwords" && renderPasswords()}
           {initialView === "lists" && renderLists()}

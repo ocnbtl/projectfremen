@@ -61,6 +61,7 @@ import PersonalOpsSidebar, {
   PERSONAL_OPS_DOMAIN_LABELS,
   type PersonalOpsSidebarCounts
 } from "./PersonalOpsSidebar";
+import PersonalOpsIcon, { type PersonalOpsIconName } from "./PersonalOpsIcon";
 import styles from "./PersonalOpsWorkspace.module.css";
 
 export type PersonalOpsView =
@@ -149,7 +150,7 @@ type OpenForm = {
 const VIEW_COPY: Record<PersonalOpsView, { title: string; description: string; family?: PersonalOpsFamily }> = {
   command: {
     title: "Personal Ops Command",
-    description: "Your operating view for today across goals, decisions, obligations, and follow-ups."
+    description: ""
   },
   goals: {
     title: "Current Goals",
@@ -172,6 +173,14 @@ const VIEW_COPY: Record<PersonalOpsView, { title: string; description: string; f
     family: "followUps"
   }
 };
+
+const PERSONAL_SYSTEM_LINKS: ReadonlyArray<{ label: string; href: string; icon: PersonalOpsIconName }> = [
+  { label: "Passwords", href: "/admin/personal/passwords", icon: "password" },
+  { label: "Lists", href: "/admin/personal/lists", icon: "list" },
+  { label: "Travel", href: "/admin/personal/travel", icon: "travel" },
+  { label: "Personal Build", href: "/admin/personal/personal-build", icon: "build" },
+  { label: "Car", href: "/admin/personal/car", icon: "car" }
+];
 
 const FAMILY_LABELS: Record<PersonalOpsFamily, string> = {
   goals: "Goal",
@@ -1045,6 +1054,7 @@ export default function PersonalOpsWorkspace({
   const [pendingAction, setPendingAction] = useState<PendingAction | null>(null);
   const [archiveReason, setArchiveReason] = useState("");
   const [queryDraft, setQueryDraft] = useState(urlState.query);
+  const [filtersOpen, setFiltersOpen] = useState(urlState.filter !== "all");
   const queryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const updateUrl = useCallback(
@@ -1513,7 +1523,7 @@ export default function PersonalOpsWorkspace({
       <main className={styles.directory} aria-label={`${VIEW_COPY[initialView].title} ledger`}>
         <div className={styles.mobileToolbar}>
           <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}>☰ Personal Ops</button>
-          <button type="button" onClick={() => openCreate(primaryFamily)}>+ {FAMILY_LABELS[primaryFamily]}</button>
+          <button type="button" onClick={() => openCreate(primaryFamily)}><PersonalOpsIcon name="plus" /> {FAMILY_LABELS[primaryFamily]}</button>
         </div>
         <div className={styles.mainScroll}>
           <header className={styles.pageHeader}>
@@ -1523,14 +1533,16 @@ export default function PersonalOpsWorkspace({
             </div>
             <div className={styles.headerActions}>
               <label className={styles.visuallyHidden} htmlFor="personal-ops-search">Search this ledger</label>
-              <input
-                id="personal-ops-search"
-                className={styles.button}
-                type="search"
-                value={queryDraft}
-                onChange={(event) => changeQuery(event.target.value)}
-                placeholder="Search ledger"
-              />
+              <span className={styles.searchControl}>
+                <PersonalOpsIcon name="search" />
+                <input
+                  id="personal-ops-search"
+                  type="search"
+                  value={queryDraft}
+                  onChange={(event) => changeQuery(event.target.value)}
+                  placeholder="Search..."
+                />
+              </span>
               <select
                 className={styles.button}
                 value={urlState.sort}
@@ -1542,7 +1554,28 @@ export default function PersonalOpsWorkspace({
                 <option value="updated">Recently updated</option>
                 <option value="title">Title</option>
               </select>
-              <button type="button" className={styles.primaryButton} onClick={() => openCreate(primaryFamily)}>New {FAMILY_LABELS[primaryFamily]}</button>
+              <button
+                type="button"
+                className={styles.filterToggle}
+                data-active={urlState.filter !== "all" || undefined}
+                aria-label={filtersOpen ? "Hide filters" : "Show filters"}
+                aria-expanded={filtersOpen}
+                aria-controls="personal-ops-filter-rail"
+                onClick={() => setFiltersOpen((current) => !current)}
+              >
+                <PersonalOpsIcon name="filter" />
+                {urlState.filter !== "all" && <span>1</span>}
+              </button>
+              {initialView === "command" ? (
+                <div className={styles.commandCreateActions} aria-label="Create Personal Ops object">
+                  <button type="button" className={styles.primaryButton} onClick={() => openCreate("followUps")}><PersonalOpsIcon name="plus" />Follow-up</button>
+                  <button type="button" className={styles.button} onClick={() => openCreate("decisions")}><PersonalOpsIcon name="plus" />Decision</button>
+                  <button type="button" className={styles.button} onClick={() => openCreate("obligations")}><PersonalOpsIcon name="plus" />Obligation</button>
+                  <button type="button" className={styles.button} onClick={() => openCreate("goals")}><PersonalOpsIcon name="plus" />Goal</button>
+                </div>
+              ) : (
+                <button type="button" className={styles.primaryButton} onClick={() => openCreate(primaryFamily)}><PersonalOpsIcon name="plus" />{FAMILY_LABELS[primaryFamily]}</button>
+              )}
             </div>
             {!isDecisionView && (
               <PersonalOpsStatusLine items={[
@@ -1554,8 +1587,19 @@ export default function PersonalOpsWorkspace({
             )}
           </header>
 
+          {initialView === "command" && (
+            <nav className={styles.personalSystemsDock} aria-label="Personal systems">
+              {PERSONAL_SYSTEM_LINKS.map((item) => (
+                <Link href={item.href} aria-label={item.label} title={item.label} key={item.href}>
+                  <PersonalOpsIcon name={item.icon} />
+                  <span className={styles.visuallyHidden}>{item.label}</span>
+                </Link>
+              ))}
+            </nav>
+          )}
+
           <PersonalOpsMetricRail items={metrics} />
-          <PersonalOpsFilterRail items={filterItems} />
+          {filtersOpen && <div id="personal-ops-filter-rail"><PersonalOpsFilterRail items={filterItems} /></div>}
 
           {error && <div className={styles.error} role="alert" style={{ margin: "0 16px 10px" }}>{error}</div>}
           {notice && <div className={styles.notice} role="status" style={{ margin: "0 16px 10px" }}>{notice}</div>}
@@ -1635,12 +1679,6 @@ export default function PersonalOpsWorkspace({
           )}
         </div>
 
-        <nav className={styles.quickActions} aria-label="Personal Ops quick actions">
-          <button type="button" onClick={() => openCreate("followUps")}><span>New follow-up</span><small>actionable next step</small></button>
-          <button type="button" onClick={() => openCreate("decisions")}><span>File decision</span><small>question + decision</small></button>
-          <button type="button" onClick={() => openCreate("obligations")}><span>Add obligation</span><small>criteria + evidence</small></button>
-          <button type="button" onClick={() => openCreate("goals")}><span>Add native goal</span><small>outcome + key results</small></button>
-        </nav>
       </main>
 
       {selectedItem && (

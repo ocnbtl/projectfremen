@@ -207,7 +207,14 @@ function decryptCredential(item: EncryptedCredentialRecord): CredentialInput {
 }
 
 function detail(item: EncryptedCredentialRecord): CredentialDetail {
-  return { id: item.id, ...decryptCredential(item), createdAt: item.createdAt, updatedAt: item.updatedAt };
+  const decrypted = decryptCredential(item);
+  return {
+    id: item.id,
+    ...decrypted,
+    hasPin: Boolean(decrypted.pin),
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt
+  };
 }
 
 function summary(item: EncryptedCredentialRecord): CredentialSummary {
