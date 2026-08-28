@@ -31,7 +31,7 @@ export async function GET(_request: Request, context: RouteContext) {
       status: 200,
       headers: {
         "Content-Type": photo.mimeType,
-        "Cache-Control": "private, max-age=300, must-revalidate",
+        "Cache-Control": "private, no-store, max-age=0",
         "Content-Length": String(photo.byteLength),
         "X-Content-Type-Options": "nosniff"
       }

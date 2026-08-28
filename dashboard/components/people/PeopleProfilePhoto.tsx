@@ -15,6 +15,17 @@ type PhotoResponse = {
   error?: string;
 };
 
+type PhotoEditorDraft = {
+  source: Blob;
+  previewUrl: string;
+  sourceWidth: number;
+  sourceHeight: number;
+  zoom: number;
+  panX: number;
+  panY: number;
+  outputSize: 256 | 512 | 1024;
+};
+
 export function PeopleProfileAvatar({
   label,
   initials,
@@ -56,20 +67,25 @@ export function PeopleProfileAvatar({
   return <span className={`people-row-avatar people-profile-photo${compact ? " is-compact" : ""}`}>{image}</span>;
 }
 
-async function prepareProfilePhoto(source: Blob): Promise<File> {
+function clamp(value: number, minimum: number, maximum: number) {
+  return Math.min(maximum, Math.max(minimum, value));
+}
+
+async function prepareProfilePhoto(editor: PhotoEditorDraft): Promise<File> {
+  const source = editor.source;
   if (!source.type.startsWith("image/")) throw new Error("Choose an image from your device or clipboard.");
   const bitmap = await createImageBitmap(source);
   try {
-    const side = Math.min(bitmap.width, bitmap.height);
-    const sourceX = Math.max(0, (bitmap.width - side) / 2);
-    const sourceY = Math.max(0, (bitmap.height - side) / 2);
+    const side = Math.min(bitmap.width, bitmap.height) / editor.zoom;
+    const sourceX = ((editor.panX + 1) / 2) * Math.max(0, bitmap.width - side);
+    const sourceY = ((editor.panY + 1) / 2) * Math.max(0, bitmap.height - side);
     const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 512;
+    canvas.width = editor.outputSize;
+    canvas.height = editor.outputSize;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("This browser could not prepare the picture.");
-    context.drawImage(bitmap, sourceX, sourceY, side, side, 0, 0, 512, 512);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.84));
+    context.drawImage(bitmap, sourceX, sourceY, side, side, 0, 0, editor.outputSize, editor.outputSize);
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.86));
     if (!blob) throw new Error("This browser could not prepare the picture.");
     return new File([blob], "profile-picture.jpg", { type: "image/jpeg" });
   } finally {
@@ -105,9 +121,12 @@ export default function PeopleProfilePhotoDialog({
   const cameraInputRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const previewUrlRef = useRef("");
+  const dragRef = useRef<{ pointerId: number; x: number; y: number; panX: number; panY: number; width: number; height: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
+  const [photoDraft, setPhotoDraft] = useState<PhotoEditorDraft | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -118,13 +137,54 @@ export default function PeopleProfilePhotoDialog({
     return () => returnFocusRef.current?.focus();
   }, [open]);
 
+  useEffect(() => () => {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+  }, []);
+
   if (!open) return null;
 
-  async function upload(source: Blob) {
+  function releasePreview() {
+    if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+    previewUrlRef.current = "";
+  }
+
+  function closeDialog(force = false) {
+    if (saving && !force) return;
+    releasePreview();
+    setPhotoDraft(null);
+    onClose();
+  }
+
+  async function beginEditing(source: Blob) {
+    setError("");
+    if (!source.type.startsWith("image/")) {
+      setError("Choose an image from your device or clipboard.");
+      return;
+    }
+    if (source.size > 20_000_000) {
+      setError("Choose an image smaller than 20 MB before editing.");
+      return;
+    }
+    try {
+      const bitmap = await createImageBitmap(source);
+      const sourceWidth = bitmap.width;
+      const sourceHeight = bitmap.height;
+      bitmap.close();
+      releasePreview();
+      const previewUrl = URL.createObjectURL(source);
+      previewUrlRef.current = previewUrl;
+      setPhotoDraft({ source, previewUrl, sourceWidth, sourceHeight, zoom: 1, panX: 0, panY: 0, outputSize: 512 });
+    } catch {
+      setError("This browser could not open that picture.");
+    }
+  }
+
+  async function uploadEditedPhoto() {
+    if (!photoDraft) return;
     setSaving(true);
     setError("");
     try {
-      const photo = await prepareProfilePhoto(source);
+      const photo = await prepareProfilePhoto(photoDraft);
       const formData = new FormData();
       formData.append("photo", photo);
       const response = await fetch(`/api/people/photos/${encodeURIComponent(personId)}`, {
@@ -134,7 +194,7 @@ export default function PeopleProfilePhotoDialog({
       });
       const payload = (await response.json().catch(() => ({ ok: false, error: "Invalid server response" }))) as PhotoResponse;
       if (!response.ok || !payload.ok || !payload.photo) throw new Error(payload.error || "Profile picture could not be saved.");
-      if (await onSaved(payload.photo)) onClose();
+      if (await onSaved(payload.photo)) closeDialog(true);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Profile picture could not be saved.");
     } finally {
@@ -150,7 +210,7 @@ export default function PeopleProfilePhotoDialog({
       for (const item of items) {
         const imageType = item.types.find((type) => type.startsWith("image/"));
         if (imageType) {
-          await upload(await item.getType(imageType));
+          await beginEditing(await item.getType(imageType));
           return;
         }
       }
@@ -170,7 +230,7 @@ export default function PeopleProfilePhotoDialog({
       });
       const payload = (await response.json().catch(() => ({ ok: false, error: "Invalid server response" }))) as PhotoResponse;
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Profile picture could not be removed.");
-      if (await onRemoved()) onClose();
+      if (await onRemoved()) closeDialog(true);
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : "Profile picture could not be removed.");
     } finally {
@@ -180,7 +240,7 @@ export default function PeopleProfilePhotoDialog({
 
   return (
     <div className="people-photo-overlay" role="presentation" onMouseDown={(event) => {
-      if (event.target === event.currentTarget && !saving) onClose();
+      if (event.target === event.currentTarget && !saving) closeDialog();
     }}>
       <div
         ref={dialogRef}
@@ -190,7 +250,7 @@ export default function PeopleProfilePhotoDialog({
         aria-labelledby="people-photo-dialog-title"
         tabIndex={-1}
         onKeyDown={(event) => {
-          if (event.key === "Escape" && !saving) onClose();
+          if (event.key === "Escape" && !saving) closeDialog();
           if (event.key === "Tab") {
             const controls = Array.from(
               event.currentTarget.querySelectorAll<HTMLElement>('button:not(:disabled), [href], input:not(:disabled), [tabindex]:not([tabindex="-1"])')
@@ -214,7 +274,7 @@ export default function PeopleProfilePhotoDialog({
           const image = Array.from(event.clipboardData.items).find((item) => item.type.startsWith("image/"))?.getAsFile();
           if (image) {
             event.preventDefault();
-            void upload(image);
+            void beginEditing(image);
           }
         }}
       >
@@ -223,10 +283,10 @@ export default function PeopleProfilePhotoDialog({
             <span>Profile picture</span>
             <h2 id="people-photo-dialog-title">{personName}</h2>
           </div>
-          <button type="button" aria-label="Close profile picture options" onClick={onClose} disabled={saving}>×</button>
+          <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving}>×</button>
         </header>
-        <p>Pictures are cropped to a private square portrait and remain available only inside your authenticated workspace.</p>
-        <div className="people-photo-options">
+        <p>{photoDraft ? "Place the picture inside the square, then choose its saved size." : "Choose a picture to crop before it is saved to this private profile."}</p>
+        {!photoDraft && <div className="people-photo-options">
           <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={saving}>
             <span aria-hidden="true">↑</span><strong>Upload</strong><small>Choose a saved picture</small>
           </button>
@@ -236,8 +296,70 @@ export default function PeopleProfilePhotoDialog({
           <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={saving}>
             <span aria-hidden="true">○</span><strong>Take picture</strong><small>Open the camera</small>
           </button>
-        </div>
-        <div className="people-photo-paste-hint" tabIndex={0}>You can also paste a picture here with Ctrl+V or Command+V.</div>
+        </div>}
+        {!photoDraft && <div className="people-photo-paste-hint" tabIndex={0}>You can also paste a picture here with Ctrl+V or Command+V.</div>}
+        {photoDraft && <section className="people-photo-editor" aria-label="Crop and resize profile picture">
+          <div
+            className="people-photo-crop-frame"
+            role="img"
+            aria-label={`Square crop preview for ${personName}. Drag to reposition.`}
+            tabIndex={0}
+            onPointerDown={(event) => {
+              const bounds = event.currentTarget.getBoundingClientRect();
+              dragRef.current = { pointerId: event.pointerId, x: event.clientX, y: event.clientY, panX: photoDraft.panX, panY: photoDraft.panY, width: bounds.width, height: bounds.height };
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              const drag = dragRef.current;
+              if (!drag || drag.pointerId !== event.pointerId) return;
+              setPhotoDraft((current) => current ? {
+                ...current,
+                panX: clamp(drag.panX - ((event.clientX - drag.x) / Math.max(1, drag.width)) * 2, -1, 1),
+                panY: clamp(drag.panY - ((event.clientY - drag.y) / Math.max(1, drag.height)) * 2, -1, 1)
+              } : current);
+            }}
+            onPointerUp={(event) => {
+              if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null;
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
+            }}
+            onPointerCancel={() => { dragRef.current = null; }}
+            onKeyDown={(event) => {
+              const next = event.key === "ArrowLeft" ? { panX: -0.05, panY: 0 }
+                : event.key === "ArrowRight" ? { panX: 0.05, panY: 0 }
+                  : event.key === "ArrowUp" ? { panX: 0, panY: -0.05 }
+                    : event.key === "ArrowDown" ? { panX: 0, panY: 0.05 }
+                      : null;
+              if (!next) return;
+              event.preventDefault();
+              setPhotoDraft((current) => current ? { ...current, panX: clamp(current.panX + next.panX, -1, 1), panY: clamp(current.panY + next.panY, -1, 1) } : current);
+            }}
+          >
+            <img
+              src={photoDraft.previewUrl}
+              alt=""
+              draggable={false}
+              style={{
+                objectPosition: `${(photoDraft.panX + 1) * 50}% ${(photoDraft.panY + 1) * 50}%`,
+                transform: `scale(${photoDraft.zoom})`
+              }}
+            />
+            <span className="people-photo-crop-grid" aria-hidden="true" />
+          </div>
+          <div className="people-photo-editor-controls">
+            <label>
+              <span>Zoom</span>
+              <div className="people-photo-zoom-control">
+                <button type="button" aria-label="Zoom out" onClick={() => setPhotoDraft((current) => current ? { ...current, zoom: clamp(Number((current.zoom - 0.1).toFixed(2)), 1, 3) } : current)}>−</button>
+                <input aria-label="Zoom" type="range" min="1" max="3" step="0.05" value={photoDraft.zoom} onChange={(event) => setPhotoDraft((current) => current ? { ...current, zoom: Number(event.target.value) } : current)} />
+                <button type="button" aria-label="Zoom in" onClick={() => setPhotoDraft((current) => current ? { ...current, zoom: clamp(Number((current.zoom + 0.1).toFixed(2)), 1, 3) } : current)}>+</button>
+              </div>
+            </label>
+            <label><span>Horizontal crop</span><input aria-label="Horizontal crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panX} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panX: Number(event.target.value) } : current)} /></label>
+            <label><span>Vertical crop</span><input aria-label="Vertical crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panY} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panY: Number(event.target.value) } : current)} /></label>
+            <label><span>Resize output</span><select aria-label="Resize output" value={photoDraft.outputSize} onChange={(event) => setPhotoDraft((current) => current ? { ...current, outputSize: Number(event.target.value) as PhotoEditorDraft["outputSize"] } : current)}><option value="256">256 px</option><option value="512">512 px</option><option value="1024">1024 px</option></select></label>
+          </div>
+          <div className="people-photo-editor-meta"><span>{photoDraft.sourceWidth} × {photoDraft.sourceHeight} source</span><button type="button" onClick={() => setPhotoDraft((current) => current ? { ...current, zoom: 1, panX: 0, panY: 0 } : current)}>Center crop</button></div>
+        </section>}
         <input
           ref={uploadInputRef}
           className="sr-only"
@@ -246,7 +368,7 @@ export default function PeopleProfilePhotoDialog({
           onChange={(event) => {
             const file = event.currentTarget.files?.[0];
             event.currentTarget.value = "";
-            if (file) void upload(file);
+            if (file) void beginEditing(file);
           }}
         />
         <input
@@ -258,12 +380,17 @@ export default function PeopleProfilePhotoDialog({
           onChange={(event) => {
             const file = event.currentTarget.files?.[0];
             event.currentTarget.value = "";
-            if (file) void upload(file);
+            if (file) void beginEditing(file);
           }}
         />
         {error && <p className="personal-record-error" role="alert">{error}</p>}
         {saving && <p className="people-photo-status" role="status">Preparing and saving picture…</p>}
-        {hasPhoto && (
+        {photoDraft ? (
+          <footer className="people-photo-editor-actions">
+            <button type="button" onClick={() => { releasePreview(); setPhotoDraft(null); }} disabled={saving}>Choose another</button>
+            <button type="button" className="is-primary" onClick={() => void uploadEditedPhoto()} disabled={saving}>{saving ? "Saving…" : "Save picture"}</button>
+          </footer>
+        ) : hasPhoto && (
           <footer>
             {confirmRemove ? (
               <div className="people-photo-remove-confirm">

@@ -413,7 +413,10 @@ try {
   assert.match(peopleWorkspace, /EmailEntriesEditor/i);
   assert.match(peopleWorkspace, /PhoneEntriesEditor/i);
   assert.match(peopleWorkspace, /Custom category/i);
-  assert.match(peopleWorkspace, /Website & social profiles/i);
+  assert.match(peopleWorkspace, /people-record-type-toggle/i);
+  assert.match(peopleWorkspace, /aria-pressed={className === "person"}/i);
+  assert.match(peopleWorkspace, /YouTube/i);
+  assert.match(peopleWorkspace, /quickYouTube/i);
   assert.match(peopleWorkspace, /people-location-suggestions/i);
   assert.match(
     peopleWorkspace,
@@ -421,9 +424,9 @@ try {
   );
   assert.doesNotMatch(peopleWorkspace, /Colleague \/ Coworker/i);
   assert.match(peopleWorkspace, /No cadence/i);
-  assert.match(peopleWorkspace, /Add university/i);
-  assert.match(peopleWorkspace, /Add job/i);
-  assert.match(peopleWorkspace, /Add location/i);
+  assert.match(peopleWorkspace, /<PeopleAddButton label="University"/i);
+  assert.match(peopleWorkspace, /<PeopleAddButton label="Occupation"/i);
+  assert.match(peopleWorkspace, /<PeopleAddButton label="Location"/i);
   assert.match(peopleWorkspace, /<option value="catch-up">Catch-up<\/option>/i);
   assert.doesNotMatch(peopleWorkspace, /Meaningful interaction/i);
   const personalRecordsStore = await readFile("lib/personal-records-store.ts", "utf8");

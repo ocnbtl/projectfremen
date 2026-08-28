@@ -26,6 +26,7 @@ export type PersonalOpsIconName =
   | "plus"
   | "username"
   | "email"
+  | "link"
   | "website"
   | "phone"
   | "pin"
@@ -68,6 +69,7 @@ export const PERSONAL_OPS_ICON_LIBRARY: ReadonlyArray<{ name: PersonalOpsIconNam
   { name: "plus", label: "Add" },
   { name: "username", label: "Person" },
   { name: "email", label: "Email" },
+  { name: "link", label: "Link" },
   { name: "website", label: "Website" },
   { name: "phone", label: "Phone" },
   { name: "pin", label: "PIN" },
@@ -122,6 +124,7 @@ export default function PersonalOpsIcon({ name, className }: { name: PersonalOps
   if (name === "plus") return <svg {...common}><path d="M12 5v14M5 12h14" /></svg>;
   if (name === "username") return <svg {...common}><circle cx="12" cy="8" r="3.5" /><path d="M5.5 20a6.5 6.5 0 0 1 13 0" /></svg>;
   if (name === "email") return <svg {...common}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m4 7 8 6 8-6" /></svg>;
+  if (name === "link") return <svg {...common}><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" /><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" /></svg>;
   if (name === "website") return <svg {...common}><circle cx="12" cy="12" r="9" /><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18" /></svg>;
   if (name === "phone") return <svg {...common}><path d="M7 3.5 4.5 6c.8 6.8 6.7 12.7 13.5 13.5l2.5-2.5-4-3-2 2c-2.7-1.1-5.4-3.8-6.5-6.5l2-2z" /></svg>;
   if (name === "pin") return <svg {...common}><rect x="4" y="4" width="16" height="16" rx="3" /><circle cx="8" cy="8" r=".8" fill="currentColor" stroke="none" /><circle cx="12" cy="8" r=".8" fill="currentColor" stroke="none" /><circle cx="16" cy="8" r=".8" fill="currentColor" stroke="none" /><circle cx="8" cy="12" r=".8" fill="currentColor" stroke="none" /><circle cx="12" cy="12" r=".8" fill="currentColor" stroke="none" /><circle cx="16" cy="12" r=".8" fill="currentColor" stroke="none" /><circle cx="8" cy="16" r=".8" fill="currentColor" stroke="none" /><circle cx="12" cy="16" r=".8" fill="currentColor" stroke="none" /></svg>;

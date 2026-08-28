@@ -109,7 +109,7 @@ type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up";
 type PeopleListMode = "list" | "compact" | "grid";
 type PeopleLastContactFilter = "any" | "7d" | "30d" | "90d" | "none";
 type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "note" | "memory" | "milestone";
-type ContactMethodId = "email" | "phone" | "website" | "instagram" | "tiktok" | "x" | "linkedin";
+type ContactMethodId = "email" | "phone" | "website" | "instagram" | "tiktok" | "x" | "linkedin" | "youtube";
 
 type ContactMethod = {
   id: ContactMethodId;
@@ -264,6 +264,7 @@ function ContactMethodIcon({ id }: { id: ContactMethodId }) {
       {id === "website" && <><circle cx="12" cy="12" r="8.5" /><path d="M3.7 12h16.6M12 3.5c2.2 2.3 3.2 5.1 3.2 8.5s-1 6.2-3.2 8.5C9.8 18.2 8.8 15.4 8.8 12S9.8 5.8 12 3.5Z" /></>}
       {id === "instagram" && <><rect x="4" y="4" width="16" height="16" rx="4" /><circle cx="12" cy="12" r="3.5" /><circle cx="17.2" cy="6.8" r=".7" /></>}
       {id === "tiktok" && <><path d="M14.5 4v10.2a4 4 0 1 1-3-3.9" /><path d="M14.5 4c.7 2.5 2.2 4 4.5 4.4" /></>}
+      {id === "youtube" && <><rect x="3.5" y="6.5" width="17" height="11" rx="3" /><path d="m10 9.5 5 2.5-5 2.5Z" /></>}
     </svg>
   );
 }
@@ -279,6 +280,7 @@ function contactMethodHref(id: ContactMethodId, value: string): { href?: string;
   if (id === "instagram") return { href: `https://instagram.com/${username}`, actionLabel: "Open" };
   if (id === "tiktok") return { href: `https://tiktok.com/@${username}`, actionLabel: "Open" };
   if (id === "x") return { href: `https://x.com/${username}`, actionLabel: "Open" };
+  if (id === "youtube") return { href: `https://youtube.com/@${username}`, actionLabel: "Open" };
   return {};
 }
 
@@ -341,6 +343,7 @@ type ContactProfileDraft = {
   instagram: string;
   tiktok: string;
   x: string;
+  youtube: string;
   partner: string;
   organizationType: string;
   industry: string;
@@ -652,6 +655,7 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
     fields: [
       { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/in/..." },
       { key: "website", label: "Website", type: "url", placeholder: "https://..." },
+      { key: "youtube", label: "YouTube", type: "url", placeholder: "https://youtube.com/@..." },
       { key: "instagram", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
       { key: "tiktok", label: "TikTok", type: "url", placeholder: "https://tiktok.com/@..." },
       { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." }
@@ -687,6 +691,7 @@ const ORGANIZATION_PROFILE_SECTIONS: Array<{ title: string; tone: string; fields
     fields: [
       { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/company/..." },
       { key: "website", label: "Website", type: "url", placeholder: "https://..." },
+      { key: "youtube", label: "YouTube", type: "url", placeholder: "https://youtube.com/@..." },
       { key: "instagram", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
       { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." }
     ]
@@ -734,6 +739,7 @@ const EMPTY_PROFILE_DRAFT: ContactProfileDraft = {
   instagram: "",
   tiktok: "",
   x: "",
+  youtube: "",
   partner: "",
   organizationType: "",
   industry: "",
@@ -1291,6 +1297,7 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     instagram: profile?.instagram || "",
     tiktok: profile?.tiktok || "",
     x: profile?.x || "",
+    youtube: profile?.youtube || "",
     partner: profile?.partner || "",
     organizationType: profile?.organizationType || "",
     industry: profile?.industry || "",
@@ -2162,6 +2169,7 @@ export default function PeopleWorkspace({
   const [quickTikTok, setQuickTikTok] = useState("");
   const [quickX, setQuickX] = useState("");
   const [quickLinkedIn, setQuickLinkedIn] = useState("");
+  const [quickYouTube, setQuickYouTube] = useState("");
   const [profileDraft, setProfileDraft] = useState<ContactProfileDraft>({ ...EMPTY_PROFILE_DRAFT });
   const [profileGroups, setProfileGroups] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
@@ -2575,7 +2583,8 @@ export default function PeopleWorkspace({
     { id: "instagram", label: "Instagram", value: selectedProfile.instagram },
     { id: "tiktok", label: "TikTok", value: selectedProfile.tiktok },
     { id: "x", label: "X", value: selectedProfile.x },
-    { id: "linkedin", label: "LinkedIn", value: selectedProfile.linkedin }
+    { id: "linkedin", label: "LinkedIn", value: selectedProfile.linkedin },
+    { id: "youtube", label: "YouTube", value: selectedProfile.youtube }
   ] satisfies Array<Omit<ContactMethod, "available">>)
     .filter((method) => selectedPerson?.className !== "org" || !["email", "phone"].includes(method.id))
     .map((method) => ({
@@ -2709,7 +2718,8 @@ export default function PeopleWorkspace({
     quickInstagram,
     quickTikTok,
     quickX,
-    quickLinkedIn
+    quickLinkedIn,
+    quickYouTube
   ].some((value) => value.trim().length > 0)
     || (className === "person" && cleanEmailEntries(quickEmails).length > 0)
     || (className === "person" && cleanPhoneEntries(quickPhones).length > 0)
@@ -2940,11 +2950,11 @@ export default function PeopleWorkspace({
         }
       : builtProfile;
     const previousProfileSources = new Set(
-      [selectedProfile.website, selectedProfile.linkedin, selectedProfile.instagram, selectedProfile.tiktok, selectedProfile.x]
+      [selectedProfile.website, selectedProfile.linkedin, selectedProfile.youtube, selectedProfile.instagram, selectedProfile.tiktok, selectedProfile.x]
         .filter((value): value is string => Boolean(value))
     );
     const preservedSources = selectedPerson.externalSources.filter((source) => !previousProfileSources.has(source));
-    const profileSources = [profile.website, profile.linkedin, profile.instagram, profile.tiktok, profile.x]
+    const profileSources = [profile.website, profile.linkedin, profile.youtube, profile.instagram, profile.tiktok, profile.x]
       .filter((value): value is string => Boolean(value));
     return patchPerson(selectedPerson.id, {
       title: profile.fullName || selectedPerson.title,
@@ -3080,7 +3090,8 @@ export default function PeopleWorkspace({
       instagram: quickInstagram,
       tiktok: quickTikTok,
       x: quickX,
-      linkedin: quickLinkedIn
+      linkedin: quickLinkedIn,
+      youtube: quickYouTube
     });
 
     const legacyInput = peopleCreateInputToLegacy({
@@ -3097,7 +3108,7 @@ export default function PeopleWorkspace({
       areas: ["Relationships"],
       subjects: className === "org" ? [] : groups,
       projects: splitList(quickProjects),
-      externalSources: [referenceUrl, quickInstagram, quickTikTok, quickX, quickLinkedIn].filter(Boolean),
+      externalSources: [referenceUrl, quickInstagram, quickTikTok, quickX, quickLinkedIn, quickYouTube].filter(Boolean),
       sourceUrl: referenceUrl
     });
 
@@ -3152,6 +3163,7 @@ export default function PeopleWorkspace({
       setQuickTikTok("");
       setQuickX("");
       setQuickLinkedIn("");
+      setQuickYouTube("");
       if (createdPerson) {
         await mirrorPersonalRecord(createdPerson);
         await releaseDirtyHistoryGuard();
@@ -3420,6 +3432,7 @@ export default function PeopleWorkspace({
     setQuickFoundedYear("");
     setQuickTeamSize("");
     setQuickOrganizationPeople([]);
+    setQuickYouTube("");
     setQuickEmails([newEmailEntry({ id: "new-contact-email-1", category: "primary" })]);
     setQuickPhones([newPhoneEntry({ id: "new-contact-phone-1", category: "primary", countryCode: "+1" })]);
     setQuickEducation([]);
@@ -3447,6 +3460,17 @@ export default function PeopleWorkspace({
       return;
     }
     setName(value);
+  }
+
+  function switchQuickProfileType(nextClassName: "person" | "org") {
+    if (nextClassName === className) return;
+    setClassName(nextClassName);
+    setQuickLocations((current) => current.map((entry, index) => index === 0 && ["Primary home", "Relevant location", "Headquarters"].includes(entry.label || "")
+      ? { ...entry, label: nextClassName === "org" ? "Relevant location" : "Primary home" }
+      : entry));
+    if (nextClassName === "person") {
+      setQuickOccupations((current) => current.length ? current : [newOccupationEntry({ id: "new-contact-job-1" })]);
+    }
   }
 
   async function saveProfilePhoto(photo: ProfilePhotoMetadata): Promise<boolean> {
@@ -3594,61 +3618,147 @@ export default function PeopleWorkspace({
           <strong>{className === "org" ? "New Organization" : "New Person"}</strong>
           <button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
         </div>
-        <label>
-          {className === "org" ? "Organization name" : "Full name"}
-          <input
-            value={name}
-            onChange={(event) => updateQuickName(event.target.value)}
-            placeholder={className === "org" ? "Organization name" : "First, middle, and last name"}
-            aria-describedby={showDerivedQuickName ? "people-derived-name" : undefined}
-            required
-          />
-        </label>
-        {showDerivedQuickName && derivedQuickName && (
-          <div id="people-derived-name" className="people-derived-name" aria-live="polite" data-people-derived-name>
-            <span><small>First</small><strong data-derived-first-name>{derivedQuickName.firstName}</strong></span>
-            {derivedQuickName.middleName && <span><small>Middle</small><strong>{derivedQuickName.middleName}</strong></span>}
-            <span><small>Last</small><strong data-derived-last-name>{derivedQuickName.lastName}</strong></span>
+        <fieldset className="people-record-type-toggle">
+          <legend className="sr-only">Record type</legend>
+          <div>
+            <button type="button" aria-pressed={className === "person"} onClick={() => switchQuickProfileType("person")}>Person</button>
+            <button type="button" aria-pressed={className === "org"} onClick={() => switchQuickProfileType("org")}>Organization</button>
           </div>
-        )}
+        </fieldset>
         {className === "person" && (
-          <div className="people-capture-identity-grid">
-            <label>
-              Nickname
-              <input value={quickNickname} onChange={(event) => setQuickNickname(event.target.value)} placeholder="Also filled from quoted names" />
-            </label>
-            <BirthdayEditor value={quickBirthday} onChange={setQuickBirthday} />
-          </div>
+          <>
+            <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" aria-labelledby="people-create-identity-title">
+              <header className="people-profile-section-heading">
+                <span><PeopleIcon name="organization" /></span>
+                <h4 id="people-create-identity-title">Identity</h4>
+              </header>
+              <div className="people-profile-field-grid">
+                <label className="is-wide people-create-name-field">
+                  Full name
+                  <input
+                    value={name}
+                    onChange={(event) => updateQuickName(event.target.value)}
+                    placeholder="First, middle, and last name"
+                    aria-describedby={showDerivedQuickName ? "people-derived-name" : undefined}
+                    required
+                  />
+                </label>
+                <label>
+                  Nickname
+                  <input value={quickNickname} onChange={(event) => setQuickNickname(event.target.value)} placeholder="Also filled from quoted names" />
+                </label>
+              </div>
+              {showDerivedQuickName && derivedQuickName && (
+                <div id="people-derived-name" className="people-derived-name people-create-derived-name" aria-live="polite" data-people-derived-name>
+                  <span><small>First</small><strong data-derived-first-name>{derivedQuickName.firstName}</strong></span>
+                  {derivedQuickName.middleName && <span><small>Middle</small><strong>{derivedQuickName.middleName}</strong></span>}
+                  <span><small>Last</small><strong data-derived-last-name>{derivedQuickName.lastName}</strong></span>
+                </div>
+              )}
+              <BirthdayEditor value={quickBirthday} onChange={setQuickBirthday} />
+            </section>
+            <section className="people-profile-section people-themed-section module-ref-tone-crimson people-capture-section" aria-labelledby="people-create-about-title">
+              <header className="people-profile-section-heading">
+                <span><PeopleIcon name="notes" /></span>
+                <h4 id="people-create-about-title">About</h4>
+              </header>
+              <div className="people-profile-field-grid">
+                <label className="is-wide">Relationship context<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={4} /></label>
+              </div>
+              <PeopleNotesEditor notes={quickNotes} onChange={setQuickNotes} />
+            </section>
+            <section className="people-profile-section people-themed-section module-ref-tone-purple people-capture-section" aria-labelledby="people-create-groups-title">
+              <header className="people-profile-section-heading">
+                <span><PeopleIcon name="groups" /></span>
+                <h4 id="people-create-groups-title">Groups</h4>
+              </header>
+              <fieldset className="people-group-picker people-profile-group-picker">
+                <legend className="sr-only">Groups</legend>
+                <div>{GROUP_OPTIONS.map((option) => <label key={option}>
+                  <input type="checkbox" checked={groups.includes(option)} onChange={() => toggleGroup(option)} />
+                  <span>{option}</span>
+                </label>)}</div>
+              </fieldset>
+            </section>
+            <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" aria-labelledby="people-create-communication-title">
+              <header className="people-profile-section-heading">
+                <span><PeopleIcon name="communication" /></span>
+                <h4 id="people-create-communication-title">Communication</h4>
+              </header>
+              <div className="people-contact-channel-grid">
+                <EmailEntriesEditor
+                  entries={quickEmails}
+                  onChange={(id, patch) => setQuickEmails((current) => updateContactEntry(current, id, patch))}
+                  onAdd={() => setQuickEmails((current) => [...current, newEmailEntry({ category: current.some((entry) => entry.category === "primary") ? "personal" : "primary" })])}
+                  onRemove={(id) => setQuickEmails((current) => removeEntry(current, id))}
+                />
+                <PhoneEntriesEditor
+                  entries={quickPhones}
+                  onChange={(id, patch) => setQuickPhones((current) => updateContactEntry(current, id, patch))}
+                  onAdd={() => setQuickPhones((current) => [...current, newPhoneEntry({
+                    category: current.some((entry) => entry.category === "primary") ? "personal" : "primary",
+                    countryCode: current[0]?.countryCode || "+1"
+                  })])}
+                  onRemove={(id) => setQuickPhones((current) => removeEntry(current, id))}
+                />
+              </div>
+              <div className="people-profile-field-grid people-create-social-grid">
+                <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
+                <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(event.target.value)} placeholder="https://youtube.com/@..." /></label>
+                <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(event.target.value)} placeholder="https://instagram.com/..." /></label>
+                <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(event.target.value)} placeholder="https://tiktok.com/@..." /></label>
+                <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(event.target.value)} placeholder="https://x.com/..." /></label>
+                <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(event.target.value)} placeholder="https://linkedin.com/in/..." /></label>
+              </div>
+            </section>
+            <OccupationEntriesEditor
+              entries={quickOccupations}
+              organizations={organizationOptions}
+              onChange={(id, patch) => setQuickOccupations((current) => updateEntry(current, id, patch))}
+              onAdd={() => setQuickOccupations((current) => [...current, newOccupationEntry()])}
+              onRemove={(id) => setQuickOccupations((current) => removeEntry(current, id))}
+            />
+            <EducationEntriesEditor
+              entries={quickEducation}
+              organizations={organizationOptions}
+              onChange={(id, patch) => setQuickEducation((current) => updateEntry(current, id, patch))}
+              onAdd={() => setQuickEducation((current) => [...current, newEducationEntry()])}
+              onRemove={(id) => setQuickEducation((current) => removeEntry(current, id))}
+            />
+            <LocationEntriesEditor
+              entries={quickLocations}
+              organization={false}
+              onChange={(id, patch) => setQuickLocations((current) => updateEntry(current, id, patch))}
+              onAdd={() => setQuickLocations((current) => [...current, newLocationEntry({ label: current.length === 0 ? "Primary home" : "" })])}
+              onRemove={(id) => setQuickLocations((current) => removeEntry(current, id))}
+            />
+            <section className="people-profile-section people-themed-section module-ref-tone-orange people-capture-section" aria-labelledby="people-create-cadence-title">
+              <header className="people-profile-section-heading">
+                <span><PeopleIcon name="cadence" /></span>
+                <h4 id="people-create-cadence-title">Cadence</h4>
+              </header>
+              <div className="people-profile-field-grid">
+                <label>Status<select value={status} onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}><option value="active">Active</option><option value="next">Next</option><option value="idea">Loose tie</option><option value="inactive">Dormant</option></select></label>
+                <label>Cadence<select data-people-cadence-select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+                <label>Last contact<input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} /></label>
+                <label>Next contact<input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></label>
+                <label className="is-wide">Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
+              </div>
+            </section>
+          </>
         )}
-        <div className="people-capture-classification">
-          <label className="people-type-field">
-            Type
-            <select value={className} onChange={(event) => {
-              const nextClassName = event.target.value as "person" | "org";
-              setClassName(nextClassName);
-              setQuickLocations((current) => current.map((entry, index) => index === 0 && ["Primary home", "Relevant location", "Headquarters"].includes(entry.label || "")
-                ? { ...entry, label: nextClassName === "org" ? "Relevant location" : "Primary home" }
-                : entry));
-            }}>
-              <option value="person">Person</option>
-              <option value="org">Organization</option>
-            </select>
-          </label>
-          {className === "person" && <fieldset className="people-group-picker">
-            <legend>Groups</legend>
-            <div>{GROUP_OPTIONS.map((option) => <label key={option}>
-              <input type="checkbox" checked={groups.includes(option)} onChange={() => toggleGroup(option)} />
-              <span>{option}</span>
-            </label>)}</div>
-            <small>Choose every group that fits.</small>
-          </fieldset>}
-        </div>
         {className === "org" && (
-          <section className="people-organization-create-fields" aria-labelledby="people-organization-details-title">
-            <header>
-              <div><h4 id="people-organization-details-title">Organization details</h4><p>Use organization facts here; people can link this object as an employer, school, agency, or other affiliation.</p></div>
+          <>
+          <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" aria-labelledby="people-organization-details-title">
+            <header className="people-profile-section-heading">
+              <span><PeopleIcon name="organization" /></span>
+              <h4 id="people-organization-details-title">Organization details</h4>
             </header>
             <div className="people-profile-field-grid">
+              <label className="is-wide people-create-name-field">
+                Organization name
+                <input value={name} onChange={(event) => updateQuickName(event.target.value)} placeholder="Organization name" required />
+              </label>
               <label>
                 Organization type
                 <select data-organization-type value={quickOrganizationType} onChange={(event) => {
@@ -3665,82 +3775,31 @@ export default function PeopleWorkspace({
               <label className="is-wide">Description<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={3} placeholder="What this organization is and why it is relevant." /></label>
             </div>
           </section>
-        )}
-        {className === "person" && <div className="people-contact-channel-grid">
-          <EmailEntriesEditor
-            entries={quickEmails}
-            onChange={(id, patch) => setQuickEmails((current) => updateContactEntry(current, id, patch))}
-            onAdd={() => setQuickEmails((current) => [...current, newEmailEntry({ category: current.some((entry) => entry.category === "primary") ? "personal" : "primary" })])}
-            onRemove={(id) => setQuickEmails((current) => removeEntry(current, id))}
+          <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" aria-labelledby="people-organization-links-title">
+            <header className="people-profile-section-heading">
+              <span><PeopleIcon name="communication" /></span>
+              <h4 id="people-organization-links-title">Links</h4>
+            </header>
+            <div className="people-profile-field-grid people-create-social-grid">
+              <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
+              <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(event.target.value)} placeholder="https://youtube.com/@..." /></label>
+              <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(event.target.value)} placeholder="https://instagram.com/..." /></label>
+              <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(event.target.value)} placeholder="https://tiktok.com/@..." /></label>
+              <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(event.target.value)} placeholder="https://x.com/..." /></label>
+              <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(event.target.value)} placeholder="https://linkedin.com/company/..." /></label>
+              <label className="is-wide">Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
+            </div>
+          </section>
+          <LocationEntriesEditor
+            entries={quickLocations}
+            organization
+            onChange={(id, patch) => setQuickLocations((current) => updateEntry(current, id, patch))}
+            onAdd={() => setQuickLocations((current) => [...current, newLocationEntry({ label: current.length === 0 ? "Relevant location" : "" })])}
+            onRemove={(id) => setQuickLocations((current) => removeEntry(current, id))}
           />
-          <PhoneEntriesEditor
-            entries={quickPhones}
-            onChange={(id, patch) => setQuickPhones((current) => updateContactEntry(current, id, patch))}
-            onAdd={() => setQuickPhones((current) => [...current, newPhoneEntry({
-              category: current.some((entry) => entry.category === "primary") ? "personal" : "primary",
-              countryCode: current[0]?.countryCode || "+1"
-            })])}
-            onRemove={(id) => setQuickPhones((current) => removeEntry(current, id))}
-          />
-        </div>}
-        {className === "person" && <label>
-          Relationship context
-          <textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={4} />
-        </label>}
-        {className === "person" && (
-          <PeopleNotesEditor notes={quickNotes} onChange={setQuickNotes} />
-        )}
-        {className === "person" && (
-          <>
-            <OccupationEntriesEditor
-              entries={quickOccupations}
-              organizations={organizationOptions}
-              onChange={(id, patch) => setQuickOccupations((current) => updateEntry(current, id, patch))}
-              onAdd={() => setQuickOccupations((current) => [...current, newOccupationEntry()])}
-              onRemove={(id) => setQuickOccupations((current) => removeEntry(current, id))}
-            />
-            <EducationEntriesEditor
-              entries={quickEducation}
-              organizations={organizationOptions}
-              onChange={(id, patch) => setQuickEducation((current) => updateEntry(current, id, patch))}
-              onAdd={() => setQuickEducation((current) => [...current, newEducationEntry()])}
-              onRemove={(id) => setQuickEducation((current) => removeEntry(current, id))}
-            />
+          <OrganizationPeopleEditor people={personOptions} selectedIds={quickOrganizationPeople} onChange={setQuickOrganizationPeople} />
           </>
         )}
-        <LocationEntriesEditor
-          entries={quickLocations}
-          organization={className === "org"}
-          onChange={(id, patch) => setQuickLocations((current) => updateEntry(current, id, patch))}
-          onAdd={() => setQuickLocations((current) => [...current, newLocationEntry({ label: current.length === 0 ? className === "org" ? "Relevant location" : "Primary home" : "" })])}
-          onRemove={(id) => setQuickLocations((current) => removeEntry(current, id))}
-        />
-        {className === "org" && (
-          <OrganizationPeopleEditor
-            people={personOptions}
-            selectedIds={quickOrganizationPeople}
-            onChange={setQuickOrganizationPeople}
-          />
-        )}
-        {className === "person" && <div className="people-capture-grid">
-          <label>Status<select value={status} onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}><option value="active">Active</option><option value="next">Next</option><option value="idea">Loose tie</option><option value="inactive">Dormant</option></select></label>
-          <label>Cadence<select data-people-cadence-select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
-        </div>}
-        <label>Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
-        {className === "person" && <div className="people-capture-grid">
-          <label>Last contact<input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} /></label>
-          <label>Next contact<input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></label>
-        </div>}
-        <fieldset className="people-social-fields">
-          <legend>Website & social profiles</legend>
-          <div className="people-capture-grid">
-            <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
-            <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(event.target.value)} placeholder="https://instagram.com/..." /></label>
-            <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(event.target.value)} placeholder="https://tiktok.com/@..." /></label>
-            <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(event.target.value)} placeholder="https://x.com/..." /></label>
-            <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(event.target.value)} placeholder="https://linkedin.com/in/..." /></label>
-          </div>
-        </fieldset>
         <datalist id="people-location-suggestions">
           {locationSuggestions.map((location) => <option value={location} key={location} />)}
         </datalist>

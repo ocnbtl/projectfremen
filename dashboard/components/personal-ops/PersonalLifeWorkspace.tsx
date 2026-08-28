@@ -2,7 +2,7 @@
 
 import dynamic from "next/dynamic";
 import type { FormEvent } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import type {
@@ -100,6 +100,22 @@ function formatDate(value?: string) {
   return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" }).format(date);
 }
 
+function credentialWebsiteHref(value: string) {
+  if (!value.trim()) return "";
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : "";
+  } catch {
+    return "";
+  }
+}
+
+function credentialWebsiteDomain(value: string) {
+  const href = credentialWebsiteHref(value);
+  if (!href) return "Website unavailable";
+  return new URL(href).hostname.replace(/^www\./i, "");
+}
+
 function countsFor(ops: PersonalOpsState, life: PersonalLifeState, passwords: number): PersonalOpsSidebarCounts {
   const core = [...ops.goals, ...ops.decisions, ...ops.obligations, ...ops.followUps];
   return {
@@ -159,7 +175,13 @@ export default function PersonalLifeWorkspace({
   const [credentialDraft, setCredentialDraft] = useState<CredentialDraft | null>(null);
   const [passwordFieldVisible, setPasswordFieldVisible] = useState(false);
   const [pinFieldVisible, setPinFieldVisible] = useState(false);
+  const [expandedWebsiteId, setExpandedWebsiteId] = useState("");
+  const websiteRevealTimerRef = useRef<number | null>(null);
   const copy = VIEW_COPY[initialView];
+
+  useEffect(() => () => {
+    if (websiteRevealTimerRef.current !== null) window.clearTimeout(websiteRevealTimerRef.current);
+  }, []);
 
   async function requestCredentials(url = "/api/personal/passwords") {
     const response = await fetch(url, { cache: "no-store" });
@@ -343,6 +365,7 @@ export default function PersonalLifeWorkspace({
   }
 
   async function editCredential(item: CredentialSummary) {
+    expandCredentialWebsite(item.id);
     setBusy(true);
     setError("");
     try {
@@ -368,6 +391,28 @@ export default function PersonalLifeWorkspace({
     }
   }
 
+  function expandCredentialWebsite(id: string) {
+    if (websiteRevealTimerRef.current !== null) window.clearTimeout(websiteRevealTimerRef.current);
+    setExpandedWebsiteId(id);
+    websiteRevealTimerRef.current = window.setTimeout(() => {
+      setExpandedWebsiteId((current) => current === id ? "" : current);
+      websiteRevealTimerRef.current = null;
+    }, 3200);
+  }
+
+  async function copyCredentialWebsite(item: CredentialSummary) {
+    const href = credentialWebsiteHref(item.website);
+    if (!href) return;
+    setError("");
+    try {
+      await navigator.clipboard.writeText(href);
+      expandCredentialWebsite(item.id);
+      setNotice("Website copied.");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The website could not be copied.");
+    }
+  }
+
   async function deleteCredential(item: CredentialSummary) {
     if (!window.confirm(`Delete “${item.title || "credential"}”? This removes the encrypted record.`)) return;
     setBusy(true);
@@ -381,6 +426,7 @@ export default function PersonalLifeWorkspace({
       const payload = await response.json() as { ok?: boolean; error?: string };
       if (!response.ok || !payload.ok) throw new Error(payload.error || "The credential could not be deleted.");
       setCredentials((current) => current.filter((candidate) => candidate.id !== item.id));
+      setExpandedWebsiteId((current) => current === item.id ? "" : current);
       setCredentialSecrets((current) => {
         const next = { ...current };
         delete next[item.id];
@@ -497,27 +543,38 @@ export default function PersonalLifeWorkspace({
         </header>
         <div className={styles.credentialLedger} role="table" aria-label="Credentials">
           <div className={styles.credentialGridHeader} role="row">
-            <span role="columnheader" aria-label="Account icon" />
             <span className={styles.credentialAccountHeading} role="columnheader">Account</span>
             <span role="columnheader" aria-label="Username" title="Username"><PersonalOpsIcon name="username" /></span>
             <span role="columnheader" aria-label="Email" title="Email"><PersonalOpsIcon name="email" /></span>
             <span role="columnheader" aria-label="Phone" title="Phone"><PersonalOpsIcon name="phone" /></span>
-            <span role="columnheader" aria-label="Website" title="Website"><PersonalOpsIcon name="website" /></span>
             <span role="columnheader" aria-label="Password" title="Password"><PersonalOpsIcon name="password" /></span>
             <span role="columnheader" aria-label="PIN" title="PIN"><PersonalOpsIcon name="pin" /></span>
             <span role="columnheader" aria-label="Actions" />
           </div>
           <div className={styles.credentialList} role="rowgroup">
             {credentials.length ? credentials.map((item) => (
-            <article className={styles.credentialRow} role="row" key={item.id}>
-              <span className={styles.keyIcon} role="cell"><PersonalOpsIcon name="password" /></span>
+            <article className={styles.credentialRow} role="row" data-website-expanded={expandedWebsiteId === item.id || undefined} key={item.id}>
               <div className={`${styles.credentialIdentity} ${styles.credentialPrivate}`} role="cell">
-                <strong>{item.title || "Untitled credential"}</strong>
+                <button
+                  type="button"
+                  className={styles.credentialLinkTrigger}
+                  aria-label={item.website ? `Copy and reveal website for ${item.title}` : `No website for ${item.title}`}
+                  title={item.website ? "Copy and reveal website" : "No website added"}
+                  aria-expanded={item.website ? expandedWebsiteId === item.id : undefined}
+                  onClick={() => void copyCredentialWebsite(item)}
+                  disabled={!item.website}
+                ><PersonalOpsIcon name="link" /></button>
+                <span className={styles.credentialIdentityText}>
+                  <strong>{item.title || "Untitled credential"}</strong>
+                  {item.website && <span className={styles.credentialWebsiteReveal} id={`credential-website-${item.id}`}>
+                    <span>{credentialWebsiteDomain(item.website)}</span>
+                    <a href={credentialWebsiteHref(item.website)} target="_blank" rel="noreferrer" aria-label={`Open website for ${item.title}`} title="Open website"><PersonalOpsIcon name="open" /></a>
+                  </span>}
+                </span>
               </div>
               <span className={`${styles.credentialCell} ${styles.credentialPrivate}`} role="cell" data-field="username" data-label="Username">{item.username}</span>
               <span className={`${styles.credentialCell} ${styles.credentialPrivate}`} role="cell" data-field="email" data-label="Email">{item.email}</span>
               <span className={`${styles.credentialCell} ${styles.credentialPrivate}`} role="cell" data-field="phone" data-label="Phone">{item.phone}</span>
-              <span className={`${styles.credentialCell} ${styles.credentialPrivate}`} role="cell" data-field="website" data-label="Website">{item.website}</span>
               <code className={styles.credentialPrivate} role="cell" data-field="password" data-label="Password" aria-label={passwordsMasked ? "Hidden password" : "Revealed password"}>{passwordsMasked ? "••••••••" : credentialSecrets[item.id]?.secret || ""}</code>
               <code className={styles.credentialPrivate} role="cell" data-field="pin" data-label="PIN" aria-label={!item.hasPin ? "No PIN" : passwordsMasked ? "Hidden PIN" : "Revealed PIN"}>{item.hasPin ? passwordsMasked ? "••••" : credentialSecrets[item.id]?.pin || "" : ""}</code>
               <div className={styles.iconActions} role="cell" aria-label={`${item.title} actions`}>
@@ -660,9 +717,9 @@ export default function PersonalLifeWorkspace({
           <button type="button" className={styles.editorClose} aria-label="Close password editor" title="Close" onClick={closeCredentialEditor}><PersonalOpsIcon name="close" /></button>
         </header>
         {input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}
+        {input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}
         {input("Username", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "Optional username" })}
         {input("Email", "email", credentialDraft.email, (value) => setCredentialDraft((current) => current ? { ...current, email: value } : current), { type: "email", placeholder: "name@example.com" })}
-        {input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}
         <div className={styles.credentialPhoneFields}>
           <label>
             <span>Country code</span>

@@ -199,6 +199,7 @@ export type PersonalContactProfile = {
   instagram?: string;
   tiktok?: string;
   x?: string;
+  youtube?: string;
   partner?: string;
   organizationType?: string;
   industry?: string;
@@ -414,6 +415,7 @@ const CONTACT_PROFILE_TEXT_KEYS = [
   "instagram",
   "tiktok",
   "x",
+  "youtube",
   "partner",
   "organizationType",
   "industry",
@@ -1041,6 +1043,10 @@ function normalizeContactProfile(input: unknown, strictEntries = false): Persona
     if (typeof value === "string") {
       profile[key as ContactProfileTextKey] = value.trim();
     }
+  }
+
+  for (const profileUrl of [profile.website, profile.linkedin, profile.youtube]) {
+    if (strictEntries && profileUrl) normalizeOptionalHttpUrl(profileUrl);
   }
 
   if (profile.birthday) profile.birthday = normalizeBirthday(profile.birthday, strictEntries) || undefined;
@@ -1882,7 +1888,7 @@ export async function updatePersonalRecord(
   }
   const time = mergeTimePatch(current.time, patch.time);
   const profilePatch = normalizeContactProfilePatch(patch.profile);
-  for (const profileUrl of [profilePatch?.website, profilePatch?.linkedin]) {
+  for (const profileUrl of [profilePatch?.website, profilePatch?.linkedin, profilePatch?.youtube]) {
     if (profileUrl) normalizeOptionalHttpUrl(profileUrl);
   }
   const url = typeof patch.url === "string" ? normalizeOptionalHttpUrl(patch.url) : current.url;

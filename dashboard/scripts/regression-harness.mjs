@@ -5835,6 +5835,31 @@ async function checkPeopleMemoryBrowserState(
           photoOptions.some((label) => label.includes("Take picture")),
         `Profile picture dialog omitted upload, paste, or camera capture at ${viewport.label}`
       );
+      await photoDialog.locator('input[type="file"]').first().setInputFiles({
+        name: "profile-crop-regression.png",
+        mimeType: "image/png",
+        buffer: Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")
+      });
+      const photoEditor = photoDialog.locator('.people-photo-editor[aria-label="Crop and resize profile picture"]');
+      await photoEditor.waitFor();
+      assert(
+        await photoEditor.getByLabel("Zoom", { exact: true }).count() === 1 &&
+          await photoEditor.getByLabel("Horizontal crop").count() === 1 &&
+          await photoEditor.getByLabel("Vertical crop").count() === 1 &&
+          await photoEditor.getByLabel("Resize output").count() === 1 &&
+          await photoDialog.getByRole("button", { name: "Save picture" }).count() === 1,
+        `Profile picture editor omitted crop, zoom, or resize controls at ${viewport.label}`
+      );
+      await photoEditor.getByRole("button", { name: "Zoom in" }).click();
+      await photoEditor.getByLabel("Horizontal crop").fill("0.2");
+      await photoEditor.getByLabel("Vertical crop").fill("-0.2");
+      await photoEditor.getByLabel("Resize output").selectOption("1024");
+      assert(
+        Number(await photoEditor.getByLabel("Zoom", { exact: true }).inputValue()) > 1 &&
+          await photoEditor.getByLabel("Resize output").inputValue() === "1024",
+        `Profile picture crop controls did not preserve their draft state at ${viewport.label}`
+      );
+      await photoDialog.getByRole("button", { name: "Choose another" }).click();
       await photoDialog.getByRole("button", { name: "Close profile picture options" }).click();
       const overviewCards = overview.locator(":scope > [data-people-overview-card]");
       assert(
@@ -5853,9 +5878,10 @@ async function checkPeopleMemoryBrowserState(
       );
       const contactButtons = overview.locator("[data-contact-method]");
       assert(
-        await contactButtons.count() === 7 &&
+        await contactButtons.count() === 8 &&
           await overview.locator("[data-contact-method]:disabled").count() > 0 &&
-          await overview.locator('[data-contact-method="tiktok"]:disabled').count() === 1,
+          await overview.locator('[data-contact-method="tiktok"]:disabled').count() === 1 &&
+          await overview.locator('[data-contact-method="youtube"]:not(:disabled)').count() === 1,
         `People Overview did not keep every contact method visible with unavailable methods disabled at ${viewport.label}`
       );
       await contactButtons.first().hover();
@@ -6290,16 +6316,18 @@ async function checkPeopleMemoryBrowserState(
       });
 
       await page.goto(`${baseUrl}/admin/people/new`, { waitUntil: "networkidle" });
-      const classification = page.locator(".people-capture-classification");
-      await classification.waitFor();
-      const typeRect = await classification.locator(".people-type-field").boundingBox();
-      const groupRect = await classification.locator(".people-group-picker").boundingBox();
-      assert(typeRect && groupRect, `New People classification controls were not measurable at ${viewport.label}`);
-      if (viewport.label !== "mobile") {
-        assert(typeRect.width < groupRect.width, `New People Type control still consumes more space than Groups at ${viewport.label}`);
-      }
-      const typeSelect = classification.locator(".people-type-field select");
-      await typeSelect.selectOption("org");
+      const recordTypeGroup = page.getByRole("group", { name: "Record type" });
+      await recordTypeGroup.waitFor();
+      const personTypeButton = recordTypeGroup.getByRole("button", { name: "Person", exact: true });
+      const organizationTypeButton = recordTypeGroup.getByRole("button", { name: "Organization", exact: true });
+      assert(
+        await personTypeButton.getAttribute("aria-pressed") === "true" &&
+          await organizationTypeButton.getAttribute("aria-pressed") === "false",
+        `New People did not default to the compact Person mode at ${viewport.label}`
+      );
+      const typeToggleRect = await recordTypeGroup.boundingBox();
+      assert(typeToggleRect && (viewport.label === "mobile" || typeToggleRect.width <= 240), `New People record toggle is not compact at ${viewport.label}`);
+      await organizationTypeButton.click();
       assert(await page.locator(".people-edit-toolbar strong").textContent() === "New Organization", `New People did not reflect Organization type at ${viewport.label}`);
       const organizationForm = page.locator(".people-capture-form");
       assert(
@@ -6311,6 +6339,7 @@ async function checkPeopleMemoryBrowserState(
           await organizationForm.getByLabel("Phone", { exact: true }).count() === 0 &&
           await organizationForm.getByLabel("Status", { exact: true }).count() === 0 &&
           await organizationForm.getByLabel("Cadence", { exact: true }).count() === 0 &&
+          await organizationForm.getByLabel("YouTube", { exact: true }).count() === 1 &&
           await organizationForm.getByText("Mission", { exact: true }).count() === 0 &&
           await organizationForm.getByText("Services or capabilities", { exact: true }).count() === 0 &&
           await organizationForm.getByText("Organization context", { exact: true }).count() === 0 &&
@@ -6318,6 +6347,26 @@ async function checkPeopleMemoryBrowserState(
           await page.locator("[data-people-education-editor]").count() === 0 &&
           await page.locator("[data-people-birthday-editor]").count() === 0,
         `New Organization did not use its organization-specific property form at ${viewport.label}`
+      );
+      const organizationLabelTypography = await organizationForm.evaluate(() => {
+        const organizationName = document.querySelector('label:has(input[placeholder="Organization name"])');
+        const teamSize = Array.from(document.querySelectorAll("label")).find((label) => label.textContent?.trim().startsWith("Team size"));
+        if (!organizationName || !teamSize) return null;
+        const nameStyle = getComputedStyle(organizationName);
+        const teamStyle = getComputedStyle(teamSize);
+        return {
+          nameFamily: nameStyle.fontFamily,
+          teamFamily: teamStyle.fontFamily,
+          nameTransform: nameStyle.textTransform,
+          teamTransform: teamStyle.textTransform
+        };
+      });
+      assert(
+        organizationLabelTypography &&
+          organizationLabelTypography.nameFamily === organizationLabelTypography.teamFamily &&
+          organizationLabelTypography.nameTransform === "none" &&
+          organizationLabelTypography.teamTransform === "none",
+        `Organization create labels did not share one sentence-case type style at ${viewport.label}: ${JSON.stringify(organizationLabelTypography)}`
       );
       const organizationTypeSelect = organizationForm.locator("[data-organization-type]");
       const organizationIndustrySelect = organizationForm.locator("[data-organization-industry]");
@@ -6348,8 +6397,9 @@ async function checkPeopleMemoryBrowserState(
         await organizationForm.locator(`[data-linked-person="${personId}"]`).count() === 0,
         `Organization people picker did not remove a direct draft link at ${viewport.label}`
       );
-      await typeSelect.selectOption("person");
+      await personTypeButton.click();
       await page.getByLabel("Full name").fill('Avery "June" North');
+      await page.getByLabel("YouTube", { exact: true }).fill("https://youtube.com/@avery-north");
       assert(
         await page.locator("[data-derived-first-name]").textContent() === "Avery" &&
           await page.locator("[data-derived-last-name]").textContent() === "North" &&
@@ -6381,7 +6431,7 @@ async function checkPeopleMemoryBrowserState(
           unknownYearBirthdayState.day === "14",
         `New People did not accept a month and day with an unknown birth year at ${viewport.label}: ${JSON.stringify(unknownYearBirthdayState)}`
       );
-      const createGroups = (await classification.locator(".people-group-picker label").allTextContents())
+      const createGroups = (await page.locator(".people-capture-form .people-group-picker label").allTextContents())
         .map((label) => label.trim());
       assert(
         JSON.stringify(createGroups) === JSON.stringify(expectedGroupOptions),
@@ -6454,7 +6504,7 @@ async function checkPeopleMemoryBrowserState(
         `New People repeatable Add controls failed at ${viewport.label}`
       );
       if (viewport.label === "mobile") {
-        const groupHeights = await classification.locator(".people-group-picker label").evaluateAll((elements) =>
+        const groupHeights = await page.locator(".people-capture-form .people-group-picker label").evaluateAll((elements) =>
           elements.map((element) => element.getBoundingClientRect().height)
         );
         assert(groupHeights.every((height) => height >= 44), `New People mobile group targets fell below 44px: ${JSON.stringify(groupHeights)}`);
@@ -6487,6 +6537,7 @@ async function checkPeopleMemoryBrowserState(
             createdFromQuickEntry.profile?.phones?.length === 2 &&
             createdFromQuickEntry.profile.phones[0].number === "+51987654321" &&
             createdFromQuickEntry.profile.phones[1].category === "work" &&
+            createdFromQuickEntry.profile.youtube === "https://youtube.com/@avery-north" &&
             createdFromQuickEntry.profile.occupations[0].organizationId === organizationId &&
             createdFromQuickEntry.profile.education[0].organizationId === organizationId,
           "People quick entry did not persist nickname, partial birthday, international phone, and Organization object links"
@@ -6494,11 +6545,12 @@ async function checkPeopleMemoryBrowserState(
 
         await page.goto(`${baseUrl}/admin/people/new`, { waitUntil: "networkidle" });
         const organizationQuickForm = page.locator(".people-capture-form");
-        await organizationQuickForm.locator(".people-type-field select").selectOption("org");
+        await organizationQuickForm.getByRole("group", { name: "Record type" }).getByRole("button", { name: "Organization", exact: true }).click();
         const quickOrganizationTitle = `${organizationTitle}-ui`;
         await organizationQuickForm.getByLabel("Organization name").fill(quickOrganizationTitle);
         await organizationQuickForm.getByLabel("Industry or field").selectOption("Technology");
         await organizationQuickForm.getByLabel("Description").fill("A directly linked organization created by the regression UI.");
+        await organizationQuickForm.getByLabel("YouTube", { exact: true }).fill("https://youtube.com/@regression-studio");
         await organizationQuickForm.locator("[data-location-entry]").first().locator("input").nth(1).fill("Columbus, Ohio, USA");
         await organizationQuickForm.getByLabel("Person to link").selectOption(personId);
         await organizationQuickForm.getByRole("button", { name: "Add person" }).click();
@@ -6515,6 +6567,7 @@ async function checkPeopleMemoryBrowserState(
             createdFromOrganizationQuickEntry?.profile?.organizationType === "Business" &&
             createdFromOrganizationQuickEntry.profile.industry === "Technology" &&
             createdFromOrganizationQuickEntry.profile.context === "A directly linked organization created by the regression UI." &&
+            createdFromOrganizationQuickEntry.profile.youtube === "https://youtube.com/@regression-studio" &&
             createdFromOrganizationQuickEntry.profile.headquarters === "Columbus, Ohio, USA" &&
             createdFromOrganizationQuickEntry.profile.locations?.[0]?.label === "Relevant location" &&
             createdFromOrganizationQuickEntry.profile.associatedPeople?.includes(personId) &&
@@ -6530,6 +6583,7 @@ async function checkPeopleMemoryBrowserState(
       assert(
         await page.locator(".people-profile-header h2").textContent() === organizationTitle &&
           await page.getByText("Business", { exact: true }).count() > 0 &&
+          await page.locator('[data-contact-method="youtube"]:not(:disabled)').count() === 1 &&
           await page.getByRole("heading", { name: "Linked people" }).count() === 0 &&
           await page.locator(".people-info-row", { hasText: "Linked people" }).count() === 1,
         `Organization profile did not render its compact facts without duplicating linked People at ${viewport.label}`
@@ -8730,12 +8784,21 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       assert(!bodyText.includes("Protected at rest"), "Password page retained removed protection helper copy");
       const keyring = page.locator('section[aria-label="Encrypted password keyring"]');
       assert(await keyring.locator(":scope > header svg").count() === 0, "Password keyring header retained the removed global key icon");
-      assert(await keyring.locator('[role="columnheader"][title="Username"], [role="columnheader"][title="Email"], [role="columnheader"][title="Phone"], [role="columnheader"][title="Website"], [role="columnheader"][title="Password"], [role="columnheader"][title="PIN"]').count() === 6, "Credential ledger did not expose the six icon-only column headings");
+      assert(
+        await keyring.locator('[role="columnheader"][title="Username"], [role="columnheader"][title="Email"], [role="columnheader"][title="Phone"], [role="columnheader"][title="Password"], [role="columnheader"][title="PIN"]').count() === 5 &&
+          await keyring.locator('[role="columnheader"][title="Website"]').count() === 0,
+        "Credential ledger did not expose the five aligned icon-only field headings"
+      );
       const row = keyring.locator("article").filter({ hasText: credentialTitle }).first();
       await row.waitFor();
-      assert(await row.locator(":scope > span svg").count() === 1, "Credential row lost its account key icon");
+      const websiteTrigger = row.getByRole("button", { name: `Copy and reveal website for ${credentialTitle}` });
+      assert(
+        await websiteTrigger.locator("svg").count() === 1 &&
+          await row.locator('[data-field="website"]').count() === 0,
+        "Credential row did not replace the account key/raw Website cell with its link disclosure"
+      );
       const rowText = await row.innerText();
-      assert(!/Username|Email|Website/.test(rowText), `Credential row retained visible metadata labels: ${rowText}`);
+      assert(!/https:\/\/|Username|Email|Website/.test(rowText), `Credential row retained a raw URL or visible metadata labels: ${rowText}`);
       const deleteStyle = await row.getByRole("button", { name: `Delete ${credentialTitle}` }).evaluate((element) => {
         const style = getComputedStyle(element);
         return { backgroundColor: style.backgroundColor, color: style.color };
@@ -8745,7 +8808,7 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
         const columnAlignment = await keyring.evaluate((element) => {
           const header = Array.from(element.querySelector('[role="row"]')?.children || []);
           const row = Array.from(element.querySelector("article")?.children || []);
-          return header.slice(0, 8).map((cell, index) => {
+          return header.map((cell, index) => {
             const headerRect = cell.getBoundingClientRect();
             const rowRect = row[index]?.getBoundingClientRect();
             return rowRect ? Math.abs(headerRect.left - rowRect.left) : 999;
@@ -8753,6 +8816,30 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
         });
         assert(columnAlignment.every((offset) => offset <= 1), `Credential ledger columns are not vertically aligned: ${JSON.stringify(columnAlignment)}`);
       }
+      await page.getByRole("button", { name: "Unblur password page" }).click();
+      await websiteTrigger.click();
+      const websiteNotice = page.getByRole("status").filter({ hasText: "Website copied." });
+      await websiteNotice.waitFor();
+      assert(
+        await row.getAttribute("data-website-expanded") !== null &&
+          await row.getByText("example.com", { exact: true }).count() === 1 &&
+          await row.getByRole("link", { name: `Open website for ${credentialTitle}` }).getAttribute("href") === "https://example.com/account",
+        `Credential website did not unroll into its domain and Open action at ${viewport.label}`
+      );
+      await websiteNotice.getByRole("button", { name: "Dismiss notification" }).click();
+      await page.waitForTimeout(3300);
+      assert(await row.getAttribute("data-website-expanded") === null, `Credential website did not collapse after its disclosure window at ${viewport.label}`);
+      await row.getByRole("button", { name: `Edit ${credentialTitle}` }).click();
+      const editEditor = page.locator("form[data-credential-editor]");
+      await editEditor.waitFor();
+      assert(
+        await row.getAttribute("data-website-expanded") !== null &&
+          await editEditor.getByLabel("Website", { exact: true }).inputValue() === "https://example.com/account",
+        `Editing a credential did not unroll and populate its Website at ${viewport.label}`
+      );
+      await editEditor.getByRole("button", { name: "Close password editor" }).click();
+      await editEditor.waitFor({ state: "detached" });
+      await page.getByRole("button", { name: "Blur password page" }).click();
       await row.getByRole("button", { name: `Copy password for ${credentialTitle}` }).click();
       const notice = page.getByRole("status").filter({ hasText: "Password copied." });
       await notice.waitFor();
@@ -8765,6 +8852,27 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       await page.getByRole("button", { name: "Password", exact: true }).click();
       const editor = page.locator("form[data-credential-editor]");
       await editor.waitFor();
+      const credentialIdentityLayout = await editor.evaluate(() => {
+        const rect = (label) => Array.from(document.querySelectorAll("label")).find((element) => element.textContent?.trim().startsWith(label))?.getBoundingClientRect();
+        const account = rect("Account");
+        const website = rect("Website");
+        const username = rect("Username");
+        const email = rect("Email");
+        return account && website && username && email ? {
+          account: { x: account.x, y: account.y },
+          website: { x: website.x, y: website.y },
+          username: { x: username.x, y: username.y },
+          email: { x: email.x, y: email.y }
+        } : null;
+      });
+      assert(
+        credentialIdentityLayout && (
+          viewport.width <= 760
+            ? credentialIdentityLayout.account.y < credentialIdentityLayout.website.y && credentialIdentityLayout.website.y < credentialIdentityLayout.username.y && credentialIdentityLayout.username.y < credentialIdentityLayout.email.y
+            : Math.abs(credentialIdentityLayout.account.y - credentialIdentityLayout.website.y) <= 1 && Math.abs(credentialIdentityLayout.username.y - credentialIdentityLayout.email.y) <= 1 && credentialIdentityLayout.username.y > credentialIdentityLayout.account.y && credentialIdentityLayout.account.x < credentialIdentityLayout.website.x && credentialIdentityLayout.username.x < credentialIdentityLayout.email.x
+        ),
+        `Credential Account/Website and Username/Email layout drifted at ${viewport.label}: ${JSON.stringify(credentialIdentityLayout)}`
+      );
       const countryCode = editor.getByLabel("Country code");
       assert(await countryCode.inputValue() === "+1", "New credential did not default to the +1 country code");
       await countryCode.fill("");
@@ -15197,6 +15305,7 @@ async function main() {
           context: "Regression-created organization description.",
           organizationType: "Business",
           industry: "Professional services",
+          youtube: "https://youtube.com/@regression-studio",
           foundedYear: "2021",
           teamSize: "1–10",
           headquarters: "Columbus, Ohio, USA",
@@ -15219,6 +15328,7 @@ async function main() {
       createdOrganization?.id &&
         createdOrganization.profile?.organizationType === "Business" &&
         createdOrganization.profile?.industry === "Professional services" &&
+        createdOrganization.profile?.youtube === "https://youtube.com/@regression-studio" &&
         createdOrganization.profile?.locations?.[0]?.label === "Relevant location" &&
         createdOrganization.subjects?.length === 0 &&
         !createdOrganization.time?.reviewCadence,
@@ -15275,6 +15385,7 @@ async function main() {
           fullName: updatedPersonTitle,
           nickname: "Reg",
           contactCadence: "NONE",
+          youtube: "https://youtube.com/@regression-person",
           emails: [
             { id: "email-regression-primary", category: "primary", address: "regression-person@example.com" },
             { id: "email-regression-work", category: "work", address: "studio-regression@example.com" },
@@ -15356,6 +15467,10 @@ async function main() {
     assert(
       persistedPerson?.profile?.birthday === "--03-14",
       "People birthday without a known year did not persist"
+    );
+    assert(
+      persistedPerson?.profile?.youtube === "https://youtube.com/@regression-person",
+      "People YouTube profile link did not persist"
     );
     const nativeObjectLinkInput = {
       source: {
@@ -15670,6 +15785,8 @@ async function main() {
       readPhoto.response.ok &&
         readPhoto.response.headers.get("content-type") === "image/png" &&
         readPhoto.response.headers.get("x-content-type-options") === "nosniff" &&
+        readPhoto.response.headers.get("cache-control")?.includes("private") &&
+        readPhoto.response.headers.get("cache-control")?.includes("no-store") &&
         Buffer.from(readPhoto.body, "latin1").byteLength > 0,
       "People profile picture did not return as a protected image response"
     );
