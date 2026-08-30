@@ -14,7 +14,9 @@ Keep these system-wide foundations shared across every module:
 - Border #D5E2E7
 - Border strong #BFD2DB
 - Selected #F7FBFF
-- Navy #0D252D for the main system action color
+- Current Navy reference #0D252D for primary actions and high-emphasis interface text. This hex value is a starting point, not a locked foundation.
+
+You are explicitly authorized to refine the shared Navy. Keep it recognizably navy, but select the particular hue, saturation, and brightness that works best as the system-wide primary color alongside Ink, black, the shared neutrals, and all nine module primary/secondary combinations. Compare multiple navy candidates before choosing one. The chosen Navy should feel strong and distinctive without becoming harsh, overly blue, nearly black, or visually competitive with module colors. Create a coordinated Navy scale and specify exact tokens for high-emphasis text, primary action, hover, pressed, selected, link, icon, and focus states. Document the chosen hex values, contrast ratios, and rationale, including why the final Navy is more cohesive than the current #0D252D reference.
 
 For each module, design:
 1. One clearly distinguishable primary hue with a coordinated 50, 100, 200, 300, 400, 500, 600, 700, 800, and 900 scale.
@@ -41,4 +43,4 @@ Finish with:
 - A short rationale for each primary/secondary pairing.
 - A “Ready for implementation” section that calls out any unresolved accessibility or cohesion decisions.
 
-Do not change typography, spacing, component structure, content, or the shared neutral/navy foundations. The deliverable is the color system and its application guidance only.`;
+Do not change typography, spacing, component structure, content, or the shared neutral foundations. Navy is explicitly open to refinement under the criteria above. The deliverable is the color system and its application guidance only.`;
