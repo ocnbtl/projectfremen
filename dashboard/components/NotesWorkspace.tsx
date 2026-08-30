@@ -8,6 +8,7 @@ import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSi
 import DirectoryPane from "./admin-shell/DirectoryPane";
 import InspectorRail from "./admin-shell/InspectorRail";
 import SharedAIDock from "./admin-shell/SharedAIDock";
+import UnigentamosIcon from "./icons/UnigentamosIcon";
 import DenseObjectRow from "./operational/DenseObjectRow";
 import ObjectHeader from "./operational/ObjectHeader";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
@@ -2466,7 +2467,7 @@ export default function NotesWorkspace({
             <div className={styles.headerActions}>
               <button type="button" className={styles.button} onClick={() => document.querySelector<HTMLElement>(`.${styles.chipRow}`)?.focus()}>Filter</button>
               <button type="button" className={styles.button} onClick={() => { const next = density === "compact" ? "comfortable" : "compact"; setDensity(next); updateUrl({ density: next }); }}>{density === "compact" ? "Comfortable" : "Compact"}</button>
-              <button type="button" className={styles.button} data-primary="true" onClick={openQuickCapture}>+ New Note</button>
+              <button type="button" className={styles.button} data-primary="true" onClick={openQuickCapture}><UnigentamosIcon role="plus" /> New Note</button>
             </div>
           </header>
 
@@ -2512,7 +2513,7 @@ export default function NotesWorkspace({
               </div>
               <div className={styles.captureBody}>
                 <label className={styles.field}>Context<textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Capture context, next action, and why it matters." /></label>
-                <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Native NoteLink persistence is unresolved.")}>+ Link object</button>
+                <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Native NoteLink persistence is unresolved.")}><UnigentamosIcon role="plus" /> Link object</button>
                 <button type="submit" className={styles.button} data-primary="true" disabled={captureSaving || !title.trim()}>{captureSaving ? "Saving…" : "Save Note"}</button>
               </div>
             </form>

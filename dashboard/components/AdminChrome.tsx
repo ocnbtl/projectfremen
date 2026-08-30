@@ -7,6 +7,7 @@ import type { ModuleId } from "../lib/native-objects/types";
 import AppTopNav from "./admin-shell/AppTopNav";
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import OfflineVaultBridge from "./OfflineVaultBridge";
+import UnigentamosIcon from "./icons/UnigentamosIcon";
 
 type SidebarItem = {
   label: string;
@@ -84,7 +85,7 @@ function AdminPageSidebar({
         aria-label={collapsed ? "Expand page sidebar" : "Collapse page sidebar"}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
       >
-        <span />
+        <UnigentamosIcon role="menu" size={16} />
       </button>
       {!collapsed && (
         <div className="admin-page-sidebar-inner">

@@ -11,6 +11,7 @@ import type {
 import { getModuleRoute } from "../../lib/native-objects/routes";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import ConfirmationSheet from "./ConfirmationSheet";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./ProjectAssociationSheet.module.css";
 
 const FOCUSABLE_SELECTOR = [
@@ -290,7 +291,7 @@ export default function ProjectAssociationSheet({
                 onClick={requestClose}
                 disabled={busy}
               >
-                ×
+                <UnigentamosIcon role="close" size={18} />
               </button>
             </header>
 

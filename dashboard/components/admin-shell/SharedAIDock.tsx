@@ -3,6 +3,7 @@
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import type { ModuleId, NativeObjectRef } from "../../lib/native-objects/types";
 
 export type SharedAIContext = {
@@ -283,7 +284,7 @@ function SharedAIDockSurface({
         title={compactViewport ? "Open assistant" : "Open assistant · drag to reposition"}
       >
         <span className="shared-ai-dock__launcher-mark" aria-hidden="true">
-          <svg viewBox="0 0 24 24" focusable="false"><path d="M5 5.5h14v11H9l-4 3v-14Z" /><path d="M8.5 9.5h7M8.5 12.5h4.5" /></svg>
+          <UnigentamosIcon role="message" />
         </span>
         <span className="shared-ai-dock__launcher-label">Assistant</span>
       </button>
@@ -316,26 +317,24 @@ function SharedAIDockSurface({
               </div>
             </div>
             <button ref={closeRef} type="button" onClick={() => onOpenChange(false)} aria-label="Close AI assistant">
-              <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false">
-                <path d="m4 4 12 12M16 4 4 16" fill="none" stroke="currentColor" strokeWidth="1.5" />
-              </svg>
+              <UnigentamosIcon role="close" size={20} />
             </button>
           </header>
 
           <div className="shared-ai-dock__body">
             <div className="shared-ai-dock__context" aria-label="Current AI context">
               <span className="shared-ai-dock__context-eye" aria-label="Viewing">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.8 12s3.4-5.5 9.2-5.5 9.2 5.5 9.2 5.5-3.4 5.5-9.2 5.5S2.8 12 2.8 12Z" /><circle cx="12" cy="12" r="2.5" /></svg>
+                <UnigentamosIcon role="show" />
               </span>
               <strong>{contextSegments.map((segment, index) => (
                 <span key={`${segment}-${index}`}>
-                  {index > 0 && <svg className="shared-ai-dock__context-arrow" viewBox="0 0 16 16" aria-hidden="true"><path d="m6 3.5 4.5 4.5L6 12.5" /></svg>}
+                  {index > 0 && <UnigentamosIcon className="shared-ai-dock__context-arrow" role="chevron-right" size={16} />}
                   <span>{segment}</span>
                 </span>
               ))}</strong>
             </div>
             <div className="shared-ai-dock__empty-state">
-              <span className="shared-ai-dock__empty-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M5 5.5h14v11H9l-4 3v-14Z" /><path d="M8.5 9.5h7M8.5 12.5h4.5" /></svg></span>
+              <span className="shared-ai-dock__empty-icon" aria-hidden="true"><UnigentamosIcon role="message" /></span>
               <div><h3>Connect a local model</h3><p id={descriptionId}>This panel is ready to hold context, but a model connector has not been configured.</p></div>
             </div>
             <div className="shared-ai-dock__local-setup" aria-label="Local AI connection brief">
@@ -361,7 +360,7 @@ function SharedAIDockSurface({
             <div>
               <textarea id={promptId} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Draft a prompt while disconnected…" />
               <button type="button" disabled title="AI assistant is disconnected" aria-label="Send message">
-                <svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m3 10 13-6-4.2 12-2.1-4.1L3 10Z" /><path d="m9.7 11.9 2.8-3" /></svg>
+                <UnigentamosIcon role="send" size={20} />
               </button>
             </div>
             {footer}

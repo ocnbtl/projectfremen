@@ -187,7 +187,7 @@ export default function ResourcePropertiesView({ resource, editRequest = 0, onSa
                 <button type="button" aria-label={`Remove color ${index + 1}`} disabled={!editing || form.gradient.colors.length <= 2} onClick={() => update("gradient", { ...form.gradient, colors: form.gradient.colors.filter((_, itemIndex) => itemIndex !== index) })}><PersonalOpsIcon name="delete" /></button>
               </div>)}
             </div>
-            <button type="button" className={styles.addColor} disabled={!editing || form.gradient.colors.length >= 7} onClick={() => update("gradient", { ...form.gradient, colors: [...form.gradient.colors, "#D9CABD"] })}>+ Color</button>
+            <button type="button" className={styles.addColor} disabled={!editing || form.gradient.colors.length >= 7} onClick={() => update("gradient", { ...form.gradient, colors: [...form.gradient.colors, "#D9CABD"] })}><PersonalOpsIcon name="plus" /> Color</button>
           </div>
         </div>
       </section>

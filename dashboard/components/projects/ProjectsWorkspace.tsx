@@ -9,6 +9,7 @@ import InspectorRail from "../admin-shell/InspectorRail";
 import ModuleShell from "../admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "../admin-shell/ModuleSidebar";
 import SharedAIDock from "../admin-shell/SharedAIDock";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import ConfirmationSheet from "../operational/ConfirmationSheet";
 import DenseObjectRow from "../operational/DenseObjectRow";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "../operational/DetailTabs";
@@ -276,54 +277,27 @@ function initials(value: string) {
 }
 
 function ObjectiveDeleteIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="15" height="15" aria-hidden="true" focusable="false">
-      <path d="M4.5 5.5h11M8 5.5V4h4v1.5m-6 0 .6 10h6.8l.6-10M8.25 8v4.75M11.75 8v4.75" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <UnigentamosIcon role="delete" size={15} />;
 }
 
 function InspectIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
-      <circle cx="8.5" cy="8.5" r="4.75" fill="none" stroke="currentColor" strokeWidth="1.4" />
-      <path d="m12.1 12.1 4 4" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-    </svg>
-  );
+  return <UnigentamosIcon role="search" size={16} />;
 }
 
 function OpenIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
-      <path d="M8 4.5H5.5a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h9a1 1 0 0 0 1-1V12M11 4.5h4.5V9M15.25 4.75 9 11" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <UnigentamosIcon role="open" size={16} />;
 }
 
 function PeopleCountIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false">
-      <circle cx="10" cy="6.5" r="2.7" fill="none" stroke="currentColor" strokeWidth="1.35" />
-      <path d="M5.25 15.5c.5-2.7 2.05-4.05 4.75-4.05s4.25 1.35 4.75 4.05" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" />
-    </svg>
-  );
+  return <UnigentamosIcon role="person" size={14} />;
 }
 
 function ObjectCountIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false">
-      <path d="m7.7 11.85-1.2 1.2a2.45 2.45 0 0 1-3.45-3.45l2.6-2.6A2.45 2.45 0 0 1 9.1 7M12.3 8.15l1.2-1.2a2.45 2.45 0 0 1 3.45 3.45l-2.6 2.6A2.45 2.45 0 0 1 10.9 13M7.5 10h5" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <UnigentamosIcon role="link" size={14} />;
 }
 
 function ClockIcon() {
-  return (
-    <svg viewBox="0 0 20 20" width="14" height="14" aria-hidden="true" focusable="false">
-      <circle cx="10" cy="10" r="6.4" fill="none" stroke="currentColor" strokeWidth="1.35" />
-      <path d="M10 6.4v4l2.8 1.6" fill="none" stroke="currentColor" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
+  return <UnigentamosIcon role="clock" size={14} />;
 }
 
 function RowActionIcons({
@@ -827,7 +801,7 @@ function EditorSurface({
             <p id="projects-editor-description">{description}</p>
           </div>
           <button type="button" className={styles.iconButton} onClick={onRequestClose} disabled={busy} aria-label={`Close ${title}`}>
-            ×
+            <UnigentamosIcon role="close" size={18} />
           </button>
         </header>
         <div className={styles.formBody}>
@@ -956,7 +930,7 @@ function ProjectObjectivesEditor({
             setDirty(true);
           }}
           disabled={busy}
-        >+ Add objective</button>
+        ><UnigentamosIcon role="plus" size={16} /> Add objective</button>
       )}
     </section>
   );
@@ -2936,7 +2910,7 @@ export default function ProjectsWorkspace({
             <button type="button" className={styles.addRowButton} onClick={() => {
               setEditor((current) => current ? { ...current, objectives: [...(current.objectives || []), { id: `draft-objective-${crypto.randomUUID()}`, text: "", targetAt: "", completed: false }] } : current);
               setEditorDirty(true);
-            }}>+ Add objective</button>
+            }}><UnigentamosIcon role="plus" size={16} /> Add objective</button>
           </fieldset>
           {editor.kind === "project-create" && <fieldset className={styles.repeatableField} data-wide="true">
             <legend>People</legend>
@@ -2951,13 +2925,13 @@ export default function ProjectsWorkspace({
                 <button type="button" className={styles.iconButton} onClick={() => {
                   setEditor((current) => current ? { ...current, people: current.people?.filter((item) => item.id !== person.id) } : current);
                   setEditorDirty(true);
-                }} aria-label={`Remove person ${index + 1}`}>×</button>
+                }} aria-label={`Remove person ${index + 1}`}><UnigentamosIcon role="close" size={14} /></button>
               </div>)}
             </div>
             <button type="button" className={styles.addRowButton} onClick={() => {
               setEditor((current) => current ? { ...current, people: [...(current.people || []), { id: `draft-person-${crypto.randomUUID()}`, personId: "", role: "", context: "" }] } : current);
               setEditorDirty(true);
-            }}>+ Add person</button>
+            }}><UnigentamosIcon role="plus" size={16} /> Add person</button>
           </fieldset>}
           <label className={styles.field}>Status<select name="lifecycle" value={value("lifecycle")} onChange={(event) => changeEditorValue("lifecycle", event.target.value)}>
             {!(["idea", "developing", "active", "monitoring", "dormant"] as string[]).includes(value("lifecycle")) && <option value={value("lifecycle")}>{displayLabel(value("lifecycle"))} (legacy)</option>}
@@ -3361,7 +3335,7 @@ export default function ProjectsWorkspace({
           }}
         />}
       >
-        <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation">☰</button>
+        <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation"><UnigentamosIcon role="menu" size={18} /></button>
         {isInspectorOverlay && selectedItem && <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => setInspectorOpen(true)}>{initialDetail ? "Completion" : "Details"}</button>}
         {initialDetail ? (
           <div className={styles.mainScroll}>

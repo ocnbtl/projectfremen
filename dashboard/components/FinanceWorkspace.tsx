@@ -17,6 +17,7 @@ import FinanceRulesInspector, { isFinanceRuleTab } from "./finance/FinanceRulesI
 import FinanceRulesRouteView from "./finance/FinanceRulesView";
 import FinanceTransactionsRouteView from "./finance/FinanceTransactionsView";
 import FinanceMutationDialog, { activeCloseForState, type FinanceOperation } from "./finance/FinanceMutationDialog";
+import UnigentamosIcon from "./icons/UnigentamosIcon";
 import {
   createNativeObjectRef,
   getModuleRoute,
@@ -126,33 +127,13 @@ function classNames(...parts: Array<string | false | null | undefined>) {
 }
 
 function Icon({ name }: { name: string }) {
-  const common = { fill: "none", stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round" as const, strokeLinejoin: "round" as const };
-  const paths: Record<string, React.ReactNode> = {
-    Wallet: <><path d="M4 7.5h16v10H4z" /><path d="M16 11h4v3h-4z" /><path d="M6.5 7.5V5.8L16 4v3.5" /></>,
-    PiggyBank: <><path d="M5 12c0-3 2.6-5 6.2-5H15c2.8 0 5 2 5 4.6 0 2.8-2.3 5.1-5.2 5.1H9l-2 2H5.5v-3.1A5 5 0 0 1 5 12z" /><path d="M16 8V5h2" /><circle cx="15.5" cy="10" r=".5" /></>,
-    CreditCard: <><path d="M3.5 6.5h17v11h-17z" /><path d="M3.5 9.5h17" /><path d="M7 14h3" /></>,
-    LineChart: <><path d="M4 18h16" /><path d="M5 15l4-4 3 2 5-7 2 2" /></>,
-    Banknote: <><path d="M4 7h16v10H4z" /><circle cx="12" cy="12" r="2" /><path d="M7 9.5v5M17 9.5v5" /></>,
-    Briefcase: <><path d="M4 8h16v10H4z" /><path d="M9 8V6h6v2" /><path d="M4 12h16" /></>,
-    Alert: <><path d="M12 4l9 16H3z" /><path d="M12 9v4" /><path d="M12 17h.01" /></>,
-    Trending: <><path d="M4 16l5-5 3 3 7-7" /><path d="M15 7h4v4" /></>,
-    Calendar: <><path d="M5 5h14v15H5z" /><path d="M8 3v4M16 3v4M5 9h14" /></>,
-    Filter: <><path d="M4 5h16l-6 7v5l-4 2v-7z" /></>,
-    Plus: <><path d="M12 5v14M5 12h14" /></>,
-    Search: <><circle cx="10.5" cy="10.5" r="5.5" /><path d="M15 15l5 5" /></>,
-    Sliders: <><path d="M4 7h10M18 7h2M4 12h2M10 12h10M4 17h12M20 17h0" /><circle cx="16" cy="7" r="2" /><circle cx="8" cy="12" r="2" /><circle cx="18" cy="17" r="2" /></>,
-    Check: <><path d="M5 12l4 4L19 6" /></>,
-    Link: <><path d="M10 8H8a4 4 0 0 0 0 8h2" /><path d="M14 8h2a4 4 0 0 1 0 8h-2" /><path d="M9 12h6" /></>,
-    Sparkles: <><path d="M12 3l1.6 5.4L19 10l-5.4 1.6L12 17l-1.6-5.4L5 10l5.4-1.6z" /><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" /></>,
-    Send: <><path d="M21 3L10 14" /><path d="M21 3l-7 18-4-7-7-4z" /></>,
-    X: <><path d="M7 7l10 10M17 7L7 17" /></>,
-    Chevron: <><path d="M8 10l4 4 4-4" /></>
+  const roles: Record<string, string> = {
+    Wallet: "wallet", PiggyBank: "piggy-bank", CreditCard: "credit-card", LineChart: "line-chart",
+    Banknote: "banknote", Briefcase: "briefcase", Alert: "alert", Trending: "trending",
+    Calendar: "calendar", Filter: "filter", Plus: "plus", Search: "search", Sliders: "sliders",
+    Check: "check", Link: "link", Sparkles: "sparkles", Send: "send", X: "close", Chevron: "chevron-down"
   };
-  return (
-    <svg viewBox="0 0 24 24" aria-hidden="true" {...common}>
-      {paths[name] || paths.Wallet}
-    </svg>
-  );
+  return <UnigentamosIcon role={roles[name] || "wallet"} />;
 }
 
 function Swatch({ hue }: { hue: Hue }) {

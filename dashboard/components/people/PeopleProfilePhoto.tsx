@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 
 type PhotoMetadata = {
   url: string;
@@ -283,7 +284,7 @@ export default function PeopleProfilePhotoDialog({
             <span>Profile picture</span>
             <h2 id="people-photo-dialog-title">{personName}</h2>
           </div>
-          <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving}>×</button>
+          <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving}><UnigentamosIcon role="close" size={18} /></button>
         </header>
         <p>{photoDraft ? "Place the picture inside the square, then choose its saved size." : "Choose a picture to crop before it is saved to this private profile."}</p>
         {!photoDraft && <div className="people-photo-options">

@@ -6040,7 +6040,7 @@ async function checkPeopleMemoryBrowserState(
         timelineActionWidths.length === 2 &&
           timelineActionWidths.every((width) => width < 190) &&
           JSON.stringify(timelineActionLabels) === JSON.stringify(["Interaction", "Follow-up"]) &&
-          await page.locator('.people-timeline-actions .people-add-action path[d="M12 5v14M5 12h14"]').count() === 2,
+          await page.locator('.people-timeline-actions .people-add-action svg[data-icon-role="plus"][data-icon-candidate="plus"]').count() === 2,
         `Timeline actions remained oversized at ${viewport.label}: ${JSON.stringify(timelineActionWidths)}`
       );
       const followUpPanel = page.locator('[data-people-follow-up-bridge]');
@@ -6147,7 +6147,7 @@ async function checkPeopleMemoryBrowserState(
           await page.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
           await page.getByText("connected media context", { exact: false }).count() === 0 &&
           await page.getByRole("button", { name: "Add object", exact: true }).count() === 1 &&
-          await page.locator('.people-links-toolbar-actions .people-add-action path[d="M12 5v14M5 12h14"]').count() === 1 &&
+          await page.locator('.people-links-toolbar-actions .people-add-action svg[data-icon-role="plus"][data-icon-candidate="plus"]').count() === 1 &&
           (await page.getByRole("button", { name: "Add object", exact: true }).innerText()).trim() === "Objects" &&
           await page.getByRole("heading", { name: "Add relationship", exact: true }).count() === 0 &&
           await page.getByRole("button", { name: /^(Browse|Refresh)$/ }).count() === 0,
@@ -9103,8 +9103,8 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
       assert(await page.locator("#personal-ops-filter-rail").count() === 0, `Personal Ops retained the detached filter rail at ${viewport.label}`);
 
       const aiLauncher = page.getByRole("button", { name: "Open AI assistant" });
-      const launcherPath = await aiLauncher.locator("svg path").first().getAttribute("d");
-      assert(launcherPath === "M5 5.5h14v11H9l-4 3v-14Z", `AI launcher retained the sparkle mark at ${viewport.label}`);
+      const launcherIcon = aiLauncher.locator('svg[data-icon-role="message"][data-icon-candidate="message"]');
+      assert(await launcherIcon.count() === 1, `AI launcher did not use the canonical message icon at ${viewport.label}`);
       await aiLauncher.click();
       const aiPanel = page.getByRole("dialog", { name: "Unigentamos AI" });
       await aiPanel.waitFor();
@@ -9183,12 +9183,14 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
 
       await page.goto(`${baseUrl}/admin/personal/style-guide`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { name: "Style Guide", exact: true }).waitFor();
-      for (const label of ["Type", "Color", "Modules", "Components", "Icons"]) {
+      for (const label of ["Type", "System colors", "Modules", "Components", "Icons"]) {
         assert(await page.getByRole("navigation", { name: "Style Guide sections" }).getByRole("link", { name: label, exact: true }).count() === 1, `Style Guide navigation omitted ${label} at ${viewport.label}`);
       }
       assert(await page.getByText("Resources remain authoritative.", { exact: false }).count() >= 1, `Style Guide did not disclose the Resource ownership boundary at ${viewport.label}`);
       assert(await page.locator('section[aria-label="Guide identity"] input').count() === 2, `Style Guide identity was not editable at ${viewport.label}`);
-      assert(await page.locator('input[aria-label$=" usage"]').count() >= 30, `Style Guide did not expose the canonical icon usage registry at ${viewport.label}`);
+      assert(await page.locator('[data-icon-registry-count="85"]').count() === 1, `Style Guide did not expose all 85 canonical icon roles at ${viewport.label}`);
+      assert(await page.locator('input[aria-label$=" usage"]').count() === 85, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
+      assert(await page.locator('[class*="iconCandidate"]').count() >= 420, `Style Guide did not expose five curated recommendations for each unselected icon at ${viewport.label}`);
       const typographyFamilies = await page.locator('[class*="specimenPreview"]').evaluateAll((elements) => elements.slice(0, 6).map((element) => getComputedStyle(element).fontFamily));
       assert(
         typographyFamilies.some((family) => family.includes("Plus Jakarta Sans Variable")) &&
@@ -9197,7 +9199,7 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
         `Style Guide specimens did not render their selected font families at ${viewport.label}: ${JSON.stringify(typographyFamilies)}`
       );
       assert(
-        await page.locator('[class*="swatchCard"]').count() >= 18 && await page.locator('[class*="moduleCard"]').count() >= 8,
+        await page.locator('[class*="swatchCard"]').count() >= 18 && await page.locator('[class*="moduleSystemCard"]').count() === 9,
         `Style Guide did not expose the expanded foundation and module palettes at ${viewport.label}`
       );
       const componentButton = page.locator("button:visible").filter({ hasText: "Component" }).first();
@@ -11822,7 +11824,7 @@ async function checkResourceFocusRedesignBrowserState(baseUrl, cookieJar, resour
         });
         assert(await page.locator("output").nth(0).textContent() === "8", "Resource usefulness slider did not update the controlled form state");
         assert(await page.locator("output").nth(1).textContent() === "7", "Resource trust slider did not update the controlled form state");
-        await page.getByRole("button", { name: "+ Color", exact: true }).click();
+        await page.getByRole("button", { name: "Color", exact: true }).click();
         await page.getByRole("button", { name: "Save", exact: true }).click();
         await page.getByText("Resource saved.", { exact: true }).waitFor();
         assert(await page.locator('input[type="range"]').nth(0).inputValue() === "8", "Resource usefulness slider did not persist through the new Properties editor");
@@ -12007,14 +12009,15 @@ async function main() {
         personalPasswordsStore.includes("validateInternationalPhone") &&
         personalPasswordsApi.includes("hasAdminSession") &&
         personalPasswordsApi.includes("isCsrfRequestValid") &&
-        personalOpsIconSource.includes('M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13') &&
-        personalOpsIconSource.includes('M12 5v14M5 12h14') &&
+        personalOpsIconSource.includes('import UnigentamosIcon from "../icons/UnigentamosIcon"') &&
+        personalOpsIconSource.includes("ICON_ROLE") &&
+        !personalOpsIconSource.includes("<path") &&
         personalOpsWorkspaceSource.includes('placeholder="Search..."') &&
         personalOpsWorkspaceSource.includes('aria-label="Personal systems"') &&
         !personalOpsWorkspaceSource.includes('aria-label="Personal Ops quick actions"') &&
         !personalOpsSidebarSource.includes('label: "Passwords"') &&
-        sharedAiDockSource.includes('M5 5.5h14v11H9l-4 3v-14Z') &&
-        !sharedAiDockSource.includes('m12 3 1.3 4.1') &&
+        sharedAiDockSource.includes('<UnigentamosIcon role="message"') &&
+        !sharedAiDockSource.includes("<svg") &&
         sharedAiDockStyles.includes("backdrop-filter: blur(32px) saturate(150%)") &&
         travelMapSource.includes("geoNaturalEarth1") &&
         travelMapSource.includes("world-atlas/countries-110m.json") &&
@@ -12691,10 +12694,12 @@ async function main() {
     const initialStyleGuide = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide");
     assert(
       initialStyleGuide.response.ok &&
-        initialStyleGuide.payload?.state?.schemaVersion === 2 &&
+        initialStyleGuide.payload?.state?.schemaVersion === 3 &&
         initialStyleGuide.payload?.state?.typography?.length >= 6 &&
         initialStyleGuide.payload?.state?.colors?.length >= 18 &&
-        initialStyleGuide.payload?.state?.modules?.length >= 8,
+        initialStyleGuide.payload?.state?.modules?.length === 9 &&
+        initialStyleGuide.payload?.state?.icons?.length === 85 &&
+        initialStyleGuide.payload.state.icons.every((item) => item.usage),
       "Style Guide defaults did not expose the expanded design foundation"
     );
     const styleInput = {
@@ -12710,7 +12715,41 @@ async function main() {
       headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
       body: JSON.stringify({ input: styleInput, expectedUpdatedAt: initialStyleGuide.payload.state.updatedAt })
     });
-    assert(savedStyleGuide.response.ok && savedStyleGuide.payload?.state?.icons?.[0]?.usage === "Destructive actions" && savedStyleGuide.payload.state.updatedAt, `Style Guide tokens did not persist: ${JSON.stringify(savedStyleGuide.payload)}`);
+    assert(savedStyleGuide.response.ok && savedStyleGuide.payload?.state?.icons?.find((item) => item.icon === "delete")?.usage === "Destructive actions" && savedStyleGuide.payload.state.updatedAt, `Style Guide tokens did not persist: ${JSON.stringify(savedStyleGuide.payload)}`);
+    const iconSelectionWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ role: "delete", candidate: "trash", expectedUpdatedAt: savedStyleGuide.payload.state.updatedAt })
+    });
+    assert(iconSelectionWithoutCsrf.response.status === 403, "Style Guide icon selection accepted a write without CSRF proof");
+    const selectedStyleGuideIcon = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ role: "delete", candidate: "trash", expectedUpdatedAt: savedStyleGuide.payload.state.updatedAt })
+    });
+    const selectedDelete = selectedStyleGuideIcon.payload?.state?.icons?.find((item) => item.icon === "delete");
+    assert(
+      selectedStyleGuideIcon.response.ok &&
+        selectedDelete?.selection === "trash" &&
+        selectedDelete?.resourceId &&
+        selectedStyleGuideIcon.payload?.resource?.id === selectedDelete.resourceId &&
+        selectedStyleGuideIcon.payload.resource.provenance?.areas?.includes("Style Guide") &&
+        selectedStyleGuideIcon.payload.resource.provenance?.subjects?.includes("Component: Icon") &&
+        selectedStyleGuideIcon.payload.resource.provenance?.subjects?.includes("Icon role: delete") &&
+        selectedStyleGuideIcon.payload.resource.source?.canonicalUrl === "https://www.streamlinehq.com/icons/download/trash--29169",
+      `Style Guide icon selection did not atomically persist its canonical Resource: ${JSON.stringify(selectedStyleGuideIcon.payload)}`
+    );
+    const repeatedStyleGuideIcon = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
+      body: JSON.stringify({ role: "delete", candidate: "trash", expectedUpdatedAt: savedStyleGuide.payload.state.updatedAt })
+    });
+    assert(
+      repeatedStyleGuideIcon.response.ok &&
+        repeatedStyleGuideIcon.payload?.state?.updatedAt === selectedStyleGuideIcon.payload.state.updatedAt &&
+        repeatedStyleGuideIcon.payload?.resource?.id === selectedDelete.resourceId,
+      "Style Guide icon selection was not idempotent"
+    );
     const staleStyleGuide = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide", {
       method: "PUT",
       headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") },
@@ -17158,7 +17197,7 @@ async function main() {
     const resourceLinks = await requestText(server.baseUrl, cookieJar, `/admin/resources/${createdResource.id}?tab=links`);
     assert(resourceLinks.response.ok, `Resource Links route failed: ${describeStatus(resourceLinks.response)}`);
     assertSelectedTab(resourceLinks.body, `resource-${createdResource.id}-tab-links`, "Resources direct Links tab URL state");
-    for (const expected of ["+ Object", "Projects", "People &amp; Organizations", "Notes", "Reviews", "Files", updatedNoteTitle]) {
+    for (const expected of ["Object", "Projects", "People &amp; Organizations", "Notes", "Reviews", "Files", updatedNoteTitle]) {
       assert(resourceLinks.body.includes(expected), `Resource Links omitted the streamlined object hub content: ${expected}`);
     }
 

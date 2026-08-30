@@ -2,6 +2,7 @@
 
 import type { FormEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import {
   formatMediaReviewCadence,
   MEDIA_REVIEW_CADENCE_OPTIONS,
@@ -247,14 +248,7 @@ export default function MediaReviewScheduleEditorSheet({
                 disabled={busy}
                 aria-label="Close Media review timing editor"
               >
-                <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true">
-                  <path
-                    d="m4 4 12 12M16 4 4 16"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                  />
-                </svg>
+                <UnigentamosIcon role="close" size={20} />
               </button>
             </header>
 

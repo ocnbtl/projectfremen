@@ -6,6 +6,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ADMIN_NAV_ITEMS } from "../../lib/admin-navigation";
 import PersonalViewportToggle from "../PersonalViewportToggle";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 
 type ProjectMenuItem = {
   id: string;
@@ -160,9 +161,7 @@ export default function AppTopNav({
         >
           <span>Menu</span>
           <strong>{activeNavItem?.label || "Home"}</strong>
-          <svg viewBox="0 0 12 8" width="12" height="8" aria-hidden="true" focusable="false">
-            <path d="M1 1.5 6 6.5l5-5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-          </svg>
+          <UnigentamosIcon role="chevron-down" size={12} />
         </button>
         <nav
           id="app-mobile-primary-navigation"
@@ -244,9 +243,7 @@ export default function AppTopNav({
                 aria-controls="app-project-navigation"
               >
                 {item.label}
-                <svg viewBox="0 0 12 8" width="12" height="8" aria-hidden="true" focusable="false">
-                  <path d="M1 1.5 6 6.5l5-5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                </svg>
+                <UnigentamosIcon role="chevron-down" size={12} />
               </button>
               <div
                 id="app-project-navigation"
@@ -289,10 +286,7 @@ export default function AppTopNav({
             aria-label="Admin command search"
             onSubmit={submitCommandSearch}
           >
-            <svg viewBox="0 0 20 20" width="16" height="16" aria-hidden="true" focusable="false">
-              <circle cx="8.5" cy="8.5" r="5.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
-              <path d="m12.5 12.5 4 4" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
+            <UnigentamosIcon role="search" size={16} />
             <input
               ref={searchInputRef}
               value={commandQuery}

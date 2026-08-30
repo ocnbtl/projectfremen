@@ -57,6 +57,7 @@ import PersonalOpsSidebar, {
   PERSONAL_OPS_DOMAIN_LABELS,
   type PersonalOpsSidebarCounts
 } from "./PersonalOpsSidebar";
+import PersonalOpsIcon from "./PersonalOpsIcon";
 import styles from "./PersonalOpsWorkspace.module.css";
 
 export type PersonalOpsAdvancedView = "routines" | "inbox" | "templates";
@@ -616,7 +617,7 @@ function AdvancedObjectForm({
             <h2>{editing ? `Edit ${label}` : `New ${label}`}</h2>
             <p>{form.family === "routines" ? "Cadence stays manual until a run is explicitly previewed and confirmed." : form.family === "captures" ? "Raw source is preserved; classification is optional." : "New templates begin as drafts and test without writing objects."}</p>
           </div>
-          <button type="button" className={styles.closeButton} onClick={onClose} aria-label={`Close ${label} form`}>×</button>
+          <button type="button" className={styles.closeButton} onClick={onClose} aria-label={`Close ${label} form`}><PersonalOpsIcon name="close" /></button>
         </header>
         <div className={styles.sheetScroll}>
           <div className={styles.formGrid}>
@@ -1419,8 +1420,8 @@ export default function PersonalOpsAdvancedWorkspace({
 
       <main className={styles.directory} aria-label={`${config.title} ledger`}>
         <div className={styles.mobileToolbar}>
-          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}>☰ Personal Ops</button>
-          <button type="button" onClick={openCreate}>+ {config.singular}</button>
+          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal Ops</button>
+          <button type="button" onClick={openCreate}><PersonalOpsIcon name="plus" /> {config.singular}</button>
         </div>
         <div className={styles.mainScroll}>
           <header className={styles.pageHeader}>
@@ -1448,7 +1449,7 @@ export default function PersonalOpsAdvancedWorkspace({
                 </select>
               </label>}
               <button type="button" className={styles.button} aria-pressed={urlState.compact} onClick={() => updateUrl({ compact: !urlState.compact })}>Compact</button>
-              <button type="button" className={styles.primaryButton} onClick={openCreate}>+ {config.singular}</button>
+              <button type="button" className={styles.primaryButton} onClick={openCreate}><PersonalOpsIcon name="plus" /> {config.singular}</button>
               <button
                 type="button"
                 className={styles.button}
@@ -1634,7 +1635,7 @@ export default function PersonalOpsAdvancedWorkspace({
                     <h2>{selectedItem.title}</h2>
                     <p>Legacy Personal Record · compatibility source</p>
                   </div>
-                  <button type="button" className={styles.closeButton} onClick={() => updateUrl({ selected: "" }, true)} aria-label="Close inspector">×</button>
+                  <button type="button" className={styles.closeButton} onClick={() => updateUrl({ selected: "" }, true)} aria-label="Close inspector"><PersonalOpsIcon name="close" /></button>
                 </div>
                 <div className={[styles.notice, styles.legacyBoundary].join(" ")} data-tone="attention">
                   This record remains in its current owner and has not been classified or converted. Native creation requires a separate explicit choice; this view never copies it silently.
@@ -1657,7 +1658,7 @@ export default function PersonalOpsAdvancedWorkspace({
                       <h2>{selectedItem.title}</h2>
                       <p>{cleanLabel(selectedItem.objectType)} · {selectedItem.domain}{selectedItem.objectType === "routine" ? "" : ` · owner ${selectedItem.owner}`}</p>
                     </div>
-                    <button type="button" className={styles.closeButton} onClick={() => updateUrl({ selected: "" }, true)} aria-label="Close inspector">×</button>
+                    <button type="button" className={styles.closeButton} onClick={() => updateUrl({ selected: "" }, true)} aria-label="Close inspector"><PersonalOpsIcon name="close" /></button>
                   </div>
                   <div className={styles.chipRow}>
                     <PersonalOpsStatusChip tone={toneFor(selectedItem.lifecycle)}>{cleanLabel(selectedItem.lifecycle)}</PersonalOpsStatusChip>

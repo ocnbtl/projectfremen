@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { ReactNode } from "react";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { useEffect, useRef } from "react";
 
 export type ModuleSidebarItem = {
@@ -172,9 +173,7 @@ export default function ModuleSidebar({
         </div>
         {onClose && (
           <button type="button" className="module-sidebar__close" onClick={onClose} aria-label={`Close ${title} navigation`}>
-            <svg viewBox="0 0 20 20" width="20" height="20" aria-hidden="true" focusable="false">
-              <path d="m4 4 12 12M16 4 4 16" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            </svg>
+            <UnigentamosIcon role="close" size={20} />
           </button>
         )}
         {status && <div className="module-sidebar__status">{status}</div>}

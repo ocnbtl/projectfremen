@@ -28,6 +28,7 @@ import {
   vaultRelationshipsFor
 } from "../lib/local-first/vault-record-tools";
 import styles from "./VaultWorkspace.module.css";
+import UnigentamosIcon from "./icons/UnigentamosIcon";
 
 type VaultStatus = Awaited<ReturnType<typeof browserVault.status>>;
 type BootstrapObject = { canonicalId: string; objectKind: VaultObjectKind; fields: Record<string, VaultFieldValue> };
@@ -1050,7 +1051,7 @@ export default function VaultWorkspace({
           {setupTarget === "windows" ? (
             <article className={styles.setupCard} aria-labelledby="windows-setup-title">
               <div className={styles.deviceTrail} aria-label="Windows stores the main vault and syncs it to your other devices">
-                <strong>Windows PC</strong><span>→</span><span>Your private vault</span><span>→</span><span>Other devices</span>
+                <strong>Windows PC</strong><UnigentamosIcon role="chevron-right" /><span>Your private vault</span><UnigentamosIcon role="chevron-right" /><span>Other devices</span>
               </div>
               <div className={styles.setupHeading}>
                 <div><p className={styles.eyebrow}>Main computer</p><h2 id="windows-setup-title">Set up this Windows PC</h2></div>
@@ -1099,7 +1100,7 @@ export default function VaultWorkspace({
           ) : (
             <article className={styles.setupCard} aria-labelledby="apple-setup-title">
               <div className={styles.deviceTrail} aria-label="Windows sends a recovery file to this device">
-                <strong>Windows PC</strong><span>→</span><span>Recovery file</span><span>→</span><span>This device</span>
+                <strong>Windows PC</strong><UnigentamosIcon role="chevron-right" /><span>Recovery file</span><UnigentamosIcon role="chevron-right" /><span>This device</span>
               </div>
               <div className={styles.setupHeading}>
                 <div><p className={styles.eyebrow}>iPhone, iPad, or MacBook</p><h2 id="apple-setup-title">Connect this Apple device</h2></div>
@@ -1370,7 +1371,7 @@ export default function VaultWorkspace({
               <span>Saved searches</span>
               {savedSearches.map((search) => <span className={styles.savedSearch} key={search.id}>
                 <button type="button" onClick={() => { setActiveKind(search.kind); setRecordQuery(search.query); }}>{search.label}</button>
-                <button type="button" aria-label={`Delete saved search ${search.label}`} onClick={() => void persistSavedSearches(savedSearches.filter((item) => item.id !== search.id))}>×</button>
+                <button type="button" aria-label={`Delete saved search ${search.label}`} onClick={() => void persistSavedSearches(savedSearches.filter((item) => item.id !== search.id))}><UnigentamosIcon role="close" size={14} /></button>
               </span>)}
             </div>}
             <div className={styles.kindTabs} role="tablist" aria-label="Vault object kinds">

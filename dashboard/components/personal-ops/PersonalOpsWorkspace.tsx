@@ -769,7 +769,7 @@ function ObjectForm({
             <p>{form.sourceLabel ? `Source: ${form.sourceLabel}` : "Saved to the native Personal Ops ledger."}</p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close form">
-            ×
+            <PersonalOpsIcon name="close" />
           </button>
         </header>
         <div className={styles.sheetScroll}>
@@ -1529,7 +1529,7 @@ export default function PersonalOpsWorkspace({
 
       <main className={styles.directory} aria-label={`${VIEW_COPY[initialView].title} ledger`}>
         <div className={styles.mobileToolbar}>
-          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}>☰ Personal Ops</button>
+          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal Ops</button>
           <button type="button" onClick={() => openCreate(primaryFamily)}><PersonalOpsIcon name="plus" /> {FAMILY_LABELS[primaryFamily]}</button>
         </div>
         <div className={styles.mainScroll}>
@@ -1700,7 +1700,7 @@ export default function PersonalOpsWorkspace({
                   <h2>{selectedItem.title}</h2>
                   <p>{typeLabel(selectedItem)} · {selectedItem.source === "legacy-goal" ? selectedItem.projectLabel : selectedItem.domain}</p>
                 </div>
-                <button type="button" className={styles.closeButton} onClick={() => { updateUrl({ selected: "" }); setMobileInspectorOpen(false); }} aria-label="Close inspector">×</button>
+                <button type="button" className={styles.closeButton} onClick={() => { updateUrl({ selected: "" }); setMobileInspectorOpen(false); }} aria-label="Close inspector"><PersonalOpsIcon name="close" /></button>
               </div>
               <div className={styles.chipRow}>
                 <PersonalOpsStatusChip tone={toneForState(stateLabel(selectedItem))}>{cleanLabel(stateLabel(selectedItem))}</PersonalOpsStatusChip>

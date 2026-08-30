@@ -1,3 +1,13 @@
+/* Canonical functional icons: Tabler Line uses a 24px grid and 2px stroke. */
+.unigentamos-icon {
+  flex: none;
+  fill: none !important;
+  stroke: currentColor;
+  stroke-width: 2 !important;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
 /* Figma transfer slice: Command Center and Personal Ops dashboard surfaces. */
 .admin-home-shell {
   background: #f4f8f6;

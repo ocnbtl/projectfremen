@@ -96,7 +96,7 @@ export default function DogTrackerWorkspace({ initialState, sidebarCounts, initi
     <div className={baseStyles.shell}>
       <PersonalOpsSidebar activeView="dog" filter="" pathname="/admin/personal/dog" counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
       <main className={baseStyles.directory} aria-label="Dog care">
-        <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)}>☰ Personal Ops</button><button type="button" onClick={() => setEditor(draftFor("walk"))}><PersonalOpsIcon name="plus" /> Walk</button></div>
+        <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)}><PersonalOpsIcon name="menu" /> Personal Ops</button><button type="button" onClick={() => setEditor(draftFor("walk"))}><PersonalOpsIcon name="plus" /> Walk</button></div>
         <div className={[baseStyles.mainScroll, styles.utilityScroll].join(" ")}>
           <header className={styles.utilityHeader}>
             <div><span className={styles.kicker}>Daily care</span><h1>Dog</h1><p>A lightweight record of walks, meals, and bathroom breaks.</p></div>

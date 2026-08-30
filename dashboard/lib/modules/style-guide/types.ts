@@ -1,4 +1,4 @@
-export const STYLE_GUIDE_SCHEMA_VERSION = 2 as const;
+export const STYLE_GUIDE_SCHEMA_VERSION = 3 as const;
 
 export type StyleGuideTypographyRole = {
   id: string;
@@ -21,13 +21,17 @@ export type StyleGuideModulePalette = {
   id: string;
   module: string;
   accent: string;
+  secondary: string;
   surface: string;
+  status: "working" | "figma_ready";
 };
 
 export type StyleGuideIconAssignment = {
   id: string;
   icon: string;
   usage: string;
+  selection?: string;
+  resourceId?: string;
 };
 
 export type StyleGuideState = {

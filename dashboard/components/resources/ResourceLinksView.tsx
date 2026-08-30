@@ -112,7 +112,7 @@ export default function ResourceLinksView({ resource, links, targets, evidenceTa
     <div className={styles.linksHub}>
       <div className={styles.linksToolbar}>
         <h2>Links</h2>
-        <div><strong>{combined.length}</strong><button type="button" className={styles.primaryButton} onClick={() => setAdding((current) => !current)}>+ Object</button></div>
+        <div><strong>{combined.length}</strong><button type="button" className={styles.primaryButton} onClick={() => setAdding((current) => !current)}><PersonalOpsIcon name="plus" /> Object</button></div>
       </div>
       {feedback ? <p className={styles.feedback} data-error="true" role="alert">{feedback}</p> : null}
       {adding ? <form className={styles.linkComposer} onSubmit={saveLink}>

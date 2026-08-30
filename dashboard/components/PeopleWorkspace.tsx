@@ -43,6 +43,7 @@ import type {
   PersonalRecordStatus
 } from "../lib/personal-records-store";
 import SharedAIDock from "./admin-shell/SharedAIDock";
+import UnigentamosIcon from "./icons/UnigentamosIcon";
 import ConfirmationSheet from "./operational/ConfirmationSheet";
 import DetailTabs from "./operational/DetailTabs";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
@@ -167,39 +168,16 @@ type PeopleIconName =
   | "view-grid";
 
 function PeopleIcon({ name }: { name: PeopleIconName }) {
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-      {name === "birthday" && <><path d="M5 10h14v10H5z" /><path d="M7 10V7h10v3M12 7V4M10.5 4.5 12 3l1.5 1.5" /><path d="M5 14c2 1.5 4.5 1.5 7 0 2.5 1.5 5 1.5 7 0" /></>}
-      {name === "location" && <><path d="M12 21s6-5.2 6-11a6 6 0 1 0-12 0c0 5.8 6 11 6 11Z" /><circle cx="12" cy="10" r="2" /></>}
-      {name === "hometown" && <><path d="m4 11 8-7 8 7" /><path d="M6.5 10v10h11V10M10 20v-6h4v6" /></>}
-      {name === "occupation" && <><rect x="3.5" y="7" width="17" height="12" rx="2" /><path d="M9 7V4.5h6V7M3.5 12h17M10 12v2h4v-2" /></>}
-      {name === "employer" && <><path d="M4 20V7l8-3v16M12 9l8-2v13" /><path d="M7 10h2M7 14h2M15 11h2M15 15h2" /></>}
-      {name === "university" && <><path d="m3 9 9-5 9 5-9 5-9-5Z" /><path d="M6 11.5V16c3.5 2.4 8.5 2.4 12 0v-4.5M21 9v6" /></>}
-      {name === "partner" && <><path d="M8.5 12.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM15.5 19.5a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" /><path d="m11.4 9.8 1.2 1.2" /></>}
-      {name === "children" && <><circle cx="8" cy="8" r="3" /><circle cx="16" cy="9" r="2.5" /><path d="M3.5 20c.3-4 1.8-6 4.5-6s4.2 2 4.5 6M12.5 20c.2-3.2 1.4-4.8 3.5-4.8s3.3 1.6 3.5 4.8" /></>}
-      {name === "organization" && <><rect x="4" y="4" width="16" height="16" rx="2" /><path d="M8 8h3M8 12h3M14 8h2M14 12h2M9 20v-4h6v4" /></>}
-      {name === "industry" && <><path d="M4 20V9l5 3V8l5 3V5l6 4v11Z" /><path d="M8 16h2M14 16h2" /></>}
-      {name === "founded" && <><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></>}
-      {name === "team" && <><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2" /><path d="M3.5 20c.3-4 2.1-6 5.5-6s5.2 2 5.5 6M14 15c3.6-.3 5.5 1.4 6 5" /></>}
-      {name === "edit" && <><path d="m5 19 3.8-.8L19 8a2.1 2.1 0 0 0-3-3L5.8 15.2 5 19Z" /><path d="m14.5 6.5 3 3" /></>}
-      {name === "object" && <><rect x="4" y="4" width="7" height="7" rx="1.5" /><rect x="13" y="13" width="7" height="7" rx="1.5" /><path d="M11 7.5h3.5A2.5 2.5 0 0 1 17 10v3M13 16.5H9.5A2.5 2.5 0 0 1 7 14v-3" /></>}
-      {name === "dormant" && <><path d="M19 14.5A7.5 7.5 0 0 1 9.5 5a7.5 7.5 0 1 0 9.5 9.5Z" /></>}
-      {name === "export" && <><path d="M12 3v12M7.5 7.5 12 3l4.5 4.5" /><path d="M5 13v7h14v-7" /></>}
-      {name === "delete" && <><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13" /><path d="M10 11v5M14 11v5" /></>}
-      {name === "chevron" && <path d="m9 6 6 6-6 6" />}
-      {name === "search" && <><circle cx="11" cy="11" r="6.5" /><path d="m16 16 4 4" /></>}
-      {name === "filter" && <path d="M4 6h16M7 12h10M10 18h4" />}
-      {name === "close" && <path d="M6 6l12 12M18 6 6 18" />}
-      {name === "plus" && <path d="M12 5v14M5 12h14" />}
-      {name === "groups" && <><circle cx="8" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M3 20c.3-4 2-6 5-6s4.7 2 5 6M13 15.5c3.8-.5 6 1 6.5 4.5" /></>}
-      {name === "communication" && <><path d="M4 5h16v11H9l-5 4V5Z" /><path d="M8 9h8M8 12h5" /></>}
-      {name === "notes" && <><path d="M6 3.5h9l3 3V20H6Z" /><path d="M15 3.5V7h3M9 11h6M9 14h6M9 17h4" /></>}
-      {name === "cadence" && <><circle cx="12" cy="12" r="8.5" /><path d="M12 7v5l3 2" /></>}
-      {name === "view-comfortable" && <><rect x="4" y="5" width="16" height="5" rx="1.5" /><rect x="4" y="14" width="16" height="5" rx="1.5" /></>}
-      {name === "view-compact" && <><path d="M5 7h14M5 12h14M5 17h14" /></>}
-      {name === "view-grid" && <><rect x="4" y="4" width="6" height="6" rx="1" /><rect x="14" y="4" width="6" height="6" rx="1" /><rect x="4" y="14" width="6" height="6" rx="1" /><rect x="14" y="14" width="6" height="6" rx="1" /></>}
-    </svg>
-  );
+  const roles: Readonly<Record<PeopleIconName, string>> = {
+    birthday: "birthday", location: "location", hometown: "hometown", occupation: "briefcase",
+    employer: "employer", university: "university", partner: "partner", children: "users",
+    organization: "organization", industry: "industry", founded: "clock", team: "users", edit: "edit",
+    object: "object", dormant: "dormant", export: "export", delete: "delete", chevron: "chevron-right",
+    search: "search", filter: "filter", close: "close", plus: "plus", groups: "users",
+    communication: "message", notes: "notes", cadence: "clock", "view-comfortable": "view-comfortable",
+    "view-compact": "view-compact", "view-grid": "view-grid"
+  };
+  return <UnigentamosIcon role={roles[name]} />;
 }
 
 function profileSectionIcon(title: string): PeopleIconName {
@@ -257,18 +235,17 @@ function PeopleAddButton({
 }
 
 function ContactMethodIcon({ id }: { id: ContactMethodId }) {
-  if (id === "linkedin") return <span aria-hidden="true">in</span>;
-  if (id === "x") return <span aria-hidden="true">X</span>;
-  return (
-    <svg aria-hidden="true" viewBox="0 0 24 24" focusable="false">
-      {id === "email" && <><path d="M3.5 6.5h17v11h-17z" /><path d="m4 7 8 6 8-6" /></>}
-      {id === "phone" && <path d="M7 3.5 4.5 6c.8 6.8 6.7 12.7 13.5 13.5l2.5-2.5-4-3-2 2c-2.7-1.1-5.4-3.8-6.5-6.5l2-2z" />}
-      {id === "website" && <><circle cx="12" cy="12" r="8.5" /><path d="M3.7 12h16.6M12 3.5c2.2 2.3 3.2 5.1 3.2 8.5s-1 6.2-3.2 8.5C9.8 18.2 8.8 15.4 8.8 12S9.8 5.8 12 3.5Z" /></>}
-      {id === "instagram" && <><rect x="4" y="4" width="16" height="16" rx="4" /><circle cx="12" cy="12" r="3.5" /><circle cx="17.2" cy="6.8" r=".7" /></>}
-      {id === "tiktok" && <><path d="M14.5 4v10.2a4 4 0 1 1-3-3.9" /><path d="M14.5 4c.7 2.5 2.2 4 4.5 4.4" /></>}
-      {id === "youtube" && <><rect x="3.5" y="6.5" width="17" height="11" rx="3" /><path d="m10 9.5 5 2.5-5 2.5Z" /></>}
-    </svg>
-  );
+  const roles: Readonly<Record<ContactMethodId, string>> = {
+    email: "email",
+    phone: "phone",
+    website: "website",
+    linkedin: "brand-linkedin",
+    instagram: "brand-instagram",
+    tiktok: "brand-tiktok",
+    x: "brand-x",
+    youtube: "brand-youtube"
+  };
+  return <UnigentamosIcon role={roles[id]} />;
 }
 
 function contactMethodHref(id: ContactMethodId, value: string): { href?: string; actionLabel?: string } {
@@ -3994,7 +3971,7 @@ export default function PeopleWorkspace({
       <div className="people-mobile-topbar">
         {mobileSurface === "directory" ? (
           <button type="button" aria-label="Open people menu" onClick={() => setMobileMenuOpen(true)}>
-            <span aria-hidden="true">☰</span>
+            <UnigentamosIcon role="menu" size={18} />
           </button>
         ) : (
           <button
@@ -4002,7 +3979,7 @@ export default function PeopleWorkspace({
             aria-label={mobileSurface === "editor" ? "Cancel editing" : "Back to People directory"}
             onClick={() => mobileSurface === "editor" ? requestCancelEditor() : router.push(getModuleRoute("people"))}
           >
-            <span aria-hidden="true">←</span>
+            <UnigentamosIcon role="back" size={18} />
           </button>
         )}
         <span className="people-mobile-brand">U</span>
@@ -5059,7 +5036,7 @@ export default function PeopleWorkspace({
                 <h2 id="log-interaction-title">Log interaction</h2>
                 <p>Tag everyone involved once; the same entry appears on each profile.</p>
               </div>
-              <button className="people-dialog-close" type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}><span aria-hidden="true">×</span></button>
+              <button className="people-dialog-close" type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}><UnigentamosIcon role="close" size={18} /></button>
             </header>
             <div className="people-interaction-fields">
               <label>
@@ -5211,7 +5188,7 @@ export default function PeopleWorkspace({
             <strong>{value}</strong>
           </button>
         ))}
-        <button type="button" onClick={() => setFiltersOpen((current) => !current)}>+ Add filter</button>
+        <button type="button" onClick={() => setFiltersOpen((current) => !current)}><UnigentamosIcon role="plus" size={16} /> Add filter</button>
       </aside>
 
       {selectedPerson && (
