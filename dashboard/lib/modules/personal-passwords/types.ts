@@ -1,5 +1,24 @@
 export const PERSONAL_PASSWORDS_SCHEMA_VERSION = 1 as const;
 
+export function normalizeCredentialWebsite(value: string): string {
+  const website = value.trim();
+  if (!website.endsWith("/")) return website;
+  try {
+    const parsed = new URL(website);
+    if (
+      (parsed.protocol === "http:" || parsed.protocol === "https:") &&
+      !parsed.search &&
+      !parsed.hash &&
+      parsed.pathname.endsWith("/")
+    ) {
+      return website.replace(/\/+$/, "");
+    }
+  } catch {
+    // Validation reports malformed URLs after normalization.
+  }
+  return website;
+}
+
 export type EncryptedCredentialEnvelope = {
   version: 1;
   algorithm: "aes-256-gcm";

@@ -14,6 +14,7 @@ import {
 } from "../people/phone";
 import {
   PERSONAL_PASSWORDS_SCHEMA_VERSION,
+  normalizeCredentialWebsite,
   type CredentialDetail,
   type CredentialInput,
   type CredentialSummary,
@@ -67,7 +68,7 @@ function cleanSecret(value: unknown): string {
 
 function normalizeInput(value: unknown): CredentialInput {
   if (!isRecord(value)) throw new PersonalPasswordsStoreError("Credential input must be an object");
-  const website = cleanText(value.website, "Website", 2_000);
+  const website = normalizeCredentialWebsite(cleanText(value.website, "Website", 2_000));
   const phone = cleanText(value.phone, "Phone", 100);
   const phoneCountryCode = canonicalCountryCode(
     cleanText(value.phoneCountryCode, "Country code", 8),

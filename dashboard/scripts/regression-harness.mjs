@@ -8928,6 +8928,11 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       await page.getByRole("button", { name: "Password", exact: true }).click();
       const editor = page.locator("form[data-credential-editor]");
       await editor.waitFor();
+      const websiteInput = editor.getByLabel("Website", { exact: true });
+      await page.evaluate(() => navigator.clipboard.writeText("https://example.com/"));
+      await websiteInput.focus();
+      await page.keyboard.press("Control+V");
+      assert(await websiteInput.inputValue() === "https://example.com", `Credential website paste retained its terminal slash at ${viewport.label}`);
       const credentialIdentityLayout = await editor.evaluate(() => {
         const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
         const account = rect('[name="title"]');
@@ -12542,7 +12547,7 @@ async function main() {
     const createdCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "POST",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
-      body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}-user`, email: `${testRunId}@example.com`, phone: "987654321", phoneCountryCode: "+51", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com", notes: "Synthetic credential context." } })
+      body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}-user`, email: `${testRunId}@example.com`, phone: "987654321", phoneCountryCode: "+51", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com/", notes: "Synthetic credential context." } })
     });
     assert(
       createdCredential.response.ok && createdCredential.payload?.ok && createdCredential.payload.item?.id && createdCredential.payload.item?.hasPin === true && !("secret" in createdCredential.payload.item) && !("pin" in createdCredential.payload.item),
@@ -12577,10 +12582,10 @@ async function main() {
     const updatedCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "PATCH",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
-      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: `${syntheticCredentialTitle} updated`, username: `${testRunId}-user-2`, email: `${testRunId}-updated@example.com`, phone: "6147963848", phoneCountryCode: "+1", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com", notes: "Updated synthetic context." } })
+      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: `${syntheticCredentialTitle} updated`, username: `${testRunId}-user-2`, email: `${testRunId}-updated@example.com`, phone: "6147963848", phoneCountryCode: "+1", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com/account/", notes: "Updated synthetic context." } })
     });
     assert(
-      updatedCredential.response.ok && updatedCredential.payload?.item?.updatedAt !== credentialSummary.updatedAt && updatedCredential.payload?.item?.website === "https://example.com",
+      updatedCredential.response.ok && updatedCredential.payload?.item?.updatedAt !== credentialSummary.updatedAt && updatedCredential.payload?.item?.website === "https://example.com/account",
       "Encrypted password update did not persist or changed the website"
     );
     const staleCredentialUpdate = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {

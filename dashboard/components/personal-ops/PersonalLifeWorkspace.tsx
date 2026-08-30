@@ -21,7 +21,11 @@ import type {
   VehicleModificationStatus
 } from "../../lib/modules/personal-life/types";
 import type { PersonalOpsState } from "../../lib/modules/personal-ops/types";
-import type { CredentialDetail, CredentialSummary } from "../../lib/modules/personal-passwords/types";
+import {
+  normalizeCredentialWebsite,
+  type CredentialDetail,
+  type CredentialSummary
+} from "../../lib/modules/personal-passwords/types";
 import {
   PHONE_COUNTRY_FORMATS,
   canonicalCountryCode,
@@ -101,7 +105,7 @@ function formatDate(value?: string) {
 }
 
 function credentialWebsiteHref(value: string) {
-  const website = value.trim();
+  const website = normalizeCredentialWebsite(value);
   if (!website) return "";
   try {
     const parsed = new URL(website);
@@ -718,7 +722,28 @@ export default function PersonalLifeWorkspace({
           <button type="button" className={styles.editorClose} aria-label="Close password editor" title="Close" onClick={closeCredentialEditor}><PersonalOpsIcon name="close" /></button>
         </header>
         {input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}
-        {input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}
+        <label>
+          <span>Website</span>
+          <input
+            name="website"
+            type="url"
+            value={credentialDraft.website}
+            onChange={(event) => setCredentialDraft((current) => current ? { ...current, website: event.target.value } : current)}
+            onPaste={(event) => {
+              const pasted = event.clipboardData.getData("text");
+              const input = event.currentTarget;
+              const start = input.selectionStart ?? credentialDraft.website.length;
+              const end = input.selectionEnd ?? start;
+              const nextWebsite = `${credentialDraft.website.slice(0, start)}${pasted}${credentialDraft.website.slice(end)}`;
+              const normalizedWebsite = normalizeCredentialWebsite(nextWebsite);
+              if (normalizedWebsite === nextWebsite) return;
+              event.preventDefault();
+              setCredentialDraft((current) => current ? { ...current, website: normalizedWebsite } : current);
+            }}
+            onBlur={() => setCredentialDraft((current) => current ? { ...current, website: normalizeCredentialWebsite(current.website) } : current)}
+            placeholder="https://"
+          />
+        </label>
         <div className={styles.credentialIdentityFields}>
           {input("Username", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "Optional username" })}
           {input("Email", "email", credentialDraft.email, (value) => setCredentialDraft((current) => current ? { ...current, email: value } : current), { type: "email", placeholder: "name@example.com" })}
