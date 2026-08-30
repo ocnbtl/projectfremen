@@ -8894,10 +8894,12 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       await websiteTrigger.click();
       const websiteNotice = page.getByRole("status").filter({ hasText: "Website copied." });
       await websiteNotice.waitFor();
+      const copiedWebsite = await page.evaluate(() => navigator.clipboard.readText());
       assert(
         await row.getAttribute("data-website-expanded") !== null &&
           await row.getByText("example.com", { exact: true }).count() === 1 &&
-          await row.getByRole("link", { name: `Open website for ${credentialTitle}` }).getAttribute("href") === "https://example.com/account",
+          await row.getByRole("link", { name: `Open website for ${credentialTitle}` }).getAttribute("href") === "https://example.com" &&
+          copiedWebsite === "https://example.com",
         `Credential website did not unroll into its domain and Open action at ${viewport.label}`
       );
       await websiteNotice.getByRole("button", { name: "Dismiss notification" }).click();
@@ -8908,7 +8910,7 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       await editEditor.waitFor();
       assert(
         await row.getAttribute("data-website-expanded") !== null &&
-          await editEditor.getByLabel("Website", { exact: true }).inputValue() === "https://example.com/account",
+          await editEditor.getByLabel("Website", { exact: true }).inputValue() === "https://example.com",
         `Editing a credential did not unroll and populate its Website at ${viewport.label}`
       );
       await editEditor.getByRole("button", { name: "Close password editor" }).click();
@@ -8927,25 +8929,40 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       const editor = page.locator("form[data-credential-editor]");
       await editor.waitFor();
       const credentialIdentityLayout = await editor.evaluate(() => {
-        const rect = (label) => Array.from(document.querySelectorAll("label")).find((element) => element.textContent?.trim().startsWith(label))?.getBoundingClientRect();
-        const account = rect("Account");
-        const website = rect("Website");
-        const username = rect("Username");
-        const email = rect("Email");
-        return account && website && username && email ? {
-          account: { x: account.x, y: account.y },
-          website: { x: website.x, y: website.y },
-          username: { x: username.x, y: username.y },
-          email: { x: email.x, y: email.y }
+        const rect = (selector) => document.querySelector(selector)?.getBoundingClientRect();
+        const account = rect('[name="title"]');
+        const website = rect('[name="website"]');
+        const username = rect('[name="username"]');
+        const email = rect('[name="email"]');
+        const countryCode = rect('[name="phoneCountryCode"]');
+        const phone = rect('[name="phone"]');
+        const password = rect('[name="secret"]');
+        const pin = rect('[name="pin"]');
+        const notes = rect("textarea");
+        const shape = (box) => ({ x: box.x, y: box.y, width: box.width, right: box.right });
+        return account && website && username && email && countryCode && phone && password && pin && notes ? {
+          account: shape(account),
+          website: shape(website),
+          username: shape(username),
+          email: shape(email),
+          countryCode: shape(countryCode),
+          phone: shape(phone),
+          password: shape(password),
+          pin: shape(pin),
+          notes: shape(notes)
         } : null;
       });
       assert(
         credentialIdentityLayout && (
           viewport.width <= 760
-            ? credentialIdentityLayout.account.y < credentialIdentityLayout.website.y && credentialIdentityLayout.website.y < credentialIdentityLayout.username.y && credentialIdentityLayout.username.y < credentialIdentityLayout.email.y
-            : Math.abs(credentialIdentityLayout.account.y - credentialIdentityLayout.website.y) <= 1 && Math.abs(credentialIdentityLayout.username.y - credentialIdentityLayout.email.y) <= 1 && credentialIdentityLayout.username.y > credentialIdentityLayout.account.y && credentialIdentityLayout.account.x < credentialIdentityLayout.website.x && credentialIdentityLayout.username.x < credentialIdentityLayout.email.x
+            ? credentialIdentityLayout.account.y < credentialIdentityLayout.website.y && credentialIdentityLayout.website.y < credentialIdentityLayout.username.y && credentialIdentityLayout.username.y < credentialIdentityLayout.email.y && credentialIdentityLayout.email.y < credentialIdentityLayout.phone.y && Math.abs(credentialIdentityLayout.countryCode.y - credentialIdentityLayout.phone.y) <= 1 && credentialIdentityLayout.phone.y < credentialIdentityLayout.password.y && credentialIdentityLayout.password.y < credentialIdentityLayout.pin.y && credentialIdentityLayout.pin.y < credentialIdentityLayout.notes.y
+            : Math.abs(credentialIdentityLayout.account.y - credentialIdentityLayout.website.y) <= 1 && Math.abs(credentialIdentityLayout.username.y - credentialIdentityLayout.email.y) <= 1 && Math.abs(credentialIdentityLayout.username.y - credentialIdentityLayout.countryCode.y) <= 1 && Math.abs(credentialIdentityLayout.username.y - credentialIdentityLayout.phone.y) <= 1 && credentialIdentityLayout.username.y > credentialIdentityLayout.account.y && Math.abs(credentialIdentityLayout.password.y - credentialIdentityLayout.pin.y) <= 1 && credentialIdentityLayout.password.y > credentialIdentityLayout.username.y && credentialIdentityLayout.notes.y > credentialIdentityLayout.password.y
         ),
-        `Credential Account/Website and Username/Email layout drifted at ${viewport.label}: ${JSON.stringify(credentialIdentityLayout)}`
+        `Credential editor row layout drifted at ${viewport.label}: ${JSON.stringify(credentialIdentityLayout)}`
+      );
+      assert(
+        credentialIdentityLayout && credentialIdentityLayout.countryCode.width < credentialIdentityLayout.phone.width && Math.abs(credentialIdentityLayout.countryCode.right - credentialIdentityLayout.phone.x) <= 1,
+        `Credential country code was not compact and attached to Phone at ${viewport.label}: ${JSON.stringify(credentialIdentityLayout)}`
       );
       const countryCode = editor.getByLabel("Country code");
       assert(await countryCode.inputValue() === "+1", "New credential did not default to the +1 country code");
@@ -12525,7 +12542,7 @@ async function main() {
     const createdCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "POST",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
-      body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}-user`, email: `${testRunId}@example.com`, phone: "987654321", phoneCountryCode: "+51", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com/account", notes: "Synthetic credential context." } })
+      body: JSON.stringify({ input: { title: syntheticCredentialTitle, username: `${testRunId}-user`, email: `${testRunId}@example.com`, phone: "987654321", phoneCountryCode: "+51", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com", notes: "Synthetic credential context." } })
     });
     assert(
       createdCredential.response.ok && createdCredential.payload?.ok && createdCredential.payload.item?.id && createdCredential.payload.item?.hasPin === true && !("secret" in createdCredential.payload.item) && !("pin" in createdCredential.payload.item),
@@ -12534,13 +12551,13 @@ async function main() {
     const credentialSummary = createdCredential.payload.item;
     const listedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords");
     assert(
-      listedCredentials.response.ok && listedCredentials.payload?.items?.some((item) => item.id === credentialSummary.id && item.username === `${testRunId}-user` && item.email === `${testRunId}@example.com` && item.phone === syntheticPhone && item.phoneCountryCode === "+51" && item.hasPin === true && !("secret" in item) && !("pin" in item)),
-      "Default encrypted password list exposed a secret or omitted separate username/email/phone fields"
+      listedCredentials.response.ok && listedCredentials.payload?.items?.some((item) => item.id === credentialSummary.id && item.username === `${testRunId}-user` && item.email === `${testRunId}@example.com` && item.phone === syntheticPhone && item.phoneCountryCode === "+51" && item.website === "https://example.com" && item.hasPin === true && !("secret" in item) && !("pin" in item)),
+      "Default encrypted password list exposed a secret, changed the website, or omitted separate username/email/phone fields"
     );
     const revealedCredentials = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords?includeSecrets=true");
     assert(
-      revealedCredentials.response.ok && revealedCredentials.payload?.items?.find((item) => item.id === credentialSummary.id)?.secret === syntheticPassword && revealedCredentials.payload?.items?.find((item) => item.id === credentialSummary.id)?.pin === syntheticPin,
-      "Explicit authenticated password reveal did not preserve the credential password and PIN exactly"
+      revealedCredentials.response.ok && revealedCredentials.payload?.items?.find((item) => item.id === credentialSummary.id)?.secret === syntheticPassword && revealedCredentials.payload?.items?.find((item) => item.id === credentialSummary.id)?.pin === syntheticPin && revealedCredentials.payload?.items?.find((item) => item.id === credentialSummary.id)?.website === "https://example.com",
+      "Explicit authenticated password reveal did not preserve the credential password, PIN, and website exactly"
     );
     const encryptedPasswordFile = await readFile(path.join(serverEnv.FREMEN_DATA_DIR, "personal-passwords.json"), "utf8");
     assert(
@@ -12560,9 +12577,12 @@ async function main() {
     const updatedCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "PATCH",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
-      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: `${syntheticCredentialTitle} updated`, username: `${testRunId}-user-2`, email: `${testRunId}-updated@example.com`, phone: "6147963848", phoneCountryCode: "+1", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com/account", notes: "Updated synthetic context." } })
+      body: JSON.stringify({ id: credentialSummary.id, expectedUpdatedAt: credentialSummary.updatedAt, input: { title: `${syntheticCredentialTitle} updated`, username: `${testRunId}-user-2`, email: `${testRunId}-updated@example.com`, phone: "6147963848", phoneCountryCode: "+1", secret: syntheticPassword, pin: syntheticPin, website: "https://example.com", notes: "Updated synthetic context." } })
     });
-    assert(updatedCredential.response.ok && updatedCredential.payload?.item?.updatedAt !== credentialSummary.updatedAt, "Encrypted password update did not persist");
+    assert(
+      updatedCredential.response.ok && updatedCredential.payload?.item?.updatedAt !== credentialSummary.updatedAt && updatedCredential.payload?.item?.website === "https://example.com",
+      "Encrypted password update did not persist or changed the website"
+    );
     const staleCredentialUpdate = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "PATCH",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },

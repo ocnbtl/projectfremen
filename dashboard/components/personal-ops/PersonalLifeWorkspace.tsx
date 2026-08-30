@@ -101,10 +101,11 @@ function formatDate(value?: string) {
 }
 
 function credentialWebsiteHref(value: string) {
-  if (!value.trim()) return "";
+  const website = value.trim();
+  if (!website) return "";
   try {
-    const parsed = new URL(value);
-    return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.toString() : "";
+    const parsed = new URL(website);
+    return parsed.protocol === "http:" || parsed.protocol === "https:" ? website : "";
   } catch {
     return "";
   }
@@ -718,49 +719,51 @@ export default function PersonalLifeWorkspace({
         </header>
         {input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}
         {input("Website", "website", credentialDraft.website, (value) => setCredentialDraft((current) => current ? { ...current, website: value } : current), { type: "url", placeholder: "https://" })}
-        {input("Username", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "Optional username" })}
-        {input("Email", "email", credentialDraft.email, (value) => setCredentialDraft((current) => current ? { ...current, email: value } : current), { type: "email", placeholder: "name@example.com" })}
-        <div className={styles.credentialPhoneFields}>
-          <label>
-            <span>Country code</span>
-            <input
-              name="phoneCountryCode"
-              inputMode="tel"
-              list="credential-country-code-suggestions"
-              value={credentialDraft.phoneCountryCode}
-              onChange={(event) => {
-                const nextCode = normalizeCountryCodeInput(event.target.value);
-                setCredentialDraft((current) => current ? {
-                  ...current,
-                  phoneCountryCode: nextCode,
-                  phone: /^\+\d{1,4}$/.test(nextCode) && nextCode !== current.phoneCountryCode
-                    ? rebasePhoneCountryCode(current.phone, current.phoneCountryCode, nextCode)
-                    : current.phone
-                } : current);
-              }}
-              onBlur={(event) => {
-                const nextCode = canonicalCountryCode(event.target.value, "");
-                if (nextCode) setCredentialDraft((current) => current ? { ...current, phoneCountryCode: nextCode } : current);
-              }}
-              placeholder="+1"
-              required={Boolean(credentialDraft.phone.trim())}
-            />
-          </label>
-          <label>
-            <span>Phone</span>
-            <input
-              name="phone"
-              type="tel"
-              inputMode="tel"
-              value={credentialDraft.phone}
-              onChange={(event) => setCredentialDraft((current) => current ? { ...current, phone: event.target.value } : current)}
-              onBlur={() => setCredentialDraft((current) => current ? { ...current, phone: formatInternationalPhone(current.phone, current.phoneCountryCode) } : current)}
-              placeholder={credentialDraft.phoneCountryCode === "+51" ? "987-654-321" : "614-796-3848"}
-              aria-describedby={credentialPhoneError ? "credential-phone-error" : undefined}
-            />
-          </label>
-          <datalist id="credential-country-code-suggestions">{PHONE_COUNTRY_FORMATS.map((country) => <option value={country.code} label={`${country.country} · ${country.localDigits} digits`} key={country.code} />)}</datalist>
-          {credentialPhoneError && <p id="credential-phone-error" role="status">{credentialPhoneError}</p>}
+        <div className={styles.credentialIdentityFields}>
+          {input("Username", "username", credentialDraft.username, (value) => setCredentialDraft((current) => current ? { ...current, username: value } : current), { placeholder: "Optional username" })}
+          {input("Email", "email", credentialDraft.email, (value) => setCredentialDraft((current) => current ? { ...current, email: value } : current), { type: "email", placeholder: "name@example.com" })}
+          <div className={styles.credentialPhoneFields}>
+            <div className={styles.credentialCountryCode}>
+              <input
+                name="phoneCountryCode"
+                aria-label="Country code"
+                inputMode="tel"
+                list="credential-country-code-suggestions"
+                value={credentialDraft.phoneCountryCode}
+                onChange={(event) => {
+                  const nextCode = normalizeCountryCodeInput(event.target.value);
+                  setCredentialDraft((current) => current ? {
+                    ...current,
+                    phoneCountryCode: nextCode,
+                    phone: /^\+\d{1,4}$/.test(nextCode) && nextCode !== current.phoneCountryCode
+                      ? rebasePhoneCountryCode(current.phone, current.phoneCountryCode, nextCode)
+                      : current.phone
+                  } : current);
+                }}
+                onBlur={(event) => {
+                  const nextCode = canonicalCountryCode(event.target.value, "");
+                  if (nextCode) setCredentialDraft((current) => current ? { ...current, phoneCountryCode: nextCode } : current);
+                }}
+                placeholder="+1"
+                required={Boolean(credentialDraft.phone.trim())}
+              />
+            </div>
+            <label>
+              <span>Phone</span>
+              <input
+                name="phone"
+                type="tel"
+                inputMode="tel"
+                value={credentialDraft.phone}
+                onChange={(event) => setCredentialDraft((current) => current ? { ...current, phone: event.target.value } : current)}
+                onBlur={() => setCredentialDraft((current) => current ? { ...current, phone: formatInternationalPhone(current.phone, current.phoneCountryCode) } : current)}
+                placeholder={credentialDraft.phoneCountryCode === "+51" ? "987-654-321" : "614-796-3848"}
+                aria-describedby={credentialPhoneError ? "credential-phone-error" : undefined}
+              />
+            </label>
+            <datalist id="credential-country-code-suggestions">{PHONE_COUNTRY_FORMATS.map((country) => <option value={country.code} label={`${country.country} · ${country.localDigits} digits`} key={country.code} />)}</datalist>
+            {credentialPhoneError && <p id="credential-phone-error" role="status">{credentialPhoneError}</p>}
+          </div>
         </div>
         <div className={styles.editorField}>
           <label htmlFor="credential-secret">Password</label>

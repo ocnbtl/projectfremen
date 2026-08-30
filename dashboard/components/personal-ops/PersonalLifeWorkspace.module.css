@@ -199,6 +199,7 @@
 /* Shared editors. */
 .overlay { position: fixed; z-index: 180; inset: 68px 0 0; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, #111 34%, transparent); }
 .editor { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; width: min(660px, 100%); max-height: calc(100dvh - 104px); overflow: auto; padding: 16px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--panel-bg); box-shadow: 0 18px 60px color-mix(in srgb, #000 22%, transparent); }
+.editor[data-credential-editor] { width: min(760px, 100%); }
 .editor header, .editor footer, .editor .full { grid-column: 1 / -1; }
 .editor header { display: flex; align-items: start; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
 .editor[data-credential-editor] > header { position: sticky; z-index: 2; top: 0; background: var(--panel-bg); }
@@ -215,7 +216,11 @@
 .editor[data-credential-editor] > footer { position: sticky; z-index: 2; bottom: 0; background: var(--panel-bg); }
 .editor footer button { display: inline-flex; width: 96px; min-width: 96px; min-height: 34px; align-items: center; justify-content: center; }
 .editor footer .primaryButton { border-color: var(--action-primary); background: var(--action-primary); color: #fff; }
-.credentialPhoneFields { grid-column: 1 / -1; display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 12px; }
+.credentialIdentityFields { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, .9fr) minmax(0, 1.15fr) minmax(210px, 1.15fr); gap: 12px; }
+.credentialPhoneFields { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 0; align-items: end; }
+.credentialCountryCode { align-self: end; }
+.credentialCountryCode input { padding-inline: 6px; border-right: 0; border-radius: 5px 0 0 5px; text-align: center; }
+.credentialPhoneFields > label input { border-radius: 0 5px 5px 0; }
 .credentialPhoneFields p { grid-column: 1 / -1; margin: -5px 0 0; color: var(--accent-crimson, #b73343); font: 650 10px/1.35 var(--font-body); }
 .secretControl { position: relative; height: 36px; }
 .secretControl input { position: absolute; inset: 0; display: block; height: 36px; padding-right: 42px; }
@@ -267,7 +272,7 @@
   .modLanes { grid-template-columns: 1fr; }
   .editor { grid-template-columns: 1fr; }
   .editor header, .editor footer, .editor .full { grid-column: 1; }
-  .credentialPhoneFields { grid-column: 1; grid-template-columns: 108px minmax(0, 1fr); gap: 10px; }
+  .credentialIdentityFields { grid-column: 1; grid-template-columns: 1fr; }
   .coordinateFields { grid-column: 1; grid-template-columns: 1fr; }
 }
 
@@ -342,8 +347,8 @@
 :global(html[data-personal-preview="mobile"]) .editor header,
 :global(html[data-personal-preview="mobile"]) .editor footer,
 :global(html[data-personal-preview="mobile"]) .editor .full { grid-column: 1; }
-:global(html[data-admin-preview="mobile"]) .credentialPhoneFields,
-:global(html[data-personal-preview="mobile"]) .credentialPhoneFields { grid-column: 1; grid-template-columns: 108px minmax(0, 1fr); gap: 10px; }
+:global(html[data-admin-preview="mobile"]) .credentialIdentityFields,
+:global(html[data-personal-preview="mobile"]) .credentialIdentityFields { grid-column: 1; grid-template-columns: 1fr; }
 :global(html[data-admin-preview="mobile"]) .coordinateFields,
 :global(html[data-personal-preview="mobile"]) .coordinateFields { grid-column: 1; grid-template-columns: 1fr; }
 
