@@ -31,7 +31,7 @@ export default async function PersonalLifeRoutePage({ view }: { view: PersonalLi
       .catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Personal systems could not be loaded." })),
     readPersonalOpsState()
       .then((state) => ({ ok: true as const, state }))
-      .catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Personal Ops could not be loaded." })),
+      .catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Personal could not be loaded." })),
     view === "passwords"
       ? listCredentialSummaries()
           .then((items) => ({ ok: true as const, items }))
@@ -65,7 +65,7 @@ export default async function PersonalLifeRoutePage({ view }: { view: PersonalLi
 
   return (
     <div className="shell admin-chrome-main module-ref-shell personal-ops-module-shell native-module-shell">
-      <AdminChrome showCommandSearch={false} showPageSidebar={false} showLocalAi={false} sidebarTitle="Personal Ops" sidebarSummary="Private command surfaces for lists, travel, personal gear, vehicles, and encrypted credentials." />
+      <AdminChrome showCommandSearch={false} showPageSidebar={false} showLocalAi={false} sidebarTitle="Personal" sidebarSummary="Private command surfaces for lists, travel, personal gear, vehicles, and encrypted credentials." />
       <PersonalLifeWorkspace
         initialView={view}
         initialState={lifeResult.ok ? lifeResult.state : emptyPersonalLifeState()}

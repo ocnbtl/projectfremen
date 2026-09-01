@@ -129,7 +129,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       id: "decision:" + item.id,
       title: item.title,
       detail: shortDetail(item.question, "This decision is still open."),
-      owner: "Personal Ops · Decisions",
+      owner: "Personal · Decisions",
       when: dueLabel(item.revisitAt || item.dueAt, now),
       action: "Make or defer decision",
       href: "/admin/personal/decisions",
@@ -141,7 +141,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       id: "obligation:" + item.id,
       title: item.title,
       detail: shortDetail(item.consequence, "This commitment still needs completion evidence."),
-      owner: "Personal Ops · Obligations",
+      owner: "Personal · Obligations",
       when: dueLabel(item.dueAt, now),
       action: "Review commitment",
       href: "/admin/personal/obligations",
@@ -153,7 +153,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       id: "follow-up:" + item.id,
       title: item.title,
       detail: shortDetail(item.context, "This follow-up is still open."),
-      owner: "Personal Ops · Follow-ups",
+      owner: "Personal · Follow-ups",
       when: dueLabel(item.deferredUntil || item.dueAt, now),
       action: "Open follow-up",
       href: "/admin/personal/follow-ups",
@@ -226,7 +226,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const modules = [
     { name: "Projects", href: "/admin/projects", available: Boolean(projects), value: projects ? `${activeProjects.length} active · ${openProjectBlockers.length} blockers` : "Unavailable", tone: "projects" },
-    { name: "Personal Ops", href: "/admin/personal", available: Boolean(personalOps), value: personalOps ? `${openDecisions.length} decisions · ${openFollowUps.length} follow-ups` : "Unavailable", tone: "personal" },
+    { name: "Personal", href: "/admin/personal", available: Boolean(personalOps), value: personalOps ? `${openDecisions.length} decisions · ${openFollowUps.length} follow-ups` : "Unavailable", tone: "personal" },
     { name: "Notes", href: "/admin/notes", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "note").length} records` : "Unavailable", tone: "notes" },
     { name: "People", href: "/admin/people", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "person").length} records` : "Unavailable", tone: "people" },
     { name: "Resources", href: "/admin/resources", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "resource").length} records` : "Unavailable", tone: "resources" },
@@ -268,7 +268,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         ]}
         sidebarActions={[
           { label: "Projects", href: "/admin/projects" },
-          { label: "Personal Ops", href: "/admin/personal" },
+          { label: "Personal", href: "/admin/personal" },
           { label: "Finance", href: "/admin/finance" },
           { label: "Reviews", href: "/admin/reviews/weekly" }
         ]}

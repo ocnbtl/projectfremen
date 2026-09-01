@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
-import { ICON_REGISTRY } from "../../lib/icons/icon-registry";
+import { ICON_REGISTRY, ICON_REGISTRY_BY_ID } from "../../lib/icons/icon-registry";
 import { createResourcesRepository } from "../../lib/modules/resources/repository";
 import type { ResourceRecord } from "../../lib/modules/resources/types";
 import { decodeStyleGuideComponent, encodeStyleGuideComponent, isStyleGuideComponent, STYLE_GUIDE_AREA } from "../../lib/modules/style-guide/component-resource";
@@ -19,6 +19,7 @@ import styles from "./PersonalUtilityWorkspace.module.css";
 type ComponentDraft = { id?: string; title: string; url: string; tags: string; icon: PersonalOpsIconName | ""; visual: string; code: string; animation: string };
 
 const COMPONENT_ICON_PREFIX = "Icon:";
+const ICON_ROLE_PREFIX = "Icon role:";
 const FONT_PREVIEW_STACKS: Readonly<Record<string, string>> = {
   "Plus Jakarta Sans": '"Plus Jakarta Sans Variable", "Avenir Next", "Segoe UI", sans-serif',
   "Plus Jakarta Sans Variable": '"Plus Jakarta Sans Variable", "Avenir Next", "Segoe UI", sans-serif',
@@ -60,6 +61,13 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
   const components = resources.filter(isStyleGuideComponent);
   const availableResources = resources.filter((resource) => !isStyleGuideComponent(resource));
   const selectedCount = draft.icons.filter((item) => item.selection).length;
+  const iconTitleTargets = resources.flatMap((resource) => {
+    const marker = resource.provenance.subjects.find((subject) => subject.toLowerCase().startsWith(ICON_ROLE_PREFIX.toLowerCase()));
+    const role = marker?.slice(ICON_ROLE_PREFIX.length).trim() || "";
+    const entry = ICON_REGISTRY_BY_ID.get(role);
+    if (!entry || /\s\(icon\)\s*$/i.test(resource.title)) return [];
+    return [{ resource, title: `${entry.label} (Icon)` }];
+  });
 
   function updateTypography(itemId: string, change: Partial<StyleGuideTypographyRole>) { setDraft((current) => ({ ...current, typography: current.typography.map((item) => item.id === itemId ? { ...item, ...change } : item) })); }
   function updateColor(itemId: string, change: Partial<StyleGuideColorToken>) { setDraft((current) => ({ ...current, colors: current.colors.map((item) => item.id === itemId ? { ...item, ...change } : item) })); }
@@ -92,6 +100,36 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The icon could not be selected."); return false; } finally { setBusy(false); }
   }
 
+  async function normalizeIconResourceTitles() {
+    if (!iconTitleTargets.length) return;
+    setBusy(true); setError(""); setNotice("");
+    let nextResources = resources;
+    let updatedCount = 0;
+    try {
+      for (const target of iconTitleTargets) {
+        const result = await repository.update(target.resource.id, {
+          title: target.title,
+          expectedUpdatedAt: target.resource.updatedAt
+        });
+        if (!result.ok) {
+          setResources(nextResources);
+          setError(`${result.error.message}${updatedCount ? ` ${updatedCount} earlier title${updatedCount === 1 ? " was" : "s were"} saved and can be safely reconciled by running this action again.` : ""}`);
+          return;
+        }
+        updatedCount += 1;
+        nextResources = nextResources.map((resource) => resource.id === result.data.id ? result.data : resource);
+      }
+      setResources(nextResources);
+      setNotice(`${updatedCount} icon Resource title${updatedCount === 1 ? "" : "s"} normalized and saved.`);
+      router.refresh();
+    } catch (cause) {
+      setResources(nextResources);
+      setError(cause instanceof Error ? cause.message : "The icon Resource titles could not be normalized.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function saveComponent(event: FormEvent) {
     event.preventDefault(); if (!editor) return; setBusy(true); setError("");
     const current = editor.id ? resources.find((item) => item.id === editor.id) : undefined;
@@ -121,7 +159,7 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
     <div className={baseStyles.shell}>
       <PersonalOpsSidebar activeView="style-guide" filter="" pathname="/admin/personal/style-guide" counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
       <main className={baseStyles.directory} aria-label="Style Guide">
-        <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)}><PersonalOpsIcon name="menu" /> Personal Ops</button><button type="button" onClick={saveGuide} disabled={busy}><PersonalOpsIcon name="check" /> Save</button></div>
+        <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)}><PersonalOpsIcon name="menu" /> Personal</button><button type="button" onClick={saveGuide} disabled={busy}><PersonalOpsIcon name="check" /> Save</button></div>
         <div className={[baseStyles.mainScroll, styles.utilityScroll].join(" ")}>
           <header className={styles.utilityHeader}><div><span className={styles.kicker}>Design system · V1.1</span><h1>Style Guide</h1><p>The approved shared Navy, neutral foundations, and nine module identities in one implementation reference.</p></div><button type="button" className={styles.primaryButton} onClick={saveGuide} disabled={busy}><PersonalOpsIcon name="check" /> Save guide</button></header>
           <nav className={styles.sectionNav} aria-label="Style Guide sections"><a href="#typography"><PersonalOpsIcon name="font" /> Type</a><a href="#colors"><PersonalOpsIcon name="palette" /> System colors</a><a href="#modules"><PersonalOpsIcon name="style-guide" /> Modules</a><a href="#components"><PersonalOpsIcon name="component" /> Components</a><a href="#icons"><PersonalOpsIcon name="object" /> Icons</a></nav>
@@ -166,7 +204,7 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
           </section>
 
           <section id="icons" className={styles.guideSection}>
-            <header><div className={styles.sectionIcon}><PersonalOpsIcon name="object" /></div><div><h2>Icon language</h2><p>{ICON_REGISTRY.length} comprehensive roles · five curated Tabler Line recommendations each · {selectedCount} selected.</p></div><a className={styles.streamlineLink} href="https://www.streamlinehq.com/icons/tabler-line" target="_blank" rel="noreferrer"><PersonalOpsIcon name="open" /> Streamline set</a></header>
+            <header><div className={styles.sectionIcon}><PersonalOpsIcon name="object" /></div><div><h2>Icon language</h2><p>{ICON_REGISTRY.length} comprehensive roles · five curated Tabler Line recommendations each · {selectedCount} selected.</p></div><div className={styles.headerActions}>{iconTitleTargets.length > 0 && <button type="button" className={styles.secondaryButton} disabled={busy} onClick={() => void normalizeIconResourceTitles()} title={iconTitleTargets.map((target) => `${target.resource.title} → ${target.title}`).join("\n")}><PersonalOpsIcon name="edit" /> Normalize {iconTitleTargets.length} name{iconTitleTargets.length === 1 ? "" : "s"}</button>}<a className={styles.streamlineLink} href="https://www.streamlinehq.com/icons/tabler-line" target="_blank" rel="noreferrer"><PersonalOpsIcon name="open" /> Streamline set</a></div></header>
             <StyleGuideIconRegistry assignments={draft.icons} modules={draft.modules} busy={busy} onSelect={selectIcon} />
           </section>
         </div>

@@ -34,7 +34,7 @@ export default async function PeopleRoutePage({
       .then((followUps) => ({ ok: true as const, followUps }))
       .catch((error: unknown) => ({
         ok: false as const,
-        error: error instanceof Error ? error.message : "Personal Ops Follow-ups could not be loaded."
+        error: error instanceof Error ? error.message : "Personal Follow-ups could not be loaded."
       })),
     readProjectsState()
       .then((state) => ({ ok: true as const, state }))

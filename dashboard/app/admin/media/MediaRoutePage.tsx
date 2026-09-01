@@ -102,7 +102,7 @@ export default async function MediaRoutePage({
       legacyContentGraph: contentGraph,
       projects: ownerEvidenceSource<ProjectsState>(projectsResult, "Projects"),
       reviews: ownerEvidenceSource<ReviewsState>(reviewsResult, "Reviews"),
-      personalOps: ownerEvidenceSource<PersonalOpsState>(personalOpsResult, "Personal Ops")
+      personalOps: ownerEvidenceSource<PersonalOpsState>(personalOpsResult, "Personal")
     });
   }
 
@@ -154,7 +154,7 @@ export default async function MediaRoutePage({
           initialPersonalOpsFollowUpsError={
             personalOpsResult.status === "fulfilled"
               ? ""
-              : "Personal Ops Follow-up status could not be loaded."
+              : "Personal Follow-up status could not be loaded."
           }
           initialReviewViews={
             reviewsResult.status === "fulfilled"

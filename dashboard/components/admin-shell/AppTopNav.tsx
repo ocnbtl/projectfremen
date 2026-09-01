@@ -9,14 +9,6 @@ import { moduleColorIdForPathname, moduleThemeVariables } from "../../lib/design
 import PersonalViewportToggle from "../PersonalViewportToggle";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
-type ProjectMenuItem = {
-  id: string;
-  slug: string;
-  name: string;
-  lifecycle: string;
-  archivedAt?: string;
-};
-
 export type AppTopNavProps = {
   showCommandSearch?: boolean;
   onCommandSearch?: (query: string) => void;
@@ -29,10 +21,6 @@ function cx(...values: Array<string | false | null | undefined>) {
   return values.filter(Boolean).join(" ");
 }
 
-function projectMenuLabel(name: string) {
-  return name.replace(/^Project\s+/i, "").trim() || name;
-}
-
 export default function AppTopNav({
   showCommandSearch = true,
   onCommandSearch,
@@ -42,11 +30,8 @@ export default function AppTopNav({
 }: AppTopNavProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [projectsOpen, setProjectsOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
-  const [projectMenuItems, setProjectMenuItems] = useState<ProjectMenuItem[]>([]);
-  const projectsGroupRef = useRef<HTMLDivElement>(null);
   const mobileNavRef = useRef<HTMLDivElement>(null);
   const mobileNavTriggerRef = useRef<HTMLButtonElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -54,9 +39,6 @@ export default function AppTopNav({
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
-      if (!projectsGroupRef.current?.contains(event.target as Node)) {
-        setProjectsOpen(false);
-      }
       if (!mobileNavRef.current?.contains(event.target as Node)) {
         setMobileNavOpen(false);
       }
@@ -64,7 +46,6 @@ export default function AppTopNav({
 
     function handleKeyDown(event: KeyboardEvent) {
       if (event.key === "Escape") {
-        setProjectsOpen(false);
         if (mobileNavOpen) {
           setMobileNavOpen(false);
           window.requestAnimationFrame(() => mobileNavTriggerRef.current?.focus());
@@ -91,7 +72,6 @@ export default function AppTopNav({
 
   useEffect(() => {
     setMobileNavOpen(false);
-    setProjectsOpen(false);
   }, [pathname]);
 
   useEffect(() => {
@@ -117,27 +97,6 @@ export default function AppTopNav({
   }, [mobileNavOpen]);
 
   useEffect(() => {
-    let active = true;
-    async function refreshProjects() {
-      try {
-        const response = await fetch("/api/projects?family=projects", { cache: "no-store" });
-        const payload = await response.json() as { ok?: boolean; items?: ProjectMenuItem[] };
-        if (active && response.ok && payload.ok && Array.isArray(payload.items)) {
-          setProjectMenuItems(payload.items.filter((project) => !project.archivedAt && project.lifecycle !== "archived"));
-        }
-      } catch {
-        // Static navigation remains available when the optional live refresh fails.
-      }
-    }
-    void refreshProjects();
-    window.addEventListener("projects:changed", refreshProjects);
-    return () => {
-      active = false;
-      window.removeEventListener("projects:changed", refreshProjects);
-    };
-  }, []);
-
-  useEffect(() => {
     if (mobileNavOpen) {
       window.dispatchEvent(new Event("app-mobile-navigation-open"));
     }
@@ -154,8 +113,7 @@ export default function AppTopNav({
   const activeNavItem = ADMIN_NAV_ITEMS.find((item) => {
     const itemHref = item.href ?? "/admin";
     return pathname === itemHref
-      || pathname.startsWith(`${itemHref}/`)
-      || Boolean(item.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`)));
+      || pathname.startsWith(`${itemHref}/`);
   });
 
   return (
@@ -173,11 +131,11 @@ export default function AppTopNav({
           aria-expanded={mobileNavOpen}
           aria-controls="app-mobile-primary-navigation"
           onClick={() => {
-            setProjectsOpen(false);
             setMobileNavOpen((current) => !current);
           }}
         >
           <span>Menu</span>
+          {activeNavItem ? <UnigentamosIcon role={activeNavItem.iconRole} size={16} /> : null}
           <strong>{activeNavItem?.label || "Home"}</strong>
           <UnigentamosIcon role="chevron-down" size={12} />
         </button>
@@ -190,8 +148,7 @@ export default function AppTopNav({
           {ADMIN_NAV_ITEMS.map((item) => {
             const itemHref = item.href ?? "/admin";
             const itemActive = pathname === itemHref
-              || pathname.startsWith(`${itemHref}/`)
-              || Boolean(item.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`)));
+              || pathname.startsWith(`${itemHref}/`);
             return (
               <Link
                 href={itemHref}
@@ -201,7 +158,8 @@ export default function AppTopNav({
                 onClick={() => setMobileNavOpen(false)}
                 key={item.label}
               >
-                {item.label}
+                <UnigentamosIcon role={item.iconRole} size={18} />
+                <span>{item.label}</span>
               </Link>
             );
           })}
@@ -216,84 +174,19 @@ export default function AppTopNav({
           const itemHref = item.href ?? "/admin";
           const itemActive =
             pathname === itemHref ||
-            pathname.startsWith(`${itemHref}/`) ||
-            Boolean(item.children?.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`)));
-
-          if (!item.children) {
-            return (
-              <Link
-                href={itemHref}
-                className={cx("admin-global-nav-link", itemActive && "is-active")}
-                data-module={moduleColorIdForPathname(itemHref) || undefined}
-                aria-current={itemActive ? "page" : undefined}
-                key={item.label}
-              >
-                {item.label}
-              </Link>
-            );
-          }
-
-          const liveSlugs = new Set(projectMenuItems.map((project) => project.slug));
-          const projects = [
-            ...projectMenuItems.map((project) => ({
-              key: project.id,
-              label: projectMenuLabel(project.name),
-              href: `/admin/projects/${encodeURIComponent(project.slug || project.id)}`
-            })),
-            ...item.children
-              .filter((project) => !liveSlugs.has(project.slug))
-              .map((project) => ({
-                key: project.slug,
-                label: project.shortLabel,
-                href: `/admin/projects/${encodeURIComponent(project.slug)}`
-              }))
-          ].sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: "base" }));
+            pathname.startsWith(`${itemHref}/`);
 
           return (
-            <div className="admin-global-nav-group" key={item.label} ref={projectsGroupRef}>
-              <button
-                type="button"
-                className={cx("admin-global-nav-button", itemActive && "is-active")}
-                data-module="projects"
-                onClick={() => {
-                  setProjectsOpen((current) => !current);
-                  window.dispatchEvent(new Event("projects:changed"));
-                }}
-                aria-expanded={projectsOpen}
-                aria-haspopup="menu"
-                aria-controls="app-project-navigation"
-              >
-                {item.label}
-                <UnigentamosIcon role="chevron-down" size={12} />
-              </button>
-              <div
-                id="app-project-navigation"
-                className="admin-project-menu"
-                role="menu"
-                aria-label="Project navigation"
-                hidden={!projectsOpen}
-              >
-                <Link
-                  href={itemHref}
-                  className="admin-project-menu-overview"
-                  role="menuitem"
-                  onClick={() => setProjectsOpen(false)}
-                >
-                  All projects
-                </Link>
-                {projects.map((project) => (
-                  <Link
-                    href={project.href}
-                    className="admin-project-menu-item"
-                    role="menuitem"
-                    key={project.key}
-                    onClick={() => setProjectsOpen(false)}
-                  >
-                    <span>{project.label}</span>
-                  </Link>
-                ))}
-              </div>
-            </div>
+            <Link
+              href={itemHref}
+              className={cx("admin-global-nav-link", itemActive && "is-active")}
+              data-module={moduleColorIdForPathname(itemHref) || undefined}
+              aria-current={itemActive ? "page" : undefined}
+              key={item.label}
+            >
+              <UnigentamosIcon role={item.iconRole} size={16} />
+              <span>{item.label}</span>
+            </Link>
           );
         })}
       </nav>

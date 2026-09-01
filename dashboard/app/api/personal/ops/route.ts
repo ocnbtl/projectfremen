@@ -89,7 +89,7 @@ function errorResponse(error: unknown) {
     );
   }
   return NextResponse.json(
-    { ok: false, error: error instanceof Error ? error.message : "Personal Ops request failed" },
+    { ok: false, error: error instanceof Error ? error.message : "Personal request failed" },
     { status: 500 }
   );
 }
@@ -126,11 +126,11 @@ export async function GET(request: Request) {
     const legacyPersonalRecordId = url.searchParams.get("legacyPersonalRecordId")?.trim() || "";
 
     if (familyParam && !family) {
-      return NextResponse.json({ ok: false, error: "Invalid Personal Ops family" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Invalid Personal family" }, { status: 400 });
     }
     if (secondaryFamilyParam && !secondaryFamily) {
       return NextResponse.json(
-        { ok: false, error: "Invalid Personal Ops secondary family" },
+        { ok: false, error: "Invalid Personal secondary family" },
         { status: 400 }
       );
     }
@@ -157,7 +157,7 @@ export async function GET(request: Request) {
         return item
           ? NextResponse.json({ ok: true, item })
           : NextResponse.json(
-              { ok: false, error: "Personal Ops secondary object not found" },
+              { ok: false, error: "Personal secondary object not found" },
               { status: 404 }
             );
       }
@@ -175,7 +175,7 @@ export async function GET(request: Request) {
       const item = await readPersonalOpsObject(family, id);
       return item
         ? NextResponse.json({ ok: true, item })
-        : NextResponse.json({ ok: false, error: "Personal Ops object not found" }, { status: 404 });
+        : NextResponse.json({ ok: false, error: "Personal object not found" }, { status: 404 });
     }
 
     return NextResponse.json({ ok: true, items: await listPersonalOpsObjects(family) });
@@ -214,7 +214,7 @@ export async function POST(request: Request) {
     const operationParam = body.operation;
     const operation = parseOperation(operationParam);
     if (operationParam !== undefined && !operation) {
-      return NextResponse.json({ ok: false, error: "Invalid Personal Ops operation" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Invalid Personal operation" }, { status: 400 });
     }
 
     if (operation) {
@@ -307,7 +307,7 @@ export async function POST(request: Request) {
     const secondaryFamily = parseSecondaryFamily(secondaryFamilyParam);
     if (secondaryFamilyParam !== undefined && !secondaryFamily) {
       return NextResponse.json(
-        { ok: false, error: "Invalid Personal Ops secondary family" },
+        { ok: false, error: "Invalid Personal secondary family" },
         { status: 400 }
       );
     }
@@ -343,7 +343,7 @@ export async function POST(request: Request) {
 
     const family = parseFamily(body.family);
     if (!family) {
-      return NextResponse.json({ ok: false, error: "Invalid Personal Ops family" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Invalid Personal family" }, { status: 400 });
     }
     scope = family;
     const result = await createPersonalOpsObject(
@@ -417,7 +417,7 @@ export async function PATCH(request: Request) {
     const secondaryFamily = parseSecondaryFamily(secondaryFamilyParam);
     if (secondaryFamilyParam !== undefined && !secondaryFamily) {
       return NextResponse.json(
-        { ok: false, error: "Invalid Personal Ops secondary family" },
+        { ok: false, error: "Invalid Personal secondary family" },
         { status: 400 }
       );
     }
@@ -449,7 +449,7 @@ export async function PATCH(request: Request) {
 
     const family = parseFamily(body.family);
     if (!family) {
-      return NextResponse.json({ ok: false, error: "Invalid Personal Ops family" }, { status: 400 });
+      return NextResponse.json({ ok: false, error: "Invalid Personal family" }, { status: 400 });
     }
     scope = family;
 

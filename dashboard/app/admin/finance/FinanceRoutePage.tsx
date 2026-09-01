@@ -16,7 +16,7 @@ export default async function FinanceRoutePage({
     .then((state) => ({ ok: true as const, state }))
     .catch((error: unknown) => ({
       ok: false as const,
-      error: error instanceof Error ? error.message : "Personal Ops Decisions could not be loaded."
+      error: error instanceof Error ? error.message : "Personal Decisions could not be loaded."
     })),
     readFinanceState()
       .then((state) => ({ ok: true as const, state }))

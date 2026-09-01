@@ -236,7 +236,7 @@ export default function PersonalOpsSidebar({
           id: "settings",
           label: "Settings",
           disabled: true,
-          disabledReason: "Personal Ops settings are not connected yet."
+          disabledReason: "Personal settings are not connected yet."
         }] : [])
       ]
     };
@@ -246,7 +246,7 @@ export default function PersonalOpsSidebar({
 
   return (
     <ModuleSidebar
-      title="Personal Ops"
+      title="Personal"
       description="Daily command, durable records, and personal systems."
       sections={sections}
       className={styles.sidebar}

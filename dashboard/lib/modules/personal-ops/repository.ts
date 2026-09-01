@@ -162,7 +162,7 @@ async function requestPayload(
   } catch (error) {
     return failure(
       "network",
-      error instanceof Error ? error.message : "Unable to reach the Personal Ops repository",
+      error instanceof Error ? error.message : "Unable to reach the Personal repository",
       { retryable: true }
     );
   }
@@ -173,7 +173,7 @@ async function requestPayload(
   } catch {
     return failure(
       response.status >= 500 ? "server" : "unknown",
-      "The Personal Ops repository returned an invalid response",
+      "The Personal repository returned an invalid response",
       { status: response.status, retryable: response.status >= 500 }
     );
   }
@@ -181,7 +181,7 @@ async function requestPayload(
   if (!isRecord(raw)) {
     return failure(
       response.status >= 500 ? "server" : "unknown",
-      "The Personal Ops repository returned an invalid response",
+      "The Personal repository returned an invalid response",
       { status: response.status, retryable: response.status >= 500 }
     );
   }
@@ -190,7 +190,7 @@ async function requestPayload(
     const code = errorCode(response.status, raw);
     return failure(
       code,
-      typeof raw.error === "string" ? raw.error : "The Personal Ops request failed",
+      typeof raw.error === "string" ? raw.error : "The Personal request failed",
       {
         status: response.status,
         retryable: response.status >= 500,
@@ -306,7 +306,7 @@ export function createPersonalOpsRepository(
       if (!result.ok) return result;
       return isState(result.data.state)
         ? { ok: true, data: result.data.state }
-        : failure("unknown", "The Personal Ops response did not include a valid state");
+        : failure("unknown", "The Personal response did not include a valid state");
     },
 
     async list(family) {
@@ -317,7 +317,7 @@ export function createPersonalOpsRepository(
       const items = result.data.items;
       return Array.isArray(items) && items.every((item) => isObjectForFamily(item, family))
         ? { ok: true, data: items }
-        : failure("unknown", "The Personal Ops response did not include valid objects");
+        : failure("unknown", "The Personal response did not include valid objects");
     },
 
     async get(family, id) {
@@ -328,7 +328,7 @@ export function createPersonalOpsRepository(
       if (isObjectForFamily(result.data.item, family)) await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as unknown as Record<string, unknown>);
       return isObjectForFamily(result.data.item, family)
         ? { ok: true, data: result.data.item }
-        : failure("unknown", "The Personal Ops response did not include the requested object");
+        : failure("unknown", "The Personal response did not include the requested object");
     },
 
     async create(family, input) {
@@ -339,7 +339,7 @@ export function createPersonalOpsRepository(
       });
       if (!result.ok) return result;
       if (!isObjectForFamily(result.data.item, family) || typeof result.data.created !== "boolean") {
-        return failure("unknown", "The created Personal Ops object was missing from the response");
+        return failure("unknown", "The created Personal object was missing from the response");
       }
       const mapping = isLegacyMapping(result.data.mapping) ? result.data.mapping : undefined;
       await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as Record<string, unknown>);
@@ -372,7 +372,7 @@ export function createPersonalOpsRepository(
               ? { auditEventId: result.data.auditEventId }
               : {})
           }
-        : failure("unknown", "The updated Personal Ops object was missing from the response");
+        : failure("unknown", "The updated Personal object was missing from the response");
     },
 
     async listSecondary(family) {
@@ -385,7 +385,7 @@ export function createPersonalOpsRepository(
       const items = result.data.items;
       return Array.isArray(items) && items.every((item) => isSecondaryObjectForFamily(item, family))
         ? { ok: true, data: items }
-        : failure("unknown", "The Personal Ops response did not include valid secondary objects");
+        : failure("unknown", "The Personal response did not include valid secondary objects");
     },
 
     async getSecondary(family, id) {
@@ -398,7 +398,7 @@ export function createPersonalOpsRepository(
       if (isSecondaryObjectForFamily(result.data.item, family)) await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as unknown as Record<string, unknown>);
       return isSecondaryObjectForFamily(result.data.item, family)
         ? { ok: true, data: result.data.item }
-        : failure("unknown", "The Personal Ops response did not include the requested secondary object");
+        : failure("unknown", "The Personal response did not include the requested secondary object");
     },
 
     async createSecondary(family, input) {
@@ -409,7 +409,7 @@ export function createPersonalOpsRepository(
       });
       if (!result.ok) return result;
       if (!isSecondaryObjectForFamily(result.data.item, family) || result.data.created !== true) {
-        return failure("unknown", "The created Personal Ops secondary object was missing from the response");
+        return failure("unknown", "The created Personal secondary object was missing from the response");
       }
       await mirrorCanonicalRecord("personal-ops", family, "personal_ops", result.data.item as unknown as Record<string, unknown>);
       return {
@@ -437,7 +437,7 @@ export function createPersonalOpsRepository(
               ? { auditEventId: result.data.auditEventId }
               : {})
           }
-        : failure("unknown", "The updated Personal Ops secondary object was missing from the response");
+        : failure("unknown", "The updated Personal secondary object was missing from the response");
     },
 
     async previewRoutineRun(id, input) {
@@ -558,7 +558,7 @@ export function createPersonalOpsRepository(
       const mappings = result.data.mappings;
       return Array.isArray(mappings) && mappings.every(isLegacyMapping)
         ? { ok: true, data: mappings }
-        : failure("unknown", "The Personal Ops response did not include valid legacy mappings");
+        : failure("unknown", "The Personal response did not include valid legacy mappings");
     }
   };
 }

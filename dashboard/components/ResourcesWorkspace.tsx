@@ -141,7 +141,7 @@ const VIEW_LABELS: Readonly<Record<ResourcesView, string>> = {
   "linked-notes": "Linked to Notes",
   "linked-finance": "Linked to Finance",
   "linked-reviews": "Linked to Reviews",
-  "linked-personal-ops": "Linked to Personal Ops",
+  "linked-personal-ops": "Linked to Personal",
   "duplicate-urls": "Duplicate URLs"
 };
 
@@ -166,7 +166,7 @@ const CONTEXT_ROWS: ReadonlyArray<
   ["notes", "linked-notes", "Linked to Notes"],
   ["finance", "linked-finance", "Linked to Finance"],
   ["reviews", "linked-reviews", "Linked to Reviews"],
-  ["personal_ops", "linked-personal-ops", "Linked to Personal Ops"]
+  ["personal_ops", "linked-personal-ops", "Linked to Personal"]
 ] as const;
 
 const VIEW_LIMITATIONS: Readonly<Partial<Record<ResourcesView, string>>> = {

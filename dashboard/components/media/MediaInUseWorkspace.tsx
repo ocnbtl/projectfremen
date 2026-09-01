@@ -53,7 +53,7 @@ const FILTERS: ReadonlyArray<{
   { id: "all", label: "All evidence", tone: "blue" },
   { id: "projects", label: "Projects", tone: "blue" },
   { id: "reviews", label: "Reviews", tone: "purple" },
-  { id: "personal-ops", label: "Personal Ops", tone: "green" },
+  { id: "personal-ops", label: "Personal", tone: "green" },
   { id: "attention", label: "Attention", tone: "pink" },
   { id: "legacy", label: "Legacy candidates", tone: "amber" },
   { id: "unreferenced", label: "No reference evidence", tone: "amber" }
@@ -90,7 +90,7 @@ function labelize(value: string) {
 }
 
 function ownerLabel(value: string) {
-  return value === "personal_ops" ? "Personal Ops" : labelize(value);
+  return value === "personal_ops" ? "Personal" : labelize(value);
 }
 
 function formatDate(value?: string, fallback = "Not recorded") {
@@ -338,7 +338,7 @@ export default function MediaInUseWorkspace({
       items: [
         { id: "projects", label: "Projects", count: evidence.records.filter((record) => matchesFilter(record, "projects")).length, onSelect: () => updateScope({ filter: "projects" }) },
         { id: "reviews", label: "Reviews", count: evidence.records.filter((record) => matchesFilter(record, "reviews")).length, onSelect: () => updateScope({ filter: "reviews" }) },
-        { id: "personal-ops", label: "Personal Ops", count: evidence.records.filter((record) => matchesFilter(record, "personal-ops")).length, onSelect: () => updateScope({ filter: "personal-ops" }) }
+        { id: "personal-ops", label: "Personal", count: evidence.records.filter((record) => matchesFilter(record, "personal-ops")).length, onSelect: () => updateScope({ filter: "personal-ops" }) }
       ]
     },
     {
@@ -378,7 +378,7 @@ export default function MediaInUseWorkspace({
           compact
           variant="read_only"
           title="No native reference location"
-          description="No indexed Projects, Reviews, or Personal Ops object currently supplies a native reference for this asset. This does not prove it is unused."
+          description="No indexed Projects, Reviews, or Personal object currently supplies a native reference for this asset. This does not prove it is unused."
         />
       );
     }
@@ -765,7 +765,7 @@ export default function MediaInUseWorkspace({
 
           <div className={styles.capabilityBoundary} role="note">
             <strong>Reference evidence, not AssetUsage</strong>
-            <span>Projects, Reviews, and Personal Ops retain their own references. Media indexes those current snapshots read-only; visibility, deployed versions, usage counts, replacement safety, and complete cross-module coverage are not claimed.</span>
+            <span>Projects, Reviews, and Personal retain their own references. Media indexes those current snapshots read-only; visibility, deployed versions, usage counts, replacement safety, and complete cross-module coverage are not claimed.</span>
           </div>
 
           {(initialLoadError || readFailedCoverage.length > 0) && (
@@ -783,7 +783,7 @@ export default function MediaInUseWorkspace({
               { id: "locations", label: "Native owner locations", value: visiblePlacements.length, detail: "Not AssetUsage" },
               { id: "projects", label: "Project references", value: visiblePlacements.filter((placement) => placement.ownerModule === "projects").length, detail: "Target-owned" },
               { id: "reviews", label: "Review references", value: visiblePlacements.filter((placement) => placement.ownerModule === "reviews").length, detail: "Target-owned" },
-              { id: "ops", label: "Personal Ops references", value: visiblePlacements.filter((placement) => placement.ownerModule === "personal_ops").length, detail: "Needs classification" },
+              { id: "ops", label: "Personal references", value: visiblePlacements.filter((placement) => placement.ownerModule === "personal_ops").length, detail: "Needs classification" },
               { id: "attention", label: "Attention records", value: visibleRecords.filter((record) => record.state === "attention" || record.state === "missing_asset").length, detail: "Literal state only", tone: "attention" },
               { id: "legacy", label: "Legacy relation evidence", value: visibleLegacyCandidates, detail: "Untyped candidates" },
               { id: "usage", label: "AssetUsage records", value: "—", detail: "Repository not connected" }
@@ -833,7 +833,7 @@ export default function MediaInUseWorkspace({
             <SystemState
               variant={initialLoadError ? "error" : "read_only"}
               title={initialLoadError ? "Media reference evidence could not be loaded" : "No Media identifiers or owner references are available"}
-              description={initialLoadError ? "The owner-reference reads performed no mutation. Retry after the legacy Media read path is available." : "The current stores contain no legacy Media assets and no Projects, Reviews, or Personal Ops reference to a Media identifier. This is not proof that no external usage exists."}
+              description={initialLoadError ? "The owner-reference reads performed no mutation. Retry after the legacy Media read path is available." : "The current stores contain no legacy Media assets and no Projects, Reviews, or Personal reference to a Media identifier. This is not proof that no external usage exists."}
               action={initialLoadError ? { label: "Retry", onSelect: () => router.refresh() } : undefined}
             />
           ) : !visibleRecords.length ? (

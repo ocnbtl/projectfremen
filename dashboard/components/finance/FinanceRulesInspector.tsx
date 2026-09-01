@@ -197,7 +197,7 @@ export default function FinanceRulesInspector({
           </section>
           <div className={styles.boundary}>
             <strong>Source mutation is never implied</strong>
-            <span>Budget caps, Project ownership, close blockers, bill payment, evidence waivers, and accepted Personal Ops records remain unchanged.</span>
+            <span>Budget caps, Project ownership, close blockers, bill payment, evidence waivers, and accepted Personal records remain unchanged.</span>
           </div>
         </DetailTabPanel>
 

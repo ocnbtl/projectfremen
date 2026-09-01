@@ -90,7 +90,7 @@ const WEEKLY_CHECKLIST_V1 = [
   {
     id: "goal-progress",
     label: "Goal progress reviewed",
-    description: "Inspect Current Goals and key-result context through Personal Ops.",
+    description: "Inspect Current Goals and key-result context through Personal.",
     required: true,
     ownerModule: "personal_ops",
     action: "open",
@@ -233,7 +233,7 @@ const MONTHLY_CHECKLIST_V1 = [
   {
     id: "current-goals-checked",
     label: "Current Goals checked",
-    description: "Review Current Goals through Personal Ops and link source evidence when required.",
+    description: "Review Current Goals through Personal and link source evidence when required.",
     required: true,
     ownerModule: "personal_ops",
     action: "open",
@@ -242,7 +242,7 @@ const MONTHLY_CHECKLIST_V1 = [
     evidence: {
       id: "monthly-goal-progress",
       title: "Current Goals progress evidence",
-      description: "Personal Ops-owned Goal or Key Result evidence supporting the monthly check.",
+      description: "Personal-owned Goal or Key Result evidence supporting the monthly check.",
       required: true,
       blocksCompletion: true,
       ownerModule: "personal_ops",
@@ -253,7 +253,7 @@ const MONTHLY_CHECKLIST_V1 = [
   {
     id: "people-followups-reviewed",
     label: "People follow-ups reviewed",
-    description: "Review People cadence context and Personal Ops follow-through links.",
+    description: "Review People cadence context and Personal follow-through links.",
     required: true,
     ownerModule: "people",
     action: "review",
@@ -303,7 +303,7 @@ const MONTHLY_CHECKLIST_V1 = [
   {
     id: "decisions-filed",
     label: "Decisions filed",
-    description: "Resolve required review candidates into durable Personal Ops or native-module destinations.",
+    description: "Resolve required review candidates into durable Personal or native-module destinations.",
     required: true,
     ownerModule: "personal_ops",
     action: "file",
@@ -323,7 +323,7 @@ const MONTHLY_CHECKLIST_V1 = [
   {
     id: "next-month-priorities-drafted",
     label: "Next month priorities drafted",
-    description: "Save the next-focus summary or link a Personal Ops Goal destination.",
+    description: "Save the next-focus summary or link a Personal Goal destination.",
     required: true,
     ownerModule: "personal_ops",
     action: "draft",
@@ -421,7 +421,7 @@ export const REVIEW_DECISION_READINESS_CHECKS = [
   "Budget variance decisions resolved",
   "Carry-forward destinations selected",
   "Project blockers assigned",
-  "Personal Ops decisions created",
+  "Personal decisions created",
   "Evidence linked to high-risk decisions",
   "Waived decisions have reasons",
   "Deferred decisions have review dates",

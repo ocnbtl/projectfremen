@@ -58,7 +58,7 @@ export default async function PersonalOpsRoutePage({
         .then((state) => ({ ok: true as const, state }))
         .catch((error: unknown) => ({
           ok: false as const,
-          error: error instanceof Error ? error.message : "Personal Ops data could not be loaded."
+          error: error instanceof Error ? error.message : "Personal data could not be loaded."
         })),
       view === "inbox"
         ? readPersonalRecords()
@@ -74,7 +74,7 @@ export default async function PersonalOpsRoutePage({
       ? classifyLegacyPersonalRecords(recordsResult.records.map(legacyDescriptor))
       : [];
     const loadErrors = [
-      nativeResult.ok ? "" : `Native Personal Ops: ${nativeResult.error}`,
+      nativeResult.ok ? "" : `Native Personal: ${nativeResult.error}`,
       recordsResult.ok ? "" : `Legacy source records: ${recordsResult.error}`
     ].filter(Boolean);
 
@@ -84,7 +84,7 @@ export default async function PersonalOpsRoutePage({
           showCommandSearch={false}
           showPageSidebar={false}
           showLocalAi={false}
-          sidebarTitle="Personal Ops"
+          sidebarTitle="Personal"
           sidebarSummary="Goals, decisions, obligations, follow-ups, routines, capture, and reusable templates."
         />
         <PersonalOpsAdvancedWorkspace
@@ -102,7 +102,7 @@ export default async function PersonalOpsRoutePage({
       .then((state) => ({ ok: true as const, state }))
       .catch((error: unknown) => ({
         ok: false as const,
-        error: error instanceof Error ? error.message : "Personal Ops data could not be loaded."
+        error: error instanceof Error ? error.message : "Personal data could not be loaded."
       })),
     readPersonalRecords()
       .then((records) => ({ ok: true as const, records }))
@@ -148,7 +148,7 @@ export default async function PersonalOpsRoutePage({
     : [];
 
   const loadErrors = [
-    nativeResult.ok ? "" : `Native Personal Ops: ${nativeResult.error}`,
+    nativeResult.ok ? "" : `Native Personal: ${nativeResult.error}`,
     recordsResult.ok ? "" : `Legacy source records: ${recordsResult.error}`,
     ...entityGoalResults.map((result) =>
       result.ok ? "" : `Current Goals (${result.hub.entity}): ${result.error}`
@@ -161,7 +161,7 @@ export default async function PersonalOpsRoutePage({
         showCommandSearch={false}
         showPageSidebar={false}
         showLocalAi={false}
-        sidebarTitle="Personal Ops"
+        sidebarTitle="Personal"
         sidebarSummary="Goals, durable decisions, obligations, actionable follow-ups, and a mixed operating queue."
       />
       <PersonalOpsWorkspace

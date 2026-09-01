@@ -41,7 +41,7 @@ function countsFor(ops: PersonalOpsState, life: Awaited<ReturnType<typeof readPe
 export default async function PersonalUtilityRoutePage({ view }: { view: PersonalUtilityView }) {
   await requireAdminSession();
   const [opsResult, lifeResult, styleResult, dogResult, recordsResult] = await Promise.all([
-    readPersonalOpsState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Personal Ops could not be loaded." })),
+    readPersonalOpsState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Personal could not be loaded." })),
     readPersonalLifeState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Personal systems could not be loaded." })),
     view === "style-guide" ? readStyleGuideState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Style Guide could not be loaded." })) : Promise.resolve({ ok: true as const, state: defaultStyleGuideState() }),
     readDogTrackerState().then((state) => ({ ok: true as const, state })).catch((error: unknown) => ({ ok: false as const, error: error instanceof Error ? error.message : "Dog care could not be loaded." })),
@@ -58,7 +58,7 @@ export default async function PersonalUtilityRoutePage({ view }: { view: Persona
 
   return (
     <div className="shell admin-chrome-main module-ref-shell personal-ops-module-shell native-module-shell">
-      <AdminChrome showCommandSearch={false} showPageSidebar={false} sidebarTitle="Personal Ops" sidebarSummary="Private command surfaces and personal systems." />
+      <AdminChrome showCommandSearch={false} showPageSidebar={false} sidebarTitle="Personal" sidebarSummary="Private command surfaces and personal systems." />
       {view === "style-guide" ? (
         <PersonalStyleGuideWorkspace initialState={style} initialResources={resources} sidebarCounts={counts} initialLoadError={errors || undefined} />
       ) : (

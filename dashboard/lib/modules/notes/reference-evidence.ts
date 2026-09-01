@@ -356,7 +356,7 @@ export function buildNoteReferenceEvidence({
           relationship: "decision_source",
           state: "current",
           updatedAt: decision.updatedAt,
-          caveat: "Reviews owns candidate resolution; Personal Ops owns any filed durable Decision."
+          caveat: "Reviews owns candidate resolution; Personal owns any filed durable Decision."
         });
       }
 
@@ -371,7 +371,7 @@ export function buildNoteReferenceEvidence({
           relationship: "follow_up_source",
           state: "current",
           updatedAt: followUp.updatedAt,
-          caveat: "Reviews owns workflow state; Personal Ops owns any created actionable Follow-up."
+          caveat: "Reviews owns workflow state; Personal owns any created actionable Follow-up."
         });
       }
 

@@ -229,6 +229,7 @@ a {
 .app-top-nav__mobile-menu a {
   display: flex;
   align-items: center;
+  gap: 9px;
   min-height: 44px;
   padding: 0 12px;
   border-radius: 7px;
@@ -265,6 +266,11 @@ a {
   font-weight: 850;
   text-decoration: none;
   white-space: nowrap;
+}
+
+.admin-global-nav-link > svg,
+.app-top-nav__mobile-menu a > svg {
+  flex: 0 0 auto;
 }
 
 .admin-global-nav-link:hover,

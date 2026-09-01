@@ -54,7 +54,7 @@ export default async function ProjectsRoutePage({
       "Native Projects data could not be loaded."
     ),
     settleSource(readPersonalRecords(), [], "Legacy Personal Records could not be loaded."),
-    settleSource(readPersonalOpsState(), undefined, "Personal Ops context could not be loaded."),
+    settleSource(readPersonalOpsState(), undefined, "Personal context could not be loaded."),
     settleSource(
       readReviewsState(),
       createEmptyReviewsState(),

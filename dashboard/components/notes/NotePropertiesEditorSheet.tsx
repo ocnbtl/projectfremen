@@ -316,7 +316,7 @@ export default function NotePropertiesEditorSheet({
                   </div>
                   <div>
                     <span>Owner modules</span>
-                    <strong>No Project, Resource, Media, Review, or Personal Ops object is created</strong>
+                    <strong>No Project, Resource, Media, Review, or Personal object is created</strong>
                   </div>
                 </div>
               </section>

@@ -59,7 +59,7 @@ export async function ensureIconComponentResource(role: string, candidate: strin
   if (!entry || !entry.candidates.includes(candidate)) throw new Error("Invalid icon selection");
   const currentRecords = await readPersonalRecords();
   const existing = findExisting(currentRecords, role);
-  const title = `Icon component · ${entry.label}`;
+  const title = `${entry.label} (Icon)`;
   const url = streamlineIconUrl(candidate);
   const subjects = generatedSubjects(role, candidate);
   const notes = [

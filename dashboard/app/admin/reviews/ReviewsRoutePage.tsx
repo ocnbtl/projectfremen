@@ -47,7 +47,7 @@ export default async function ReviewsRoutePage({
       .then((state) => ({ ok: true as const, state }))
       .catch((error: unknown) => ({
         ok: false as const,
-        error: error instanceof Error ? error.message : "Personal Ops Follow-ups could not be loaded."
+        error: error instanceof Error ? error.message : "Personal Follow-ups could not be loaded."
       }))
   ]);
 

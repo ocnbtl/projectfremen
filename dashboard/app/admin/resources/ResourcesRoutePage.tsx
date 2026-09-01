@@ -99,7 +99,7 @@ export default async function ResourcesRoutePage({
     reviews: ownerEvidenceSource<ReviewsState>(reviewsResult, "Reviews"),
     personalOps: ownerEvidenceSource<PersonalOpsState>(
       personalOpsResult,
-      "Personal Ops"
+      "Personal"
     )
   });
   const clientResources = resources.map(resourceForClient);
@@ -169,7 +169,7 @@ export default async function ResourcesRoutePage({
         initialPersonalOpsFollowUpsError={
           personalOpsResult.status === "fulfilled"
             ? ""
-            : "Personal Ops Follow-up status could not be loaded."
+            : "Personal Follow-up status could not be loaded."
         }
         initialReviewViews={
           reviewsResult.status === "fulfilled"

@@ -5502,39 +5502,39 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
       await dialog.getByText(/active follow-ups already use this People source/).waitFor();
       assert(
         await dialog.getByText("This creates a linked operating object. The source stays in People.").count() === 1,
-        `Personal Ops ${viewport.label} did not explain People source ownership`
+        `Personal ${viewport.label} did not explain People source ownership`
       );
       for (const title of expectedFollowUpTitles) {
         assert(
           await dialog.getByText(title, { exact: true }).count() === 1,
-          `Personal Ops ${viewport.label} duplicate warning omitted ${title}`
+          `Personal ${viewport.label} duplicate warning omitted ${title}`
         );
       }
       assert(
         await dialog.getByLabel("Due date").inputValue() === "2026-08-12",
-        `Personal Ops ${viewport.label} shifted the date-only People handoff`
+        `Personal ${viewport.label} shifted the date-only People handoff`
       );
       for (const label of ["Title", "Description", "Status", "Due date", "Priority", "Outcome (optional)"]) {
         assert(
           await dialog.getByLabel(label).count() === 1,
-          `Personal Ops ${viewport.label} simplified Follow-up form omitted ${label}`
+          `Personal ${viewport.label} simplified Follow-up form omitted ${label}`
         );
       }
       for (const removedLabel of ["Health", "Review state", "Cadence", "Cadence rule", "Current state", "Context", "Completion criterion", "Follow-up type"]) {
         assert(
           await dialog.getByLabel(removedLabel, { exact: true }).count() === 0,
-          `Personal Ops ${viewport.label} retained redundant Follow-up field ${removedLabel}`
+          `Personal ${viewport.label} retained redundant Follow-up field ${removedLabel}`
         );
       }
       assert(
         await dialog.getByLabel("Description").inputValue() === `Reconnect with ${sourceLabel}.`,
-        `Personal Ops ${viewport.label} did not place People handoff context in the Description field`
+        `Personal ${viewport.label} did not place People handoff context in the Description field`
       );
 
       const createButton = dialog.getByRole("button", { name: "Create Follow-up" });
       assert(
         await createButton.isDisabled(),
-        `Personal Ops ${viewport.label} allowed an unconfirmed duplicate source write`
+        `Personal ${viewport.label} allowed an unconfirmed duplicate source write`
       );
       const duplicateConfirmation = dialog.getByRole("checkbox", {
         name: /I need a separate follow-up for this source/
@@ -5542,7 +5542,7 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
       await duplicateConfirmation.check();
       assert(
         await createButton.isEnabled(),
-        `Personal Ops ${viewport.label} did not enable the explicit duplicate confirmation path`
+        `Personal ${viewport.label} did not enable the explicit duplicate confirmation path`
       );
 
       const layout = await page.evaluate(() => {
@@ -5564,9 +5564,9 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
             footerRect.bottom <= window.innerHeight
         };
       });
-      assert(!layout.overflowX, `Personal Ops ${viewport.label} duplicate sheet overflowed horizontally`);
-      assert(layout.dialogWithinViewport, `Personal Ops ${viewport.label} duplicate sheet escaped the viewport`);
-      assert(layout.footerVisible, `Personal Ops ${viewport.label} duplicate actions were not visible`);
+      assert(!layout.overflowX, `Personal ${viewport.label} duplicate sheet overflowed horizontally`);
+      assert(layout.dialogWithinViewport, `Personal ${viewport.label} duplicate sheet escaped the viewport`);
+      assert(layout.footerVisible, `Personal ${viewport.label} duplicate actions were not visible`);
 
       if (viewport.width <= 760) {
         const undersizedTargets = await dialog.locator(
@@ -5588,7 +5588,7 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
         );
         assert(
           undersizedTargets.length === 0,
-          `Personal Ops mobile duplicate controls are below 44px: ${JSON.stringify(undersizedTargets)}`
+          `Personal mobile duplicate controls are below 44px: ${JSON.stringify(undersizedTargets)}`
         );
       }
 
@@ -5597,9 +5597,9 @@ async function checkPersonalOpsSourceDuplicateBrowserState(
       });
       await context.close();
     }
-    assert(mutatingRequests.length === 0, `Personal Ops duplicate browser checks emitted mutations: ${mutatingRequests.join(" | ")}`);
-    assert(browserErrors.length === 0, `Personal Ops duplicate browser checks emitted errors: ${browserErrors.join(" | ")}`);
-    assert(failedResponses.length === 0, `Personal Ops duplicate browser checks received failed responses: ${failedResponses.join(" | ")}`);
+    assert(mutatingRequests.length === 0, `Personal duplicate browser checks emitted mutations: ${mutatingRequests.join(" | ")}`);
+    assert(browserErrors.length === 0, `Personal duplicate browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Personal duplicate browser checks received failed responses: ${failedResponses.join(" | ")}`);
   } finally {
     await browser.close();
   }
@@ -6049,7 +6049,7 @@ async function checkPeopleMemoryBrowserState(
         followUpText.includes("Follow-ups") &&
           !followUpText.includes("Linked to this person") &&
           !followUpText.includes("No follow-ups for this person") &&
-          !followUpText.includes("Create in Personal Ops") &&
+          !followUpText.includes("Create in Personal") &&
           !followUpText.includes("active ·") &&
           await followUpPanel.locator("button").count() === 0,
         `Timeline retained the verbose Follow-up rail at ${viewport.label}`
@@ -7151,7 +7151,7 @@ async function checkPeopleFollowUpBridgeBrowserState(
         followUpsBefore.response.ok &&
         typeof peopleCountBefore === "number" &&
         exactSourceCountBefore === 1,
-      "People Follow-up bridge fixture did not begin with one exact Personal Ops-owned source"
+      "People Follow-up bridge fixture did not begin with one exact Personal-owned source"
     );
 
     const context = await authenticatedContext({ width: 1440, height: 900 });
@@ -7164,7 +7164,7 @@ async function checkPeopleFollowUpBridgeBrowserState(
     const bridge = page.locator(`[data-people-follow-up-bridge="${person.id}"]`);
     const row = bridge.locator(`[data-people-follow-up-id="${followUp.id}"]`);
     await bridge.waitFor();
-    assert(await row.count() === 1, "People did not render the exact Personal Ops-owned Follow-up");
+    assert(await row.count() === 1, "People did not render the exact Personal-owned Follow-up");
     assert(
       (await row.innerText()).includes(followUp.title) &&
         (await row.innerText()).includes("Scheduled") &&
@@ -7188,7 +7188,7 @@ async function checkPeopleFollowUpBridgeBrowserState(
     });
     assert(
       updatedFollowUp.response.ok && updatedFollowUp.payload?.item?.followUpState === "waiting",
-      `Personal Ops status update for the People bridge failed: ${JSON.stringify(updatedFollowUp.payload)}`
+      `Personal status update for the People bridge failed: ${JSON.stringify(updatedFollowUp.payload)}`
     );
     await page.reload({ waitUntil: "networkidle" });
     const waitingRow = page.locator(`[data-people-follow-up-id="${followUp.id}"][data-follow-up-state="waiting"]`);
@@ -7196,7 +7196,7 @@ async function checkPeopleFollowUpBridgeBrowserState(
     assert(
       await waitingRow.getAttribute("data-follow-up-state") === "waiting" &&
         (await waitingRow.innerText()).includes("Waiting"),
-      "People reload did not load the current Personal Ops Follow-up state"
+      "People reload did not load the current Personal Follow-up state"
     );
 
     await page.reload({ waitUntil: "networkidle" });
@@ -7204,7 +7204,7 @@ async function checkPeopleFollowUpBridgeBrowserState(
     await reloadedRow.waitFor();
     assert(
       await reloadedRow.getAttribute("data-follow-up-state") === "waiting",
-      "People reload did not preserve the current Personal Ops Follow-up state"
+      "People reload did not preserve the current Personal Follow-up state"
     );
 
     await reloadedRow.click();
@@ -7215,7 +7215,7 @@ async function checkPeopleFollowUpBridgeBrowserState(
     await page.getByText(followUp.title, { exact: true }).first().waitFor();
     assert(
       await page.getByText(followUp.title, { exact: true }).count() >= 1,
-      "People Follow-up owner link did not open the canonical Personal Ops object"
+      "People Follow-up owner link did not open the canonical Personal object"
     );
     await page.goBack({ waitUntil: "domcontentloaded" });
     await page.waitForURL((url) =>
@@ -7239,7 +7239,7 @@ async function checkPeopleFollowUpBridgeBrowserState(
     assert(
       forwardUrl.pathname === "/admin/personal/follow-ups" &&
         forwardUrl.searchParams.get("selected") === followUp.id,
-      "Browser Forward did not restore the canonical Personal Ops Follow-up owner route"
+      "Browser Forward did not restore the canonical Personal Follow-up owner route"
     );
     await context.close();
 
@@ -7311,7 +7311,7 @@ async function checkPeopleFollowUpBridgeBrowserState(
     ).length;
     assert(
       peopleAfter.payload?.items?.length === peopleCountBefore && exactSourceCountAfter === 1,
-      "People Follow-up visibility duplicated either the People source or Personal Ops-owned Follow-up"
+      "People Follow-up visibility duplicated either the People source or Personal-owned Follow-up"
     );
     assert(
       mutatingRequests.length === 0,
@@ -7398,7 +7398,7 @@ async function checkCrossModuleFollowUpConnections(
         label: reviewFollowUp.title,
         route: `/admin/reviews/${encodeURIComponent(reviewRun.id)}?tab=follow-ups&item=${encodeURIComponent(reviewFollowUp.id)}`
       },
-      title: `${reviewFollowUp.title} · Personal Ops owner`
+      title: `${reviewFollowUp.title} · Personal owner`
     },
     {
       key: "resource",
@@ -7434,7 +7434,7 @@ async function checkCrossModuleFollowUpConnections(
             reference.objectType === fixture.source.objectType &&
             reference.objectId === fixture.source.objectId
         ),
-        "Media Follow-up connection did not receive its existing canonical Personal Ops owner"
+        "Media Follow-up connection did not receive its existing canonical Personal owner"
       );
       createdByKey.set(fixture.key, existingMediaFollowUp);
       continue;
@@ -7450,7 +7450,7 @@ async function checkCrossModuleFollowUpConnections(
         input: {
           title: fixture.title,
           followUpType: ["milestone", "blocker"].includes(fixture.key) ? "project_follow_up" : "other",
-          context: `Regression verifies ${fixture.source.module} reads status from the Personal Ops-owned object.`,
+          context: `Regression verifies ${fixture.source.module} reads status from the Personal-owned object.`,
           lifecycle: "active",
           followUpState: "scheduled",
           priority: ["milestone", "blocker"].includes(fixture.key) ? "high" : "medium",
@@ -7554,7 +7554,7 @@ async function checkCrossModuleFollowUpConnections(
       .replace(/_/g, " ")
       .replace(/\b\w/g, (character) => character.toUpperCase());
     const expectedActiveCount = followUp.followUpState === "complete" ? 0 : 1;
-    assert(await row.count() === 1, `${label} did not render its exact Personal Ops-owned Follow-up`);
+    assert(await row.count() === 1, `${label} did not render its exact Personal-owned Follow-up`);
     assert(
       (await row.innerText()).includes(followUp.title) &&
         (await row.innerText()).includes(expectedState) &&
@@ -7562,7 +7562,7 @@ async function checkCrossModuleFollowUpConnections(
       `${label} did not render the current owner title, state, and exact-source count`
     );
     assert(
-      await panel.getByRole("link", { name: "Create in Personal Ops" }).count() === 0,
+      await panel.getByRole("link", { name: "Create in Personal" }).count() === 0,
       `${label} offered a duplicate creation path despite an exact linked owner`
     );
     const layout = await page.evaluate(() => ({
@@ -7672,7 +7672,7 @@ async function checkCrossModuleFollowUpConnections(
     assert(
       updateMediaOwner.response.ok &&
         updateMediaOwner.payload?.item?.followUpState === "waiting",
-      `Media-linked Personal Ops owner update failed: ${JSON.stringify(updateMediaOwner.payload)}`
+      `Media-linked Personal owner update failed: ${JSON.stringify(updateMediaOwner.payload)}`
     );
     createdByKey.set("media", updateMediaOwner.payload.item);
     await mediaPanel.panel
@@ -7694,7 +7694,7 @@ async function checkCrossModuleFollowUpConnections(
           contentType: "application/json",
           body: JSON.stringify({
             ok: false,
-            error: "Personal Ops status is temporarily unavailable."
+            error: "Personal status is temporarily unavailable."
           })
         });
       }
@@ -7707,7 +7707,7 @@ async function checkCrossModuleFollowUpConnections(
     await mediaPanel.panel
       .getByRole("alert")
       .getByText(
-        "Personal Ops status is temporarily unavailable. The last loaded Personal Ops status was preserved."
+        "Personal status is temporarily unavailable. The last loaded Personal status was preserved."
       )
       .waitFor();
     assert(
@@ -7777,7 +7777,7 @@ async function checkCrossModuleFollowUpConnections(
         linkedReviewFollowUp?.state === "created" &&
         linkedReviewFollowUp.createdObjectRef?.objectId === createdByKey.get("review").id &&
         linkedReviewFollowUp.createdObjectRef?.module === "personal_ops",
-      `Review did not persist the exact Personal Ops owner reference: ${JSON.stringify(linkedReview.payload)}`
+      `Review did not persist the exact Personal owner reference: ${JSON.stringify(linkedReview.payload)}`
     );
 
     const reviewOwner = createdByKey.get("review");
@@ -7800,12 +7800,12 @@ async function checkCrossModuleFollowUpConnections(
     assert(
       completeReviewOwner.response.ok &&
         completeReviewOwner.payload?.item?.followUpState === "complete",
-      `Review-linked Personal Ops owner completion failed: ${JSON.stringify(completeReviewOwner.payload)}`
+      `Review-linked Personal owner completion failed: ${JSON.stringify(completeReviewOwner.payload)}`
     );
     createdByKey.set("review", completeReviewOwner.payload.item);
 
     await desktopPage
-      .getByRole("button", { name: `Refresh Personal Ops Follow-up status for ${reviewRun.title}` })
+      .getByRole("button", { name: `Refresh Personal Follow-up status for ${reviewRun.title}` })
       .click();
     await reviewItem
       .locator(`[data-follow-up-id="${reviewOwner.id}"][data-follow-up-state="complete"]`)
@@ -7918,7 +7918,7 @@ async function checkCrossModuleFollowUpConnections(
       );
       assert(
         exactOwners.length === 1,
-        `${fixture.key} source ended with ${exactOwners.length} Personal Ops owners instead of one`
+        `${fixture.key} source ended with ${exactOwners.length} Personal owners instead of one`
       );
     }
 
@@ -7944,7 +7944,7 @@ async function checkCrossModuleFollowUpConnections(
             event.action === "review_run.upsert_follow_up" &&
             event.object?.objectId === reviewRun.id
         ).length >= 2,
-      "Review did not explicitly persist and audit its Personal Ops owner completion"
+      "Review did not explicitly persist and audit its Personal owner completion"
     );
     assert(
       browserMutations.length === 2 &&
@@ -8020,7 +8020,7 @@ async function checkCrossModuleDecisionConnections(
         label: reviewDecision.title,
         route: `/admin/reviews/${encodeURIComponent(reviewRun.id)}?tab=decisions&item=${encodeURIComponent(reviewDecision.id)}`
       },
-      title: `${reviewDecision.title} · Personal Ops owner`,
+      title: `${reviewDecision.title} · Personal owner`,
       state: "decided"
     },
     {
@@ -8090,12 +8090,12 @@ async function checkCrossModuleDecisionConnections(
         input: {
           title: fixture.title,
           question: `What explicit choice should ${fixture.source.label} retain?`,
-          description: `Regression verifies ${fixture.source.module} reads status from the Personal Ops-owned Decision.`,
+          description: `Regression verifies ${fixture.source.module} reads status from the Personal-owned Decision.`,
           domain: "Operations",
           lifecycle: "active",
           decisionState: fixture.state,
           finalDecision: decided
-            ? "File the source-backed decision once and retain Personal Ops as its owner."
+            ? "File the source-backed decision once and retain Personal as its owner."
             : undefined,
           rationale: decided
             ? "One exact source reference keeps the Review candidate and durable owner reconcilable."
@@ -8192,7 +8192,7 @@ async function checkCrossModuleDecisionConnections(
     const expectedUnresolved = decision.decisionState === "open" || decision.decisionState === "deferred"
       ? 1
       : 0;
-    assert(await row.count() === 1, `${label} did not render its exact Personal Ops-owned Decision`);
+    assert(await row.count() === 1, `${label} did not render its exact Personal-owned Decision`);
     const rowText = await row.innerText();
     const panelText = await panel.innerText();
     const expectedQuestion = decision.question || `What explicit choice should ${fixture.source.label} retain?`;
@@ -8212,7 +8212,7 @@ async function checkCrossModuleDecisionConnections(
       `${label} did not render the requested owner title, state, question, decision, and summary treatment: ${JSON.stringify({ rowText, panelText, expectedState, expectedQuestion, expectedDecision })}`
     );
     assert(
-      await panel.getByRole("link", { name: "File in Personal Ops" }).count() === 0,
+      await panel.getByRole("link", { name: "File in Personal" }).count() === 0,
       `${label} offered a duplicate creation path despite an exact linked owner`
     );
     const layout = await page.evaluate(() => ({
@@ -8258,7 +8258,7 @@ async function checkCrossModuleDecisionConnections(
         expectedUpdatedAt: projectOwner.updatedAt,
         patch: {
           decisionState: "decided",
-          finalDecision: "Keep this operating choice in the canonical Personal Ops decision record.",
+          finalDecision: "Keep this operating choice in the canonical Personal decision record.",
           rationale: "Projects displays the owner state without copying or mutating the Decision."
         }
       })
@@ -8280,7 +8280,7 @@ async function checkCrossModuleDecisionConnections(
       .waitFor();
     assert(
       (await projectPage.locator(`[data-decision-id="${projectOwner.id}"]`).innerText()).includes(
-        "Keep this operating choice in the canonical Personal Ops decision record."
+        "Keep this operating choice in the canonical Personal decision record."
       ),
       "Project Decisions did not show the saved decision beneath its question"
     );
@@ -8292,31 +8292,31 @@ async function checkCrossModuleDecisionConnections(
       await personalDecisionPage.getByRole("heading", { name: "Decisions", exact: true }).count() === 1 &&
         await personalDecisionPage.getByText("Durable choices with rationale, reversibility, provenance, and explicit review state.", { exact: true }).count() === 0 &&
         await personalDecisionPage.getByLabel("Current scope status").count() === 0,
-      "Personal Ops Decisions retained the removed header copy or status-count strip"
+      "Personal Decisions retained the removed header copy or status-count strip"
     );
     assert(
       await personalDecisionPage.getByRole("columnheader", { name: "Type", exact: true }).count() === 0 &&
         await personalDecisionPage.getByRole("columnheader", { name: "Review state", exact: true }).count() === 1 &&
         await personalDecisionPage.getByRole("columnheader", { name: "Decision state", exact: true }).count() === 1,
-      "Personal Ops Decisions did not replace the redundant Type column with review and decision state"
+      "Personal Decisions did not replace the redundant Type column with review and decision state"
     );
     assert(
       await personalDecisionPage.getByText("Recurring", { exact: true }).count() === 0 &&
         await personalDecisionPage.getByText("Blocked", { exact: true }).count() === 0 &&
         await personalDecisionPage.getByText("Linked", { exact: true }).count() === 0,
-      "Personal Ops Decisions retained health, recurring, or linked summary controls"
+      "Personal Decisions retained health, recurring, or linked summary controls"
     );
     const personalDecisionRow = personalDecisionPage.locator("tbody tr").filter({ hasText: projectOwner.title }).first();
     await personalDecisionRow.waitFor();
     const personalDecisionRowText = await personalDecisionRow.innerText();
     assert(
       personalDecisionRowText.includes(projectOwner.question) &&
-        personalDecisionRowText.includes("Keep this operating choice in the canonical Personal Ops decision record.") &&
+        personalDecisionRowText.includes("Keep this operating choice in the canonical Personal decision record.") &&
         await personalDecisionRow.getByLabel("Question", { exact: true }).count() === 1 &&
         await personalDecisionRow.getByLabel("Decision", { exact: true }).count() === 1 &&
         personalDecisionRowText.includes("Reviewed") &&
         personalDecisionRowText.includes("Decided"),
-      `Personal Ops decision row did not show question, decision, review state, and decision state: ${personalDecisionRowText}`
+      `Personal decision row did not show question, decision, review state, and decision state: ${personalDecisionRowText}`
     );
     await personalDecisionRow.getByRole("button").click();
     await personalDecisionPage.waitForURL((url) =>
@@ -8331,7 +8331,7 @@ async function checkCrossModuleDecisionConnections(
         await personalDecisionInspector.getByLabel("Decision", { exact: true }).count() === 1 &&
         await personalDecisionInspector.getByText("Health", { exact: true }).count() === 0 &&
         await personalDecisionInspector.getByText("Cadence", { exact: true }).count() === 0,
-      "Personal Ops decision inspector did not expose the streamlined question, decision, and state overview"
+      "Personal decision inspector did not expose the streamlined question, decision, and state overview"
     );
     await personalDecisionInspector.getByRole("button", { name: "Edit", exact: true }).click();
     const editDecisionDialog = personalDecisionPage.getByRole("dialog", { name: "Edit Decision" });
@@ -8411,7 +8411,7 @@ async function checkCrossModuleDecisionConnections(
         linkedReviewDecision.destinationRef?.objectType === "decision" &&
         linkedReviewDecision.destinationRef?.objectId === createdByKey.get("review").id &&
         linkedReviewDecision.rationale,
-      `Review did not persist the exact Personal Ops Decision reference: ${JSON.stringify(linkedReview.payload)}`
+      `Review did not persist the exact Personal Decision reference: ${JSON.stringify(linkedReview.payload)}`
     );
 
     const financeBudgetPage = await desktopContext.newPage();
@@ -8427,7 +8427,7 @@ async function checkCrossModuleDecisionConnections(
       `${baseUrl}/admin/finance/budgets?selected=${encodeURIComponent(handoffBudget.id)}&tab=overview`,
       { waitUntil: "networkidle" }
     );
-    await financeBudgetPage.getByText("File in Personal Ops", { exact: true }).click();
+    await financeBudgetPage.getByText("File in Personal", { exact: true }).click();
     await financeBudgetPage.waitForURL((url) =>
       url.pathname === "/admin/personal/decisions" &&
       url.searchParams.get("create") === "decision" &&
@@ -8497,7 +8497,7 @@ async function checkCrossModuleDecisionConnections(
     await assertPanel(financeClosePage, sources[3], "Finance close-item decisions");
     assert(
       await financeClosePage.getByText("Finance retains close ownership", { exact: true }).count() === 1 &&
-        await financeClosePage.getByText("Open in Personal Ops", { exact: true }).count() >= 1,
+        await financeClosePage.getByText("Open in Personal", { exact: true }).count() >= 1,
       "Finance close item did not preserve its native ownership boundary and owner-aware Decision action"
     );
     const closeHandoffParams = new URLSearchParams({
@@ -8594,7 +8594,7 @@ async function checkCrossModuleDecisionConnections(
     assert(
       await mobileDecisionRow.getByLabel("Question", { exact: true }).count() === 1 &&
         await mobileDecisionRow.getByLabel("Decision", { exact: true }).count() === 1,
-      "Mobile Personal Ops decision row omitted the question and decision markers"
+      "Mobile Personal decision row omitted the question and decision markers"
     );
     await mobileDecisionRow.getByRole("button").click();
     const mobileDecisionInspector = mobileDecisionPage.getByRole("dialog", { name: "Selected object inspector" });
@@ -8619,7 +8619,7 @@ async function checkCrossModuleDecisionConnections(
     }));
     assert(
       mobileDecisionTargets.length === 0 && mobileDecisionLayout.scrollWidth <= mobileDecisionLayout.innerWidth,
-      `Mobile Personal Ops decision inspector failed target-size or overflow checks: ${JSON.stringify({ mobileDecisionTargets, mobileDecisionLayout })}`
+      `Mobile Personal decision inspector failed target-size or overflow checks: ${JSON.stringify({ mobileDecisionTargets, mobileDecisionLayout })}`
     );
     await mobileDecisionPage.screenshot({
       path: path.join(screenshotDir, "personal-decisions-390x844.png"),
@@ -8646,7 +8646,7 @@ async function checkCrossModuleDecisionConnections(
       );
       assert(
         exactOwners.length === 1,
-        `${fixture.key} source ended with ${exactOwners.length} Personal Ops Decisions instead of one`
+        `${fixture.key} source ended with ${exactOwners.length} Personal Decisions instead of one`
       );
     }
 
@@ -8661,7 +8661,7 @@ async function checkCrossModuleDecisionConnections(
           event.action === "review_run.upsert_decision" &&
           event.object?.objectId === reviewRun.id
       ),
-      "Review did not audit its exact Personal Ops Decision link"
+      "Review did not audit its exact Personal Decision link"
     );
     assert(
       browserMutations.length === 2 &&
@@ -8854,7 +8854,7 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       await page.goto(`${baseUrl}/admin/personal/passwords`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { name: "Passwords", exact: true }).waitFor();
       const bodyText = await page.locator("body").innerText();
-      assert(!bodyText.includes("Personal Ops / Command"), "Password page retained the removed eyebrow");
+      assert(!bodyText.includes("Personal / Command"), "Password page retained the removed eyebrow");
       assert(!bodyText.includes("Protected at rest"), "Password page retained removed protection helper copy");
       const keyring = page.locator('section[aria-label="Encrypted password keyring"]');
       assert(await keyring.locator(":scope > header svg").count() === 0, "Password keyring header retained the removed global key icon");
@@ -9062,9 +9062,9 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
       });
 
       await page.goto(`${baseUrl}/admin/personal`, { waitUntil: "networkidle" });
-      await page.getByRole("heading", { name: "Personal Ops Command", exact: true }).waitFor();
+      await page.getByRole("heading", { name: "Personal Command", exact: true }).waitFor();
       const bodyText = await page.locator("body").innerText();
-      assert(!bodyText.includes("operating view for today") && !bodyText.includes("across goals, decisions, obligations, and follow-ups"), `Personal Ops Command retained removed explanatory copy at ${viewport.label}`);
+      assert(!bodyText.includes("operating view for today") && !bodyText.includes("across goals, decisions, obligations, and follow-ups"), `Personal Command retained removed explanatory copy at ${viewport.label}`);
       const systemDock = page.getByRole("navigation", { name: "Personal systems" });
       await systemDock.waitFor();
       for (const label of ["Passwords", "Lists", "Travel", "Personal Build", "Car", "Style Guide", "Dog"]) {
@@ -9072,22 +9072,22 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
       }
       const sidebarLabels = await page.locator(".module-sidebar__navigation .module-sidebar__item-label").allInnerTexts();
       for (const label of ["Passwords", "Lists", "Travel", "Personal Build", "Car", "Style Guide", "Dog"]) {
-        assert(!sidebarLabels.includes(label), `Personal Ops sidebar retained ${label} at ${viewport.label}`);
+        assert(!sidebarLabels.includes(label), `Personal sidebar retained ${label} at ${viewport.label}`);
       }
 
-      const header = page.locator('main[aria-label="Personal Ops Command ledger"] header').first();
+      const header = page.locator('main[aria-label="Personal Command ledger"] header').first();
       const search = header.getByPlaceholder("Search...");
       const sort = header.locator('summary[aria-label^="Sort:"]');
       const filter = header.locator('summary[aria-label^="Filter:"]');
       for (const label of ["Follow-up", "Decision", "Obligation", "Goal"]) {
         assert(await header.getByRole("button", { name: label, exact: true }).count() === 1, `Top action strip omitted + ${label} at ${viewport.label}`);
       }
-      assert(await page.locator('nav[aria-label="Personal Ops quick actions"]').count() === 0, `Personal Ops retained the bottom action rail at ${viewport.label}`);
+      assert(await page.locator('nav[aria-label="Personal quick actions"]').count() === 0, `Personal retained the bottom action rail at ${viewport.label}`);
       const controlCenters = await Promise.all([search, sort, filter, header.getByRole("button", { name: "Follow-up", exact: true })].map((locator) => locator.evaluate((element) => {
         const rect = element.getBoundingClientRect();
         return rect.top + rect.height / 2;
       })));
-      assert(Math.max(...controlCenters) - Math.min(...controlCenters) <= 2, `Personal Ops command controls are not vertically aligned at ${viewport.label}: ${JSON.stringify(controlCenters)}`);
+      assert(Math.max(...controlCenters) - Math.min(...controlCenters) <= 2, `Personal command controls are not vertically aligned at ${viewport.label}: ${JSON.stringify(controlCenters)}`);
       await sort.click();
       const sortMenu = header.getByRole("menu", { name: "Sort ledger" });
       await sortMenu.waitFor();
@@ -9100,7 +9100,7 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
       await filterMenu.waitFor();
       assert(await filterMenu.getByRole("menuitemradio").count() >= 5, `Filter icon did not open an anchored filter menu at ${viewport.label}`);
       await filter.click();
-      assert(await page.locator("#personal-ops-filter-rail").count() === 0, `Personal Ops retained the detached filter rail at ${viewport.label}`);
+      assert(await page.locator("#personal-ops-filter-rail").count() === 0, `Personal retained the detached filter rail at ${viewport.label}`);
 
       const aiLauncher = page.getByRole("button", { name: "Open AI assistant" });
       const launcherIcon = aiLauncher.locator('svg[data-icon-role="message"][data-icon-candidate="message"]');
@@ -9116,7 +9116,7 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
       assert(aiSurfaceAlpha >= 0.82 && aiSurfaceAlpha < 1, `AI panel is not the expected readable liquid-glass surface at ${viewport.label}: ${JSON.stringify(aiSurface)}`);
 
       const layout = await page.evaluate(() => ({ scrollWidth: document.documentElement.scrollWidth, innerWidth: window.innerWidth }));
-      assert(layout.scrollWidth <= layout.innerWidth, `Personal Ops Command overflowed horizontally at ${viewport.label}: ${JSON.stringify(layout)}`);
+      assert(layout.scrollWidth <= layout.innerWidth, `Personal Command overflowed horizontally at ${viewport.label}: ${JSON.stringify(layout)}`);
       await page.screenshot({ path: path.join(screenshotDir, `command-${viewport.label}.png`), fullPage: true });
       if (viewport.label === "desktop-1440x900") {
         const assistantDraft = "Keep this draft through module navigation";
@@ -9141,9 +9141,9 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
       }
       await context.close();
     }
-    assert(browserMutations.length === 0, `Personal Ops Command browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`);
-    assert(browserErrors.length === 0, `Personal Ops Command browser checks emitted errors: ${browserErrors.join(" | ")}`);
-    assert(failedResponses.length === 0, `Personal Ops Command browser checks received failed responses: ${failedResponses.join(" | ")}`);
+    assert(browserMutations.length === 0, `Personal Command browser checks emitted unexpected mutations: ${browserMutations.join(" | ")}`);
+    assert(browserErrors.length === 0, `Personal Command browser checks emitted errors: ${browserErrors.join(" | ")}`);
+    assert(failedResponses.length === 0, `Personal Command browser checks received failed responses: ${failedResponses.join(" | ")}`);
   } finally {
     await browser.close();
   }
@@ -9188,8 +9188,8 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       }
       assert(await page.getByText("Resources remain authoritative.", { exact: false }).count() >= 1, `Style Guide did not disclose the Resource ownership boundary at ${viewport.label}`);
       assert(await page.locator('section[aria-label="Guide identity"] input').count() === 2, `Style Guide identity was not editable at ${viewport.label}`);
-      assert(await page.locator('[data-icon-registry-count="85"]').count() === 1, `Style Guide did not expose all 85 canonical icon roles at ${viewport.label}`);
-      assert(await page.locator('input[aria-label$=" usage"]').count() === 85, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
+      assert(await page.locator('[data-icon-registry-count="94"]').count() === 1, `Style Guide did not expose all 94 canonical icon roles at ${viewport.label}`);
+      assert(await page.locator('input[aria-label$=" usage"]').count() === 94, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
       assert(await page.locator('[class*="iconCandidate"]').count() >= 420, `Style Guide did not expose five curated recommendations for each unselected icon at ${viewport.label}`);
       const typographyFamilies = await page.locator('[class*="specimenPreview"]').evaluateAll((elements) => elements.slice(0, 6).map((element) => getComputedStyle(element).fontFamily));
       assert(
@@ -9241,7 +9241,7 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
         window.__personalTransitionObserver?.disconnect();
         return window.__personalTransitionLoadingFrames || [];
       });
-      assert(loadingFrames.length === 0, `Personal Ops route transition rendered a loading skeleton at ${viewport.label}: ${JSON.stringify(loadingFrames)}`);
+      assert(loadingFrames.length === 0, `Personal route transition rendered a loading skeleton at ${viewport.label}: ${JSON.stringify(loadingFrames)}`);
       for (const label of ["Walk", "Feed", "Pee", "Poop"]) {
         assert(await page.locator('section[aria-label="Latest dog care"]', { hasText: label }).count() === 1, `Dog care pulse omitted ${label} at ${viewport.label}`);
       }
@@ -9442,19 +9442,14 @@ async function checkProjectCreationWorkflow(
       `Objectives remained too loosely spaced: ${JSON.stringify(objectiveSpacing)}`
     );
 
-    await page.locator(".admin-global-nav-button").filter({ hasText: "Projects" }).click();
-    const projectMenuLabel = projectName.replace(/^Project\s+/i, "");
-    const projectMenuRow = page.locator(".admin-project-menu-item").filter({ hasText: projectMenuLabel }).first();
-    await projectMenuRow.waitFor();
-    const projectMenuLabels = await page.locator(".admin-project-menu-item span").allTextContents();
-    const sortedProjectMenuLabels = [...projectMenuLabels].sort((left, right) => left.localeCompare(right, undefined, { sensitivity: "base" }));
+    const projectsNavLink = page.locator('.admin-global-nav-link[href="/admin/projects"]');
     assert(
-      await projectMenuRow.locator("small").count() === 0 &&
-        !(await projectMenuRow.innerText()).includes("Project SAITE") &&
-        projectMenuLabels.join("|") === sortedProjectMenuLabels.join("|"),
-      `The Projects navigation dropdown retained the Project prefix, lifecycle text, or unsorted rows: ${projectMenuLabels.join(" | ")}`
+      await projectsNavLink.count() === 1 &&
+        await projectsNavLink.locator('[data-icon-role="module-projects"]').count() === 1 &&
+        await page.locator(".admin-global-nav-button").count() === 0 &&
+        await page.locator(".admin-project-menu").count() === 0,
+      "Projects did not become a direct icon-led navigation link or retained its dropdown"
     );
-    await page.locator(".admin-global-nav-button").filter({ hasText: "Projects" }).click();
 
     await page.getByRole("button", { name: "Log update", exact: true }).first().click();
     const interactionForm = page.locator("form").filter({ hasText: "Log project update" });
@@ -12014,7 +12009,7 @@ async function main() {
         !personalOpsIconSource.includes("<path") &&
         personalOpsWorkspaceSource.includes('placeholder="Search..."') &&
         personalOpsWorkspaceSource.includes('aria-label="Personal systems"') &&
-        !personalOpsWorkspaceSource.includes('aria-label="Personal Ops quick actions"') &&
+        !personalOpsWorkspaceSource.includes('aria-label="Personal quick actions"') &&
         !personalOpsSidebarSource.includes('label: "Passwords"') &&
         sharedAiDockSource.includes('<UnigentamosIcon role="message"') &&
         !sharedAiDockSource.includes("<svg") &&
@@ -12093,14 +12088,14 @@ async function main() {
         unauthPersonalRecords.response.headers.get("vary")?.toLowerCase().includes("cookie"),
       "Unauthenticated Personal Records response did not preserve the private no-store cache boundary"
     );
-    pass("Unauthenticated Personal Ops records API is blocked");
+    pass("Unauthenticated Personal records API is blocked");
 
     const unauthPersonalOps = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops");
     assert(
       unauthPersonalOps.response.status === 401,
       `Expected /api/personal/ops to return 401, got ${describeStatus(unauthPersonalOps.response)}`
     );
-    pass("Unauthenticated native Personal Ops API is blocked");
+    pass("Unauthenticated native Personal API is blocked");
 
     const unauthPersonalLife = await requestJson(server.baseUrl, cookieJar, "/api/personal/life");
     assert(unauthPersonalLife.response.status === 401, `Expected /api/personal/life to return 401, got ${describeStatus(unauthPersonalLife.response)}`);
@@ -12131,9 +12126,9 @@ async function main() {
     });
     assert(
       unauthSecondaryCreate.response.status === 401 && !unauthSecondaryCreate.payload?.ok,
-      `Unauthenticated secondary Personal Ops create was not blocked: ${JSON.stringify(unauthSecondaryCreate.payload)}`
+      `Unauthenticated secondary Personal create was not blocked: ${JSON.stringify(unauthSecondaryCreate.payload)}`
     );
-    pass("Unauthenticated secondary Personal Ops mutations are blocked before CSRF or persistence");
+    pass("Unauthenticated secondary Personal mutations are blocked before CSRF or persistence");
 
     const unauthProjects = await requestJson(server.baseUrl, cookieJar, "/api/projects");
     assert(
@@ -12186,14 +12181,14 @@ async function main() {
       isAdminLoginRedirect(unauthPersonal.response, unauthPersonal.body),
       `Expected /admin/personal to redirect to admin login when unauthenticated, got ${describeStatus(unauthPersonal.response)}`
     );
-    pass("Unauthenticated Personal Ops page redirects to login");
+    pass("Unauthenticated Personal page redirects to login");
 
     const unauthPersonalDetail = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
     assert(
       isAdminLoginRedirect(unauthPersonalDetail.response, unauthPersonalDetail.body),
       `Expected /admin/personal/travel to redirect to admin login when unauthenticated, got ${describeStatus(unauthPersonalDetail.response)}`
     );
-    pass("Unauthenticated Personal Ops detail page redirects to login");
+    pass("Unauthenticated Personal detail page redirects to login");
 
     for (const pathname of [
       "/admin/personal/routines",
@@ -12389,36 +12384,40 @@ async function main() {
     logStep("Checking protected pages and locked navigation");
     const adminHome = await requestText(server.baseUrl, cookieJar, `/admin?run=${encodeURIComponent(testRunId)}`);
     assert(adminHome.response.ok, `Admin home failed: ${describeStatus(adminHome.response)}`);
-    for (const expected of ["Projects", "Blacktube", "Fremen", "Iceflake", "Pacific", "Pint", "Notes", "People", "Media", "Resources", "Finance", "Current Goals", "Weekly", "Monthly"]) {
+    for (const expected of ["Projects", "Notes", "People", "Media", "Resources", "Finance", "Vault", "Current Goals", "Weekly", "Monthly"]) {
       assert(adminHome.body.includes(expected), `Admin home missing expected text: ${expected}`);
     }
-    assert(adminHome.body.includes("Personal Ops"), "Admin home missing Personal Ops entry point");
+    assert(adminHome.body.includes("Personal"), "Admin home missing Personal entry point");
+    for (const role of ["projects", "notes", "people", "media", "personal", "reviews", "resources", "finance", "vault"]) {
+      assert(adminHome.body.includes(`data-icon-role="module-${role}"`), `Admin home missing ${role} navigation icon`);
+    }
+    assert(!adminHome.body.includes('id="app-project-navigation"'), "Admin home retained the Projects dropdown");
     assert(adminHome.body.includes("app-mobile-primary-navigation"), "Admin home missing responsive permanent-navigation disclosure");
     pass("Admin home renders locked nav and review shortcuts");
 
     const personalPage = await requestText(server.baseUrl, cookieJar, "/admin/personal");
-    assert(personalPage.response.ok, `Personal Ops page failed: ${describeStatus(personalPage.response)}`);
+    assert(personalPage.response.ok, `Personal page failed: ${describeStatus(personalPage.response)}`);
     for (const expected of [
-      "Personal Ops",
-      "Personal Ops Command",
+      "Personal",
+      "Personal Command",
       "Current Goals bridge",
       "Routines",
       "Capture Inbox",
       "Templates"
     ]) {
-      assert(personalPage.body.includes(expected), `Personal Ops page missing expected text: ${expected}`);
+      assert(personalPage.body.includes(expected), `Personal page missing expected text: ${expected}`);
     }
     for (const removedBoundary of [
-      "Routines arrive in the advanced Personal Ops phase.",
+      "Routines arrive in the advanced Personal phase.",
       "Capture processing is intentionally disabled",
-      "Templates are planned for the advanced Personal Ops phase."
+      "Templates are planned for the advanced Personal phase."
     ]) {
-      assert(!personalPage.body.includes(removedBoundary), `Personal Ops page still exposes obsolete disabled copy: ${removedBoundary}`);
+      assert(!personalPage.body.includes(removedBoundary), `Personal page still exposes obsolete disabled copy: ${removedBoundary}`);
     }
-    assert(!personalPage.body.includes("Architecture Guardrails"), "Personal Ops Command still renders the obsolete static architecture mockup");
-    assert(!personalPage.body.includes("Native Database"), "Personal Ops Command still renders the obsolete fake native-database card");
-    assert(!personalPage.body.includes('href="/admin/personal/obligations"'), "Personal Ops Command navigation retained Obligations");
-    pass("Personal Ops Command loads with the native operating queue and explicit unfinished boundaries");
+    assert(!personalPage.body.includes("Architecture Guardrails"), "Personal Command still renders the obsolete static architecture mockup");
+    assert(!personalPage.body.includes("Native Database"), "Personal Command still renders the obsolete fake native-database card");
+    assert(!personalPage.body.includes('href="/admin/personal/obligations"'), "Personal Command navigation retained Obligations");
+    pass("Personal Command loads with the native operating queue and explicit unfinished boundaries");
 
     const personalOpsRoutes = [
       {
@@ -12472,7 +12471,7 @@ async function main() {
         label: "Capture Inbox",
         expected: [
           "Capture Inbox",
-          "Raw inputs, quick captures, and triage into native Personal Ops objects.",
+          "Raw inputs, quick captures, and triage into native Personal objects.",
           "Raw capture text is immutable.",
           "Process Inbox"
         ]
@@ -12515,26 +12514,26 @@ async function main() {
     ];
     for (const route of personalOpsRoutes) {
       const page = await requestText(server.baseUrl, cookieJar, route.pathname);
-      assert(page.response.ok, `Personal Ops ${route.label} page failed: ${describeStatus(page.response)}`);
+      assert(page.response.ok, `Personal ${route.label} page failed: ${describeStatus(page.response)}`);
       for (const expected of route.expected) {
-        assert(page.body.includes(expected), `Personal Ops ${route.label} page missing expected text: ${expected}`);
+        assert(page.body.includes(expected), `Personal ${route.label} page missing expected text: ${expected}`);
       }
       if (route.label === "Decisions") {
         assert(
           !page.body.includes("Durable choices with rationale, reversibility, provenance, and explicit review state."),
-          "Personal Ops Decisions retained the removed explanatory header copy"
+          "Personal Decisions retained the removed explanatory header copy"
         );
       }
       if (route.label === "Passwords") {
         assert(
           !page.body.includes("Encrypted credentials available inside your authenticated admin session.") &&
             !page.body.includes("Protected at rest") &&
-            !page.body.includes("Personal Ops / Command"),
-          "Personal Ops Passwords retained removed explanatory copy"
+            !page.body.includes("Personal / Command"),
+          "Personal Passwords retained removed explanatory copy"
         );
       }
     }
-    pass("All canonical Personal Ops routes load through one shared shell with explicit advanced safety boundaries");
+    pass("All canonical Personal routes load through one shared shell with explicit advanced safety boundaries");
 
     const passwordCsrfToken = cookieJar.get("admin_csrf");
     const passwordWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
@@ -12581,7 +12580,7 @@ async function main() {
     await checkPersonalPasswordsBrowserState(server.baseUrl, cookieJar, syntheticCredentialTitle);
     pass("Password ledger and editor preserve the compact icon language, responsive layout, editable international phone code, masked secret fields, and centered close control");
     await checkPersonalOpsCommandBrowserState(server.baseUrl, cookieJar);
-    pass("Personal Ops Command keeps secondary systems in an icon dock, aligns concise top actions with search/filter/sort, and renders the AI assistant as opaque frosted workspace chrome");
+    pass("Personal Command keeps secondary systems in an icon dock, aligns concise top actions with search/filter/sort, and renders the AI assistant as opaque frosted workspace chrome");
     const updatedCredential = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
       method: "PATCH",
       headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
@@ -12698,7 +12697,8 @@ async function main() {
         initialStyleGuide.payload?.state?.typography?.length >= 6 &&
         initialStyleGuide.payload?.state?.colors?.length >= 18 &&
         initialStyleGuide.payload?.state?.modules?.length === 9 &&
-        initialStyleGuide.payload?.state?.icons?.length === 85 &&
+        initialStyleGuide.payload?.state?.icons?.length === 94 &&
+        ["module-projects", "module-notes", "module-people", "module-media", "module-personal", "module-reviews", "module-resources", "module-finance", "module-vault"].every((role) => initialStyleGuide.payload.state.icons.some((item) => item.icon === role)) &&
         initialStyleGuide.payload.state.icons.every((item) => item.usage),
       "Style Guide defaults did not expose the expanded design foundation"
     );
@@ -12805,9 +12805,9 @@ async function main() {
     const personalOpsAfterRouteReads = await readFile(personalOpsDataPath, "utf8");
     assert(
       personalOpsAfterRouteReads === migratedV1SeedJson,
-      "Reading authenticated Personal Ops routes rewrote the schema v1 seed before a user mutation"
+      "Reading authenticated Personal routes rewrote the schema v1 seed before a user mutation"
     );
-    pass("Schema v1 Personal Ops route reads normalize in memory without writing the isolated store");
+    pass("Schema v1 Personal route reads normalize in memory without writing the isolated store");
 
     const projectsPage = await requestText(server.baseUrl, cookieJar, "/admin/projects");
     assert(projectsPage.response.ok, `Projects page failed: ${describeStatus(projectsPage.response)}`);
@@ -13240,11 +13240,11 @@ async function main() {
     }
 
     const personalTravelPage = await requestText(server.baseUrl, cookieJar, "/admin/personal/travel");
-    assert(personalTravelPage.response.ok, `Personal Ops Travel page failed: ${describeStatus(personalTravelPage.response)}`);
+    assert(personalTravelPage.response.ok, `Personal Travel page failed: ${describeStatus(personalTravelPage.response)}`);
     for (const expected of ["Travel", "Add trip", "Trip ledger", "Loading the world map", "Been", "Lima"]) {
-      assert(personalTravelPage.body.includes(expected), `Personal Ops Travel page missing expected text: ${expected}`);
+      assert(personalTravelPage.body.includes(expected), `Personal Travel page missing expected text: ${expected}`);
     }
-    pass("Personal Ops Travel loads its map-first atlas and trip ledger");
+    pass("Personal Travel loads its map-first atlas and trip ledger");
 
     const entityPage = await requestText(server.baseUrl, cookieJar, "/admin/entities/unigentamos");
     assert(entityPage.response.ok, `Entity page failed: ${describeStatus(entityPage.response)}`);
@@ -13926,7 +13926,7 @@ async function main() {
     );
     pass("Project completion remains explicitly disabled while reversible archive, restore, audit, and detail reload work");
 
-    logStep("Checking native Personal Ops persistence, validation, and audit boundaries");
+    logStep("Checking native Personal persistence, validation, and audit boundaries");
     const rejectPersonalOpsCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
       method: "POST",
       headers: {
@@ -13941,9 +13941,9 @@ async function main() {
     });
     assert(
       rejectPersonalOpsCsrf.response.status === 403 && !rejectPersonalOpsCsrf.payload?.ok,
-      `Native Personal Ops POST accepted a missing CSRF header: ${JSON.stringify(rejectPersonalOpsCsrf.payload)}`
+      `Native Personal POST accepted a missing CSRF header: ${JSON.stringify(rejectPersonalOpsCsrf.payload)}`
     );
-    pass("Secondary Personal Ops mutations reject missing CSRF proof");
+    pass("Secondary Personal mutations reject missing CSRF proof");
 
     const initialPersonalOpsState = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops");
     assert(
@@ -13957,11 +13957,11 @@ async function main() {
         initialPersonalOpsState.payload.state.routines?.length === 0 &&
         initialPersonalOpsState.payload.state.captures?.length === 0 &&
         initialPersonalOpsState.payload.state.templates?.length === 0,
-      `Native Personal Ops state did not load: ${JSON.stringify(initialPersonalOpsState.payload)}`
+      `Native Personal state did not load: ${JSON.stringify(initialPersonalOpsState.payload)}`
     );
     assert(
       (await readFile(personalOpsDataPath, "utf8")) === migratedV1SeedJson,
-      "Reading schema v1 through the Personal Ops API wrote schema v2 before a successful mutation"
+      "Reading schema v1 through the Personal API wrote schema v2 before a successful mutation"
     );
     pass("Schema v1 reads return an additive schema v2 view with all core counts preserved and no disk write");
 
@@ -13976,7 +13976,7 @@ async function main() {
         family: "goals",
         input: {
           title: nativeGoalTitle,
-          outcome: "Prove that a native Personal Ops Goal survives an isolated reload.",
+          outcome: "Prove that a native Personal Goal survives an isolated reload.",
           domain: "Personal Admin",
           lifecycle: "active",
           health: "healthy",
@@ -14016,9 +14016,9 @@ async function main() {
         migratedPersonalOpsFile.auditEvents?.filter(
           (event) => event.action === "personal_ops.schema_migrated_v1_to_v2"
         ).length === 1,
-      `The first successful Personal Ops write did not persist one additive migration with preserved counts: ${JSON.stringify(migratedPersonalOpsFile)}`
+      `The first successful Personal write did not persist one additive migration with preserved counts: ${JSON.stringify(migratedPersonalOpsFile)}`
     );
-    pass("The first successful Personal Ops write persists schema v2 once, preserves v1 counts, and records migration audit");
+    pass("The first successful Personal write persists schema v2 once, preserves v1 counts, and records migration audit");
 
     const updatedNativeGoalTitle = `${nativeGoalTitle}-updated`;
     const updateNativeGoal = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
@@ -14058,7 +14058,7 @@ async function main() {
     });
     assert(
       rejectStaleNativeGoal.response.status === 409 && rejectStaleNativeGoal.payload?.code === "stale",
-      `Native Personal Ops accepted a stale overwrite: ${JSON.stringify(rejectStaleNativeGoal.payload)}`
+      `Native Personal accepted a stale overwrite: ${JSON.stringify(rejectStaleNativeGoal.payload)}`
     );
     pass("Native Goal create/update flow enforces optimistic concurrency");
 
@@ -14117,7 +14117,7 @@ async function main() {
     const decisionConversionKey = `${testRunId}-decision-conversion`;
     const nativeDecisionInput = {
       title: `${testRunId}-native-decision`,
-      question: "Should this explicit legacy candidate become a durable Personal Ops Decision?",
+      question: "Should this explicit legacy candidate become a durable Personal Decision?",
       domain: "Personal Admin",
       lifecycle: "active",
       decisionState: "open",
@@ -14204,7 +14204,7 @@ async function main() {
       `Converted Note Decisions route failed: ${describeStatus(convertedNoteDecisionTab.response)}`
     );
     for (const expected of [
-      "Filed in Personal Ops",
+      "Filed in Personal",
       nativeDecision.title,
       "Decided",
       "Outputs created from this Note",
@@ -14224,7 +14224,7 @@ async function main() {
       convertedDecisionOwnerRoute.response.ok && convertedDecisionOwnerRoute.body.includes(nativeDecision.title),
       "The durable Decision owner route did not render the converted object"
     );
-    pass("Converted Notes Decisions reopen their durable Personal Ops owner object without duplicating the source");
+    pass("Converted Notes Decisions reopen their durable Personal owner object without duplicating the source");
 
     const nativeObligationTitle = `${testRunId}-native-obligation`;
     const obligationEvidenceLabel = "Regression completion evidence";
@@ -14381,7 +14381,7 @@ async function main() {
       rejectDuplicateSourceFollowUp.response.status === 409 &&
         rejectDuplicateSourceFollowUp.payload?.code === "conflict" &&
         rejectDuplicateSourceFollowUp.payload?.fieldErrors?.sourceRefs,
-      `Personal Ops accepted an unconfirmed duplicate source: ${JSON.stringify(rejectDuplicateSourceFollowUp.payload)}`
+      `Personal accepted an unconfirmed duplicate source: ${JSON.stringify(rejectDuplicateSourceFollowUp.payload)}`
     );
 
     const createConfirmedDuplicateSourceFollowUp = await requestJson(
@@ -14406,7 +14406,7 @@ async function main() {
     assert(
       createConfirmedDuplicateSourceFollowUp.response.ok &&
         createConfirmedDuplicateSourceFollowUp.payload?.created,
-      `Personal Ops rejected an explicitly confirmed separate follow-up: ${JSON.stringify(createConfirmedDuplicateSourceFollowUp.payload)}`
+      `Personal rejected an explicitly confirmed separate follow-up: ${JSON.stringify(createConfirmedDuplicateSourceFollowUp.payload)}`
     );
     const duplicateSourceState = await requestJson(
       server.baseUrl,
@@ -14423,7 +14423,7 @@ async function main() {
               ref.objectId === nativeFollowUpSourceId
           )
         ).length === 2,
-      `Personal Ops did not preserve the two explicitly distinct follow-ups: ${JSON.stringify(duplicateSourceState.payload)}`
+      `Personal did not preserve the two explicitly distinct follow-ups: ${JSON.stringify(duplicateSourceState.payload)}`
     );
     const duplicateSourceAudit = await requestJson(
       server.baseUrl,
@@ -14437,7 +14437,7 @@ async function main() {
             event.action === "follow_up.created_with_duplicate_source_confirmation" &&
             event.object?.objectId === createConfirmedDuplicateSourceFollowUp.payload.item.id
         ),
-      "Personal Ops did not audit the explicit duplicate-source confirmation"
+      "Personal did not audit the explicit duplicate-source confirmation"
     );
     await checkPersonalOpsSourceDuplicateBrowserState(
       server.baseUrl,
@@ -14522,7 +14522,7 @@ async function main() {
             mapping.nativeRef?.objectId === nativeDecision.id
         ) &&
         persistedPersonalOpsState?.auditEvents?.length >= 9,
-      `Native Personal Ops state did not preserve objects, mapping, and audit events: ${JSON.stringify(persistedPersonalOpsState)}`
+      `Native Personal state did not preserve objects, mapping, and audit events: ${JSON.stringify(persistedPersonalOpsState)}`
     );
 
     const archivedGoalPage = await requestText(
@@ -14532,9 +14532,9 @@ async function main() {
     );
     assert(archivedGoalPage.response.ok, `Archived Goals route failed: ${describeStatus(archivedGoalPage.response)}`);
     assert(archivedGoalPage.body.includes(updatedNativeGoalTitle), "Soft-archived Goal was missing after authenticated route reload");
-    pass("Native Personal Ops soft archive preserves object history, audit, provenance, and route reload state");
+    pass("Native Personal soft archive preserves object history, audit, provenance, and route reload state");
 
-    logStep("Checking advanced Personal Ops definitions, previews, confirmations, and fail-closed boundaries");
+    logStep("Checking advanced Personal definitions, previews, confirmations, and fail-closed boundaries");
     const personalOpsPost = (body) => requestJson(server.baseUrl, cookieJar, "/api/personal/ops", {
       method: "POST",
       headers: {
@@ -14553,7 +14553,7 @@ async function main() {
     });
     const readAdvancedPersonalOpsState = async () => {
       const result = await requestJson(server.baseUrl, cookieJar, "/api/personal/ops");
-      assert(result.response.ok && result.payload?.ok, `Advanced Personal Ops state failed to load: ${JSON.stringify(result.payload)}`);
+      assert(result.response.ok && result.payload?.ok, `Advanced Personal state failed to load: ${JSON.stringify(result.payload)}`);
       return result.payload.state;
     };
 
@@ -14680,7 +14680,7 @@ async function main() {
       inactiveRoutineStateAfterPreview.routines?.find((item) => item.id === routineDraft.id)?.updatedAt === routineDraft.updatedAt &&
         inactiveRoutineStateAfterPreview.auditEvents?.length === inactiveRoutineStateBeforePreview.auditEvents?.length &&
         inactiveRoutineStateAfterPreview.followUps?.length === inactiveRoutineStateBeforePreview.followUps?.length,
-      "Draft Routine preview mutated the isolated Personal Ops store"
+      "Draft Routine preview mutated the isolated Personal store"
     );
 
     const activateRoutine = await personalOpsPatch({
@@ -15527,11 +15527,11 @@ async function main() {
         persistedAdvancedState.auditEvents?.some((event) => event.action === "routine.run_confirmed") &&
         persistedAdvancedState.auditEvents?.some((event) => event.action === "capture_item.processed") &&
         persistedAdvancedState.auditEvents?.some((event) => event.action === "template.instantiated"),
-      `Advanced Personal Ops state or audit did not persist: ${JSON.stringify(persistedAdvancedState)}`
+      `Advanced Personal state or audit did not persist: ${JSON.stringify(persistedAdvancedState)}`
     );
     pass("Template tests remain pure and honest; activation, confirmed use, fingerprint idempotency, schema independence, archive/restore, and deprecation guards work");
 
-    logStep("Checking Personal Ops record persistence");
+    logStep("Checking Personal record persistence");
     const personalRecordTitle = `${testRunId}-travel-record`;
     const createPersonalRecord = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
       method: "POST",
@@ -15574,7 +15574,7 @@ async function main() {
         !("tags" in item) &&
         !("relatedDomains" in item)
     );
-    assert(savedPersonalRecord, "Saved Personal Ops record was not returned by domain GET with the full property model");
+    assert(savedPersonalRecord, "Saved Personal record was not returned by domain GET with the full property model");
 
     const personalRecordDetail = await requestText(
       server.baseUrl,
@@ -15585,7 +15585,7 @@ async function main() {
     for (const expected of [personalRecordTitle, "All Properties", "Created_YearMonth", "Created_Quarter", "Review_Cadence"]) {
       assert(personalRecordDetail.body.includes(expected), `Personal record detail missing expected text: ${expected}`);
     }
-    pass("Legacy Personal Ops record create/read and canonical detail flow remain compatible beside the native Travel atlas");
+    pass("Legacy Personal record create/read and canonical detail flow remain compatible beside the native Travel atlas");
 
     logStep("Checking People adapter persistence and direct routes");
     const organizationTitle = `${testRunId}-research-studio`;
@@ -16208,7 +16208,7 @@ async function main() {
           input: {
             title: peopleBridgeFollowUpTitle,
             followUpType: "person_check_in",
-            context: "Verify that People reads current status from the Personal Ops-owned object.",
+            context: "Verify that People reads current status from the Personal-owned object.",
             lifecycle: "active",
             followUpState: "scheduled",
             priority: "medium",
@@ -16237,7 +16237,7 @@ async function main() {
       { id: createdPerson.id, title: updatedPersonTitle },
       createPeopleBridgeFollowUp.payload.item
     );
-    pass("People reads current Personal Ops Follow-up status without duplicate ownership and preserves owner-route history");
+    pass("People reads current Personal Follow-up status without duplicate ownership and preserves owner-route history");
 
     logStep("Checking Notes adapter persistence and canonical editor route");
     const sharedContentSourceUrl = "https://example.com/regression-content-source";
@@ -17069,7 +17069,7 @@ async function main() {
         createMediaUsageFollowUp.payload?.item?.sourceRefs?.some(
           (reference) => reference.module === "media" && reference.objectId === createdMedia.id
         ),
-      `Media-backed Personal Ops reference failed: ${JSON.stringify(createMediaUsageFollowUp.payload)}`
+      `Media-backed Personal reference failed: ${JSON.stringify(createMediaUsageFollowUp.payload)}`
     );
     const mediaUsageFollowUp = createMediaUsageFollowUp.payload.item;
 
@@ -17883,7 +17883,7 @@ async function main() {
       );
     }
     assert(mediaUsageProjectLink.id && mediaUsageFollowUp.id, "Media reference fixtures lost their stable source identities");
-    pass("Media In Use indexes Project and Personal Ops owner references without creating AssetUsage");
+    pass("Media In Use indexes Project and Personal owner references without creating AssetUsage");
 
     const alphaDuplicates = await requestText(
       server.baseUrl,
@@ -19485,7 +19485,7 @@ async function main() {
     );
     assert(
       countRenderedToken(mediaInUseWithReview.body, ">Open owner</a>") >= 3,
-      "Media In Use did not expose first-class owner navigation for Project, Review, and Personal Ops locations"
+      "Media In Use did not expose first-class owner navigation for Project, Review, and Personal locations"
     );
     await checkMediaInUseBrowserState(server.baseUrl, cookieJar, mediaTitle);
     const mediaSourceAfterInUseReads = await requestJson(
@@ -19529,7 +19529,7 @@ async function main() {
             destinationObjectType: "follow_up",
             ownerId: "Codex Regression",
             reason: "The next phase remains outside this ReviewRun.",
-            nextAction: "Create or link the Personal Ops follow-up before the next review.",
+            nextAction: "Create or link the Personal follow-up before the next review.",
             dueDate: "2026-07-20",
             state: "assigned"
           }
@@ -19616,8 +19616,8 @@ async function main() {
     weeklyReviewRun = crossModuleFollowUpResult.run;
     weeklyReviewView = crossModuleFollowUpResult.view;
     let reviewFollowUpOwner = crossModuleFollowUpResult.reviewOwner;
-    pass("Projects, Milestones, Blockers, Notes, and Reviews share exact Personal Ops Follow-up owner state without duplicate native objects");
-    pass("Resources and Media share current Personal Ops Follow-up owner state with duplicate-safe handoffs and recoverable refresh failures");
+    pass("Projects, Milestones, Blockers, Notes, and Reviews share exact Personal Follow-up owner state without duplicate native objects");
+    pass("Resources and Media share current Personal Follow-up owner state with duplicate-safe handoffs and recoverable refresh failures");
 
     const addReviewDecisionCandidate = await requestJson(
       server.baseUrl,
@@ -19636,7 +19636,7 @@ async function main() {
             action: "upsert_decision",
             decision: {
               title: `${testRunId} review decision candidate`,
-              question: "Should the source-backed operating choice be filed as a durable Personal Ops Decision?",
+              question: "Should the source-backed operating choice be filed as a durable Personal Decision?",
               sourceRef: {
                 module: "projects",
                 objectType: "project",
@@ -19655,7 +19655,7 @@ async function main() {
               rationale: "",
               recommendation: "Retain a single durable owner and link it back to this Review.",
               alternatives: ["Leave the choice as an unowned review note"],
-              reversalCondition: "Supersede the Personal Ops Decision if the underlying project evidence changes.",
+              reversalCondition: "Supersede the Personal Decision if the underlying project evidence changes.",
               evidenceIds: [],
               required: true,
               blocksCompletion: true,
@@ -19691,8 +19691,8 @@ async function main() {
     );
     weeklyReviewRun = crossModuleDecisionResult.run;
     weeklyReviewView = crossModuleDecisionResult.view;
-    pass("Projects, Milestones, Blockers, Reviews, and Finance share exact Personal Ops Decision state while preserving module ownership");
-    pass("Project timeline rows and child inspectors reconcile Personal Ops owner state with Review coverage without duplicate native objects");
+    pass("Projects, Milestones, Blockers, Reviews, and Finance share exact Personal Decision state while preserving module ownership");
+    pass("Project timeline rows and child inspectors reconcile Personal owner state with Review coverage without duplicate native objects");
 
     await checkPeopleProjectConnections(
       server.baseUrl,
@@ -19751,7 +19751,7 @@ async function main() {
           expectedUpdatedAt: reviewFollowUpOwner.updatedAt,
           patch: {
             lifecycle: "archived",
-            archiveReason: "Regression verifies Reviews rejects an archived Personal Ops owner."
+            archiveReason: "Regression verifies Reviews rejects an archived Personal owner."
           }
         })
       }
@@ -19771,7 +19771,7 @@ async function main() {
     assert(
       archivedOwnerReviewPage.response.ok &&
         archivedOwnerReviewPage.body.includes("Linked Follow-up is archived") &&
-        archivedOwnerReviewPage.body.includes("has an archived Personal Ops owner") &&
+        archivedOwnerReviewPage.body.includes("has an archived Personal owner") &&
         archivedOwnerReviewPage.body.includes("Create current replacement"),
       `Reviews did not expose the archived owner and its recoverable actions: ${describeStatus(archivedOwnerReviewPage.response)}`
     );
@@ -19867,7 +19867,7 @@ async function main() {
       `Review Follow-up owner restore failed: ${JSON.stringify(restoreReviewFollowUpOwner.payload)}`
     );
     reviewFollowUpOwner = restoreReviewFollowUpOwner.payload.item;
-    pass("Reviews blocks archived or unavailable Personal Ops Follow-up owners and preserves an explicit restore or relink path");
+    pass("Reviews blocks archived or unavailable Personal Follow-up owners and preserves an explicit restore or relink path");
 
     assert(
       weeklyReviewView?.canComplete === true && weeklyReviewView.blockers?.length === 0,
@@ -20272,7 +20272,7 @@ async function main() {
       "Budget variance decisions resolved",
       "Carry-forward destinations selected",
       "Project blockers assigned",
-      "Personal Ops decisions created",
+      "Personal decisions created",
       "Evidence linked to high-risk decisions",
       "Waived decisions have reasons",
       "Deferred decisions have review dates",

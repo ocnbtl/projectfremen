@@ -1,4 +1,4 @@
-/* Purpose-built working surfaces inside the existing Personal Ops command shell. */
+/* Purpose-built working surfaces inside the existing Personal command shell. */
 .scroll { min-height: 0; flex: 1; overflow: auto; background: var(--panel-bg); color: var(--text); }
 .pageHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: center; padding: 20px 22px 14px; border-bottom: 1px solid var(--border); }
 .pageHeader span, .editor header span { color: var(--text-muted); font: 800 10px/1.2 var(--font-heading); letter-spacing: .09em; text-transform: uppercase; }

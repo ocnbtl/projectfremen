@@ -167,7 +167,7 @@ export default function NoteDecisionsView({
       {
         id: "outcome",
         label: "Proposed outcome",
-        detail: draft.outcome.trim() ? "The proposed outcome will remain open for review in Personal Ops." : "Add the current recommendation or outcome.",
+        detail: draft.outcome.trim() ? "The proposed outcome will remain open for review in Personal." : "Add the current recommendation or outcome.",
         complete: Boolean(draft.outcome.trim())
       },
       {
@@ -224,7 +224,7 @@ export default function NoteDecisionsView({
     setNotice("");
     if (!candidateOpen) return;
     if (loadError) {
-      setError("Personal Ops ownership could not be checked. Filing is blocked to prevent a duplicate Decision.");
+      setError("Personal ownership could not be checked. Filing is blocked to prevent a duplicate Decision.");
       return;
     }
     if (blockers.length) {
@@ -278,8 +278,8 @@ export default function NoteDecisionsView({
     setConfirmationOpen(false);
     setNotice(
       result.data.created
-        ? "Decision filed in Personal Ops. The source Note body was not changed."
-        : "The existing Personal Ops conversion was reopened; no duplicate was created."
+        ? "Decision filed in Personal. The source Note body was not changed."
+        : "The existing Personal conversion was reopened; no duplicate was created."
     );
   }
 
@@ -289,12 +289,12 @@ export default function NoteDecisionsView({
         <SystemState
           variant="read_only"
           title="No Note-owned decision candidate"
-          description="This Note is not classified as a legacy decision candidate. You can open a new Personal Ops Decision with this Note as source context, but Notes will not relabel the Note or invent a candidate."
+          description="This Note is not classified as a legacy decision candidate. You can open a new Personal Decision with this Note as source context, but Notes will not relabel the Note or invent a candidate."
         />
         <section className={styles.boundary}>
           <strong>Object boundary</strong>
-          <span>Notes keeps the authored source. Personal Ops owns any durable Decision created from it.</span>
-          <Link href={personalOpsDecisionsRoute}>Open Personal Ops Decisions</Link>
+          <span>Notes keeps the authored source. Personal owns any durable Decision created from it.</span>
+          <Link href={personalOpsDecisionsRoute}>Open Personal Decisions</Link>
         </section>
       </div>
     );
@@ -320,7 +320,7 @@ export default function NoteDecisionsView({
                       intent: "primary" as const,
                       disabled: Boolean(loadError || brokenMapping),
                       disabledReason: loadError
-                        ? "Personal Ops ownership could not be checked, so filing is blocked to prevent duplicates."
+                        ? "Personal ownership could not be checked, so filing is blocked to prevent duplicates."
                         : brokenMapping
                           ? "The existing mapping must be repaired before another Decision can be filed."
                           : undefined
@@ -336,7 +336,7 @@ export default function NoteDecisionsView({
                 id: "follow-up",
                 label: "Create Follow-up",
                 disabled: true,
-                disabledReason: "Follow-up creation from a Note candidate needs a separate explicit Personal Ops preview."
+                disabledReason: "Follow-up creation from a Note candidate needs a separate explicit Personal preview."
               },
               {
                 id: "review",
@@ -364,7 +364,7 @@ export default function NoteDecisionsView({
       {loadError && (
         <SystemState
           variant="error"
-          title="Personal Ops ownership check unavailable"
+          title="Personal ownership check unavailable"
           description={`${loadError} The candidate remains readable, but filing is blocked so a duplicate native Decision cannot be created.`}
         />
       )}
@@ -385,7 +385,7 @@ export default function NoteDecisionsView({
               <span className={styles.initial} aria-hidden="true">D</span>
               <span>
                 <strong>{note.title}</strong>
-                <small>Personal Ops / Decisions · source Note preserved</small>
+                <small>Personal / Decisions · source Note preserved</small>
               </span>
               <span className={styles.state} data-tone={blockers.length ? "attention" : "ready"}>
                 {blockers.length ? `${blockers.length} open` : "Ready"}
@@ -398,7 +398,7 @@ export default function NoteDecisionsView({
               <span>
                 {brokenMapping
                   ? "The audit mapping remains visible, but its target Decision could not be found."
-                  : "A durable Personal Ops Decision now represents this candidate."}
+                  : "A durable Personal Decision now represents this candidate."}
               </span>
             </div>
           )}
@@ -411,7 +411,7 @@ export default function NoteDecisionsView({
                 <button
                   type="button"
                   aria-disabled="true"
-                  onClick={() => explainUnavailable("Relinking is unavailable until Personal Ops can validate and audit a replacement target.")}
+                  onClick={() => explainUnavailable("Relinking is unavailable until Personal can validate and audit a replacement target.")}
                 >
                   Repair unavailable
                 </button>
@@ -452,7 +452,7 @@ export default function NoteDecisionsView({
           <div className={styles.sectionHeader}>
             <div>
               <span className={styles.eyebrow}>Existing structured Decision</span>
-              <h2 id={`filed-decision-${note.id}`}>Filed in Personal Ops</h2>
+              <h2 id={`filed-decision-${note.id}`}>Filed in Personal</h2>
             </div>
             <span className={styles.state} data-tone="ready">{cleanLabel(primaryDecision.decisionState)}</span>
           </div>
@@ -633,7 +633,7 @@ export default function NoteDecisionsView({
               <li key={decision.id}>
                 <span>
                   <strong>{decision.title}</strong>
-                  <small>Personal Ops Decision · {cleanLabel(decision.decisionState)}</small>
+                  <small>Personal Decision · {cleanLabel(decision.decisionState)}</small>
                 </span>
                 <Link href={getNativeObjectRoute({ module: "personal_ops", objectType: "decision", objectId: decision.id })}>
                   Open
@@ -662,7 +662,7 @@ export default function NoteDecisionsView({
         <button
           type="button"
           aria-disabled="true"
-          onClick={() => explainUnavailable("Follow-up creation requires a separate Personal Ops preview and confirmation.")}
+          onClick={() => explainUnavailable("Follow-up creation requires a separate Personal preview and confirmation.")}
         >
           Follow-up unavailable
         </button>
@@ -680,10 +680,10 @@ export default function NoteDecisionsView({
         onOpenChange={setConfirmationOpen}
         onConfirm={confirmConversion}
         title="File this durable Decision?"
-        description="Personal Ops will become the owner of one structured Decision while Notes remains the owner of the source candidate."
+        description="Personal will become the owner of one structured Decision while Notes remains the owner of the source candidate."
         consequences={[
           "The source Note title, body, lifecycle, and review state remain unchanged.",
-          "One Personal Ops Decision, one source mapping, and one audit event are created.",
+          "One Personal Decision, one source mapping, and one audit event are created.",
           "Repeating this confirmed conversion key reopens the existing Decision instead of creating a duplicate.",
           "No Follow-up, Project item, or Review attachment is created automatically."
         ]}
@@ -695,7 +695,7 @@ export default function NoteDecisionsView({
       >
         <dl className={styles.confirmationFacts}>
           <div><dt>Decision</dt><dd>{draft.title}</dd></div>
-          <div><dt>Owner</dt><dd>Personal Ops</dd></div>
+          <div><dt>Owner</dt><dd>Personal</dd></div>
           <div><dt>Source</dt><dd>Note · {note.title}</dd></div>
           <div><dt>State</dt><dd>Open</dd></div>
         </dl>

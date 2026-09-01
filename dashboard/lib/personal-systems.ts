@@ -268,8 +268,8 @@ export const PERSONAL_SYSTEM_DOMAINS: PersonalSystemDomain[] = [
 
 export const PERSONAL_SYSTEM_GUARDRAILS = [
   "Founder-only admin surface attached to the existing command center.",
-  "No new auth middleware, public endpoints, or production network calls for Personal Ops notes.",
-  "Personal Ops notes use the existing app_state persistence layer.",
+  "No new auth middleware, public endpoints, or production network calls for Personal notes.",
+  "Personal notes use the existing app_state persistence layer.",
   "Sensitive domains use manual, minimized notes until a stricter model is needed."
 ];
 

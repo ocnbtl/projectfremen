@@ -148,7 +148,7 @@ type OpenForm = {
 
 const VIEW_COPY: Record<PersonalOpsView, { title: string; description: string; family?: PersonalOpsFamily }> = {
   command: {
-    title: "Personal Ops Command",
+    title: "Personal Command",
     description: ""
   },
   goals: {
@@ -216,7 +216,7 @@ const SOURCE_MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
   media: "Media",
   projects: "Projects",
   notes: "Notes",
-  personal_ops: "Personal Ops",
+  personal_ops: "Personal",
   reviews: "Reviews",
   resources: "Resources",
   finance: "Finance"
@@ -766,7 +766,7 @@ function ObjectForm({
         <header className={styles.sheetHeader}>
           <div>
             <h2 id={titleId}>{editing ? `Edit ${familyLabel}` : `New ${familyLabel}`}</h2>
-            <p>{form.sourceLabel ? `Source: ${form.sourceLabel}` : "Saved to the native Personal Ops ledger."}</p>
+            <p>{form.sourceLabel ? `Source: ${form.sourceLabel}` : "Saved to the native Personal ledger."}</p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close form">
             <PersonalOpsIcon name="close" />
@@ -811,7 +811,7 @@ function ObjectForm({
                   />
                   <span>
                     <strong>I need a separate follow-up for this source</strong>
-                    <small>The confirmation is recorded in Personal Ops audit history.</small>
+                    <small>The confirmation is recorded in Personal audit history.</small>
                   </span>
                 </label>
               </section>
@@ -1529,7 +1529,7 @@ export default function PersonalOpsWorkspace({
 
       <main className={styles.directory} aria-label={`${VIEW_COPY[initialView].title} ledger`}>
         <div className={styles.mobileToolbar}>
-          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal Ops</button>
+          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal</button>
           <button type="button" onClick={() => openCreate(primaryFamily)}><PersonalOpsIcon name="plus" /> {FAMILY_LABELS[primaryFamily]}</button>
         </div>
         <div className={styles.mainScroll}>
@@ -1570,7 +1570,7 @@ export default function PersonalOpsWorkspace({
                 </div>
               </details>
               {initialView === "command" ? (
-                <div className={styles.commandCreateActions} aria-label="Create Personal Ops object">
+                <div className={styles.commandCreateActions} aria-label="Create Personal object">
                   <button type="button" className={styles.primaryButton} onClick={() => openCreate("followUps")}><PersonalOpsIcon name="plus" />Follow-up</button>
                   <button type="button" className={styles.button} onClick={() => openCreate("decisions")}><PersonalOpsIcon name="plus" />Decision</button>
                   <button type="button" className={styles.button} onClick={() => openCreate("obligations")}><PersonalOpsIcon name="plus" />Obligation</button>
@@ -1607,7 +1607,7 @@ export default function PersonalOpsWorkspace({
           {notice && <div className={styles.notice} role="status" style={{ margin: "0 16px 10px" }}>{notice}</div>}
 
           {initialLoadError ? (
-            <SystemState variant="error" title="Personal Ops could not load" description={initialLoadError} />
+            <SystemState variant="error" title="Personal could not load" description={initialLoadError} />
           ) : scopedItems.length === 0 ? (
             <SystemState
               variant="empty"

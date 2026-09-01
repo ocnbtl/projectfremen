@@ -11,14 +11,14 @@ export default async function AdminObsidianPage() {
     <main className="shell admin-chrome-main">
       <AdminChrome
         sidebarTitle="Legacy Export"
-        sidebarSummary="Obsidian export remains available, but Personal Ops is now dashboard-native."
+        sidebarSummary="Obsidian export remains available, but Personal is now dashboard-native."
         sidebarItems={[
           { label: "Direction", value: "Export only" },
           { label: "Primary notes", value: "Unigentamos" }
         ]}
         sidebarActions={[
           { label: "Native Notes", href: "/admin/notes" },
-          { label: "Personal Ops", href: "/admin/personal" }
+          { label: "Personal", href: "/admin/personal" }
         ]}
       />
       <header className="topbar">

@@ -294,7 +294,7 @@ export async function updatePersonalLifeObject<Collection extends PersonalLifeCo
   return mutateJsonFile<unknown, PersonalLifeObjectByCollection[Collection]>(FILE_NAME, emptyPersonalLifeState(), (raw) => {
     const state = normalizeState(raw);
     const current = state[collection].find((item) => item.id === id) as PersonalLifeObjectByCollection[Collection] | undefined;
-    if (!current) throw new Error("Personal Ops record was not found");
+    if (!current) throw new Error("Personal record was not found");
     if (current.updatedAt !== expectedUpdatedAt) throw new Error("This record changed after it was opened. Refresh and try again.");
     const now = new Date().toISOString();
     const item = normalizeObject(collection, { ...current, ...patch, id: current.id, createdAt: current.createdAt, updatedAt: now }, now);
@@ -307,7 +307,7 @@ export async function deletePersonalLifeObject(collection: PersonalLifeCollectio
   await mutateJsonFile<unknown, void>(FILE_NAME, emptyPersonalLifeState(), (raw) => {
     const state = normalizeState(raw);
     const current = state[collection].find((item) => item.id === id);
-    if (!current) throw new Error("Personal Ops record was not found");
+    if (!current) throw new Error("Personal record was not found");
     if (current.updatedAt !== expectedUpdatedAt) throw new Error("This record changed after it was opened. Refresh and try again.");
     return { value: { ...state, [collection]: state[collection].filter((item) => item.id !== id) }, result: undefined };
   });

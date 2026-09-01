@@ -561,6 +561,13 @@
 
 .streamlineLink svg { width: 14px; height: 14px; }
 
+.headerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .moduleSystemGrid,
 .iconRegistry { display: grid; }
 

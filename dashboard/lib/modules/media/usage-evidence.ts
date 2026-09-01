@@ -560,7 +560,7 @@ export function buildMediaUsageEvidence({
       relationships: [relationship],
       state: objectReferenceState(item),
       updatedAt: item.updatedAt,
-      caveat: "Personal Ops retains this explicit reference for operating context. It is not proof of public visibility, active delivery usage, or version replacement safety."
+      caveat: "Personal retains this explicit reference for operating context. It is not proof of public visibility, active delivery usage, or version replacement safety."
     });
   };
 

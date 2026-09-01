@@ -3117,7 +3117,7 @@ export default function ProjectsWorkspace({
       : confirmation?.kind === "project-restore"
         ? "The project will return to active views. Existing history and references remain unchanged."
         : confirmation?.kind === "milestone-complete"
-          ? "The milestone completion will be recorded on the native project timeline. Linked Personal Ops and Reviews records remain unchanged and keep their own lifecycle."
+          ? "The milestone completion will be recorded on the native project timeline. Linked Personal and Reviews records remain unchanged and keep their own lifecycle."
           : confirmation?.kind === "link-remove"
             ? "Only the Project reference will be removed. The source object remains unchanged in its owner module."
             : "The existing typed reference will return to its state from before removal.";

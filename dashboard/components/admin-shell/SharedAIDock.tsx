@@ -29,7 +29,7 @@ const MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
   media: "Media",
   projects: "Projects",
   notes: "Notes",
-  personal_ops: "Personal Ops",
+  personal_ops: "Personal",
   reviews: "Reviews",
   resources: "Resources",
   finance: "Finance"

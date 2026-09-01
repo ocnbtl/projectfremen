@@ -48,14 +48,14 @@ async function requireAvailableFollowUpOwner(
   if (!owner) {
     throw new ReviewsStoreError(
       "conflict",
-      `The linked Personal Ops Follow-up for “${label}” is unavailable. Refresh Personal Ops or link a current owner before continuing.`,
+      `The linked Personal Follow-up for “${label}” is unavailable. Refresh Personal or link a current owner before continuing.`,
       { status: 409 }
     );
   }
   if (!isAvailableFollowUp(owner)) {
     throw new ReviewsStoreError(
       "conflict",
-      `The linked Personal Ops Follow-up for “${label}” is archived. Restore it in Personal Ops or link a current owner before continuing.`,
+      `The linked Personal Follow-up for “${label}” is archived. Restore it in Personal or link a current owner before continuing.`,
       { status: 409 }
     );
   }

@@ -39,7 +39,7 @@ export default function LinkedDecisionsPanel({
   hideWhenEmpty = false,
   className = "",
   wide = false,
-  title = "Personal Ops decisions"
+  title = "Personal decisions"
 }: {
   source: NativeObjectRef;
   decisions: PersonalOpsDecision[];
@@ -75,7 +75,7 @@ export default function LinkedDecisionsPanel({
       {showHeader && (
         <header className={styles.header}>
           <div className={styles.heading}>
-            <span>Personal Ops owner</span>
+            <span>Personal owner</span>
             <strong>{title}</strong>
           </div>
           <button
@@ -116,20 +116,20 @@ export default function LinkedDecisionsPanel({
                   )}
                 </span>
                 <span className={styles.state}>{labelize(decision.decisionState)}</span>
-                <small className={styles.ownerLink}>Open in Personal Ops</small>
+                <small className={styles.ownerLink}>Open in Personal</small>
               </Link>
             </li>
           ))}
           {linked.length > visible.length && (
             <li className={styles.more}>
               {linked.length - visible.length} more linked Decision
-              {linked.length - visible.length === 1 ? "" : "s"} in Personal Ops
+              {linked.length - visible.length === 1 ? "" : "s"} in Personal
             </li>
           )}
         </ul>
       ) : (
         <p className={styles.empty}>
-          No Personal Ops Decision uses this exact source.
+          No Personal Decision uses this exact source.
         </p>
       )}
 
@@ -142,7 +142,7 @@ export default function LinkedDecisionsPanel({
           )}
           {createHref && linked.length === 0 && (
             <Link className={styles.create} href={createHref}>
-              File in Personal Ops
+              File in Personal
             </Link>
           )}
         </div>
@@ -150,7 +150,7 @@ export default function LinkedDecisionsPanel({
 
       {showBoundary && (
         <p className={styles.boundary}>
-          Decision state is read from Personal Ops. The source module remains unchanged.
+          Decision state is read from Personal. The source module remains unchanged.
         </p>
       )}
     </section>

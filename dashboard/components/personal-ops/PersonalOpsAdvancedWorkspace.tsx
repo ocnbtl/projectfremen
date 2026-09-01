@@ -183,7 +183,7 @@ const VIEW_CONFIG: Record<PersonalOpsAdvancedView, {
   inbox: {
     family: "captures",
     title: "Capture Inbox",
-    description: "Raw inputs, quick captures, and triage into native Personal Ops objects.",
+    description: "Raw inputs, quick captures, and triage into native Personal objects.",
     singular: "Capture"
   },
   templates: {
@@ -1114,7 +1114,7 @@ export default function PersonalOpsAdvancedWorkspace({
     await refreshState();
     setOpenForm(null);
     setDraft(null);
-    setNotice(`${config.singular} saved. Persistence was verified through the native Personal Ops repository.`);
+    setNotice(`${config.singular} saved. Persistence was verified through the native Personal repository.`);
     updateUrl({ selected: item.id, tab: "overview" }, true);
     setMobileInspectorOpen(true);
     setBusy(false);
@@ -1279,7 +1279,7 @@ export default function PersonalOpsAdvancedWorkspace({
     else {
       await refreshState();
       setOperation(null);
-      setNotice(result.data.created ? `Template created ${result.data.usage.createdRef.label} in its native Personal Ops collection.` : "This template use was already recorded; no duplicate object was created.");
+      setNotice(result.data.created ? `Template created ${result.data.usage.createdRef.label} in its native Personal collection.` : "This template use was already recorded; no duplicate object was created.");
     }
     setBusy(false);
   }
@@ -1420,7 +1420,7 @@ export default function PersonalOpsAdvancedWorkspace({
 
       <main className={styles.directory} aria-label={`${config.title} ledger`}>
         <div className={styles.mobileToolbar}>
-          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal Ops</button>
+          <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal</button>
           <button type="button" onClick={openCreate}><PersonalOpsIcon name="plus" /> {config.singular}</button>
         </div>
         <div className={styles.mainScroll}>
@@ -1475,9 +1475,9 @@ export default function PersonalOpsAdvancedWorkspace({
           <div className={styles.boundaryBanner} role="note">
             <strong>Safe operating boundary:</strong>{" "}
             {initialView === "routines"
-              ? "Runs are manual, previewed, idempotent, and limited to confirmed destination-native Personal Ops drafts. No scheduler runs in the background."
+              ? "Runs are manual, previewed, idempotent, and limited to confirmed destination-native Personal drafts. No scheduler runs in the background."
               : initialView === "inbox"
-                ? "Raw capture text is immutable. Processing is explicit, atomic for supported Personal Ops outputs, and never performs AI or cross-module mutation."
+                ? "Raw capture text is immutable. Processing is explicit, atomic for supported Personal outputs, and never performs AI or cross-module mutation."
                 : "Templates are definitions. Testing writes nothing; using an active template requires confirmation and never changes prior outputs."}
           </div>
 
@@ -1763,7 +1763,7 @@ export default function PersonalOpsAdvancedWorkspace({
         onOpenChange={(open) => { if (!open && !busy) setOperation(null); }}
         onConfirm={confirmOperation}
         title={operationTitle}
-        description={operation?.kind === "routine" ? "Review each generated destination before recording this manual run." : operation?.kind === "capture-setup" ? "Choose one or more native Personal Ops outputs. The raw capture remains unchanged." : operation?.kind === "capture-preview" ? "All supported outputs will be created together and linked back to the immutable capture source." : operation?.kind === "template-values" ? "Enter values and test the definition. Testing never writes an object." : operation?.kind === "template-preview" ? "The test result below is non-writing. Only an active template can be used after this preview." : undefined}
+        description={operation?.kind === "routine" ? "Review each generated destination before recording this manual run." : operation?.kind === "capture-setup" ? "Choose one or more native Personal outputs. The raw capture remains unchanged." : operation?.kind === "capture-preview" ? "All supported outputs will be created together and linked back to the immutable capture source." : operation?.kind === "template-values" ? "Enter values and test the definition. Testing never writes an object." : operation?.kind === "template-preview" ? "The test result below is non-writing. Only an active template can be used after this preview." : undefined}
         consequences={operation?.kind === "routine" ? ["Confirmed destination-native drafts are created once.", "The run and created references are written to audit history."] : operation?.kind === "capture-preview" ? ["Supported outputs are created atomically.", "Raw text and provenance remain unchanged."] : operation?.kind === "template-preview" && operation.item.availability === "active" ? ["One destination-native object is created.", "Usage and created reference are recorded on this Template."] : undefined}
         confirmLabel={operationConfirmLabel}
         busy={busy}

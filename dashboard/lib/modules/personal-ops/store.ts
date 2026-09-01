@@ -536,7 +536,7 @@ function appendModuleAudits(state: PersonalOpsState, events: readonly AuditEvent
           module: "personal_ops",
           objectType: "personal_ops_schema",
           objectId: "personal-ops",
-          label: "Personal Ops data"
+          label: "Personal data"
         }),
         action: "personal_ops.schema_migrated_v1_to_v2",
         actorId: events[0].actorId,
@@ -570,7 +570,7 @@ function assertStateCollections(
     if (!Array.isArray(value[key])) {
       throw new PersonalOpsStoreError(
         "server",
-        `Personal Ops data is malformed: ${key} must be a collection.`,
+        `Personal data is malformed: ${key} must be a collection.`,
         { status: 500 }
       );
     }
@@ -581,7 +581,7 @@ function normalizeState(value: unknown): PersonalOpsState {
   if (!isRecord(value)) {
     throw new PersonalOpsStoreError(
       "server",
-      "Personal Ops data is malformed and cannot be read safely.",
+      "Personal data is malformed and cannot be read safely.",
       { status: 500 }
     );
   }
@@ -620,7 +620,7 @@ function normalizeState(value: unknown): PersonalOpsState {
   if (value.schemaVersion !== PERSONAL_OPS_SCHEMA_VERSION) {
     throw new PersonalOpsStoreError(
       "server",
-      "Personal Ops data uses an unsupported schema version. A migration is required before writing.",
+      "Personal data uses an unsupported schema version. A migration is required before writing.",
       { status: 500 }
     );
   }
@@ -1027,7 +1027,7 @@ export async function createPersonalOpsObject<Family extends PersonalOpsFamily>(
   options: { actorId?: string; now?: Date } = {}
 ): Promise<PersonalOpsStoreCreateResult<Family>> {
   if (!PERSONAL_OPS_FAMILIES.includes(family)) {
-    validation("Unsupported Personal Ops family", "family");
+    validation("Unsupported Personal family", "family");
   }
   const actorId = options.actorId || "admin";
   const now = (options.now || new Date()).toISOString();
@@ -1332,7 +1332,7 @@ export async function updatePersonalOpsObject<Family extends PersonalOpsFamily>(
   options: { expectedUpdatedAt: string; actorId?: string; now?: Date }
 ): Promise<PersonalOpsStoreUpdateResult<Family>> {
   if (!PERSONAL_OPS_FAMILIES.includes(family)) {
-    validation("Unsupported Personal Ops family", "family");
+    validation("Unsupported Personal family", "family");
   }
   const cleanId = requiredText(id, "id", 240);
   const expectedUpdatedAt = requiredText(options.expectedUpdatedAt, "expectedUpdatedAt", 120);
@@ -1344,7 +1344,7 @@ export async function updatePersonalOpsObject<Family extends PersonalOpsFamily>(
     const collection = collectionFor(state, family);
     const index = collection.findIndex((item) => item.id === cleanId);
     if (index === -1) {
-      throw new PersonalOpsStoreError("not_found", "Personal Ops object not found", { status: 404 });
+      throw new PersonalOpsStoreError("not_found", "Personal object not found", { status: 404 });
     }
     const current = collection[index];
     if (current.updatedAt !== expectedUpdatedAt) {
@@ -1405,7 +1405,7 @@ function normalizeDestination(value: unknown, field: string): PersonalOpsDestina
 
   if (module === "personal_ops") {
     if (!isCoreFamily(value.family)) {
-      validation(`${field}.family must be a core Personal Ops family`, `${field}.family`);
+      validation(`${field}.family must be a core Personal family`, `${field}.family`);
     }
     if (!isRecord(value.input)) validation(`${field}.input must be an object`, `${field}.input`);
     if (hasOwn(value.input, "legacySource")) {
@@ -1530,7 +1530,7 @@ function normalizeCaptureSource(value: unknown, now: string): CaptureSource {
   }
   return {
     kind,
-    label: optionalText(raw.label, "source.label", 240) || "Personal Ops capture",
+    label: optionalText(raw.label, "source.label", 240) || "Personal capture",
     capturedAt: optionalDate(raw.capturedAt, "source.capturedAt") || now,
     sourceRef
   };
@@ -1806,7 +1806,7 @@ function validateRoutine(item: PersonalOpsRoutine, now: string, actorId: string)
   );
   if (item.lifecycle === "active" && enabledCore.length === 0) {
     validation(
-      "An active routine needs at least one enabled, unconditional core Personal Ops destination. Condition evaluation is not connected yet.",
+      "An active routine needs at least one enabled, unconditional core Personal destination. Condition evaluation is not connected yet.",
       "generationRules"
     );
   }
@@ -1860,7 +1860,7 @@ function validateTemplate(item: PersonalOpsTemplate, now: string, actorId: strin
   );
   if (enabledCore.length === 0) {
     validation(
-      "An active template needs at least one enabled core Personal Ops destination",
+      "An active template needs at least one enabled core Personal destination",
       "generatedDefinitions"
     );
   }
@@ -1913,7 +1913,7 @@ export async function listPersonalOpsSecondaryObjects<Family extends PersonalOps
   family: Family
 ): Promise<PersonalOpsSecondaryObjectByFamily[Family][]> {
   if (!PERSONAL_OPS_SECONDARY_FAMILIES.includes(family)) {
-    validation("Unsupported Personal Ops secondary family", "secondaryFamily");
+    validation("Unsupported Personal secondary family", "secondaryFamily");
   }
   const state = await readPersonalOpsState();
   return [...secondaryCollectionFor(state, family)].sort((left, right) =>
@@ -1926,7 +1926,7 @@ export async function readPersonalOpsSecondaryObject<Family extends PersonalOpsS
   id: string
 ): Promise<PersonalOpsSecondaryObjectByFamily[Family] | null> {
   if (!PERSONAL_OPS_SECONDARY_FAMILIES.includes(family)) {
-    validation("Unsupported Personal Ops secondary family", "secondaryFamily");
+    validation("Unsupported Personal secondary family", "secondaryFamily");
   }
   const state = await readPersonalOpsState();
   return secondaryCollectionFor(state, family).find((item) => item.id === id) ?? null;
@@ -1938,7 +1938,7 @@ export async function createPersonalOpsSecondaryObject<Family extends PersonalOp
   options: { actorId?: string; now?: Date } = {}
 ): Promise<PersonalOpsSecondaryStoreCreateResult<Family>> {
   if (!PERSONAL_OPS_SECONDARY_FAMILIES.includes(family)) {
-    validation("Unsupported Personal Ops secondary family", "secondaryFamily");
+    validation("Unsupported Personal secondary family", "secondaryFamily");
   }
   const actorId = options.actorId || "admin";
   const now = (options.now || new Date()).toISOString();
@@ -2200,7 +2200,7 @@ export async function updatePersonalOpsSecondaryObject<Family extends PersonalOp
   options: { expectedUpdatedAt: string; actorId?: string; now?: Date }
 ): Promise<PersonalOpsSecondaryStoreUpdateResult<Family>> {
   if (!PERSONAL_OPS_SECONDARY_FAMILIES.includes(family)) {
-    validation("Unsupported Personal Ops secondary family", "secondaryFamily");
+    validation("Unsupported Personal secondary family", "secondaryFamily");
   }
   const cleanId = requiredText(id, "id", 240);
   validateSecondaryPatch(family, patch);
@@ -2212,7 +2212,7 @@ export async function updatePersonalOpsSecondaryObject<Family extends PersonalOp
     const collection = secondaryCollectionFor(state, family);
     const index = collection.findIndex((item) => item.id === cleanId);
     if (index === -1) {
-      throw new PersonalOpsStoreError("not_found", "Personal Ops object not found", { status: 404 });
+      throw new PersonalOpsStoreError("not_found", "Personal object not found", { status: 404 });
     }
     const current = collection[index];
     if (current.updatedAt !== expectedUpdatedAt) {
@@ -2569,7 +2569,7 @@ export async function confirmPersonalOpsRoutineRun(
       }));
     }
     if (generated.length === 0) {
-      validation("This routine has no confirmed core Personal Ops outputs to create", "ruleIds");
+      validation("This routine has no confirmed core Personal outputs to create", "ruleIds");
     }
 
     const run: RoutineRun = {
@@ -2675,7 +2675,7 @@ function capturePreviewFromItem(
       return {
         ...base,
         canCreate: false,
-        disabledReason: `${output.destination.module} creation is not connected. Keep this output as a preview or choose a core Personal Ops destination.`
+        disabledReason: `${output.destination.module} creation is not connected. Keep this output as a preview or choose a core Personal destination.`
       };
     }
     try {
@@ -3081,7 +3081,7 @@ export async function instantiatePersonalOpsTemplate(
     }
     const definition = current.generatedDefinitions.find((item) => item.id === definitionId);
     if (!definition || definition.destination.module !== "personal_ops") {
-      validation("Only core Personal Ops template destinations can be instantiated", "definitionId");
+      validation("Only core Personal template destinations can be instantiated", "definitionId");
     }
     const resolvedDestination = {
       ...definition.destination,

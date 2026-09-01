@@ -370,7 +370,7 @@ export default function NotePropertiesView({
             <li><span><strong>Authorship</strong><small>Authored body stays Notes-owned; downstream objects link back.</small></span><span className={styles.stateChip} data-tone="blue">Notes</span></li>
           </ul>
           <div className={styles.sourceBoundary}>
-            Durable Decisions belong to Personal Ops. External-source identity belongs to Resources. Files and snapshots
+            Durable Decisions belong to Personal. External-source identity belongs to Resources. Files and snapshots
             belong to Media. ReviewRun state belongs to Reviews.
           </div>
         </section>

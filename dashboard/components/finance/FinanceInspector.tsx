@@ -537,7 +537,7 @@ export default function FinanceInspector({
               compact
               title="Budget decisions"
             />
-            <div className={styles.boundary}><strong>Finance owns the cap</strong><span>A Personal Ops Decision may record a choice without changing Finance. A material overage never silently changes the cap.</span></div>
+            <div className={styles.boundary}><strong>Finance owns the cap</strong><span>A Personal Decision may record a choice without changing Finance. A material overage never silently changes the cap.</span></div>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="transactions" active={safeTab === "transactions"} className={styles.inspectorPanel}>
             <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?query=${encodeURIComponent(budgetRow.budget.category)}`}><span><strong>Search Transactions</strong><small>Transactions owns transaction facts; this is a category search, not a persisted link.</small></span><span>Open</span></a>
@@ -597,7 +597,7 @@ export default function FinanceInspector({
               createHref={buildDecisionCreationRoute(closeDecisionSource!)}
               title="Close-item decisions"
             />
-            <div className={styles.boundary}><strong>Finance retains close ownership</strong><span>Personal Ops owns the durable Decision. Filing one does not resolve this checklist item unless Finance explicitly records the check outcome.</span></div>
+            <div className={styles.boundary}><strong>Finance retains close ownership</strong><span>Personal owns the durable Decision. Filing one does not resolve this checklist item unless Finance explicitly records the check outcome.</span></div>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="links" active={safeTab === "links"} className={styles.inspectorPanel}>
             <a className={styles.compactRow} href={getModuleRoute("reviews")}><span><strong>Reviews coordination</strong><small>Reviews may reference Finance close state but does not own it.</small></span><span>Open</span></a>

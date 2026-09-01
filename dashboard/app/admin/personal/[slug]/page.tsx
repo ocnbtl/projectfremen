@@ -59,21 +59,21 @@ export default async function PersonalDomainPage({
           { label: "Status", value: STATUS_LABELS[domain.status] }
         ]}
         sidebarActions={[
-          { label: "All Personal Ops", href: "/admin/personal" },
+          { label: "All Personal", href: "/admin/personal" },
           { label: "Notes", href: "/admin/personal/notes-docs" },
           { label: "Reviews", href: "/admin/reviews/weekly" }
         ]}
       />
       <header className="topbar personal-domain-topbar">
         <div>
-          <p className="muted personal-ops-kicker">Personal Ops domain</p>
+          <p className="muted personal-ops-kicker">Personal domain</p>
           <h1 style={{ margin: 0 }}>{domain.label}</h1>
           <p className="muted" style={{ margin: "8px 0 0" }}>
             {domain.summary}
           </p>
         </div>
         <Link href="/admin/personal" className="review-back-link">
-          Back to Personal Ops
+          Back to Personal
         </Link>
       </header>
 
@@ -169,7 +169,7 @@ export default async function PersonalDomainPage({
         </aside>
       </section>
 
-      <section className="personal-domain-switcher" aria-label="Personal Ops domains">
+      <section className="personal-domain-switcher" aria-label="Personal domains">
         {PERSONAL_SYSTEM_DOMAINS.map((item) => (
           <Link
             href={`/admin/personal/${item.slug}`}

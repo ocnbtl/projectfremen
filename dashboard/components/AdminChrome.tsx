@@ -124,7 +124,7 @@ function AdminPageSidebar({
 
 function moduleFromTitle(title: string): ModuleId {
   const normalized = title.trim().toLowerCase();
-  if (normalized === "personal ops" || normalized === "personal") return "personal_ops";
+  if (normalized === "personal" || normalized === "personal") return "personal_ops";
   if (normalized === "people") return "people";
   if (normalized === "media") return "media";
   if (normalized === "projects") return "projects";

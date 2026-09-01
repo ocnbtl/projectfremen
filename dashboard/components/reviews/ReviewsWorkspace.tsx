@@ -313,7 +313,7 @@ function followUpOwnerBlockers(
       id: `follow-up-owner-state-${run.id}`,
       type: "external_gate",
       sourceItemId: run.id,
-      label: "Personal Ops Follow-up owner state could not be verified",
+      label: "Personal Follow-up owner state could not be verified",
       routeTab: "follow-ups",
       severity: "blocking"
     }];
@@ -329,7 +329,7 @@ function followUpOwnerBlockers(
         id: `follow-up-owner-missing-${item.id}`,
         type: "follow_up" as const,
         sourceItemId: item.id,
-        label: `${item.title} has an unavailable Personal Ops owner`,
+        label: `${item.title} has an unavailable Personal owner`,
         routeTab: "follow-ups" as const,
         severity: "blocking" as const
       }];
@@ -339,7 +339,7 @@ function followUpOwnerBlockers(
         id: `follow-up-owner-archived-${item.id}`,
         type: "follow_up" as const,
         sourceItemId: item.id,
-        label: `${item.title} has an archived Personal Ops owner`,
+        label: `${item.title} has an archived Personal owner`,
         routeTab: "follow-ups" as const,
         severity: "blocking" as const
       }];
@@ -915,10 +915,10 @@ export default function ReviewsWorkspace({
             candidate.rationale.trim() ||
             ownerDecision.rationale?.trim() ||
             ownerDecision.finalDecision?.trim() ||
-            "This Review explicitly links the exact source-backed Personal Ops Decision."
+            "This Review explicitly links the exact source-backed Personal Decision."
         }
       },
-      "Exact Personal Ops Decision linked. Personal Ops remains the decision-state owner."
+      "Exact Personal Decision linked. Personal remains the decision-state owner."
     );
   }
 
@@ -928,7 +928,7 @@ export default function ReviewsWorkspace({
     ownerFollowUp: PersonalOpsFollowUp
   ) {
     if (!isAvailableFollowUp(ownerFollowUp)) {
-      setError("This Personal Ops Follow-up is archived. Restore it or choose a current owner before linking it to the Review.");
+      setError("This Personal Follow-up is archived. Restore it or choose a current owner before linking it to the Review.");
       return false;
     }
     const { createdAt: _createdAt, updatedAt: _updatedAt, ...followUp } = candidate;
@@ -952,8 +952,8 @@ export default function ReviewsWorkspace({
         }
       },
       ownerIsComplete
-        ? "Exact Personal Ops Follow-up linked and its completed owner state recorded."
-        : "Exact Personal Ops Follow-up linked. Personal Ops remains the lifecycle owner."
+        ? "Exact Personal Follow-up linked and its completed owner state recorded."
+        : "Exact Personal Follow-up linked. Personal remains the lifecycle owner."
     );
   }
 
@@ -1181,7 +1181,7 @@ export default function ReviewsWorkspace({
           destinationRef: nativeRefFromDraft(editor),
           rationale: editor.rationale.trim()
         }
-      }, "Durable Personal Ops Decision linked and this review candidate marked filed.");
+      }, "Durable Personal Decision linked and this review candidate marked filed.");
       if (ok) setEditor(null);
       return;
     }
@@ -1200,7 +1200,7 @@ export default function ReviewsWorkspace({
           destinationModule: "personal_ops",
           createdObjectRef: nativeRefFromDraft(editor)
         }
-      }, "Durable Personal Ops Follow-up linked and this review candidate resolved.");
+      }, "Durable Personal Follow-up linked and this review candidate resolved.");
       if (ok) setEditor(null);
       return;
     }
@@ -1218,7 +1218,7 @@ export default function ReviewsWorkspace({
           required: true,
           blocksCompletion: true
         }
-      }, "Follow-up candidate added. Create the actionable object in Personal Ops, then link it here to resolve the candidate.");
+      }, "Follow-up candidate added. Create the actionable object in Personal, then link it here to resolve the candidate.");
       if (ok) setEditor(null);
     }
   }
@@ -1459,7 +1459,7 @@ export default function ReviewsWorkspace({
         <div className={styles.panelHeader}>
           <div>
             <h2>Decision candidates</h2>
-            <p>Reviews owns readiness. Durable Decisions are filed in Personal Ops.</p>
+            <p>Reviews owns readiness. Durable Decisions are filed in Personal.</p>
           </div>
           <button type="button" className={styles.button} onClick={() => setEditor({ kind: "decision", title: "", question: "", destinationModule: "personal_ops", dueDate: "", ...defaultSourceDraft("projects") })} disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed"}>Add candidate…</button>
         </div>
@@ -1492,7 +1492,7 @@ export default function ReviewsWorkspace({
                       <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-decision", decisionId: item.id, rationale: item.rationale, module: "personal_ops", objectType: "decision", objectId: "", containerObjectId: "", label: item.title })}>Choose linked Decision…</button>
                     ) : (
                       <>
-                        <Link className={styles.textLink} href={personalOpsCreateRoute("decision", run, source, item.title, item.dueDate)}>Create once in Personal Ops…</Link>
+                        <Link className={styles.textLink} href={personalOpsCreateRoute("decision", run, source, item.title, item.dueDate)}>Create once in Personal…</Link>
                         <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-decision", decisionId: item.id, rationale: item.rationale, module: "personal_ops", objectType: "decision", objectId: "", containerObjectId: "", label: item.title })}>Link filed Decision…</button>
                       </>
                     )}
@@ -1536,14 +1536,14 @@ export default function ReviewsWorkspace({
     <div className={styles.panelGrid}>
       <section className={styles.panel} data-span="full">
         <div className={styles.panelHeader}>
-          <div><h2>Actionable follow-ups</h2><p>Reviews proposes and tracks resolution; Personal Ops owns the actionable object.</p></div>
+          <div><h2>Actionable follow-ups</h2><p>Reviews proposes and tracks resolution; Personal owns the actionable object.</p></div>
           <div className={styles.inlineActions}>
             <button
               type="button"
               className={styles.button}
               onClick={() => void refreshFollowUps()}
               disabled={followUpsLoading}
-              aria-label={`Refresh Personal Ops Follow-up status for ${run.title}`}
+              aria-label={`Refresh Personal Follow-up status for ${run.title}`}
             >
               {followUpsLoading ? "Refreshing…" : "Refresh owner status"}
             </button>
@@ -1580,8 +1580,8 @@ export default function ReviewsWorkspace({
                       variant="stale"
                       title={linkedOwner ? "Linked Follow-up is archived" : "Linked Follow-up is unavailable"}
                       description={linkedOwner
-                        ? "Restore the Personal Ops owner or link a current Follow-up before this Review can complete."
-                        : "The owner reference is preserved. Refresh Personal Ops, repair the reference, or link a current Follow-up before completion."}
+                        ? "Restore the Personal owner or link a current Follow-up before this Review can complete."
+                        : "The owner reference is preserved. Refresh Personal, repair the reference, or link a current Follow-up before completion."}
                       compact
                     />
                   )}
@@ -1609,7 +1609,7 @@ export default function ReviewsWorkspace({
                       <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Choose linked Follow-up…</button>
                     ) : (
                       <>
-                        <Link className={styles.textLink} href={personalOpsCreateRoute("follow-up", run, source, item.title, item.dueDate)}>Create once in Personal Ops…</Link>
+                        <Link className={styles.textLink} href={personalOpsCreateRoute("follow-up", run, source, item.title, item.dueDate)}>Create once in Personal…</Link>
                         <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Link existing Follow-up…</button>
                       </>
                     )}
@@ -1951,7 +1951,7 @@ export default function ReviewsWorkspace({
     </InspectorRail>
   );
 
-  const sidebar = <ModuleSidebar title="Reviews" description="Auditable review runs" sections={sidebarSections} footer={<p className={styles.sidebarFootnote}>ReviewRuns live here. Finance closes in Finance; durable Decisions and actionable Follow-ups live in Personal Ops.</p>} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} className={styles.sidebar} />;
+  const sidebar = <ModuleSidebar title="Reviews" description="Auditable review runs" sections={sidebarSections} footer={<p className={styles.sidebarFootnote}>ReviewRuns live here. Finance closes in Finance; durable Decisions and actionable Follow-ups live in Personal.</p>} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} className={styles.sidebar} />;
 
   const directory = (
     <DirectoryPane className={styles.directory} ariaLabel="Review directory" busy={busy}>
@@ -1961,7 +1961,7 @@ export default function ReviewsWorkspace({
           <div><h1>Reviews</h1><p>Review the source, resolve the work, then complete with evidence.</p></div>
           <div className={styles.headerActions}><button type="button" className={styles.button} onClick={() => openCreate("weekly")}>Start weekly</button><button type="button" className={styles.button} data-primary="true" onClick={() => openCreate("monthly")}>Start monthly</button></div>
         </header>
-        <p className={styles.ownershipBanner}>Reviews coordinates completion. It does not duplicate Project blockers, Personal Ops Decisions or Follow-ups, or Finance close state.</p>
+        <p className={styles.ownershipBanner}>Reviews coordinates completion. It does not duplicate Project blockers, Personal Decisions or Follow-ups, or Finance close state.</p>
         {!selectedRun && renderSourceHandoff(null)}
         {initialLoadError && <SystemState variant="error" description={initialLoadError} action={{ label: "Retry", onSelect: () => void refreshState() }} />}
         <MetricStrip className={styles.metrics} items={[
@@ -2169,7 +2169,7 @@ function EditorSheet({ editor, setEditor, busy, errorMessage, onConfirm }: { edi
   }, [editor, errorMessage]);
   if (!editor) return null;
   const sourceEditor = ["context", "repair-context", "evidence", "decision", "follow-up", "reconcile-decision", "reconcile-follow-up"].includes(editor.kind) ? editor as EditorState & SourceDraft : null;
-  const title = editor.kind === "create" ? `Start ${editor.cadence} review` : editor.kind === "context" ? "Link source context" : editor.kind === "repair-context" ? "Repair source reference" : editor.kind === "context-health" ? "Report source issue" : editor.kind === "evidence" ? editor.originalSourceRef ? "Refresh or replace evidence" : "Link evidence source" : editor.kind === "review-evidence-replacement" ? "Review replacement evidence" : editor.kind === "waive-evidence" ? "Waive evidence requirement" : editor.kind === "carry-forward" ? "Assign carry-forward" : editor.kind === "decision" ? "Add decision candidate" : editor.kind === "follow-up" ? "Add follow-up candidate" : editor.kind === "reconcile-decision" ? "Link filed Personal Ops Decision" : "Link created Personal Ops Follow-up";
+  const title = editor.kind === "create" ? `Start ${editor.cadence} review` : editor.kind === "context" ? "Link source context" : editor.kind === "repair-context" ? "Repair source reference" : editor.kind === "context-health" ? "Report source issue" : editor.kind === "evidence" ? editor.originalSourceRef ? "Refresh or replace evidence" : "Link evidence source" : editor.kind === "review-evidence-replacement" ? "Review replacement evidence" : editor.kind === "waive-evidence" ? "Waive evidence requirement" : editor.kind === "carry-forward" ? "Assign carry-forward" : editor.kind === "decision" ? "Add decision candidate" : editor.kind === "follow-up" ? "Add follow-up candidate" : editor.kind === "reconcile-decision" ? "Link filed Personal Decision" : "Link created Personal Follow-up";
   const confirmLabel = editor.kind === "create" ? "Start review" : editor.kind === "repair-context" ? "Repair reference" : editor.kind === "context-health" ? "Update link state" : editor.kind === "review-evidence-replacement" ? "Confirm replacement" : editor.kind === "waive-evidence" ? "Record waiver" : editor.kind === "carry-forward" ? "Assign carry-forward" : editor.kind === "decision" || editor.kind === "follow-up" ? "Add candidate" : editor.kind === "reconcile-decision" ? "Link Decision" : editor.kind === "reconcile-follow-up" ? "Link Follow-up" : editor.kind === "evidence" && editor.originalSourceRef ? "Save evidence source" : "Link source";
   let invalid = false;
   if (editor.kind === "create") invalid = !editor.title?.trim() || !editor.periodStart || !editor.periodEnd;
@@ -2196,10 +2196,10 @@ function EditorSheet({ editor, setEditor, busy, errorMessage, onConfirm }: { edi
       {editor.kind === "review-evidence-replacement" && <div className={styles.formGrid}><p className={styles.ownershipBanner}>Review the proposed replacement before it can satisfy this evidence requirement.</p><div className={styles.evidenceReviewSummary}><span>Replacement source</span><Link href={editor.sourceRef.route}>{editor.sourceRef.label}</Link><small>{editor.sourceRef.objectType} · {editor.sourceRef.objectId}</small><strong>Reason</strong><p>{editor.reason}</p>{editor.previousSourceRef && <small>Previous source retained: {editor.previousSourceRef.label} · {editor.previousSourceRef.objectId}</small>}</div></div>}
       {editor.kind === "waive-evidence" && <div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Reason</span><textarea value={editor.reason} onChange={(event) => setEditor({ ...editor, reason: event.target.value })} /></label><label className={styles.field} data-span="full"><span>Risk note</span><textarea value={editor.riskNote} onChange={(event) => setEditor({ ...editor, riskNote: event.target.value })} /></label></div>}
       {editor.kind === "carry-forward" && <div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Item</span><input value={editor.title} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /></label><label className={styles.field}><span>Owner</span><input value={editor.ownerId} onChange={(event) => setEditor({ ...editor, ownerId: event.target.value })} /></label><label className={styles.field}><span>Destination</span><select value={editor.destinationModule} onChange={(event) => setEditor({ ...editor, destinationModule: event.target.value as ModuleId })}>{NATIVE_MODULES.map((module) => <option value={module} key={module}>{displayLabel(module)}</option>)}</select></label><label className={styles.field} data-span="full"><span>Reason</span><textarea value={editor.reason} onChange={(event) => setEditor({ ...editor, reason: event.target.value })} /></label><label className={styles.field} data-span="full"><span>Next action</span><textarea value={editor.nextAction} onChange={(event) => setEditor({ ...editor, nextAction: event.target.value })} /></label><label className={styles.field}><span>Due date</span><input type="date" value={editor.dueDate} onChange={(event) => setEditor({ ...editor, dueDate: event.target.value })} /></label></div>}
-      {editor.kind === "decision" && <><div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Candidate title</span><input value={editor.title} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /></label><label className={styles.field} data-span="full"><span>Decision question</span><textarea value={editor.question} onChange={(event) => setEditor({ ...editor, question: event.target.value })} /></label><label className={styles.field}><span>Due date</span><input type="date" value={editor.dueDate} onChange={(event) => setEditor({ ...editor, dueDate: event.target.value })} /></label><label className={styles.field}><span>Durable destination</span><input value="Personal Ops · Decision" disabled /><small>Reviews owns candidate readiness; Personal Ops owns the durable Decision.</small></label></div><SourceFields draft={editor} onChange={(patch) => setEditor({ ...editor, ...patch })} /></>}
+      {editor.kind === "decision" && <><div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Candidate title</span><input value={editor.title} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /></label><label className={styles.field} data-span="full"><span>Decision question</span><textarea value={editor.question} onChange={(event) => setEditor({ ...editor, question: event.target.value })} /></label><label className={styles.field}><span>Due date</span><input type="date" value={editor.dueDate} onChange={(event) => setEditor({ ...editor, dueDate: event.target.value })} /></label><label className={styles.field}><span>Durable destination</span><input value="Personal · Decision" disabled /><small>Reviews owns candidate readiness; Personal owns the durable Decision.</small></label></div><SourceFields draft={editor} onChange={(patch) => setEditor({ ...editor, ...patch })} /></>}
       {editor.kind === "follow-up" && <><div className={styles.formGrid}><label className={styles.field} data-span="full"><span>Follow-up title</span><input value={editor.title} onChange={(event) => setEditor({ ...editor, title: event.target.value })} /></label><label className={styles.field}><span>Owner</span><input value={editor.ownerId} onChange={(event) => setEditor({ ...editor, ownerId: event.target.value })} /></label><label className={styles.field}><span>Due date</span><input type="date" value={editor.dueDate} onChange={(event) => setEditor({ ...editor, dueDate: event.target.value })} /></label></div><SourceFields draft={editor} onChange={(patch) => setEditor({ ...editor, ...patch })} /></>}
-      {editor.kind === "reconcile-decision" && <div className={styles.formGrid}><p className={styles.ownershipBanner}>After creating the durable Decision in Personal Ops, paste its native ID here. This explicit link prevents duplicate creation and is required before the review candidate can be filed.</p><label className={styles.field}><span>Personal Ops Decision ID</span><input value={editor.objectId} onChange={(event) => setEditor({ ...editor, objectId: event.target.value })} /></label><label className={styles.field}><span>Decision label</span><input value={editor.label} onChange={(event) => setEditor({ ...editor, label: event.target.value })} /></label><label className={styles.field} data-span="full"><span>Filed rationale</span><textarea value={editor.rationale} onChange={(event) => setEditor({ ...editor, rationale: event.target.value })} /></label></div>}
-      {editor.kind === "reconcile-follow-up" && <div className={styles.formGrid}><p className={styles.ownershipBanner}>After creating the actionable Follow-up in Personal Ops, paste its native ID here. The Review candidate remains open until this link is saved.</p><label className={styles.field}><span>Personal Ops Follow-up ID</span><input value={editor.objectId} onChange={(event) => setEditor({ ...editor, objectId: event.target.value })} /></label><label className={styles.field}><span>Follow-up label</span><input value={editor.label} onChange={(event) => setEditor({ ...editor, label: event.target.value })} /></label></div>}
+      {editor.kind === "reconcile-decision" && <div className={styles.formGrid}><p className={styles.ownershipBanner}>After creating the durable Decision in Personal, paste its native ID here. This explicit link prevents duplicate creation and is required before the review candidate can be filed.</p><label className={styles.field}><span>Personal Decision ID</span><input value={editor.objectId} onChange={(event) => setEditor({ ...editor, objectId: event.target.value })} /></label><label className={styles.field}><span>Decision label</span><input value={editor.label} onChange={(event) => setEditor({ ...editor, label: event.target.value })} /></label><label className={styles.field} data-span="full"><span>Filed rationale</span><textarea value={editor.rationale} onChange={(event) => setEditor({ ...editor, rationale: event.target.value })} /></label></div>}
+      {editor.kind === "reconcile-follow-up" && <div className={styles.formGrid}><p className={styles.ownershipBanner}>After creating the actionable Follow-up in Personal, paste its native ID here. The Review candidate remains open until this link is saved.</p><label className={styles.field}><span>Personal Follow-up ID</span><input value={editor.objectId} onChange={(event) => setEditor({ ...editor, objectId: event.target.value })} /></label><label className={styles.field}><span>Follow-up label</span><input value={editor.label} onChange={(event) => setEditor({ ...editor, label: event.target.value })} /></label></div>}
     </ConfirmationSheet>
   );
 }

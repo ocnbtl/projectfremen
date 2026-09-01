@@ -639,7 +639,7 @@ export function buildResourceLinkedContextEvidence({
           state: runArchived ? "archived" : "current",
           ambiguity: "unique",
           updatedAt: decision.updatedAt,
-          caveat: "The Resource is retained as Review decision context. Durable Decision ownership remains in Personal Ops."
+          caveat: "The Resource is retained as Review decision context. Durable Decision ownership remains in Personal."
         });
       }
 
@@ -656,7 +656,7 @@ export function buildResourceLinkedContextEvidence({
           state: runArchived ? "archived" : "current",
           ambiguity: "unique",
           updatedAt: followUp.updatedAt,
-          caveat: "The Resource is retained as Review follow-up context. Actionable Follow-up ownership remains in Personal Ops."
+          caveat: "The Resource is retained as Review follow-up context. Actionable Follow-up ownership remains in Personal."
         });
       }
 
@@ -701,7 +701,7 @@ export function buildResourceLinkedContextEvidence({
       state: objectReferenceState(item),
       ambiguity: "unique",
       updatedAt: item.updatedAt,
-      caveat: "Personal Ops retains this explicit operating-context reference. It owns due dates, completion, decisions, obligations, routines, and follow-ups."
+      caveat: "Personal retains this explicit operating-context reference. It owns due dates, completion, decisions, obligations, routines, and follow-ups."
     });
   };
 

@@ -1676,10 +1676,10 @@ export default function NotesWorkspace({
         id: "decision-candidate",
         label: "Decision candidate is reconciled",
         detail: durableDecision
-          ? `Durable Personal Ops Decision “${durableDecision.title}” is linked through current native state.`
+          ? `Durable Personal Decision “${durableDecision.title}” is linked through current native state.`
           : durableDecisionMapping
-            ? "The conversion mapping is present, but its Personal Ops Decision target is missing and needs repair."
-            : "No durable Personal Ops Decision has been filed from this candidate.",
+            ? "The conversion mapping is present, but its Personal Decision target is missing and needs repair."
+            : "No durable Personal Decision has been filed from this candidate.",
         required: true,
         complete: Boolean(durableDecision),
         href: durableDecisionMapping && durableDecision?.id === durableDecisionMapping.nativeRef.objectId
@@ -1789,7 +1789,7 @@ export default function NotesWorkspace({
 
           <section className={styles.panel}>
             <h2>Owner-module boundaries</h2>
-            <div className={styles.sourceBoundary}>Resource health stays in Resources. Durable Decisions stay in Personal Ops. Candidate evidence shown here never copies either object into Notes.</div>
+            <div className={styles.sourceBoundary}>Resource health stays in Resources. Durable Decisions stay in Personal. Candidate evidence shown here never copies either object into Notes.</div>
             <div className={styles.factGrid}>
               <div className={styles.fact}><span>Resource owner routes</span><strong>{resourceTargets.length}</strong></div>
               <div className={styles.fact}><span>Decision candidate</span><strong>{note.type === "decision" ? "Open" : "Not present"}</strong></div>
@@ -1989,7 +1989,7 @@ export default function NotesWorkspace({
               <div className={styles.factGrid}>
                 <div className={styles.fact}><span>Type</span><strong>{decision ? "Durable Decision" : TYPE_LABELS[selectedNote.type]}</strong></div>
                 <div className={styles.fact}><span>Status</span><strong>{decision ? displayLabel(decision.decisionState) : candidateOpen ? "Open candidate" : "Not present"}</strong></div>
-                <div className={styles.fact}><span>Destination</span><strong>Personal Ops / Decisions</strong></div>
+                <div className={styles.fact}><span>Destination</span><strong>Personal / Decisions</strong></div>
                 <div className={styles.fact}><span>Source</span><strong>Note body</strong></div>
                 <div className={styles.fact}><span>Owner</span><strong>{decision?.owner || "You"}</strong></div>
                 <div className={styles.fact}><span>Provenance</span><strong>{mapping || selectedNote.provenance.recordId ? "Linked" : "Open"}</strong></div>
@@ -2048,7 +2048,7 @@ export default function NotesWorkspace({
             />
             <section className={styles.panel} data-wide="true">
               <h2>Object boundary</h2>
-              <div className={styles.sourceBoundary}>Decision is owned by Personal Ops. The Note body remains intact; the source mapping preserves provenance.</div>
+              <div className={styles.sourceBoundary}>Decision is owned by Personal. The Note body remains intact; the source mapping preserves provenance.</div>
             </section>
           </div>
         </DetailTabPanel>

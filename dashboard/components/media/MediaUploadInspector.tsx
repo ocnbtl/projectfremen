@@ -289,7 +289,7 @@ export default function MediaUploadInspector({
             compact
             variant="read_only"
             title="Native links are unavailable"
-            description="A local filename is not enough evidence to infer a Project, Person, Review, Note, Resource, or Personal Ops relationship."
+            description="A local filename is not enough evidence to infer a Project, Person, Review, Note, Resource, or Personal relationship."
           />
           <QuickActionBar
             ariaLabel="Unavailable local intake link actions"

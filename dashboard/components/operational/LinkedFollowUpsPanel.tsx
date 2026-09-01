@@ -52,7 +52,7 @@ export default function LinkedFollowUpsPanel({
   hideWhenEmpty = false,
   className = "",
   wide = false,
-  title = "Personal Ops follow-through"
+  title = "Personal follow-through"
 }: {
   source: NativeObjectRef;
   followUps: PersonalOpsFollowUp[];
@@ -91,7 +91,7 @@ export default function LinkedFollowUpsPanel({
       {showHeader && (
         <header className={styles.header}>
           <div className={styles.heading}>
-            {presentation !== "people" && <span>{presentation === "rail" ? "Linked to this person" : "Personal Ops owner"}</span>}
+            {presentation !== "people" && <span>{presentation === "rail" ? "Linked to this person" : "Personal owner"}</span>}
             <strong>{title}</strong>
           </div>
           {presentation === "people" ? (
@@ -131,14 +131,14 @@ export default function LinkedFollowUpsPanel({
                   </small>
                 </span>
                 <span className={styles.state}>{labelize(followUp.followUpState)}</span>
-                <small className={styles.ownerLink}>Open in Personal Ops</small>
+                <small className={styles.ownerLink}>Open in Personal</small>
               </Link>
             </li>
           ))}
           {linked.length > visible.length && (
             <li className={styles.more}>
               {linked.length - visible.length} more linked Follow-up
-              {linked.length - visible.length === 1 ? "" : "s"} in Personal Ops
+              {linked.length - visible.length === 1 ? "" : "s"} in Personal
             </li>
           )}
         </ul>
@@ -148,7 +148,7 @@ export default function LinkedFollowUpsPanel({
             ? "Current linked Follow-up status is unavailable. Retry before creating new work."
             : presentation === "rail"
               ? "No follow-ups for this person."
-              : "No Personal Ops Follow-up uses this exact source."}
+              : "No Personal Follow-up uses this exact source."}
         </p>
       ) : null}
 
@@ -159,14 +159,14 @@ export default function LinkedFollowUpsPanel({
         </span>
         {createHref && linked.length === 0 && !error && (
           <Link className={styles.create} href={createHref}>
-            Create in Personal Ops
+            Create in Personal
           </Link>
         )}
       </div>}
 
       {showBoundary && (
         <p className={styles.boundary}>
-          Status is read from Personal Ops. The source module keeps its own native state.
+          Status is read from Personal. The source module keeps its own native state.
         </p>
       )}
     </section>

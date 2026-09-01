@@ -137,6 +137,7 @@ type PeopleTimelineInteraction = {
 };
 
 type PeopleIconName =
+  | "person"
   | "birthday"
   | "location"
   | "hometown"
@@ -169,6 +170,7 @@ type PeopleIconName =
 
 function PeopleIcon({ name }: { name: PeopleIconName }) {
   const roles: Readonly<Record<PeopleIconName, string>> = {
+    person: "person",
     birthday: "birthday", location: "location", hometown: "hometown", occupation: "briefcase",
     employer: "employer", university: "university", partner: "partner", children: "users",
     organization: "organization", industry: "industry", founded: "clock", team: "users", edit: "edit",
@@ -182,7 +184,7 @@ function PeopleIcon({ name }: { name: PeopleIconName }) {
 
 function profileSectionIcon(title: string): PeopleIconName {
   const normalizedTitle = title.toLowerCase();
-  if (normalizedTitle.includes("identity")) return "organization";
+  if (normalizedTitle.includes("identity")) return "person";
   if (normalizedTitle === "communication" || normalizedTitle === "links") return "communication";
   if (normalizedTitle.includes("group")) return "groups";
   if (normalizedTitle.includes("place") || normalizedTitle.includes("location")) return "location";
@@ -3788,7 +3790,7 @@ export default function PeopleWorkspace({
           <>
             <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" aria-labelledby="people-create-identity-title">
               <header className="people-profile-section-heading">
-                <span><PeopleIcon name="organization" /></span>
+                <span><PeopleIcon name="person" /></span>
                 <h4 id="people-create-identity-title">Identity</h4>
               </header>
               <div className="people-profile-field-grid">
@@ -4651,7 +4653,7 @@ export default function PeopleWorkspace({
                   <PeopleAddButton
                     label="Follow-up"
                     onClick={() => router.push(followUpCreationRoute(selectedPerson))}
-                    ariaLabel={`Schedule a Personal Ops follow-up for ${selectedPerson.title}`}
+                    ariaLabel={`Schedule a Personal follow-up for ${selectedPerson.title}`}
                   />
                 </div>
                 <div className="people-timeline-layout">

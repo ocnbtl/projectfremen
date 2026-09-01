@@ -24,7 +24,7 @@ function json(body: unknown, status = 200) {
 }
 
 function responseFor(error: unknown) {
-  const message = error instanceof Error ? error.message : "Personal Ops data could not be saved";
+  const message = error instanceof Error ? error.message : "Personal data could not be saved";
   return json({ ok: false, error: message }, message.startsWith("This record changed") ? 409 : message.endsWith("not found") ? 404 : 400);
 }
 
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
   if (denied) return denied;
   try {
     const body = await request.json() as { collection?: unknown; input?: unknown };
-    if (!isPersonalLifeCollection(body.collection)) throw new Error("A valid Personal Ops collection is required");
+    if (!isPersonalLifeCollection(body.collection)) throw new Error("A valid Personal collection is required");
     const collection = body.collection;
     const item = await createPersonalLifeObject(collection, (body.input || {}) as PersonalLifeInputByCollection[typeof collection]);
     await appendAuditEvent({ at: new Date().toISOString(), action: `personal_life.${collection}.create.success`, path: new URL(request.url).pathname, method: "POST", ip: getRequestIp(request), status: "ok", detail: item.id });
@@ -67,7 +67,7 @@ export async function PATCH(request: Request) {
   if (denied) return denied;
   try {
     const body = await request.json() as { collection?: unknown; id?: unknown; patch?: unknown; expectedUpdatedAt?: unknown };
-    if (!isPersonalLifeCollection(body.collection)) throw new Error("A valid Personal Ops collection is required");
+    if (!isPersonalLifeCollection(body.collection)) throw new Error("A valid Personal collection is required");
     const id = typeof body.id === "string" ? body.id.trim() : "";
     const expectedUpdatedAt = typeof body.expectedUpdatedAt === "string" ? body.expectedUpdatedAt.trim() : "";
     if (!id || !expectedUpdatedAt) throw new Error("Record id and expectedUpdatedAt are required");
@@ -85,7 +85,7 @@ export async function DELETE(request: Request) {
   if (denied) return denied;
   try {
     const body = await request.json() as { collection?: unknown; id?: unknown; expectedUpdatedAt?: unknown };
-    if (!isPersonalLifeCollection(body.collection)) throw new Error("A valid Personal Ops collection is required");
+    if (!isPersonalLifeCollection(body.collection)) throw new Error("A valid Personal collection is required");
     const id = typeof body.id === "string" ? body.id.trim() : "";
     const expectedUpdatedAt = typeof body.expectedUpdatedAt === "string" ? body.expectedUpdatedAt.trim() : "";
     if (!id || !expectedUpdatedAt) throw new Error("Record id and expectedUpdatedAt are required");

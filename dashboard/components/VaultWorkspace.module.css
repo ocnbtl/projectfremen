@@ -10,7 +10,7 @@
   --vault-control: #fbfcfb;
   --vault-border: rgba(62, 60, 56, .18);
   min-height: 100vh;
-  padding: 28px clamp(18px, 4vw, 64px) 64px;
+  padding: calc(var(--app-content-offset) + 20px) clamp(18px, 4vw, 64px) 64px;
   color: var(--vault-ink);
   background: var(--vault-canvas);
   -webkit-font-smoothing: antialiased;

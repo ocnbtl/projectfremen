@@ -831,14 +831,14 @@ function normalizeDecision(run: ReviewRun, input: ReviewDecisionMutation, now: s
   if (!isModuleId(destinationModule)) validation("decision.destinationModule is unsupported", "decision.destinationModule");
   if (destinationModule !== "personal_ops") {
     validation(
-      "Durable review Decisions must be filed in Personal Ops",
+      "Durable review Decisions must be filed in Personal",
       "decision.destinationModule"
     );
   }
   const destinationRef = optionalNativeRef(input.destinationRef, "decision.destinationRef");
   if (destinationRef && (destinationRef.module !== "personal_ops" || destinationRef.objectType !== "decision")) {
     validation(
-      "decision.destinationRef must reference a Personal Ops Decision",
+      "decision.destinationRef must reference a Personal Decision",
       "decision.destinationRef"
     );
   }
@@ -932,14 +932,14 @@ function normalizeFollowUp(run: ReviewRun, input: ReviewFollowUpMutation, now: s
   if (!isModuleId(destinationModule)) validation("followUp.destinationModule is unsupported", "followUp.destinationModule");
   if (destinationModule !== "personal_ops") {
     validation(
-      "Actionable review Follow-ups must be created in Personal Ops",
+      "Actionable review Follow-ups must be created in Personal",
       "followUp.destinationModule"
     );
   }
   const createdObjectRef = optionalNativeRef(input.createdObjectRef, "followUp.createdObjectRef");
   if (createdObjectRef && (createdObjectRef.module !== "personal_ops" || createdObjectRef.objectType !== "follow_up")) {
     validation(
-      "followUp.createdObjectRef must reference a Personal Ops Follow-up",
+      "followUp.createdObjectRef must reference a Personal Follow-up",
       "followUp.createdObjectRef"
     );
   }

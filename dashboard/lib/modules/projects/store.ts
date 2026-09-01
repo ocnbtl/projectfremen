@@ -1460,7 +1460,7 @@ function applyBlockerPatch(
     validation("Record why the blocker is being waived", "waiverReason");
   }
   if (requestedState === "carried_forward" && !next.carryForwardRef) {
-    validation("Link the Personal Ops follow-up carrying this blocker forward", "carryForwardRef");
+    validation("Link the Personal follow-up carrying this blocker forward", "carryForwardRef");
   }
   if (requestedState === "archived" && current.state !== "archived") {
     next.archivedAt = now;

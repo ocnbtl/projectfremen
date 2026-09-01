@@ -46,7 +46,7 @@ function mapLegacyType(className: PersonalRecordClass): Mapping<NoteType> {
         code: "legacy_type_decision",
         field: "type",
         confidence: "direct",
-        message: "Legacy Decision class maps to a Notes decision candidate; canonical durable Decisions belong to Personal Ops.",
+        message: "Legacy Decision class maps to a Notes decision candidate; canonical durable Decisions belong to Personal.",
         legacyValue: className
       }
     };

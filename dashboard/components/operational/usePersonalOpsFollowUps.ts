@@ -40,7 +40,7 @@ export function usePersonalOpsFollowUps(
       setError("");
     } else {
       setError(
-        `${result.error.message} The last loaded Personal Ops status was preserved.`
+        `${result.error.message} The last loaded Personal status was preserved.`
       );
     }
     setLoading(false);

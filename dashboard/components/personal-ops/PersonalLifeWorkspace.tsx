@@ -254,12 +254,12 @@ export default function PersonalLifeWorkspace({
       return null;
     }
     replaceObject(collection, payload.item);
-    setNotice(existing ? "Changes saved." : "Added to Personal Ops.");
+    setNotice(existing ? "Changes saved." : "Added to Personal.");
     return payload.item;
   }
 
   async function removeObject(collection: PersonalLifeCollection, item: PersonalList | PersonalTrip | PersonalBuildItem | PersonalVehicle) {
-    if (!window.confirm(`Delete “${"title" in item ? item.title : item.name}”? This removes this Personal Ops record.`)) return;
+    if (!window.confirm(`Delete “${"title" in item ? item.title : item.name}”? This removes this Personal record.`)) return;
     setBusy(true);
     const response = await fetch("/api/personal/life", { method: "DELETE", headers: buildJsonHeadersWithCsrf(), body: JSON.stringify({ collection, id: item.id, expectedUpdatedAt: item.updatedAt }) });
     const payload = await response.json() as { ok?: boolean; error?: string };
@@ -700,9 +700,9 @@ export default function PersonalLifeWorkspace({
   return <div className={baseStyles.shell}>
     <PersonalOpsSidebar activeView={initialView} filter="" pathname={`/admin/personal/${initialView}`} counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
     <main className={baseStyles.directory}>
-      <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal Ops</button><button type="button" className={initialView === "passwords" ? styles.mobileAddAction : undefined} onClick={() => openCreate()}><PersonalOpsIcon name="plus" /><span>{copy.action}</span></button></div>
+      <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal</button><button type="button" className={initialView === "passwords" ? styles.mobileAddAction : undefined} onClick={() => openCreate()}><PersonalOpsIcon name="plus" /><span>{copy.action}</span></button></div>
       <div className={styles.scroll}>
-        <header className={styles.pageHeader}><div>{initialView !== "passwords" && <span>Personal Ops / Command</span>}<h1>{copy.title}</h1>{copy.description && <p>{copy.description}</p>}</div><div className={styles.headerActions}>{initialView === "passwords" && <button type="button" className={styles.privacyToggle} aria-label={passwordsMasked ? "Unblur password page" : "Blur password page"} aria-pressed={!passwordsMasked} onClick={() => void togglePasswordPrivacy()} disabled={busy} title={passwordsMasked ? "Unblur page" : "Blur page"}>{passwordsMasked ? <PersonalOpsIcon name="show" /> : <PersonalOpsIcon name="hide" />}<span>{passwordsMasked ? "Unblur" : "Blur"}</span></button>}<button type="button" className={`${styles.primaryButton} ${initialView === "passwords" ? styles.addAction : ""}`} onClick={() => openCreate()}><PersonalOpsIcon name="plus" /><span>{copy.action}</span></button></div></header>
+        <header className={styles.pageHeader}><div>{initialView !== "passwords" && <span>Personal / Command</span>}<h1>{copy.title}</h1>{copy.description && <p>{copy.description}</p>}</div><div className={styles.headerActions}>{initialView === "passwords" && <button type="button" className={styles.privacyToggle} aria-label={passwordsMasked ? "Unblur password page" : "Blur password page"} aria-pressed={!passwordsMasked} onClick={() => void togglePasswordPrivacy()} disabled={busy} title={passwordsMasked ? "Unblur page" : "Blur page"}>{passwordsMasked ? <PersonalOpsIcon name="show" /> : <PersonalOpsIcon name="hide" />}<span>{passwordsMasked ? "Unblur" : "Blur"}</span></button>}<button type="button" className={`${styles.primaryButton} ${initialView === "passwords" ? styles.addAction : ""}`} onClick={() => openCreate()}><PersonalOpsIcon name="plus" /><span>{copy.action}</span></button></div></header>
         {error && <p className={styles.error} role="alert">{error}</p>}
         {notice && <div className={styles.notice} role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" title="Dismiss" onClick={() => setNotice("")}><PersonalOpsIcon name="close" /></button></div>}
         <div className={styles.workspace} data-view={initialView}>
@@ -809,7 +809,7 @@ export default function PersonalLifeWorkspace({
       </form>
     </div>}
 
-    {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} onSubmit={submitEditor}><header><div>{editor.collection !== "trips" && <span>Personal Ops record</span>}<h2>{editor.collection === "trips" ? tripEditorTitle : `${editor.id ? "Edit" : "Add"} ${editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}`}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)}><PersonalOpsIcon name="close" /></button></header>
+    {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} onSubmit={submitEditor}><header><div>{editor.collection !== "trips" && <span>Personal record</span>}<h2>{editor.collection === "trips" ? tripEditorTitle : `${editor.id ? "Edit" : "Add"} ${editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}`}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)}><PersonalOpsIcon name="close" /></button></header>
       {editor.collection === "lists" && <>{input("Title", "title", editorValue("title"), (value) => setEditorValue("title", value), { required: true })}<label><span>Type</span><select value={editorValue("kind")} onChange={(event) => setEditorValue("kind", event.target.value)}><option value="shopping">Things to buy</option><option value="watchlist">Watchlist</option><option value="favorites">Favorites</option><option value="packing">Packing</option><option value="custom">Custom</option></select></label><label className={styles.full}><span>Description</span><textarea value={editorValue("description")} onChange={(event) => setEditorValue("description", event.target.value)} rows={3} /></label></>}
       {editor.collection === "trips" && <>
         <label className={styles.full}><span>Status</span><select value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}>{Object.entries(TRIP_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>

@@ -21,7 +21,7 @@ export function usePersonalOpsDecisions(
       setError("");
     } else {
       setError(
-        `${result.error.message} The last loaded Personal Ops Decision status was preserved.`
+        `${result.error.message} The last loaded Personal Decision status was preserved.`
       );
     }
     setLoading(false);
