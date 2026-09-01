@@ -11785,6 +11785,23 @@ async function checkResourceFocusRedesignBrowserState(baseUrl, cookieJar, resour
         if (url.origin === new URL(baseUrl).origin && !["GET", "HEAD", "OPTIONS"].includes(request.method())) mutatingRequests.push(`${request.method()} ${url.pathname}`);
       });
 
+      await page.goto(`${baseUrl}/admin/resources?query=${encodeURIComponent(resourceTitle)}`, { waitUntil: "networkidle" });
+      const directoryTitle = page.locator(`#dense-object-row-${resourceId}-title`);
+      await directoryTitle.waitFor();
+      const directoryLayout = await directoryTitle.evaluate((title) => {
+        const row = title.closest(".dense-object-row");
+        const leading = row?.querySelector(".dense-object-row__leading")?.getBoundingClientRect();
+        const content = row?.querySelector(".dense-object-row__content")?.getBoundingClientRect();
+        return leading && content
+          ? { leadingRight: leading.right, contentLeft: content.left }
+          : null;
+      });
+      assert(
+        directoryLayout && directoryLayout.contentLeft >= directoryLayout.leadingRight + 8,
+        `Resources ${viewport.label} directory title overlapped its thumbnail: ${JSON.stringify(directoryLayout)}`
+      );
+      await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}-directory.png`), fullPage: true });
+
       await page.goto(`${baseUrl}/admin/resources/${encodeURIComponent(resourceId)}?tab=properties`, { waitUntil: "networkidle" });
       const detailsButton = page.getByRole("button", { name: "Open Resource details" });
       if ((await detailsButton.count()) && (await detailsButton.isVisible())) await detailsButton.click();
@@ -12733,6 +12750,7 @@ async function main() {
         selectedDelete?.selection === "trash" &&
         selectedDelete?.resourceId &&
         selectedStyleGuideIcon.payload?.resource?.id === selectedDelete.resourceId &&
+        selectedStyleGuideIcon.payload.resource.title === '"Delete" Icon' &&
         selectedStyleGuideIcon.payload.resource.provenance?.areas?.includes("Style Guide") &&
         selectedStyleGuideIcon.payload.resource.provenance?.subjects?.includes("Component: Icon") &&
         selectedStyleGuideIcon.payload.resource.provenance?.subjects?.includes("Icon role: delete") &&
@@ -18037,7 +18055,7 @@ async function main() {
       createdResource.id,
       resourceTitle
     );
-    pass("Resources focus view preserves editable gradient and freshness fields across desktop, tablet, and mobile without overflow or browser errors");
+    pass("Resources directory titles clear their thumbnails, and focus view preserves editable gradient and freshness fields across desktop, tablet, and mobile without overflow or browser errors");
 
     const mediaSourceBeforeEdit = contentGraphRecordsAfterRouteReads.payload.items.find(
       (item) => item.id === createdMedia.id

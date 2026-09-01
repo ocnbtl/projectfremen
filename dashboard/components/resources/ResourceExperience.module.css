@@ -239,7 +239,7 @@
 
 .directoryMark { width: 42px; height: 42px; border-radius: 11px 4px 11px 4px; }
 .resourceRow:global(.dense-object-row) { grid-template-columns: minmax(0, 1fr) auto; }
-.resourceRow :global(.dense-object-row__body) { grid-template-columns: auto minmax(0, 1fr) auto; }
+.resourceRow:global(.dense-object-row) :global(.dense-object-row__body) { grid-template-columns: auto minmax(0, 1fr) auto; }
 .resourceRow :global(.dense-object-row__leading) { display: grid; place-items: center; }
 .resourceRow :global(.dense-object-row__actions) { display: grid; place-items: center; padding: 8px 10px 8px 0; }
 .directoryTitle { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }

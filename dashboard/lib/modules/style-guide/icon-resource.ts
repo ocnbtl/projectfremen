@@ -3,6 +3,7 @@ import { ICON_REGISTRY_BY_ID, candidateLabel, iconModules, streamlineIconUrl } f
 import { createPersonalRecord, readPersonalRecords, updatePersonalRecord, type PersonalRecord } from "../../personal-records-store";
 import { resourceCreateInputToLegacy, resourceUpdateInputToLegacy } from "../resources/legacy-adapter";
 import { encodeStyleGuideComponent, STYLE_GUIDE_AREA } from "./component-resource";
+import { formatIconResourceTitle } from "./icon-title";
 
 const ROLE_PREFIX = "Icon role:";
 const CANDIDATE_PREFIX = "Tabler Line:";
@@ -59,7 +60,7 @@ export async function ensureIconComponentResource(role: string, candidate: strin
   if (!entry || !entry.candidates.includes(candidate)) throw new Error("Invalid icon selection");
   const currentRecords = await readPersonalRecords();
   const existing = findExisting(currentRecords, role);
-  const title = `${entry.label} (Icon)`;
+  const title = formatIconResourceTitle(entry.label);
   const url = streamlineIconUrl(candidate);
   const subjects = generatedSubjects(role, candidate);
   const notes = [

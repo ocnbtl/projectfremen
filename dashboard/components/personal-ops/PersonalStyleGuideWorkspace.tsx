@@ -8,6 +8,7 @@ import { ICON_REGISTRY, ICON_REGISTRY_BY_ID } from "../../lib/icons/icon-registr
 import { createResourcesRepository } from "../../lib/modules/resources/repository";
 import type { ResourceRecord } from "../../lib/modules/resources/types";
 import { decodeStyleGuideComponent, encodeStyleGuideComponent, isStyleGuideComponent, STYLE_GUIDE_AREA } from "../../lib/modules/style-guide/component-resource";
+import { formatIconResourceTitle } from "../../lib/modules/style-guide/icon-title";
 import type { StyleGuideColorToken, StyleGuideInput, StyleGuideState, StyleGuideTypographyRole } from "../../lib/modules/style-guide/types";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import PersonalOpsSidebar, { type PersonalOpsSidebarCounts } from "./PersonalOpsSidebar";
@@ -65,8 +66,10 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
     const marker = resource.provenance.subjects.find((subject) => subject.toLowerCase().startsWith(ICON_ROLE_PREFIX.toLowerCase()));
     const role = marker?.slice(ICON_ROLE_PREFIX.length).trim() || "";
     const entry = ICON_REGISTRY_BY_ID.get(role);
-    if (!entry || /\s\(icon\)\s*$/i.test(resource.title)) return [];
-    return [{ resource, title: `${entry.label} (Icon)` }];
+    if (!entry) return [];
+    const title = formatIconResourceTitle(entry.label);
+    if (resource.title === title) return [];
+    return [{ resource, title }];
   });
 
   function updateTypography(itemId: string, change: Partial<StyleGuideTypographyRole>) { setDraft((current) => ({ ...current, typography: current.typography.map((item) => item.id === itemId ? { ...item, ...change } : item) })); }
