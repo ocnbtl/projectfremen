@@ -1,14 +1,14 @@
 .page {
-  --vault-ink: #17312c;
-  --vault-copy: #526860;
-  --vault-muted: #6b7d77;
-  --vault-accent: #1f5a49;
-  --vault-accent-strong: #173b35;
-  --vault-mint: #e6f2ed;
-  --vault-canvas: #f3f6f4;
+  --vault-ink: #102026;
+  --vault-copy: #23383f;
+  --vault-muted: #60747c;
+  --vault-accent: #3e3c38;
+  --vault-accent-strong: #282624;
+  --vault-mint: #f3f2f0;
+  --vault-canvas: #f4f7f5;
   --vault-surface: rgba(255, 255, 255, .92);
-  --vault-control: #f6f8f7;
-  --vault-border: rgba(23, 49, 44, .14);
+  --vault-control: #fbfcfb;
+  --vault-border: rgba(62, 60, 56, .18);
   min-height: 100vh;
   padding: 28px clamp(18px, 4vw, 64px) 64px;
   color: var(--vault-ink);
@@ -28,7 +28,7 @@
 .header p,
 .eyebrow {
   margin: 0 0 5px;
-  color: #567269;
+  color: var(--vault-muted);
   font-size: 11px;
   font-weight: 800;
   letter-spacing: .13em;
@@ -94,10 +94,10 @@
   max-width: 1148px;
   margin: 0 auto 18px;
   padding: 12px 16px;
-  border: 1px solid #bad4c9;
+  border: 1px solid #c2c0bc;
   border-radius: 10px;
-  color: #244b3f;
-  background: #e8f4ef;
+  color: var(--vault-ink);
+  background: var(--vault-mint);
   line-height: 1.5;
 }
 
@@ -151,7 +151,7 @@
   font-weight: 800;
   cursor: pointer;
 }
-.syncRecovery button:focus-visible { outline: 3px solid rgba(31, 90, 73, .25); outline-offset: 2px; }
+.syncRecovery button:focus-visible { outline: 3px solid rgba(130, 128, 124, .4); outline-offset: 2px; }
 .syncRecovery button:disabled { opacity: .45; cursor: not-allowed; }
 
 .signInButton {
@@ -171,7 +171,7 @@
 }
 
 .signInButton:hover { background: var(--vault-accent-strong); }
-.signInButton:focus-visible { outline: 3px solid rgba(31, 90, 73, .2); outline-offset: 2px; }
+.signInButton:focus-visible { outline: 3px solid rgba(130, 128, 124, .4); outline-offset: 2px; }
 
 .releaseNote {
   display: flex;

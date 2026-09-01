@@ -121,7 +121,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       when: dueLabel(item.dueAt, now),
       action: "Resolve blocker",
       href: "/admin/projects/blockers",
-      tone: "crimson",
+      tone: "projects",
       priority: item.severity === "critical" || item.severity === "high" ? "now" : priorityForDate(item.dueAt, now, item.severity === "medium" ? "next" : "watch"),
       sortAt: item.dueAt || item.updatedAt
     } as AttentionItem)),
@@ -133,7 +133,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       when: dueLabel(item.revisitAt || item.dueAt, now),
       action: "Make or defer decision",
       href: "/admin/personal/decisions",
-      tone: "violet",
+      tone: "personal",
       priority: item.risk === "critical" || item.risk === "high" ? "now" : priorityForDate(item.revisitAt || item.dueAt, now, "next"),
       sortAt: item.revisitAt || item.dueAt || item.updatedAt
     } as AttentionItem)),
@@ -145,7 +145,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       when: dueLabel(item.dueAt, now),
       action: "Review commitment",
       href: "/admin/personal/obligations",
-      tone: "orange",
+      tone: "personal",
       priority: item.obligationState === "blocked" || item.priority === "critical" ? "now" : priorityForDate(item.dueAt, now, item.priority === "high" ? "next" : "watch"),
       sortAt: item.dueAt || item.updatedAt
     } as AttentionItem)),
@@ -157,7 +157,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       when: dueLabel(item.deferredUntil || item.dueAt, now),
       action: "Open follow-up",
       href: "/admin/personal/follow-ups",
-      tone: "green",
+      tone: "personal",
       priority: priorityForDate(item.deferredUntil || item.dueAt, now, item.priority === "critical" || item.priority === "high" ? "next" : "watch"),
       sortAt: item.deferredUntil || item.dueAt || item.updatedAt
     } as AttentionItem)),
@@ -169,7 +169,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       when: "Recorded " + item.occurredOn,
       action: "Review ledger entry",
       href: "/admin/finance/transactions?filter=unreviewed",
-      tone: "yellow",
+      tone: "finance",
       priority: item.status === "pending" ? "next" : "watch",
       sortAt: item.occurredOn
     } as AttentionItem)),
@@ -181,7 +181,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       when: dueLabel(item.dueDate, now),
       action: "Review bill status",
       href: "/admin/finance/bills",
-      tone: "crimson",
+      tone: "finance",
       priority: item.status === "overdue" ? "now" : priorityForDate(item.dueDate, now, "next"),
       sortAt: item.dueDate
     } as AttentionItem)),
@@ -193,7 +193,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       when: "Before close can finish",
       action: "Resolve close check",
       href: "/admin/finance/monthly-review",
-      tone: "blue",
+      tone: "finance",
       priority: "next",
       sortAt: currentClose?.updatedAt || ""
     } as AttentionItem)),
@@ -207,7 +207,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         when: dueLabel(item.dueAt, now),
         action: "Continue review",
         href: "/admin/reviews/" + encodeURIComponent(item.cadence) + "?run=" + encodeURIComponent(item.id),
-        tone: "green",
+        tone: "reviews",
         priority: priorityForDate(item.dueAt, now, openRequired ? "next" : "watch"),
         sortAt: item.dueAt || item.updatedAt
       } as AttentionItem;
@@ -225,14 +225,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   ];
 
   const modules = [
-    { name: "Projects", href: "/admin/projects", available: Boolean(projects), value: projects ? `${activeProjects.length} active · ${openProjectBlockers.length} blockers` : "Unavailable", tone: "blue" },
-    { name: "Personal Ops", href: "/admin/personal", available: Boolean(personalOps), value: personalOps ? `${openDecisions.length} decisions · ${openFollowUps.length} follow-ups` : "Unavailable", tone: "violet" },
-    { name: "Notes", href: "/admin/notes", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "note").length} records` : "Unavailable", tone: "green" },
-    { name: "People", href: "/admin/people", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "person").length} records` : "Unavailable", tone: "cyan" },
-    { name: "Resources", href: "/admin/resources", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "resource").length} records` : "Unavailable", tone: "orange" },
-    { name: "Media", href: "/admin/media", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "file").length} records` : "Unavailable", tone: "cyan" },
-    { name: "Finance", href: "/admin/finance", available: Boolean(finance), value: finance ? `${activeAccounts.length} accounts · ${pendingTransactions.length} pending` : "Unavailable", tone: "orange" },
-    { name: "Reviews", href: "/admin/reviews/weekly", available: Boolean(reviews), value: reviews ? `${currentReviews.length} current runs` : "Unavailable", tone: "crimson" }
+    { name: "Projects", href: "/admin/projects", available: Boolean(projects), value: projects ? `${activeProjects.length} active · ${openProjectBlockers.length} blockers` : "Unavailable", tone: "projects" },
+    { name: "Personal Ops", href: "/admin/personal", available: Boolean(personalOps), value: personalOps ? `${openDecisions.length} decisions · ${openFollowUps.length} follow-ups` : "Unavailable", tone: "personal" },
+    { name: "Notes", href: "/admin/notes", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "note").length} records` : "Unavailable", tone: "notes" },
+    { name: "People", href: "/admin/people", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "person").length} records` : "Unavailable", tone: "people" },
+    { name: "Resources", href: "/admin/resources", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "resource").length} records` : "Unavailable", tone: "resources" },
+    { name: "Media", href: "/admin/media", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "file").length} records` : "Unavailable", tone: "media" },
+    { name: "Finance", href: "/admin/finance", available: Boolean(finance), value: finance ? `${activeAccounts.length} accounts · ${pendingTransactions.length} pending` : "Unavailable", tone: "finance" },
+    { name: "Reviews", href: "/admin/reviews/weekly", available: Boolean(reviews), value: reviews ? `${currentReviews.length} current runs` : "Unavailable", tone: "reviews" }
   ];
 
   const recentActivity: ActivityItem[] = [

@@ -8,8 +8,7 @@ import { ICON_REGISTRY } from "../../lib/icons/icon-registry";
 import { createResourcesRepository } from "../../lib/modules/resources/repository";
 import type { ResourceRecord } from "../../lib/modules/resources/types";
 import { decodeStyleGuideComponent, encodeStyleGuideComponent, isStyleGuideComponent, STYLE_GUIDE_AREA } from "../../lib/modules/style-guide/component-resource";
-import { FIGMA_MAKE_COLOR_SYSTEM_PROMPT } from "../../lib/modules/style-guide/figma-prompt";
-import type { StyleGuideColorToken, StyleGuideInput, StyleGuideModulePalette, StyleGuideState, StyleGuideTypographyRole } from "../../lib/modules/style-guide/types";
+import type { StyleGuideColorToken, StyleGuideInput, StyleGuideState, StyleGuideTypographyRole } from "../../lib/modules/style-guide/types";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import PersonalOpsSidebar, { type PersonalOpsSidebarCounts } from "./PersonalOpsSidebar";
 import PersonalOpsIcon, { PERSONAL_OPS_ICON_LIBRARY, type PersonalOpsIconName } from "./PersonalOpsIcon";
@@ -28,8 +27,6 @@ const FONT_PREVIEW_STACKS: Readonly<Record<string, string>> = {
   Inconsolata: '"Inconsolata Variable", "SFMono-Regular", Consolas, monospace',
   "Inconsolata Variable": '"Inconsolata Variable", "SFMono-Regular", Consolas, monospace'
 };
-const SCALE_STEPS = [50, 100, 300, 500, 700, 900] as const;
-
 function makeId(prefix: string) { return `${prefix}-${crypto.randomUUID()}`; }
 function unique(values: string[]) { return Array.from(new Set(values.map((value) => value.trim()).filter(Boolean))); }
 function previewFontFamily(family: string) { return FONT_PREVIEW_STACKS[family.trim()] || family; }
@@ -46,11 +43,6 @@ function componentDraft(resource?: ResourceRecord): ComponentDraft {
   return { id: resource?.id, title: resource?.title || "", url: resource?.source.canonicalUrl || "", tags: resource ? componentTags(resource).join(", ") : "", icon: resource ? componentIcon(resource) : "", ...content };
 }
 function guideInput(value: StyleGuideState): StyleGuideInput { return { title: value.title, description: value.description, typography: value.typography, colors: value.colors, modules: value.modules, icons: value.icons }; }
-function scaleColor(accent: string, step: typeof SCALE_STEPS[number]) {
-  if (step === 500) return accent;
-  if (step < 500) return `color-mix(in srgb, ${accent} ${step === 50 ? 8 : step === 100 ? 16 : 54}%, white)`;
-  return `color-mix(in srgb, ${accent} ${step === 700 ? 76 : 52}%, #102026)`;
-}
 
 export default function PersonalStyleGuideWorkspace({ initialState, initialResources, sidebarCounts, initialLoadError }: { initialState: StyleGuideState; initialResources: ResourceRecord[]; sidebarCounts: PersonalOpsSidebarCounts; initialLoadError?: string }) {
   const router = useRouter();
@@ -71,7 +63,6 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
 
   function updateTypography(itemId: string, change: Partial<StyleGuideTypographyRole>) { setDraft((current) => ({ ...current, typography: current.typography.map((item) => item.id === itemId ? { ...item, ...change } : item) })); }
   function updateColor(itemId: string, change: Partial<StyleGuideColorToken>) { setDraft((current) => ({ ...current, colors: current.colors.map((item) => item.id === itemId ? { ...item, ...change } : item) })); }
-  function updateModule(itemId: string, change: Partial<StyleGuideModulePalette>) { setDraft((current) => ({ ...current, modules: current.modules.map((item) => item.id === itemId ? { ...item, ...change } : item) })); }
 
   async function persistGuide(showNotice = true): Promise<StyleGuideState> {
     const input = guideInput(draft);
@@ -99,10 +90,6 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
       if (payload.resource) setResources((items) => items.some((item) => item.id === payload.resource?.id) ? items.map((item) => item.id === payload.resource?.id ? payload.resource! : item) : [payload.resource!, ...items]);
       setNotice("Icon selected, applied sitewide, and saved as a Resource."); router.refresh(); return true;
     } catch (cause) { setError(cause instanceof Error ? cause.message : "The icon could not be selected."); return false; } finally { setBusy(false); }
-  }
-
-  async function copyFigmaPrompt() {
-    try { await navigator.clipboard.writeText(FIGMA_MAKE_COLOR_SYSTEM_PROMPT); setNotice("Figma Make prompt copied."); } catch { setError("The prompt could not be copied. Select it below and copy it manually."); }
   }
 
   async function saveComponent(event: FormEvent) {
@@ -136,7 +123,7 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
       <main className={baseStyles.directory} aria-label="Style Guide">
         <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)}><PersonalOpsIcon name="menu" /> Personal Ops</button><button type="button" onClick={saveGuide} disabled={busy}><PersonalOpsIcon name="check" /> Save</button></div>
         <div className={[baseStyles.mainScroll, styles.utilityScroll].join(" ")}>
-          <header className={styles.utilityHeader}><div><span className={styles.kicker}>Design system</span><h1>Style Guide</h1><p>One editable language for type, color, components, motion, and icons.</p></div><button type="button" className={styles.primaryButton} onClick={saveGuide} disabled={busy}><PersonalOpsIcon name="check" /> Save guide</button></header>
+          <header className={styles.utilityHeader}><div><span className={styles.kicker}>Design system · V1.1</span><h1>Style Guide</h1><p>The approved shared Navy, neutral foundations, and nine module identities in one implementation reference.</p></div><button type="button" className={styles.primaryButton} onClick={saveGuide} disabled={busy}><PersonalOpsIcon name="check" /> Save guide</button></header>
           <nav className={styles.sectionNav} aria-label="Style Guide sections"><a href="#typography"><PersonalOpsIcon name="font" /> Type</a><a href="#colors"><PersonalOpsIcon name="palette" /> System colors</a><a href="#modules"><PersonalOpsIcon name="style-guide" /> Modules</a><a href="#components"><PersonalOpsIcon name="component" /> Components</a><a href="#icons"><PersonalOpsIcon name="object" /> Icons</a></nav>
           {error && <div className={styles.error} role="alert">{error}</div>}
           {notice && <div className={styles.notice} role="status">{notice}<button type="button" onClick={() => setNotice("")} aria-label="Dismiss"><PersonalOpsIcon name="close" /></button></div>}
@@ -149,20 +136,27 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
           </section>
 
           <section id="colors" className={styles.guideSection}>
-            <header><div className={styles.sectionIcon}><PersonalOpsIcon name="palette" /></div><div><h2>System-wide color</h2><p>Shared neutrals, navy, states, and foundations used by every module.</p></div><button type="button" className={styles.addButton} onClick={() => setDraft((current) => ({ ...current, colors: [...current.colors, { id: makeId("color"), label: "New color", value: "#64777E", usage: "" }] }))}><PersonalOpsIcon name="plus" /> Color</button></header>
+            <header><div className={styles.sectionIcon}><PersonalOpsIcon name="palette" /></div><div><h2>System-wide color</h2><p>Eleven shared foundations and the approved ten-step Navy scale. Navy 600 is the system action color.</p></div><span className={styles.figmaPending}>Approved · V1.1</span></header>
             <div className={styles.swatchGrid}>{draft.colors.map((item) => <article className={styles.swatchCard} key={item.id}><div className={styles.swatch} style={{ background: item.value }} /><div>{fieldLabel("Name", <input value={item.label} onChange={(event) => updateColor(item.id, { label: event.target.value })} />)}<div className={styles.colorPair}><input aria-label={`${item.label} picker`} type="color" value={item.value} onChange={(event) => updateColor(item.id, { value: event.target.value.toUpperCase() })} /><input aria-label={`${item.label} hex`} className={styles.monoInput} value={item.value} onChange={(event) => updateColor(item.id, { value: event.target.value })} /></div>{fieldLabel("Use", <input value={item.usage} onChange={(event) => updateColor(item.id, { usage: event.target.value })} />)}</div><button type="button" className={styles.deleteIcon} onClick={() => setDraft((current) => ({ ...current, colors: current.colors.filter((candidate) => candidate.id !== item.id) }))} aria-label={`Delete ${item.label}`}><PersonalOpsIcon name="delete" /></button></article>)}</div>
           </section>
 
           <section id="modules" className={styles.guideSection}>
-            <header><div className={styles.sectionIcon}><PersonalOpsIcon name="style-guide" /></div><div><h2>Module color system</h2><p>Nine working palettes. Final scales remain explicitly Figma-pending.</p></div><span className={styles.figmaPending}>Working · Figma pending</span></header>
+            <header><div className={styles.sectionIcon}><PersonalOpsIcon name="style-guide" /></div><div><h2>Module color system</h2><p>Nine approved identities with exact primary scales, secondary scales, semantic tokens, and component specimens.</p></div><span className={styles.figmaPending}>Approved · V1.1</span></header>
             <div className={styles.moduleSystemGrid}>{draft.modules.map((item) => {
               const moduleIcons = ICON_REGISTRY.filter((entry) => entry.usages.some((usage) => usage.module === item.module));
-              return <details className={styles.moduleSystemCard} style={{ "--module-accent": item.accent, "--module-secondary": item.secondary, "--module-surface": item.surface } as CSSProperties} key={item.id} open={item.id === "projects"}>
-                <summary><span className={styles.moduleMark}><UnigentamosIcon role={moduleIcons[0]?.id || "object"} /></span><span><strong>{item.module}</strong><small>{moduleIcons.length} live icon role{moduleIcons.length === 1 ? "" : "s"}</small></span><span className={styles.moduleDots}><i /><i /><i /></span><PersonalOpsIcon name="chevron-down" /></summary>
-                <div className={styles.moduleSystemBody}><div className={styles.moduleScale} aria-label={`${item.module} working primary scale`}>{SCALE_STEPS.map((step) => <span key={step} style={{ background: scaleColor(item.accent, step) }}><b>{step}</b></span>)}</div><div className={styles.moduleFields}>{fieldLabel("Primary", <span className={styles.colorControl}><input type="color" value={item.accent} onChange={(event) => updateModule(item.id, { accent: event.target.value.toUpperCase() })} /><code>{item.accent}</code></span>)}{fieldLabel("Secondary", <span className={styles.colorControl}><input type="color" value={item.secondary} onChange={(event) => updateModule(item.id, { secondary: event.target.value.toUpperCase() })} /><code>{item.secondary}</code></span>)}{fieldLabel("Quiet surface", <span className={styles.colorControl}><input type="color" value={item.surface} onChange={(event) => updateModule(item.id, { surface: event.target.value.toUpperCase() })} /><code>{item.surface}</code></span>)}</div><div className={styles.moduleIconStrip}>{moduleIcons.map((entry) => <span key={entry.id} title={`${entry.label} · ${entry.usages.filter((usage) => usage.module === item.module).map((usage) => usage.breadcrumb).join(" · ")}`}><UnigentamosIcon role={entry.id} /><UnigentamosIcon role={entry.id} style={{ color: item.accent }} /><small>{entry.label}</small></span>)}</div></div>
+              return <details className={styles.moduleSystemCard} style={{ "--module-accent": item.tokens.action, "--module-secondary": item.tokens.accent, "--module-surface": item.tokens.quiet, "--module-border": item.tokens.border, "--module-icon": item.tokens.icon, "--module-focus": item.tokens.focus, "--module-on-primary": item.tokens.textOnPrimary } as CSSProperties} key={item.id} open={item.id === "projects"}>
+                <summary><span className={styles.moduleMark}><UnigentamosIcon role={moduleIcons[0]?.id || "object"} /></span><span><strong>{item.module}</strong><small>{item.primaryName} · {item.hue} · {item.secondaryName}</small></span><span className={styles.moduleDots}><i /><i /><i /></span><PersonalOpsIcon name="chevron-down" /></summary>
+                <div className={styles.moduleSystemBody}>
+                  <div className={styles.scaleBlock}><span>Primary · {item.primaryName}</span><div className={styles.moduleScale} aria-label={`${item.module} approved primary scale`}>{item.primaryScale.map((stop) => <span key={stop.step} data-dark={stop.step >= 600 || undefined} style={{ background: stop.value }}><b>{stop.step}</b><code>{stop.value}</code></span>)}</div></div>
+                  <div className={styles.scaleBlock}><span>Secondary · {item.secondaryName}</span><div className={`${styles.moduleScale} ${styles.secondaryScale}`} aria-label={`${item.module} approved secondary scale`}>{item.secondaryScale.map((stop) => <span key={stop.step} data-dark={stop.step >= 700 || undefined} style={{ background: stop.value }}><b>{stop.step}</b><code>{stop.value}</code></span>)}</div></div>
+                  <div className={styles.moduleTokenGrid} aria-label={`${item.module} semantic tokens`}>{[
+                    ["Action", item.tokens.action], ["Hover", item.tokens.actionHover], ["Pressed", item.tokens.actionPressed], ["Selected", item.tokens.selected], ["Quiet", item.tokens.quiet], ["Border", item.tokens.border], ["Icon", item.tokens.icon], ["Text on primary", item.tokens.textOnPrimary], ["Focus", item.tokens.focus], ["Secondary accent", item.tokens.accent]
+                  ].map(([label, value]) => <span key={label}><i style={{ background: value }} /><b>{label}</b><code>{value}</code></span>)}</div>
+                  <div className={styles.moduleSpecimens} aria-label={`${item.module} component specimens`}><button type="button">Primary action</button><span className={styles.selectedSpecimen}><UnigentamosIcon role={moduleIcons[0]?.id || "object"} /><strong>Selected row</strong><small>Quiet module context</small></span><span className={styles.focusSpecimen}>Focus ring</span><span className={styles.accentSpecimen}><i /> Secondary accent</span></div>
+                  <div className={styles.moduleIconStrip}>{moduleIcons.map((entry) => <span key={entry.id} title={`${entry.label} · ${entry.usages.filter((usage) => usage.module === item.module).map((usage) => usage.breadcrumb).join(" · ")}`}><UnigentamosIcon role={entry.id} /><UnigentamosIcon role={entry.id} style={{ color: item.tokens.icon }} /><small>{entry.label}</small></span>)}</div>
+                </div>
               </details>;
             })}</div>
-            <div className={styles.figmaPrompt}><div><span className={styles.kicker}>Figma Make handoff</span><h3>Generate the final cohesive palettes</h3><p>The prompt fixes the shared foundations and asks Figma to resolve the nine accessible module systems. No final palette is claimed until you approve that output.</p></div><button type="button" className={styles.secondaryButton} onClick={() => void copyFigmaPrompt()}><PersonalOpsIcon name="copy" /> Copy prompt</button><textarea aria-label="Figma Make color system prompt" readOnly value={FIGMA_MAKE_COLOR_SYSTEM_PROMPT} /></div>
           </section>
 
           <section id="components" className={styles.guideSection}>

@@ -11,7 +11,7 @@
   --ops-positive: #21845f;
   --ops-attention: #c97418;
   --ops-danger: #c92d3f;
-  --ops-linked: #227da8;
+  --ops-linked: var(--module-icon, #2068c0);
   --ops-review: #7f55c7;
   --ops-people: #c74e90;
   --ops-neutral: #8a735a;
@@ -75,7 +75,7 @@
 }
 
 .sidebar :global(.module-sidebar__item.is-active) {
-  background: var(--selected-bg);
+  background: var(--module-quiet, var(--selected-bg));
   box-shadow: inset 3px 0 0 var(--ops-linked);
 }
 
@@ -126,7 +126,8 @@
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px 16px;
   align-items: start;
-  padding: 18px 16px 10px;
+  padding: 18px 16px 12px;
+  border-bottom: 1px solid var(--module-border, var(--border));
   background: var(--panel-bg);
 }
 
@@ -279,7 +280,7 @@
   border: 2px solid var(--panel-bg);
   border-radius: 999px;
   background: var(--action-primary);
-  color: #fff;
+  color: var(--action-primary-contrast, #fff);
   font: 760 8px/1 var(--font-mono);
 }
 
@@ -432,7 +433,7 @@
 .primaryButton {
   border-color: var(--action-primary);
   background: var(--action-primary);
-  color: #fff;
+  color: var(--action-primary-contrast, #fff);
 }
 
 .button:hover:not(:disabled),

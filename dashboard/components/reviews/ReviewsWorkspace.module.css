@@ -116,6 +116,11 @@
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 14px;
+  padding: 16px 18px;
+  border: 1px solid var(--module-border);
+  border-left: 3px solid var(--module-icon);
+  border-radius: 10px;
+  background: var(--panel-bg);
 }
 
 .header h1,
@@ -179,7 +184,7 @@
 .button[data-primary="true"] {
   border-color: var(--action-primary);
   background: var(--action-primary);
-  color: #fff;
+  color: var(--action-primary-contrast, #fff);
 }
 
 .button[data-danger="true"] {
@@ -235,9 +240,9 @@
 }
 
 .filterChip[aria-pressed="true"] {
-  border-color: #95b4c2;
-  background: var(--selected-bg);
-  box-shadow: inset 3px 0 0 #4b879f;
+  border-color: var(--module-border);
+  background: var(--module-quiet);
+  box-shadow: inset 3px 0 0 var(--module-icon);
 }
 
 .select {

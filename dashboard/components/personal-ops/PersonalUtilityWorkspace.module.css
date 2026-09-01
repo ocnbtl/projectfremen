@@ -70,6 +70,8 @@
 .cardActions a,
 .notice button {
   display: inline-flex;
+  width: auto;
+  flex: 0 0 auto;
   min-height: 36px;
   align-items: center;
   justify-content: center;
@@ -607,14 +609,37 @@
 
 .moduleSystemBody {
   display: grid;
-  gap: 11px;
-  padding: 2px 4px 14px 52px;
+  gap: 14px;
+  padding: 2px 4px 18px 52px;
 }
 
-.moduleScale { display: grid; min-height: 50px; grid-template-columns: repeat(6, minmax(42px, 1fr)); overflow: hidden; border: 1px solid var(--border-soft); border-radius: 6px; }
-.moduleScale span { display: flex; align-items: flex-end; padding: 5px; color: #102026; }
-.moduleScale span:nth-last-child(-n + 2) { color: #fff; }
-.moduleScale b { font: 720 8px/1 var(--font-mono); }
+.scaleBlock { display: grid; gap: 6px; }
+.scaleBlock > span { color: var(--text-muted); font: 800 9px/1.2 var(--font-body); letter-spacing: .06em; text-transform: uppercase; }
+.moduleScale { display: grid; min-height: 64px; grid-template-columns: repeat(10, minmax(54px, 1fr)); overflow-x: auto; border: 1px solid var(--border-soft); border-radius: 6px; }
+.moduleScale span { display: grid; min-width: 54px; align-content: end; gap: 4px; padding: 7px 6px; color: #102026; }
+.moduleScale span[data-dark="true"] { color: #fff; }
+.moduleScale b { font: 780 8px/1 var(--font-mono); }
+.moduleScale code { font: 650 7px/1 var(--font-mono); opacity: .78; }
+.secondaryScale { grid-template-columns: repeat(3, minmax(110px, 1fr)); }
+
+.moduleTokenGrid { display: grid; grid-template-columns: repeat(5, minmax(108px, 1fr)); gap: 6px; }
+.moduleTokenGrid > span { display: grid; min-width: 0; grid-template-columns: 18px minmax(0, 1fr); gap: 3px 6px; align-items: center; padding: 7px; border: 1px solid var(--border-soft); border-radius: 6px; background: var(--panel-bg-subtle); }
+.moduleTokenGrid i { width: 18px; height: 18px; grid-row: 1 / span 2; border: 1px solid rgba(16, 32, 38, .13); border-radius: 4px; }
+.moduleTokenGrid b { overflow: hidden; color: var(--text-strong); font: 760 8px/1.2 var(--font-body); text-overflow: ellipsis; white-space: nowrap; }
+.moduleTokenGrid code { color: var(--text-muted); font: 650 8px/1 var(--font-mono); }
+
+.moduleSpecimens { display: grid; grid-template-columns: minmax(118px, .65fr) minmax(190px, 1.2fr) minmax(94px, .55fr) minmax(130px, .7fr); gap: 8px; align-items: stretch; }
+.moduleSpecimens > button,
+.moduleSpecimens > span { min-height: 54px; border-radius: 7px; font: 800 10px/1.2 var(--font-body); }
+.moduleSpecimens > button { border: 1px solid var(--module-accent); background: var(--module-accent); color: var(--module-on-primary); }
+.selectedSpecimen { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 2px 7px; align-content: center; padding: 8px 10px; border: 1px solid var(--module-border); border-left: 3px solid var(--module-accent); background: var(--module-surface); color: var(--text-strong); }
+.selectedSpecimen svg { width: 19px; height: 19px; grid-row: 1 / span 2; color: var(--module-icon); }
+.selectedSpecimen small { color: var(--text-muted); font-size: 8px; }
+.focusSpecimen,
+.accentSpecimen { display: flex; align-items: center; justify-content: center; padding: 8px; border: 1px solid var(--border); background: var(--panel-bg); color: var(--text-strong); }
+.focusSpecimen { box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-focus) 45%, transparent); }
+.accentSpecimen { gap: 7px; }
+.accentSpecimen i { width: 10px; height: 10px; border-radius: 50%; background: var(--module-secondary); }
 
 .moduleFields { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .colorControl { display: flex; min-height: 36px; align-items: center; gap: 7px; padding: 3px 8px 3px 3px; border: 1px solid var(--border); border-radius: 6px; background: var(--panel-bg); }
@@ -1036,6 +1061,11 @@
     padding-left: 4px;
   }
 
+  .moduleTokenGrid,
+  .moduleSpecimens {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .moduleFields,
   .iconRegistryRow {
     grid-template-columns: 1fr;
@@ -1053,7 +1083,11 @@
   }
 
   .moduleScale {
-    grid-template-columns: repeat(3, minmax(42px, 1fr));
+    grid-template-columns: repeat(10, minmax(54px, 1fr));
+  }
+
+  .secondaryScale {
+    grid-template-columns: repeat(3, minmax(90px, 1fr));
   }
 
   .figmaPrompt {
@@ -1075,10 +1109,12 @@
   }
 
   .typeControls {
-    grid-template-columns: repeat(2, minmax(0, 1fr)) 40px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .typeControls .deleteIcon {
+    grid-column: 2;
+    justify-self: end;
     width: 40px;
     min-height: 44px;
   }

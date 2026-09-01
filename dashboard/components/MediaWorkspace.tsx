@@ -2027,9 +2027,18 @@ export default function MediaWorkspace({
     </InspectorRail>
   );
 
-  const aiDock = editorAssetId || reviewScheduleAssetId || projectAssociationAssetId || resourceHandoffTarget || mobileSidebarOpen || (isInspectorOverlay && inspectorOpen) ? null : (
+  const aiDockHidden = Boolean(
+    editorAssetId ||
+    reviewScheduleAssetId ||
+    projectAssociationAssetId ||
+    resourceHandoffTarget ||
+    mobileSidebarOpen ||
+    (isInspectorOverlay && inspectorOpen)
+  );
+  const aiDock = (
     <SharedAIDock
       open={aiOpen}
+      hidden={aiDockHidden}
       onOpenChange={(next) => {
         setAiOpen(next);
         updateUrl({ ai: next });

@@ -1,5 +1,23 @@
 export const STYLE_GUIDE_SCHEMA_VERSION = 3 as const;
 
+export type StyleGuideScaleStop = {
+  step: number;
+  value: string;
+};
+
+export type StyleGuideModuleTokens = {
+  action: string;
+  actionHover: string;
+  actionPressed: string;
+  selected: string;
+  quiet: string;
+  border: string;
+  icon: string;
+  textOnPrimary: string;
+  focus: string;
+  accent: string;
+};
+
 export type StyleGuideTypographyRole = {
   id: string;
   label: string;
@@ -20,10 +38,16 @@ export type StyleGuideColorToken = {
 export type StyleGuideModulePalette = {
   id: string;
   module: string;
+  primaryName: string;
+  hue: string;
+  secondaryName: string;
   accent: string;
   secondary: string;
   surface: string;
-  status: "working" | "figma_ready";
+  primaryScale: StyleGuideScaleStop[];
+  secondaryScale: StyleGuideScaleStop[];
+  tokens: StyleGuideModuleTokens;
+  status: "approved";
 };
 
 export type StyleGuideIconAssignment = {

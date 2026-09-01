@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from "react";
-import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import type { ModuleId, NativeObjectRef } from "../../lib/native-objects/types";
@@ -446,7 +446,7 @@ export default function SharedAIDock(props: SharedAIDockProps) {
     allowedActionsKey
   ]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!host) return;
     host.register(registration);
     return () => host.unregister(ownerId, ownerPathname);

@@ -1,4 +1,12 @@
 import { mutateJsonFile, readJsonFile } from "../../file-store";
+import {
+  MODULE_COLOR_SYSTEM,
+  NAVY_SCALE,
+  PRIMARY_SCALE_STEPS,
+  SECONDARY_SCALE_STEPS,
+  SYSTEM_COLOR_TOKENS,
+  type ModuleColorId
+} from "../../design-system/color-system";
 import { ICON_REGISTRY, getIconEntry, isIconCandidate } from "../../icons/icon-registry";
 import {
   STYLE_GUIDE_SCHEMA_VERSION,
@@ -12,6 +20,26 @@ import {
 
 const FILE_NAME = "personal-style-guide.json";
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+function approvedModulePalettes(): StyleGuideModulePalette[] {
+  return (Object.keys(MODULE_COLOR_SYSTEM) as ModuleColorId[]).map((moduleId) => {
+    const definition = MODULE_COLOR_SYSTEM[moduleId];
+    return {
+      id: moduleId === "personal_ops" ? "personal" : moduleId,
+      module: definition.label,
+      primaryName: definition.primaryName,
+      hue: definition.hue,
+      secondaryName: definition.secondaryName,
+      accent: definition.tokens.action,
+      secondary: definition.tokens.accent,
+      surface: definition.tokens.quiet,
+      primaryScale: PRIMARY_SCALE_STEPS.map((step) => ({ step, value: definition.primary[step] })),
+      secondaryScale: SECONDARY_SCALE_STEPS.map((step) => ({ step, value: definition.secondary[step] })),
+      tokens: { ...definition.tokens },
+      status: "approved" as const
+    };
+  });
+}
 
 export function defaultStyleGuideState(): StyleGuideState {
   return {
@@ -28,36 +56,25 @@ export function defaultStyleGuideState(): StyleGuideState {
       { id: "data", label: "Data", family: "Inconsolata", size: 12, weight: 650, lineHeight: 1.35, letterSpacing: 0.01 }
     ],
     colors: [
-      { id: "ink", label: "Ink", value: "#102026", usage: "Primary text and actions" },
-      { id: "text", label: "Text", value: "#23383F", usage: "Default body text" },
-      { id: "muted", label: "Muted", value: "#60747C", usage: "Secondary labels and supporting text" },
-      { id: "faint", label: "Faint", value: "#7C8E95", usage: "Placeholder and unavailable states" },
-      { id: "canvas", label: "Canvas", value: "#F4F7F5", usage: "Application background" },
-      { id: "canvas-alt", label: "Canvas alternate", value: "#F6F8F7", usage: "Directory and secondary workspace background" },
-      { id: "panel", label: "Panel", value: "#FFFFFF", usage: "Cards, sheets, and controls" },
-      { id: "paper", label: "Paper", value: "#FBFCFB", usage: "Quiet inset surface" },
-      { id: "border", label: "Border", value: "#D5E2E7", usage: "Default dividers and outlines" },
-      { id: "border-strong", label: "Border strong", value: "#BFD2DB", usage: "Interactive control outlines" },
-      { id: "selected", label: "Selected", value: "#F7FBFF", usage: "Selected rows and focused navigation" },
-      { id: "navy", label: "Navy", value: "#0D252D", usage: "Primary actions" },
-      { id: "eucalyptus", label: "Eucalyptus", value: "#2F6F64", usage: "People and positive relationship accents" },
-      { id: "blue", label: "Blue", value: "#347998", usage: "Links, resources, and information" },
-      { id: "amber", label: "Amber", value: "#C47B19", usage: "Attention and upcoming work" },
-      { id: "crimson", label: "Crimson", value: "#B73343", usage: "Destructive and urgent" },
-      { id: "violet", label: "Violet", value: "#76566B", usage: "Notes and authored knowledge" },
-      { id: "clay", label: "Clay", value: "#8A5C4A", usage: "Media and physical assets" }
+      ...SYSTEM_COLOR_TOKENS.map((token) => ({ ...token })),
+      ...PRIMARY_SCALE_STEPS.map((step) => ({
+        id: `navy-${step}`,
+        label: `Navy ${step}`,
+        value: NAVY_SCALE[step],
+        usage: step === 600
+          ? "Shared primary action and high-emphasis interface color"
+          : step === 500
+            ? "Shared links and informational icon color"
+            : step === 700
+              ? "Shared primary action hover"
+              : step === 800
+                ? "Shared primary action pressed"
+                : step === 50
+                  ? "Shared Navy selected and quiet surface"
+                  : "Shared Navy scale"
+      }))
     ],
-    modules: [
-      { id: "projects", module: "Projects", accent: "#516B83", secondary: "#C47B19", surface: "#F1F4F7", status: "working" },
-      { id: "notes", module: "Notes", accent: "#76566B", secondary: "#347998", surface: "#F7F3F6", status: "working" },
-      { id: "people", module: "People", accent: "#2F6F64", secondary: "#76566B", surface: "#F1F6F4", status: "working" },
-      { id: "media", module: "Media", accent: "#8A5C4A", secondary: "#347998", surface: "#F8F3F0", status: "working" },
-      { id: "personal", module: "Personal", accent: "#102026", secondary: "#2F6F64", surface: "#F4F7F6", status: "working" },
-      { id: "reviews", module: "Reviews", accent: "#665A82", secondary: "#C47B19", surface: "#F5F3F8", status: "working" },
-      { id: "resources", module: "Resources", accent: "#2F6B78", secondary: "#2F6F64", surface: "#F0F6F7", status: "working" },
-      { id: "finance", module: "Finance", accent: "#7B6441", secondary: "#347998", surface: "#F7F4EE", status: "working" },
-      { id: "vault", module: "Vault", accent: "#1F5A49", secondary: "#173B35", surface: "#E6F2ED", status: "working" }
-    ],
+    modules: approvedModulePalettes(),
     icons: ICON_REGISTRY.map((entry) => ({
       id: `icon-${entry.id}`,
       icon: entry.id,
@@ -112,7 +129,8 @@ function typography(value: unknown): StyleGuideTypographyRole[] {
   });
 }
 
-function colors(value: unknown, backfillDefaults = false): StyleGuideColorToken[] {
+function colors(value: unknown, useApprovedDefaults = false): StyleGuideColorToken[] {
+  if (useApprovedDefaults) return defaultStyleGuideState().colors;
   if (!Array.isArray(value)) return defaultStyleGuideState().colors;
   const normalized = value.slice(0, 40).map((candidate, index) => {
     const item = isRecord(candidate) ? candidate : {};
@@ -123,12 +141,11 @@ function colors(value: unknown, backfillDefaults = false): StyleGuideColorToken[
       usage: text(item.usage, `Color ${index + 1} usage`, 240)
     };
   });
-  if (!backfillDefaults) return normalized;
-  const existingIds = new Set(normalized.map((item) => item.id));
-  return [...normalized, ...defaultStyleGuideState().colors.filter((item) => !existingIds.has(item.id))].slice(0, 40);
+  return normalized;
 }
 
-function modules(value: unknown): StyleGuideModulePalette[] {
+function modules(value: unknown, useApprovedDefaults = false): StyleGuideModulePalette[] {
+  if (useApprovedDefaults) return defaultStyleGuideState().modules;
   if (!Array.isArray(value)) return defaultStyleGuideState().modules;
   const defaults = defaultStyleGuideState().modules;
   const normalized = value.slice(0, 40).map((candidate, index) => {
@@ -136,13 +153,47 @@ function modules(value: unknown): StyleGuideModulePalette[] {
     const rawId = id(item.id, `module-${index + 1}`);
     const moduleId = rawId === "personal-ops" ? "personal" : rawId;
     const fallback = defaults.find((entry) => entry.id === moduleId) || defaults[0];
+    const rawPrimaryScale = Array.isArray(item.primaryScale) ? item.primaryScale : fallback.primaryScale;
+    const rawSecondaryScale = Array.isArray(item.secondaryScale) ? item.secondaryScale : fallback.secondaryScale;
+    const rawTokens = isRecord(item.tokens) ? item.tokens : fallback.tokens;
     return {
       id: moduleId,
       module: moduleId === "personal" ? "Personal" : text(item.module, `Module ${index + 1}`, 80, true),
+      primaryName: text(item.primaryName, `Module ${index + 1} primary name`, 80) || fallback.primaryName,
+      hue: text(item.hue, `Module ${index + 1} hue`, 80) || fallback.hue,
+      secondaryName: text(item.secondaryName, `Module ${index + 1} secondary name`, 80) || fallback.secondaryName,
       accent: color(item.accent, `Module ${index + 1} primary`, fallback.accent),
       secondary: color(item.secondary, `Module ${index + 1} secondary`, fallback.secondary),
       surface: color(item.surface, `Module ${index + 1} surface`, fallback.surface),
-      status: item.status === "figma_ready" ? "figma_ready" as const : "working" as const
+      primaryScale: rawPrimaryScale.slice(0, 10).map((candidate, scaleIndex) => {
+        const stop = isRecord(candidate) ? candidate : {};
+        const fallbackStop = fallback.primaryScale[scaleIndex] || fallback.primaryScale[0];
+        return {
+          step: number(stop.step, `Module ${index + 1} primary step`, 0, 1000, fallbackStop.step),
+          value: color(stop.value, `Module ${index + 1} primary scale`, fallbackStop.value)
+        };
+      }),
+      secondaryScale: rawSecondaryScale.slice(0, 3).map((candidate, scaleIndex) => {
+        const stop = isRecord(candidate) ? candidate : {};
+        const fallbackStop = fallback.secondaryScale[scaleIndex] || fallback.secondaryScale[0];
+        return {
+          step: number(stop.step, `Module ${index + 1} secondary step`, 0, 1000, fallbackStop.step),
+          value: color(stop.value, `Module ${index + 1} secondary scale`, fallbackStop.value)
+        };
+      }),
+      tokens: {
+        action: color(rawTokens.action, `Module ${index + 1} action`, fallback.tokens.action),
+        actionHover: color(rawTokens.actionHover, `Module ${index + 1} action hover`, fallback.tokens.actionHover),
+        actionPressed: color(rawTokens.actionPressed, `Module ${index + 1} action pressed`, fallback.tokens.actionPressed),
+        selected: color(rawTokens.selected, `Module ${index + 1} selected`, fallback.tokens.selected),
+        quiet: color(rawTokens.quiet, `Module ${index + 1} quiet`, fallback.tokens.quiet),
+        border: color(rawTokens.border, `Module ${index + 1} border`, fallback.tokens.border),
+        icon: color(rawTokens.icon, `Module ${index + 1} icon`, fallback.tokens.icon),
+        textOnPrimary: color(rawTokens.textOnPrimary, `Module ${index + 1} text on primary`, fallback.tokens.textOnPrimary),
+        focus: color(rawTokens.focus, `Module ${index + 1} focus`, fallback.tokens.focus),
+        accent: color(rawTokens.accent, `Module ${index + 1} accent`, fallback.tokens.accent)
+      },
+      status: "approved" as const
     };
   });
   const byId = new Map(normalized.map((item) => [item.id, item]));
@@ -175,7 +226,16 @@ function icons(value: unknown): StyleGuideIconAssignment[] {
 function normalize(value: unknown): StyleGuideState {
   const fallback = defaultStyleGuideState();
   if (!isRecord(value)) return fallback;
-  const backfillDefaults = value.schemaVersion !== STYLE_GUIDE_SCHEMA_VERSION;
+  const storedModules = Array.isArray(value.modules) ? value.modules : [];
+  const hasApprovedColorSystem = storedModules.length === 9
+    && storedModules.every((candidate) => isRecord(candidate)
+      && candidate.status === "approved"
+      && Array.isArray(candidate.primaryScale)
+      && candidate.primaryScale.length === 10
+      && Array.isArray(candidate.secondaryScale)
+      && candidate.secondaryScale.length === 3
+      && isRecord(candidate.tokens));
+  const backfillDefaults = value.schemaVersion !== STYLE_GUIDE_SCHEMA_VERSION || !hasApprovedColorSystem;
   return {
     schemaVersion: STYLE_GUIDE_SCHEMA_VERSION,
     id: "personal-style-guide",
@@ -183,7 +243,7 @@ function normalize(value: unknown): StyleGuideState {
     description: text(value.description, "Style guide description", 500),
     typography: typography(value.typography),
     colors: colors(value.colors, backfillDefaults),
-    modules: modules(value.modules),
+    modules: modules(value.modules, backfillDefaults),
     icons: icons(value.icons),
     createdAt: text(value.createdAt, "createdAt", 40),
     updatedAt: text(value.updatedAt, "updatedAt", 40)

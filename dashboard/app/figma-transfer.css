@@ -6590,8 +6590,8 @@ html[data-admin-preview="mobile"] .people-redesign-shell.is-ai-open .people-smar
   height: 32px;
   grid-row: 1 / span 2;
   border-radius: 7px;
-  background: #0d252d;
-  color: #ffffff;
+  background: var(--action-primary);
+  color: var(--action-primary-contrast);
   font-family: "Inconsolata Variable", "SFMono-Regular", Consolas, monospace;
   font-size: 10px;
   font-weight: 900;
@@ -12915,4 +12915,207 @@ html[data-admin-preview="mobile"] .shared-ai-dock__panel {
 html[data-admin-preview="mobile"] .people-record-type-toggle,
 html[data-admin-preview="mobile"] .people-record-type-toggle > div {
   width: 100%;
+}
+
+/* Approved V1.1 module identities — shared hierarchy and orientation layer. */
+.module-shell {
+  border-top: 3px solid var(--module-primary-400, var(--module-focus));
+  background: var(--shell-bg);
+}
+
+.module-shell__main,
+.module-shell .directory-pane {
+  background: var(--shell-bg-alt);
+}
+
+.module-shell .module-sidebar__header {
+  border-bottom: 1px solid var(--module-border);
+}
+
+.module-shell .module-sidebar__eyebrow,
+.module-shell .object-header__type,
+.module-shell .confirmation-sheet__eyebrow {
+  color: var(--module-icon);
+}
+
+.module-shell .module-sidebar__item.is-active {
+  background: var(--module-quiet);
+  box-shadow: inset 3px 0 0 var(--module-icon);
+  color: var(--text-strong);
+}
+
+.module-shell .module-sidebar__item:not(.is-disabled):hover {
+  background: color-mix(in srgb, var(--module-quiet) 72%, var(--panel-bg));
+}
+
+.module-shell .metric-strip {
+  border-top: 2px solid var(--module-border);
+}
+
+.module-shell .detail-tabs > button.is-active {
+  color: var(--module-icon);
+  box-shadow: inset 0 -2px 0 var(--module-icon);
+}
+
+.module-shell :where(input, select, textarea):focus {
+  border-color: var(--module-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-focus) 22%, transparent);
+}
+
+.module-shell :where(button, a)[data-primary="true"],
+.module-shell .quick-action-bar__action.is-primary,
+.module-shell .shared-ai-dock__launcher,
+.module-shell .confirmation-sheet__actions .is-primary {
+  border-color: var(--action-primary) !important;
+  background: var(--action-primary) !important;
+  color: var(--action-primary-contrast) !important;
+}
+
+.module-shell .system-state > button {
+  width: auto;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid var(--action-primary);
+  border-radius: 7px;
+  background: var(--action-primary);
+  color: var(--action-primary-contrast);
+  font: 850 12px var(--font-heading);
+}
+
+.module-shell :where(button, a)[data-primary="true"]:hover,
+.module-shell .quick-action-bar__action.is-primary:hover,
+.module-shell .shared-ai-dock__launcher:hover {
+  border-color: var(--action-primary-hover) !important;
+  background: var(--action-primary-hover) !important;
+}
+
+.module-shell :where(button, a)[data-primary="true"]:active,
+.module-shell .quick-action-bar__action.is-primary:active {
+  border-color: var(--action-primary-pressed) !important;
+  background: var(--action-primary-pressed) !important;
+}
+
+.module-shell :where(.directoryHeader, .header, .editorHeader, .finance-workspace-header) {
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--module-border);
+}
+
+.people-redesign-shell {
+  --surface-selected: var(--module-quiet, #fff5ed);
+  --accent-blue: var(--module-icon, #963a08);
+  --accent-orange: var(--action-primary, #963a08);
+  --accent-brown: var(--module-secondary-700, #5a6040);
+  --action-primary: #963a08;
+  --action-primary-hover: #6e2804;
+  --action-primary-pressed: #441802;
+  --action-primary-contrast: #ffffff;
+  --module-quiet: #fff5ed;
+  --module-border: #ffbb80;
+  --module-icon: #963a08;
+  --module-focus: #e87020;
+}
+
+.people-redesign-shell .people-directory-panel,
+.people-redesign-shell .people-profile-panel,
+.people-redesign-shell .people-smart-panel {
+  border-top-color: var(--module-border);
+}
+
+.command-hero {
+  border-top-color: var(--navy-600);
+  background: var(--panel-bg);
+}
+
+.command-kicker,
+.command-kicker-small {
+  color: var(--navy-600);
+}
+
+.command-hero-actions a:first-child {
+  border-color: var(--navy-600);
+  background: var(--navy-600);
+  color: #ffffff;
+}
+
+.command-lane[class*="command-tone-"],
+.command-health[class*="command-tone-"] {
+  --command-tone-surface: var(--navy-50);
+  --command-tone-border: var(--navy-200);
+}
+
+.command-lane[class*="command-tone-"] {
+  border-top: 3px solid currentColor;
+}
+
+.command-lane[class*="command-tone-"] .command-lane-list a,
+.command-health[class*="command-tone-"] {
+  border-color: var(--command-tone-border);
+  background: var(--command-tone-surface);
+}
+
+.command-attention-row[class*="command-tone-"] {
+  background: color-mix(in srgb, var(--command-tone-surface, var(--panel-bg-subtle)) 72%, var(--panel-bg));
+}
+
+.command-tone-projects { color: #754420; --command-tone-surface: #f8f4f0; --command-tone-border: #dfbf9e; }
+.command-tone-notes { color: #5e2288; --command-tone-surface: #f6f0fc; --command-tone-border: #d0aaf0; }
+.command-tone-people { color: #963a08; --command-tone-surface: #fff5ed; --command-tone-border: #ffbb80; }
+.command-tone-media { color: #862618; --command-tone-surface: #fbf0ee; --command-tone-border: #eba096; }
+.command-tone-personal { color: #1850a0; --command-tone-surface: #ecf4fd; --command-tone-border: #92c0f2; }
+.command-tone-reviews { color: #7e6000; --command-tone-surface: #fefce6; --command-tone-border: #faee76; }
+.command-tone-resources { color: #821850; --command-tone-surface: #fbf0f4; --command-tone-border: #eaa2be; }
+.command-tone-finance { color: #0a5a36; --command-tone-surface: #e8f5ee; --command-tone-border: #80cca8; }
+
+.finance-module-shell {
+  --finance-border: var(--border);
+  --finance-divider: color-mix(in srgb, var(--module-border) 46%, var(--border));
+  --finance-muted: var(--text-muted);
+  --finance-faint: var(--text-faint);
+  --finance-ink: var(--text-strong);
+  --finance-panel: var(--panel-bg);
+  --finance-soft: var(--panel-bg-subtle);
+}
+
+.finance-module-shell .finance-workspace-header {
+  padding: 16px 18px;
+  border: 1px solid var(--module-border);
+  border-left: 3px solid var(--module-icon);
+  border-radius: 10px;
+  background: var(--panel-bg);
+}
+
+.finance-module-shell .finance-native-action-bar {
+  border-color: var(--module-border);
+  background: var(--module-quiet);
+}
+
+.finance-module-shell .finance-sidebar-nav button.is-active,
+.finance-module-shell .finance-sidebar-section button.is-active {
+  border-color: var(--module-border);
+  background: var(--module-quiet);
+  box-shadow: inset 3px 0 0 var(--module-icon);
+  color: var(--text-strong);
+}
+
+.finance-module-shell .finance-action.is-primary {
+  border-color: var(--action-primary);
+  background: var(--action-primary);
+  color: var(--action-primary-contrast);
+}
+
+.finance-module-shell .finance-action.is-primary:hover {
+  border-color: var(--action-primary-hover);
+  background: var(--action-primary-hover);
+}
+
+.finance-module-shell .finance-action:focus-visible,
+.finance-module-shell .finance-rail-actions button:focus-visible,
+.finance-module-shell .finance-checklist button:focus-visible {
+  outline-color: var(--module-focus);
+}
+
+@media (max-width: 760px) {
+  .module-shell {
+    border-top-width: 2px;
+  }
 }

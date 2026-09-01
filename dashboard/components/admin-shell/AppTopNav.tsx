@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ADMIN_NAV_ITEMS } from "../../lib/admin-navigation";
+import { moduleColorIdForPathname, moduleThemeVariables } from "../../lib/design-system/color-system";
 import PersonalViewportToggle from "../PersonalViewportToggle";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
@@ -94,6 +95,23 @@ export default function AppTopNav({
   }, [pathname]);
 
   useEffect(() => {
+    const root = document.documentElement;
+    const moduleId = moduleColorIdForPathname(pathname);
+    const variables = moduleId ? moduleThemeVariables(moduleId) : {};
+    const propertyNames = Object.keys(moduleThemeVariables("projects"));
+    root.dataset.activeModule = moduleId || "home";
+    for (const propertyName of propertyNames) {
+      const value = variables[propertyName];
+      if (value) root.style.setProperty(propertyName, value);
+      else root.style.removeProperty(propertyName);
+    }
+    return () => {
+      for (const propertyName of propertyNames) root.style.removeProperty(propertyName);
+      delete root.dataset.activeModule;
+    };
+  }, [pathname]);
+
+  useEffect(() => {
     document.body.classList.toggle("app-mobile-nav-open", mobileNavOpen);
     return () => document.body.classList.remove("app-mobile-nav-open");
   }, [mobileNavOpen]);
@@ -141,7 +159,7 @@ export default function AppTopNav({
   });
 
   return (
-    <header className={cx("admin-global-topnav", "app-top-nav", className)}>
+    <header className={cx("admin-global-topnav", "app-top-nav", className)} data-active-module={moduleColorIdForPathname(pathname) || "home"}>
       <Link href="/admin" className="admin-global-brand app-top-nav__brand" aria-label="Unigentamos home">
         <span aria-hidden="true">U</span>
         <strong>Unigentamos</strong>
@@ -178,6 +196,7 @@ export default function AppTopNav({
               <Link
                 href={itemHref}
                 className={itemActive ? "is-active" : undefined}
+                data-module={moduleColorIdForPathname(itemHref) || undefined}
                 aria-current={itemActive ? "page" : undefined}
                 onClick={() => setMobileNavOpen(false)}
                 key={item.label}
@@ -186,7 +205,7 @@ export default function AppTopNav({
               </Link>
             );
           })}
-          <Link href="/vault?focus=search" onClick={() => setMobileNavOpen(false)}>
+          <Link href="/vault?focus=search" data-module="vault" onClick={() => setMobileNavOpen(false)}>
             Search all records
           </Link>
         </nav>
@@ -205,6 +224,7 @@ export default function AppTopNav({
               <Link
                 href={itemHref}
                 className={cx("admin-global-nav-link", itemActive && "is-active")}
+                data-module={moduleColorIdForPathname(itemHref) || undefined}
                 aria-current={itemActive ? "page" : undefined}
                 key={item.label}
               >
@@ -234,6 +254,7 @@ export default function AppTopNav({
               <button
                 type="button"
                 className={cx("admin-global-nav-button", itemActive && "is-active")}
+                data-module="projects"
                 onClick={() => {
                   setProjectsOpen((current) => !current);
                   window.dispatchEvent(new Event("projects:changed"));

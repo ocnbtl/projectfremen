@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import type { ModuleId } from "../../lib/native-objects/types";
 
 export type ModuleShellMode = "directory" | "detail" | "editor" | "review";
@@ -31,6 +32,7 @@ export default function ModuleShell({
       data-mode={mode}
       data-has-sidebar={Boolean(sidebar) || undefined}
       data-has-inspector={Boolean(inspector) || undefined}
+      style={moduleThemeVariables(module) as CSSProperties}
     >
       {sidebar}
       <main className="module-shell__main" aria-label={ariaLabel}>
@@ -41,4 +43,3 @@ export default function ModuleShell({
     </div>
   );
 }
-
