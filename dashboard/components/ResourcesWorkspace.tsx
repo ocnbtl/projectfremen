@@ -210,7 +210,8 @@ function formatDate(value?: string | null, fallback = "Not recorded") {
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
-    year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric"
+    year: date.getUTCFullYear() === new Date().getUTCFullYear() ? undefined : "numeric",
+    timeZone: "UTC"
   }).format(date);
 }
 

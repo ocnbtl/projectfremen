@@ -51,7 +51,7 @@ function formatDate(value?: string | null, withTime = false) {
   if (!value) return "Not yet";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-US", withTime ? { dateStyle: "medium", timeStyle: "short" } : { month: "short", day: "numeric", year: "numeric" }).format(date);
+  return new Intl.DateTimeFormat("en-US", withTime ? { dateStyle: "medium", timeStyle: "short", timeZone: "UTC" } : { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }).format(date);
 }
 
 function stateForCheck(value: string) {
