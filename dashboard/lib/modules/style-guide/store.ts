@@ -200,7 +200,7 @@ function modules(value: unknown, useApprovedDefaults = false): StyleGuideModuleP
   return defaults.map((fallback) => byId.get(fallback.id) || fallback);
 }
 
-function icons(value: unknown): StyleGuideIconAssignment[] {
+function icons(value: unknown, refreshUsage = false): StyleGuideIconAssignment[] {
   const normalized = (Array.isArray(value) ? value : []).slice(0, 160).map((candidate, index) => {
     const item = isRecord(candidate) ? candidate : {};
     const rawIcon = text(item.icon, `Icon ${index + 1}`, 80, true);
@@ -216,10 +216,14 @@ function icons(value: unknown): StyleGuideIconAssignment[] {
     };
   });
   const byIcon = new Map(normalized.map((item) => [item.icon, item]));
-  return ICON_REGISTRY.map((entry) => byIcon.get(entry.id) || {
-    id: `icon-${entry.id}`,
-    icon: entry.id,
-    usage: getIconEntry(entry.id).usages.map((item) => `${item.module} › ${item.breadcrumb}`).join(" · ")
+  return ICON_REGISTRY.map((entry) => {
+    const existing = byIcon.get(entry.id);
+    return {
+      ...(existing || { id: `icon-${entry.id}`, icon: entry.id }),
+      usage: refreshUsage || !existing
+        ? getIconEntry(entry.id).usages.map((item) => `${item.module} › ${item.breadcrumb}`).join(" · ")
+        : existing.usage
+    };
   });
 }
 
@@ -244,7 +248,7 @@ function normalize(value: unknown): StyleGuideState {
     typography: typography(value.typography),
     colors: colors(value.colors, backfillDefaults),
     modules: modules(value.modules, backfillDefaults),
-    icons: icons(value.icons),
+    icons: icons(value.icons, value.schemaVersion !== STYLE_GUIDE_SCHEMA_VERSION),
     createdAt: text(value.createdAt, "createdAt", 40),
     updatedAt: text(value.updatedAt, "updatedAt", 40)
   };

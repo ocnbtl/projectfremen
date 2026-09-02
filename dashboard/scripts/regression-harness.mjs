@@ -5685,6 +5685,30 @@ async function checkPeopleMemoryBrowserState(
           await viewCycle.locator("[data-view-morph] path").count() === 6,
         `People directory retained redundant counts or the old toolbar at ${viewport.label}`
       );
+      const peoplePrimaryActionStyles = await directoryHeader.locator(".people-header-actions button").evaluateAll((buttons) => buttons.map((button) => ({
+        backgroundColor: getComputedStyle(button).backgroundColor,
+        color: getComputedStyle(button).color,
+        childColors: Array.from(button.children).map((child) => getComputedStyle(child).color)
+      })));
+      assert(
+        peoplePrimaryActionStyles.length === 3 &&
+          peoplePrimaryActionStyles.every((style) =>
+            style.backgroundColor === "rgb(19, 60, 94)" &&
+            style.color === "rgb(255, 255, 255)" &&
+            style.childColors.every((color) => color === "rgb(255, 255, 255)")
+          ),
+        `People header actions did not use the refined Navy scheme at ${viewport.label}: ${JSON.stringify(peoplePrimaryActionStyles)}`
+      );
+      if (viewport.label === "desktop") {
+        await directoryHeader.locator('button[aria-label="Add organization"]').click();
+        await page.waitForURL(/\/admin\/people\/new\?type=organization$/);
+        assert(
+          await page.locator(".people-edit-toolbar strong").textContent() === "New Organization" &&
+            await page.getByRole("button", { name: "Organization", exact: true }).getAttribute("aria-pressed") === "true",
+          "Add Organization did not open the organization-specific editor"
+        );
+        await page.goto(`${baseUrl}/admin/people`, { waitUntil: "networkidle" });
+      }
       const sidebar = page.locator(".people-desktop-sidebar");
       const sidebarText = await sidebar.innerText();
       const operationalSection = sidebar.locator(".people-sidebar-section").filter({ hasText: "Operational" });
@@ -5721,6 +5745,20 @@ async function checkPeopleMemoryBrowserState(
           await filterSheet.locator("footer").getByRole("button", { name: "Reset" }).count() === 1 &&
           await filterSheet.getByText("Save as view", { exact: false }).count() === 0,
         `People filters did not expose four editable controls or retained Save as view at ${viewport.label}`
+      );
+      const filterActionGeometry = await filterSheet.locator("footer button").evaluateAll((buttons) => buttons.map((button) => {
+        const rect = button.getBoundingClientRect();
+        return {
+          width: rect.width,
+          height: rect.height,
+          textContained: button.scrollWidth <= button.clientWidth && button.scrollHeight <= button.clientHeight
+        };
+      }));
+      assert(
+        filterActionGeometry.length === 2 &&
+          filterActionGeometry.every((button) => button.width >= 72 && button.height >= 38 && button.textContained) &&
+          Math.abs(filterActionGeometry[0].height - filterActionGeometry[1].height) < 1,
+        `People filter actions were misaligned or clipped at ${viewport.label}: ${JSON.stringify(filterActionGeometry)}`
       );
       const popoverMotion = await filterSheet.evaluate((element) => ({
         animationName: getComputedStyle(element).animationName,
@@ -6134,10 +6172,11 @@ async function checkPeopleMemoryBrowserState(
       );
       const timelineActionLabels = await page.locator(".people-timeline-actions .people-add-action span").allTextContents();
       assert(
-        timelineActionWidths.length === 2 &&
+          timelineActionWidths.length === 2 &&
           timelineActionWidths.every((width) => width < 190) &&
           JSON.stringify(timelineActionLabels) === JSON.stringify(["Interaction", "Follow-up"]) &&
-          await page.locator('.people-timeline-actions .people-add-action svg[data-icon-role="plus"][data-icon-candidate="plus"]').count() === 2,
+          await page.locator('.people-timeline-actions .people-add-action svg[data-icon-role="interaction"][data-icon-candidate="message-plus"]').count() === 1 &&
+          await page.locator('.people-timeline-actions .people-add-action svg[data-icon-role="plus"][data-icon-candidate="plus"]').count() === 1,
         `Timeline actions remained oversized at ${viewport.label}: ${JSON.stringify(timelineActionWidths)}`
       );
       const followUpPanel = page.locator('[data-people-follow-up-bridge]');
@@ -6173,7 +6212,8 @@ async function checkPeopleMemoryBrowserState(
       assert(
         (await sharedOrganizationInteraction.innerText()).includes(personTitle) &&
           (await sharedOrganizationInteraction.innerText()).includes(organizationTitle) &&
-          (await sharedOrganizationInteraction.innerText()).includes("Warm"),
+          (await sharedOrganizationInteraction.innerText()).includes("Warm") &&
+          (await sharedOrganizationInteraction.innerText()).includes("3:00 PM–4:00 PM"),
         `Shared interaction did not sync to the Organization timeline with participants and approach at ${viewport.label}`
       );
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=timeline`, { waitUntil: "networkidle" });
@@ -6183,7 +6223,10 @@ async function checkPeopleMemoryBrowserState(
       await interactionDialog.waitFor();
       assert(
         (await interactionDialog.getByLabel("Type").locator("option").allTextContents()).includes("Catch-up") &&
-          (await interactionDialog.getByLabel("Type").locator("option").allTextContents()).includes("Memory"),
+          (await interactionDialog.getByLabel("Type").locator("option").allTextContents()).includes("Memory") &&
+          await interactionDialog.getByLabel("Start").count() === 1 &&
+          await interactionDialog.getByLabel("End").count() === 1 &&
+          await interactionDialog.getByLabel("End").isDisabled(),
         `Interaction composer omitted Catch-up or Memory at ${viewport.label}`
       );
       const interactionComposerState = {
@@ -6204,10 +6247,23 @@ async function checkPeopleMemoryBrowserState(
       await interactionDialog.getByLabel("Type").selectOption("catch-up");
       await interactionDialog.getByLabel("Title").fill("Quick catch-up");
       await interactionDialog.getByLabel("Warm").check();
+      await interactionDialog.getByLabel("Start").fill("15:00");
+      await interactionDialog.getByLabel("End").fill("16:00");
       assert(
         await interactionDialog.getByLabel("Type").inputValue() === "catch-up" &&
-          await interactionDialog.getByLabel("Warm").isChecked(),
+          await interactionDialog.getByLabel("Warm").isChecked() &&
+          await interactionDialog.getByLabel("Start").inputValue() === "15:00" &&
+          await interactionDialog.getByLabel("End").inputValue() === "16:00",
         `Interaction composer did not accept Catch-up and Warm approach at ${viewport.label}`
+      );
+      const participantGeometry = await interactionDialog.locator(".people-interaction-participant-picker label").evaluateAll((labels) => labels.map((label) => {
+        const avatar = label.querySelector(".people-profile-photo")?.getBoundingClientRect();
+        const name = label.querySelector(":scope > span:last-child")?.getBoundingClientRect();
+        return avatar && name ? name.left - avatar.right : -1;
+      }));
+      assert(
+        participantGeometry.length > 0 && participantGeometry.every((gap) => gap >= 4),
+        `Interaction participant avatars overlapped names at ${viewport.label}: ${JSON.stringify(participantGeometry)}`
       );
       const dialogActions = await interactionDialog.locator(".people-dialog-action").evaluateAll((elements) =>
         elements.map((element) => {
@@ -6361,12 +6417,12 @@ async function checkPeopleMemoryBrowserState(
         `Properties did not render every labeled email and phone number at ${viewport.label}`
       );
       assert(
-        await page.getByRole("button", { name: /^Remove (email|phone|job|university|location)/ }).count() > 0 &&
+        await page.getByRole("button", { name: /^Remove (email|phone|job|university|place)/ }).count() > 0 &&
           await page.getByRole("button", { name: "Add email" }).count() === 1 &&
           await page.getByRole("button", { name: "Add phone" }).count() === 1 &&
           await page.getByRole("button", { name: "Add occupation" }).count() === 1 &&
           await page.getByRole("button", { name: "Add school" }).count() === 1 &&
-          await page.getByRole("button", { name: "Add location" }).count() === 1 &&
+          await page.getByRole("button", { name: "Add place" }).count() === 1 &&
           await page.getByRole("heading", { name: "Occupations", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "Education", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "Places", exact: true }).count() === 1 &&
@@ -6437,6 +6493,40 @@ async function checkPeopleMemoryBrowserState(
         fullPage: true
       });
 
+      await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}/edit?tab=properties`, { waitUntil: "networkidle" });
+      const organizationEditor = page.locator(".people-edit-form");
+      await organizationEditor.waitFor();
+      assert(
+        await organizationEditor.getByLabel("TikTok", { exact: true }).count() === 1 &&
+          await organizationEditor.getByLabel("Projects", { exact: true }).count() === 1 &&
+          await organizationEditor.getByRole("heading", { name: "Places", exact: true }).count() === 1 &&
+          await organizationEditor.getByRole("heading", { name: "Locations", exact: true }).count() === 0,
+        `Organization Properties did not retain creation fields or the shared Places language at ${viewport.label}`
+      );
+      const organizationSectionColors = await organizationEditor.locator(".people-themed-section").evaluateAll((sections) => ({
+        borders: Array.from(new Set(sections.map((section) => getComputedStyle(section).borderColor))),
+        headings: Array.from(new Set(sections.map((section) => {
+          const heading = section.querySelector(".people-profile-section-heading, .people-repeatable-heading");
+          return heading ? getComputedStyle(heading).color : "";
+        }).filter(Boolean)))
+      }));
+      assert(
+        organizationSectionColors.borders.length === 1 && organizationSectionColors.headings.length <= 2,
+        `Organization Properties retained unrelated rainbow section colors at ${viewport.label}: ${JSON.stringify(organizationSectionColors)}`
+      );
+      await organizationEditor.getByLabel("TikTok", { exact: true }).fill("https://tiktok.com/@discard-regression");
+      await organizationEditor.getByRole("button", { name: "Cancel", exact: true }).click();
+      const peopleDiscardDialog = page.getByRole("dialog", { name: "Discard your changes?", exact: true });
+      await peopleDiscardDialog.waitFor();
+      assert(
+        await peopleDiscardDialog.getByText("Confirm action", { exact: true }).count() === 0 &&
+          await peopleDiscardDialog.locator('svg[data-icon-role="discard-changes"]').count() === 1 &&
+          (await peopleDiscardDialog.innerText()).includes("The saved profile will stay unchanged") &&
+          await peopleDiscardDialog.getByRole("button", { name: "Keep editing", exact: true }).count() === 1,
+        `People discard confirmation did not use the concise icon-led design at ${viewport.label}`
+      );
+      await peopleDiscardDialog.getByRole("button", { name: "Discard changes", exact: true }).click();
+
       await page.goto(`${baseUrl}/admin/people/new`, { waitUntil: "networkidle" });
       const recordTypeGroup = page.getByRole("group", { name: "Record type" });
       await recordTypeGroup.waitFor();
@@ -6462,6 +6552,8 @@ async function checkPeopleMemoryBrowserState(
           await organizationForm.getByLabel("Status", { exact: true }).count() === 0 &&
           await organizationForm.getByLabel("Cadence", { exact: true }).count() === 0 &&
           await organizationForm.getByLabel("YouTube", { exact: true }).count() === 1 &&
+          await organizationForm.getByRole("heading", { name: "Notes", exact: true }).count() === 1 &&
+          await organizationForm.getByRole("heading", { name: "Places", exact: true }).count() === 1 &&
           await organizationForm.getByText("Mission", { exact: true }).count() === 0 &&
           await organizationForm.getByText("Services or capabilities", { exact: true }).count() === 0 &&
           await organizationForm.getByText("Organization context", { exact: true }).count() === 0 &&
@@ -6469,6 +6561,12 @@ async function checkPeopleMemoryBrowserState(
           await page.locator("[data-people-education-editor]").count() === 0 &&
           await page.locator("[data-people-birthday-editor]").count() === 0,
         `New Organization did not use its organization-specific property form at ${viewport.label}`
+      );
+      const organizationDescription = await organizationForm.getByLabel("Description").boundingBox();
+      const organizationNotes = await organizationForm.getByRole("heading", { name: "Notes", exact: true }).boundingBox();
+      assert(
+        organizationDescription && organizationNotes && organizationNotes.y > organizationDescription.y + organizationDescription.height,
+        `Organization Notes did not appear below Description at ${viewport.label}`
       );
       const organizationLabelTypography = await organizationForm.evaluate(() => {
         const organizationName = document.querySelector('label:has(input[placeholder="Organization name"])');
@@ -6496,6 +6594,7 @@ async function checkPeopleMemoryBrowserState(
         const location = document.querySelector("[data-location-entry]");
         const locationInputs = location ? Array.from(location.querySelectorAll("input")) : [];
         const remove = location?.querySelector(".people-remove-icon")?.getBoundingClientRect();
+        const add = location?.querySelector(".people-add-action")?.getBoundingClientRect();
         const city = locationInputs[1]?.getBoundingClientRect();
         const cityLabel = location?.querySelector(".people-field-label:nth-of-type(1)") || location?.querySelectorAll(".people-field-label")[1];
         const teamLabel = document.querySelector('[class~="people-org-team"]');
@@ -6503,8 +6602,10 @@ async function checkPeopleMemoryBrowserState(
           foundedTop: founded?.top || 0,
           teamTop: team?.top || 0,
           removeTop: remove?.top || 0,
+          addTop: add?.top || 0,
           cityTop: city?.top || 0,
           removeHeight: remove?.height || 0,
+          addHeight: add?.height || 0,
           cityHeight: city?.height || 0,
           cityFamily: cityLabel ? getComputedStyle(cityLabel).fontFamily : "",
           teamFamily: teamLabel ? getComputedStyle(teamLabel).fontFamily : ""
@@ -6514,8 +6615,10 @@ async function checkPeopleMemoryBrowserState(
         organizationLayout &&
           (viewport.label === "mobile" || Math.abs(organizationLayout.foundedTop - organizationLayout.teamTop) < 2) &&
           (viewport.label === "mobile" || Math.abs(organizationLayout.removeTop - organizationLayout.cityTop) < 2) &&
+          (viewport.label === "mobile" || Math.abs(organizationLayout.addTop - organizationLayout.cityTop) < 2) &&
+          Math.abs(organizationLayout.addHeight - organizationLayout.cityHeight) < 2 &&
           organizationLayout.cityFamily === organizationLayout.teamFamily,
-        `Organization details or Location alignment drifted at ${viewport.label}: ${JSON.stringify(organizationLayout)}`
+        `Organization details or Places alignment drifted at ${viewport.label}: ${JSON.stringify(organizationLayout)}`
       );
       const organizationTypeSelect = organizationForm.locator("[data-organization-type]");
       const organizationIndustrySelect = organizationForm.locator("[data-organization-industry]");
@@ -6659,7 +6762,7 @@ async function checkPeopleMemoryBrowserState(
       );
       const addUniversityButton = page.getByRole("button", { name: "Add school" });
       const addJobButton = page.getByRole("button", { name: "Add occupation" });
-      const addLocationButton = page.getByRole("button", { name: "Add location" });
+      const addLocationButton = page.getByRole("button", { name: "Add place" });
       if (viewport.label === "mobile") {
         await addUniversityButton.dispatchEvent("click");
         await addJobButton.dispatchEvent("click");
@@ -7008,6 +7111,14 @@ async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, 
     assert(
       await page.getByRole("button", { name: `Remove star from ${personTitle}`, exact: true }).getAttribute("aria-pressed") === "true",
       "People profile star did not expose its selected state"
+    );
+    const starredProfileVisual = await page.getByRole("button", { name: `Remove star from ${personTitle}`, exact: true }).evaluate((button) => {
+      const icon = button.querySelector("svg");
+      return icon ? { fill: getComputedStyle(icon).fill, color: getComputedStyle(icon).color } : null;
+    });
+    assert(
+      starredProfileVisual && starredProfileVisual.fill === starredProfileVisual.color && starredProfileVisual.fill !== "none",
+      `People profile star was not visibly filled: ${JSON.stringify(starredProfileVisual)}`
     );
 
     await page.goto(`${baseUrl}/admin/people?sidebar=starred`, { waitUntil: "networkidle" });
@@ -7708,6 +7819,8 @@ async function checkCrossModuleFollowUpConnections(
         new URL(desktopPage.url()).searchParams.get("tab") === "decisions",
       "Browser Back did not restore the source Note and Decisions tab"
     );
+    await desktopPage.waitForTimeout(250);
+    await desktopPage.waitForLoadState("networkidle");
 
     await desktopPage.goto(
       `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=overview`,
@@ -9301,8 +9414,8 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       }
       assert(await page.getByText("Resources remain authoritative.", { exact: false }).count() >= 1, `Style Guide did not disclose the Resource ownership boundary at ${viewport.label}`);
       assert(await page.locator('section[aria-label="Guide identity"] input').count() === 2, `Style Guide identity was not editable at ${viewport.label}`);
-      assert(await page.locator('[data-icon-registry-count="105"]').count() === 1, `Style Guide did not expose all 105 canonical icon roles at ${viewport.label}`);
-      assert(await page.locator('input[aria-label$=" usage"]').count() === 105, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
+      assert(await page.locator('[data-icon-registry-count="107"]').count() === 1, `Style Guide did not expose all 107 canonical icon roles at ${viewport.label}`);
+      assert(await page.locator('input[aria-label$=" usage"]').count() === 107, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
       assert(await page.locator('[class*="iconCandidate"]').count() >= 420, `Style Guide did not expose five curated recommendations for each unselected icon at ${viewport.label}`);
       const iconCentering = await page.locator('[class*="iconCandidate"] a').first().evaluate((anchor) => {
         const icon = anchor.querySelector("svg");
@@ -10399,6 +10512,7 @@ async function checkNoteProjectAssociations(
         restoredUrl.searchParams.get("tab") === "links",
       "Browser Back did not restore the Notes identity and Links tab"
     );
+    await page.waitForTimeout(250);
     await page.goto(restoredUrl.href, { waitUntil: "networkidle" });
     await page.locator(`[data-project-id="${project.id}"]`).waitFor();
     assert(
@@ -12831,14 +12945,14 @@ async function main() {
     const initialStyleGuide = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide");
     assert(
       initialStyleGuide.response.ok &&
-        initialStyleGuide.payload?.state?.schemaVersion === 4 &&
+        initialStyleGuide.payload?.state?.schemaVersion === 5 &&
         initialStyleGuide.payload?.state?.typography?.length >= 6 &&
         initialStyleGuide.payload?.state?.colors?.length >= 18 &&
         initialStyleGuide.payload?.state?.modules?.length === 9 &&
-        initialStyleGuide.payload?.state?.icons?.length === 105 &&
+        initialStyleGuide.payload?.state?.icons?.length === 107 &&
         initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.primaryName === "Signal Red" &&
         initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.tokens?.action === "#B42318" &&
-        ["module-projects", "module-notes", "module-people", "module-media", "module-personal", "module-reviews", "module-resources", "module-finance", "module-vault"].every((role) => initialStyleGuide.payload.state.icons.some((item) => item.icon === role)) &&
+        ["module-projects", "module-notes", "module-people", "module-media", "module-personal", "module-reviews", "module-resources", "module-finance", "module-vault", "interaction", "discard-changes"].every((role) => initialStyleGuide.payload.state.icons.some((item) => item.icon === role)) &&
         initialStyleGuide.payload.state.icons.every((item) => item.usage),
       "Style Guide defaults did not expose the expanded design foundation"
     );
@@ -16009,6 +16123,8 @@ async function main() {
           participantIds: [createdPerson.id, createdOrganization.id],
           kind: "meeting",
           occurredOn: "2026-08-11",
+          startTime: "15:00",
+          endTime: "16:00",
           approach: "warm",
           updatesLastContact: false
         }
@@ -16023,8 +16139,37 @@ async function main() {
       sharedInteraction?.className === "interaction" &&
         JSON.stringify(sharedInteraction.interaction?.participantIds) === JSON.stringify([createdPerson.id, createdOrganization.id]) &&
         sharedInteraction.interaction?.approach === "warm" &&
-        sharedInteraction.interaction?.kind === "meeting",
+        sharedInteraction.interaction?.kind === "meeting" &&
+        sharedInteraction.interaction?.startTime === "15:00" &&
+        sharedInteraction.interaction?.endTime === "16:00",
       "People did not persist one shared interaction with both participant identities and its approach"
+    );
+    const rejectInvalidInteractionWindow = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-csrf-token": csrfToken
+      },
+      body: JSON.stringify({
+        domain: "notes-docs",
+        title: "Invalid interaction window",
+        className: "interaction",
+        status: "completed",
+        privacy: "private",
+        stage: "processed",
+        happensOn: "2026-08-11",
+        interaction: {
+          participantIds: [createdPerson.id],
+          kind: "meeting",
+          occurredOn: "2026-08-11",
+          endTime: "16:00",
+          updatesLastContact: false
+        }
+      })
+    });
+    assert(
+      rejectInvalidInteractionWindow.response.status === 400 && !rejectInvalidInteractionWindow.payload?.ok,
+      "People accepted an interaction end time without a start time"
     );
     assert(
       persistedPerson?.subjects?.includes("Colleague") &&
@@ -17345,6 +17490,7 @@ async function main() {
         !resourceDetail.body.includes(`resource-${createdResource.id}-tab-${removedTab}`),
         `Resource detail retained the removed ${removedTab} tab`
       );
+
     }
 
     const resourceTimeline = await requestText(server.baseUrl, cookieJar, `/admin/resources/${createdResource.id}?tab=timeline`);

@@ -133,6 +133,8 @@ type ContactMethod = {
 
 type PeopleTimelineInteraction = {
   date?: string;
+  startTime?: string;
+  endTime?: string;
   kind?: string;
   title: string;
   summary?: string;
@@ -158,6 +160,9 @@ type PeopleIconName =
   | "object"
   | "dormant"
   | "active"
+  | "interaction"
+  | "new-person"
+  | "more"
   | "star"
   | "export"
   | "delete"
@@ -182,7 +187,7 @@ function PeopleIcon({ name }: { name: PeopleIconName }) {
     birthday: "birthday", location: "location", hometown: "hometown", occupation: "briefcase",
     employer: "employer", university: "university", partner: "partner", children: "users",
     organization: "organization", industry: "industry", founded: "clock", team: "users", edit: "edit",
-    object: "object", dormant: "dormant", active: "active", star: "star", export: "export", delete: "delete", chevron: "chevron-right",
+    object: "object", dormant: "dormant", active: "active", interaction: "interaction", "new-person": "new-person", more: "more", star: "star", export: "export", delete: "delete", chevron: "chevron-right",
     search: "search", filter: "filter", sort: "sort", check: "check", close: "close", plus: "plus", groups: "users",
     communication: "message", notes: "notes", cadence: "clock", "view-comfortable": "view-comfortable",
     "view-compact": "view-compact", "view-grid": "view-grid"
@@ -292,7 +297,8 @@ function PeopleAddButton({
   className = "",
   disabled = false,
   ariaLabel,
-  iconOnly = false
+  iconOnly = false,
+  icon = "plus"
 }: {
   label: string;
   onClick: () => void;
@@ -300,6 +306,7 @@ function PeopleAddButton({
   disabled?: boolean;
   ariaLabel?: string;
   iconOnly?: boolean;
+  icon?: PeopleIconName;
 }) {
   return (
     <button
@@ -309,7 +316,7 @@ function PeopleAddButton({
       disabled={disabled}
       aria-label={ariaLabel || `Add ${label.toLowerCase()}`}
     >
-      <PeopleIcon name="plus" />
+      <PeopleIcon name={icon} />
       <span className={iconOnly ? "people-visually-hidden" : undefined}>{label}</span>
     </button>
   );
@@ -415,6 +422,7 @@ type ContactProfileDraft = {
   headquarters: string;
   children: string;
   interactions: string;
+  projects: string;
   emails: PersonalEmailEntry[];
   phones: PersonalPhoneEntry[];
   memories: PersonalMemoryEntry[];
@@ -745,7 +753,9 @@ const ORGANIZATION_PROFILE_SECTIONS: Array<{ title: string; tone: string; fields
       { key: "website", label: "Website", type: "url", placeholder: "https://..." },
       { key: "youtube", label: "YouTube", type: "url", placeholder: "https://youtube.com/@..." },
       { key: "instagram", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
-      { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." }
+      { key: "tiktok", label: "TikTok", type: "url", placeholder: "https://tiktok.com/@..." },
+      { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." },
+      { key: "projects", label: "Projects", placeholder: "Comma-separated project names" }
     ]
   }
 ];
@@ -797,6 +807,7 @@ const EMPTY_PROFILE_DRAFT: ContactProfileDraft = {
   headquarters: "",
   children: "",
   interactions: "",
+  projects: "",
   emails: [],
   phones: [],
   memories: [],
@@ -875,6 +886,16 @@ function formatFullDate(value?: string) {
     day: "numeric",
     year: "numeric"
   }).format(date);
+}
+
+function formatInteractionTime(startTime?: string, endTime?: string) {
+  const format = (value: string) => {
+    const [hours, minutes] = value.split(":").map(Number);
+    const date = new Date(2000, 0, 1, hours, minutes);
+    return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
+  };
+  if (!startTime) return "";
+  return endTime ? `${format(startTime)}–${format(endTime)}` : format(startTime);
 }
 
 function splitList(value: string) {
@@ -1112,6 +1133,8 @@ function canonicalInteractionItem(record: PersonalRecord): PeopleTimelineItem | 
       kind: record.interaction.kind,
       title: record.title,
       summary: record.body || undefined,
+      startTime: record.interaction.startTime,
+      endTime: record.interaction.endTime,
       approach: record.interaction.approach,
       updatesLastContact: record.interaction.updatesLastContact
     }
@@ -1357,6 +1380,7 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     headquarters: profile?.headquarters || "",
     children: joinList(profile?.children),
     interactions: joinTextEntries(profile?.interactions),
+    projects: joinList(record.projects),
     emails: profile ? legacyEmailEntries(profile) : [],
     phones: profile ? legacyPhoneEntries(profile) : [],
     memories: (profile?.memories || []).map((memory) => ({ ...memory })),
@@ -1393,6 +1417,7 @@ function lastContactTimestamp(record: PersonalRecord, interactionDate = ""): num
 }
 
 function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile {
+  const { projects: _projects, ...profileDraft } = draft;
   const education = cleanEducationEntries(draft.education);
   const occupations = cleanOccupationEntries(draft.occupations);
   const locations = cleanLocationEntries(draft.locations);
@@ -1405,7 +1430,7 @@ function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile
   const universityEmail = emails.find((entry) => entry.category === "university");
   const primaryPhone = phones.find((entry) => entry.category === "primary") || phones[0];
   return {
-    ...draft,
+    ...profileDraft,
     ...Object.fromEntries(PEOPLE_PROFILE_LINK_KEYS.map((key) => [key, withoutTrailingLinkSlash(draft[key])])),
     phoneCountryCode: primaryPhone?.countryCode || canonicalCountryCode(draft.phoneCountryCode),
     phoneNumber: primaryPhone?.number || "",
@@ -1821,8 +1846,8 @@ function LocationEntriesEditor({
   return (
     <section className="people-repeatable-section people-themed-section module-ref-tone-cyan" data-people-location-editor data-profile-section="locations">
       <header className="people-repeatable-heading">
-        <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>{organization ? "Locations" : "Places"}</h4></div>
-        {entries.length === 0 && <PeopleAddButton label="Location" onClick={onAdd} iconOnly />}
+        <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>Places</h4></div>
+        {entries.length === 0 && <PeopleAddButton label="Place" onClick={onAdd} iconOnly />}
       </header>
       {!organization && onComesFromChange && (
         <label className="people-comes-from-field">Comes from<input list="people-location-suggestions" value={comesFrom} onChange={(event) => onComesFromChange(event.target.value)} placeholder="Hometown or place of origin" /></label>
@@ -1830,16 +1855,16 @@ function LocationEntriesEditor({
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-location">
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Label</span><input aria-label={`Location ${index + 1} label`} value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? "Relevant location" : index === 0 ? "Primary home" : "Second home"} /></label>
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City</span><input aria-label={`Location ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing…" /></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Label</span><input aria-label={`Place ${index + 1} label`} value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? "Relevant place" : index === 0 ? "Primary home" : "Second home"} /></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City</span><input aria-label={`Place ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing…" /></label>
             <div className={`people-repeatable-inline-actions${index === 0 ? " has-visible-label" : ""}`}>
-              <RemoveIconButton className="people-repeatable-inline-remove people-location-inline-remove" label={`Remove location ${index + 1}`} onClick={() => onRemove(entry.id)} />
-              {index === 0 && <PeopleAddButton label="Location" onClick={onAdd} iconOnly />}
+              <RemoveIconButton className="people-repeatable-inline-remove people-location-inline-remove" label={`Remove place ${index + 1}`} onClick={() => onRemove(entry.id)} />
+              {index === 0 && <PeopleAddButton label="Place" onClick={onAdd} iconOnly />}
             </div>
-            <label className="is-wide"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><textarea aria-label={`Location ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={1} /></label>
+            <label className="is-wide"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><textarea aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={1} /></label>
           </div>
         </article>
-      )) : <p className="people-repeatable-empty">No location added.</p>}
+      )) : <p className="people-repeatable-empty">No place added.</p>}
     </section>
   );
 }
@@ -2234,6 +2259,7 @@ export default function PeopleWorkspace({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const initialUrlState = parsePeopleUrlState(searchParams);
+  const initialCreateClass = initialMode === "new" && searchParams.get("type") === "organization" ? "org" : "person";
   const projectsRepository = useMemo(() => createProjectsRepository(), []);
   const [people, setPeople] = useState(initialPeople);
   const [interactionRecords, setInteractionRecords] = useState(initialInteractions);
@@ -2264,7 +2290,7 @@ export default function PeopleWorkspace({
   const [quickMiddleName, setQuickMiddleName] = useState("");
   const [quickLastName, setQuickLastName] = useState("");
   const [quickBirthday, setQuickBirthday] = useState("");
-  const [className, setClassName] = useState<Extract<PersonalRecordClass, "person" | "org">>("person");
+  const [className, setClassName] = useState<Extract<PersonalRecordClass, "person" | "org">>(initialCreateClass);
   const [groups, setGroups] = useState<string[]>(["Collaborator"]);
   const [status, setStatus] = useState<PersonalRecordStatus>("active");
   const [quickContext, setQuickContext] = useState("");
@@ -2331,6 +2357,8 @@ export default function PeopleWorkspace({
   const [interactionApproach, setInteractionApproach] = useState<"" | PersonalInteractionApproach>("");
   const [interactionParticipantIds, setInteractionParticipantIds] = useState<string[]>([]);
   const [interactionDate, setInteractionDate] = useState("");
+  const [interactionStartTime, setInteractionStartTime] = useState("");
+  const [interactionEndTime, setInteractionEndTime] = useState("");
   const [interactionTitle, setInteractionTitle] = useState("");
   const [interactionSummary, setInteractionSummary] = useState("");
   const [interactionMeaningful, setInteractionMeaningful] = useState(true);
@@ -2407,6 +2435,7 @@ export default function PeopleWorkspace({
       setDetailMode("edit");
       setAddingPerson(false);
     } else if (initialMode === "new") {
+      setClassName(searchParams.get("type") === "organization" ? "org" : "person");
       setAddingPerson(true);
       setDetailMode("edit");
     } else {
@@ -3158,6 +3187,7 @@ export default function PeopleWorkspace({
         reviewCadence: profile.contactCadence || undefined
       },
       subjects: profileGroups,
+      projects: splitList(nextDraft.projects),
       profile
     });
   }
@@ -3185,6 +3215,8 @@ export default function PeopleWorkspace({
     setInteractionKind("meeting");
     setInteractionApproach("");
     setInteractionParticipantIds(record ? [record.id] : []);
+    setInteractionStartTime("");
+    setInteractionEndTime("");
     setInteractionTitle("");
     setInteractionSummary("");
     setInteractionMeaningful(true);
@@ -3195,6 +3227,11 @@ export default function PeopleWorkspace({
   async function saveInteraction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!interactionDate || !interactionTitle.trim() || interactionParticipantIds.length === 0) return;
+    if (interactionEndTime && (!interactionStartTime || interactionEndTime < interactionStartTime)) {
+      setError("Choose a start time before the end time, and keep the end after the start.");
+      return;
+    }
+    setError("");
     setInteractionSaving(true);
     const kindLabel = interactionKind === "catch-up" ? "Catch-up" : labelize(interactionKind);
     try {
@@ -3210,6 +3247,10 @@ export default function PeopleWorkspace({
           status: "completed",
           body: interactionSummary.trim(),
           happensOn: interactionDate,
+          time: {
+            startDate: interactionDate,
+            startTime: interactionStartTime || undefined
+          },
           areas: ["Relationships"],
           subjects: [kindLabel, ...(interactionApproach ? [`${labelize(interactionApproach)} approach`] : [])],
           intents: ["connect"],
@@ -3217,6 +3258,8 @@ export default function PeopleWorkspace({
             participantIds: interactionParticipantIds,
             kind: interactionKind,
             occurredOn: interactionDate,
+            startTime: interactionStartTime || undefined,
+            endTime: interactionEndTime || undefined,
             approach: interactionApproach || undefined,
             updatesLastContact: interactionMeaningful
           }
@@ -3240,6 +3283,8 @@ export default function PeopleWorkspace({
       setInteractionSummary("");
       setInteractionParticipantIds([]);
       setInteractionApproach("");
+      setInteractionStartTime("");
+      setInteractionEndTime("");
       setActionNotice(`Interaction saved to ${interactionParticipantIds.length} ${interactionParticipantIds.length === 1 ? "profile" : "profiles"}.`);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : "Unable to save the interaction. Your draft is still here.");
@@ -3680,7 +3725,7 @@ export default function PeopleWorkspace({
   }
 
   function openAddPerson(type: "person" | "org" = "person") {
-    const destination = `${getModuleRoute("people")}/new`;
+    const destination = `${getModuleRoute("people")}/new${type === "org" ? "?type=organization" : ""}`;
     if (guardDirtyNavigation(destination)) return;
     setClassName(type);
     setName("");
@@ -3697,6 +3742,12 @@ export default function PeopleWorkspace({
     setQuickTeamSize("");
     setQuickOrganizationPeople([]);
     setQuickObjectTargetIds([]);
+    setQuickProjects("");
+    setReferenceUrl("");
+    setQuickInstagram("");
+    setQuickTikTok("");
+    setQuickX("");
+    setQuickLinkedIn("");
     setQuickYouTube("");
     setQuickEmails([newEmailEntry({ id: "new-contact-email-1", category: "primary" })]);
     setQuickPhones([newPhoneEntry({ id: "new-contact-phone-1", category: "primary", countryCode: "+1" })]);
@@ -3888,9 +3939,9 @@ export default function PeopleWorkspace({
     return (
       <form className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
         <div className="people-edit-toolbar">
-          <button type="button" onClick={requestCancelEditor}>Cancel</button>
+          <button type="button" onClick={requestCancelEditor}><PeopleIcon name="close" /><span>Cancel</span></button>
           <strong>{className === "org" ? "New Organization" : "New Person"}</strong>
-          <button type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
+          <button type="submit" disabled={saving}><PeopleIcon name="check" /><span>{saving ? "Saving..." : "Save"}</span></button>
         </div>
         <fieldset className="people-record-type-toggle">
           <legend className="sr-only">Record type</legend>
@@ -4044,6 +4095,13 @@ export default function PeopleWorkspace({
               <label className="people-org-team">Team size<input value={quickTeamSize} onChange={(event) => setQuickTeamSize(event.target.value)} placeholder="1–10, 50, global network..." /></label>
               <label className="is-wide">Description<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={3} placeholder="What this organization is and why it is relevant." /></label>
             </div>
+            <PeopleNotesEditor
+              title="Notes"
+              idPrefix="people-organization-note"
+              editorKind="notes"
+              notes={quickNotes}
+              onChange={setQuickNotes}
+            />
           </section>
           <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" aria-labelledby="people-organization-links-title">
             <header className="people-profile-section-heading">
@@ -4174,13 +4232,13 @@ export default function PeopleWorkspace({
           </div>
           <div className="people-header-actions">
             <button type="button" aria-label="Log interaction" onClick={() => openInteractionComposer()}>
-              <PeopleIcon name="plus" /><span>Interaction</span>
+              <PeopleIcon name="interaction" /><span>Interaction</span>
             </button>
             <button type="button" aria-label="Add organization" onClick={() => openAddPerson("org")}>
-              <PeopleIcon name="plus" /><span>Organization</span>
+              <PeopleIcon name="organization" /><span>Organization</span>
             </button>
             <button type="button" aria-label="Add person" onClick={() => openAddPerson("person")}>
-              <PeopleIcon name="plus" /><span>Person</span>
+              <PeopleIcon name="new-person" /><span>Person</span>
             </button>
           </div>
         </header>
@@ -4428,7 +4486,7 @@ export default function PeopleWorkspace({
                 <h2 id="people-recent-interactions-title">Recent interactions</h2>
                 <span>Shared activity across People</span>
               </div>
-              <button type="button" onClick={() => openInteractionComposer()}>Log interaction</button>
+              <button type="button" onClick={() => openInteractionComposer()}><PeopleIcon name="interaction" /><span>Log interaction</span></button>
             </header>
             <div className="people-recent-interaction-list">
               {recentInteractionItems.length > 0 ? recentInteractionItems.map((item) => {
@@ -4448,7 +4506,7 @@ export default function PeopleWorkspace({
                     {item.kind === "interaction" && item.interaction.approach && (
                       <span className={`people-approach-badge is-${item.interaction.approach}`}>{labelize(item.interaction.approach)}</span>
                     )}
-                    <time dateTime={item.date}>{item.date ? formatFullDate(item.date) : "Date unknown"}</time>
+                    <time dateTime={item.date}>{item.date ? formatFullDate(item.date) : "Date unknown"}{item.kind === "interaction" && formatInteractionTime(item.interaction.startTime, item.interaction.endTime) ? ` · ${formatInteractionTime(item.interaction.startTime, item.interaction.endTime)}` : ""}</time>
                   </article>
                 );
               }) : (
@@ -4525,7 +4583,7 @@ export default function PeopleWorkspace({
                   aria-expanded={profileMenuOpen}
                   aria-controls="people-profile-action-menu"
                   onClick={() => setProfileMenuOpen((current) => !current)}
-                ><span aria-hidden="true">•••</span></button>
+                ><PeopleIcon name="more" /></button>
               </div>
               {profileMenuOpen && (
                 <div id="people-profile-action-menu" className="people-action-menu" role="menu" aria-label="Profile actions">
@@ -4572,8 +4630,8 @@ export default function PeopleWorkspace({
                   <div className="people-edit-toolbar">
                     <strong>{selectedPerson.className === "org" ? "Edit Organization" : "Edit Profile"}</strong>
                     <div>
-                      <button type="button" onClick={requestCancelEditor}>Cancel</button>
-                      <button type="submit" disabled={profileSaving}>{profileSaving ? "Saving..." : "Save"}</button>
+                      <button type="button" onClick={requestCancelEditor}><PeopleIcon name="close" /><span>Cancel</span></button>
+                      <button type="submit" disabled={profileSaving}><PeopleIcon name="check" /><span>{profileSaving ? "Saving..." : "Save"}</span></button>
                     </div>
                   </div>
                   {(selectedPerson.className === "org" ? ORGANIZATION_PROFILE_SECTIONS : PROFILE_SECTIONS).map((section) => (
@@ -4752,7 +4810,7 @@ export default function PeopleWorkspace({
             ) : detailMode === "timeline" ? (
               <section className="people-timeline-panel">
                 <div className="people-timeline-actions">
-                  <PeopleAddButton label="Interaction" ariaLabel="Log interaction" onClick={() => openInteractionComposer(selectedPerson)} />
+                  <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
                   <PeopleAddButton
                     label="Follow-up"
                     onClick={() => router.push(followUpCreationRoute(selectedPerson))}
@@ -4779,7 +4837,7 @@ export default function PeopleWorkspace({
                       ) : (
                         <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
                           <div className="people-timeline-entry-meta">
-                            <span>{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) ? formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id)) : "Date unknown"}</span>
+                            <span>{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) ? formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id)) : "Date unknown"}{formatInteractionTime(item.interaction.startTime, item.interaction.endTime) ? ` · ${formatInteractionTime(item.interaction.startTime, item.interaction.endTime)}` : ""}</span>
                             {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind}</span>}
                             {item.interaction.approach && <span className={`people-approach-badge is-${item.interaction.approach}`}>{labelize(item.interaction.approach)}</span>}
                           </div>
@@ -5113,22 +5171,22 @@ export default function PeopleWorkspace({
 
       {!initialLoadError && <nav className="people-mobile-actionbar" aria-label="People quick actions">
         {mobileSurface === "directory" ? (
-          <button type="button" onClick={() => openAddPerson("person")}>Add Person</button>
+          <button type="button" onClick={() => openAddPerson("person")}><PeopleIcon name="new-person" /><span>Add Person</span></button>
         ) : mobileSurface === "editor" ? (
           <>
-            <button type="button" onClick={requestCancelEditor}>Cancel</button>
+            <button type="button" onClick={requestCancelEditor}><PeopleIcon name="close" /><span>Cancel</span></button>
             <button
               type="button"
               onClick={() => document.querySelector<HTMLFormElement>(addingPerson ? ".people-capture-form" : ".people-edit-form")?.requestSubmit()}
               disabled={saving || profileSaving}
             >
-              {saving || profileSaving ? "Saving…" : "Save"}
+              <PeopleIcon name="check" /><span>{saving || profileSaving ? "Saving…" : "Save"}</span>
             </button>
           </>
         ) : (
           <>
-            <button type="button" onClick={() => openInteractionComposer(selectedPerson)}>Log Interaction</button>
-            <button type="button" onClick={() => setProfileMenuOpen(true)}>More</button>
+            <button type="button" onClick={() => openInteractionComposer(selectedPerson)}><PeopleIcon name="interaction" /><span>Log Interaction</span></button>
+            <button type="button" onClick={() => setProfileMenuOpen(true)}><PeopleIcon name="more" /><span>More</span></button>
           </>
         )}
       </nav>}
@@ -5161,6 +5219,25 @@ export default function PeopleWorkspace({
                 Date
                 <input type="date" value={interactionDate} onChange={(event) => setInteractionDate(event.target.value)} required />
               </label>
+              <fieldset className="people-interaction-time is-wide">
+                <legend>Time <span>Optional</span></legend>
+                <div>
+                  <label>
+                    Start
+                    <input type="time" value={interactionStartTime} onChange={(event) => {
+                      const nextStart = event.target.value;
+                      setInteractionStartTime(nextStart);
+                      if (!nextStart) setInteractionEndTime("");
+                    }} />
+                  </label>
+                  <span aria-hidden="true">to</span>
+                  <label>
+                    End
+                    <input type="time" value={interactionEndTime} min={interactionStartTime || undefined} disabled={!interactionStartTime} onChange={(event) => setInteractionEndTime(event.target.value)} />
+                  </label>
+                </div>
+                <p>Leave both blank for an untimed interaction, or add a start time by itself.</p>
+              </fieldset>
               <label className="is-wide">
                 Title
                 <input value={interactionTitle} onChange={(event) => setInteractionTitle(event.target.value)} placeholder="Coffee, call, introduction, or shared moment" required />
@@ -5219,7 +5296,7 @@ export default function PeopleWorkspace({
             {error && <p className="personal-record-error">{error}</p>}
             <footer className="people-dialog-actions">
               <button className="people-dialog-action" type="button" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}>Cancel</button>
-              <button className="people-dialog-action is-primary" type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate || interactionParticipantIds.length === 0}>
+              <button className="people-dialog-action is-primary" type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate || interactionParticipantIds.length === 0 || Boolean(interactionEndTime && (!interactionStartTime || interactionEndTime < interactionStartTime))}>
                 {interactionSaving ? "Saving..." : "Save interaction"}
               </button>
             </footer>
@@ -5349,9 +5426,12 @@ export default function PeopleWorkspace({
           if (!open) setPendingNavigation(null);
         }}
         onConfirm={discardEditorChanges}
-        title="Discard unsaved People changes?"
-        description="Your current form values have not been saved to the Personal Records store."
-        consequences={["The stored person will not be changed.", "Only the unsaved draft in this editor will be discarded."]}
+        className="people-discard-confirmation"
+        eyebrow={null}
+        iconRole="discard-changes"
+        title="Discard your changes?"
+        description="Your unsaved edits will be removed. The saved profile will stay unchanged."
+        cancelLabel="Keep editing"
         confirmLabel="Discard changes"
         tone="danger"
       />

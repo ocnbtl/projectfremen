@@ -198,6 +198,8 @@ export type PersonalInteractionDetails = {
   participantIds: string[];
   kind: PersonalInteractionKind;
   occurredOn: string;
+  startTime?: string;
+  endTime?: string;
   approach?: PersonalInteractionApproach;
   updatesLastContact: boolean;
 };
@@ -667,6 +669,22 @@ function normalizeInteractionDetails(value: unknown, strict = false): PersonalIn
   }
   if (!occurredOn || !isValidMemoryDate(occurredOn)) return undefined;
 
+  const timePattern = /^(?:[01]\d|2[0-3]):[0-5]\d$/;
+  const startTime = typeof raw.startTime === "string" ? raw.startTime.trim() : "";
+  const endTime = typeof raw.endTime === "string" ? raw.endTime.trim() : "";
+  if (strict && startTime && !timePattern.test(startTime)) {
+    throw new Error("Interaction start time is invalid");
+  }
+  if (strict && endTime && !timePattern.test(endTime)) {
+    throw new Error("Interaction end time is invalid");
+  }
+  if (strict && endTime && !startTime) {
+    throw new Error("Interaction end time requires a start time");
+  }
+  if (strict && startTime && endTime && endTime < startTime) {
+    throw new Error("Interaction end time must be after the start time");
+  }
+
   const rawApproach = typeof raw.approach === "string" ? raw.approach.trim().toLowerCase() : "";
   const approach = rawApproach === "cold" || rawApproach === "warm"
     ? rawApproach as PersonalInteractionApproach
@@ -676,6 +694,8 @@ function normalizeInteractionDetails(value: unknown, strict = false): PersonalIn
     participantIds,
     kind,
     occurredOn,
+    ...(timePattern.test(startTime) ? { startTime } : {}),
+    ...(timePattern.test(endTime) && timePattern.test(startTime) && endTime >= startTime ? { endTime } : {}),
     ...(approach ? { approach } : {}),
     updatesLastContact: raw.updatesLastContact !== false
   };

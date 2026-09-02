@@ -20,6 +20,8 @@ export type ConfirmationSheetProps = {
   confirmDisabledReason?: string;
   dismissible?: boolean;
   className?: string;
+  eyebrow?: string | null;
+  iconRole?: string;
 };
 
 const FOCUSABLE_SELECTOR = [
@@ -46,7 +48,9 @@ export default function ConfirmationSheet({
   confirmDisabled = false,
   confirmDisabledReason,
   dismissible = true,
-  className
+  className,
+  eyebrow = "Confirm action",
+  iconRole
 }: ConfirmationSheetProps) {
   const titleId = useId();
   const descriptionId = useId();
@@ -128,9 +132,12 @@ export default function ConfirmationSheet({
         aria-busy={busy || undefined}
       >
         <header className="confirmation-sheet__header">
-          <div>
-            <span className="confirmation-sheet__eyebrow">Confirm action</span>
-            <h2 id={titleId}>{title}</h2>
+          <div className="confirmation-sheet__title-group">
+            {iconRole && <span className="confirmation-sheet__icon"><UnigentamosIcon role={iconRole} size={20} /></span>}
+            <div>
+              {eyebrow && <span className="confirmation-sheet__eyebrow">{eyebrow}</span>}
+              <h2 id={titleId}>{title}</h2>
+            </div>
           </div>
           {dismissible && (
             <button

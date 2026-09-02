@@ -13809,3 +13809,310 @@ html[data-admin-preview="mobile"] .people-record-type-toggle > div {
     grid-template-columns: 24px 78px minmax(0, 1fr);
   }
 }
+
+/* People V1.2 — refined Navy actions with People Orange / Warm Olive context. */
+.people-redesign-shell {
+  --people-action: var(--navy-600, #133c5e);
+  --people-action-hover: var(--navy-700, #0c2b44);
+  --people-action-pressed: var(--navy-800, #071a2c);
+  --people-action-soft: var(--navy-50, #ebf2f9);
+  --people-action-border: var(--navy-200, #90bce0);
+  --action-primary: var(--people-action);
+  --action-primary-hover: var(--people-action-hover);
+  --action-primary-pressed: var(--people-action-pressed);
+  --accent-orange: var(--module-icon);
+}
+
+.people-redesign-shell :where(
+  .people-header-actions button,
+  .people-edit-toolbar button[type="submit"],
+  .people-dialog-action.is-primary,
+  .people-recent-interactions > header button,
+  .people-timeline-actions .people-add-action,
+  .people-mobile-actionbar button:last-child,
+  .people-filter-sheet footer button:last-child
+) {
+  border-color: var(--people-action) !important;
+  background: var(--people-action) !important;
+  color: #fff !important;
+}
+
+.people-redesign-shell :where(
+  .people-header-actions button,
+  .people-edit-toolbar button[type="submit"],
+  .people-dialog-action.is-primary,
+  .people-recent-interactions > header button,
+  .people-timeline-actions .people-add-action,
+  .people-mobile-actionbar button:last-child,
+  .people-filter-sheet footer button:last-child
+) > * {
+  color: inherit !important;
+}
+
+.people-redesign-shell :where(
+  .people-header-actions button,
+  .people-edit-toolbar button[type="submit"],
+  .people-dialog-action.is-primary,
+  .people-recent-interactions > header button,
+  .people-timeline-actions .people-add-action,
+  .people-mobile-actionbar button:last-child,
+  .people-filter-sheet footer button:last-child
+):hover:not(:disabled) {
+  border-color: var(--people-action-hover) !important;
+  background: var(--people-action-hover) !important;
+}
+
+.people-redesign-shell :where(
+  .people-control-trigger,
+  .people-view-cycle,
+  .people-edit-toolbar button:not([type="submit"]),
+  .people-dialog-action:not(.is-primary),
+  .people-add-action,
+  .people-profile-more,
+  .people-mobile-actionbar button:first-child,
+  .people-filter-sheet footer button:first-child
+):not(.people-remove-icon, .people-row-star, .people-profile-star, .is-danger) {
+  border-color: color-mix(in srgb, var(--people-action-border) 72%, var(--border-soft)) !important;
+  background: var(--surface-panel) !important;
+  color: var(--people-action) !important;
+}
+
+.people-redesign-shell :where(
+  .people-control-trigger,
+  .people-view-cycle,
+  .people-edit-toolbar button:not([type="submit"]),
+  .people-dialog-action:not(.is-primary),
+  .people-add-action,
+  .people-profile-more,
+  .people-mobile-actionbar button:first-child,
+  .people-filter-sheet footer button:first-child
+):not(.people-remove-icon, .people-row-star, .people-profile-star, .is-danger):hover:not(:disabled) {
+  border-color: var(--people-action-border) !important;
+  background: var(--people-action-soft) !important;
+  color: var(--people-action-hover) !important;
+}
+
+.people-redesign-shell .people-capture-form .people-record-type-toggle button[aria-pressed="true"] {
+  background: var(--people-action) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 6px color-mix(in srgb, var(--people-action) 22%, transparent);
+}
+
+.people-redesign-shell .people-edit-toolbar button,
+.people-redesign-shell .people-recent-interactions > header button,
+.people-redesign-shell .people-mobile-actionbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.people-redesign-shell .people-edit-toolbar button svg,
+.people-redesign-shell .people-recent-interactions > header button svg,
+.people-redesign-shell .people-mobile-actionbar button svg {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+}
+
+.people-redesign-shell .people-profile-form .people-themed-section,
+.people-redesign-shell .people-capture-form .people-themed-section,
+.people-redesign-shell .people-profile-form .people-contact-channel-section,
+.people-redesign-shell .people-capture-form .people-contact-channel-section,
+.people-redesign-shell .people-profile-form .people-object-create-editor,
+.people-redesign-shell .people-capture-form .people-object-create-editor {
+  --people-section-accent: var(--module-icon) !important;
+  border-color: color-mix(in srgb, var(--module-border) 46%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--module-quiet) 16%, var(--surface-panel)) !important;
+}
+
+.people-redesign-shell :where(
+  [data-profile-section="links"],
+  [data-profile-section="communication"],
+  [data-profile-section="locations"],
+  [data-profile-section="education"],
+  [data-profile-section="people"],
+  [data-profile-section="objects"],
+  [data-profile-section="cadence"]
+) {
+  --people-section-accent: var(--module-secondary-700, #5a6040) !important;
+}
+
+.people-redesign-shell .people-profile-form :where(.people-profile-section-heading, .people-repeatable-heading),
+.people-redesign-shell .people-capture-form :where(.people-profile-section-heading, .people-repeatable-heading) {
+  border-color: color-mix(in srgb, var(--people-section-accent) 18%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--people-section-accent) 6%, var(--surface-panel)) !important;
+  color: var(--people-section-accent) !important;
+}
+
+.people-redesign-shell .people-primary-search .people-filter-sheet footer button {
+  display: inline-flex;
+  width: auto;
+  min-width: 0;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 13px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.people-redesign-shell .people-primary-search .people-filter-sheet footer button:last-child {
+  width: 100%;
+}
+
+.people-redesign-shell .people-contact-channel-fields,
+.people-redesign-shell .people-repeatable-fields-location {
+  align-items: end;
+}
+
+.people-redesign-shell .people-repeatable-inline-actions {
+  height: 40px;
+  margin: 0;
+  align-self: end;
+  align-items: center;
+  transform: translateY(-12px) !important;
+}
+
+.people-redesign-shell .people-repeatable-inline-actions > .people-location-inline-remove {
+  margin: 0 !important;
+  align-self: center !important;
+  transform: none !important;
+}
+
+.people-redesign-shell .people-repeatable-fields > .people-repeatable-inline-remove,
+.people-redesign-shell .people-contact-remove,
+.people-redesign-shell .people-contact-channel-fields .people-contact-remove {
+  margin: 0 !important;
+  align-self: end !important;
+}
+
+.people-redesign-shell .people-repeatable-fields > .people-repeatable-inline-remove {
+  transform: translateY(-12px) !important;
+}
+
+.people-redesign-shell .people-contact-remove,
+.people-redesign-shell .people-contact-channel-fields .people-contact-remove {
+  transform: none !important;
+}
+
+.people-redesign-shell .people-row-star,
+.people-redesign-shell .people-profile-star {
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+.people-redesign-shell .people-row-star.is-starred,
+.people-redesign-shell .people-profile-star.is-starred {
+  color: var(--module-icon) !important;
+}
+
+.people-redesign-shell .people-row-star.is-starred svg,
+.people-redesign-shell .people-profile-star.is-starred svg {
+  fill: currentColor !important;
+}
+
+.people-interaction-participant-picker label > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-interaction-participant-picker .people-profile-photo.is-compact {
+  width: 28px;
+  min-width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.people-interaction-time {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid color-mix(in srgb, var(--people-action-border) 56%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--people-action-soft) 38%, var(--surface-panel));
+}
+
+.people-interaction-time legend {
+  padding: 0 4px;
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.people-interaction-time legend span {
+  margin-left: 4px;
+  color: var(--text-muted);
+  font-size: 9px;
+  font-weight: 700;
+}
+
+.people-interaction-time > div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 8px;
+  align-items: end;
+}
+
+.people-interaction-time > div > span {
+  padding-bottom: 11px;
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.people-interaction-time p {
+  margin: 6px 0 0;
+  color: var(--text-muted);
+  font-size: 9px;
+  line-height: 1.4;
+}
+
+.confirmation-sheet__title-group {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.confirmation-sheet__icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 10px;
+  background: var(--panel-bg-subtle);
+  color: var(--action-primary);
+}
+
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__panel {
+  width: min(440px, 100%);
+  border-color: color-mix(in srgb, var(--people-action-border) 60%, var(--border));
+}
+
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__icon {
+  background: var(--people-action-soft);
+  color: var(--people-action);
+}
+
+.people-redesign-shell .people-discard-confirmation .confirmation-sheet__actions button:first-child {
+  border-color: var(--people-action-border);
+  background: var(--surface-panel);
+  color: var(--people-action);
+}
+
+@media (max-width: 760px) {
+  .people-interaction-time > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .people-interaction-time > div > span {
+    display: none;
+  }
+}
