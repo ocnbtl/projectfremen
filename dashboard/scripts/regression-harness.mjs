@@ -5716,6 +5716,9 @@ async function checkPeopleMemoryBrowserState(
       await filterSheet.waitFor();
       assert(
         await filterSheet.locator("select").count() === 4 &&
+          await filterSheet.locator(".people-filter-select").count() === 4 &&
+          await filterSheet.locator("header").getByRole("button", { name: "Reset" }).count() === 0 &&
+          await filterSheet.locator("footer").getByRole("button", { name: "Reset" }).count() === 1 &&
           await filterSheet.getByText("Save as view", { exact: false }).count() === 0,
         `People filters did not expose four editable controls or retained Save as view at ${viewport.label}`
       );
@@ -5740,7 +5743,7 @@ async function checkPeopleMemoryBrowserState(
       await filterTrigger.click();
       assert(await filterSheet.count() === 0, `People filter trigger did not close the open filter sheet at ${viewport.label}`);
       await filterTrigger.click();
-      await page.locator("#people-filter-sheet").getByRole("button", { name: "Clear all" }).click();
+      await page.locator("#people-filter-sheet").getByRole("button", { name: "Reset" }).click();
       await page.locator("#people-filter-sheet").getByRole("button", { name: /Show \d+ results/i }).click();
       if (viewport.label !== "mobile") {
         await page.locator('.people-primary-search .people-control-trigger[aria-controls="people-sort-menu"]').click();
@@ -5760,8 +5763,9 @@ async function checkPeopleMemoryBrowserState(
       );
       assert(
         await nicknameDirectoryRow.locator(".people-activity-marker svg").count() === 1 &&
-          (await nicknameDirectoryRow.locator(".people-activity-marker").innerText()).trim().length > 0,
-        `People directory did not render its icon-and-word activity marker at ${viewport.label}`
+          (await nicknameDirectoryRow.locator(".people-activity-marker").innerText()).trim().length === 0 &&
+          (await nicknameDirectoryRow.locator(".people-row-date").innerText()).trim().length > 0,
+        `People directory did not keep the activity icon and last-contact date on one compact line at ${viewport.label}`
       );
       if (viewport.label === "desktop") {
         await nicknameDirectoryRow.hover();
@@ -5929,8 +5933,9 @@ async function checkPeopleMemoryBrowserState(
         photoOptions.length === 3 &&
           photoOptions.some((label) => label.includes("Upload")) &&
           photoOptions.some((label) => label.includes("Paste")) &&
-          photoOptions.some((label) => label.includes("Take picture")),
-        `Profile picture dialog omitted upload, paste, or camera capture at ${viewport.label}`
+          photoOptions.some((label) => label.includes("Take picture")) &&
+          await photoDialog.locator(".people-photo-options button .unigentamos-icon").count() === 3,
+        `Profile picture dialog omitted canonical upload, paste, or camera actions at ${viewport.label}`
       );
       await photoDialog.locator('input[type="file"]').first().setInputFiles({
         name: "profile-crop-regression.png",
@@ -9296,9 +9301,17 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       }
       assert(await page.getByText("Resources remain authoritative.", { exact: false }).count() >= 1, `Style Guide did not disclose the Resource ownership boundary at ${viewport.label}`);
       assert(await page.locator('section[aria-label="Guide identity"] input').count() === 2, `Style Guide identity was not editable at ${viewport.label}`);
-      assert(await page.locator('[data-icon-registry-count="102"]').count() === 1, `Style Guide did not expose all 102 canonical icon roles at ${viewport.label}`);
-      assert(await page.locator('input[aria-label$=" usage"]').count() === 102, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
+      assert(await page.locator('[data-icon-registry-count="105"]').count() === 1, `Style Guide did not expose all 105 canonical icon roles at ${viewport.label}`);
+      assert(await page.locator('input[aria-label$=" usage"]').count() === 105, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
       assert(await page.locator('[class*="iconCandidate"]').count() >= 420, `Style Guide did not expose five curated recommendations for each unselected icon at ${viewport.label}`);
+      const iconCentering = await page.locator('[class*="iconCandidate"] a').first().evaluate((anchor) => {
+        const icon = anchor.querySelector("svg");
+        if (!icon) return Number.POSITIVE_INFINITY;
+        const box = anchor.getBoundingClientRect();
+        const glyph = icon.getBoundingClientRect();
+        return Math.abs((box.left + box.width / 2) - (glyph.left + glyph.width / 2));
+      });
+      assert(iconCentering <= 1, `Style Guide recommendation icons were not centered in their boxes at ${viewport.label}: ${iconCentering}`);
       const typographyFamilies = await page.locator('[class*="specimenPreview"]').evaluateAll((elements) => elements.slice(0, 6).map((element) => getComputedStyle(element).fontFamily));
       assert(
         typographyFamilies.some((family) => family.includes("Plus Jakarta Sans Variable")) &&
@@ -10386,7 +10399,7 @@ async function checkNoteProjectAssociations(
         restoredUrl.searchParams.get("tab") === "links",
       "Browser Back did not restore the Notes identity and Links tab"
     );
-    await page.reload({ waitUntil: "networkidle" });
+    await page.goto(restoredUrl.href, { waitUntil: "networkidle" });
     await page.locator(`[data-project-id="${project.id}"]`).waitFor();
     assert(
       await page.locator(`[data-project-id="${project.id}"]`).count() === 1,
@@ -12818,11 +12831,13 @@ async function main() {
     const initialStyleGuide = await requestJson(server.baseUrl, cookieJar, "/api/personal/style-guide");
     assert(
       initialStyleGuide.response.ok &&
-        initialStyleGuide.payload?.state?.schemaVersion === 3 &&
+        initialStyleGuide.payload?.state?.schemaVersion === 4 &&
         initialStyleGuide.payload?.state?.typography?.length >= 6 &&
         initialStyleGuide.payload?.state?.colors?.length >= 18 &&
         initialStyleGuide.payload?.state?.modules?.length === 9 &&
-        initialStyleGuide.payload?.state?.icons?.length === 102 &&
+        initialStyleGuide.payload?.state?.icons?.length === 105 &&
+        initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.primaryName === "Signal Red" &&
+        initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.tokens?.action === "#B42318" &&
         ["module-projects", "module-notes", "module-people", "module-media", "module-personal", "module-reviews", "module-resources", "module-finance", "module-vault"].every((role) => initialStyleGuide.payload.state.icons.some((item) => item.icon === role)) &&
         initialStyleGuide.payload.state.icons.every((item) => item.usage),
       "Style Guide defaults did not expose the expanded design foundation"
@@ -15735,7 +15750,9 @@ async function main() {
           context: "Regression-created organization description.",
           organizationType: "Business",
           industry: "Professional services",
-          youtube: "https://youtube.com/@regression-studio",
+          website: "https://regression-studio.example/",
+          youtube: "https://youtube.com/@regression-studio/",
+          instagram: "https://instagram.com/regression-studio/",
           foundedYear: "2021",
           teamSize: "1–10",
           headquarters: "Columbus, Ohio, USA",
@@ -15758,7 +15775,9 @@ async function main() {
       createdOrganization?.id &&
         createdOrganization.profile?.organizationType === "Business" &&
         createdOrganization.profile?.industry === "Professional services" &&
+        createdOrganization.profile?.website === "https://regression-studio.example" &&
         createdOrganization.profile?.youtube === "https://youtube.com/@regression-studio" &&
+        createdOrganization.profile?.instagram === "https://instagram.com/regression-studio" &&
         createdOrganization.profile?.locations?.[0]?.label === "Relevant location" &&
         createdOrganization.subjects?.length === 0 &&
         !createdOrganization.time?.reviewCadence,
@@ -15778,16 +15797,16 @@ async function main() {
         className: "person",
         status: "active",
         body: "Regression-created relationship context.",
-        url: "https://example.com/regression-person",
+        url: "https://example.com/regression-person/",
         areas: ["Relationships"],
         subjects: ["Collaborator"],
-        externalSources: ["https://example.com/regression-person"],
+        externalSources: ["https://example.com/regression-person/"],
         intents: ["connect"],
         time: { reviewCadence: "P1M" },
         profile: {
           fullName: personTitle,
           context: "Regression-created relationship context.",
-          website: "https://example.com/regression-person",
+          website: "https://example.com/regression-person/",
           associatedPeople: [],
           children: [],
           interactions: [],
@@ -15798,6 +15817,12 @@ async function main() {
     assert(createPerson.response.ok && createPerson.payload?.ok, `People create failed: ${JSON.stringify(createPerson.payload)}`);
     const createdPerson = createPerson.payload.items?.find((item) => item.title === personTitle && item.className === "person");
     assert(createdPerson?.id, "Created People record was not returned");
+    assert(
+      createdPerson.url === "https://example.com/regression-person" &&
+        createdPerson.profile?.website === "https://example.com/regression-person" &&
+        createdPerson.externalSources?.[0] === "https://example.com/regression-person",
+      "People create retained a browser-added trailing slash"
+    );
     const updatedPersonTitle = `${personTitle}-updated`;
     const updatePerson = await requestJson(server.baseUrl, cookieJar, "/api/personal/records", {
       method: "PATCH",
@@ -15815,7 +15840,8 @@ async function main() {
           fullName: updatedPersonTitle,
           nickname: "Reg",
           contactCadence: "NONE",
-          youtube: "https://youtube.com/@regression-person",
+          youtube: "https://youtube.com/@regression-person/",
+          instagram: "https://instagram.com/regression-person/",
           emails: [
             { id: "email-regression-primary", category: "primary", address: "regression-person@example.com" },
             { id: "email-regression-work", category: "work", address: "studio-regression@example.com" },
@@ -15900,8 +15926,9 @@ async function main() {
       "People birthday without a known year did not persist"
     );
     assert(
-      persistedPerson?.profile?.youtube === "https://youtube.com/@regression-person",
-      "People YouTube profile link did not persist"
+      persistedPerson?.profile?.youtube === "https://youtube.com/@regression-person" &&
+        persistedPerson.profile.instagram === "https://instagram.com/regression-person",
+      "People social profile links did not persist without browser-added trailing slashes"
     );
     const nativeObjectLinkInput = {
       source: {
@@ -16290,6 +16317,11 @@ async function main() {
       headers: { "x-csrf-token": csrfToken }
     });
     assert(removePhoto.response.ok && removePhoto.payload?.ok, "People profile picture removal failed");
+    const removePhotoAgain = await requestJson(server.baseUrl, cookieJar, photoPath, {
+      method: "DELETE",
+      headers: { "x-csrf-token": csrfToken }
+    });
+    assert(removePhotoAgain.response.ok && removePhotoAgain.payload?.ok, "People profile picture removal was not idempotent");
     const removedPhotoRead = await requestJson(server.baseUrl, cookieJar, photoPath);
     assert(
       removedPhotoRead.response.status === 404 && !removedPhotoRead.payload?.ok,

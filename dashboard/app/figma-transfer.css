@@ -13620,7 +13620,7 @@ html[data-admin-preview="mobile"] .people-record-type-toggle > div {
 .command-tone-projects { color: #754420; --command-tone-surface: #f8f4f0; --command-tone-border: #dfbf9e; }
 .command-tone-notes { color: #5e2288; --command-tone-surface: #f6f0fc; --command-tone-border: #d0aaf0; }
 .command-tone-people { color: #963a08; --command-tone-surface: #fff5ed; --command-tone-border: #ffbb80; }
-.command-tone-media { color: #862618; --command-tone-surface: #fbf0ee; --command-tone-border: #eba096; }
+.command-tone-media { color: #b42318; --command-tone-surface: #fff1f0; --command-tone-border: #ffc3bd; }
 .command-tone-personal { color: #1850a0; --command-tone-surface: #ecf4fd; --command-tone-border: #92c0f2; }
 .command-tone-reviews { color: #7e6000; --command-tone-surface: #fefce6; --command-tone-border: #faee76; }
 .command-tone-resources { color: #821850; --command-tone-surface: #fbf0f4; --command-tone-border: #eaa2be; }
@@ -13674,8 +13674,138 @@ html[data-admin-preview="mobile"] .people-record-type-toggle > div {
   outline-color: var(--module-focus);
 }
 
+/* People: compact recency, warm controls, and unclipped contact affordances. */
+.people-filter-select {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  align-items: center;
+}
+
+.people-filter-select select {
+  grid-area: 1 / 1;
+  min-height: 34px;
+  padding: 0 34px 0 10px;
+  appearance: none;
+  border: 1px solid color-mix(in srgb, var(--module-border) 58%, var(--border-soft));
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--module-quiet) 34%, var(--surface-panel));
+  color: var(--text-strong);
+  font-family: "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  font-size: 11px;
+  font-weight: 720;
+  line-height: 1.2;
+  cursor: pointer;
+}
+
+.people-filter-select > svg {
+  grid-area: 1 / 1;
+  justify-self: end;
+  width: 15px;
+  height: 15px;
+  margin-right: 10px;
+  pointer-events: none;
+  transform: rotate(90deg);
+  color: var(--module-icon);
+}
+
+.people-filter-select select:hover,
+.people-filter-select select:focus-visible {
+  border-color: var(--module-border);
+  background: var(--module-quiet);
+  outline: 0;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-focus) 16%, transparent);
+}
+
+.people-filter-sheet footer {
+  display: grid;
+  grid-template-columns: minmax(84px, auto) minmax(0, 1fr);
+  gap: 8px;
+}
+
+.people-filter-sheet footer button:first-child {
+  justify-content: center;
+  border-color: color-mix(in srgb, var(--module-border) 68%, var(--border-soft));
+  background: var(--surface-panel);
+  color: var(--module-icon);
+}
+
+.people-filter-sheet footer button:first-child:hover {
+  background: var(--module-quiet);
+}
+
+.people-row-date {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+
+.people-row-date > span:last-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-row-date .people-activity-marker {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.people-row-star {
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--text-faint) !important;
+  opacity: .62;
+}
+
+.people-row-star svg {
+  fill: none;
+}
+
+.people-row-star.is-starred {
+  color: var(--module-icon) !important;
+  opacity: 1;
+}
+
+.people-row-star.is-starred svg {
+  fill: currentColor;
+}
+
+.people-contact-methods-compact {
+  flex-wrap: wrap;
+  overflow: visible;
+  padding: 6px;
+  margin: -4px;
+}
+
+.people-photo-options button > span svg {
+  display: block;
+  width: 19px;
+  height: 19px;
+  margin: auto;
+}
+
+[data-people-location-editor] > .people-repeatable-heading .people-add-action.is-icon-only {
+  align-self: center;
+}
+
+.people-repeatable-inline-actions {
+  align-items: center;
+}
+
+.people-contact-channel-fields .people-contact-remove {
+  transform: translateY(-1px) !important;
+}
+
 @media (max-width: 760px) {
   .module-shell {
     border-top-width: 2px;
+  }
+
+  .people-filter-fields > label {
+    grid-template-columns: 24px 78px minmax(0, 1fr);
   }
 }

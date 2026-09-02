@@ -10,6 +10,7 @@ import {
   type FollowUpSourceRef
 } from "../lib/modules/personal-ops/follow-up-links";
 import { sortPeopleMemories } from "../lib/modules/people/memories";
+import { PEOPLE_PROFILE_LINK_KEYS, withoutTrailingLinkSlash } from "../lib/modules/people/links";
 import { getSourceProjectConnections } from "../lib/modules/projects/people-links";
 import { createProjectsRepository } from "../lib/modules/projects/repository";
 import { peopleCreateInputToLegacy, peopleUpdateInputToLegacy } from "../lib/modules/people/legacy-adapter";
@@ -231,11 +232,31 @@ function MorphingViewIcon({ mode }: { mode: PeopleListMode }) {
   );
 }
 
-function PeopleActivityMarker({ dormant }: { dormant: boolean }) {
+function PeopleActivityMarker({ dormant, compact = false }: { dormant: boolean; compact?: boolean }) {
+  const label = dormant ? "Dormant" : "Active";
   return (
-    <span className={`people-activity-marker is-${dormant ? "dormant" : "active"}`}>
+    <span className={`people-activity-marker is-${dormant ? "dormant" : "active"}`} aria-label={label} title={label}>
       <PeopleIcon name={dormant ? "dormant" : "active"} />
-      <span>{dormant ? "Dormant" : "Active"}</span>
+      {!compact && <span>{label}</span>}
+    </span>
+  );
+}
+
+function PeopleFilterSelect({
+  ariaLabel,
+  value,
+  onChange,
+  children
+}: {
+  ariaLabel: string;
+  value: string;
+  onChange: (value: string) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <span className="people-filter-select">
+      <select aria-label={ariaLabel} value={value} onChange={(event) => onChange(event.target.value)}>{children}</select>
+      <PeopleIcon name="chevron" />
     </span>
   );
 }
@@ -1385,6 +1406,7 @@ function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile
   const primaryPhone = phones.find((entry) => entry.category === "primary") || phones[0];
   return {
     ...draft,
+    ...Object.fromEntries(PEOPLE_PROFILE_LINK_KEYS.map((key) => [key, withoutTrailingLinkSlash(draft[key])])),
     phoneCountryCode: primaryPhone?.countryCode || canonicalCountryCode(draft.phoneCountryCode),
     phoneNumber: primaryPhone?.number || "",
     primaryEmail: primaryEmail?.address || "",
@@ -3282,8 +3304,9 @@ export default function PeopleWorkspace({
       areas: ["Relationships"],
       subjects: className === "org" ? [] : groups,
       projects: splitList(quickProjects),
-      externalSources: [referenceUrl, quickInstagram, quickTikTok, quickX, quickLinkedIn, quickYouTube].filter(Boolean),
-      sourceUrl: referenceUrl
+      externalSources: [profile.website, profile.instagram, profile.tiktok, profile.x, profile.linkedin, profile.youtube]
+        .filter((value): value is string => Boolean(value)),
+      sourceUrl: profile.website
     });
 
     try {
@@ -3807,12 +3830,15 @@ export default function PeopleWorkspace({
   }
 
   function updateProfileDraft(key: ContactProfileTextKey, value: string) {
+    const normalizedValue = (PEOPLE_PROFILE_LINK_KEYS as readonly string[]).includes(key)
+      ? withoutTrailingLinkSlash(value)
+      : value;
     setProfileDraft((current) => {
       if (key !== "fullName" || selectedPerson?.className === "org") {
-        return { ...current, [key]: value };
+        return { ...current, [key]: normalizedValue };
       }
-      const quoted = extractQuotedNickname(value);
-      const resolvedValue = quoted?.fullName || value;
+      const quoted = extractQuotedNickname(normalizedValue);
+      const resolvedValue = quoted?.fullName || normalizedValue;
       const previous = derivePersonNameParts(current.fullName);
       const next = derivePersonNameParts(resolvedValue);
       return {
@@ -3946,12 +3972,12 @@ export default function PeopleWorkspace({
                 />
               </div>
               <div className="people-profile-field-grid people-create-social-grid">
-                <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
-                <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(event.target.value)} placeholder="https://youtube.com/@..." /></label>
-                <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(event.target.value)} placeholder="https://instagram.com/..." /></label>
-                <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(event.target.value)} placeholder="https://tiktok.com/@..." /></label>
-                <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(event.target.value)} placeholder="https://x.com/..." /></label>
-                <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(event.target.value)} placeholder="https://linkedin.com/in/..." /></label>
+                <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
+                <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
+                <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(withoutTrailingLinkSlash(event.target.value))} placeholder="https://instagram.com/..." /></label>
+                <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(withoutTrailingLinkSlash(event.target.value))} placeholder="https://tiktok.com/@..." /></label>
+                <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
+                <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/in/..." /></label>
               </div>
             </section>
             <OccupationEntriesEditor
@@ -4025,12 +4051,12 @@ export default function PeopleWorkspace({
               <h4 id="people-organization-links-title">Links</h4>
             </header>
             <div className="people-profile-field-grid people-create-social-grid people-create-social-grid-no-divider">
-              <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(event.target.value)} placeholder="https://..." /></label>
-              <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(event.target.value)} placeholder="https://youtube.com/@..." /></label>
-              <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(event.target.value)} placeholder="https://instagram.com/..." /></label>
-              <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(event.target.value)} placeholder="https://tiktok.com/@..." /></label>
-              <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(event.target.value)} placeholder="https://x.com/..." /></label>
-              <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(event.target.value)} placeholder="https://linkedin.com/company/..." /></label>
+              <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
+              <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
+              <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(withoutTrailingLinkSlash(event.target.value))} placeholder="https://instagram.com/..." /></label>
+              <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(withoutTrailingLinkSlash(event.target.value))} placeholder="https://tiktok.com/@..." /></label>
+              <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
+              <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/company/..." /></label>
               <label className="is-wide">Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
             </div>
           </section>
@@ -4206,25 +4232,27 @@ export default function PeopleWorkspace({
                 <section id="people-filter-sheet" ref={filterSheetRef} className="people-control-popover people-filter-sheet" role="dialog" aria-labelledby="people-filter-title">
                   <header>
                     <div><PeopleIcon name="filter" /><h2 id="people-filter-title">Filters</h2></div>
+                  </header>
+                  <div className="people-filter-fields">
+                    <label><PeopleIcon name="active" /><span>Show</span><PeopleFilterSelect ariaLabel="Show" value={activeFilter} onChange={(value) => {
+                      const next = value as PeopleFilter;
+                      setActiveFilter(next);
+                      updatePeopleUrl({ filter: next });
+                    }}>{FILTERS.map((filter) => <option value={filter.id} key={filter.id}>{filter.label}</option>)}</PeopleFilterSelect></label>
+                    <label><PeopleIcon name="groups" /><span>Relationship</span><PeopleFilterSelect ariaLabel="Relationship" value={relationshipFilter} onChange={setRelationshipFilter}><option value="">Any relationship</option>{GROUP_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}</PeopleFilterSelect></label>
+                    <label><PeopleIcon name="location" /><span>Location</span><PeopleFilterSelect ariaLabel="Location" value={locationFilter} onChange={setLocationFilter}><option value="">Any location</option>{filterLocationOptions.map((option) => <option value={option} key={option}>{option}</option>)}</PeopleFilterSelect></label>
+                    <label><PeopleIcon name="cadence" /><span>Last contact</span><PeopleFilterSelect ariaLabel="Last contact" value={lastContactFilter} onChange={(value) => setLastContactFilter(value as PeopleLastContactFilter)}>{LAST_CONTACT_FILTER_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</PeopleFilterSelect></label>
+                  </div>
+                  <footer>
                     <button type="button" onClick={() => {
                       setActiveFilter("all");
                       setRelationshipFilter("");
                       setLocationFilter("");
                       setLastContactFilter("any");
                       updatePeopleUrl({ filter: "all" });
-                    }}>Clear all</button>
-                  </header>
-                  <div className="people-filter-fields">
-                    <label><PeopleIcon name="active" /><span>Show</span><select value={activeFilter} onChange={(event) => {
-                      const next = event.target.value as PeopleFilter;
-                      setActiveFilter(next);
-                      updatePeopleUrl({ filter: next });
-                    }}>{FILTERS.map((filter) => <option value={filter.id} key={filter.id}>{filter.label}</option>)}</select></label>
-                    <label><PeopleIcon name="groups" /><span>Relationship</span><select value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}><option value="">Any relationship</option>{GROUP_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}</select></label>
-                    <label><PeopleIcon name="location" /><span>Location</span><select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}><option value="">Any location</option>{filterLocationOptions.map((option) => <option value={option} key={option}>{option}</option>)}</select></label>
-                    <label><PeopleIcon name="cadence" /><span>Last contact</span><select value={lastContactFilter} onChange={(event) => setLastContactFilter(event.target.value as PeopleLastContactFilter)}>{LAST_CONTACT_FILTER_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
-                  </div>
-                  <footer><button type="button" onClick={() => setFiltersOpen(false)}>Show {visiblePeople.length} results</button></footer>
+                    }}>Reset</button>
+                    <button type="button" onClick={() => setFiltersOpen(false)}>Show {visiblePeople.length} results</button>
+                  </footer>
                 </section>
               )}
 
@@ -4384,11 +4412,11 @@ export default function PeopleWorkspace({
                       </span>
                     </span>
                     <span className={`people-row-date${getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) ? "" : " is-unknown"}`}>
-                      <PeopleActivityMarker dormant={isDormant(record)} />
+                      <PeopleActivityMarker dormant={isDormant(record)} compact />
                       <span>{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>
                     </span>
                     <span className="people-row-next">{getDirectoryNextContactLabel(record)}</span>
-                    {record.starred && <span className="people-row-star" data-people-starred aria-label="Starred"><PeopleIcon name="star" /></span>}
+                    <span className={`people-row-star${record.starred ? " is-starred" : ""}`} data-people-starred={record.starred || undefined} aria-label={record.starred ? "Starred" : "Not starred"}><PeopleIcon name="star" /></span>
                   </button>
                 </article>
               );

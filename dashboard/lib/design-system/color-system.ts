@@ -76,10 +76,10 @@ export const MODULE_COLOR_SYSTEM: Record<ModuleColorId, ModuleColorDefinition> =
     tokens: { action: "#963A08", actionHover: "#6E2804", actionPressed: "#441802", selected: "#FFF5ED", quiet: "#FFF5ED", border: "#FFBB80", icon: "#963A08", textOnPrimary: "#FFFFFF", focus: "#E87020", accent: "#8A9060" }
   },
   media: {
-    id: "media", label: "Media", primaryName: "Brick Coral", hue: "H14°", secondaryName: "Warm Sand",
-    primary: { 50: "#FBF0EE", 100: "#F5CFCA", 200: "#EBA096", 300: "#DE7065", 400: "#CC4A3C", 500: "#B03A2A", 600: "#862618", 700: "#601A10", 800: "#3C1009", 900: "#1E0804" },
+    id: "media", label: "Media", primaryName: "Signal Red", hue: "H4°", secondaryName: "Warm Sand",
+    primary: { 50: "#FFF1F0", 100: "#FFE0DD", 200: "#FFC3BD", 300: "#FF9B91", 400: "#F5675B", 500: "#D94336", 600: "#B42318", 700: "#8F1D14", 800: "#5F1711", 900: "#300B08" },
     secondary: { 100: "#EDE4D8", 500: "#B09470", 700: "#7C6448" },
-    tokens: { action: "#862618", actionHover: "#601A10", actionPressed: "#3C1009", selected: "#FBF0EE", quiet: "#FBF0EE", border: "#EBA096", icon: "#B03A2A", textOnPrimary: "#FFFFFF", focus: "#CC4A3C", accent: "#B09470" }
+    tokens: { action: "#B42318", actionHover: "#8F1D14", actionPressed: "#5F1711", selected: "#FFF1F0", quiet: "#FFF1F0", border: "#FFC3BD", icon: "#B42318", textOnPrimary: "#FFFFFF", focus: "#F5675B", accent: "#B09470" }
   },
   personal_ops: {
     id: "personal_ops", label: "Personal", primaryName: "Personal Blue", hue: "H216°", secondaryName: "Blue-Gray Slate",

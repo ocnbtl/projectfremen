@@ -1,4 +1,4 @@
-import { readJsonFile, writeJsonFile } from "../../file-store";
+import { deleteJsonFile, readJsonFile, writeJsonFile } from "../../file-store";
 
 const MAX_PROFILE_PHOTO_BYTES = 1_500_000;
 const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -59,5 +59,5 @@ export async function writePeopleProfilePhoto(
 }
 
 export async function removePeopleProfilePhoto(personId: string): Promise<void> {
-  await writeJsonFile(fileName(personId), null);
+  await deleteJsonFile(fileName(personId));
 }

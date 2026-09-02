@@ -290,7 +290,7 @@ a {
 [data-module="projects"] { --nav-module-accent: #754420; --nav-module-surface: #f8f4f0; --nav-module-border: #dfbf9e; }
 [data-module="notes"] { --nav-module-accent: #5e2288; --nav-module-surface: #f6f0fc; --nav-module-border: #d0aaf0; }
 [data-module="people"] { --nav-module-accent: #963a08; --nav-module-surface: #fff5ed; --nav-module-border: #ffbb80; }
-[data-module="media"] { --nav-module-accent: #862618; --nav-module-surface: #fbf0ee; --nav-module-border: #eba096; }
+[data-module="media"] { --nav-module-accent: #b42318; --nav-module-surface: #fff1f0; --nav-module-border: #ffc3bd; }
 [data-module="personal_ops"] { --nav-module-accent: #1850a0; --nav-module-surface: #ecf4fd; --nav-module-border: #92c0f2; }
 [data-module="reviews"] { --nav-module-accent: #7e6000; --nav-module-surface: #fefce6; --nav-module-border: #faee76; }
 [data-module="resources"] { --nav-module-accent: #821850; --nav-module-surface: #fbf0f4; --nav-module-border: #eaa2be; }

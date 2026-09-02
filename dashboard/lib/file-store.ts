@@ -1,5 +1,5 @@
 import { constants as fsConstants } from "node:fs";
-import { access, mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { access, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 const STATIC_DATA_DIR = path.join(/* turbopackIgnore: true */ process.cwd(), "data");
@@ -187,6 +187,21 @@ async function writeJsonToSupabase<T>(fileName: string, value: T, config: Supaba
   }
 }
 
+async function deleteJsonFromSupabase(fileName: string, config: SupabaseConfig): Promise<void> {
+  const query = new URLSearchParams({ key: `eq.${fileName}` });
+  const response = await fetch(`${config.url}/rest/v1/app_state?${query.toString()}`, {
+    method: "DELETE",
+    headers: {
+      ...supabaseHeaders(config),
+      Prefer: "return=minimal"
+    },
+    cache: "no-store"
+  });
+  if (!response.ok) {
+    throw new Error(`Supabase delete failed (${response.status}) for key ${fileName}`);
+  }
+}
+
 function nextStoreVersion(previous?: string): string {
   const now = new Date().toISOString();
   if (!previous || now > previous) return now;
@@ -315,6 +330,24 @@ export async function writeJsonFile<T>(fileName: string, value: T): Promise<void
     const tmpPath = `${filePath}.tmp-${process.pid}-${Date.now()}-${Math.random().toString(16).slice(2)}`;
     await writeFile(/* turbopackIgnore: true */ tmpPath, JSON.stringify(value, null, 2) + "\n", "utf8");
     await rename(/* turbopackIgnore: true */ tmpPath, filePath);
+  });
+}
+
+/** Delete a runtime JSON record. The operation is intentionally idempotent. */
+export async function deleteJsonFile(fileName: string): Promise<void> {
+  await withWriteLock(fileName, async () => {
+    const supabase = getSupabaseConfig();
+    if (supabase) {
+      await deleteJsonFromSupabase(fileName, supabase);
+      return;
+    }
+
+    const dataDir = await getDataDirectory();
+    try {
+      await unlink(/* turbopackIgnore: true */ path.join(/* turbopackIgnore: true */ dataDir, fileName));
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    }
   });
 }
 

@@ -703,6 +703,8 @@
 .iconCandidates { display: grid; grid-template-columns: repeat(5, minmax(72px, 1fr)); gap: 5px; }
 .iconCandidate { min-width: 0; overflow: hidden; border: 1px solid var(--border-soft); border-radius: 6px; background: var(--panel-bg-subtle); }
 .iconCandidate a { display: grid; min-height: 58px; place-items: center; gap: 4px; padding: 6px; color: var(--text-strong); text-decoration: none; }
+.iconRegistrySpecimen > svg,
+.iconCandidate a > svg { display: block; margin: auto; place-self: center; }
 .iconCandidate a > span { width: 100%; overflow: hidden; color: var(--text-muted); font: 650 8px/1.2 var(--font-body); text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .iconCandidate a b { margin-right: 3px; color: var(--action-primary); font-family: var(--font-mono); }
 .iconCandidate button { width: 100%; min-height: 25px; border: 0; border-top: 1px solid var(--border-soft); background: var(--panel-bg); color: var(--text-strong); font: 750 8px/1 var(--font-body); cursor: pointer; }

@@ -1,4 +1,4 @@
-export const STYLE_GUIDE_SCHEMA_VERSION = 3 as const;
+export const STYLE_GUIDE_SCHEMA_VERSION = 4 as const;
 
 export type StyleGuideScaleStop = {
   step: number;

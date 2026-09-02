@@ -27,6 +27,9 @@ type PhotoEditorDraft = {
   outputSize: 256 | 512 | 1024;
 };
 
+const PROFILE_PHOTO_UPLOAD_BUDGET = 700_000;
+const PROFILE_PHOTO_QUALITY_STEPS = [0.86, 0.78, 0.7, 0.62, 0.54, 0.46] as const;
+
 export function PeopleProfileAvatar({
   label,
   initials,
@@ -86,9 +89,16 @@ async function prepareProfilePhoto(editor: PhotoEditorDraft): Promise<File> {
     const context = canvas.getContext("2d");
     if (!context) throw new Error("This browser could not prepare the picture.");
     context.drawImage(bitmap, sourceX, sourceY, side, side, 0, 0, editor.outputSize, editor.outputSize);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.86));
-    if (!blob) throw new Error("This browser could not prepare the picture.");
-    return new File([blob], "profile-picture.jpg", { type: "image/jpeg" });
+    let prepared: Blob | null = null;
+    for (const quality of PROFILE_PHOTO_QUALITY_STEPS) {
+      prepared = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      if (prepared && prepared.size <= PROFILE_PHOTO_UPLOAD_BUDGET) break;
+    }
+    if (!prepared) throw new Error("This browser could not prepare the picture.");
+    if (prepared.size > PROFILE_PHOTO_UPLOAD_BUDGET) {
+      throw new Error("This picture is still too detailed after preparation. Choose 512 px and try again.");
+    }
+    return new File([prepared], "profile-picture.jpg", { type: "image/jpeg" });
   } finally {
     bitmap.close();
   }
@@ -195,7 +205,8 @@ export default function PeopleProfilePhotoDialog({
       });
       const payload = (await response.json().catch(() => ({ ok: false, error: "Invalid server response" }))) as PhotoResponse;
       if (!response.ok || !payload.ok || !payload.photo) throw new Error(payload.error || "Profile picture could not be saved.");
-      if (await onSaved(payload.photo)) closeDialog(true);
+      if (!(await onSaved(payload.photo))) throw new Error("The picture was stored, but the profile could not be refreshed. Try saving it again.");
+      closeDialog(true);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : "Profile picture could not be saved.");
     } finally {
@@ -231,7 +242,8 @@ export default function PeopleProfilePhotoDialog({
       });
       const payload = (await response.json().catch(() => ({ ok: false, error: "Invalid server response" }))) as PhotoResponse;
       if (!response.ok || !payload.ok) throw new Error(payload.error || "Profile picture could not be removed.");
-      if (await onRemoved()) closeDialog(true);
+      if (!(await onRemoved())) throw new Error("The picture was removed, but the profile could not be refreshed. Try removing it again.");
+      closeDialog(true);
     } catch (removeError) {
       setError(removeError instanceof Error ? removeError.message : "Profile picture could not be removed.");
     } finally {
@@ -289,13 +301,13 @@ export default function PeopleProfilePhotoDialog({
         <p>{photoDraft ? "Place the picture inside the square, then choose its saved size." : "Choose a picture to crop before it is saved to this private profile."}</p>
         {!photoDraft && <div className="people-photo-options">
           <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={saving}>
-            <span aria-hidden="true">↑</span><strong>Upload</strong><small>Choose a saved picture</small>
+            <span aria-hidden="true"><UnigentamosIcon role="photo-upload" size={19} /></span><strong>Upload</strong><small>Choose a saved picture</small>
           </button>
           <button type="button" onClick={() => void pasteFromClipboard()} disabled={saving}>
-            <span aria-hidden="true">⌘</span><strong>Paste</strong><small>Use the clipboard</small>
+            <span aria-hidden="true"><UnigentamosIcon role="photo-paste" size={19} /></span><strong>Paste</strong><small>Use the clipboard</small>
           </button>
           <button type="button" onClick={() => cameraInputRef.current?.click()} disabled={saving}>
-            <span aria-hidden="true">○</span><strong>Take picture</strong><small>Open the camera</small>
+            <span aria-hidden="true"><UnigentamosIcon role="photo-camera" size={19} /></span><strong>Take picture</strong><small>Open the camera</small>
           </button>
         </div>}
         {!photoDraft && <div className="people-photo-paste-hint" tabIndex={0}>You can also paste a picture here with Ctrl+V or Command+V.</div>}

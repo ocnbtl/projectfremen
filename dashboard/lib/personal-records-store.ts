@@ -5,6 +5,11 @@ import {
   normalizePhoneForStorage,
   validateInternationalPhone
 } from "./modules/people/phone";
+import {
+  PEOPLE_PROFILE_LINK_KEYS,
+  normalizePeopleExternalSources,
+  withoutTrailingLinkSlash
+} from "./modules/people/links";
 import { getPersonalSystemDomain } from "./personal-systems";
 
 export type PersonalRecordClass =
@@ -1132,6 +1137,11 @@ function normalizeContactProfile(input: unknown, strictEntries = false): Persona
     }
   }
 
+  for (const key of PEOPLE_PROFILE_LINK_KEYS) {
+    const value = profile[key];
+    if (typeof value === "string") profile[key] = withoutTrailingLinkSlash(value) || undefined;
+  }
+
   for (const profileUrl of [profile.website, profile.linkedin, profile.youtube]) {
     if (strictEntries && profileUrl) normalizeOptionalHttpUrl(profileUrl);
   }
@@ -1172,6 +1182,10 @@ function normalizeContactProfilePatch(input: unknown): Partial<PersonalContactPr
     if (typeof value === "string") {
       patch[key] = value.trim() || undefined;
     }
+  }
+
+  for (const key of PEOPLE_PROFILE_LINK_KEYS) {
+    if (typeof patch[key] === "string") patch[key] = withoutTrailingLinkSlash(patch[key]) || undefined;
   }
 
   if (patch.birthday) patch.birthday = normalizeBirthday(patch.birthday, true) || undefined;
@@ -1420,7 +1434,7 @@ function sanitizeTitle(value: string): string {
 }
 
 function normalizeOptionalHttpUrl(value: string): string | undefined {
-  const url = value.trim();
+  const url = withoutTrailingLinkSlash(value);
   if (!url) {
     return undefined;
   }
@@ -1988,14 +2002,16 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     status: pickStatus(raw.status as string | undefined),
     growth: "seed",
     body,
-    url: typeof raw.url === "string" && raw.url.trim() ? raw.url.trim() : undefined,
+    url: typeof raw.url === "string" && raw.url.trim() ? withoutTrailingLinkSlash(raw.url) : undefined,
     areas: sanitizeList(raw.areas as string[] | undefined),
     subjects: sanitizeSubjectsForClass(raw.subjects as string[] | undefined, className),
     projects: sanitizeList(raw.projects as string[] | undefined),
     intents: sanitizeList(raw.intents as string[] | undefined).filter((item) =>
       PERSONAL_RECORD_INTENTS.includes(item as PersonalRecordIntent)
     ) as PersonalRecordIntent[],
-    externalSources: sanitizeList(raw.externalSources as string[] | undefined),
+    externalSources: className === "person" || className === "org"
+      ? normalizePeopleExternalSources(sanitizeList(raw.externalSources as string[] | undefined))
+      : sanitizeList(raw.externalSources as string[] | undefined),
     relations,
     time: normalizeTime(raw.time, createdMeta, stage, className),
     profile,
@@ -2111,7 +2127,9 @@ export async function createPersonalRecord(
     intents: sanitizeList(input.intents).filter((item) =>
       PERSONAL_RECORD_INTENTS.includes(item as PersonalRecordIntent)
     ) as PersonalRecordIntent[],
-    externalSources: sanitizeList(input.externalSources),
+    externalSources: className === "person" || className === "org"
+      ? normalizePeopleExternalSources(sanitizeList(input.externalSources))
+      : sanitizeList(input.externalSources),
     ...(input.starred === true ? { starred: true } : {}),
     relations,
     time: normalizeTime(
@@ -2253,7 +2271,9 @@ export async function updatePersonalRecord(
       : current.subjects,
     projects: Array.isArray(patch.projects) ? sanitizeList(patch.projects) : current.projects,
     externalSources: Array.isArray(patch.externalSources)
-      ? sanitizeList(patch.externalSources)
+      ? current.className === "person" || current.className === "org"
+        ? normalizePeopleExternalSources(sanitizeList(patch.externalSources))
+        : sanitizeList(patch.externalSources)
       : current.externalSources,
     status: nextStatus,
     time,
