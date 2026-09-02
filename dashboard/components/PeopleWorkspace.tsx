@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { motion, useReducedMotion } from "motion/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
 import { mirrorPersonalRecord } from "../lib/local-first/domain-mirror";
@@ -103,6 +104,8 @@ type PeopleSidebarView =
   | "profile-gaps"
   | "dormant"
   | "import-export"
+  | "import"
+  | "export"
   | "duplicates"
   | "recently-deleted"
   | "customize";
@@ -153,11 +156,15 @@ type PeopleIconName =
   | "edit"
   | "object"
   | "dormant"
+  | "active"
+  | "star"
   | "export"
   | "delete"
   | "chevron"
   | "search"
   | "filter"
+  | "sort"
+  | "check"
   | "close"
   | "plus"
   | "groups"
@@ -174,12 +181,63 @@ function PeopleIcon({ name }: { name: PeopleIconName }) {
     birthday: "birthday", location: "location", hometown: "hometown", occupation: "briefcase",
     employer: "employer", university: "university", partner: "partner", children: "users",
     organization: "organization", industry: "industry", founded: "clock", team: "users", edit: "edit",
-    object: "object", dormant: "dormant", export: "export", delete: "delete", chevron: "chevron-right",
-    search: "search", filter: "filter", close: "close", plus: "plus", groups: "users",
+    object: "object", dormant: "dormant", active: "active", star: "star", export: "export", delete: "delete", chevron: "chevron-right",
+    search: "search", filter: "filter", sort: "sort", check: "check", close: "close", plus: "plus", groups: "users",
     communication: "message", notes: "notes", cadence: "clock", "view-comfortable": "view-comfortable",
     "view-compact": "view-compact", "view-grid": "view-grid"
   };
   return <UnigentamosIcon role={roles[name]} />;
+}
+
+const VIEW_ORDER: PeopleListMode[] = ["list", "compact", "grid"];
+const VIEW_LABELS: Record<PeopleListMode, string> = {
+  list: "Comfortable",
+  compact: "Compact",
+  grid: "Grid"
+};
+const VIEW_MORPH_PATHS: Record<PeopleListMode, string[]> = {
+  list: [
+    "M3 5 L7 5 L7 5 L7 5", "M9 5 L21 5 L21 5 L21 5",
+    "M3 12 L7 12 L7 12 L7 12", "M9 12 L21 12 L21 12 L21 12",
+    "M3 19 L7 19 L7 19 L7 19", "M9 19 L21 19 L21 19 L21 19"
+  ],
+  compact: [
+    "M4 4 L20 4 L20 4 L20 4", "M4 7.2 L20 7.2 L20 7.2 L20 7.2",
+    "M4 10.4 L20 10.4 L20 10.4 L20 10.4", "M4 13.6 L20 13.6 L20 13.6 L20 13.6",
+    "M4 16.8 L20 16.8 L20 16.8 L20 16.8", "M4 20 L20 20 L20 20 L20 20"
+  ],
+  grid: [
+    "M3 3 L9 3 L9 8 L3 8", "M15 3 L21 3 L21 8 L15 8",
+    "M3 9.5 L9 9.5 L9 14.5 L3 14.5", "M15 9.5 L21 9.5 L21 14.5 L15 14.5",
+    "M3 16 L9 16 L9 21 L3 21", "M15 16 L21 16 L21 21 L15 21"
+  ]
+};
+
+function MorphingViewIcon({ mode }: { mode: PeopleListMode }) {
+  const reduceMotion = useReducedMotion();
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" data-view-morph={mode}>
+      {VIEW_MORPH_PATHS[mode].map((path, index) => (
+        <motion.path
+          initial={{ d: reduceMotion ? path : VIEW_MORPH_PATHS.list[index] }}
+          animate={{ d: path }}
+          transition={reduceMotion ? { duration: 0 } : { duration: 0.26, ease: [0.22, 1, 0.36, 1] }}
+          fill="none"
+          vectorEffect="non-scaling-stroke"
+          key={index}
+        />
+      ))}
+    </svg>
+  );
+}
+
+function PeopleActivityMarker({ dormant }: { dormant: boolean }) {
+  return (
+    <span className={`people-activity-marker is-${dormant ? "dormant" : "active"}`}>
+      <PeopleIcon name={dormant ? "dormant" : "active"} />
+      <span>{dormant ? "Dormant" : "Active"}</span>
+    </span>
+  );
 }
 
 function profileSectionIcon(title: string): PeopleIconName {
@@ -284,6 +342,7 @@ type PeopleTimelineItem =
 type SidebarItemConfig = {
   id: PeopleSidebarView;
   label: string;
+  icon: string;
   tone?: string;
   surface?: "list" | "profile" | "utility";
 };
@@ -385,6 +444,7 @@ const GROUP_OPTIONS = [
   "Community",
   "Family",
   "Friend",
+  "Neighbor",
   "Partner",
   "University",
   "Vendor",
@@ -569,43 +629,28 @@ const PEOPLE_SIDEBAR_SECTIONS: Array<{ title: string; items: SidebarItemConfig[]
   {
     title: "People",
     items: [
-      { id: "all", label: "All People" },
-      { id: "starred", label: "Starred", tone: "pink" },
-      { id: "recent", label: "Recently Contacted", tone: "green" },
-      { id: "upcoming", label: "Upcoming Follow-ups", tone: "orange" },
-      { id: "attention", label: "Needs Attention", tone: "crimson" },
-      { id: "relationship-map", label: "Relationship Map", tone: "purple", surface: "profile" }
-    ]
-  },
-  {
-    title: "My lists",
-    items: [
-      { id: "family", label: "Family", tone: "green" },
-      { id: "close-friends", label: "Close Friends", tone: "pink" },
-      { id: "business", label: "Business", tone: "blue" },
-      { id: "advisors-mentors", label: "Advisors & Mentors", tone: "purple" },
-      { id: "neighbors", label: "Neighbors", tone: "orange" },
-      { id: "health-wellness", label: "Health & Wellness", tone: "cyan" },
-      { id: "all-lists", label: "All Lists", tone: "brown", surface: "utility" }
+      { id: "all", label: "All People", icon: "person" },
+      { id: "starred", label: "Starred", icon: "star" },
+      { id: "upcoming", label: "Upcoming Follow-ups", icon: "follow-up" },
+      { id: "relationship-map", label: "Relationship Map", icon: "relationship-map", surface: "profile" }
     ]
   },
   {
     title: "Smart views",
     items: [
-      { id: "no-contact-90", label: "No Contact > 90 Days", tone: "brown" },
-      { id: "birthdays-month", label: "Birthdays This Month", tone: "orange" },
-      { id: "new-people", label: "New People", tone: "green" },
-      { id: "profile-gaps", label: "Profile Gaps", tone: "blue" },
-      { id: "dormant", label: "Dormant", tone: "brown" }
+      { id: "no-contact-90", label: "No Contact > 90 Days", icon: "no-contact" },
+      { id: "birthdays-month", label: "Upcoming Birthdays", icon: "birthday" },
+      { id: "new-people", label: "New People", icon: "new-person" },
+      { id: "profile-gaps", label: "Profile Gaps", icon: "profile-gaps" }
     ]
   },
   {
-    title: "Data",
+    title: "Operational",
     items: [
-      { id: "import-export", label: "Import / Export", surface: "utility" },
-      { id: "duplicates", label: "Duplicates", tone: "orange", surface: "utility" },
-      { id: "recently-deleted", label: "Recently Deleted", tone: "brown", surface: "utility" },
-      { id: "customize", label: "Customize People", tone: "blue", surface: "utility" }
+      { id: "import", label: "Import", icon: "import", surface: "utility" },
+      { id: "export", label: "Export", icon: "export", surface: "utility" },
+      { id: "duplicates", label: "Duplicates", icon: "duplicates", surface: "utility" },
+      { id: "recently-deleted", label: "Recently Deleted", icon: "recently-deleted", surface: "utility" }
     ]
   }
 ];
@@ -1474,11 +1519,17 @@ function isNoContact90(record: PersonalRecord, interactionDate = "") {
   return Number.isNaN(date.getTime()) || Date.now() - date.getTime() > 1000 * 60 * 60 * 24 * 90;
 }
 
-function isBirthdayThisMonth(record: PersonalRecord) {
+function hasUpcomingBirthday(record: PersonalRecord, windowDays = 31) {
   const birthday = getProfile(record).birthday;
   if (!birthday) return false;
   const parsed = parseBirthday(birthday);
-  return Boolean(parsed && parsed.month === new Date().getMonth() + 1);
+  if (!parsed) return false;
+  const now = new Date();
+  const todayUtc = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate());
+  let occurrenceUtc = Date.UTC(now.getUTCFullYear(), parsed.month - 1, parsed.day);
+  if (occurrenceUtc < todayUtc) occurrenceUtc = Date.UTC(now.getUTCFullYear() + 1, parsed.month - 1, parsed.day);
+  const daysAway = Math.floor((occurrenceUtc - todayUtc) / (1000 * 60 * 60 * 24));
+  return daysAway >= 0 && daysAway <= windowDays;
 }
 
 function isNewPerson(record: PersonalRecord) {
@@ -1534,7 +1585,7 @@ function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView, int
   if (view === "neighbors") return hasGroupLike(record, ["neighbor"]);
   if (view === "health-wellness") return hasGroupLike(record, ["health", "wellness", "doctor", "therapy", "trainer"]);
   if (view === "no-contact-90") return isNoContact90(record, interactionDate);
-  if (view === "birthdays-month") return isBirthdayThisMonth(record);
+  if (view === "birthdays-month") return hasUpcomingBirthday(record);
   if (view === "new-people") return isNewPerson(record);
   if (view === "profile-gaps") return getProfileGaps(record).length > 0;
   if (view === "dormant") return isDormant(record);
@@ -2234,6 +2285,7 @@ export default function PeopleWorkspace({
   const [detailMode, setDetailMode] = useState<DetailMode>(initialMode === "new" || initialMode === "edit" ? "edit" : "profile");
   const [addingPerson, setAddingPerson] = useState(initialMode === "new");
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
@@ -2269,6 +2321,11 @@ export default function PeopleWorkspace({
   const interactionSavingRef = useRef(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const filterSheetRef = useRef<HTMLElement>(null);
+  const sortMenuRef = useRef<HTMLDivElement>(null);
+  const filterTriggerRef = useRef<HTMLButtonElement>(null);
+  const mobileFilterTriggerRef = useRef<HTMLButtonElement>(null);
+  const sortTriggerRef = useRef<HTMLButtonElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const dirtyHistoryGuardRef = useRef<string | null>(null);
   const suppressDirtyPopRef = useRef(false);
 
@@ -2439,6 +2496,36 @@ export default function PeopleWorkspace({
       previousFocus?.focus();
     };
   }, [filtersOpen, mobileMenuOpen]);
+
+  useEffect(() => {
+    if (!filtersOpen && !sortOpen) return;
+    if (sortOpen) sortMenuRef.current?.querySelector<HTMLElement>("[role='menuitemradio']")?.focus();
+    const closeDetachedMenu = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        filterSheetRef.current?.contains(target)
+        || sortMenuRef.current?.contains(target)
+        || filterTriggerRef.current?.contains(target)
+        || mobileFilterTriggerRef.current?.contains(target)
+        || sortTriggerRef.current?.contains(target)
+      ) return;
+      setFiltersOpen(false);
+      setSortOpen(false);
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      const returnFocus = sortOpen ? sortTriggerRef.current : filterTriggerRef.current;
+      setFiltersOpen(false);
+      setSortOpen(false);
+      returnFocus?.focus();
+    };
+    document.addEventListener("mousedown", closeDetachedMenu);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("mousedown", closeDetachedMenu);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [filtersOpen, sortOpen]);
 
   function buildPeopleDestination(
     partial: Partial<ReturnType<typeof parsePeopleUrlState>>,
@@ -2669,8 +2756,7 @@ export default function PeopleWorkspace({
   const activeFilterCount = (activeFilter === "all" ? 0 : 1)
     + (relationshipFilter ? 1 : 0)
     + (locationFilter ? 1 : 0)
-    + (lastContactFilter === "any" ? 0 : 1)
-    + (query.trim() ? 1 : 0);
+    + (lastContactFilter === "any" ? 0 : 1);
   const filteringActive = detailMode === "profile" && activeFilterCount > 0;
   const mobileSurface = addingPerson || initialMode === "new" || detailMode === "edit" || initialMode === "edit"
     ? "editor"
@@ -2936,6 +3022,7 @@ export default function PeopleWorkspace({
     setActiveSidebarView(item.id);
     setActiveFilter("all");
     setFiltersOpen(false);
+    setSortOpen(false);
     setMobileMenuOpen(false);
     setUtilityNotice("");
     setAddingPerson(false);
@@ -3990,10 +4077,10 @@ export default function PeopleWorkspace({
             ? className === "org" ? "New Organization" : "New Person"
             : selectedPerson?.className === "org" ? "Edit Organization" : "Edit Person"
           : mobileSurface === "profile" ? labelize(activeView) : "People"}</strong>
-        <button type="button" aria-label="Search people" aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
+        <button type="button" aria-label="Search people" onClick={() => searchInputRef.current?.focus()}>
           <PeopleIcon name="search" />
         </button>
-        <button type="button" aria-label={filtersOpen ? "Close filters" : "Open filters"} aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
+        <button ref={mobileFilterTriggerRef} type="button" aria-label={filtersOpen ? "Close filters" : "Open filters"} aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
           <PeopleIcon name="filter" />
         </button>
       </div>
@@ -4021,6 +4108,7 @@ export default function PeopleWorkspace({
                   onClick={() => selectSidebarView(item)}
                   key={item.id}
                 >
+                  <UnigentamosIcon role={item.icon} size={16} />
                   <span>{item.label}</span>
                   {typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
                 </button>
@@ -4043,6 +4131,7 @@ export default function PeopleWorkspace({
                   onClick={() => selectSidebarView(item)}
                   key={item.id}
                 >
+                  <UnigentamosIcon role={item.icon} size={16} />
                   <span>{item.label}</span>
                   {typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
                 </button>
@@ -4074,6 +4163,7 @@ export default function PeopleWorkspace({
           <div className="people-primary-search">
             <PeopleIcon name="search" />
             <input
+              ref={searchInputRef}
               aria-label="Search people"
               value={query}
               onChange={(event) => {
@@ -4083,111 +4173,96 @@ export default function PeopleWorkspace({
               placeholder="Search people..."
             />
             {query && (
-              <button type="button" aria-label="Clear search" onClick={() => { setQuery(""); updatePeopleUrl({ query: "" }, { native: true }); }}>
+              <button type="button" className="people-search-clear" aria-label="Clear search" onClick={() => { setQuery(""); updatePeopleUrl({ query: "" }, { native: true }); }}>
                 <PeopleIcon name="close" />
               </button>
             )}
-            <button type="button" className="people-search-filter" aria-label={filtersOpen ? "Hide filters" : "Show filters"} aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
-              <PeopleIcon name="filter" />
-              {activeFilterCount > 0 && <span>{activeFilterCount}</span>}
-            </button>
-          </div>
-          <div className="people-view-switch" role="group" aria-label="People directory view">
-            {([
-              ["list", "view-comfortable", "Comfortable"],
-              ["compact", "view-compact", "Compact"],
-              ["grid", "view-grid", "Grid"]
-            ] as const).map(([mode, icon, label]) => (
+            <div className="people-search-controls">
               <button
+                ref={filterTriggerRef}
                 type="button"
-                aria-label={`${label} view`}
-                aria-pressed={listMode === mode}
-                title={`${label} view`}
-                onClick={() => {
-                  setListMode(mode);
-                  updatePeopleUrl({ view: mode });
-                }}
-                key={mode}
+                className="people-control-trigger"
+                aria-label={filtersOpen ? "Hide filters" : "Show filters"}
+                aria-expanded={filtersOpen}
+                aria-controls="people-filter-sheet"
+                onClick={() => { setFiltersOpen((current) => !current); setSortOpen(false); }}
               >
-                <PeopleIcon name={icon} />
+                <PeopleIcon name="filter" /><span>Filter</span>
+                {activeFilterCount > 0 && <strong>{activeFilterCount}</strong>}
               </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="people-filter-bar" role="list" aria-label="People filters">
-          {FILTERS.map((filter) => (
-            <button
-              type="button"
-              className={`module-ref-pill module-ref-tone-${filter.tone}${activeFilter === filter.id ? " is-active" : ""}`}
-              onClick={() => { setActiveFilter(filter.id); updatePeopleUrl({ filter: filter.id }); }}
-              key={filter.id}
-            >
-              {filter.label}
-            </button>
-          ))}
-          <button type="button" aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
-            More
-          </button>
-          <label className="people-sort-control">
-            Sort
-            <select value={sortMode} onChange={(event) => {
-              const next = event.target.value as PeopleSortMode;
-              setSortMode(next);
-              updatePeopleUrl({ sort: next });
-            }}>
-              <option value="last-name">Last Name</option>
-              <option value="recent-contact">Recent Contact</option>
-              <option value="next-follow-up">Next Follow-up</option>
-            </select>
-          </label>
-        </div>
-
-        {filtersOpen && (
-          <section id="people-filter-sheet" ref={filterSheetRef} className="people-filter-sheet" role="dialog" aria-modal="true" aria-labelledby="people-filter-title">
-            <div className="people-sheet-handle" />
-            <header>
-              <h2 id="people-filter-title">Filters</h2>
-              <button type="button" onClick={() => {
-                setActiveFilter("all");
-                setRelationshipFilter("");
-                setLocationFilter("");
-                setLastContactFilter("any");
-                setQuery("");
-                updatePeopleUrl({ filter: "all", query: "" });
-              }}>
-                Reset
+              <button
+                ref={sortTriggerRef}
+                type="button"
+                className="people-control-trigger"
+                aria-label={sortOpen ? "Hide sorting" : "Show sorting"}
+                aria-expanded={sortOpen}
+                aria-controls="people-sort-menu"
+                onClick={() => { setSortOpen((current) => !current); setFiltersOpen(false); }}
+              >
+                <PeopleIcon name="sort" /><span>Sort</span>
               </button>
-            </header>
-            <div className="people-filter-fields">
-              <label>
-                <span>Relationship type</span>
-                <select value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}>
-                  <option value="">Any relationship</option>
-                  {GROUP_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
-                </select>
-              </label>
-              <label>
-                <span>Location</span>
-                <select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}>
-                  <option value="">Any location</option>
-                  {filterLocationOptions.map((option) => <option value={option} key={option}>{option}</option>)}
-                </select>
-              </label>
-              <label>
-                <span>Last contact</span>
-                <select value={lastContactFilter} onChange={(event) => setLastContactFilter(event.target.value as PeopleLastContactFilter)}>
-                  {LAST_CONTACT_FILTER_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-                </select>
-              </label>
+
+              {filtersOpen && (
+                <section id="people-filter-sheet" ref={filterSheetRef} className="people-control-popover people-filter-sheet" role="dialog" aria-labelledby="people-filter-title">
+                  <header>
+                    <div><PeopleIcon name="filter" /><h2 id="people-filter-title">Filters</h2></div>
+                    <button type="button" onClick={() => {
+                      setActiveFilter("all");
+                      setRelationshipFilter("");
+                      setLocationFilter("");
+                      setLastContactFilter("any");
+                      updatePeopleUrl({ filter: "all" });
+                    }}>Clear all</button>
+                  </header>
+                  <div className="people-filter-fields">
+                    <label><PeopleIcon name="active" /><span>Show</span><select value={activeFilter} onChange={(event) => {
+                      const next = event.target.value as PeopleFilter;
+                      setActiveFilter(next);
+                      updatePeopleUrl({ filter: next });
+                    }}>{FILTERS.map((filter) => <option value={filter.id} key={filter.id}>{filter.label}</option>)}</select></label>
+                    <label><PeopleIcon name="groups" /><span>Relationship</span><select value={relationshipFilter} onChange={(event) => setRelationshipFilter(event.target.value)}><option value="">Any relationship</option>{GROUP_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}</select></label>
+                    <label><PeopleIcon name="location" /><span>Location</span><select value={locationFilter} onChange={(event) => setLocationFilter(event.target.value)}><option value="">Any location</option>{filterLocationOptions.map((option) => <option value={option} key={option}>{option}</option>)}</select></label>
+                    <label><PeopleIcon name="cadence" /><span>Last contact</span><select value={lastContactFilter} onChange={(event) => setLastContactFilter(event.target.value as PeopleLastContactFilter)}>{LAST_CONTACT_FILTER_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+                  </div>
+                  <footer><button type="button" onClick={() => setFiltersOpen(false)}>Show {visiblePeople.length} results</button></footer>
+                </section>
+              )}
+
+              {sortOpen && (
+                <div id="people-sort-menu" ref={sortMenuRef} className="people-control-popover people-sort-menu" role="menu" aria-label="Sort people">
+                  <header><PeopleIcon name="sort" /><h2>Sort people</h2></header>
+                  {([[
+                    "last-name", "Last Name"
+                  ], [
+                    "recent-contact", "Recent Contact"
+                  ], [
+                    "next-follow-up", "Next Follow-Up"
+                  ]] as const).map(([mode, label]) => (
+                    <button type="button" role="menuitemradio" aria-checked={sortMode === mode} onClick={() => {
+                      setSortMode(mode);
+                      updatePeopleUrl({ sort: mode });
+                      setSortOpen(false);
+                    }} key={mode}><span>{label}</span>{sortMode === mode && <PeopleIcon name="check" />}</button>
+                  ))}
+                </div>
+              )}
             </div>
-            <footer>
-              <button type="button" onClick={() => setFiltersOpen(false)}>
-                Show {visiblePeople.length} Results
-              </button>
-            </footer>
-          </section>
-        )}
+          </div>
+          <button
+            type="button"
+            className="people-view-cycle"
+            aria-label={`View: ${VIEW_LABELS[listMode]}. Switch to ${VIEW_LABELS[VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]]}`}
+            title={`${VIEW_LABELS[listMode]} view`}
+            onClick={() => {
+              const next = VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length];
+              setListMode(next);
+              updatePeopleUrl({ view: next });
+            }}
+          >
+            <MorphingViewIcon mode={listMode} />
+            <span>View</span>
+          </button>
+        </div>
 
         {initialLoadError ? (
           <SystemState
@@ -4260,10 +4335,10 @@ export default function PeopleWorkspace({
                 <p>Duplicate review will compare names, emails, and phone numbers when enough records exist.</p>
               </div>
             )}
-            {activeSidebarView === "import-export" && (
+            {(activeSidebarView === "import-export" || activeSidebarView === "import" || activeSidebarView === "export") && (
               <div className="people-utility-grid">
-                <button type="button" disabled aria-describedby="people-unavailable-actions">Import preview not connected</button>
-                <button type="button" disabled aria-describedby="people-unavailable-actions">Export people data unavailable</button>
+                {(activeSidebarView === "import-export" || activeSidebarView === "import") && <button type="button" disabled aria-describedby="people-unavailable-actions">Import preview not connected</button>}
+                {(activeSidebarView === "import-export" || activeSidebarView === "export") && <button type="button" disabled aria-describedby="people-unavailable-actions">Export people data unavailable</button>}
               </div>
             )}
             {activeSidebarView === "customize" && (
@@ -4298,7 +4373,7 @@ export default function PeopleWorkspace({
                       compact={listMode === "compact"}
                     />
                     <span className="people-row-main">
-                      <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>AKA {profile.nickname}</em>}</span>
+                      <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>aka {profile.nickname}</em>}</span>
                       <small>{record.className === "org"
                         ? [profile.organizationType, profile.industry].filter(Boolean).join(" · ") || profile.context || getPrimaryGroup(record)
                         : [profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at ") || profile.context || getPrimaryGroup(record)}</small>
@@ -4309,11 +4384,11 @@ export default function PeopleWorkspace({
                       </span>
                     </span>
                     <span className={`people-row-date${getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) ? "" : " is-unknown"}`}>
-                      {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <i />}
-                      {formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}
+                      <PeopleActivityMarker dormant={isDormant(record)} />
+                      <span>{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>
                     </span>
                     <span className="people-row-next">{getDirectoryNextContactLabel(record)}</span>
-                    {record.starred && <span className="people-row-star" data-people-starred aria-label="Starred">★</span>}
+                    {record.starred && <span className="people-row-star" data-people-starred aria-label="Starred"><PeopleIcon name="star" /></span>}
                   </button>
                 </article>
               );
@@ -4391,7 +4466,7 @@ export default function PeopleWorkspace({
               />
               <div className="people-profile-identity">
                 <div className="people-profile-title-line">
-                  <h2>{selectedPerson.title}{selectedPerson.className === "person" && selectedProfile.nickname && <>, <span>AKA {selectedProfile.nickname}</span></>}</h2>
+                  <h2>{selectedPerson.title}{selectedPerson.className === "person" && selectedProfile.nickname && <>, <span>aka {selectedProfile.nickname}</span></>}</h2>
                 </div>
                 <p>{selectedPerson.className === "org"
                   ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || "Organization"
@@ -4403,7 +4478,7 @@ export default function PeopleWorkspace({
                 </div>
               </div>
               <div className="people-profile-actions">
-                <span className="people-status-marker"><i aria-hidden="true" />{STATUS_LABELS[selectedPerson.status]}</span>
+                <PeopleActivityMarker dormant={isDormant(selectedPerson)} />
                 <button
                   type="button"
                   className={`people-profile-star${selectedPerson.starred ? " is-starred" : ""}`}
@@ -4413,7 +4488,7 @@ export default function PeopleWorkspace({
                   disabled={Boolean(lifecycleSaving)}
                   title={selectedPerson.starred ? "Remove from Starred" : "Add to Starred"}
                 >
-                  <span aria-hidden="true">{selectedPerson.starred ? "★" : "☆"}</span>
+                  <PeopleIcon name="star" />
                 </button>
                 <button
                   type="button"

@@ -5623,6 +5623,7 @@ async function checkPeopleMemoryBrowserState(
     "Community",
     "Family",
     "Friend",
+    "Neighbor",
     "Partner",
     "University",
     "Vendor",
@@ -5671,28 +5672,65 @@ async function checkPeopleMemoryBrowserState(
       const page = await context.newPage();
       await page.goto(`${baseUrl}/admin/people`, { waitUntil: "networkidle" });
       const directoryHeader = page.locator(".people-directory-header");
-      const viewSwitch = page.locator(".people-view-switch");
+      const viewCycle = page.locator(".people-view-cycle");
       assert(
         !(await directoryHeader.innerText()).includes("People records") &&
           await directoryHeader.locator('button[aria-label="Log interaction"]').count() === 1 &&
           await directoryHeader.locator('button[aria-label="Add organization"]').count() === 1 &&
           await directoryHeader.locator('button[aria-label="Add person"]').count() === 1 &&
-          await page.locator(".people-primary-search .people-search-filter").count() === 1 &&
-          await viewSwitch.locator("button").count() === 3,
+          await page.locator('.people-primary-search .people-control-trigger[aria-controls="people-filter-sheet"]').count() === 1 &&
+          await page.locator('.people-primary-search .people-control-trigger[aria-controls="people-sort-menu"]').count() === 1 &&
+          await page.locator(".people-filter-bar, .people-sort-control, .people-view-switch").count() === 0 &&
+          await viewCycle.count() === 1 &&
+          await viewCycle.locator("[data-view-morph] path").count() === 6,
         `People directory retained redundant counts or the old toolbar at ${viewport.label}`
+      );
+      const sidebar = page.locator(".people-desktop-sidebar");
+      const sidebarText = await sidebar.innerText();
+      const operationalSection = sidebar.locator(".people-sidebar-section").filter({ hasText: "Operational" });
+      assert(
+        await sidebar.locator(".people-sidebar-section").count() === 3 &&
+          await sidebar.locator(".people-sidebar-section button").count() === 12 &&
+          await sidebar.locator(".people-sidebar-section button > svg").count() === 12 &&
+          await operationalSection.locator("button").count() === 4 &&
+          await operationalSection.locator("button").filter({ hasText: "Duplicates" }).locator("strong").textContent() === "0" &&
+          sidebarText.includes("Upcoming Birthdays") &&
+          !["Recently Contacted", "Needs Attention", "Dormant", "Customize People", "Close Friends", "Health & Wellness", "All Lists"].some((label) => sidebarText.includes(label)),
+        `People sidebar did not match the compact icon-led navigation at ${viewport.label}: ${sidebarText}`
+      );
+      const initialViewPath = await viewCycle.locator("path").first().getAttribute("d");
+      await viewCycle.click();
+      await page.waitForFunction(() => document.querySelector(".people-view-cycle [data-view-morph]")?.getAttribute("data-view-morph") === "compact");
+      await page.waitForTimeout(320);
+      assert(
+        (await viewCycle.getAttribute("aria-label"))?.includes("Compact") &&
+          await viewCycle.locator("[data-view-morph='compact'] path").count() === 6 &&
+          await viewCycle.locator("path").first().getAttribute("d") !== initialViewPath,
+        `People View control did not morph and cycle at ${viewport.label}`
       );
       const filterTrigger = viewport.label === "mobile"
         ? page.locator('.people-mobile-topbar button[aria-controls="people-filter-sheet"]').last()
-        : page.locator(".people-primary-search .people-search-filter");
+        : page.locator('.people-primary-search .people-control-trigger[aria-controls="people-filter-sheet"]');
       await filterTrigger.click();
       const filterSheet = page.locator("#people-filter-sheet");
       await filterSheet.waitFor();
       assert(
-        await filterSheet.locator("select").count() === 3 &&
+        await filterSheet.locator("select").count() === 4 &&
           await filterSheet.getByText("Save as view", { exact: false }).count() === 0,
-        `People filters did not expose three editable controls or retained Save as view at ${viewport.label}`
+        `People filters did not expose four editable controls or retained Save as view at ${viewport.label}`
       );
-      await filterSheet.getByLabel("Relationship type").selectOption("Advisor");
+      const popoverMotion = await filterSheet.evaluate((element) => ({
+        animationName: getComputedStyle(element).animationName,
+        transformOrigin: getComputedStyle(element).transformOrigin,
+        position: getComputedStyle(element).position
+      }));
+      assert(
+        popoverMotion.animationName === "people-control-menu-enter" &&
+          popoverMotion.transformOrigin !== "0px 0px" &&
+          popoverMotion.position === "absolute",
+        `People filter did not use the attached origin-aware menu motion at ${viewport.label}: ${JSON.stringify(popoverMotion)}`
+      );
+      await filterSheet.getByLabel("Relationship").selectOption("Advisor");
       await filterSheet.getByLabel("Location").selectOption("Columbus, Ohio, USA");
       await filterSheet.getByLabel("Last contact").selectOption("90d");
       assert(
@@ -5702,13 +5740,44 @@ async function checkPeopleMemoryBrowserState(
       await filterTrigger.click();
       assert(await filterSheet.count() === 0, `People filter trigger did not close the open filter sheet at ${viewport.label}`);
       await filterTrigger.click();
-      await page.locator("#people-filter-sheet").getByRole("button", { name: "Reset" }).click();
-      await page.locator("#people-filter-sheet").getByRole("button", { name: /Show \d+ Results/ }).click();
+      await page.locator("#people-filter-sheet").getByRole("button", { name: "Clear all" }).click();
+      await page.locator("#people-filter-sheet").getByRole("button", { name: /Show \d+ results/i }).click();
+      if (viewport.label !== "mobile") {
+        await page.locator('.people-primary-search .people-control-trigger[aria-controls="people-sort-menu"]').click();
+        const sortMenu = page.getByRole("menu", { name: "Sort people" });
+        await sortMenu.waitFor();
+        assert(
+          await sortMenu.getByRole("menuitemradio").count() === 3 &&
+            await sortMenu.getByRole("menuitemradio", { name: "Recent Contact" }).count() === 1,
+          `People Sort menu did not consolidate all sort modes at ${viewport.label}`
+        );
+        await sortMenu.getByRole("menuitemradio", { name: "Last Name" }).click();
+      }
       const nicknameDirectoryRow = page.locator(".people-directory-row").filter({ hasText: personTitle });
       assert(
-        (await nicknameDirectoryRow.locator(".people-row-name").innerText()).includes("AKA Reg"),
+        (await nicknameDirectoryRow.locator(".people-row-name").innerText()).includes("aka Reg"),
         `People directory did not expose the profile nickname at ${viewport.label}`
       );
+      assert(
+        await nicknameDirectoryRow.locator(".people-activity-marker svg").count() === 1 &&
+          (await nicknameDirectoryRow.locator(".people-activity-marker").innerText()).trim().length > 0,
+        `People directory did not render its icon-and-word activity marker at ${viewport.label}`
+      );
+      if (viewport.label === "desktop") {
+        await nicknameDirectoryRow.hover();
+        const hoverTreatment = await nicknameDirectoryRow.evaluate((row) => ({
+          outerShadow: getComputedStyle(row).boxShadow,
+          innerShadow: getComputedStyle(row.querySelector(".people-directory-row-body")).boxShadow,
+          transform: getComputedStyle(row).transform
+        }));
+        assert(
+          hoverTreatment.outerShadow !== "none" &&
+            !hoverTreatment.outerShadow.includes("inset") &&
+            hoverTreatment.innerShadow === "none" &&
+            hoverTreatment.transform !== "none",
+          `People row hover did not lift the complete card cleanly: ${JSON.stringify(hoverTreatment)}`
+        );
+      }
       const recentInteractions = page.locator(".people-recent-interactions");
       await recentInteractions.waitFor();
       assert(
@@ -5819,13 +5888,32 @@ async function checkPeopleMemoryBrowserState(
       await overview.waitFor();
       const profileHeadingText = (await page.locator(".people-profile-header h2").innerText()).replace(/\s+/g, " ");
       assert(
-        profileHeadingText.includes(`${personTitle}, AKA Reg`),
-        `People profile title did not use the requested AKA nickname treatment at ${viewport.label}: ${JSON.stringify({ profileHeadingText, expected: `${personTitle}, AKA Reg` })}`
+        profileHeadingText.includes(`${personTitle}, aka Reg`),
+        `People profile title did not use the requested lowercase aka nickname treatment at ${viewport.label}: ${JSON.stringify({ profileHeadingText, expected: `${personTitle}, aka Reg` })}`
       );
       assert(
-        await page.locator(".people-profile-actions > .people-status-marker").count() === 1 &&
-          await page.locator(".people-profile-title-line > .people-status-marker").count() === 0,
+        await page.locator(".people-profile-actions > .people-activity-marker").count() === 1 &&
+          await page.locator(".people-profile-actions > .people-activity-marker svg").count() === 1 &&
+          await page.locator(".people-profile-title-line > .people-activity-marker").count() === 0,
         `People profile status did not move beside Star and More at ${viewport.label}`
+      );
+      const peopleColorTreatment = await page.evaluate(() => {
+        const shell = document.querySelector(".people-redesign-shell");
+        const header = document.querySelector(".people-profile-header");
+        const tag = document.querySelector(".people-tag-row span");
+        return {
+          moduleIcon: shell ? getComputedStyle(shell).getPropertyValue("--module-icon").trim() : "",
+          headerBackground: header ? getComputedStyle(header).backgroundImage : "",
+          tagColor: tag ? getComputedStyle(tag).color : "",
+          tagBackground: tag ? getComputedStyle(tag).backgroundColor : ""
+        };
+      });
+      assert(
+        peopleColorTreatment.moduleIcon &&
+          peopleColorTreatment.headerBackground.includes("linear-gradient") &&
+          peopleColorTreatment.tagColor === "rgb(150, 58, 8)" &&
+          peopleColorTreatment.tagBackground !== "rgb(255, 255, 255)",
+        `People profile did not use the approved orange banner and tag language at ${viewport.label}: ${JSON.stringify(peopleColorTreatment)}`
       );
       const profilePhoto = page.getByRole("button", { name: new RegExp(`profile picture for ${personTitle}`, "i") });
       await profilePhoto.waitFor();
@@ -5893,14 +5981,18 @@ async function checkPeopleMemoryBrowserState(
           await overview.locator('[data-contact-method="youtube"]:not(:disabled)').count() === 1,
         `People Overview did not keep every contact method visible with unavailable methods disabled at ${viewport.label}`
       );
-      await contactButtons.first().hover();
-      const contactHoverGeometry = await contactButtons.first().evaluate((element) => {
+      const contactHoverTarget = overview.locator('[data-contact-method="youtube"]');
+      await contactHoverTarget.hover();
+      const contactHoverGeometry = await contactHoverTarget.evaluate((element) => {
         const rect = element.getBoundingClientRect();
-        return { width: rect.width, radius: Number.parseFloat(getComputedStyle(element).borderRadius) };
+        const style = getComputedStyle(element);
+        return { width: rect.width, radius: Number.parseFloat(style.borderRadius), color: style.color, boxShadow: style.boxShadow };
       });
       assert(
-        contactHoverGeometry.radius >= contactHoverGeometry.width / 2 - 1,
-        `People contact hover surface was not circular at ${viewport.label}: ${JSON.stringify(contactHoverGeometry)}`
+        contactHoverGeometry.radius >= contactHoverGeometry.width / 2 - 1 &&
+          contactHoverGeometry.color === "rgb(150, 58, 8)" &&
+          !contactHoverGeometry.boxShadow.includes("41, 106, 127"),
+        `People contact hover was not circular and module-colored at ${viewport.label}: ${JSON.stringify(contactHoverGeometry)}`
       );
       const emailButton = overview.getByRole("button", { name: "Show Email" });
       await emailButton.click();
@@ -6297,11 +6389,24 @@ async function checkPeopleMemoryBrowserState(
         const fieldRect = phoneFields?.getBoundingClientRect();
         const removeRect = phoneRemove?.getBoundingClientRect();
         const comesFrom = document.querySelector(".people-comes-from-field");
+        const alignedRemoveButtons = Array.from(document.querySelectorAll(
+          ".people-repeatable-fields > .people-repeatable-inline-remove, .people-repeatable-inline-actions > .people-repeatable-inline-remove"
+        ));
+        const repeatableBottomGaps = alignedRemoveButtons.flatMap((button) => {
+          const fields = button.closest(".people-repeatable-fields, .people-contact-channel-fields");
+          const field = fields?.querySelector("input, select, textarea");
+          if (!field) return [];
+          return [Math.abs(field.getBoundingClientRect().bottom - button.getBoundingClientRect().bottom)];
+        });
+        const themedSections = Array.from(document.querySelectorAll(".people-profile-form .people-themed-section"));
         return {
           removeColors: Array.from(new Set(removeButtons.map((button) => getComputedStyle(button).backgroundColor))),
           addColors: Array.from(new Set(addButtons.map((button) => getComputedStyle(button).backgroundColor))),
           removeIconWidths: removeButtons.map((button) => button.querySelector("svg")?.getBoundingClientRect().width || 0),
           phoneBottomGap: fieldRect && removeRect ? Math.abs(fieldRect.bottom - removeRect.bottom) : 999,
+          repeatableBottomGaps,
+          themedSectionShadows: Array.from(new Set(themedSections.map((section) => getComputedStyle(section).boxShadow))),
+          themedSectionLeftWidths: themedSections.map((section) => Number.parseFloat(getComputedStyle(section).borderLeftWidth)),
           comesFromOverflow: comesFrom ? comesFrom.scrollWidth - comesFrom.clientWidth : 999
         };
       });
@@ -6311,6 +6416,9 @@ async function checkPeopleMemoryBrowserState(
           propertyControlGeometry.removeColors[0] !== propertyControlGeometry.addColors[0] &&
           propertyControlGeometry.removeIconWidths.every((width) => width >= 18) &&
           propertyControlGeometry.phoneBottomGap < 2 &&
+          (viewport.label === "mobile" || propertyControlGeometry.repeatableBottomGaps.every((gap) => gap < 2)) &&
+          propertyControlGeometry.themedSectionShadows.every((shadow) => shadow === "none") &&
+          propertyControlGeometry.themedSectionLeftWidths.every((width) => width <= 1) &&
           propertyControlGeometry.comesFromOverflow <= 0,
         `Properties add/remove controls or Comes from alignment drifted at ${viewport.label}: ${JSON.stringify(propertyControlGeometry)}`
       );
@@ -6740,7 +6848,7 @@ async function checkPeopleUnknownLastContactBrowserState(baseUrl, cookieJar, per
     let directoryRow = editorPage.locator(".people-directory-row").filter({ hasText: personTitle }).first();
     await directoryRow.waitFor();
     assert(
-      (await directoryRow.locator(".people-row-date").innerText()).trim() === "Jul 14",
+      (await directoryRow.locator(".people-row-date > span:last-child").innerText()).trim() === "Jul 14",
       "People directory did not keep the current-year last-contact date compact"
     );
     assert(
@@ -6772,7 +6880,7 @@ async function checkPeopleUnknownLastContactBrowserState(baseUrl, cookieJar, per
       directoryRow = datePage.locator(".people-directory-row").filter({ hasText: personTitle }).first();
       await directoryRow.waitFor();
       assert(
-        (await directoryRow.locator(".people-row-date").innerText()).trim() === `Jul 14, ${currentYear - 1}`,
+        (await directoryRow.locator(".people-row-date > span:last-child").innerText()).trim() === `Jul 14, ${currentYear - 1}`,
         `People directory omitted the prior-year last-contact year at ${viewport.label}`
       );
       assert(
@@ -6833,8 +6941,8 @@ async function checkPeopleUnknownLastContactBrowserState(baseUrl, cookieJar, per
       await row.waitFor();
       const lastContact = row.locator(".people-row-date");
       assert(
-        (await lastContact.innerText()).trim() === "N/A" &&
-          await lastContact.locator("i").count() === 0 &&
+        (await lastContact.locator(":scope > span:last-child").innerText()).trim() === "N/A" &&
+          await lastContact.locator(".people-activity-marker svg").count() === 1 &&
           (await lastContact.getAttribute("class"))?.includes("is-unknown"),
         `People directory did not show a neutral N/A last-contact state at ${viewport.label}`
       );
@@ -9188,8 +9296,8 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       }
       assert(await page.getByText("Resources remain authoritative.", { exact: false }).count() >= 1, `Style Guide did not disclose the Resource ownership boundary at ${viewport.label}`);
       assert(await page.locator('section[aria-label="Guide identity"] input').count() === 2, `Style Guide identity was not editable at ${viewport.label}`);
-      assert(await page.locator('[data-icon-registry-count="94"]').count() === 1, `Style Guide did not expose all 94 canonical icon roles at ${viewport.label}`);
-      assert(await page.locator('input[aria-label$=" usage"]').count() === 94, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
+      assert(await page.locator('[data-icon-registry-count="102"]').count() === 1, `Style Guide did not expose all 102 canonical icon roles at ${viewport.label}`);
+      assert(await page.locator('input[aria-label$=" usage"]').count() === 102, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
       assert(await page.locator('[class*="iconCandidate"]').count() >= 420, `Style Guide did not expose five curated recommendations for each unselected icon at ${viewport.label}`);
       const typographyFamilies = await page.locator('[class*="specimenPreview"]').evaluateAll((elements) => elements.slice(0, 6).map((element) => getComputedStyle(element).fontFamily));
       assert(
@@ -12714,7 +12822,7 @@ async function main() {
         initialStyleGuide.payload?.state?.typography?.length >= 6 &&
         initialStyleGuide.payload?.state?.colors?.length >= 18 &&
         initialStyleGuide.payload?.state?.modules?.length === 9 &&
-        initialStyleGuide.payload?.state?.icons?.length === 94 &&
+        initialStyleGuide.payload?.state?.icons?.length === 102 &&
         ["module-projects", "module-notes", "module-people", "module-media", "module-personal", "module-reviews", "module-resources", "module-finance", "module-vault"].every((role) => initialStyleGuide.payload.state.icons.some((item) => item.icon === role)) &&
         initialStyleGuide.payload.state.icons.every((item) => item.usage),
       "Style Guide defaults did not expose the expanded design foundation"

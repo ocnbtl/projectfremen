@@ -102,6 +102,8 @@ const PEOPLE_SIDEBARS = [
   "profile-gaps",
   "dormant",
   "import-export",
+  "import",
+  "export",
   "duplicates",
   "recently-deleted",
   "customize"

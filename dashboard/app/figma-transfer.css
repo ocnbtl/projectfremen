@@ -11604,6 +11604,8 @@ html[data-admin-preview="mobile"] .people-header-actions button {
 }
 
 .people-filter-sheet footer button:last-child {
+  width: 100%;
+  min-height: 40px;
   justify-content: center;
   text-align: center;
 }
@@ -13019,6 +13021,564 @@ html[data-admin-preview="mobile"] .people-record-type-toggle > div {
 .people-redesign-shell .people-profile-panel,
 .people-redesign-shell .people-smart-panel {
   border-top-color: var(--module-border);
+}
+
+/* People controls and relationship language: approved orange module system. */
+.people-redesign-shell .people-sidebar-section button {
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  min-height: 36px;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: var(--text-body);
+  box-shadow: none;
+}
+
+.people-redesign-shell .people-sidebar-section button > svg {
+  width: 16px;
+  height: 16px;
+  color: var(--module-icon);
+}
+
+.people-redesign-shell .people-sidebar-section button:hover,
+.people-redesign-shell .people-sidebar-section button.is-active {
+  border-color: color-mix(in srgb, var(--module-border) 72%, var(--border-soft));
+  background: var(--module-quiet);
+  color: var(--text-strong);
+  box-shadow: none;
+}
+
+.people-redesign-shell .people-directory-tools {
+  position: relative;
+  grid-template-columns: minmax(0, 1fr) auto;
+  overflow: visible;
+}
+
+.people-redesign-shell .people-primary-search {
+  overflow: visible;
+  padding-right: 4px;
+  border-color: color-mix(in srgb, var(--module-border) 56%, var(--border-soft));
+  background: var(--surface-panel);
+}
+
+.people-search-controls {
+  position: relative;
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  padding-left: 4px;
+  border-left: 1px solid var(--border-soft);
+}
+
+.people-primary-search .people-control-trigger {
+  display: inline-flex;
+  width: auto;
+  min-width: 78px;
+  height: 32px;
+  min-height: 32px;
+  gap: 6px;
+  padding: 0 9px;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-body);
+  font-size: 11px;
+  font-weight: 820;
+}
+
+.people-primary-search .people-control-trigger:hover,
+.people-primary-search .people-control-trigger[aria-expanded="true"] {
+  border-color: var(--module-border);
+  background: var(--module-quiet);
+  color: var(--module-icon);
+}
+
+.people-primary-search .people-control-trigger > span {
+  color: inherit;
+  font-size: inherit;
+}
+
+.people-primary-search .people-control-trigger > strong {
+  display: grid;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--module-icon);
+  color: #fff;
+  font: 800 9px/1 "Inconsolata Variable", monospace;
+}
+
+.people-primary-search .people-search-clear {
+  flex: 0 0 28px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+}
+
+.people-control-popover {
+  position: absolute !important;
+  top: calc(100% + 9px) !important;
+  right: 0 !important;
+  bottom: auto !important;
+  left: auto !important;
+  z-index: 95;
+  width: min(430px, calc(100vw - 48px)) !important;
+  max-height: min(620px, calc(100vh - 150px));
+  overflow: auto;
+  box-sizing: border-box;
+  border: 1px solid color-mix(in srgb, var(--module-border) 62%, var(--border-soft));
+  border-radius: 14px !important;
+  background: var(--surface-panel);
+  box-shadow: 0 22px 50px rgba(36, 31, 28, .17), 0 3px 12px rgba(36, 31, 28, .08);
+  transform-origin: calc(100% - 100px) top;
+  animation: people-control-menu-enter 190ms cubic-bezier(.23, 1, .32, 1) both;
+}
+
+@keyframes people-control-menu-enter {
+  from { opacity: 0; transform: translateY(-7px) scale(.965); filter: blur(2px); }
+  to { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+}
+
+.people-control-popover header {
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 2px 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.people-control-popover header > div,
+.people-sort-menu header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.people-control-popover h2 {
+  margin: 0;
+  color: var(--text-strong);
+  font-size: 14px;
+  font-weight: 790;
+}
+
+.people-control-popover header svg {
+  color: var(--module-icon);
+}
+
+.people-filter-sheet {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.people-filter-sheet header > button {
+  width: auto;
+  min-height: 30px;
+  padding: 0 7px;
+  color: var(--module-icon);
+}
+
+.people-filter-fields {
+  display: grid;
+  gap: 7px;
+}
+
+.people-filter-fields > label {
+  display: grid;
+  grid-template-columns: 24px 92px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 44px;
+  padding: 5px 7px;
+  border: 1px solid var(--border-soft);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--module-quiet) 42%, var(--surface-panel));
+}
+
+.people-filter-fields > label > svg {
+  width: 17px;
+  height: 17px;
+  color: var(--module-icon);
+}
+
+.people-filter-fields > label > span {
+  color: var(--text-subtle);
+  font-size: 10px;
+  font-weight: 820;
+}
+
+.people-filter-fields select {
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-soft);
+  border-radius: 7px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  font-size: 11px;
+  font-weight: 730;
+}
+
+.people-filter-sheet footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 0;
+}
+
+.people-filter-sheet footer button:last-child {
+  justify-content: center;
+  border-color: var(--module-icon);
+  background: var(--module-icon);
+  color: #fff;
+}
+
+.people-sort-menu {
+  display: grid;
+  gap: 3px;
+  width: 240px !important;
+  padding: 9px;
+  transform-origin: calc(100% - 38px) top;
+}
+
+.people-sort-menu header {
+  justify-content: flex-start;
+  min-height: 34px;
+  padding: 0 8px 7px;
+}
+
+.people-sort-menu > button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  width: 100%;
+  min-height: 39px;
+  padding: 0 9px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-body);
+  font-size: 11px;
+  font-weight: 760;
+  text-align: left;
+}
+
+.people-sort-menu > button:hover,
+.people-sort-menu > button[aria-checked="true"] {
+  border-color: color-mix(in srgb, var(--module-border) 70%, var(--border-soft));
+  background: var(--module-quiet);
+  color: var(--module-icon);
+}
+
+.people-sort-menu > button svg {
+  justify-self: end;
+}
+
+.people-view-cycle {
+  display: inline-flex;
+  min-width: 82px;
+  min-height: 40px;
+  padding: 0 11px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 1px solid color-mix(in srgb, var(--module-border) 70%, var(--border-soft));
+  border-radius: 9px;
+  background: var(--surface-panel);
+  color: var(--module-icon);
+  font-size: 11px;
+  font-weight: 820;
+}
+
+.people-view-cycle:hover {
+  background: var(--module-quiet);
+}
+
+.people-view-cycle svg {
+  width: 20px;
+  height: 20px;
+  overflow: visible;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.people-redesign-shell .people-directory-row {
+  border-color: var(--border-soft);
+  background: var(--surface-panel);
+  box-shadow: none;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 180ms ease, transform 180ms ease;
+}
+
+.people-redesign-shell .people-directory-row:hover,
+.people-redesign-shell .people-directory-row.is-selected {
+  border-color: var(--module-border);
+  background: var(--module-quiet);
+  box-shadow: 0 12px 28px rgba(81, 42, 18, .12);
+  transform: translateY(-1px);
+}
+
+.people-redesign-shell .people-directory-row-body {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.people-row-name > em {
+  min-height: auto;
+  padding: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.people-row-main > span:not(.people-row-name) > em,
+.people-tag-row span,
+.people-tag-row span:nth-child(2n),
+.people-tag-row span:nth-child(3n) {
+  border: 1px solid color-mix(in srgb, var(--module-border) 76%, var(--border-soft));
+  border-radius: 999px;
+  background: var(--module-quiet);
+  color: var(--module-icon);
+}
+
+.people-row-date {
+  display: grid;
+  gap: 3px;
+  color: var(--text-subtle);
+}
+
+.people-row-date > span:last-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.people-activity-marker {
+  display: inline-flex;
+  width: max-content;
+  align-items: center;
+  gap: 5px;
+  color: var(--module-icon);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: .025em;
+  text-transform: uppercase;
+}
+
+.people-activity-marker.is-dormant {
+  color: var(--module-secondary-700, #5a6040);
+}
+
+.people-activity-marker svg {
+  width: 13px;
+  height: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.9;
+}
+
+.people-profile-actions > .people-activity-marker {
+  min-height: 34px;
+  padding: 0 9px;
+  border: 1px solid color-mix(in srgb, currentColor 24%, var(--border-soft));
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .76);
+}
+
+.people-row-star,
+.people-deleted-star,
+.people-profile-actions .people-profile-star,
+.people-profile-actions .people-profile-star.is-starred {
+  border-color: color-mix(in srgb, var(--module-border) 80%, var(--border-soft));
+  background: var(--module-quiet);
+  color: var(--module-icon);
+}
+
+.people-row-star svg,
+.people-profile-star svg {
+  width: 17px;
+  height: 17px;
+  fill: color-mix(in srgb, currentColor 22%, transparent);
+  stroke: currentColor;
+  stroke-width: 1.8;
+}
+
+.people-profile-header {
+  border-color: var(--module-border) !important;
+  background: linear-gradient(135deg, var(--module-quiet), color-mix(in srgb, var(--module-quiet) 48%, var(--surface-panel))) !important;
+  box-shadow: 0 10px 28px rgba(81, 42, 18, .08);
+}
+
+.people-contact-methods-compact button:hover,
+.people-contact-methods-compact button.is-active {
+  border-color: var(--module-border);
+  background: var(--module-quiet);
+  color: var(--module-icon);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-focus) 14%, transparent), 0 4px 12px rgba(81, 42, 18, .11);
+}
+
+.people-contact-methods-compact button:focus-visible,
+.people-primary-search button:focus-visible,
+.people-view-cycle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--module-focus) 24%, transparent);
+  outline-offset: 2px;
+}
+
+.people-profile-form .people-themed-section,
+.people-profile-form .people-contact-channel-section,
+.people-profile-form .people-object-create-editor {
+  --people-section-accent: var(--module-icon);
+  border-color: var(--border-soft) !important;
+  background: var(--surface-panel) !important;
+  color: var(--text-body);
+  box-shadow: none;
+  border-left-width: 1px !important;
+}
+
+.people-profile-form .people-profile-section-heading,
+.people-profile-form .people-repeatable-heading {
+  border-color: var(--border-soft) !important;
+  background: var(--surface-panel-soft) !important;
+  color: var(--module-icon);
+}
+
+.people-profile-form .people-repeatable-title > span {
+  background: var(--module-quiet);
+}
+
+.people-repeatable-fields-education {
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .8fr) minmax(0, 1fr) 104px 40px;
+}
+
+.people-repeatable-fields-job {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 112px 40px;
+}
+
+.people-contact-channel-fields {
+  grid-template-columns: minmax(112px, .55fr) minmax(0, 1fr) 40px;
+  align-items: end;
+}
+
+.people-contact-remove,
+.people-contact-channel-fields .people-contact-remove {
+  align-self: end !important;
+  margin: 0 !important;
+  transform: none !important;
+}
+
+.people-repeatable-inline-remove {
+  align-self: end !important;
+  margin: 0 !important;
+  transform: translateY(-12px) !important;
+}
+
+.people-repeatable-fields-location .people-repeatable-inline-actions.has-visible-label {
+  transform: none;
+}
+
+@media (max-width: 980px) {
+  .people-repeatable-fields-education,
+  .people-repeatable-fields-job {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .people-repeatable-inline-remove {
+    grid-column: -2 / -1;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 760px) {
+  .people-redesign-shell .people-directory-tools,
+  html[data-admin-preview="mobile"] .people-redesign-shell .people-directory-tools {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .people-view-cycle {
+    justify-self: end;
+  }
+
+  .people-repeatable-fields-education,
+  .people-repeatable-fields-job,
+  .people-contact-channel-fields {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .people-repeatable-inline-remove,
+  .people-contact-remove,
+  .people-contact-channel-fields .people-contact-remove {
+    grid-column: 1;
+    justify-self: end;
+  }
+
+  .people-primary-search .people-control-trigger {
+    min-width: 36px;
+    width: 36px;
+    padding: 0;
+  }
+
+  .people-primary-search .people-control-trigger > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+
+  .people-primary-search .people-control-trigger > strong {
+    position: absolute;
+    top: -3px;
+    right: -2px;
+  }
+
+  .people-control-popover,
+  html[data-admin-preview="mobile"] .people-control-popover {
+    position: absolute !important;
+    top: calc(100% + 9px) !important;
+    right: -28px !important;
+    bottom: auto !important;
+    left: auto !important;
+    width: min(430px, calc(100vw - 32px)) !important;
+    max-height: calc(100vh - 190px);
+  }
+
+  .people-filter-fields > label {
+    grid-template-columns: 20px 78px minmax(0, 1fr);
+  }
+
+  .people-view-cycle {
+    min-width: 42px;
+    width: 42px;
+    padding: 0;
+  }
+
+  .people-view-cycle > span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .people-control-popover {
+    animation: none;
+  }
+
+  .people-redesign-shell .people-directory-row {
+    transition: none;
+  }
 }
 
 .command-hero {
