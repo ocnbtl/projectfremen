@@ -161,6 +161,7 @@ type PeopleIconName =
   | "dormant"
   | "active"
   | "interaction"
+  | "follow-up"
   | "new-person"
   | "more"
   | "star"
@@ -187,7 +188,7 @@ function PeopleIcon({ name }: { name: PeopleIconName }) {
     birthday: "birthday", location: "location", hometown: "hometown", occupation: "briefcase",
     employer: "employer", university: "university", partner: "partner", children: "users",
     organization: "organization", industry: "industry", founded: "clock", team: "users", edit: "edit",
-    object: "object", dormant: "dormant", active: "active", interaction: "interaction", "new-person": "new-person", more: "more", star: "star", export: "export", delete: "delete", chevron: "chevron-right",
+    object: "object", dormant: "dormant", active: "active", interaction: "interaction", "follow-up": "follow-up", "new-person": "new-person", more: "more", star: "star", export: "export", delete: "delete", chevron: "chevron-right",
     search: "search", filter: "filter", sort: "sort", check: "check", close: "close", plus: "plus", groups: "users",
     communication: "message", notes: "notes", cadence: "clock", "view-comfortable": "view-comfortable",
     "view-compact": "view-compact", "view-grid": "view-grid"
@@ -1182,12 +1183,7 @@ function isThisWeek(record: PersonalRecord) {
 }
 
 function isDormant(record: PersonalRecord) {
-  if (record.status === "inactive") return true;
-  if (record.time.reviewCadence?.toUpperCase() === "NONE") return false;
-  if (!record.time.lastReview && !record.time.nextReview) return true;
-  const last = record.time.lastReview ? parseDisplayDate(record.time.lastReview) : null;
-  if (!last || Number.isNaN(last.getTime())) return false;
-  return Date.now() - last.getTime() > 1000 * 60 * 60 * 24 * 75;
+  return record.status === "inactive";
 }
 
 function getPeopleTone(record: PersonalRecord) {
@@ -1986,7 +1982,7 @@ function QuickObjectsEditor({
   }
 
   return (
-    <section className="people-object-create-editor people-themed-section module-ref-tone-blue" data-people-create-objects>
+    <section className="people-object-create-editor people-themed-section module-ref-tone-blue" data-people-create-objects data-profile-section="objects">
       <header className="people-repeatable-heading">
         <div className="people-repeatable-title"><span><PeopleIcon name="object" /></span><h4>Objects</h4></div>
       </header>
@@ -2337,15 +2333,15 @@ export default function PeopleWorkspace({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const [objectLinkOpen, setObjectLinkOpen] = useState(false);
   const [objectLinkTargetId, setObjectLinkTargetId] = useState("");
   const [objectLinkRelationship, setObjectLinkRelationship] = useState("related");
   const [objectLinkSaving, setObjectLinkSaving] = useState(false);
   const [objectLinks, setObjectLinks] = useState(initialObjectLinks);
-  const [dormantConfirmOpen, setDormantConfirmOpen] = useState(false);
   const [photoDialogOpen, setPhotoDialogOpen] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState("");
-  const [lifecycleSaving, setLifecycleSaving] = useState<"" | "star" | "dormant" | "delete" | "restore">("");
+  const [lifecycleSaving, setLifecycleSaving] = useState<"" | "star" | "status" | "delete" | "restore">("");
   const [expandedContactMethod, setExpandedContactMethod] = useState<ContactMethodId | null>(null);
   const [quickNoteOpen, setQuickNoteOpen] = useState(false);
   const [quickNoteDraft, setQuickNoteDraft] = useState("");
@@ -2386,6 +2382,7 @@ export default function PeopleWorkspace({
         setAddingPerson(true);
         setDetailMode("edit");
         setProfileMenuOpen(false);
+        setStatusMenuOpen(false);
         return;
       }
       const state = event.state?.__unigentamosPeopleRoute as {
@@ -2411,6 +2408,7 @@ export default function PeopleWorkspace({
       ));
       setAddingPerson(false);
       setProfileMenuOpen(false);
+      setStatusMenuOpen(false);
     };
     window.addEventListener("popstate", handleProfileHistory);
     return () => window.removeEventListener("popstate", handleProfileHistory);
@@ -2494,14 +2492,18 @@ export default function PeopleWorkspace({
   }, [interactionSaving]);
 
   useEffect(() => {
-    if (!profileMenuOpen) return;
+    if (!profileMenuOpen && !statusMenuOpen) return;
     const closeMenu = (event: MouseEvent) => {
       const target = event.target instanceof Element ? event.target : null;
-      if (target?.closest("#people-profile-action-menu, .people-profile-more")) return;
+      if (target?.closest("#people-profile-action-menu, .people-profile-more, #people-profile-status-menu, .people-profile-status-trigger")) return;
       setProfileMenuOpen(false);
+      setStatusMenuOpen(false);
     };
     const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setProfileMenuOpen(false);
+      if (event.key === "Escape") {
+        setProfileMenuOpen(false);
+        setStatusMenuOpen(false);
+      }
     };
     document.addEventListener("mousedown", closeMenu);
     document.addEventListener("keydown", closeOnEscape);
@@ -2509,7 +2511,7 @@ export default function PeopleWorkspace({
       document.removeEventListener("mousedown", closeMenu);
       document.removeEventListener("keydown", closeOnEscape);
     };
-  }, [profileMenuOpen]);
+  }, [profileMenuOpen, statusMenuOpen]);
 
   useEffect(() => {
     const container = mobileMenuOpen ? mobileMenuRef.current : filtersOpen ? filterSheetRef.current : null;
@@ -3565,16 +3567,18 @@ export default function PeopleWorkspace({
     setLifecycleSaving("");
   }
 
-  async function toggleDormant() {
-    if (!selectedPerson || lifecycleSaving) return;
-    setLifecycleSaving("dormant");
-    const nextDormant = selectedPerson.status !== "inactive";
-    const saved = await patchPerson(selectedPerson.id, { status: nextDormant ? "inactive" : "active" });
+  async function setRelationshipStatus(nextStatus: "active" | "inactive") {
+    if (!selectedPerson || lifecycleSaving || selectedPerson.status === nextStatus) {
+      setStatusMenuOpen(false);
+      return;
+    }
+    setLifecycleSaving("status");
+    const saved = await patchPerson(selectedPerson.id, { status: nextStatus });
     setLifecycleSaving("");
     if (!saved) return;
-    setDormantConfirmOpen(false);
+    setStatusMenuOpen(false);
     setProfileMenuOpen(false);
-    setActionNotice(`${selectedPerson.title} is now ${nextDormant ? "dormant" : "active"}.`);
+    setActionNotice(`${selectedPerson.title} is now ${nextStatus === "inactive" ? "dormant" : "active"}.`);
   }
 
   function exportContact() {
@@ -3952,7 +3956,7 @@ export default function PeopleWorkspace({
         </fieldset>
         {className === "person" && (
           <>
-            <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" aria-labelledby="people-create-identity-title">
+            <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" data-profile-section="identity" aria-labelledby="people-create-identity-title">
               <header className="people-profile-section-heading">
                 <span><PeopleIcon name="person" /></span>
                 <h4 id="people-create-identity-title">Identity</h4>
@@ -3977,7 +3981,7 @@ export default function PeopleWorkspace({
               </div>
               <BirthdayEditor value={quickBirthday} onChange={setQuickBirthday} />
             </section>
-            <section className="people-profile-section people-themed-section module-ref-tone-crimson people-capture-section" aria-labelledby="people-create-about-title">
+            <section className="people-profile-section people-themed-section module-ref-tone-crimson people-capture-section" data-profile-section="about" aria-labelledby="people-create-about-title">
               <header className="people-profile-section-heading">
                 <span><PeopleIcon name="notes" /></span>
                 <h4 id="people-create-about-title">About</h4>
@@ -3987,7 +3991,7 @@ export default function PeopleWorkspace({
               </div>
               <PeopleNotesEditor notes={quickNotes} onChange={setQuickNotes} />
             </section>
-            <section className="people-profile-section people-themed-section module-ref-tone-purple people-capture-section" aria-labelledby="people-create-groups-title">
+            <section className="people-profile-section people-themed-section module-ref-tone-purple people-capture-section" data-profile-section="groups" aria-labelledby="people-create-groups-title">
               <header className="people-profile-section-heading">
                 <span><PeopleIcon name="groups" /></span>
                 <h4 id="people-create-groups-title">Groups</h4>
@@ -4000,7 +4004,7 @@ export default function PeopleWorkspace({
                 </label>)}</div>
               </fieldset>
             </section>
-            <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" aria-labelledby="people-create-communication-title">
+            <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" data-profile-section="communication" aria-labelledby="people-create-communication-title">
               <header className="people-profile-section-heading">
                 <span><PeopleIcon name="communication" /></span>
                 <h4 id="people-create-communication-title">Communication</h4>
@@ -4053,7 +4057,7 @@ export default function PeopleWorkspace({
               onRemove={(id) => setQuickLocations((current) => removeEntry(current, id))}
             />
             <QuickObjectsEditor targets={quickObjectTargets} selectedIds={quickObjectTargetIds} onChange={setQuickObjectTargetIds} />
-            <section className="people-profile-section people-themed-section module-ref-tone-orange people-capture-section" aria-labelledby="people-create-cadence-title">
+            <section className="people-profile-section people-themed-section module-ref-tone-orange people-capture-section" data-profile-section="cadence" aria-labelledby="people-create-cadence-title">
               <header className="people-profile-section-heading">
                 <span><PeopleIcon name="cadence" /></span>
                 <h4 id="people-create-cadence-title">Cadence</h4>
@@ -4070,7 +4074,7 @@ export default function PeopleWorkspace({
         )}
         {className === "org" && (
           <>
-          <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" aria-labelledby="people-organization-details-title">
+          <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" data-profile-section="identity" aria-labelledby="people-organization-details-title">
             <header className="people-profile-section-heading">
               <span><PeopleIcon name="organization" /></span>
               <h4 id="people-organization-details-title">Details</h4>
@@ -4103,7 +4107,7 @@ export default function PeopleWorkspace({
               onChange={setQuickNotes}
             />
           </section>
-          <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" aria-labelledby="people-organization-links-title">
+          <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" data-profile-section="links" aria-labelledby="people-organization-links-title">
             <header className="people-profile-section-heading">
               <span><PeopleIcon name="communication" /></span>
               <h4 id="people-organization-links-title">Links</h4>
@@ -4556,7 +4560,7 @@ export default function PeopleWorkspace({
                 </div>
                 <p>{selectedPerson.className === "org"
                   ? [selectedProfile.organizationType, selectedProfile.industry].filter(Boolean).join(" · ") || "Organization"
-                  : [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer ? `at ${selectedProfile.primaryEmployer}` : ""].filter(Boolean).join(" ") || getPrimaryGroup(selectedPerson)}</p>
+                  : [selectedProfile.primaryOccupation, selectedProfile.primaryEmployer ? `at ${selectedProfile.primaryEmployer}` : ""].filter(Boolean).join(" ") || selectedProfile.context || selectedPerson.body || "Person"}</p>
                 <div className="people-tag-row">
                   {selectedTags.map((tag) => (
                     <span key={tag}>{tag}</span>
@@ -4564,7 +4568,46 @@ export default function PeopleWorkspace({
                 </div>
               </div>
               <div className="people-profile-actions">
-                <PeopleActivityMarker dormant={isDormant(selectedPerson)} />
+                <div className="people-profile-status-control">
+                  <button
+                    type="button"
+                    className="people-profile-status-trigger"
+                    aria-label={`Change relationship status. Current status: ${isDormant(selectedPerson) ? "Dormant" : "Active"}`}
+                    aria-haspopup="menu"
+                    aria-expanded={statusMenuOpen}
+                    aria-controls="people-profile-status-menu"
+                    disabled={lifecycleSaving === "status"}
+                    onClick={() => {
+                      setProfileMenuOpen(false);
+                      setStatusMenuOpen((current) => !current);
+                    }}
+                  >
+                    <PeopleActivityMarker dormant={isDormant(selectedPerson)} />
+                    <PeopleIcon name="chevron" />
+                  </button>
+                  {statusMenuOpen && (
+                    <div id="people-profile-status-menu" className="people-profile-status-menu" role="menu" aria-label="Relationship status">
+                      {(["active", "inactive"] as const).map((nextStatus) => {
+                        const dormant = nextStatus === "inactive";
+                        const selected = dormant ? isDormant(selectedPerson) : !isDormant(selectedPerson);
+                        return (
+                          <button
+                            type="button"
+                            role="menuitemradio"
+                            aria-checked={selected}
+                            onClick={() => void setRelationshipStatus(nextStatus)}
+                            disabled={lifecycleSaving === "status"}
+                            key={nextStatus}
+                          >
+                            <PeopleIcon name={dormant ? "dormant" : "active"} />
+                            <span>{dormant ? "Dormant" : "Active"}</span>
+                            {selected && <PeopleIcon name="check" />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
                 <button
                   type="button"
                   className={`people-profile-star${selectedPerson.starred ? " is-starred" : ""}`}
@@ -4582,14 +4625,16 @@ export default function PeopleWorkspace({
                   aria-label="More profile actions"
                   aria-expanded={profileMenuOpen}
                   aria-controls="people-profile-action-menu"
-                  onClick={() => setProfileMenuOpen((current) => !current)}
+                  onClick={() => {
+                    setStatusMenuOpen(false);
+                    setProfileMenuOpen((current) => !current);
+                  }}
                 ><PeopleIcon name="more" /></button>
               </div>
               {profileMenuOpen && (
                 <div id="people-profile-action-menu" className="people-action-menu" role="menu" aria-label="Profile actions">
                   <button type="button" role="menuitem" onClick={openEditProfile}><PeopleIcon name="edit" /><span>Edit profile</span></button>
                   <button type="button" role="menuitem" onClick={() => { setObjectLinkOpen(true); setProfileMenuOpen(false); }}><PeopleIcon name="object" /><span>Add to object</span></button>
-                  <button type="button" role="menuitem" onClick={() => { setDormantConfirmOpen(true); setProfileMenuOpen(false); }}><PeopleIcon name="dormant" /><span>{selectedPerson.status === "inactive" ? "Set active" : "Set dormant"}</span></button>
                   <button type="button" role="menuitem" onClick={exportContact}><PeopleIcon name="export" /><span>Export contact</span></button>
                   <button
                     type="button"
@@ -4813,6 +4858,7 @@ export default function PeopleWorkspace({
                   <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
                   <PeopleAddButton
                     label="Follow-up"
+                    icon="follow-up"
                     onClick={() => router.push(followUpCreationRoute(selectedPerson))}
                     ariaLabel={`Schedule a Personal follow-up for ${selectedPerson.title}`}
                   />
@@ -5384,22 +5430,6 @@ export default function PeopleWorkspace({
           onRemoved={clearProfilePhoto}
         />
       )}
-
-      <ConfirmationSheet
-        open={dormantConfirmOpen}
-        onOpenChange={(open) => {
-          if (!open && lifecycleSaving !== "dormant") setDormantConfirmOpen(false);
-        }}
-        onConfirm={toggleDormant}
-        title={`${selectedPerson?.status === "inactive" ? "Reactivate" : "Set dormant"} ${selectedPerson?.title || "this profile"}?`}
-        description={selectedPerson?.status === "inactive" ? "This profile will return to active People views." : "This profile stays intact but leaves active relationship views."}
-        consequences={selectedPerson?.status === "inactive"
-          ? ["Links and history remain unchanged.", "The profile will be included in active views again."]
-          : ["Links and history remain unchanged.", "You can reactivate the profile from Dormant at any time."]}
-        confirmLabel={selectedPerson?.status === "inactive" ? "Set active" : "Set dormant"}
-        busy={lifecycleSaving === "dormant"}
-        dismissible={lifecycleSaving !== "dormant"}
-      />
 
       <ConfirmationSheet
         open={Boolean(deleteTarget)}

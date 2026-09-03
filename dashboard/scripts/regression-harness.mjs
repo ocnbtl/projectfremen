@@ -5831,6 +5831,17 @@ async function checkPeopleMemoryBrowserState(
       await assertNoOverflow(page, `People recent interactions ${viewport.label}`);
       if (viewport.label === "desktop") {
         const aiLauncher = page.getByRole("button", { name: "Open AI assistant" });
+        const aiLauncherTreatment = await aiLauncher.evaluate((button) => ({
+          backgroundColor: getComputedStyle(button).backgroundColor,
+          borderColor: getComputedStyle(button).borderColor,
+          color: getComputedStyle(button).color
+        }));
+        assert(
+          aiLauncherTreatment.backgroundColor === "rgb(19, 60, 94)" &&
+            aiLauncherTreatment.borderColor === "rgb(19, 60, 94)" &&
+            aiLauncherTreatment.color === "rgb(255, 255, 255)",
+          `People AI launcher did not use the refined Navy action treatment: ${JSON.stringify(aiLauncherTreatment)}`
+        );
         const launcherBefore = await aiLauncher.boundingBox();
         assert(launcherBefore, "People AI launcher was not measurable before dragging");
         await page.mouse.move(launcherBefore.x + (launcherBefore.width / 2), launcherBefore.y + (launcherBefore.height / 2));
@@ -5934,27 +5945,40 @@ async function checkPeopleMemoryBrowserState(
         `People profile title did not use the requested lowercase aka nickname treatment at ${viewport.label}: ${JSON.stringify({ profileHeadingText, expected: `${personTitle}, aka Reg` })}`
       );
       assert(
-        await page.locator(".people-profile-actions > .people-activity-marker").count() === 1 &&
-          await page.locator(".people-profile-actions > .people-activity-marker svg").count() === 1 &&
+        await page.locator(".people-profile-actions .people-profile-status-trigger").count() === 1 &&
+          await page.locator(".people-profile-status-trigger .people-activity-marker svg").count() === 1 &&
           await page.locator(".people-profile-title-line > .people-activity-marker").count() === 0,
-        `People profile status did not move beside Star and More at ${viewport.label}`
+        `People profile status was not an editable control beside Star and More at ${viewport.label}`
+      );
+      const profileSubtitle = (await page.locator(".people-profile-identity > p").innerText()).trim();
+      const profileTags = (await page.locator(".people-tag-row span").allTextContents()).map((tag) => tag.trim());
+      assert(
+        profileTags.includes("Acquaintance") &&
+          !profileTags.some((tag) => tag.toLowerCase() === profileSubtitle.toLowerCase()),
+        `People profile duplicated the relationship tag instead of showing About context: ${JSON.stringify({ profileSubtitle, profileTags })}`
       );
       const peopleColorTreatment = await page.evaluate(() => {
         const shell = document.querySelector(".people-redesign-shell");
         const header = document.querySelector(".people-profile-header");
         const tag = document.querySelector(".people-tag-row span");
+        const oliveSection = document.querySelector('.people-fact-cluster.is-work');
+        const oliveIcon = oliveSection?.querySelector('.people-info-icon');
         return {
           moduleIcon: shell ? getComputedStyle(shell).getPropertyValue("--module-icon").trim() : "",
           headerBackground: header ? getComputedStyle(header).backgroundImage : "",
           tagColor: tag ? getComputedStyle(tag).color : "",
-          tagBackground: tag ? getComputedStyle(tag).backgroundColor : ""
+          tagBackground: tag ? getComputedStyle(tag).backgroundColor : "",
+          oliveBorder: oliveSection ? getComputedStyle(oliveSection).borderColor : "",
+          oliveIconColor: oliveIcon ? getComputedStyle(oliveIcon).color : ""
         };
       });
       assert(
         peopleColorTreatment.moduleIcon &&
           peopleColorTreatment.headerBackground.includes("linear-gradient") &&
           peopleColorTreatment.tagColor === "rgb(150, 58, 8)" &&
-          peopleColorTreatment.tagBackground !== "rgb(255, 255, 255)",
+          peopleColorTreatment.tagBackground !== "rgb(255, 255, 255)" &&
+          peopleColorTreatment.oliveBorder === "rgb(228, 232, 216)" &&
+          peopleColorTreatment.oliveIconColor === "rgb(90, 96, 64)",
         `People profile did not use the approved orange banner and tag language at ${viewport.label}: ${JSON.stringify(peopleColorTreatment)}`
       );
       const profilePhoto = page.getByRole("button", { name: new RegExp(`profile picture for ${personTitle}`, "i") });
@@ -6176,7 +6200,7 @@ async function checkPeopleMemoryBrowserState(
           timelineActionWidths.every((width) => width < 190) &&
           JSON.stringify(timelineActionLabels) === JSON.stringify(["Interaction", "Follow-up"]) &&
           await page.locator('.people-timeline-actions .people-add-action svg[data-icon-role="interaction"][data-icon-candidate="message-plus"]').count() === 1 &&
-          await page.locator('.people-timeline-actions .people-add-action svg[data-icon-role="plus"][data-icon-candidate="plus"]').count() === 1,
+          await page.locator('.people-timeline-actions .people-add-action svg[data-icon-role="follow-up"]').count() === 1,
         `Timeline actions remained oversized at ${viewport.label}: ${JSON.stringify(timelineActionWidths)}`
       );
       const followUpPanel = page.locator('[data-people-follow-up-bridge]');
@@ -6445,10 +6469,12 @@ async function checkPeopleMemoryBrowserState(
       const propertyControlGeometry = await page.evaluate(() => {
         const removeButtons = Array.from(document.querySelectorAll(".people-edit-form .people-remove-icon"));
         const addButtons = Array.from(document.querySelectorAll(".people-edit-form .people-add-action"));
-        const phoneFields = document.querySelector("[data-phone-entry] .people-contact-channel-fields");
-        const phoneRemove = phoneFields?.querySelector(".people-contact-remove");
-        const fieldRect = phoneFields?.getBoundingClientRect();
-        const removeRect = phoneRemove?.getBoundingClientRect();
+        const contactAlignments = Array.from(document.querySelectorAll("[data-email-entry], [data-phone-entry]")).flatMap((entry) => {
+          const input = entry.querySelector(".people-contact-value-field input")?.getBoundingClientRect();
+          const remove = entry.querySelector(".people-contact-remove")?.getBoundingClientRect();
+          if (!input || !remove) return [];
+          return [{ topGap: Math.abs(input.top - remove.top), bottomGap: Math.abs(input.bottom - remove.bottom) }];
+        });
         const comesFrom = document.querySelector(".people-comes-from-field");
         const alignedRemoveButtons = Array.from(document.querySelectorAll(
           ".people-repeatable-fields > .people-repeatable-inline-remove, .people-repeatable-inline-actions > .people-repeatable-inline-remove"
@@ -6464,7 +6490,7 @@ async function checkPeopleMemoryBrowserState(
           removeColors: Array.from(new Set(removeButtons.map((button) => getComputedStyle(button).backgroundColor))),
           addColors: Array.from(new Set(addButtons.map((button) => getComputedStyle(button).backgroundColor))),
           removeIconWidths: removeButtons.map((button) => button.querySelector("svg")?.getBoundingClientRect().width || 0),
-          phoneBottomGap: fieldRect && removeRect ? Math.abs(fieldRect.bottom - removeRect.bottom) : 999,
+          contactAlignments,
           repeatableBottomGaps,
           themedSectionShadows: Array.from(new Set(themedSections.map((section) => getComputedStyle(section).boxShadow))),
           themedSectionLeftWidths: themedSections.map((section) => Number.parseFloat(getComputedStyle(section).borderLeftWidth)),
@@ -6472,11 +6498,11 @@ async function checkPeopleMemoryBrowserState(
         };
       });
       assert(
-        propertyControlGeometry.removeColors.length === 1 &&
-          propertyControlGeometry.addColors.length === 1 &&
-          propertyControlGeometry.removeColors[0] !== propertyControlGeometry.addColors[0] &&
+        JSON.stringify(propertyControlGeometry.removeColors) === JSON.stringify(["rgb(180, 35, 24)"]) &&
+          JSON.stringify(propertyControlGeometry.addColors) === JSON.stringify(["rgb(19, 60, 94)"]) &&
           propertyControlGeometry.removeIconWidths.every((width) => width >= 18) &&
-          propertyControlGeometry.phoneBottomGap < 2 &&
+          propertyControlGeometry.contactAlignments.length >= 2 &&
+          (viewport.label === "mobile" || propertyControlGeometry.contactAlignments.every(({ topGap, bottomGap }) => topGap < 2 && bottomGap < 2)) &&
           (viewport.label === "mobile" || propertyControlGeometry.repeatableBottomGaps.every((gap) => gap < 2)) &&
           propertyControlGeometry.themedSectionShadows.every((shadow) => shadow === "none") &&
           propertyControlGeometry.themedSectionLeftWidths.every((width) => width <= 1) &&
@@ -6567,6 +6593,27 @@ async function checkPeopleMemoryBrowserState(
       assert(
         organizationDescription && organizationNotes && organizationNotes.y > organizationDescription.y + organizationDescription.height,
         `Organization Notes did not appear below Description at ${viewport.label}`
+      );
+      const organizationCreateTreatment = await organizationForm.evaluate((form) => {
+        const boxes = Array.from(form.querySelectorAll(":scope > .people-themed-section, :scope > .people-object-create-editor"));
+        const notesHeading = form.querySelector('[data-people-notes-editor="notes"] > .people-repeatable-heading');
+        const addButtons = Array.from(form.querySelectorAll(".people-add-action"));
+        const removeButtons = Array.from(form.querySelectorAll(".people-remove-icon"));
+        return {
+          leftBorders: boxes.map((box) => Number.parseFloat(getComputedStyle(box).borderLeftWidth)),
+          shadows: boxes.map((box) => getComputedStyle(box).boxShadow),
+          notesHeadingBackground: notesHeading ? getComputedStyle(notesHeading).backgroundColor : "missing",
+          addColors: Array.from(new Set(addButtons.map((button) => getComputedStyle(button).backgroundColor))),
+          removeColors: Array.from(new Set(removeButtons.map((button) => getComputedStyle(button).backgroundColor)))
+        };
+      });
+      assert(
+        organizationCreateTreatment.leftBorders.every((width) => width <= 1) &&
+          organizationCreateTreatment.shadows.every((shadow) => shadow === "none") &&
+          organizationCreateTreatment.notesHeadingBackground === "rgba(0, 0, 0, 0)" &&
+          JSON.stringify(organizationCreateTreatment.addColors) === JSON.stringify(["rgb(19, 60, 94)"]) &&
+          organizationCreateTreatment.removeColors.every((color) => color === "rgb(180, 35, 24)"),
+        `New Organization retained side tabs, highlighted Notes, or off-system actions at ${viewport.label}: ${JSON.stringify(organizationCreateTreatment)}`
       );
       const organizationLabelTypography = await organizationForm.evaluate(() => {
         const organizationName = document.querySelector('label:has(input[placeholder="Organization name"])');
@@ -7147,7 +7194,7 @@ async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, 
     assert(
       await actionMenu.getByRole("menuitem", { name: "Edit profile" }).count() === 1 &&
         await actionMenu.getByRole("menuitem", { name: "Add to object" }).count() === 1 &&
-        await actionMenu.getByRole("menuitem", { name: "Set dormant" }).count() === 1 &&
+        await actionMenu.getByRole("menuitem", { name: /Set (active|dormant)/ }).count() === 0 &&
         await actionMenu.getByRole("menuitem", { name: "Export contact" }).count() === 1,
       "People profile menu did not expose the compact functional action set"
     );
@@ -7160,23 +7207,29 @@ async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, 
       "People Add to object did not expose real object and relationship choices"
     );
     await objectDialog.getByRole("button", { name: "Close object picker" }).click();
-    await page.getByRole("button", { name: "More profile actions" }).click();
-    await page.getByRole("menuitem", { name: "Set dormant" }).click();
-    const dormantConfirmation = page.getByRole("dialog", { name: `Set dormant ${personTitle}?` });
+
+    const statusTrigger = page.getByRole("button", { name: `Change relationship status. Current status: Active`, exact: true });
+    await statusTrigger.click();
+    const statusMenu = page.getByRole("menu", { name: "Relationship status" });
+    await statusMenu.waitFor();
+    assert(
+      await statusMenu.getByRole("menuitemradio", { name: "Active", exact: true }).count() === 1 &&
+        await statusMenu.getByRole("menuitemradio", { name: "Dormant", exact: true }).count() === 1,
+      "People status control did not expose the direct Active and Dormant choices"
+    );
     const [dormantResponse] = await Promise.all([
       page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
-      dormantConfirmation.getByRole("button", { name: "Set dormant", exact: true }).click()
+      statusMenu.getByRole("menuitemradio", { name: "Dormant", exact: true }).click()
     ]);
-    assert((await responseRecord(dormantResponse))?.status === "inactive", "People Set dormant action did not persist");
+    assert((await responseRecord(dormantResponse))?.status === "inactive", "People direct Dormant status did not persist");
 
-    await page.getByRole("button", { name: "More profile actions" }).click();
-    await page.getByRole("menuitem", { name: "Set active" }).click();
-    const activeConfirmation = page.getByRole("dialog", { name: `Reactivate ${personTitle}?` });
+    const dormantTrigger = page.getByRole("button", { name: `Change relationship status. Current status: Dormant`, exact: true });
+    await dormantTrigger.click();
     const [activeResponse] = await Promise.all([
       page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
-      activeConfirmation.getByRole("button", { name: "Set active", exact: true }).click()
+      page.getByRole("menu", { name: "Relationship status" }).getByRole("menuitemradio", { name: "Active", exact: true }).click()
     ]);
-    assert((await responseRecord(activeResponse))?.status === "active", "People Set active action did not persist");
+    assert((await responseRecord(activeResponse))?.status === "active", "People direct Active status did not persist");
 
     await page.getByRole("button", { name: "More profile actions" }).click();
     const [contactDownload] = await Promise.all([

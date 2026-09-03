@@ -14116,3 +14116,221 @@ html[data-admin-preview="mobile"] .people-record-type-toggle > div {
     display: none;
   }
 }
+
+/* People V1.3 — complete Navy actions, Warm Olive context, and flat record sections. */
+.people-redesign-shell {
+  --people-olive-soft: var(--module-secondary-100, #e4e8d8);
+  --people-olive: var(--module-secondary-500, #8a9060);
+  --people-olive-strong: var(--module-secondary-700, #5a6040);
+  --people-destructive: #b42318;
+  --people-destructive-hover: #8f1d14;
+}
+
+.shared-ai-dock--people {
+  --people-action: var(--navy-600, #133c5e);
+  --people-action-hover: var(--navy-700, #0c2b44);
+}
+
+.people-redesign-shell .people-add-action.people-add-action,
+.people-redesign-shell .people-note-add.people-note-add,
+.people-redesign-shell .people-about-notes > header button,
+.shared-ai-dock--people .shared-ai-dock__launcher {
+  border-color: var(--people-action) !important;
+  background: var(--people-action) !important;
+  color: #fff !important;
+}
+
+.people-redesign-shell .people-add-action.people-add-action:hover:not(:disabled),
+.people-redesign-shell .people-note-add.people-note-add:hover:not(:disabled),
+.people-redesign-shell .people-about-notes > header button:hover:not(:disabled),
+.shared-ai-dock--people .shared-ai-dock__launcher:hover:not(:disabled) {
+  border-color: var(--people-action-hover) !important;
+  background: var(--people-action-hover) !important;
+  color: #fff !important;
+}
+
+.people-redesign-shell .people-remove-icon.people-remove-icon,
+.people-redesign-shell .people-contact-remove.people-contact-remove,
+.people-redesign-shell .people-note-remove.people-note-remove {
+  border-color: var(--people-destructive) !important;
+  background: var(--people-destructive) !important;
+  color: #fff !important;
+}
+
+.people-redesign-shell .people-remove-icon.people-remove-icon:hover:not(:disabled),
+.people-redesign-shell .people-contact-remove.people-contact-remove:hover:not(:disabled),
+.people-redesign-shell .people-note-remove.people-note-remove:hover:not(:disabled) {
+  border-color: var(--people-destructive-hover) !important;
+  background: var(--people-destructive-hover) !important;
+  color: #fff !important;
+}
+
+.people-redesign-shell :where(.people-capture-form, .people-profile-form) :where(
+  .people-profile-section.people-themed-section,
+  .people-repeatable-section.people-themed-section,
+  .people-contact-channel-section,
+  .people-organization-link-editor,
+  .people-object-create-editor
+) {
+  border-left-width: 1px !important;
+  box-shadow: none !important;
+}
+
+.people-redesign-shell :where(.people-capture-form, .people-profile-form) .people-notes-editor > .people-repeatable-heading {
+  padding-inline: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--text-strong) !important;
+}
+
+.people-redesign-shell :where(
+  [data-profile-section="links"],
+  [data-profile-section="communication"],
+  [data-profile-section="occupations"],
+  [data-profile-section="locations"],
+  [data-profile-section="education"],
+  [data-profile-section="people"],
+  [data-profile-section="objects"],
+  [data-profile-section="cadence"]
+) {
+  --people-section-accent: var(--people-olive-strong) !important;
+}
+
+.people-redesign-shell :where(
+  [data-profile-section="links"],
+  [data-profile-section="communication"],
+  [data-profile-section="occupations"],
+  [data-profile-section="locations"],
+  [data-profile-section="education"],
+  [data-profile-section="people"],
+  [data-profile-section="objects"],
+  [data-profile-section="cadence"]
+) :where(.people-profile-section-heading, .people-repeatable-heading) {
+  border-color: color-mix(in srgb, var(--people-olive) 22%, var(--border-soft)) !important;
+  background: color-mix(in srgb, var(--people-olive-soft) 56%, var(--surface-panel)) !important;
+  color: var(--people-olive-strong) !important;
+}
+
+.people-redesign-shell .people-contact-channel-fields {
+  align-items: end;
+}
+
+.people-redesign-shell .people-contact-channel-fields :where(.people-contact-value-field input, .people-contact-remove) {
+  box-sizing: border-box;
+  height: 40px !important;
+  min-height: 40px !important;
+  margin: 0 !important;
+}
+
+.people-redesign-shell .people-contact-channel-fields .people-contact-remove {
+  display: grid;
+  align-self: end !important;
+  place-items: center;
+  transform: none !important;
+}
+
+.people-redesign-shell .people-profile-status-control {
+  position: relative;
+}
+
+.people-redesign-shell .people-profile-status-trigger {
+  display: inline-flex;
+  min-height: 36px;
+  padding: 0 9px;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--people-olive-soft);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, .82);
+  color: var(--people-olive-strong);
+}
+
+.people-redesign-shell .people-profile-status-trigger:hover:not(:disabled),
+.people-redesign-shell .people-profile-status-trigger[aria-expanded="true"] {
+  border-color: var(--people-olive);
+  background: color-mix(in srgb, var(--people-olive-soft) 72%, white);
+}
+
+.people-redesign-shell .people-profile-status-trigger > svg {
+  width: 13px;
+  height: 13px;
+  transition: transform 150ms ease;
+}
+
+.people-redesign-shell .people-profile-status-trigger[aria-expanded="true"] > svg {
+  transform: rotate(90deg);
+}
+
+.people-redesign-shell .people-profile-status-menu {
+  position: absolute;
+  top: calc(100% + 7px);
+  right: 0;
+  z-index: 18;
+  display: grid;
+  width: 166px;
+  gap: 3px;
+  padding: 6px;
+  border: 1px solid color-mix(in srgb, var(--people-olive) 34%, var(--border-soft));
+  border-radius: 11px;
+  background: var(--surface-panel);
+  box-shadow: var(--shadow-floating);
+  transform-origin: top right;
+  animation: people-menu-enter 130ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.people-redesign-shell .people-profile-status-menu button {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 18px;
+  min-height: 38px;
+  padding: 0 8px;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-strong);
+  font: 760 11px/1 var(--font-body);
+  text-align: left;
+}
+
+.people-redesign-shell .people-profile-status-menu button:hover,
+.people-redesign-shell .people-profile-status-menu button[aria-checked="true"] {
+  background: color-mix(in srgb, var(--people-olive-soft) 64%, var(--surface-panel));
+}
+
+.people-redesign-shell .people-profile-status-menu button:first-child > svg:first-child {
+  color: var(--module-icon);
+}
+
+.people-redesign-shell .people-profile-status-menu button:last-child > svg:first-child,
+.people-redesign-shell .people-profile-status-menu button > svg:last-child {
+  color: var(--people-olive-strong);
+}
+
+.people-redesign-shell :where(.people-fact-cluster.is-work, .people-fact-cluster.is-relationships) {
+  border-color: var(--people-olive-soft) !important;
+  background: color-mix(in srgb, var(--people-olive-soft) 42%, var(--surface-panel)) !important;
+}
+
+.people-redesign-shell :where(.people-fact-cluster.is-work, .people-fact-cluster.is-relationships) .people-info-icon {
+  color: var(--people-olive-strong) !important;
+}
+
+.people-redesign-shell .people-education-overview,
+.people-redesign-shell .people-relationship-rhythm {
+  border-color: var(--people-olive-soft) !important;
+  background: color-mix(in srgb, var(--people-olive-soft) 36%, var(--surface-panel)) !important;
+}
+
+.people-redesign-shell .people-education-overview .people-info-icon,
+.people-redesign-shell .people-relationship-rhythm h3 {
+  color: var(--people-olive-strong) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .people-redesign-shell .people-profile-status-menu,
+  .people-redesign-shell .people-profile-status-trigger > svg {
+    animation: none;
+    transition: none;
+  }
+}
