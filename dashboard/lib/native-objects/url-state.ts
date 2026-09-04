@@ -84,6 +84,7 @@ const PEOPLE_VIEWS = ["list", "compact", "grid"] as const;
 const PEOPLE_TABS = ["overview", "timeline", "links", "properties"] as const;
 const PEOPLE_SIDEBARS = [
   "all",
+  "organizations",
   "starred",
   "recent",
   "upcoming",

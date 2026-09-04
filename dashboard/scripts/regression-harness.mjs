@@ -5714,14 +5714,52 @@ async function checkPeopleMemoryBrowserState(
       const operationalSection = sidebar.locator(".people-sidebar-section").filter({ hasText: "Operational" });
       assert(
         await sidebar.locator(".people-sidebar-section").count() === 3 &&
-          await sidebar.locator(".people-sidebar-section button").count() === 12 &&
-          await sidebar.locator(".people-sidebar-section button > svg").count() === 12 &&
+          await sidebar.locator(".people-sidebar-section button").count() === 13 &&
+          await sidebar.locator(".people-sidebar-section button > svg").count() === 13 &&
           await operationalSection.locator("button").count() === 4 &&
           await operationalSection.locator("button").filter({ hasText: "Duplicates" }).locator("strong").textContent() === "0" &&
-          sidebarText.includes("Upcoming Birthdays") &&
+          sidebarText.includes("Upcoming Birthdays") && sidebarText.includes("Organizations") && sidebarText.includes("Follow-ups") && sidebarText.includes("Relationships") &&
+          !sidebarText.includes("All People") && !sidebarText.includes("Upcoming Follow-ups") && !sidebarText.includes("Relationship Map") &&
           !["Recently Contacted", "Needs Attention", "Dormant", "Customize People", "Close Friends", "Health & Wellness", "All Lists"].some((label) => sidebarText.includes(label)),
         `People sidebar did not match the compact icon-led navigation at ${viewport.label}: ${sidebarText}`
       );
+      for (const { id, label } of [
+        { id: "birthdays-month", label: "Upcoming Birthdays" },
+        { id: "no-contact-90", label: "No Contact > 90 Days" },
+        { id: "recently-deleted", label: "Recently Deleted" }
+      ]) {
+        await page.goto(`${baseUrl}/admin/people?sidebar=${id}`, { waitUntil: "networkidle" });
+        const headingGeometry = await directoryHeader.evaluate((header) => {
+          const heading = header.querySelector("h1");
+          const actions = header.querySelector(".people-header-actions");
+          const headerRect = header.getBoundingClientRect();
+          const headingRect = heading?.getBoundingClientRect();
+          const actionsRect = actions?.getBoundingClientRect();
+          const buttonTops = Array.from(actions?.querySelectorAll("button") || []).flatMap((button) => {
+            const rect = button.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0 ? [rect.top] : [];
+          });
+          const headingStyle = heading ? getComputedStyle(heading) : null;
+          const headingFontSize = Number.parseFloat(headingStyle?.fontSize || "0");
+          return {
+            headerFits: header.scrollWidth <= header.clientWidth,
+            headingFits: Boolean(
+              heading &&
+              headingStyle?.whiteSpace === "nowrap" &&
+              headingRect &&
+              headingRect.height <= headingFontSize * 1.7
+            ),
+            actionsFit: Boolean(actionsRect && actionsRect.right <= headerRect.right + 0.5),
+            actionsShareRow: buttonTops.length > 0 && Math.max(...buttonTops) - Math.min(...buttonTops) < 1.5,
+            gap: headingRect && actionsRect ? actionsRect.left - headingRect.right : -1
+          };
+        });
+        assert(
+          headingGeometry.headerFits && headingGeometry.headingFits && headingGeometry.actionsFit && headingGeometry.actionsShareRow && headingGeometry.gap >= 6,
+          `People ${label} heading or actions wrapped at ${viewport.label}: ${JSON.stringify(headingGeometry)}`
+        );
+      }
+      await page.goto(`${baseUrl}/admin/people`, { waitUntil: "networkidle" });
       if (viewport.label === "desktop") {
         await page.evaluate(() => {
           window.__peopleLoadingShellSeen = false;
@@ -5745,7 +5783,18 @@ async function checkPeopleMemoryBrowserState(
           !sidebarTransition.loadingShellSeen && sidebarTransition.pathname === "/admin/people" && sidebarTransition.activeLabel === "Starred",
           `People sidebar transition flashed a loading shell or changed routes: ${JSON.stringify(sidebarTransition)}`
         );
-        await sidebar.getByRole("button", { name: /All People/ }).click();
+        await sidebar.locator(".people-sidebar-section").first().getByRole("button", { name: /^Organizations / }).click();
+        const organizationViewTitles = await page.locator(".people-directory-row .people-row-name strong").allTextContents();
+        assert(
+          organizationViewTitles.includes(organizationTitle) && !organizationViewTitles.includes(personTitle),
+          "Organizations sidebar view did not isolate organization records"
+        );
+        await sidebar.locator(".people-sidebar-section").first().getByRole("button", { name: /^People / }).click();
+        const peopleViewTitles = await page.locator(".people-directory-row .people-row-name strong").allTextContents();
+        assert(
+          peopleViewTitles.includes(personTitle) && !peopleViewTitles.includes(organizationTitle),
+          "People sidebar view did not isolate person records"
+        );
       }
       const initialViewPath = await viewCycle.locator("path").first().getAttribute("d");
       if (viewport.label !== "mobile") {
@@ -5764,7 +5813,7 @@ async function checkPeopleMemoryBrowserState(
           };
         });
         assert(
-          searchGeometry.iconInputCenterGap < 4 &&
+          searchGeometry.iconInputCenterGap < 1 &&
             searchGeometry.controlsBorderLeft === 0 &&
             Math.abs(searchGeometry.sortRightGap - searchGeometry.viewLeftGap) < 2,
           `People search alignment or trailing spacing drifted at ${viewport.label}: ${JSON.stringify(searchGeometry)}`
@@ -5836,10 +5885,23 @@ async function checkPeopleMemoryBrowserState(
         await sortMenu.waitFor();
         assert(
           await sortMenu.getByRole("menuitemradio").count() === 3 &&
-            await sortMenu.getByRole("menuitemradio", { name: "Recent Contact" }).count() === 1,
+            await sortMenu.getByRole("menuitemradio", { name: "Recent Contact" }).count() === 1 &&
+            await sortMenu.locator(".people-sort-selection").count() === 1,
           `People Sort menu did not consolidate all sort modes at ${viewport.label}`
         );
+        const initialSortTransform = await sortMenu.locator(".people-sort-selection").evaluate((element) => getComputedStyle(element).transform);
+        await sortMenu.getByRole("menuitemradio", { name: "Recent Contact" }).click();
+        await page.waitForTimeout(230);
+        assert(
+          await sortMenu.count() === 1 &&
+            await sortMenu.getByRole("menuitemradio", { name: "Recent Contact" }).getAttribute("aria-checked") === "true" &&
+            await sortMenu.getByRole("menuitemradio", { name: "Recent Contact" }).locator(".people-sort-check.is-visible").count() === 1 &&
+            await sortMenu.locator(".people-sort-selection").evaluate((element) => getComputedStyle(element).transform) !== initialSortTransform,
+          `People Sort selection did not slide persistently at ${viewport.label}`
+        );
         await sortMenu.getByRole("menuitemradio", { name: "Last Name" }).click();
+        assert(await sortMenu.count() === 1, `People Sort menu closed after selection at ${viewport.label}`);
+        await page.locator('.people-primary-search .people-control-trigger[aria-controls="people-sort-menu"]').click();
       }
       const nicknameDirectoryRow = page.locator(".people-directory-row").filter({ hasText: personTitle });
       assert(
@@ -5944,6 +6006,10 @@ async function checkPeopleMemoryBrowserState(
         const switchTarget = initialHeading === organizationTitle
           ? { id: personId, title: personTitle }
           : { id: organizationId, title: organizationTitle };
+        await sidebar.locator(".people-sidebar-section").first().getByRole(
+          "button",
+          { name: switchTarget.id === organizationId ? /^Organizations / : /^People / }
+        ).click();
         const switchRow = page.locator(".people-directory-row").filter({
           has: page.getByText(switchTarget.title, { exact: true })
         }).first();
@@ -6003,7 +6069,7 @@ async function checkPeopleMemoryBrowserState(
         const statusMenu = page.getByRole("menu", { name: "Relationship status" });
         assert(
           await statusMenu.getByRole("menuitemradio").count() === 3 &&
-            await statusMenu.getByRole("menuitemradio", { name: "Loose tie" }).locator('svg[data-icon-role="loose-tie"]').count() === 1 &&
+            await statusMenu.getByRole("menuitemradio", { name: "Loose tie" }).locator('svg[data-icon-role="loose-tie"][data-icon-candidate="users-minus"]').count() === 1 &&
             await statusTrigger.locator('svg[data-icon-role="chevron-right"]').count() === 0,
           "People status menu did not expose Active, Loose tie, and Dormant without a trigger arrow"
         );
@@ -6398,12 +6464,13 @@ async function checkPeopleMemoryBrowserState(
       await interactionDialog.getByRole("button", { name: "Close interaction composer" }).click();
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=relations`, { waitUntil: "networkidle" });
+      const linksHub = page.locator(".people-links-hub");
       assert(
-        await page.getByRole("heading", { name: "Links", exact: true }).count() === 1 &&
-          await page.getByRole("heading", { name: "People", exact: true }).count() === 1 &&
-          await page.getByRole("heading", { name: "Organizations", exact: true }).count() === 1 &&
-          await page.getByRole("heading", { name: "Files", exact: true }).count() === 1 &&
-          await page.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
+        await linksHub.getByRole("heading", { name: "Links", exact: true }).count() === 1 &&
+          await linksHub.getByRole("heading", { name: "People", exact: true }).count() === 1 &&
+          await linksHub.getByRole("heading", { name: "Organizations", exact: true }).count() === 1 &&
+          await linksHub.getByRole("heading", { name: "Files", exact: true }).count() === 1 &&
+          await linksHub.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
           await page.getByText("connected media context", { exact: false }).count() === 0 &&
           await page.getByRole("button", { name: "Add object", exact: true }).count() === 1 &&
           await page.locator('.people-links-toolbar-actions .people-add-action svg[data-icon-role="plus"][data-icon-candidate="plus"]').count() === 1 &&
@@ -6557,8 +6624,27 @@ async function checkPeopleMemoryBrowserState(
         await page.locator("[data-email-entry]").count() === 3 &&
           await page.locator("[data-phone-entry]").count() === 2 &&
           await page.getByLabel("Email 3 category").inputValue() === "custom" &&
-          await page.getByLabel("Custom category").first().inputValue() === "Alumni",
+          await page.getByLabel("Custom category").first().inputValue() === "Alumni" &&
+          await page.locator(".people-contact-entry-advanced").count() === 0 &&
+          await page.locator(".people-phone-value-fields").count() === 2 &&
+          await page.getByLabel("Phone 1 country code").inputValue() === "+51",
         `Properties did not render every labeled email and phone number at ${viewport.label}`
+      );
+      const compactPropertySpacing = await page.evaluate(() => {
+        const bottomToTop = (from, to) => {
+          const fromRect = document.querySelector(from)?.getBoundingClientRect();
+          const toRect = document.querySelector(to)?.getBoundingClientRect();
+          return fromRect && toRect ? toRect.top - fromRect.bottom : 999;
+        };
+        return {
+          nameToBirthday: bottomToTop('[data-profile-section="identity"] > .people-profile-field-grid', '[data-profile-section="identity"] > .people-birthday-field'),
+          aboutToDream: bottomToTop('[data-profile-section="about"] > .people-profile-field-grid', '[data-people-notes-editor="life-dream"]'),
+          dreamToNotes: bottomToTop('[data-people-notes-editor="life-dream"]', '[data-people-notes-editor="notes"]')
+        };
+      });
+      assert(
+        Object.values(compactPropertySpacing).every((gap) => gap >= 0 && gap <= 8),
+        `Properties retained excessive Identity or About spacing at ${viewport.label}: ${JSON.stringify(compactPropertySpacing)}`
       );
       assert(
         await page.getByRole("button", { name: /^Remove (email|phone|job|university|place)/ }).count() > 0 &&
@@ -6596,6 +6682,14 @@ async function checkPeopleMemoryBrowserState(
           return [{ topGap: Math.abs(input.top - remove.top), bottomGap: Math.abs(input.bottom - remove.bottom) }];
         });
         const comesFrom = document.querySelector(".people-comes-from-field");
+        const contactHeadings = Array.from(document.querySelectorAll(".people-contact-channel-section > .people-repeatable-heading"));
+        const toolbarButtons = Array.from(document.querySelectorAll(".people-edit-toolbar button"));
+        const phoneRowTops = Array.from(document.querySelectorAll("[data-phone-entry]")).map((entry) => [
+          entry.querySelector(".people-contact-category-fields select"),
+          entry.querySelector(".people-country-code-field input"),
+          entry.querySelector(".people-contact-value-field input"),
+          entry.querySelector(".people-contact-remove")
+        ].map((control) => control ? Math.round(control.getBoundingClientRect().top) : -999));
         const alignedRemoveButtons = Array.from(document.querySelectorAll(
           ".people-repeatable-fields > .people-repeatable-inline-remove, .people-repeatable-fields > .people-location-remove"
         ));
@@ -6614,7 +6708,10 @@ async function checkPeopleMemoryBrowserState(
           repeatableBottomGaps,
           themedSectionShadows: Array.from(new Set(themedSections.map((section) => getComputedStyle(section).boxShadow))),
           themedSectionLeftWidths: themedSections.map((section) => Number.parseFloat(getComputedStyle(section).borderLeftWidth)),
-          comesFromOverflow: comesFrom ? comesFrom.scrollWidth - comesFrom.clientWidth : 999
+          comesFromOverflow: comesFrom ? comesFrom.scrollWidth - comesFrom.clientWidth : 999,
+          contactHeadingBackgrounds: Array.from(new Set(contactHeadings.map((heading) => getComputedStyle(heading).backgroundColor))),
+          toolbarFontWeights: Array.from(new Set(toolbarButtons.map((button) => getComputedStyle(button).fontWeight))),
+          phoneRowTops
         };
       });
       assert(
@@ -6626,8 +6723,32 @@ async function checkPeopleMemoryBrowserState(
           (viewport.label === "mobile" || propertyControlGeometry.repeatableBottomGaps.every((gap) => gap < 2)) &&
           propertyControlGeometry.themedSectionShadows.every((shadow) => shadow === "none") &&
           propertyControlGeometry.themedSectionLeftWidths.every((width) => width <= 1) &&
-          propertyControlGeometry.comesFromOverflow <= 0,
+          propertyControlGeometry.comesFromOverflow <= 0 &&
+          propertyControlGeometry.contactHeadingBackgrounds.every((background) => background === "rgba(0, 0, 0, 0)") &&
+          propertyControlGeometry.toolbarFontWeights.length === 1 && Number(propertyControlGeometry.toolbarFontWeights[0]) <= 650 &&
+          (viewport.label === "mobile" || propertyControlGeometry.phoneRowTops.every((tops) => new Set(tops).size === 1)),
         `Properties add/remove controls or Comes from alignment drifted at ${viewport.label}: ${JSON.stringify(propertyControlGeometry)}`
+      );
+      const scrollOwnership = await page.evaluate(() => {
+        const profile = document.querySelector(".people-profile-panel");
+        const panel = document.querySelector(".people-active-tab-panel");
+        const form = document.querySelector(".people-edit-form");
+        const header = document.querySelector(".people-profile-header");
+        const headerTop = header?.getBoundingClientRect().top || 0;
+        if (panel) panel.scrollTop = Math.min(160, Math.max(0, panel.scrollHeight - panel.clientHeight));
+        return {
+          profileOverflow: profile ? getComputedStyle(profile).overflowY : "missing",
+          panelOverflow: panel ? getComputedStyle(panel).overflowY : "missing",
+          formOverflow: form ? getComputedStyle(form).overflowY : "missing",
+          headerTopGap: header ? Math.abs(header.getBoundingClientRect().top - headerTop) : 999
+        };
+      });
+      assert(
+        scrollOwnership.profileOverflow === "hidden" &&
+          scrollOwnership.panelOverflow === "auto" &&
+          scrollOwnership.formOverflow === "visible" &&
+          scrollOwnership.headerTopGap < 1,
+        `Properties retained competing scroll containers at ${viewport.label}: ${JSON.stringify(scrollOwnership)}`
       );
       assert(
         await page.locator('[data-location-entry="location-regression-1"] input[aria-label="Place 1 street address"]').inputValue() === "123 Test Street, Columbus, Ohio 43215, USA",
@@ -6908,8 +7029,7 @@ async function checkPeopleMemoryBrowserState(
       );
       await page.getByLabel("Email", { exact: true }).first().fill("avery.north@example.com");
       const firstPhoneEntry = page.locator("[data-phone-entry]").first();
-      await firstPhoneEntry.locator("summary").click();
-      const firstCountryCode = firstPhoneEntry.getByLabel("Country code");
+      const firstCountryCode = firstPhoneEntry.getByLabel("Phone 1 country code");
       await firstCountryCode.fill("");
       assert(await firstCountryCode.inputValue() === "", `New People did not allow the preset +1 code to be cleared at ${viewport.label}`);
       await firstCountryCode.fill("+51");
@@ -6934,7 +7054,7 @@ async function checkPeopleMemoryBrowserState(
       await page.getByLabel("Custom category").fill("Alumni");
       await page.getByLabel("Email", { exact: true }).nth(1).fill("avery.alumni@example.edu");
       await page.getByLabel("Phone 2 category").selectOption("work");
-      await page.getByLabel("Country code").nth(1).fill("+1");
+      await page.getByLabel("Phone 2 country code").fill("+1");
       await page.getByLabel("Phone", { exact: true }).nth(1).fill("6145550142");
       assert(
         await page.locator("[data-email-entry]").count() === 2 &&
@@ -7062,9 +7182,10 @@ async function checkPeopleMemoryBrowserState(
         fullPage: true
       });
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}?tab=links`, { waitUntil: "networkidle" });
+      const organizationLinksHub = page.locator(".people-links-hub");
       assert(
-        await page.getByRole("heading", { name: "People", exact: true }).count() === 1 &&
-          await page.getByRole("heading", { name: "Organizations", exact: true }).count() === 1 &&
+        await organizationLinksHub.getByRole("heading", { name: "People", exact: true }).count() === 1 &&
+          await organizationLinksHub.getByRole("heading", { name: "Organizations", exact: true }).count() === 1 &&
           (await page.locator(".people-links-section.is-people").innerText()).includes(personTitle),
         `Organization Links did not render linked People in its dedicated section at ${viewport.label}`
       );
@@ -9606,6 +9727,12 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       assert(await page.locator('[data-icon-registry-count="108"]').count() === 1, `Style Guide did not expose all 108 canonical icon roles at ${viewport.label}`);
       assert(await page.locator('input[aria-label$=" usage"]').count() === 108, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
       assert(await page.locator('[class*="iconCandidate"]').count() >= 420, `Style Guide did not expose five curated recommendations for each unselected icon at ${viewport.label}`);
+      for (const candidate of ["users-minus", "user-question", "user-share", "circles-relation", "user-exclamation"]) {
+        assert(
+          await page.locator(`svg[data-icon-role="loose-tie"][data-icon-candidate="${candidate}"]`).count() >= 1,
+          `Style Guide omitted the curated Loose tie candidate ${candidate} at ${viewport.label}`
+        );
+      }
       const iconCentering = await page.locator('[class*="iconCandidate"] a').first().evaluate((anchor) => {
         const icon = anchor.querySelector("svg");
         if (!icon) return Number.POSITIVE_INFINITY;
@@ -13276,7 +13403,7 @@ async function main() {
     const peoplePage = await requestText(server.baseUrl, cookieJar, "/admin/people");
     assert(peoplePage.response.ok, `People page failed: ${describeStatus(peoplePage.response)}`);
     assert(
-      peoplePage.body.includes("All People") && !peoplePage.body.includes("total Personal Records"),
+      peoplePage.body.includes("Organizations") && peoplePage.body.includes("Follow-ups") && peoplePage.body.includes("Relationships") && !peoplePage.body.includes("All People") && !peoplePage.body.includes("total Personal Records"),
       "People page missing the streamlined native directory scope"
     );
     pass("People hub loads");

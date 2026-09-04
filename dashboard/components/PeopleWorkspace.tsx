@@ -87,6 +87,7 @@ type PeopleView = "overview" | "timeline" | "links" | "properties";
 type DetailMode = "profile" | "edit" | "timeline" | "workspace";
 type PeopleSidebarView =
   | "all"
+  | "organizations"
   | "starred"
   | "recent"
   | "upcoming"
@@ -672,10 +673,11 @@ const PEOPLE_SIDEBAR_SECTIONS: Array<{ title: string; items: SidebarItemConfig[]
   {
     title: "People",
     items: [
-      { id: "all", label: "All People", icon: "person" },
+      { id: "all", label: "People", icon: "person" },
+      { id: "organizations", label: "Organizations", icon: "organization" },
       { id: "starred", label: "Starred", icon: "star" },
-      { id: "upcoming", label: "Upcoming Follow-ups", icon: "follow-up" },
-      { id: "relationship-map", label: "Relationship Map", icon: "relationship-map", surface: "profile" }
+      { id: "upcoming", label: "Follow-ups", icon: "follow-up" },
+      { id: "relationship-map", label: "Relationships", icon: "relationship-map", surface: "profile" }
     ]
   },
   {
@@ -1622,7 +1624,8 @@ function hasGroupLike(record: PersonalRecord, terms: string[]) {
 }
 
 function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView, interactionDate = "") {
-  if (view === "all") return true;
+  if (view === "all") return record.className === "person";
+  if (view === "organizations") return record.className === "org";
   if (view === "starred") return record.starred === true;
   if (view === "recent") return isRecentContact(record, interactionDate);
   if (view === "upcoming") {
@@ -2135,47 +2138,47 @@ function PhoneEntriesEditor({
                 </label>
               )}
             </div>
-            <label className="people-contact-value-field">
-              Phone
-              <input
-                type="tel"
-                inputMode="tel"
-                value={entry.number}
-                onChange={(event) => onChange(entry.id, { number: event.target.value })}
-                onBlur={() => onChange(entry.id, { number: formatInternationalPhone(entry.number, entry.countryCode) })}
-                placeholder={entry.countryCode === "+51" ? "987-654-321" : "614-796-3848"}
-                aria-describedby={phoneError ? `people-phone-error-${entry.id}` : undefined}
-              />
-            </label>
+            <div className="people-phone-value-fields">
+              <label className="people-country-code-field">
+                Code
+                <input
+                  aria-label={`Phone ${index + 1} country code`}
+                  inputMode="tel"
+                  list="people-country-code-suggestions"
+                  value={entry.countryCode}
+                  onChange={(event) => {
+                    const nextCode = normalizeCountryCodeInput(event.target.value);
+                    onChange(entry.id, {
+                      countryCode: nextCode,
+                      number: /^\+\d{1,4}$/.test(nextCode) && nextCode !== entry.countryCode
+                        ? rebasePhoneCountryCode(entry.number, entry.countryCode, nextCode)
+                        : entry.number
+                    });
+                  }}
+                  onBlur={(event) => {
+                    const nextCode = canonicalCountryCode(event.target.value, "");
+                    if (!nextCode) return;
+                    onChange(entry.id, { countryCode: nextCode });
+                  }}
+                  placeholder="+1"
+                  required={Boolean(entry.number.trim())}
+                />
+              </label>
+              <label className="people-contact-value-field">
+                Phone
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  value={entry.number}
+                  onChange={(event) => onChange(entry.id, { number: event.target.value })}
+                  onBlur={() => onChange(entry.id, { number: formatInternationalPhone(entry.number, entry.countryCode) })}
+                  placeholder={entry.countryCode === "+51" ? "987-654-321" : "614-796-3848"}
+                  aria-describedby={phoneError ? `people-phone-error-${entry.id}` : undefined}
+                />
+              </label>
+            </div>
             <RemoveIconButton className="people-contact-remove" label={`Remove phone ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
-          <details className="people-contact-entry-advanced" open={!entry.countryCode || entry.countryCode !== "+1"}>
-            <summary>Country code {entry.countryCode || "required"}</summary>
-            <label>
-              Country code
-              <input
-                inputMode="tel"
-                list="people-country-code-suggestions"
-                value={entry.countryCode}
-                onChange={(event) => {
-                  const nextCode = normalizeCountryCodeInput(event.target.value);
-                  onChange(entry.id, {
-                    countryCode: nextCode,
-                    number: /^\+\d{1,4}$/.test(nextCode) && nextCode !== entry.countryCode
-                      ? rebasePhoneCountryCode(entry.number, entry.countryCode, nextCode)
-                      : entry.number
-                  });
-                }}
-                onBlur={(event) => {
-                  const nextCode = canonicalCountryCode(event.target.value, "");
-                  if (!nextCode) return;
-                  onChange(entry.id, { countryCode: nextCode });
-                }}
-                placeholder="+1"
-                required={Boolean(entry.number.trim())}
-              />
-            </label>
-          </details>
           {phoneError && <p id={`people-phone-error-${entry.id}`} className="people-phone-error" role="status">{phoneError}</p>}
         </article>
       );
@@ -2721,8 +2724,11 @@ export default function PeopleWorkspace({
   ])).sort((left, right) => left.localeCompare(right)), [activePeople]);
 
   const selectedPerson = useMemo(() => {
+    if (pathname === getModuleRoute("people") && visiblePeople.length > 0) {
+      return visiblePeople.find((record) => record.id === selectedId) || visiblePeople[0];
+    }
     return activePeople.find((record) => record.id === selectedId) || visiblePeople[0];
-  }, [activePeople, selectedId, visiblePeople]);
+  }, [activePeople, pathname, selectedId, visiblePeople]);
   const selectedOrganizationDerivedPersonIds = useMemo(() => {
     if (!selectedPerson || selectedPerson.className !== "org") return [];
     return personOptions.filter((record) => (
@@ -2770,6 +2776,8 @@ export default function PeopleWorkspace({
     )).length;
     return {
       total: activePeople.length,
+      people: activePeople.filter((record) => record.className === "person").length,
+      organizations: activePeople.filter((record) => record.className === "org").length,
       due: activePeople.filter(isDue).length,
       week: activePeople.filter(isThisWeek).length,
       dormant: activePeople.filter(isDormant).length,
@@ -2845,7 +2853,8 @@ export default function PeopleWorkspace({
     `is-mobile-${mobileSurface}`
   ].filter(Boolean).join(" ");
   const activeSidebarItem = PEOPLE_SIDEBAR_SECTIONS.flatMap((section) => section.items).find((item) => item.id === activeSidebarView);
-  const activeViewLabel = activeSidebarItem?.label || "All People";
+  const activeViewLabel = activeSidebarItem?.label || "People";
+  const compactDirectoryTitle = activeSidebarView === "birthdays-month" || activeSidebarView === "no-contact-90" || activeSidebarView === "recently-deleted";
   const resolvedUtilityNotice = activeSidebarItem?.surface === "utility" && activeSidebarView !== "recently-deleted"
     ? utilityNotice || `${activeViewLabel} is a read-only People utility in this checkpoint. Stored-data actions remain disabled until matching backend support exists.`
     : utilityNotice;
@@ -3061,7 +3070,8 @@ export default function PeopleWorkspace({
 
   function getSidebarCount(view: PeopleSidebarView) {
     const counts: Partial<Record<PeopleSidebarView, number>> = {
-      all: stats.total,
+      all: stats.people,
+      organizations: stats.organizations,
       starred: stats.starred,
       recent: stats.recent,
       upcoming: stats.upcoming,
@@ -4266,7 +4276,7 @@ export default function PeopleWorkspace({
       </aside>
 
       <main className="people-directory-panel" data-total-records={totalRecords}>
-        <header className="people-directory-header">
+        <header className={`people-directory-header${compactDirectoryTitle ? " has-compact-title" : ""}`}>
           <div>
             <h1>{activeViewLabel}</h1>
           </div>
@@ -4357,19 +4367,28 @@ export default function PeopleWorkspace({
               {sortOpen && (
                 <div id="people-sort-menu" ref={sortMenuRef} className="people-control-popover people-sort-menu" role="menu" aria-label="Sort people">
                   <header><PeopleIcon name="sort" /><h2>Sort people</h2></header>
-                  {([[
-                    "last-name", "Last Name"
-                  ], [
-                    "recent-contact", "Recent Contact"
-                  ], [
-                    "next-follow-up", "Next Follow-Up"
-                  ]] as const).map(([mode, label]) => (
-                    <button type="button" role="menuitemradio" aria-checked={sortMode === mode} onClick={() => {
-                      setSortMode(mode);
-                      updatePeopleUrl({ sort: mode });
-                      setSortOpen(false);
-                    }} key={mode}><span>{label}</span>{sortMode === mode && <PeopleIcon name="check" />}</button>
-                  ))}
+                  <div className="people-sort-options">
+                    <span
+                      className="people-sort-selection"
+                      style={{ transform: `translateY(${(["last-name", "recent-contact", "next-follow-up"] as PeopleSortMode[]).indexOf(sortMode) * 42}px)` }}
+                      aria-hidden="true"
+                    />
+                    {([[
+                      "last-name", "Last Name"
+                    ], [
+                      "recent-contact", "Recent Contact"
+                    ], [
+                      "next-follow-up", "Next Follow-Up"
+                    ]] as const).map(([mode, label]) => (
+                      <button type="button" role="menuitemradio" aria-checked={sortMode === mode} onClick={() => {
+                        setSortMode(mode);
+                        updatePeopleUrl({ sort: mode });
+                      }} key={mode}>
+                        <span>{label}</span>
+                        <span className={`people-sort-check${sortMode === mode ? " is-visible" : ""}`} aria-hidden="true"><PeopleIcon name="check" /></span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               )}
             </div>

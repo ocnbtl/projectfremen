@@ -14598,3 +14598,313 @@ html[data-admin-preview="mobile"] .people-record-type-toggle > div {
     transition: none;
   }
 }
+
+/* People V1.5 — scoped directory views and a single, compact properties canvas. */
+.people-redesign-shell :where(input, select, textarea) {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+.people-redesign-shell .people-directory-header {
+  flex-wrap: nowrap;
+}
+
+.people-redesign-shell .people-directory-header > div:first-child,
+.people-redesign-shell .people-directory-header h1 {
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.people-redesign-shell .people-directory-header.has-compact-title h1 {
+  font-size: 16px;
+  letter-spacing: -.018em;
+}
+
+.people-redesign-shell .people-header-actions {
+  flex-wrap: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .people-redesign-shell .people-header-actions {
+    gap: 6px;
+  }
+
+  .people-redesign-shell .people-header-actions button {
+    width: 38px;
+    min-width: 38px;
+    padding-inline: 0;
+  }
+
+  .people-redesign-shell .people-header-actions button span {
+    display: none;
+  }
+}
+
+html[data-admin-preview="tablet"] .people-redesign-shell .people-header-actions {
+  gap: 6px;
+}
+
+html[data-admin-preview="tablet"] .people-redesign-shell .people-header-actions button {
+  width: 38px;
+  min-width: 38px;
+  padding-inline: 0;
+}
+
+html[data-admin-preview="tablet"] .people-redesign-shell .people-header-actions button span {
+  display: none;
+}
+
+.people-redesign-shell .people-primary-search {
+  min-height: 42px;
+  align-items: center;
+}
+
+.people-redesign-shell .people-primary-search > svg {
+  align-self: center;
+}
+
+.people-redesign-shell .people-primary-search input {
+  align-self: center;
+  height: 40px;
+  min-height: 40px;
+  padding: 0;
+  line-height: 40px;
+}
+
+.people-redesign-shell .people-sort-options {
+  position: relative;
+  display: grid;
+  gap: 3px;
+  isolation: isolate;
+}
+
+.people-redesign-shell .people-sort-selection {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 0;
+  height: 39px;
+  border: 1px solid color-mix(in srgb, var(--module-border) 70%, var(--border-soft));
+  border-radius: 8px;
+  background: var(--module-quiet);
+  transition: transform 190ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.people-redesign-shell .people-sort-options > button {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 18px;
+  width: 100%;
+  min-height: 39px;
+  padding: 0 9px;
+  align-items: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-body);
+  font-size: 11px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.people-redesign-shell .people-sort-options > button:hover:not([aria-checked="true"]) {
+  background: color-mix(in srgb, var(--text-strong) 4%, transparent);
+}
+
+.people-redesign-shell .people-sort-options > button[aria-checked="true"] {
+  background: transparent;
+  color: var(--module-icon);
+}
+
+.people-redesign-shell .people-sort-check {
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  transform: scale(.72);
+  transition: opacity 90ms ease, transform 170ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.people-redesign-shell .people-sort-check.is-visible {
+  opacity: 1;
+  transform: scale(1);
+  transition-delay: 95ms;
+}
+
+.people-redesign-shell .people-sort-check svg {
+  width: 15px;
+  height: 15px;
+}
+
+.people-redesign-shell .people-profile-panel {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  align-content: stretch;
+  overflow: hidden;
+}
+
+html[data-admin-preview="mobile"] .people-redesign-shell .people-profile-panel {
+  overflow: hidden;
+}
+
+.people-redesign-shell .people-profile-panel > .people-active-tab-panel {
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  padding-right: 4px;
+  overscroll-behavior: contain;
+}
+
+.people-redesign-shell .people-profile-panel:has(.people-capture-form) {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.people-redesign-shell .people-edit-form {
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
+}
+
+.people-redesign-shell .people-repeatable-fields > .people-repeatable-inline-remove,
+.people-redesign-shell .people-repeatable-fields-location .people-location-remove,
+.people-redesign-shell .people-repeatable-inline-actions {
+  transform: none !important;
+}
+
+.people-redesign-shell .people-edit-toolbar button {
+  font: 650 11px/1 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-redesign-shell .people-edit-toolbar button svg {
+  stroke-width: 1.75;
+}
+
+.people-redesign-shell [data-profile-section="identity"] > .people-profile-field-grid {
+  margin-bottom: 0;
+}
+
+.people-redesign-shell [data-profile-section="identity"] > .people-birthday-field {
+  margin-top: 0;
+}
+
+.people-redesign-shell [data-profile-section="about"] > .people-profile-field-grid {
+  margin-bottom: 0;
+}
+
+.people-redesign-shell [data-profile-section="about"] > .people-notes-editor:first-of-type {
+  padding-top: 0;
+}
+
+.people-redesign-shell [data-profile-section="about"] > .people-notes-editor + .people-notes-editor {
+  margin-top: 0;
+}
+
+.people-redesign-shell [data-profile-section="about"] > .people-notes-editor {
+  margin-bottom: 0;
+}
+
+.people-redesign-shell .people-notes-editor {
+  gap: 4px;
+}
+
+.people-redesign-shell .people-contact-channel-section > .people-repeatable-heading {
+  padding: 0 !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--text-strong) !important;
+}
+
+.people-redesign-shell .people-contact-channel-section > .people-repeatable-heading h4 {
+  padding: 0;
+  background: transparent !important;
+  color: var(--text-strong);
+}
+
+.people-redesign-shell .people-contact-channel-fields {
+  grid-template-columns: minmax(108px, .48fr) minmax(0, 1fr) 40px;
+  gap: 8px;
+  align-items: end;
+}
+
+.people-redesign-shell :where(.people-contact-channel-fields label, .people-contact-category-fields label, .people-phone-value-fields label) {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  color: var(--text-subtle);
+  font: 720 10px/1.3 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.people-redesign-shell :where(.people-contact-channel-fields input, .people-contact-channel-fields select, .people-phone-value-fields input) {
+  width: 100%;
+  min-width: 0;
+  height: 40px;
+  min-height: 40px;
+  box-sizing: border-box;
+  font: 560 12px/1.35 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-redesign-shell .people-phone-value-fields {
+  display: grid;
+  grid-template-columns: 68px minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+  align-items: end;
+}
+
+.people-redesign-shell .people-country-code-field input {
+  padding-inline: 7px;
+}
+
+.people-redesign-shell .people-repeatable-section.people-themed-section > .people-comes-from-field {
+  width: auto !important;
+  max-width: none;
+  margin-inline: 10px;
+  align-self: stretch;
+  color: var(--text-subtle);
+  font: 720 10px/1.3 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.people-redesign-shell .people-comes-from-field input {
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  height: 40px;
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 560 12px/1.35 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif;
+}
+
+.people-redesign-shell .people-comes-from-field input::placeholder,
+.people-redesign-shell .people-contact-channel-fields input::placeholder {
+  font-weight: 520;
+}
+
+@media (max-width: 760px) {
+  .people-redesign-shell .people-directory-header {
+    flex-wrap: wrap;
+  }
+
+  .people-redesign-shell .people-header-actions {
+    flex-wrap: wrap;
+  }
+
+  .people-redesign-shell .people-contact-channel-fields,
+  html[data-admin-preview="mobile"] .people-redesign-shell .people-contact-channel-fields {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .people-redesign-shell .people-phone-value-fields,
+  html[data-admin-preview="mobile"] .people-redesign-shell .people-phone-value-fields {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .people-redesign-shell .people-sort-selection,
+  .people-redesign-shell .people-sort-check {
+    transition: none;
+  }
+}
