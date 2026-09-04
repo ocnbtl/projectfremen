@@ -5722,7 +5722,54 @@ async function checkPeopleMemoryBrowserState(
           !["Recently Contacted", "Needs Attention", "Dormant", "Customize People", "Close Friends", "Health & Wellness", "All Lists"].some((label) => sidebarText.includes(label)),
         `People sidebar did not match the compact icon-led navigation at ${viewport.label}: ${sidebarText}`
       );
+      if (viewport.label === "desktop") {
+        await page.evaluate(() => {
+          window.__peopleLoadingShellSeen = false;
+          const observer = new MutationObserver(() => {
+            if (document.querySelector(".people-loading-shell")) window.__peopleLoadingShellSeen = true;
+          });
+          observer.observe(document.documentElement, { childList: true, subtree: true });
+          window.__peopleSidebarObserver = observer;
+        });
+        await sidebar.getByRole("button", { name: /Starred/ }).click();
+        await page.waitForTimeout(80);
+        const sidebarTransition = await page.evaluate(() => {
+          window.__peopleSidebarObserver?.disconnect();
+          return {
+            loadingShellSeen: window.__peopleLoadingShellSeen === true,
+            pathname: window.location.pathname,
+            activeLabel: document.querySelector(".people-sidebar-section button.is-active span")?.textContent?.trim() || ""
+          };
+        });
+        assert(
+          !sidebarTransition.loadingShellSeen && sidebarTransition.pathname === "/admin/people" && sidebarTransition.activeLabel === "Starred",
+          `People sidebar transition flashed a loading shell or changed routes: ${JSON.stringify(sidebarTransition)}`
+        );
+        await sidebar.getByRole("button", { name: /All People/ }).click();
+      }
       const initialViewPath = await viewCycle.locator("path").first().getAttribute("d");
+      if (viewport.label !== "mobile") {
+        const searchGeometry = await page.evaluate(() => {
+          const search = document.querySelector(".people-primary-search")?.getBoundingClientRect();
+          const icon = document.querySelector(".people-primary-search > svg")?.getBoundingClientRect();
+          const input = document.querySelector(".people-primary-search input")?.getBoundingClientRect();
+          const sort = document.querySelector('.people-control-trigger[aria-controls="people-sort-menu"]')?.getBoundingClientRect();
+          const view = document.querySelector(".people-view-cycle")?.getBoundingClientRect();
+          const controls = document.querySelector(".people-search-controls");
+          return {
+            iconInputCenterGap: icon && input ? Math.abs((icon.top + icon.height / 2) - (input.top + input.height / 2)) : 99,
+            sortRightGap: search && sort ? search.right - sort.right : 99,
+            viewLeftGap: search && view ? view.left - search.right : 99,
+            controlsBorderLeft: controls ? Number.parseFloat(getComputedStyle(controls).borderLeftWidth) : 99
+          };
+        });
+        assert(
+          searchGeometry.iconInputCenterGap < 4 &&
+            searchGeometry.controlsBorderLeft === 0 &&
+            Math.abs(searchGeometry.sortRightGap - searchGeometry.viewLeftGap) < 2,
+          `People search alignment or trailing spacing drifted at ${viewport.label}: ${JSON.stringify(searchGeometry)}`
+        );
+      }
       await viewCycle.click();
       await page.waitForFunction(() => document.querySelector(".people-view-cycle [data-view-morph]")?.getAttribute("data-view-morph") === "compact");
       await page.waitForTimeout(320);
@@ -5950,6 +5997,34 @@ async function checkPeopleMemoryBrowserState(
           await page.locator(".people-profile-title-line > .people-activity-marker").count() === 0,
         `People profile status was not an editable control beside Star and More at ${viewport.label}`
       );
+      if (viewport.label === "desktop") {
+        const statusTrigger = page.locator(".people-profile-status-trigger");
+        await statusTrigger.click();
+        const statusMenu = page.getByRole("menu", { name: "Relationship status" });
+        assert(
+          await statusMenu.getByRole("menuitemradio").count() === 3 &&
+            await statusMenu.getByRole("menuitemradio", { name: "Loose tie" }).locator('svg[data-icon-role="loose-tie"]').count() === 1 &&
+            await statusTrigger.locator('svg[data-icon-role="chevron-right"]').count() === 0,
+          "People status menu did not expose Active, Loose tie, and Dormant without a trigger arrow"
+        );
+        const [looseTieResponse] = await Promise.all([
+          page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
+          statusMenu.getByRole("menuitemradio", { name: "Loose tie" }).click()
+        ]);
+        assert(
+          looseTieResponse.ok() &&
+            await statusMenu.count() === 1 &&
+            await statusMenu.getByRole("menuitemradio", { name: "Loose tie" }).getAttribute("aria-checked") === "true" &&
+            (await statusTrigger.textContent()).includes("Loose tie"),
+          "People status change was not optimistic or the menu closed after selection"
+        );
+        const [activeResponse] = await Promise.all([
+          page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
+          statusMenu.getByRole("menuitemradio", { name: "Active" }).click()
+        ]);
+        assert(activeResponse.ok() && await statusMenu.count() === 1, "People status menu did not remain open after restoring Active");
+        await page.keyboard.press("Escape");
+      }
       const profileSubtitle = (await page.locator(".people-profile-identity > p").innerText()).trim();
       const profileTags = (await page.locator(".people-tag-row span").allTextContents()).map((tag) => tag.trim());
       assert(
@@ -6214,6 +6289,13 @@ async function checkPeopleMemoryBrowserState(
           await followUpPanel.locator("button").count() === 0,
         `Timeline retained the verbose Follow-up rail at ${viewport.label}`
       );
+      const timelineSideOrder = await page.locator(".people-timeline-side").evaluate((side) =>
+        Array.from(side.children).map((child) => child.classList.contains("people-relationship-rhythm") ? "rhythm" : child.hasAttribute("data-people-follow-up-bridge") ? "follow-ups" : "other")
+      );
+      assert(
+        timelineSideOrder.indexOf("rhythm") < timelineSideOrder.indexOf("follow-ups"),
+        `Timeline did not place Relationship rhythm above Follow-ups at ${viewport.label}: ${JSON.stringify(timelineSideOrder)}`
+      );
       if (viewport.label !== "mobile") {
         const [streamRect, sideRect] = await Promise.all([
           page.locator(".people-timeline-stream").boundingBox(),
@@ -6341,6 +6423,18 @@ async function checkPeopleMemoryBrowserState(
         linkedHeaderGeometry.length >= 5 && linkedHeaderGeometry.every((item) => item.rightGap < 3 && item.topGap < 3),
         `Links counts did not stay in the top-right corner at ${viewport.label}: ${JSON.stringify(linkedHeaderGeometry)}`
       );
+      const linkedSectionTreatment = await page.locator(".people-links-section").evaluateAll((sections) => ({
+        borderColors: Array.from(new Set(sections.map((section) => getComputedStyle(section).borderTopColor))),
+        backgrounds: Array.from(new Set(sections.map((section) => getComputedStyle(section).backgroundColor)))
+      }));
+      const objectButtonColor = await page.getByRole("button", { name: "Add object", exact: true }).evaluate((button) => getComputedStyle(button).color);
+      assert(
+        linkedSectionTreatment.borderColors.length === 1 &&
+          linkedSectionTreatment.borderColors[0] === "rgb(138, 144, 96)" &&
+          linkedSectionTreatment.backgrounds.every((background) => background !== "rgb(255, 255, 255)") &&
+          objectButtonColor === "rgb(255, 255, 255)",
+        `People Links did not use one Warm Olive treatment or white Objects text at ${viewport.label}: ${JSON.stringify({ linkedSectionTreatment, objectButtonColor })}`
+      );
       await assertNoOverflow(page, `People Links ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-relationships-${viewport.label}.png`),
@@ -6363,9 +6457,9 @@ async function checkPeopleMemoryBrowserState(
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
       const propertyNotes = page.locator('[data-people-notes-editor="notes"]');
-      const propertyFacts = page.locator('[data-people-notes-editor="interesting-facts"]');
+      const propertyLifeDream = page.locator('[data-people-notes-editor="life-dream"]');
       await propertyNotes.waitFor();
-      await propertyFacts.waitFor();
+      await propertyLifeDream.waitFor();
       assert(
         await page.locator(".people-profile-section-heading svg").count() >= 5,
         `Properties did not provide compact icon-led sections at ${viewport.label}`
@@ -6390,12 +6484,13 @@ async function checkPeopleMemoryBrowserState(
         `Properties did not expose About notes as separate bullet editors at ${viewport.label}`
       );
       assert(
-        await propertyFacts.locator("textarea").count() === 2 &&
-          await propertyFacts.getByLabel("Interesting facts note 1").inputValue() === "Collects vintage maps" &&
-          await propertyFacts.getByLabel("Interesting facts note 2").inputValue() === "Writes field notes by hand" &&
-          await propertyFacts.getByRole("button", { name: /^Add note after note / }).count() === 2 &&
-          await propertyFacts.getByRole("button", { name: /^Remove note / }).count() === 2,
-        `Properties did not place repeatable Interesting facts below Life dream at ${viewport.label}`
+        await propertyLifeDream.locator("textarea").count() === 1 &&
+          await propertyLifeDream.getByLabel("Life dream note 1").inputValue() === "Open a small design school" &&
+          await propertyLifeDream.getByRole("button", { name: /^Add note after note / }).count() === 1 &&
+          await propertyLifeDream.getByRole("button", { name: /^Remove note / }).count() === 1 &&
+          await page.locator('[data-people-notes-editor="interesting-facts"]').count() === 0 &&
+          !(await page.locator(".people-edit-form").innerText()).includes("Interesting facts"),
+        `Properties did not expose repeatable Life dream or retained Interesting facts at ${viewport.label}`
       );
       const propertyGroups = (await page.locator(".people-profile-group-picker label").allTextContents())
         .map((label) => label.trim());
@@ -6403,6 +6498,19 @@ async function checkPeopleMemoryBrowserState(
         JSON.stringify(propertyGroups) === JSON.stringify(expectedGroupOptions),
         `Properties did not render alphabetized People groups with Other last at ${viewport.label}: ${JSON.stringify(propertyGroups)}`
       );
+      if (viewport.label === "desktop") {
+        const groupTreatment = await page.locator(".people-profile-group-picker label").evaluateAll((labels) => ({
+          rows: new Set(labels.map((label) => Math.round(label.getBoundingClientRect().top))).size,
+          backgrounds: Array.from(new Set(labels.map((label) => getComputedStyle(label).backgroundColor))),
+          borders: Array.from(new Set(labels.map((label) => getComputedStyle(label).borderColor)))
+        }));
+        assert(
+          groupTreatment.rows <= 2 &&
+            groupTreatment.backgrounds.every((background) => background === "rgba(0, 0, 0, 0)") &&
+            groupTreatment.borders.every((border) => border === "rgba(0, 0, 0, 0)"),
+          `People groups were not transparent or compact enough for two rows: ${JSON.stringify(groupTreatment)}`
+        );
+      }
       const propertyCadence = page.locator("[data-people-cadence-select]");
       assert(
         await propertyCadence.inputValue() === "NONE" &&
@@ -6430,8 +6538,20 @@ async function checkPeopleMemoryBrowserState(
       assert(
         await page.locator("[data-people-birthday-editor] select").nth(0).inputValue() === "3" &&
           await page.locator("[data-people-birthday-editor] select").nth(1).inputValue() === "14" &&
-          await page.locator("[data-people-birthday-editor] input").inputValue() === "",
+          await page.locator("[data-people-birthday-editor] input").inputValue() === "" &&
+          await page.locator('[data-people-birthday-editor] svg[data-icon-role="birthday"][data-icon-candidate="cake"]').count() === 1 &&
+          await page.locator('[data-people-birthday-editor] input[placeholder="Year"]').count() === 1 &&
+          await page.locator('[data-people-birthday-editor] input[placeholder*="optional" i]').count() === 0,
         `Properties did not retain the birthday without inventing a year at ${viewport.label}`
+      );
+      const communicationOrder = await page.locator('[data-profile-section="communication"]').evaluate((section) => ({
+        contactBeforeLinks: Array.from(section.children).indexOf(section.querySelector(".people-contact-channel-grid")) < Array.from(section.children).indexOf(section.querySelector(".people-profile-field-grid")),
+        links: Array.from(section.querySelectorAll(".people-profile-field-grid > label")).map((label) => label.firstChild?.textContent?.trim() || "")
+      }));
+      assert(
+        communicationOrder.contactBeforeLinks &&
+          JSON.stringify(communicationOrder.links) === JSON.stringify(["Website", "LinkedIn", "X", "Instagram", "TikTok", "YouTube"]),
+        `Properties did not place email and phone above the requested social-link order at ${viewport.label}: ${JSON.stringify(communicationOrder)}`
       );
       assert(
         await page.locator("[data-email-entry]").count() === 3 &&
@@ -6451,7 +6571,7 @@ async function checkPeopleMemoryBrowserState(
           await page.getByRole("heading", { name: "Education", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "Places", exact: true }).count() === 1 &&
           await page.locator(".people-repeatable-entry-heading").count() === 0 &&
-          await page.locator(".people-repeatable-fields > .people-repeatable-inline-remove, .people-repeatable-inline-actions > .people-repeatable-inline-remove").count() === 7 &&
+          await page.locator(".people-repeatable-fields > .people-repeatable-inline-remove, .people-repeatable-fields > .people-location-remove").count() === 7 &&
           !(await page.locator(".people-edit-form").innerText()).includes("A person can belong to several groups") &&
           !(await page.locator(".people-edit-form").innerText()).includes("Keep current and past work together") &&
           !(await page.locator(".people-edit-form").innerText()).includes("Add another only when") &&
@@ -6477,7 +6597,7 @@ async function checkPeopleMemoryBrowserState(
         });
         const comesFrom = document.querySelector(".people-comes-from-field");
         const alignedRemoveButtons = Array.from(document.querySelectorAll(
-          ".people-repeatable-fields > .people-repeatable-inline-remove, .people-repeatable-inline-actions > .people-repeatable-inline-remove"
+          ".people-repeatable-fields > .people-repeatable-inline-remove, .people-repeatable-fields > .people-location-remove"
         ));
         const repeatableBottomGaps = alignedRemoveButtons.flatMap((button) => {
           const fields = button.closest(".people-repeatable-fields, .people-contact-channel-fields");
@@ -6510,9 +6630,16 @@ async function checkPeopleMemoryBrowserState(
         `Properties add/remove controls or Comes from alignment drifted at ${viewport.label}: ${JSON.stringify(propertyControlGeometry)}`
       );
       assert(
-        await page.locator('[data-location-entry="location-regression-1"] textarea').inputValue() === "123 Test Street, Columbus, Ohio 43215, USA",
+        await page.locator('[data-location-entry="location-regression-1"] input[aria-label="Place 1 street address"]').inputValue() === "123 Test Street, Columbus, Ohio 43215, USA",
         `Properties did not expose the primary street address at ${viewport.label}`
       );
+      if (viewport.label !== "mobile") {
+        const placeRowTops = await page.locator('[data-location-entry="location-regression-1"] .people-repeatable-fields-location').evaluate((row) => [
+          ...Array.from(row.querySelectorAll(":scope > label > input")).map((control) => Math.round(control.getBoundingClientRect().top)),
+          Math.round(row.querySelector(":scope > .people-location-remove").getBoundingClientRect().top)
+        ]);
+        assert(new Set(placeRowTops).size === 1, `Properties did not keep Label, City, Street address, and remove on one line: ${JSON.stringify(placeRowTops)}`);
+      }
       await assertNoOverflow(page, `People memory Properties ${viewport.label}`);
       await page.screenshot({
         path: path.join(screenshotDir, `people-memory-properties-${viewport.label}.png`),
@@ -6639,9 +6766,10 @@ async function checkPeopleMemoryBrowserState(
         const founded = document.querySelector('[class~="people-org-founded"] input')?.getBoundingClientRect();
         const team = document.querySelector('[class~="people-org-team"] input')?.getBoundingClientRect();
         const location = document.querySelector("[data-location-entry]");
+        const locationHeading = document.querySelector("[data-people-location-editor] > .people-repeatable-heading")?.getBoundingClientRect();
         const locationInputs = location ? Array.from(location.querySelectorAll("input")) : [];
         const remove = location?.querySelector(".people-remove-icon")?.getBoundingClientRect();
-        const add = location?.querySelector(".people-add-action")?.getBoundingClientRect();
+        const add = document.querySelector("[data-people-location-editor] > .people-repeatable-heading .people-add-action")?.getBoundingClientRect();
         const city = locationInputs[1]?.getBoundingClientRect();
         const cityLabel = location?.querySelector(".people-field-label:nth-of-type(1)") || location?.querySelectorAll(".people-field-label")[1];
         const teamLabel = document.querySelector('[class~="people-org-team"]');
@@ -6654,6 +6782,7 @@ async function checkPeopleMemoryBrowserState(
           removeHeight: remove?.height || 0,
           addHeight: add?.height || 0,
           cityHeight: city?.height || 0,
+          addHeadingCenterGap: add && locationHeading ? Math.abs((add.top + add.height / 2) - (locationHeading.top + locationHeading.height / 2)) : 99,
           cityFamily: cityLabel ? getComputedStyle(cityLabel).fontFamily : "",
           teamFamily: teamLabel ? getComputedStyle(teamLabel).fontFamily : ""
         };
@@ -6662,7 +6791,7 @@ async function checkPeopleMemoryBrowserState(
         organizationLayout &&
           (viewport.label === "mobile" || Math.abs(organizationLayout.foundedTop - organizationLayout.teamTop) < 2) &&
           (viewport.label === "mobile" || Math.abs(organizationLayout.removeTop - organizationLayout.cityTop) < 2) &&
-          (viewport.label === "mobile" || Math.abs(organizationLayout.addTop - organizationLayout.cityTop) < 2) &&
+          (viewport.label === "mobile" || organizationLayout.addHeadingCenterGap < 2) &&
           Math.abs(organizationLayout.addHeight - organizationLayout.cityHeight) < 2 &&
           organizationLayout.cityFamily === organizationLayout.teamFamily,
         `Organization details or Places alignment drifted at ${viewport.label}: ${JSON.stringify(organizationLayout)}`
@@ -6717,7 +6846,9 @@ async function checkPeopleMemoryBrowserState(
         await page.locator("[data-people-create-objects]").getByText(organizationTitle, { exact: true }).count() === 1,
         `New People did not stage the selected Object at ${viewport.label}`
       );
-      const createNotes = page.locator("[data-people-notes-editor]");
+      const createLifeDream = page.locator('[data-people-notes-editor="life-dream"]');
+      const createNotes = page.locator('[data-people-notes-editor="notes"]');
+      await createLifeDream.getByLabel("Life dream note 1").fill("Build a welcoming neighborhood studio");
       await createNotes.getByLabel("Notes note 1").fill("Prefers afternoon calls");
       await createNotes.getByRole("button", { name: "Add note after note 1" }).click();
       await createNotes.getByLabel("Notes note 2").fill("Met through the design community");
@@ -6746,13 +6877,17 @@ async function checkPeopleMemoryBrowserState(
         year: await birthdayEditor.locator("input").inputValue(),
         legend: (await birthdayEditor.locator("legend").innerText()).trim(),
         month: await birthdayEditor.locator("select").nth(0).inputValue(),
-        day: await birthdayEditor.locator("select").nth(1).inputValue()
+        day: await birthdayEditor.locator("select").nth(1).inputValue(),
+        cakeIcon: await birthdayEditor.locator('svg[data-icon-role="birthday"][data-icon-candidate="cake"]').count(),
+        yearPlaceholder: await birthdayEditor.locator("input").getAttribute("placeholder")
       };
       assert(
         unknownYearBirthdayState.year === "" &&
           unknownYearBirthdayState.legend.toLowerCase() === "birthday" &&
           unknownYearBirthdayState.month === "3" &&
-          unknownYearBirthdayState.day === "14",
+          unknownYearBirthdayState.day === "14" &&
+          unknownYearBirthdayState.cakeIcon === 1 &&
+          unknownYearBirthdayState.yearPlaceholder === "Year",
         `New People did not accept a month and day with an unknown birth year at ${viewport.label}: ${JSON.stringify(unknownYearBirthdayState)}`
       );
       const createGroups = (await page.locator(".people-capture-form .people-group-picker label").allTextContents())
@@ -6862,6 +6997,7 @@ async function checkPeopleMemoryBrowserState(
             createdFromQuickEntry.profile?.lastName === "North" &&
             createdFromQuickEntry.profile?.nickname === "June" &&
             createdFromQuickEntry.profile?.birthday === "--03-14" &&
+            createdFromQuickEntry.profile?.lifeDream === "Build a welcoming neighborhood studio" &&
             !createdFromQuickEntry.time?.lastReview &&
             createdFromQuickEntry.profile?.emails?.length === 2 &&
             createdFromQuickEntry.profile.emails[1].category === "custom" &&
@@ -7223,11 +7359,11 @@ async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, 
     ]);
     assert((await responseRecord(dormantResponse))?.status === "inactive", "People direct Dormant status did not persist");
 
-    const dormantTrigger = page.getByRole("button", { name: `Change relationship status. Current status: Dormant`, exact: true });
-    await dormantTrigger.click();
+    await page.getByRole("button", { name: `Change relationship status. Current status: Dormant`, exact: true }).waitFor();
+    assert(await statusMenu.isVisible(), "People status menu closed before the next direct status choice");
     const [activeResponse] = await Promise.all([
       page.waitForResponse((response) => response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"),
-      page.getByRole("menu", { name: "Relationship status" }).getByRole("menuitemradio", { name: "Active", exact: true }).click()
+      statusMenu.getByRole("menuitemradio", { name: "Active", exact: true }).click()
     ]);
     assert((await responseRecord(activeResponse))?.status === "active", "People direct Active status did not persist");
 
@@ -9467,8 +9603,8 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       }
       assert(await page.getByText("Resources remain authoritative.", { exact: false }).count() >= 1, `Style Guide did not disclose the Resource ownership boundary at ${viewport.label}`);
       assert(await page.locator('section[aria-label="Guide identity"] input').count() === 2, `Style Guide identity was not editable at ${viewport.label}`);
-      assert(await page.locator('[data-icon-registry-count="107"]').count() === 1, `Style Guide did not expose all 107 canonical icon roles at ${viewport.label}`);
-      assert(await page.locator('input[aria-label$=" usage"]').count() === 107, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
+      assert(await page.locator('[data-icon-registry-count="108"]').count() === 1, `Style Guide did not expose all 108 canonical icon roles at ${viewport.label}`);
+      assert(await page.locator('input[aria-label$=" usage"]').count() === 108, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
       assert(await page.locator('[class*="iconCandidate"]').count() >= 420, `Style Guide did not expose five curated recommendations for each unselected icon at ${viewport.label}`);
       const iconCentering = await page.locator('[class*="iconCandidate"] a').first().evaluate((anchor) => {
         const icon = anchor.querySelector("svg");
@@ -13002,7 +13138,7 @@ async function main() {
         initialStyleGuide.payload?.state?.typography?.length >= 6 &&
         initialStyleGuide.payload?.state?.colors?.length >= 18 &&
         initialStyleGuide.payload?.state?.modules?.length === 9 &&
-        initialStyleGuide.payload?.state?.icons?.length === 107 &&
+        initialStyleGuide.payload?.state?.icons?.length === 108 &&
         initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.primaryName === "Signal Red" &&
         initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.tokens?.action === "#B42318" &&
         ["module-projects", "module-notes", "module-people", "module-media", "module-personal", "module-reviews", "module-resources", "module-finance", "module-vault", "interaction", "discard-changes"].every((role) => initialStyleGuide.payload.state.icons.some((item) => item.icon === role)) &&
@@ -16020,7 +16156,7 @@ async function main() {
           ],
           birthday: "--03-14",
           lifeDream: "Open a small design school",
-          interestingFact: "Collects vintage maps\nWrites field notes by hand",
+          interestingFact: "This retired field must not survive normalization",
           notes: "Prefers written project updates\nCollects field notebooks",
           education: [
             {
@@ -16091,6 +16227,10 @@ async function main() {
     assert(
       persistedPerson?.profile?.birthday === "--03-14",
       "People birthday without a known year did not persist"
+    );
+    assert(
+      !Object.prototype.hasOwnProperty.call(persistedPerson?.profile || {}, "interestingFact"),
+      "People retained the retired Interesting facts property"
     );
     assert(
       persistedPerson?.profile?.youtube === "https://youtube.com/@regression-person" &&

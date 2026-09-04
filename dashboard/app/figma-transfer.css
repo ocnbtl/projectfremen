@@ -14334,3 +14334,267 @@ html[data-admin-preview="mobile"] .people-record-type-toggle > div {
     transition: none;
   }
 }
+
+/* People V1.4 — compact profile inputs, olive context, and immediate workspace state. */
+.people-redesign-shell .people-profile-identity-grid {
+  row-gap: 6px;
+}
+
+.people-redesign-shell .people-birthday-field {
+  grid-template-columns: 30px minmax(118px, 1.2fr) minmax(72px, .7fr) minmax(94px, .8fr);
+  align-items: center;
+  gap: 7px;
+}
+
+.people-redesign-shell .people-birthday-icon {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--people-olive-soft) 64%, var(--surface-panel));
+  color: var(--people-olive-strong);
+}
+
+.people-redesign-shell .people-birthday-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.people-redesign-shell [data-profile-section="about"] > .people-profile-field-grid {
+  margin-bottom: 8px;
+}
+
+.people-redesign-shell [data-profile-section="about"] > .people-notes-editor {
+  margin-top: 0;
+}
+
+.people-redesign-shell .people-profile-group-picker {
+  border-color: transparent !important;
+  background: transparent !important;
+}
+
+.people-redesign-shell .people-profile-group-picker > div {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 3px 5px;
+}
+
+.people-redesign-shell .people-profile-group-picker label,
+.people-redesign-shell .people-profile-group-picker label:has(input:checked) {
+  min-height: 27px;
+  padding: 0 3px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.people-redesign-shell .people-profile-group-picker label:has(input:checked) {
+  color: var(--people-olive-strong);
+}
+
+.people-redesign-shell .people-contact-channel-grid {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.people-redesign-shell .people-contact-channel-section,
+.people-redesign-shell .people-contact-channel-entry {
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.people-redesign-shell .people-contact-channel-entry + .people-contact-channel-entry {
+  margin-top: 8px;
+}
+
+.people-redesign-shell .people-repeatable-fields-location {
+  grid-template-columns: minmax(90px, .55fr) minmax(120px, .8fr) minmax(180px, 1.5fr) 40px;
+}
+
+.people-redesign-shell .people-repeatable-fields-location .people-location-remove {
+  width: 40px;
+  height: 40px;
+  align-self: end;
+  margin: 0;
+  transform: translateY(-12px) !important;
+}
+
+.people-redesign-shell .people-location-address-field,
+.people-redesign-shell .people-comes-from-field,
+.people-redesign-shell .people-comes-from-field input {
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.people-redesign-shell .people-location-address-field input {
+  height: 40px;
+}
+
+.people-redesign-shell .people-links-section {
+  border-top-color: var(--people-olive) !important;
+  background: color-mix(in srgb, var(--people-olive-soft) 24%, var(--surface-panel)) !important;
+}
+
+.people-redesign-shell .people-links-section :where(.people-linked-card-header h4, .people-section-count) {
+  color: var(--people-olive-strong);
+}
+
+.people-redesign-shell .people-overview-about,
+.people-redesign-shell .people-fact-cluster.is-life,
+.people-redesign-shell .people-fact-cluster.is-work,
+.people-redesign-shell .people-fact-cluster.is-relationships {
+  border-color: var(--people-olive-soft) !important;
+  background: color-mix(in srgb, var(--people-olive-soft) 42%, var(--surface-panel)) !important;
+}
+
+.people-redesign-shell .people-fact-cluster :where(.people-info-icon),
+.people-redesign-shell .people-overview-about > h3 {
+  color: var(--people-olive-strong) !important;
+}
+
+.people-redesign-shell .people-primary-search {
+  padding-right: 8px;
+}
+
+.people-redesign-shell .people-primary-search input {
+  align-self: center;
+  height: 38px;
+  min-height: 38px;
+  padding: 0;
+  line-height: normal;
+}
+
+.people-redesign-shell .people-search-controls {
+  padding-left: 4px;
+  border-left: 0;
+}
+
+@media (min-width: 761px) and (max-width: 1100px) {
+  .people-redesign-shell .people-primary-search .people-control-trigger {
+    min-width: 67px;
+    padding-inline: 5px;
+  }
+}
+
+.people-redesign-shell .people-profile-status-menu {
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.people-redesign-shell .people-profile-status-selection {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  left: 6px;
+  z-index: 0;
+  height: 38px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--people-olive-soft) 68%, var(--surface-panel));
+  transition: transform 190ms cubic-bezier(.22, 1, .36, 1);
+}
+
+.people-redesign-shell .people-profile-status-menu button {
+  position: relative;
+  z-index: 1;
+}
+
+.people-redesign-shell .people-profile-status-menu button:hover:not([aria-checked="true"]) {
+  background: color-mix(in srgb, var(--text-strong) 4%, transparent);
+}
+
+.people-redesign-shell .people-profile-status-menu button[aria-checked="true"] {
+  background: transparent;
+  color: var(--people-olive-strong);
+}
+
+.people-redesign-shell .people-profile-status-menu button:nth-of-type(1) > svg:first-child {
+  color: var(--module-icon);
+}
+
+.people-redesign-shell .people-profile-status-menu button:nth-of-type(2) > svg:first-child,
+.people-redesign-shell .people-activity-marker.is-idea {
+  color: var(--people-olive-strong);
+}
+
+.people-redesign-shell .people-profile-status-check {
+  display: grid;
+  place-items: center;
+  color: var(--people-olive-strong);
+  animation: people-status-check-arrive 190ms cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.people-redesign-shell .people-profile-status-check svg {
+  width: 15px;
+  height: 15px;
+}
+
+@keyframes people-status-check-arrive {
+  0%, 70% { opacity: 0; transform: scale(.72); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+.people-redesign-shell .people-links-toolbar-actions .people-add-action,
+.people-redesign-shell .people-links-toolbar-actions .people-add-action > * {
+  color: #fff !important;
+}
+
+@media (max-width: 900px) {
+  .people-redesign-shell .people-profile-group-picker > div {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .people-redesign-shell [data-people-location-editor] > .people-repeatable-heading,
+  html[data-admin-preview="mobile"] .people-redesign-shell [data-people-location-editor] > .people-repeatable-heading {
+    align-items: center;
+    flex-direction: row;
+  }
+
+  .people-redesign-shell [data-people-location-editor] > .people-repeatable-heading .people-add-action.is-icon-only,
+  html[data-admin-preview="mobile"] .people-redesign-shell [data-people-location-editor] > .people-repeatable-heading .people-add-action.is-icon-only {
+    width: 40px !important;
+    min-width: 40px !important;
+    height: 40px !important;
+    min-height: 40px !important;
+  }
+}
+
+@media (max-width: 760px) {
+  .people-redesign-shell .people-birthday-field,
+  html[data-admin-preview="mobile"] .people-redesign-shell .people-birthday-field {
+    grid-template-columns: 30px minmax(0, 1fr) minmax(68px, .7fr);
+  }
+
+  .people-redesign-shell .people-birthday-field label:last-child,
+  html[data-admin-preview="mobile"] .people-redesign-shell .people-birthday-field label:last-child {
+    grid-column: 2 / -1;
+  }
+
+  .people-redesign-shell .people-profile-group-picker > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .people-redesign-shell .people-repeatable-fields-location,
+  html[data-admin-preview="mobile"] .people-redesign-shell .people-repeatable-fields-location {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+
+  .people-redesign-shell .people-repeatable-fields-location .people-location-remove {
+    grid-column: 1;
+    justify-self: end;
+    transform: none !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .people-redesign-shell .people-profile-status-selection,
+  .people-redesign-shell .people-profile-status-check {
+    animation: none;
+    transition: none;
+  }
+}

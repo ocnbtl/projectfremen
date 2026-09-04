@@ -57,7 +57,6 @@ export type PeopleContactProfile = {
   lastContact?: string;
   nextContact?: string;
   contactCadence?: string;
-  interestingFact?: string;
   lifeDream?: string;
   notes?: string;
   linkedin?: string;

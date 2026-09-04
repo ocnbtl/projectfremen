@@ -276,7 +276,6 @@ export type PersonalContactProfile = {
   lastContact?: string;
   nextContact?: string;
   contactCadence?: string;
-  interestingFact?: string;
   lifeDream?: string;
   notes?: string;
   linkedin?: string;
@@ -495,7 +494,6 @@ const CONTACT_PROFILE_TEXT_KEYS = [
   "lastContact",
   "nextContact",
   "contactCadence",
-  "interestingFact",
   "lifeDream",
   "notes",
   "linkedin",

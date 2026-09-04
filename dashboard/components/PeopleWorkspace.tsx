@@ -112,6 +112,7 @@ type PeopleSidebarView =
   | "customize";
 type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up";
 type PeopleListMode = "list" | "compact" | "grid";
+type RelationshipStatus = "active" | "idea" | "inactive";
 type PeopleLastContactFilter = "any" | "7d" | "30d" | "90d" | "none";
 type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "note" | "memory" | "milestone";
 type ContactMethodId = "email" | "phone" | "website" | "instagram" | "tiktok" | "x" | "linkedin" | "youtube";
@@ -160,6 +161,7 @@ type PeopleIconName =
   | "object"
   | "dormant"
   | "active"
+  | "loose-tie"
   | "interaction"
   | "follow-up"
   | "new-person"
@@ -188,7 +190,7 @@ function PeopleIcon({ name }: { name: PeopleIconName }) {
     birthday: "birthday", location: "location", hometown: "hometown", occupation: "briefcase",
     employer: "employer", university: "university", partner: "partner", children: "users",
     organization: "organization", industry: "industry", founded: "clock", team: "users", edit: "edit",
-    object: "object", dormant: "dormant", active: "active", interaction: "interaction", "follow-up": "follow-up", "new-person": "new-person", more: "more", star: "star", export: "export", delete: "delete", chevron: "chevron-right",
+    object: "object", dormant: "dormant", active: "active", "loose-tie": "loose-tie", interaction: "interaction", "follow-up": "follow-up", "new-person": "new-person", more: "more", star: "star", export: "export", delete: "delete", chevron: "chevron-right",
     search: "search", filter: "filter", sort: "sort", check: "check", close: "close", plus: "plus", groups: "users",
     communication: "message", notes: "notes", cadence: "clock", "view-comfortable": "view-comfortable",
     "view-compact": "view-compact", "view-grid": "view-grid"
@@ -238,12 +240,24 @@ function MorphingViewIcon({ mode }: { mode: PeopleListMode }) {
   );
 }
 
-function PeopleActivityMarker({ dormant, compact = false }: { dormant: boolean; compact?: boolean }) {
-  const label = dormant ? "Dormant" : "Active";
+const RELATIONSHIP_STATUS_OPTIONS: ReadonlyArray<{ status: RelationshipStatus; label: string; icon: PeopleIconName }> = [
+  { status: "active", label: "Active", icon: "active" },
+  { status: "idea", label: "Loose tie", icon: "loose-tie" },
+  { status: "inactive", label: "Dormant", icon: "dormant" }
+];
+
+function relationshipStatus(status: PersonalRecordStatus): RelationshipStatus {
+  if (status === "inactive") return "inactive";
+  if (status === "idea") return "idea";
+  return "active";
+}
+
+function PeopleActivityMarker({ status, compact = false }: { status: PersonalRecordStatus; compact?: boolean }) {
+  const resolved = RELATIONSHIP_STATUS_OPTIONS.find((option) => option.status === relationshipStatus(status)) || RELATIONSHIP_STATUS_OPTIONS[0];
   return (
-    <span className={`people-activity-marker is-${dormant ? "dormant" : "active"}`} aria-label={label} title={label}>
-      <PeopleIcon name={dormant ? "dormant" : "active"} />
-      {!compact && <span>{label}</span>}
+    <span className={`people-activity-marker is-${resolved.status}`} aria-label={resolved.label} title={resolved.label}>
+      <PeopleIcon name={resolved.icon} />
+      {!compact && <span>{resolved.label}</span>}
     </span>
   );
 }
@@ -404,7 +418,6 @@ type ContactProfileDraft = {
   lastContact: string;
   nextContact: string;
   contactCadence: string;
-  interestingFact: string;
   lifeDream: string;
   notes: string;
   linkedin: string;
@@ -701,20 +714,19 @@ const PROFILE_SECTIONS: Array<{ title: string; tone: string; fields: ProfileFiel
     title: "About",
     tone: "crimson",
     fields: [
-      { key: "context", label: "About", type: "textarea", placeholder: "How you know them, why they matter, and the current relationship context." },
-      { key: "lifeDream", label: "Life dream", type: "textarea" }
+      { key: "context", label: "About", type: "textarea", placeholder: "How you know them, why they matter, and the current relationship context." }
     ]
   },
   {
     title: "Communication",
     tone: "blue",
     fields: [
-      { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/in/..." },
       { key: "website", label: "Website", type: "url", placeholder: "https://..." },
-      { key: "youtube", label: "YouTube", type: "url", placeholder: "https://youtube.com/@..." },
+      { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/in/..." },
+      { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." },
       { key: "instagram", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
       { key: "tiktok", label: "TikTok", type: "url", placeholder: "https://tiktok.com/@..." },
-      { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." }
+      { key: "youtube", label: "YouTube", type: "url", placeholder: "https://youtube.com/@..." }
     ]
   },
   {
@@ -750,12 +762,12 @@ const ORGANIZATION_PROFILE_SECTIONS: Array<{ title: string; tone: string; fields
     title: "Links",
     tone: "blue",
     fields: [
-      { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/company/..." },
       { key: "website", label: "Website", type: "url", placeholder: "https://..." },
-      { key: "youtube", label: "YouTube", type: "url", placeholder: "https://youtube.com/@..." },
+      { key: "linkedin", label: "LinkedIn", type: "url", placeholder: "https://linkedin.com/company/..." },
+      { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." },
       { key: "instagram", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
       { key: "tiktok", label: "TikTok", type: "url", placeholder: "https://tiktok.com/@..." },
-      { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." },
+      { key: "youtube", label: "YouTube", type: "url", placeholder: "https://youtube.com/@..." },
       { key: "projects", label: "Projects", placeholder: "Comma-separated project names" }
     ]
   }
@@ -789,7 +801,6 @@ const EMPTY_PROFILE_DRAFT: ContactProfileDraft = {
   lastContact: "",
   nextContact: "",
   contactCadence: "",
-  interestingFact: "",
   lifeDream: "",
   notes: "",
   linkedin: "",
@@ -1357,7 +1368,6 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     lastContact: profile?.lastContact || record.time.lastReview?.slice(0, 10) || "",
     nextContact: profile?.nextContact || record.time.nextReview || "",
     contactCadence: profile?.contactCadence || record.time.reviewCadence || "",
-    interestingFact: profile?.interestingFact || "",
     lifeDream: profile?.lifeDream || "",
     notes: profile?.notes || "",
     linkedin: profile?.linkedin || "",
@@ -1680,7 +1690,8 @@ function BirthdayEditor({ value, onChange, label = "Birthday" }: { value: string
 
   return (
     <fieldset className="people-birthday-field" data-people-birthday-editor>
-      <legend>{label}</legend>
+      <legend className="people-visually-hidden">{label}</legend>
+      <span className="people-birthday-icon" aria-hidden="true"><PeopleIcon name="birthday" /></span>
       <label aria-label={`${label} month`}>
         <span className="people-visually-hidden">Month</span>
         <select value={month} onChange={(event) => {
@@ -1716,7 +1727,7 @@ function BirthdayEditor({ value, onChange, label = "Birthday" }: { value: string
             setYear(next);
             commit(month, day, next);
           }}
-          placeholder="Year (optional)"
+          placeholder="Year"
         />
       </label>
     </fieldset>
@@ -1843,7 +1854,7 @@ function LocationEntriesEditor({
     <section className="people-repeatable-section people-themed-section module-ref-tone-cyan" data-people-location-editor data-profile-section="locations">
       <header className="people-repeatable-heading">
         <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>Places</h4></div>
-        {entries.length === 0 && <PeopleAddButton label="Place" onClick={onAdd} iconOnly />}
+        <PeopleAddButton label="Place" onClick={onAdd} iconOnly />
       </header>
       {!organization && onComesFromChange && (
         <label className="people-comes-from-field">Comes from<input list="people-location-suggestions" value={comesFrom} onChange={(event) => onComesFromChange(event.target.value)} placeholder="Hometown or place of origin" /></label>
@@ -1853,11 +1864,8 @@ function LocationEntriesEditor({
           <div className="people-repeatable-fields people-repeatable-fields-location">
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Label</span><input aria-label={`Place ${index + 1} label`} value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? "Relevant place" : index === 0 ? "Primary home" : "Second home"} /></label>
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City</span><input aria-label={`Place ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing…" /></label>
-            <div className={`people-repeatable-inline-actions${index === 0 ? " has-visible-label" : ""}`}>
-              <RemoveIconButton className="people-repeatable-inline-remove people-location-inline-remove" label={`Remove place ${index + 1}`} onClick={() => onRemove(entry.id)} />
-              {index === 0 && <PeopleAddButton label="Place" onClick={onAdd} iconOnly />}
-            </div>
-            <label className="is-wide"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><textarea aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street, apartment or unit, city, state, postal code, country" rows={1} /></label>
+            <label className="people-location-address-field"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><input aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street address" /></label>
+            <RemoveIconButton className="people-location-remove" label={`Remove place ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
         </article>
       )) : <p className="people-repeatable-empty">No place added.</p>}
@@ -2184,13 +2192,15 @@ function PeopleNotesEditor({
   onChange,
   title = "Notes",
   idPrefix = "people-about-note",
-  editorKind = "notes"
+  editorKind = "notes",
+  placeholder = "Write a note…"
 }: {
   notes: string[];
   onChange: (notes: string[]) => void;
   title?: string;
   idPrefix?: string;
   editorKind?: string;
+  placeholder?: string;
 }) {
   const rows = notes.length > 0 ? notes : [""];
 
@@ -2224,7 +2234,7 @@ function PeopleNotesEditor({
               rows={1}
               value={note}
               onChange={(event) => updateNote(index, event.target.value)}
-              placeholder="Write a note…"
+              placeholder={placeholder}
             />
             <div className="people-note-actions">
               <RemoveIconButton className="people-note-remove" label={`Remove note ${index + 1}`} onClick={() => removeNote(index)} />
@@ -2290,6 +2300,7 @@ export default function PeopleWorkspace({
   const [groups, setGroups] = useState<string[]>(["Collaborator"]);
   const [status, setStatus] = useState<PersonalRecordStatus>("active");
   const [quickContext, setQuickContext] = useState("");
+  const [quickLifeDreams, setQuickLifeDreams] = useState<string[]>([""]);
   const [quickNotes, setQuickNotes] = useState<string[]>([""]);
   const [quickOrganizationType, setQuickOrganizationType] = useState("Business");
   const [quickIndustry, setQuickIndustry] = useState("");
@@ -2378,6 +2389,13 @@ export default function PeopleWorkspace({
   useEffect(() => {
     const handleProfileHistory = (event: PopStateEvent) => {
       if (suppressDirtyPopRef.current) return;
+      const nextUrlState = parsePeopleUrlState(new URLSearchParams(window.location.search));
+      setQuery(nextUrlState.query);
+      setActiveFilter(nextUrlState.filter);
+      setActiveSidebarView(nextUrlState.sidebar);
+      setSortMode(nextUrlState.sort);
+      setListMode(nextUrlState.view);
+      setAiOpen(nextUrlState.ai);
       if (window.location.pathname === `${getModuleRoute("people")}/new`) {
         setAddingPerson(true);
         setDetailMode("edit");
@@ -2608,7 +2626,12 @@ export default function PeopleWorkspace({
   ) {
     const destination = buildPeopleDestination(partial, options);
     if (options.native && typeof window !== "undefined") {
-      window.history.replaceState(window.history.state, "", destination);
+      const nextState = { ...(window.history.state || {}), __unigentamosPeopleSidebar: true };
+      if (options.history === "push") {
+        window.history.pushState(nextState, "", destination);
+      } else {
+        window.history.replaceState(nextState, "", destination);
+      }
       return;
     }
     if (options.history === "push") {
@@ -2927,6 +2950,7 @@ export default function PeopleWorkspace({
     quickLastName,
     quickBirthday,
     quickContext,
+    ...quickLifeDreams,
     ...quickNotes,
     quickIndustry,
     quickFoundedYear,
@@ -3085,7 +3109,7 @@ export default function PeopleWorkspace({
       setDetailMode("profile");
       updatePeopleUrl(
         { sidebar: item.id, filter: "all", tab: "links", person: "" },
-        { path: getModuleRoute("people"), history: "push" }
+        { path: getModuleRoute("people"), history: "push", native: true }
       );
       return;
     }
@@ -3094,14 +3118,14 @@ export default function PeopleWorkspace({
       setDetailMode("profile");
       updatePeopleUrl(
         { sidebar: item.id, filter: "all", person: "" },
-        { path: getModuleRoute("people"), history: "push" }
+        { path: getModuleRoute("people"), history: "push", native: true }
       );
       return;
     }
     setDetailMode("profile");
     updatePeopleUrl(
       { sidebar: item.id, filter: "all", person: "" },
-      { path: getModuleRoute("people"), history: "push" }
+      { path: getModuleRoute("people"), history: "push", native: true }
     );
   }
 
@@ -3314,6 +3338,7 @@ export default function PeopleWorkspace({
       nickname: className === "person" ? quickNickname : "",
       birthday: className === "person" ? quickBirthday : "",
       context: quickContext,
+      lifeDream: className === "person" ? joinTextEntries(quickLifeDreams.filter((dream) => dream.trim())) : "",
       notes: joinTextEntries(quickNotes.filter((note) => note.trim())),
       organizationType: className === "org" ? quickOrganizationType : "",
       industry: className === "org" ? quickIndustry : "",
@@ -3445,6 +3470,7 @@ export default function PeopleWorkspace({
       setGroups(["Collaborator"]);
       setStatus("active");
       setQuickContext("");
+      setQuickLifeDreams([""]);
       setQuickNotes([""]);
       setQuickOrganizationType("Business");
       setQuickIndustry("");
@@ -3567,18 +3593,19 @@ export default function PeopleWorkspace({
     setLifecycleSaving("");
   }
 
-  async function setRelationshipStatus(nextStatus: "active" | "inactive") {
-    if (!selectedPerson || lifecycleSaving || selectedPerson.status === nextStatus) {
-      setStatusMenuOpen(false);
+  async function setRelationshipStatus(nextStatus: RelationshipStatus) {
+    if (!selectedPerson || lifecycleSaving || relationshipStatus(selectedPerson.status) === nextStatus) return;
+    const previousRecord = selectedPerson;
+    setPeople((current) => current.map((record) => record.id === previousRecord.id ? { ...record, status: nextStatus } : record));
+    setLifecycleSaving("status");
+    const saved = await patchPerson(previousRecord.id, { status: nextStatus });
+    setLifecycleSaving("");
+    if (!saved) {
+      setPeople((current) => current.map((record) => record.id === previousRecord.id ? { ...record, status: previousRecord.status } : record));
       return;
     }
-    setLifecycleSaving("status");
-    const saved = await patchPerson(selectedPerson.id, { status: nextStatus });
-    setLifecycleSaving("");
-    if (!saved) return;
-    setStatusMenuOpen(false);
-    setProfileMenuOpen(false);
-    setActionNotice(`${selectedPerson.title} is now ${nextStatus === "inactive" ? "dormant" : "active"}.`);
+    const label = RELATIONSHIP_STATUS_OPTIONS.find((option) => option.status === nextStatus)?.label.toLowerCase() || nextStatus;
+    setActionNotice(`${previousRecord.title} is now ${label}.`);
   }
 
   function exportContact() {
@@ -3739,6 +3766,7 @@ export default function PeopleWorkspace({
     setQuickLastName("");
     setQuickBirthday("");
     setQuickContext("");
+    setQuickLifeDreams([""]);
     setQuickNotes([""]);
     setQuickOrganizationType("Business");
     setQuickIndustry("");
@@ -3961,7 +3989,7 @@ export default function PeopleWorkspace({
                 <span><PeopleIcon name="person" /></span>
                 <h4 id="people-create-identity-title">Identity</h4>
               </header>
-              <div className="people-profile-field-grid">
+              <div className="people-profile-field-grid people-profile-identity-grid">
                 <label className="people-create-name-field people-create-full-name">
                   Full name
                   <input
@@ -3989,6 +4017,14 @@ export default function PeopleWorkspace({
               <div className="people-profile-field-grid">
                 <label className="is-wide">Relationship context<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={4} /></label>
               </div>
+              <PeopleNotesEditor
+                title="Life dream"
+                idPrefix="people-life-dream"
+                editorKind="life-dream"
+                placeholder="Add a life dream…"
+                notes={quickLifeDreams}
+                onChange={setQuickLifeDreams}
+              />
               <PeopleNotesEditor notes={quickNotes} onChange={setQuickNotes} />
             </section>
             <section className="people-profile-section people-themed-section module-ref-tone-purple people-capture-section" data-profile-section="groups" aria-labelledby="people-create-groups-title">
@@ -4028,11 +4064,11 @@ export default function PeopleWorkspace({
               </div>
               <div className="people-profile-field-grid people-create-social-grid">
                 <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
-                <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
+                <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/in/..." /></label>
+                <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
                 <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(withoutTrailingLinkSlash(event.target.value))} placeholder="https://instagram.com/..." /></label>
                 <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(withoutTrailingLinkSlash(event.target.value))} placeholder="https://tiktok.com/@..." /></label>
-                <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
-                <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/in/..." /></label>
+                <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
               </div>
             </section>
             <OccupationEntriesEditor
@@ -4114,11 +4150,11 @@ export default function PeopleWorkspace({
             </header>
             <div className="people-profile-field-grid people-create-social-grid people-create-social-grid-no-divider">
               <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
-              <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
+              <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/company/..." /></label>
+              <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
               <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(withoutTrailingLinkSlash(event.target.value))} placeholder="https://instagram.com/..." /></label>
               <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(withoutTrailingLinkSlash(event.target.value))} placeholder="https://tiktok.com/@..." /></label>
-              <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
-              <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/company/..." /></label>
+              <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
               <label className="is-wide">Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
             </div>
           </section>
@@ -4474,7 +4510,7 @@ export default function PeopleWorkspace({
                       </span>
                     </span>
                     <span className={`people-row-date${getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) ? "" : " is-unknown"}`}>
-                      <PeopleActivityMarker dormant={isDormant(record)} compact />
+                      <PeopleActivityMarker status={record.status} compact />
                       <span>{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>
                     </span>
                     <span className="people-row-next">{getDirectoryNextContactLabel(record)}</span>
@@ -4572,7 +4608,7 @@ export default function PeopleWorkspace({
                   <button
                     type="button"
                     className="people-profile-status-trigger"
-                    aria-label={`Change relationship status. Current status: ${isDormant(selectedPerson) ? "Dormant" : "Active"}`}
+                    aria-label={`Change relationship status. Current status: ${RELATIONSHIP_STATUS_OPTIONS.find((option) => option.status === relationshipStatus(selectedPerson.status))?.label}`}
                     aria-haspopup="menu"
                     aria-expanded={statusMenuOpen}
                     aria-controls="people-profile-status-menu"
@@ -4582,26 +4618,29 @@ export default function PeopleWorkspace({
                       setStatusMenuOpen((current) => !current);
                     }}
                   >
-                    <PeopleActivityMarker dormant={isDormant(selectedPerson)} />
-                    <PeopleIcon name="chevron" />
+                    <PeopleActivityMarker status={selectedPerson.status} />
                   </button>
                   {statusMenuOpen && (
                     <div id="people-profile-status-menu" className="people-profile-status-menu" role="menu" aria-label="Relationship status">
-                      {(["active", "inactive"] as const).map((nextStatus) => {
-                        const dormant = nextStatus === "inactive";
-                        const selected = dormant ? isDormant(selectedPerson) : !isDormant(selectedPerson);
+                      <span
+                        className="people-profile-status-selection"
+                        style={{ transform: `translateY(${RELATIONSHIP_STATUS_OPTIONS.findIndex((option) => option.status === relationshipStatus(selectedPerson.status)) * 41}px)` }}
+                        aria-hidden="true"
+                      />
+                      {RELATIONSHIP_STATUS_OPTIONS.map((option) => {
+                        const selected = relationshipStatus(selectedPerson.status) === option.status;
                         return (
                           <button
                             type="button"
                             role="menuitemradio"
                             aria-checked={selected}
-                            onClick={() => void setRelationshipStatus(nextStatus)}
+                            onClick={() => void setRelationshipStatus(option.status)}
                             disabled={lifecycleSaving === "status"}
-                            key={nextStatus}
+                            key={option.status}
                           >
-                            <PeopleIcon name={dormant ? "dormant" : "active"} />
-                            <span>{dormant ? "Dormant" : "Active"}</span>
-                            {selected && <PeopleIcon name="check" />}
+                            <PeopleIcon name={option.icon} />
+                            <span>{option.label}</span>
+                            {selected && <span className="people-profile-status-check" key={option.status}><PeopleIcon name="check" /></span>}
                           </button>
                         );
                       })}
@@ -4686,7 +4725,30 @@ export default function PeopleWorkspace({
                         <span><PeopleIcon name={profileSectionIcon(section.title)} /></span>
                         <h4>{section.title}</h4>
                       </header>
-                      <div className="people-profile-field-grid">
+                      {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
+                        <EmailEntriesEditor
+                          entries={profileDraft.emails}
+                          onChange={updateProfileEmail}
+                          onAdd={() => setProfileDraft((current) => ({
+                            ...current,
+                            emails: [...current.emails, newEmailEntry({ category: current.emails.some((entry) => entry.category === "primary") ? "personal" : "primary" })]
+                          }))}
+                          onRemove={(id) => setProfileDraft((current) => ({ ...current, emails: removeEntry(current.emails, id) }))}
+                        />
+                        <PhoneEntriesEditor
+                          entries={profileDraft.phones}
+                          onChange={updateProfilePhone}
+                          onAdd={() => setProfileDraft((current) => ({
+                            ...current,
+                            phones: [...current.phones, newPhoneEntry({
+                              category: current.phones.some((entry) => entry.category === "primary") ? "personal" : "primary",
+                              countryCode: current.phones[0]?.countryCode || "+1"
+                            })]
+                          }))}
+                          onRemove={(id) => setProfileDraft((current) => ({ ...current, phones: removeEntry(current.phones, id) }))}
+                        />
+                      </div>}
+                      <div className={`people-profile-field-grid${section.title === "Identity" && selectedPerson.className === "person" ? " people-profile-identity-grid" : ""}`}>
                         {section.fields.map((field) => (
                           <label className={`${field.type === "textarea" ? "is-wide " : ""}people-profile-field-${field.key}`} key={field.key}>
                             {field.label}
@@ -4740,38 +4802,16 @@ export default function PeopleWorkspace({
                       {section.title === "Identity" && selectedPerson.className === "person" && (
                         <BirthdayEditor value={profileDraft.birthday} onChange={(value) => updateProfileDraft("birthday", value)} />
                       )}
-                      {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
-                        <EmailEntriesEditor
-                          entries={profileDraft.emails}
-                          onChange={updateProfileEmail}
-                          onAdd={() => setProfileDraft((current) => ({
-                            ...current,
-                            emails: [...current.emails, newEmailEntry({ category: current.emails.some((entry) => entry.category === "primary") ? "personal" : "primary" })]
-                          }))}
-                          onRemove={(id) => setProfileDraft((current) => ({ ...current, emails: removeEntry(current.emails, id) }))}
-                        />
-                        <PhoneEntriesEditor
-                          entries={profileDraft.phones}
-                          onChange={updateProfilePhone}
-                          onAdd={() => setProfileDraft((current) => ({
-                            ...current,
-                            phones: [...current.phones, newPhoneEntry({
-                              category: current.phones.some((entry) => entry.category === "primary") ? "personal" : "primary",
-                              countryCode: current.phones[0]?.countryCode || "+1"
-                            })]
-                          }))}
-                          onRemove={(id) => setProfileDraft((current) => ({ ...current, phones: removeEntry(current.phones, id) }))}
-                        />
-                      </div>}
                       {section.title === "About" && (
                         <>
                           {selectedPerson.className === "person" && (
                             <PeopleNotesEditor
-                              title="Interesting facts"
-                              idPrefix="people-interesting-fact"
-                              editorKind="interesting-facts"
-                              notes={profileDraft.interestingFact ? profileDraft.interestingFact.split(/\r?\n/) : [""]}
-                              onChange={(facts) => updateProfileDraft("interestingFact", facts.join("\n"))}
+                              title="Life dream"
+                              idPrefix="people-life-dream"
+                              editorKind="life-dream"
+                              placeholder="Add a life dream…"
+                              notes={profileDraft.lifeDream ? profileDraft.lifeDream.split(/\r?\n/) : [""]}
+                              onChange={(dreams) => updateProfileDraft("lifeDream", dreams.join("\n"))}
                             />
                           )}
                           <PeopleNotesEditor
@@ -4901,24 +4941,12 @@ export default function PeopleWorkspace({
                       )) : (
                         <div className="notes-empty-state">
                           <h3>No interactions yet</h3>
-                          <p>Log a call, email, meeting, message, or memory to start the history.</p>
+                          <p>Log an interaction to start the history.</p>
                         </div>
                       )}
                     </div>
                   </section>
                   <aside className="people-timeline-side" aria-label={`Follow-ups and ${selectedPerson.className === "org" ? "organization" : "relationship"} rhythm`}>
-                    <LinkedFollowUpsPanel
-                      source={peopleFollowUpSource(selectedPerson)}
-                      followUps={followUps}
-                      loading={followUpsLoading}
-                      error={followUpsError}
-                      onRefresh={() => void refreshLinkedFollowUps()}
-                      limit={3}
-                      compact
-                      presentation="people"
-                      showBoundary={false}
-                      title="Follow-ups"
-                    />
                     <section className="people-relationship-rhythm">
                       <h3>{selectedPerson.className === "org" ? "Organization rhythm" : "Relationship rhythm"}</h3>
                       {[
@@ -4933,6 +4961,18 @@ export default function PeopleWorkspace({
                         </div>
                       ))}
                     </section>
+                    <LinkedFollowUpsPanel
+                      source={peopleFollowUpSource(selectedPerson)}
+                      followUps={followUps}
+                      loading={followUpsLoading}
+                      error={followUpsError}
+                      onRefresh={() => void refreshLinkedFollowUps()}
+                      limit={3}
+                      compact
+                      presentation="people"
+                      showBoundary={false}
+                      title="Follow-ups"
+                    />
                   </aside>
                 </div>
               </section>
