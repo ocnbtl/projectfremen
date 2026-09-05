@@ -1069,6 +1069,10 @@
       <path d="M12.5 15.5l2 2" />
       <path d="M15 13l2 2" />
   </symbol>
+  <symbol id="tabler-heart-minus" viewBox="0 0 24 24">
+    <path d="M19.5 12.572l-2.494 2.47m-5.006 4.958l-7.5 -7.428a5 5 0 1 1 7.5 -6.566a5 5 0 1 1 7.5 6.572" />
+      <path d="M16 19h6" />
+  </symbol>
   <symbol id="tabler-heartbeat" viewBox="0 0 24 24">
     <path d="M19.5 13.572l-7.5 7.428l-2.896 -2.868m-6.117 -8.104a5 5 0 0 1 9.013 -3.022a5 5 0 1 1 7.5 6.572" />
       <path d="M3 13h2l2 3l2 -6l1 3h3" />
@@ -1571,6 +1575,12 @@
       <path d="M6.907 4.579a8.954 8.954 0 0 1 3.093 -1.356" />
       <path d="M9 12l2 2l4 -4" />
   </symbol>
+  <symbol id="tabler-radar-2" viewBox="0 0 24 24">
+    <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+      <path d="M15.51 15.56a5 5 0 1 0 -3.51 1.44" />
+      <path d="M18.832 17.86a9 9 0 1 0 -6.832 3.14" />
+      <path d="M12 12v9" />
+  </symbol>
   <symbol id="tabler-receipt-dollar" viewBox="0 0 24 24">
     <path d="M5 21v-16a2 2 0 0 1 2 -2h10a2 2 0 0 1 2 2v16l-3 -2l-2 2l-2 -2l-2 2l-2 -2l-3 2" />
       <path d="M14.8 8a2 2 0 0 0 -1.8 -1h-2a2 2 0 1 0 0 4h2a2 2 0 1 1 0 4h-2a2 2 0 0 1 -1.8 -1" />
@@ -1598,6 +1608,11 @@
     <path d="M3.06 13a9 9 0 1 0 .49 -4.087" />
       <path d="M3 4.001v5h5" />
       <path d="M11 12a1 1 0 1 0 2 0a1 1 0 1 0 -2 0" />
+  </symbol>
+  <symbol id="tabler-ripple" viewBox="0 0 24 24">
+    <path d="M3 7c3 -2 6 -2 9 0s6 2 9 0" />
+      <path d="M3 17c3 -2 6 -2 9 0s6 2 9 0" />
+      <path d="M3 12c3 -2 6 -2 9 0s6 2 9 0" />
   </symbol>
   <symbol id="tabler-road" viewBox="0 0 24 24">
     <path d="M4 19l4 -14" />
@@ -1974,6 +1989,12 @@
       <path d="M6 21v-2a4 4 0 0 1 4 -4h4c.412 0 .81 .062 1.183 .178m2.633 2.618c.12 .38 .184 .785 .184 1.204v2" />
       <path d="M3 3l18 18" />
   </symbol>
+  <symbol id="tabler-user-pause" viewBox="0 0 24 24">
+    <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
+      <path d="M6 21v-2a4 4 0 0 1 4 -4h3.5" />
+      <path d="M17 17v5" />
+      <path d="M21 17v5" />
+  </symbol>
   <symbol id="tabler-user-plus" viewBox="0 0 24 24">
     <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
       <path d="M16 19h6" />
@@ -1991,12 +2012,6 @@
       <path d="M6 21v-2a4 4 0 0 1 4 -4h1.5" />
       <path d="M15 18a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" />
       <path d="M20.2 20.2l1.8 1.8" />
-  </symbol>
-  <symbol id="tabler-user-share" viewBox="0 0 24 24">
-    <path d="M8 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
-      <path d="M6 21v-2a4 4 0 0 1 4 -4h3" />
-      <path d="M16 22l5 -5" />
-      <path d="M21 21.5v-4.5h-4.5" />
   </symbol>
   <symbol id="tabler-user-square" viewBox="0 0 24 24">
     <path d="M9 10a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
@@ -2021,12 +2036,6 @@
       <path d="M17 10h2a2 2 0 0 1 2 2v1" />
       <path d="M5 5a2 2 0 1 0 4 0a2 2 0 0 0 -4 0" />
       <path d="M3 13v-1a2 2 0 0 1 2 -2h2" />
-  </symbol>
-  <symbol id="tabler-users-minus" viewBox="0 0 24 24">
-    <path d="M5 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />
-      <path d="M3 21v-2a4 4 0 0 1 4 -4h4c.948 0 1.818 .33 2.504 .88" />
-      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-      <path d="M16 19h6" />
   </symbol>
   <symbol id="tabler-users-plus" viewBox="0 0 24 24">
     <path d="M5 7a4 4 0 1 0 8 0a4 4 0 0 0 -8 0" />

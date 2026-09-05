@@ -6069,7 +6069,7 @@ async function checkPeopleMemoryBrowserState(
         const statusMenu = page.getByRole("menu", { name: "Relationship status" });
         assert(
           await statusMenu.getByRole("menuitemradio").count() === 3 &&
-            await statusMenu.getByRole("menuitemradio", { name: "Loose tie" }).locator('svg[data-icon-role="loose-tie"][data-icon-candidate="users-minus"]').count() === 1 &&
+            await statusMenu.getByRole("menuitemradio", { name: "Loose tie" }).locator('svg[data-icon-role="loose-tie"][data-icon-candidate="social"]').count() === 1 &&
             await statusTrigger.locator('svg[data-icon-role="chevron-right"]').count() === 0,
           "People status menu did not expose Active, Loose tie, and Dormant without a trigger arrow"
         );
@@ -9727,7 +9727,7 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       assert(await page.locator('[data-icon-registry-count="108"]').count() === 1, `Style Guide did not expose all 108 canonical icon roles at ${viewport.label}`);
       assert(await page.locator('input[aria-label$=" usage"]').count() === 108, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
       assert(await page.locator('[class*="iconCandidate"]').count() >= 420, `Style Guide did not expose five curated recommendations for each unselected icon at ${viewport.label}`);
-      for (const candidate of ["users-minus", "user-question", "user-share", "circles-relation", "user-exclamation"]) {
+      for (const candidate of ["social", "radar-2", "ripple", "heart-minus", "user-pause"]) {
         assert(
           await page.locator(`svg[data-icon-role="loose-tie"][data-icon-candidate="${candidate}"]`).count() >= 1,
           `Style Guide omitted the curated Loose tie candidate ${candidate} at ${viewport.label}`
