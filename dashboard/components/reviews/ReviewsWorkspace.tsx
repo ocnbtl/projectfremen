@@ -1942,16 +1942,16 @@ export default function ReviewsWorkspace({
               {counts.blockers.length === 0 ? <SystemState variant="empty" title="No completion blockers" description="The server will verify this again when you confirm completion." compact /> : (
                 <ul className={styles.list}>{counts.blockers.map((blocker) => <li className={styles.blockerRow} key={blocker.id}><strong>{blocker.label}</strong><p>{displayLabel(blocker.type)} · blocking</p><button type="button" className={styles.button} onClick={() => updateUrl({ tab: blocker.routeTab, item: blocker.sourceItemId }, true)}>Open requirement</button></li>)}</ul>
               )}
-              <section className={styles.panel}><h3>Owner boundary</h3><p>Review state and carry-forward live here. Source facts, durable Decisions, actionable Follow-ups, and Finance close remain in their owner modules.</p></section>
+              <section className={styles.panel}><h3>After this review</h3><p>Carry unfinished work into the next review. Open Personal for decisions and follow-ups, or Finance to close the month.</p></section>
               <QuickActionBar actions={reviewActions(selectedRun, counts.blockers, setConfirmation)} ariaLabel="Review completion actions" />
             </div>
           </>
         );
-      })() : <div className={styles.emptyInspector}><h2>No ReviewRun loaded</h2><p>Return to Reviews and select an available run.</p></div>}
+      })() : <div className={styles.emptyInspector}><h2>Select a review</h2><p>See the requirements, missing evidence, and next steps for completion.</p></div>}
     </InspectorRail>
   );
 
-  const sidebar = <ModuleSidebar title="Reviews" description="Auditable review runs" sections={sidebarSections} footer={<p className={styles.sidebarFootnote}>ReviewRuns live here. Finance closes in Finance; durable Decisions and actionable Follow-ups live in Personal.</p>} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} className={styles.sidebar} />;
+  const sidebar = <ModuleSidebar title="Reviews" description="Make time to reflect and follow through." sections={sidebarSections} footer={<p className={styles.sidebarFootnote}>Review the evidence, resolve requirements, and carry unfinished work forward.</p>} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} className={styles.sidebar} />;
 
   const directory = (
     <DirectoryPane className={styles.directory} ariaLabel="Review directory" busy={busy}>
@@ -1961,14 +1961,13 @@ export default function ReviewsWorkspace({
           <div><h1>Reviews</h1><p>Review the source, resolve the work, then complete with evidence.</p></div>
           <div className={styles.headerActions}><button type="button" className={styles.button} onClick={() => openCreate("weekly")}>Start weekly</button><button type="button" className={styles.button} data-primary="true" onClick={() => openCreate("monthly")}>Start monthly</button></div>
         </header>
-        <p className={styles.ownershipBanner}>Reviews coordinates completion. It does not duplicate Project blockers, Personal Decisions or Follow-ups, or Finance close state.</p>
         {!selectedRun && renderSourceHandoff(null)}
         {initialLoadError && <SystemState variant="error" description={initialLoadError} action={{ label: "Retry", onSelect: () => void refreshState() }} />}
         <MetricStrip className={styles.metrics} items={[
-          { id: "open", label: "Open native runs", value: openNative.length },
+          { id: "open", label: "Open reviews", value: openNative.length },
           { id: "evidence", label: "Need evidence", value: needsEvidence.length, tone: needsEvidence.length ? "attention" : "default" },
           { id: "blocked", label: "Blocked", value: blocked.length, tone: blocked.length ? "danger" : "default" },
-          { id: "legacy", label: "Legacy read-only", value: legacyRuns.length }
+          { id: "legacy", label: "Earlier reviews · read-only", value: legacyRuns.length }
         ]} ariaLabel="Review directory facts" />
         <label className={styles.search}>
           <span aria-hidden="true">⌕</span>
@@ -1981,7 +1980,7 @@ export default function ReviewsWorkspace({
         </div>
         {error && <p className={styles.error} role="alert">{error}</p>}
         {notice && <p className={styles.notice} role="status">{notice}</p>}
-        {visibleItems.length === 0 ? <SystemState variant="empty" title="No reviews match this scope" description="Clear the filter or start a native Weekly or Monthly review." action={{ label: "Clear filters", onSelect: () => updateUrl({ query: "", filter: "all", view: "all", cadence: "all" }) }} /> : (
+        {visibleItems.length === 0 ? <SystemState variant="empty" title="No reviews match this scope" description="Clear the filter or start a weekly or monthly review." action={{ label: "Clear filters", onSelect: () => updateUrl({ query: "", filter: "all", view: "all", cadence: "all" }) }} /> : (
           <div className={styles.rows} role="list" aria-label="Reviews">
             {visibleItems.map((item) => {
               if (item.source === "legacy") {

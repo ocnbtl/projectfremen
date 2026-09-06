@@ -420,13 +420,13 @@ try {
   assert.match(peopleWorkspace, /people-location-suggestions/i);
   assert.match(
     peopleWorkspace,
-    /const GROUP_OPTIONS = \[\s*"Acquaintance",\s*"Advisor",\s*"Client",\s*"Collaborator",\s*"Colleague",\s*"Community",\s*"Family",\s*"Friend",\s*"Partner",\s*"University",\s*"Vendor",\s*"Other"\s*\]/i
+    /const GROUP_OPTIONS = \[\s*"Acquaintance",\s*"Advisor",\s*"Client",\s*"Collaborator",\s*"Colleague",\s*"Community",\s*"Family",\s*"Friend",\s*"Neighbor",\s*"Partner",\s*"University",\s*"Vendor",\s*"Other"\s*\]/i
   );
   assert.doesNotMatch(peopleWorkspace, /Colleague \/ Coworker/i);
   assert.match(peopleWorkspace, /No cadence/i);
   assert.match(peopleWorkspace, /<PeopleAddButton label="School"/i);
   assert.match(peopleWorkspace, /<PeopleAddButton label="Occupation"/i);
-  assert.match(peopleWorkspace, /<PeopleAddButton label="Location"/i);
+  assert.match(peopleWorkspace, /<PeopleAddButton label="Place"/i);
   assert.match(peopleWorkspace, /QuickObjectsEditor/i);
   assert.match(peopleWorkspace, /Linked during People creation/i);
   assert.match(peopleWorkspace, /Select university/i);
@@ -439,8 +439,10 @@ try {
   assert.match(styleGuideWorkspace, /COMPONENT_ICON_PREFIX/i);
   assert.match(styleGuideWorkspace, /PERSONAL_OPS_ICON_LIBRARY\.map/i);
   const styleGuideStore = await readFile("lib/modules/style-guide/store.ts", "utf8");
-  assert.match(styleGuideStore, /module: "Resources"/i);
-  assert.match(styleGuideStore, /module: "Media"/i);
+  assert.match(styleGuideStore, /MODULE_COLOR_SYSTEM\[moduleId\]/i);
+  const moduleColors = await readFile("lib/design-system/color-system.ts", "utf8");
+  assert.match(moduleColors, /id: "resources", label: "Resources"/i);
+  assert.match(moduleColors, /id: "media", label: "Media"/i);
   assert.match(styleGuideStore, /backfillDefaults/i);
   const resourcesWorkspace = await readFile("components/ResourcesWorkspace.tsx", "utf8");
   assert.match(resourcesWorkspace, /ResourceCollection/i);

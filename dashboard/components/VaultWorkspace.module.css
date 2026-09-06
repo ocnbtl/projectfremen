@@ -16,6 +16,8 @@
   -webkit-font-smoothing: antialiased;
 }
 
+.page button { width: auto; }
+
 .header {
   display: flex;
   align-items: center;
@@ -40,6 +42,32 @@
   font-size: clamp(28px, 4vw, 48px);
   letter-spacing: -.04em;
 }
+
+.workspaceNav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 1180px;
+  margin: 0 auto 16px;
+}
+
+.workspaceNav a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--vault-border);
+  border-radius: 8px;
+  background: var(--vault-surface);
+  color: var(--vault-ink);
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.workspaceNav a:hover { background: var(--vault-mint); }
+.workspaceNav a:focus-visible { outline: 2px solid var(--navy-600); outline-offset: 3px; }
+.page section[id^="vault-"] { scroll-margin-top: calc(var(--app-content-offset) + 16px); }
 
 .brand {
   display: flex;
@@ -609,6 +637,7 @@
 .lock { display: block; margin: 24px auto 0; background: #4a5d56; }
 .workspaceHeader { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
 .workspaceHeader > div { max-width: 760px; }
+.workspaceHeader > button { flex: none; }
 .workspaceHeader p { margin-bottom: 0; }
 .workspaceSync {
   display: flex;
@@ -622,13 +651,13 @@
   background: #eef5f2;
 }
 .workspaceSync[data-attention="true"] { border-left-color: #ad721c; background: #fff5df; }
-.workspaceSync > div { display: grid; gap: 3px; }
+.workspaceSync > div { display: grid; flex: 1; min-width: 0; gap: 3px; }
 .workspaceSync strong { color: var(--vault-ink); font-size: 13px; }
 .workspaceSync span { color: var(--vault-muted); font-size: 11px; line-height: 1.45; }
 .workspaceSync button { flex: none; min-height: 34px; padding: 6px 10px; font-size: 11px; }
 .searchRow { display: grid; grid-template-columns: minmax(0, 520px) auto; align-items: end; gap: 8px; margin-top: 16px; }
 .recordSearch { max-width: 520px; margin: 0; }
-.searchRow > button { min-height: 44px; }
+.searchRow > button { min-height: 44px; justify-self: start; }
 .savedSearches { display: flex; align-items: center; flex-wrap: wrap; gap: 7px; margin-top: 10px; }
 .savedSearches > span:first-child { margin-right: 2px; color: var(--vault-muted); font-size: 10px; font-weight: 850; letter-spacing: .07em; text-transform: uppercase; }
 .savedSearch { display: inline-flex; overflow: hidden; border: 1px solid var(--vault-border); border-radius: 999px; background: #fff; }

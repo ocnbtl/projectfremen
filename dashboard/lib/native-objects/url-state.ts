@@ -577,7 +577,7 @@ const RESOURCE_VIEWS = [
   "duplicate-urls"
 ] as const;
 const RESOURCE_SORTS = ["updated-desc", "updated-asc", "title", "review"] as const;
-const RESOURCE_TABS = ["overview", "timeline", "links", "properties", "source", "notes", "review"] as const;
+const RESOURCE_TABS = ["overview", "timeline", "links", "properties"] as const;
 
 export type ResourcesUrlState = {
   view: (typeof RESOURCE_VIEWS)[number];

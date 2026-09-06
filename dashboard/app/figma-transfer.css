@@ -7349,13 +7349,24 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
 }
 
 .quick-action-bar__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   min-height: 34px;
   padding: 0 11px;
   border: 1px solid var(--border-strong);
   border-radius: 7px;
   background: var(--panel-bg);
   color: var(--text-strong);
-  font-weight: 850;
+  font: 850 12px/1.35 var(--font-heading);
+  text-align: center;
+  text-decoration: none;
+}
+
+.quick-action-bar__action:focus-visible {
+  outline: 2px solid var(--action-primary);
+  outline-offset: 3px;
 }
 
 .quick-action-bar__action.is-primary {

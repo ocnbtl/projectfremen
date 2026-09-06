@@ -217,7 +217,7 @@ function displayLabel(value: string) {
 }
 
 function summarizeBody(body: string) {
-  return body.trim().replace(/\s+/g, " ") || "No legacy description is stored.";
+  return body.trim().replace(/\s+/g, " ") || "Add a description in Properties.";
 }
 
 function matchesQuery(asset: MediaAsset, query: string) {
@@ -1032,30 +1032,6 @@ export default function MediaWorkspace({
       )
     },
     {
-      id: "types",
-      label: "Types",
-      items: ["Images", "Video", "Audio", "Screenshots", "Design Files", "Documents / PDFs", "Source Files"].map(
-        (label) => ({
-          id: `type-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-          label,
-          disabled: true,
-          disabledReason: "Verified Media type is not stored by the legacy file adapter."
-        })
-      )
-    },
-    {
-      id: "context",
-      label: "Context",
-      items: ["Linked to Projects", "Linked to People", "Linked to Notes", "Linked to Resources", "Linked to Reviews"].map(
-        (label) => ({
-          id: `context-${label.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`,
-          label,
-          disabled: true,
-          disabledReason: "Native AssetLink records are not connected; legacy relation IDs are retained in Properties."
-        })
-      )
-    },
-    {
       id: "data",
       label: "Data",
       items: [
@@ -1082,12 +1058,6 @@ export default function MediaWorkspace({
           count: assets.filter((asset) => !hasConfirmedRights(asset)).length,
           active: view === "rights-usage",
           onSelect: () => selectView("rights-usage")
-        },
-        {
-          id: "data-settings",
-          label: "Settings",
-          disabled: true,
-          disabledReason: "Native Media settings are an open product decision."
         }
       ]
     }
@@ -1354,18 +1324,15 @@ export default function MediaWorkspace({
               />
             </section>
             <section className={styles.panel} data-wide="true">
-              <h2>Completion boundary</h2>
+              <h2>Edit metadata</h2>
               <div className={styles.sourceBoundary}>
-                <strong>Retained context is editable; native completion remains unavailable.</strong>
-                <span>Title and description save through the audited legacy adapter. Required-field rules, suggestions, extraction, native validation, and dependent-queue updates still need Media persistence.</span>
+                <strong>Titles and descriptions are editable.</strong>
+                <span>Automatic extraction and metadata completion are not available yet. Saved edits keep the existing file identity and references.</span>
               </div>
               <QuickActionBar
                 ariaLabel="Media metadata actions"
                 actions={[
                   { id: "edit-retained-metadata", label: "Edit title & description", intent: "primary", onSelect: () => openMetadataEditor(asset) },
-                  { id: "auto-fill", label: "Auto-fill suggestions", disabled: true, disabledReason: "No extraction or suggestion service is connected; suggested values never become confirmed silently." },
-                  { id: "confirm-source", label: "Confirm source", disabled: true, disabledReason: "Media source and ResourceLink persistence are not connected." },
-                  { id: "send-review", label: "Send to review", disabled: true, disabledReason: "AssetReview persistence and metadata completion gates are not connected." }
                 ]}
               />
             </section>
@@ -1424,16 +1391,7 @@ export default function MediaWorkspace({
             </section>
             <section className={styles.panel} data-wide="true">
               <h2>Rights actions unavailable</h2>
-              <QuickActionBar
-                ariaLabel="Unavailable Media rights actions"
-                actions={[
-                  { id: "confirm-rights", label: "Confirm rights", intent: "primary", disabled: true, disabledReason: "Native rights evidence, actor identity, confirmation audit, and save validation are not connected." },
-                  { id: "set-scope", label: "Set allowed use", disabled: true, disabledReason: "Allowed-use persistence and policy validation are not connected." },
-                  { id: "link-license", label: "Link license source", disabled: true, disabledReason: "External license sources remain Resource-owned and Media source-link persistence is not connected." },
-                  { id: "public-safe", label: "Mark public-safe", disabled: true, disabledReason: "Public-safe requires explicit verified rights evidence and cannot be inferred from provisional scope." },
-                  { id: "send-review", label: "Send to review", disabled: true, disabledReason: "AssetReview persistence and rights completion gates are not connected." }
-                ]}
-              />
+              <p>Rights confirmation, allowed-use changes, and license linking are not available yet. Provisional scope does not establish permission for public use.</p>
             </section>
             {activeTab === "rights" &&
               renderFollowUpsPanel(asset, "Rights evidence follow-through")}
@@ -1819,15 +1777,12 @@ export default function MediaWorkspace({
             </section>
 
             <section className={styles.panel} data-wide="true">
-              <h2>Available and unavailable actions</h2>
+              <h2>Next steps</h2>
               <QuickActionBar
                 ariaLabel="Media readiness actions"
                 actions={[
                   { id: "edit-retained-metadata", label: "Edit title & description", intent: "primary", onSelect: () => openMetadataEditor(asset) },
                   { id: "review-run", label: "Link in Reviews", href: buildReviewSourceHandoffRoute(asset.nativeRef) },
-                  { id: "confirm-rights", label: "Confirm rights", disabled: true, disabledReason: "Rights evidence and confirmation audit are not connected." },
-                  { id: "link-source", label: "Link source", disabled: true, disabledReason: "Media source and ResourceLink persistence are not connected." },
-                  { id: "mark-reviewed", label: "Mark reviewed", disabled: true, disabledReason: "This queue is legacy readiness triage, not a native AssetReview workflow." }
                 ]}
               />
             </section>
@@ -1942,16 +1897,14 @@ export default function MediaWorkspace({
     <ModuleSidebar
       id="media-module-sidebar"
       title="Media"
-      description="Binary assets, provenance, rights, versions, and usage."
+      description="Organize media records, source references, and review dates."
       sections={sidebarSections}
       mobileOpen={mobileSidebarOpen}
       onClose={() => setMobileSidebarOpen(false)}
       className={styles.sidebar}
       footer={
         <p className={styles.sidebarFootnote}>
-          Legacy adapter · title, description, and review timing writes use the protected record
-          route. Binary, source, rights, review completion, lifecycle, and versions remain
-          read-only.
+          Edit titles, descriptions, and review dates. Inspect source references and usage before sharing.
         </p>
       }
     />
@@ -1978,7 +1931,7 @@ export default function MediaWorkspace({
       ) : (
         <div className={styles.emptyInspector}>
           <h2>No asset selected</h2>
-          <p>Select a row body to inspect its retained legacy record.</p>
+          <p>Select a media record to inspect its details and source references.</p>
         </div>
       )}
     </InspectorRail>
@@ -2235,12 +2188,12 @@ export default function MediaWorkspace({
               <h1>{VIEW_LABELS[view]}</h1>
               <p>
                 {isLegacyReadinessQueue
-                  ? `${visibleAssets.length} shown · ${readinessScope.length} matching query · legacy readiness triage`
+                  ? `${visibleAssets.length} shown · review readiness and evidence gaps`
                   : isLegacyMetadataQueue
-                    ? `${visibleAssets.length} shown · ${readinessScope.length} matching query · legacy metadata evidence`
+                    ? `${visibleAssets.length} shown · inspect available metadata`
                     : isLegacyRightsQueue
                       ? `${visibleAssets.length} shown · confirm source, scope, and rights evidence before broader use`
-                  : `${assets.length} retained legacy file record${assets.length === 1 ? "" : "s"}`}
+                  : `${assets.length} media record${assets.length === 1 ? "" : "s"}`}
               </p>
             </div>
             {isLegacyEvidenceQueue ? (
@@ -2252,22 +2205,13 @@ export default function MediaWorkspace({
                     : "Media readiness queue actions"}
                 actions={isLegacyMetadataQueue
                   ? [
-                      { id: "metadata-filter", label: "Filter", disabled: true, disabledReason: "The implemented issue segments below are the available filters; an advanced filter drawer is not connected." },
-                      { id: "metadata-batch", label: "Batch complete", disabled: true, disabledReason: "Required-field validation and native metadata persistence are not connected." },
-                      { id: "metadata-autofill", label: "Auto-fill suggestions", disabled: true, disabledReason: "No extraction or suggestion service is connected; AI never confirms fields silently." },
                       { id: "metadata-upload", label: "Choose files", href: getModuleViewRoute("media", "upload-queue"), intent: "primary" }
                     ]
                   : isLegacyRightsQueue
                     ? [
-                        { id: "rights-resources", label: "Open Resources", href: getModuleRoute("resources"), intent: "primary" },
-                        { id: "rights-confirm", label: "Confirm rights", disabled: true, disabledReason: "Native rights evidence, actor identity, validation, and audit persistence are not connected." },
-                        { id: "rights-batch", label: "Batch update", disabled: true, disabledReason: "Rights are evidence-sensitive and no audited bulk mutation path is connected." },
-                        { id: "rights-export", label: "Export", disabled: true, disabledReason: "A rights export contract and stable native fields are not connected." }
+                        { id: "rights-resources", label: "Open Resources", href: getModuleRoute("resources"), intent: "primary" }
                       ]
                   : [
-                      { id: "readiness-filter", label: "Filter", disabled: true, disabledReason: "The implemented issue segments below are the available filters; an advanced filter drawer is not connected." },
-                      { id: "readiness-batch", label: "Batch review", disabled: true, disabledReason: "Native AssetReview persistence is not connected." },
-                      { id: "readiness-assign", label: "Assign", disabled: true, disabledReason: "Native Media owner assignment is not connected." },
                       { id: "readiness-upload", label: "Choose files", href: getModuleViewRoute("media", "upload-queue"), intent: "primary" }
                     ]}
               />
@@ -2276,16 +2220,6 @@ export default function MediaWorkspace({
                 <Link className={styles.button} data-primary="true" href={getModuleViewRoute("media", "upload-queue")}>
                   Choose files
                 </Link>
-                <button
-                  className={styles.button}
-                  type="button"
-                  aria-disabled="true"
-                  aria-describedby="media-more-actions-reason"
-                  title="No additional connected Media actions."
-                >
-                  …
-                  <span id="media-more-actions-reason" className="sr-only">No additional connected Media actions.</span>
-                </button>
               </div>
             )}
           </header>
@@ -2337,11 +2271,11 @@ export default function MediaWorkspace({
                 updateUrl(partial);
               }}
               placeholder={isLegacyReadinessQueue
-                ? "Search readiness queue, titles, legacy IDs, or source candidates"
+                ? "Search review queue, titles, or source references"
                 : isLegacyMetadataQueue
-                  ? "Search titles, source candidates, projects, issues, or legacy IDs"
+                  ? "Search titles, sources, projects, or issues"
                   : isLegacyRightsQueue
-                    ? "Search assets, legacy IDs, source candidates, projects, or context"
+                    ? "Search assets, sources, projects, or context"
                   : "Search titles, descriptions, projects, or source candidates"}
               aria-label="Search Media"
             />
@@ -2384,43 +2318,28 @@ export default function MediaWorkspace({
                 );
               })}
             </div>
-          ) : (
-            <div className={styles.chipRow} aria-label="Media views">
-              {(["all", "recent", "pinned", "needs-review", "in-use", "archived"] as const).map((itemView) => (
-                <button
-                  className={styles.chip}
-                  data-active={view === itemView || undefined}
-                  data-tone={itemView === "needs-review" ? "amber" : itemView === "in-use" ? "green" : "blue"}
-                  type="button"
-                  onClick={() => selectView(itemView)}
-                  key={itemView}
-                >
-                  {VIEW_LABELS[itemView]}
-                </button>
-              ))}
-            </div>
-          )}
+          ) : null}
 
-          <div className={styles.readOnlyNotice}>
-            <strong>
+          <details className={styles.readOnlyNotice}>
+            <summary>
               {isLegacyReadinessQueue
-                ? "Legacy readiness triage · Read-only"
+                ? "About review readiness"
                 : isLegacyMetadataQueue
-                  ? "Legacy metadata evidence · Read-only"
+                  ? "About metadata availability"
                   : isLegacyRightsQueue
-                    ? "Rights / Usage evidence · Read-only"
-                  : "Migration-safe read path"}
-            </strong>
+                    ? "About rights and usage"
+                  : "What you can do in Media"}
+            </summary>
             <span>
               {isLegacyReadinessQueue
-                ? "This queue organizes only evidence gaps exposed by the legacy adapter. It does not create AssetReview records, infer binaries, or claim duplicate, usage, or AI state."
+                ? "Inspect evidence gaps and edit review dates. Completing a review, assigning reviewers, and batch review are not available yet. An unknown value does not mean the original file lacks it."
                 : isLegacyMetadataQueue
-                  ? "This queue distinguishes available, candidate, and unavailable adapter evidence. A field unavailable in the legacy adapter is an evidence gap; this does not claim the original asset objectively lacks a field, compute a completion score, or simulate a save."
+                  ? "Inspect known values and source candidates. Unavailable metadata is unknown; the original file may contain it. Edit titles and descriptions in Properties. Automatic extraction and batch updates are not available yet."
                   : isLegacyRightsQueue
-                    ? "Canonical rights remain separate from provisional operating scope. Resource-owned URL candidates can be inspected, while native usage, version inheritance, audit, expiry, license, public-safe, and restriction decisions remain explicitly unavailable."
-                  : <>Only legacy records with class <span className={styles.mono}>file</span> appear here. Technical metadata and native workflow state remain explicitly unknown.</>}
+                    ? "Inspect source references and provisional sharing scope. A source link does not establish a license or permission to share. Rights confirmation, usage tracking, and rights exports are not available yet."
+                  : "Edit titles, descriptions, and review dates; connect Projects and inspect related Notes and Resources. File content, technical metadata, versions, rights confirmation, and completed reviews are not available here yet. Choosing files only stages a temporary list on this device."}
             </span>
-          </div>
+          </details>
 
           <div className={styles.sortRow}>
             <label className={styles.field}>
@@ -2704,11 +2623,11 @@ export default function MediaWorkspace({
           ) : visibleAssets.length === 0 ? (
             <SystemState
               variant="empty"
-              title={query ? "No media matches this search" : "No legacy Media records"}
+              title={query ? "No media matches this search" : "No media records yet"}
               description={
                 query
                   ? "Try a different title, description, project, or URL fragment."
-                  : "No Personal Records items with class file are available."
+                  : "Media records will appear here with their descriptions, source references, and review dates. Choose files to prepare a temporary intake list."
               }
             />
           ) : (

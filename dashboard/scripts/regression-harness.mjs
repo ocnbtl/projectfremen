@@ -9889,7 +9889,7 @@ async function checkProjectCreationWorkflow(
     assert(await page.locator('article[role="listitem"]').count() === 0, "Comfortable Projects view retained the Grid cards");
     assert(await page.locator(".dense-object-row__checkbox").count() === 0, "Projects directory retained DenseObjectRow batch checkboxes");
     await page.getByRole("button", { name: "New project" }).click();
-    const createForm = page.locator("form").filter({ hasText: "Create native project" });
+    const createForm = page.locator("form").filter({ hasText: "New project" });
     await createForm.waitFor();
     const editorGeometry = await createForm.evaluate((form) => {
       const rect = form.getBoundingClientRect();
@@ -9925,11 +9925,10 @@ async function checkProjectCreationWorkflow(
     await createForm.getByLabel("Review cadence").selectOption("P1M");
     await createForm.getByLabel("Completion target").fill("Website is approved and live.");
 
-    const createResponsePromise = page.waitForResponse(
-      (response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "POST"
-    );
-    await createForm.getByRole("button", { name: "Create project" }).click();
-    const createResponse = await createResponsePromise;
+    const [createResponse] = await Promise.all([
+      page.waitForResponse((response) => new URL(response.url()).pathname === "/api/projects" && response.request().method() === "POST"),
+      createForm.getByRole("button", { name: "Create project" }).click()
+    ]);
     assert(createResponse.ok(), `Project creation failed with ${createResponse.status()}: ${await createResponse.text()}`);
     const createdPayload = await createResponse.json();
     const projectId = createdPayload.item?.id;
@@ -10286,7 +10285,7 @@ async function checkPeopleProjectConnections(
 
     const projectPeoplePanel = projectPage.locator(`[data-project-people="${projectId}"]`);
     await projectPeoplePanel.getByRole("button", { name: "Link person" }).click();
-    const linkDialog = projectPage.locator("form").filter({ hasText: "Link native object" });
+    const linkDialog = projectPage.locator("form").filter({ hasText: "Link object" });
     await linkDialog.getByLabel("People identity").selectOption(person.id);
     await linkDialog.getByLabel("Role", { exact: true }).fill(projectRole);
     await linkDialog.getByLabel("Description", { exact: true }).fill(relationshipNote);
@@ -12984,7 +12983,7 @@ async function main() {
     for (const expected of [
       "Personal",
       "Personal Command",
-      "Current Goals bridge",
+      "Current Goals",
       "Routines",
       "Capture Inbox",
       "Templates"
@@ -13009,8 +13008,8 @@ async function main() {
         label: "Goals",
         expected: [
           "Current Goals",
-          "Outcomes and measurable key results",
-          "Current Goals bridge",
+          "Track outcomes and key results",
+          "Current Goals",
           "Goal"
         ]
       },
@@ -13036,7 +13035,7 @@ async function main() {
         label: "Follow-ups",
         expected: [
           "Follow-ups",
-          "Actionable next contact and carry-forward work, linked back to its native source.",
+          "Keep the next contact or action connected to the work that prompted it.",
           "Follow-up"
         ]
       },
@@ -13413,7 +13412,7 @@ async function main() {
     const notesPage = await requestText(server.baseUrl, cookieJar, "/admin/notes");
     assert(notesPage.response.ok, `Notes page failed: ${describeStatus(notesPage.response)}`);
     assert(notesPage.body.includes("All Notes"), "Notes page missing the native directory heading");
-    assert(notesPage.body.includes("Quick capture"), "Notes page missing persisted quick capture");
+    assert(notesPage.body.includes("New Note") && !notesPage.body.includes('id="notes-quick-capture"'), "Notes should prioritize the directory with capture available on demand");
     pass("Notes directory loads through the authored-knowledge adapter");
 
     const peoplePage = await requestText(server.baseUrl, cookieJar, "/admin/people");
@@ -13427,7 +13426,7 @@ async function main() {
     const mediaPage = await requestText(server.baseUrl, cookieJar, "/admin/media");
     assert(mediaPage.response.ok, `Media page failed: ${describeStatus(mediaPage.response)}`);
     assert(mediaPage.body.includes("All Media"), "Media page missing its native directory heading");
-    assert(mediaPage.body.includes("Migration-safe read path"), "Media page missing its read-path disclosure");
+    assert(mediaPage.body.includes("What you can do in Media"), "Media page missing its read-path disclosure");
     pass("Media directory loads with an explicit read-only boundary");
 
     const mediaNeedsReviewPage = await requestText(server.baseUrl, cookieJar, "/admin/media/needs-review");
@@ -13435,15 +13434,15 @@ async function main() {
       mediaNeedsReviewPage.response.ok,
       `Media Needs Review page failed: ${describeStatus(mediaNeedsReviewPage.response)}`
     );
-    for (const expected of ["Needs Review", "Legacy readiness triage", "Read-only"]) {
+    for (const expected of ["Needs Review", "About review readiness", "Completing a review, assigning reviewers, and batch review are not available yet"]) {
       assert(
         mediaNeedsReviewPage.body.includes(expected),
         `Media Needs Review page missing explicit legacy boundary text: ${expected}`
       );
     }
     assert(
-      mediaNeedsReviewPage.body.includes("AssetReview") &&
-        mediaNeedsReviewPage.body.includes("not connected"),
+      mediaNeedsReviewPage.body.includes("Completing a review, assigning reviewers, and batch review are not available yet") &&
+        mediaNeedsReviewPage.body.includes("An unknown value does not mean the original file lacks it"),
       "Media Needs Review page did not disclose that native AssetReview persistence is unavailable"
     );
     for (const mockupConstant of [
@@ -13470,9 +13469,9 @@ async function main() {
     );
     for (const expected of [
       "Missing Metadata",
-      "Legacy metadata evidence",
-      "unavailable in the legacy adapter",
-      "does not claim the original asset objectively lacks a field"
+      "About metadata availability",
+      "Unavailable metadata is unknown",
+      "the original file may contain it"
     ]) {
       assert(
         mediaMissingMetadataPage.body.toLowerCase().includes(expected.toLowerCase()),
@@ -13498,11 +13497,11 @@ async function main() {
     );
     for (const expected of [
       "Rights / Usage",
-      "Rights / Usage evidence",
+      "About rights and usage",
       "Needs confirmation",
       "Native usage registry",
       "not connected",
-      "Resource-owned URL candidates"
+      "A source link does not establish a license"
     ]) {
       assert(
         mediaRightsUsagePage.body.toLowerCase().includes(expected.toLowerCase()),
@@ -16914,7 +16913,7 @@ async function main() {
     const noteDetail = await requestText(server.baseUrl, cookieJar, `/admin/notes/${createdNote.id}`);
     assert(noteDetail.response.ok, `Note editor route failed: ${describeStatus(noteDetail.response)}`);
     assert(noteDetail.body.includes(noteTitle), "Note editor route missing the persisted Note");
-    assert(noteDetail.body.includes("Persistence boundary"), "Note editor did not disclose its persistence boundary");
+    assert(noteDetail.body.includes("Saving and history"), "Note editor did not disclose its persistence boundary");
 
     const noteHistory = await requestText(server.baseUrl, cookieJar, `/admin/notes/${createdNote.id}?tab=history`);
     assert(noteHistory.response.ok, `Note History route failed: ${describeStatus(noteHistory.response)}`);
@@ -16974,7 +16973,7 @@ async function main() {
     for (const expected of [
       "Recent operating window",
       "30 days",
-      "INFERRED · 30-day rolling view · no writes",
+      "Last 30 days",
       updatedNoteTitle,
       'data-note-operating-view="recent"'
     ]) {
@@ -17827,6 +17826,24 @@ async function main() {
         `Resource detail retained the removed ${removedTab} tab`
       );
 
+      const retiredTabRoute = await requestText(
+        server.baseUrl,
+        cookieJar,
+        `/admin/resources/${createdResource.id}?tab=${removedTab}`
+      );
+      assert(
+        retiredTabRoute.response.ok,
+        `Retired Resource ${removedTab} tab route failed: ${describeStatus(retiredTabRoute.response)}`
+      );
+      assertSelectedTab(
+        retiredTabRoute.body,
+        `resource-${createdResource.id}-tab-overview`,
+        `Retired Resource ${removedTab} tab compatibility state`
+      );
+      assert(
+        !retiredTabRoute.body.includes(`resource-${createdResource.id}-tab-${removedTab}`),
+        `Retired Resource ${removedTab} tab route revived removed UI`
+      );
     }
 
     const resourceTimeline = await requestText(server.baseUrl, cookieJar, `/admin/resources/${createdResource.id}?tab=timeline`);
@@ -18282,15 +18299,15 @@ async function main() {
       mediaNeedsReviewAfterCreate.response.ok,
       `Media Needs Review reload failed: ${describeStatus(mediaNeedsReviewAfterCreate.response)}`
     );
-    for (const expected of [mediaTitle, "Needs Review", "Legacy readiness triage", "Read-only"]) {
+    for (const expected of [mediaTitle, "Needs Review", "About review readiness", "Completing a review, assigning reviewers, and batch review are not available yet"]) {
       assert(
         mediaNeedsReviewAfterCreate.body.includes(expected),
         `Media Needs Review reload missing dynamic legacy-readiness evidence: ${expected}`
       );
     }
     assert(
-      mediaNeedsReviewAfterCreate.body.includes("AssetReview") &&
-        mediaNeedsReviewAfterCreate.body.includes("not connected"),
+      mediaNeedsReviewAfterCreate.body.includes("Completing a review, assigning reviewers, and batch review are not available yet") &&
+        mediaNeedsReviewAfterCreate.body.includes("An unknown value does not mean the original file lacks it"),
       "Media Needs Review reload falsely implied that a native AssetReview exists"
     );
     for (const mockupConstant of [
@@ -18321,7 +18338,7 @@ async function main() {
     );
     for (const expected of [
       mediaTitle,
-      "Legacy metadata evidence",
+      "About metadata availability",
       "Asset type",
       "Filename",
       "MIME type",

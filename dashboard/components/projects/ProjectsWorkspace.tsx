@@ -745,6 +745,7 @@ function timelineChangeLog(event: ProjectTimelineEvent, auditEvents: readonly Au
 function EditorSurface({
   open,
   title,
+  submitLabel,
   description,
   busy,
   error,
@@ -754,6 +755,7 @@ function EditorSurface({
 }: {
   open: boolean;
   title: string;
+  submitLabel: string;
   description: string;
   busy: boolean;
   error: string;
@@ -811,7 +813,7 @@ function EditorSurface({
         <footer className={styles.formFooter}>
           <button type="button" className={styles.button} onClick={onRequestClose} disabled={busy}>Cancel</button>
           <button type="submit" className={styles.button} data-primary="true" disabled={busy}>
-            {busy ? "Saving…" : title.startsWith("Create") ? "Create project" : "Save changes"}
+            {busy ? "Saving…" : submitLabel}
           </button>
         </footer>
     </form>
@@ -2060,12 +2062,6 @@ export default function ProjectsWorkspace({
       label: "Data",
       items: [
         {
-          id: "templates",
-          label: "Templates",
-          disabled: true,
-          disabledReason: "Native Project template persistence is an open product decision."
-        },
-        {
           id: "archive",
           label: "Archive",
           count: countForView("archived"),
@@ -2082,12 +2078,6 @@ export default function ProjectsWorkspace({
             setFilter("missing-owner");
             updateUrl({ view: "all", filter: "missing-owner" });
           }
-        },
-        {
-          id: "settings",
-          label: "Project Settings",
-          disabled: true,
-          disabledReason: "Module settings are intentionally deferred until permissions and native defaults are resolved."
         }
       ]
     }
@@ -2848,11 +2838,11 @@ export default function ProjectsWorkspace({
   }
 
   const editorTitle = editor?.kind === "project-create"
-    ? "Create native project"
+    ? "New project"
     : editor?.kind === "project-edit"
       ? "Edit project"
       : editor?.kind === "legacy-promote"
-        ? "Start native project tracking"
+        ? "Start project tracking"
         : editor?.kind === "milestone-create"
           ? "Add milestone"
           : editor?.kind === "blocker-create"
@@ -2869,7 +2859,7 @@ export default function ProjectsWorkspace({
                 ? "Report association issue"
                 : editor?.kind === "link-repair"
                   ? "Repair source association"
-                  : "Link native object";
+                  : "Link object";
   const editorDescription = editor?.kind === "legacy-promote"
     ? "Start tracking this project in the current workspace."
     : editor?.kind === "link-create"
@@ -2884,7 +2874,7 @@ export default function ProjectsWorkspace({
           ? "Add a dated progress note, problem, or blocker update to the project timeline."
         : editor?.kind === "interaction-edit"
           ? "Update the title, details, or occurrence time for this project update."
-      : "Changes are saved explicitly to the native Projects repository and recorded in audit history.";
+      : "Choose Save to keep your changes. The project history records each update.";
 
   function renderEditorFields() {
     if (!editor) return null;
@@ -3128,7 +3118,7 @@ export default function ProjectsWorkspace({
         <div className={styles.directoryHeader}>
           <div>
             <h1>Projects</h1>
-            <p>{visibleProjects.length} shown · {snapshot.projects.length} total identities</p>
+            <p>{visibleProjects.length} shown · {snapshot.projects.length} projects</p>
           </div>
           <div className={styles.headerActions}>
             <div className={styles.viewSwitch} role="group" aria-label="Project layout">
@@ -3148,7 +3138,7 @@ export default function ProjectsWorkspace({
         </div>
 
         {initialLoadError && <SystemState variant="error" compact title="Some project sources did not load" description={initialLoadError} />}
-        {sourceErrors.length > 0 && <p className={styles.notice} role="status">Some linked context could not be loaded. Native project data remains usable.</p>}
+        {sourceErrors.length > 0 && <p className={styles.notice} role="status">Some linked context could not be loaded. Your project is still available.</p>}
         {mutationError && <p className={styles.errorBanner} role="alert">{mutationError}</p>}
         {notice && <p className={styles.successBanner} role="status">{notice}</p>}
 
@@ -3264,7 +3254,7 @@ export default function ProjectsWorkspace({
       onRequestClose={() => setInspectorOpen(false)}
       ariaLabel={selectedItem ? `${selectedItem.project.name} inspector` : "Project inspector"}
     >
-      {selectedItem ? renderProjectBody(selectedItem) : <div className={styles.emptyInspector}><h2>Select a project</h2><p>The inspector keeps native state, linked context, and safe actions together.</p></div>}
+      {selectedItem ? renderProjectBody(selectedItem) : <div className={styles.emptyInspector}><h2>Select a project</h2><p>See its objectives, recent work, people, and next steps.</p></div>}
     </InspectorRail>
   );
 
@@ -3292,6 +3282,7 @@ export default function ProjectsWorkspace({
       <EditorSurface
         open
         title={editorTitle}
+        submitLabel={editor.kind === "project-create" ? "Create project" : "Save changes"}
         description={editorDescription}
         busy={mutationBusy}
         error={editorError}
@@ -3312,12 +3303,12 @@ export default function ProjectsWorkspace({
         ariaLabel={initialDetail && selectedItem ? `${selectedItem.project.name} project workspace` : "Projects workspace"}
         sidebar={<ModuleSidebar
           title="Projects"
-          description="Native project operations and explicit legacy projections."
+          description="Plan work, track milestones, and keep related context together."
           sections={sidebarSections}
           className={styles.sidebar}
           mobileOpen={mobileSidebarOpen}
           onClose={() => setMobileSidebarOpen(false)}
-          footer={<p className={styles.sidebarFootnote}>Projects never imports legacy task counts as milestones or duplicates source objects from owner modules.</p>}
+          footer={<p className={styles.sidebarFootnote}>Project history keeps your updates. Linked notes, people, and files stay connected to their original records.</p>}
         />}
         inspector={editorInspector || (initialDetail ? completionRail : projectInspector)}
         aiDock={<SharedAIDock

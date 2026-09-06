@@ -422,6 +422,15 @@ try {
   await page.getByLabel("How are they connected?").selectOption("source");
   await page.getByRole("button", { name: "Connect records" }).click();
   await page.getByText("Connected to Continuity guide.").waitFor();
+  const recordLayout = await page.locator("#vault-records").evaluate((section) => {
+    const syncButton = [...section.querySelectorAll("button")].find((button) => button.textContent === "Sync now");
+    const sync = syncButton.parentElement;
+    const text = sync.firstElementChild.getBoundingClientRect();
+    const button = syncButton.getBoundingClientRect();
+    return { recordTop: section.offsetTop, devicesTop: document.getElementById("vault-devices").offsetTop, textWidth: text.width, separated: text.right <= button.left };
+  });
+  assert.ok(recordLayout.recordTop < recordLayout.devicesTop, "Records must precede device administration");
+  assert.ok(recordLayout.textWidth > 200 && recordLayout.separated, "Sync status and action must have separate readable space");
   await page.screenshot({ path: path.join(artifactRoot, "vault-record-workbench-desktop.png"), fullPage: true });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
 

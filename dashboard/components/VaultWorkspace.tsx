@@ -1184,177 +1184,9 @@ export default function VaultWorkspace({
             <button disabled={busy || !online} onClick={repairSyncIssues}>Try safe repair</button>
           </section>}
 
-          {!onlineAuthorizationRequired && <section className={`${styles.panel} ${styles.devicesPanel}`} aria-labelledby="devices-sync-title">
-            <div className={styles.devicesHeader}>
-              <div>
-                <p className={styles.eyebrow}>Your devices</p>
-                <h2 id="devices-sync-title">{allDevicesCurrent ? "Everything is up to date" : deviceSnapshot ? `${currentDevices} of ${activeDevices.length} devices are up to date` : "Checking your devices…"}</h2>
-                <p>Keep the Vault open and unlocked on any device that needs to catch up.</p>
-              </div>
-              <button disabled={busy || !online} onClick={refreshDevices}>Check now</button>
-            </div>
-            {status.devices.lastError && <p className={styles.deviceError} role="status">We could not check your devices. Your saved work is safe. Try again.</p>}
-            {deviceSnapshot && activeDevices.length > 0 ? (
-              <div className={styles.deviceList} role="list" aria-label="Connected vault devices">
-                {activeDevices.map((device) => {
-                  const deviceState = deviceSyncState(device, deviceSnapshot.relayHeadSequence);
-                  const isThisDevice = device.deviceId === status.metadata?.deviceId;
-                  const deviceToneClass = {
-                    current: styles.deviceBadgeCurrent,
-                    pending: styles.deviceBadgePending,
-                    attention: styles.deviceBadgeAttention,
-                    inactive: styles.deviceBadgeInactive
-                  }[deviceState.tone];
-                  return (
-                    <article className={styles.deviceCard} role="listitem" key={device.deviceId}>
-                      <div className={styles.deviceCardTop}>
-                        <div>
-                          <strong>{device.descriptor.deviceName}</strong>
-                          <span>{deviceKindLabel(device)}{isThisDevice ? " · This device" : ""}</span>
-                        </div>
-                        <span className={`${styles.deviceBadge} ${deviceToneClass}`}>{deviceState.label}</span>
-                      </div>
-                      <p>{deviceState.detail}</p>
-                      <dl>
-                        <div><dt>Last connected</dt><dd>{relativeTime(device.lastSeenAt)}</dd></div>
-                        <div><dt>Last up to date</dt><dd>{relativeTime(device.lastSyncedAt)}</dd></div>
-                        <div><dt>Changes received</dt><dd>{device.acknowledgedSequence.toLocaleString()} of {deviceSnapshot.relayHeadSequence.toLocaleString()}</dd></div>
-                      </dl>
-                      {!isThisDevice && <div className={styles.deviceActions}>
-                        {retireArmedDeviceId === device.deviceId ? <>
-                          <span>Remove it from sync? Its saved local copy stays on that device.</span>
-                          <button disabled={busy || !online} onClick={() => void retireDevice(device.deviceId)}>Yes, remove it</button>
-                          <button className={styles.quietButton} onClick={() => setRetireArmedDeviceId(null)}>Cancel</button>
-                        </> : <button className={styles.quietButton} onClick={() => void retireDevice(device.deviceId)}>Remove old device</button>}
-                      </div>}
-                    </article>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className={styles.deviceEmpty}>
-                <strong>{online ? "Waiting for your devices" : "Go online to check your devices"}</strong>
-                <span>Open the Vault once on each device. It will appear here when it syncs.</span>
-              </div>
-            )}
-            <small>Each browser or Home Screen app counts as its own device. Sync runs while that Vault is open and unlocked.{relayHealth?.retiredDevices ? ` ${relayHealth.retiredDevices} old device${relayHealth.retiredDevices === 1 ? " has" : "s have"} been removed from sync.` : ""}</small>
-          </section>}
+          <nav className={styles.workspaceNav} aria-label="Vault sections"><a href="#vault-records">Records</a>{!onlineAuthorizationRequired && <a href="#vault-devices">Devices</a>}<a href="#vault-recovery">Storage &amp; recovery</a></nav>
 
-          <section className={`${styles.panel} ${styles.healthPanel}`} aria-labelledby="vault-health-title">
-            <div className={styles.healthHeader}>
-              <div><p className={styles.eyebrow}>Vault health</p><h2 id="vault-health-title">Storage and recovery</h2><p>Simple checks that keep the Vault reliable as it grows.</p></div>
-              <span className={styles.healthOverall}>{storageHealth?.persisted && (!backupHealth || backupHealth.lastVerifiedAt) ? "Looking good" : "A few setup items remain"}</span>
-            </div>
-            <div className={styles.healthGrid}>
-              <article className={styles.healthCard}>
-                <div><span className={styles.healthIcon} aria-hidden="true">1</span><strong>Offline on this device</strong></div>
-                <p>{storageHealth?.persisted
-                  ? "Protected. This browser should keep the Vault available when you are offline."
-                  : storageHealth?.persistenceSupported
-                    ? "Ask this browser to protect your offline Vault data from automatic cleanup."
-                    : "This browser manages offline storage itself. Keep free space on the device."}</p>
-                {storageHealth?.usageBytes !== null && storageHealth?.usageBytes !== undefined && <small>{formatBytes(storageHealth.usageBytes)} used{storageHealth.quotaBytes ? ` of ${formatBytes(storageHealth.quotaBytes)} available` : " on this device"}</small>}
-                {storageHealth?.persistenceSupported && !storageHealth.persisted && <button disabled={busy} onClick={protectStorage}>Protect offline data</button>}
-              </article>
-              <article className={styles.healthCard}>
-                <div><span className={styles.healthIcon} aria-hidden="true">2</span><strong>Encrypted sync storage</strong></div>
-                <p>{relayHealth
-                  ? `${relayHealth.relayRows.toLocaleString()} encrypted update${relayHealth.relayRows === 1 ? "" : "s"}. Cleanup waits until every active device is caught up.`
-                  : "Unlock and sync to check the encrypted relay."}</p>
-                {relayHealth && <small>{formatBytes(relayHealth.relayBytes)} used{relayHealth.lastCompactedAt ? ` · last cleaned ${relativeTime(relayHealth.lastCompactedAt)}` : " · no cleanup needed yet"}</small>}
-                {status.localCompanion.unlocked && relayHealth && <button disabled={busy || !online} onClick={cleanupRelay}>Clean up now</button>}
-              </article>
-              <article className={styles.healthCard}>
-                <div><span className={styles.healthIcon} aria-hidden="true">3</span><strong>Downloaded media</strong></div>
-                <p>{mediaCache
-                  ? mediaCache.capacityState === "critical" ? "This device is nearly full. Clean up downloaded copies now."
-                    : mediaCache.capacityState === "warning" ? "Storage is getting tight. Older downloaded copies are ready to clean up."
-                      : "Downloaded copies are healthy. Originals stay encrypted on Windows."
-                  : "Unlock the Vault to check downloaded files on this device."}</p>
-                {mediaCache && <small>{formatBytes(mediaCache.cachedBytes)} downloaded{mediaCache.reclaimableBytes ? " · " + formatBytes(mediaCache.reclaimableBytes) + " ready to clean" : " · nothing ready to clean"}</small>}
-                {mediaCache && <div className={styles.retentionControls}>
-                  <label>Keep unused downloads<select value={mediaCache.retentionDays === null ? "keep" : String(mediaCache.retentionDays)} onChange={(event) => void setMediaRetention(event.target.value === "keep" ? null : Number(event.target.value) as VaultMediaCacheRetentionDays)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="keep">Until I clean up</option></select></label>
-                  <button disabled={busy || mediaCache.reclaimableChunks === 0} onClick={cleanupMedia}>Clean up downloads</button>
-                </div>}
-              </article>
-              <article className={styles.healthCard}>
-                <div><span className={styles.healthIcon} aria-hidden="true">4</span><strong>Windows backup</strong></div>
-                <p>{backupHealth
-                  ? `${backupDestinationLabel}. A checked encrypted backup is scheduled every ${backupHealth.automaticEveryDays} day${backupHealth.automaticEveryDays === 1 ? "" : "s"} while Windows is unlocked.`
-                  : "Open and unlock the Windows Vault to check backups."}</p>
-                {backupHealth && <small>{backupHealth.lastVerifiedAt ? `Last checked ${relativeTime(backupHealth.lastVerifiedAt)}` : "No checked PC backup yet"} · {backupHealth.count} of {backupHealth.limit} slots used</small>}
-                {backupHealth?.lastAutomaticError && <span className={styles.healthWarning}>{backupHealth.lastAutomaticError}</span>}
-                {backupHealth && backupHealth.destination !== "separate-drive" && <span className={styles.healthHint}>Using this PC for now. You can add another drive later without changing how backups work.</span>}
-              </article>
-            </div>
-          </section>
-
-          <section className={styles.grid}>
-            <article className={styles.panel}>
-              <p className={styles.eyebrow}>Bring in your current data</p>
-              <h2>Add your Unigentamos workspace</h2>
-              <p>Copy your existing notes, people, resources, projects, and other records into the Vault. Nothing in your current workspace is changed or deleted.</p>
-              <button disabled={busy || !online} onClick={() => void importWorkspace()}>Refresh workspace</button>
-              <small>Finance CSV previews are skipped. Raw CSV files are never saved.</small>
-            </article>
-            <article className={styles.panel}>
-              <p className={styles.eyebrow}>Backup</p>
-              <h2>Keep a checked recovery copy</h2>
-              <div className={styles.buttonRow}>
-                <button disabled={busy} onClick={exportRecovery}>Download recovery file</button>
-                <button disabled={busy || !status.localCompanion.available} onClick={createBackup}>Back up this PC</button>
-              </div>
-              <small>The recovery file connects a device. A PC backup contains your encrypted history and media. Keep both somewhere separate from your password.</small>
-              {backups.length > 0 && <div className={styles.backupList}>
-                {backups.map((backup) => <div key={backup.backupId}>
-                  <span><strong>{new Date(backup.createdAt).toLocaleString()}</strong><small>{backup.verified ? "Checked" : "Needs checking"} · {backup.mediaFiles} file{backup.mediaFiles === 1 ? "" : "s"} · {formatBytes(backup.databaseBytes + backup.mediaBytes)}</small></span>
-                  <span className={styles.inlineActions}>
-                    <button disabled={busy} onClick={() => void verifyBackup(backup.backupId)}>Check</button>
-                    <button disabled={busy} onClick={() => void previewBackup(backup.backupId)}>Restore</button>
-                  </span>
-                </div>)}
-              </div>}
-            </article>
-            <article className={styles.panel}>
-              <p className={styles.eyebrow}>Encrypted media</p>
-              <h2>Add a file</h2>
-              <p>Photos, videos, audio, and documents are encrypted here first. Windows keeps the main copy. Other devices download an encrypted copy only when you open it.</p>
-              <label className={styles.filePicker}>
-                <input className={styles.fileInput} type="file" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void addMedia(file); }} />
-                <span aria-hidden="true">+</span>
-                <strong>Choose a file</strong>
-                <small>Up to 256 MB per file</small>
-              </label>
-            </article>
-          </section>
-
-          <section className={styles.panel}>
-            <p className={styles.eyebrow}>Version history</p>
-            <h2>Try a note</h2>
-            <p>History adds a version only when the content changes. Edits to different fields merge automatically. If the same field changes on two devices, the newest value stays on top and the other copy stays available.</p>
-            <textarea value={journal} onChange={(event) => setJournal(event.target.value)} rows={8} placeholder="Write here, save, then keep editing to create history…" />
-            <div className={styles.buttonRow}><button disabled={busy} onClick={saveJournal}>Save version</button><span>{historyCount ? `${historyCount} saved version${historyCount === 1 ? "" : "s"}` : "No versions saved yet"}</span></div>
-          </section>
-
-          {restorePreview && <section className={`${styles.panel} ${styles.restorePanel}`} aria-labelledby="restore-preview-title">
-            <div>
-              <p className={styles.eyebrow}>Restore preview</p>
-              <h2 id="restore-preview-title">Add missing data from this backup</h2>
-              <p>This adds back missing encrypted versions and files. It does not replace newer work.</p>
-            </div>
-            <dl>
-              <div><dt>Versions to add back</dt><dd>{restorePreview.restorableVersions.toLocaleString()}</dd></div>
-              <div><dt>Files to add back</dt><dd>{restorePreview.restorableMediaFiles.toLocaleString()}</dd></div>
-              <div><dt>Backup size</dt><dd>{formatBytes(restorePreview.databaseBytes + restorePreview.mediaBytes)}</dd></div>
-            </dl>
-            <label>Type <strong>{`RESTORE ${restorePreview.backupId.slice(-8).toUpperCase()}`}</strong> to continue<input value={restoreConfirmation} onChange={(event) => setRestoreConfirmation(event.target.value)} autoComplete="off" /></label>
-            <div className={styles.buttonRow}>
-              <button disabled={busy || restoreConfirmation !== `RESTORE ${restorePreview.backupId.slice(-8).toUpperCase()}`} onClick={restoreBackup}>Restore missing data</button>
-              <button className={styles.quietButton} onClick={() => { setRestorePreview(null); setRestoreConfirmation(""); }}>Cancel</button>
-            </div>
-          </section>}
-
-          <section className={`${styles.panel} ${styles.objectWorkspace}`}>
+          <section id="vault-records" tabIndex={-1} className={`${styles.panel} ${styles.objectWorkspace}`}>
             <div className={styles.workspaceHeader}>
               <div><p className={styles.eyebrow}>Offline command center</p><h2>Your records, in one place</h2><p>These are the same records used by Notes, People, Resources, Projects, Reviews, Personal, and Finance. Safe fields can be changed here offline; specialized actions stay in their full module.</p></div>
               {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={() => { void newObject(); }}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
@@ -1592,6 +1424,176 @@ export default function VaultWorkspace({
               </aside>
             </div>
           </section>
+
+          {!onlineAuthorizationRequired && <section id="vault-devices" tabIndex={-1} className={`${styles.panel} ${styles.devicesPanel}`} aria-labelledby="devices-sync-title">
+            <div className={styles.devicesHeader}>
+              <div>
+                <p className={styles.eyebrow}>Your devices</p>
+                <h2 id="devices-sync-title">{allDevicesCurrent ? "Everything is up to date" : deviceSnapshot ? `${currentDevices} of ${activeDevices.length} devices are up to date` : "Checking your devices…"}</h2>
+                <p>Keep the Vault open and unlocked on any device that needs to catch up.</p>
+              </div>
+              <button disabled={busy || !online} onClick={refreshDevices}>Check now</button>
+            </div>
+            {status.devices.lastError && <p className={styles.deviceError} role="status">We could not check your devices. Your saved work is safe. Try again.</p>}
+            {deviceSnapshot && activeDevices.length > 0 ? (
+              <div className={styles.deviceList} role="list" aria-label="Connected vault devices">
+                {activeDevices.map((device) => {
+                  const deviceState = deviceSyncState(device, deviceSnapshot.relayHeadSequence);
+                  const isThisDevice = device.deviceId === status.metadata?.deviceId;
+                  const deviceToneClass = {
+                    current: styles.deviceBadgeCurrent,
+                    pending: styles.deviceBadgePending,
+                    attention: styles.deviceBadgeAttention,
+                    inactive: styles.deviceBadgeInactive
+                  }[deviceState.tone];
+                  return (
+                    <article className={styles.deviceCard} role="listitem" key={device.deviceId}>
+                      <div className={styles.deviceCardTop}>
+                        <div>
+                          <strong>{device.descriptor.deviceName}</strong>
+                          <span>{deviceKindLabel(device)}{isThisDevice ? " · This device" : ""}</span>
+                        </div>
+                        <span className={`${styles.deviceBadge} ${deviceToneClass}`}>{deviceState.label}</span>
+                      </div>
+                      <p>{deviceState.detail}</p>
+                      <dl>
+                        <div><dt>Last connected</dt><dd>{relativeTime(device.lastSeenAt)}</dd></div>
+                        <div><dt>Last up to date</dt><dd>{relativeTime(device.lastSyncedAt)}</dd></div>
+                        <div><dt>Changes received</dt><dd>{device.acknowledgedSequence.toLocaleString()} of {deviceSnapshot.relayHeadSequence.toLocaleString()}</dd></div>
+                      </dl>
+                      {!isThisDevice && <div className={styles.deviceActions}>
+                        {retireArmedDeviceId === device.deviceId ? <>
+                          <span>Remove it from sync? Its saved local copy stays on that device.</span>
+                          <button disabled={busy || !online} onClick={() => void retireDevice(device.deviceId)}>Yes, remove it</button>
+                          <button className={styles.quietButton} onClick={() => setRetireArmedDeviceId(null)}>Cancel</button>
+                        </> : <button className={styles.quietButton} onClick={() => void retireDevice(device.deviceId)}>Remove old device</button>}
+                      </div>}
+                    </article>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className={styles.deviceEmpty}>
+                <strong>{online ? "Waiting for your devices" : "Go online to check your devices"}</strong>
+                <span>Open the Vault once on each device. It will appear here when it syncs.</span>
+              </div>
+            )}
+            <small>Each browser or Home Screen app counts as its own device. Sync runs while that Vault is open and unlocked.{relayHealth?.retiredDevices ? ` ${relayHealth.retiredDevices} old device${relayHealth.retiredDevices === 1 ? " has" : "s have"} been removed from sync.` : ""}</small>
+          </section>}
+
+          <section id="vault-recovery" tabIndex={-1} className={`${styles.panel} ${styles.healthPanel}`} aria-labelledby="vault-health-title">
+            <div className={styles.healthHeader}>
+              <div><p className={styles.eyebrow}>Vault health</p><h2 id="vault-health-title">Storage and recovery</h2><p>Simple checks that keep the Vault reliable as it grows.</p></div>
+              <span className={styles.healthOverall}>{storageHealth?.persisted && (!backupHealth || backupHealth.lastVerifiedAt) ? "Looking good" : "A few setup items remain"}</span>
+            </div>
+            <div className={styles.healthGrid}>
+              <article className={styles.healthCard}>
+                <div><span className={styles.healthIcon} aria-hidden="true">1</span><strong>Offline on this device</strong></div>
+                <p>{storageHealth?.persisted
+                  ? "Protected. This browser should keep the Vault available when you are offline."
+                  : storageHealth?.persistenceSupported
+                    ? "Ask this browser to protect your offline Vault data from automatic cleanup."
+                    : "This browser manages offline storage itself. Keep free space on the device."}</p>
+                {storageHealth?.usageBytes !== null && storageHealth?.usageBytes !== undefined && <small>{formatBytes(storageHealth.usageBytes)} used{storageHealth.quotaBytes ? ` of ${formatBytes(storageHealth.quotaBytes)} available` : " on this device"}</small>}
+                {storageHealth?.persistenceSupported && !storageHealth.persisted && <button disabled={busy} onClick={protectStorage}>Protect offline data</button>}
+              </article>
+              <article className={styles.healthCard}>
+                <div><span className={styles.healthIcon} aria-hidden="true">2</span><strong>Encrypted sync storage</strong></div>
+                <p>{relayHealth
+                  ? `${relayHealth.relayRows.toLocaleString()} encrypted update${relayHealth.relayRows === 1 ? "" : "s"}. Cleanup waits until every active device is caught up.`
+                  : "Unlock and sync to check the encrypted relay."}</p>
+                {relayHealth && <small>{formatBytes(relayHealth.relayBytes)} used{relayHealth.lastCompactedAt ? ` · last cleaned ${relativeTime(relayHealth.lastCompactedAt)}` : " · no cleanup needed yet"}</small>}
+                {status.localCompanion.unlocked && relayHealth && <button disabled={busy || !online} onClick={cleanupRelay}>Clean up now</button>}
+              </article>
+              <article className={styles.healthCard}>
+                <div><span className={styles.healthIcon} aria-hidden="true">3</span><strong>Downloaded media</strong></div>
+                <p>{mediaCache
+                  ? mediaCache.capacityState === "critical" ? "This device is nearly full. Clean up downloaded copies now."
+                    : mediaCache.capacityState === "warning" ? "Storage is getting tight. Older downloaded copies are ready to clean up."
+                      : "Downloaded copies are healthy. Originals stay encrypted on Windows."
+                  : "Unlock the Vault to check downloaded files on this device."}</p>
+                {mediaCache && <small>{formatBytes(mediaCache.cachedBytes)} downloaded{mediaCache.reclaimableBytes ? " · " + formatBytes(mediaCache.reclaimableBytes) + " ready to clean" : " · nothing ready to clean"}</small>}
+                {mediaCache && <div className={styles.retentionControls}>
+                  <label>Keep unused downloads<select value={mediaCache.retentionDays === null ? "keep" : String(mediaCache.retentionDays)} onChange={(event) => void setMediaRetention(event.target.value === "keep" ? null : Number(event.target.value) as VaultMediaCacheRetentionDays)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="keep">Until I clean up</option></select></label>
+                  <button disabled={busy || mediaCache.reclaimableChunks === 0} onClick={cleanupMedia}>Clean up downloads</button>
+                </div>}
+              </article>
+              <article className={styles.healthCard}>
+                <div><span className={styles.healthIcon} aria-hidden="true">4</span><strong>Windows backup</strong></div>
+                <p>{backupHealth
+                  ? `${backupDestinationLabel}. A checked encrypted backup is scheduled every ${backupHealth.automaticEveryDays} day${backupHealth.automaticEveryDays === 1 ? "" : "s"} while Windows is unlocked.`
+                  : "Open and unlock the Windows Vault to check backups."}</p>
+                {backupHealth && <small>{backupHealth.lastVerifiedAt ? `Last checked ${relativeTime(backupHealth.lastVerifiedAt)}` : "No checked PC backup yet"} · {backupHealth.count} of {backupHealth.limit} slots used</small>}
+                {backupHealth?.lastAutomaticError && <span className={styles.healthWarning}>{backupHealth.lastAutomaticError}</span>}
+                {backupHealth && backupHealth.destination !== "separate-drive" && <span className={styles.healthHint}>Using this PC for now. You can add another drive later without changing how backups work.</span>}
+              </article>
+            </div>
+          </section>
+
+          <section className={styles.grid}>
+            <article className={styles.panel}>
+              <p className={styles.eyebrow}>Bring in your current data</p>
+              <h2>Add your Unigentamos workspace</h2>
+              <p>Copy your existing notes, people, resources, projects, and other records into the Vault. Nothing in your current workspace is changed or deleted.</p>
+              <button disabled={busy || !online} onClick={() => void importWorkspace()}>Refresh workspace</button>
+              <small>Finance CSV previews are skipped. Raw CSV files are never saved.</small>
+            </article>
+            <article className={styles.panel}>
+              <p className={styles.eyebrow}>Backup</p>
+              <h2>Keep a checked recovery copy</h2>
+              <div className={styles.buttonRow}>
+                <button disabled={busy} onClick={exportRecovery}>Download recovery file</button>
+                <button disabled={busy || !status.localCompanion.available} onClick={createBackup}>Back up this PC</button>
+              </div>
+              <small>The recovery file connects a device. A PC backup contains your encrypted history and media. Keep both somewhere separate from your password.</small>
+              {backups.length > 0 && <div className={styles.backupList}>
+                {backups.map((backup) => <div key={backup.backupId}>
+                  <span><strong>{new Date(backup.createdAt).toLocaleString()}</strong><small>{backup.verified ? "Checked" : "Needs checking"} · {backup.mediaFiles} file{backup.mediaFiles === 1 ? "" : "s"} · {formatBytes(backup.databaseBytes + backup.mediaBytes)}</small></span>
+                  <span className={styles.inlineActions}>
+                    <button disabled={busy} onClick={() => void verifyBackup(backup.backupId)}>Check</button>
+                    <button disabled={busy} onClick={() => void previewBackup(backup.backupId)}>Restore</button>
+                  </span>
+                </div>)}
+              </div>}
+            </article>
+            <article className={styles.panel}>
+              <p className={styles.eyebrow}>Encrypted media</p>
+              <h2>Add a file</h2>
+              <p>Photos, videos, audio, and documents are encrypted here first. Windows keeps the main copy. Other devices download an encrypted copy only when you open it.</p>
+              <label className={styles.filePicker}>
+                <input className={styles.fileInput} type="file" onChange={(event) => { const file = event.currentTarget.files?.[0]; event.currentTarget.value = ""; void addMedia(file); }} />
+                <span aria-hidden="true">+</span>
+                <strong>Choose a file</strong>
+                <small>Up to 256 MB per file</small>
+              </label>
+            </article>
+          </section>
+
+          <section className={styles.panel}>
+            <p className={styles.eyebrow}>Version history</p>
+            <h2>Try a note</h2>
+            <p>History adds a version only when the content changes. Edits to different fields merge automatically. If the same field changes on two devices, the newest value stays on top and the other copy stays available.</p>
+            <textarea value={journal} onChange={(event) => setJournal(event.target.value)} rows={8} placeholder="Write here, save, then keep editing to create history…" />
+            <div className={styles.buttonRow}><button disabled={busy} onClick={saveJournal}>Save version</button><span>{historyCount ? `${historyCount} saved version${historyCount === 1 ? "" : "s"}` : "No versions saved yet"}</span></div>
+          </section>
+
+          {restorePreview && <section className={`${styles.panel} ${styles.restorePanel}`} aria-labelledby="restore-preview-title">
+            <div>
+              <p className={styles.eyebrow}>Restore preview</p>
+              <h2 id="restore-preview-title">Add missing data from this backup</h2>
+              <p>This adds back missing encrypted versions and files. It does not replace newer work.</p>
+            </div>
+            <dl>
+              <div><dt>Versions to add back</dt><dd>{restorePreview.restorableVersions.toLocaleString()}</dd></div>
+              <div><dt>Files to add back</dt><dd>{restorePreview.restorableMediaFiles.toLocaleString()}</dd></div>
+              <div><dt>Backup size</dt><dd>{formatBytes(restorePreview.databaseBytes + restorePreview.mediaBytes)}</dd></div>
+            </dl>
+            <label>Type <strong>{`RESTORE ${restorePreview.backupId.slice(-8).toUpperCase()}`}</strong> to continue<input value={restoreConfirmation} onChange={(event) => setRestoreConfirmation(event.target.value)} autoComplete="off" /></label>
+            <div className={styles.buttonRow}>
+              <button disabled={busy || restoreConfirmation !== `RESTORE ${restorePreview.backupId.slice(-8).toUpperCase()}`} onClick={restoreBackup}>Restore missing data</button>
+              <button className={styles.quietButton} onClick={() => { setRestorePreview(null); setRestoreConfirmation(""); }}>Cancel</button>
+            </div>
+          </section>}
 
           <section className={styles.metrics}>
             <div><strong>{status.diagnostics.objects}</strong><span>items on this device</span></div>

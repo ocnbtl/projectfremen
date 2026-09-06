@@ -521,6 +521,7 @@ export default function NotesWorkspace({
   const [projectLinkError, setProjectLinkError] = useState("");
   const [projectLinkNotice, setProjectLinkNotice] = useState("");
   const [captureFocusRequested, setCaptureFocusRequested] = useState(false);
+  const [captureOpen, setCaptureOpen] = useState(false);
   const captureTitleRef = useRef<HTMLInputElement>(null);
   const projectLinkFormRef = useRef<HTMLFormElement>(null);
   const dirtyHistoryGuardRef = useRef<string | null>(null);
@@ -662,10 +663,10 @@ export default function NotesWorkspace({
   }, [selectedNote?.id]);
 
   useEffect(() => {
-    if (!captureFocusRequested || view !== "all") return;
+    if (!captureFocusRequested || !captureOpen || view !== "all") return;
     captureTitleRef.current?.focus();
     setCaptureFocusRequested(false);
-  }, [captureFocusRequested, view]);
+  }, [captureFocusRequested, captureOpen, view]);
 
   useEffect(() => {
     if (initialMode !== "index" || unavailableViewReason || !visibleNotes.length) return;
@@ -732,12 +733,9 @@ export default function NotesWorkspace({
   }
 
   function openQuickCapture() {
-    if (view === "all") {
-      captureTitleRef.current?.focus();
-      return;
-    }
+    setCaptureOpen(true);
     setCaptureFocusRequested(true);
-    selectDirectoryView("all");
+    if (view !== "all") selectDirectoryView("all");
   }
 
   function setBatch(id: string, checked: boolean) {
@@ -761,7 +759,7 @@ export default function NotesWorkspace({
       current.map((note) => note.id === savedNote.id ? savedNote : note)
     );
     setPropertyEditorNoteId(null);
-    setNotice("Note routing properties saved through the audited Personal Records adapter.");
+    setNotice("Note properties saved.");
   }
 
   function openReviewScheduleEditor(note: NoteRecord | null) {
@@ -811,7 +809,8 @@ export default function NotesWorkspace({
     setBody("");
     setNoteType("idea");
     setLifecycle("draft");
-    setNotice("Note saved through the existing Personal Records adapter.");
+    setCaptureOpen(false);
+    setNotice("Note saved.");
     updateUrl({ note: result.data.id, view: "all", filter: "all", tab: "overview" }, { history: "push" });
   }
 
@@ -1049,7 +1048,7 @@ export default function NotesWorkspace({
       id: "notes",
       label: "Notes",
       items: [
-        ["all", "All Notes"], ["recent", "Recent"], ["pinned", "Pinned"], ["active", "Active"],
+        ["all", "All Notes"], ["recent", "Recent"], ["active", "Active"],
         ["needs-review", "Needs Review"], ["drafts", "Drafts"]
       ].map(([id, label]) => {
         const reason = viewUnavailable(id as NotesView, referenceEvidence);
@@ -1069,7 +1068,7 @@ export default function NotesWorkspace({
       label: "Smart Views",
       items: [
         ["linked-people", "Linked to People"], ["linked-projects", "Linked to Projects"],
-        ["linked-finance", "Linked to Finance"], ["linked-resources", "Linked to Resources"],
+        ["linked-resources", "Linked to Resources"],
         ["linked-reviews", "Linked to Reviews"], ["no-links", "No Links"]
       ].map(([id, label]) => {
         const reason = viewUnavailable(id as NotesView, referenceEvidence);
@@ -1104,8 +1103,6 @@ export default function NotesWorkspace({
       id: "data",
       label: "Data",
       items: [
-        { id: "import", label: "Import / Export", disabled: true, disabledReason: "Import and export are not connected yet." },
-        { id: "duplicates", label: "Duplicate Notes", disabled: true, disabledReason: "Duplicate detection is not connected and Notes are never auto-merged." },
         {
           id: "missing-properties",
           label: "Missing Properties",
@@ -1113,8 +1110,7 @@ export default function NotesWorkspace({
           active: view === "missing-properties",
           onSelect: () => selectDirectoryView("missing-properties")
         },
-        { id: "archived", label: "Archived", count: counts.archived, active: view === "archived", onSelect: () => selectDirectoryView("archived") },
-        { id: "settings", label: "Notes Settings", disabled: true, disabledReason: "Notes settings are not implemented." }
+        { id: "archived", label: "Archived", count: counts.archived, active: view === "archived", onSelect: () => selectDirectoryView("archived") }
       ]
     }
   ];
@@ -1122,12 +1118,12 @@ export default function NotesWorkspace({
   const sidebar = (
     <ModuleSidebar
       title="Notes"
-      description="Authored internal knowledge, explicit links, and note-local review state."
+      description="Write ideas, meeting notes, and decisions. Keep their context close."
       sections={sidebarSections}
       mobileOpen={mobileSidebarOpen}
       onClose={() => setMobileSidebarOpen(false)}
       className={styles.sidebar}
-      footer={<p className={styles.sidebarFootnote}>Legacy Note bodies - native Resource/Media NoteLinks - owner references indexed - versions and inferred backlinks pending</p>}
+      footer={<p className={styles.sidebarFootnote}>Link related work, set a review date, and save when ready. Saved versions are available in History.</p>}
     />
   );
 
@@ -1901,9 +1897,7 @@ export default function NotesWorkspace({
       actions={
         <>
           {isInspectorOverlay && <button type="button" className={`${styles.button} ${styles.closeButton}`} onClick={() => setInspectorOpen(false)}>Close</button>}
-          <button type="button" className={styles.button} aria-disabled="true" aria-describedby="notes-pin-unavailable" onClick={() => setNotice("Pinned state is not stored by the legacy Notes adapter.")}>Pin<span id="notes-pin-unavailable" className="sr-only">Pinned state is not stored by the legacy Notes adapter.</span></button>
           <Link className={styles.linkButton} href={getNativeObjectRoute({ module: "notes", objectType: "note", objectId: selectedNote.id })}>Edit</Link>
-          <button type="button" className={styles.button} aria-disabled="true" aria-describedby="notes-more-unavailable" onClick={() => setNotice("Additional Note actions are not connected yet.")}>More<span id="notes-more-unavailable" className="sr-only">Additional Note actions are not connected yet.</span></button>
         </>
       }
     />
@@ -2170,7 +2164,7 @@ export default function NotesWorkspace({
               <div className={styles.fact}><span>Next review</span><strong>{formatDate(selectedNote.nextReviewAt)}</strong></div>
               <div className={styles.fact}><span>Updated</span><strong>{formatDate(selectedNote.updatedAt)}</strong></div>
               <div className={styles.fact}><span>Review state</span><strong>{displayLabel(selectedNote.reviewState)}</strong></div>
-              <div className={styles.fact}><span>Mapping notes</span><strong>{selectedNote.mappingNotes.length}</strong></div>
+              <div className={styles.fact}><span>Cadence</span><strong>{selectedNote.nextReviewAt ? formatNoteReviewCadence(selectedNote.reviewCadence) : "Not scheduled"}</strong></div>
             </div>
           </section>
           <section className={styles.panel}>
@@ -2181,28 +2175,26 @@ export default function NotesWorkspace({
                  { id: "link", label: "Manage links", href: `${selectedNote.nativeRef.route}?tab=links` },
                 { id: "decision", label: "Review decision output", href: noteDecisionsRoute(selectedNote) },
                 { id: "schedule", label: selectedNote.nextReviewAt ? "Edit review schedule" : "Schedule review", onSelect: () => openReviewScheduleEditor(selectedNote) },
-                { id: "review", label: "Mark reviewed", disabled: true, disabledReason: "The legacy review action cannot enforce native review blockers." },
-                { id: "archive", label: "Archive", disabled: true, disabledReason: "Native archive metadata and retention are unresolved.", intent: "destructive" }
               ]}
             />
           </section>
-          <section className={styles.panel} data-wide="true">
-            <h2>Legacy relationship context</h2>
+          {relationValues.length > 0 && <section className={styles.panel} data-wide="true">
+            <h2>Related references</h2>
             {relationValues.length ? (
               <ul className={styles.objectList}>
                 {relationValues.slice(0, 8).map((relation) => <li key={`${relation.direction}-${relation.value}`}><span>{relation.value}</span><strong>{displayLabel(relation.direction)}</strong></li>)}
               </ul>
             ) : <p>No legacy relation IDs are attached. Native NoteLinks are not inferred.</p>}
-          </section>
-          <section className={styles.panel} data-wide="true">
+          </section>}
+          {sourceValues.length > 0 && <section className={styles.panel} data-wide="true">
             <h2>Resource candidates</h2>
-            <div className={styles.sourceBoundary}>URLs remain legacy source candidates until Resources creates canonical external-source objects. They are not duplicated as Notes-owned source records.</div>
+            <p>Saved source references. A matching URL alone does not create a Resource link.</p>
             {sourceValues.length ? (
               <ul className={styles.sourceList}>
                 {sourceValues.map((source) => <li key={source}><span className={styles.mono}>{source}</span>{/^https?:\/\//i.test(source) ? <a href={source} target="_blank" rel="noreferrer">Open ↗</a> : <strong>Unresolved</strong>}</li>)}
               </ul>
             ) : <p>No legacy source candidates.</p>}
-          </section>
+          </section>}
           <section className={styles.panel} data-wide="true">
             <h2>Metadata</h2>
             <div className={styles.factGrid}>
@@ -2321,8 +2313,7 @@ export default function NotesWorkspace({
                   </div>
                   <div className={styles.headerActions}>
                     <button type="button" className={styles.button} data-primary="true" onClick={() => void saveNote()} disabled={!editorDirty || saveState === "saving"}>{saveState === "saving" ? "Saving…" : "Save"}</button>
-                    <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Pinned state is not stored by the legacy Notes adapter.")}>Pin</button>
-                    <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Native NoteLink persistence is unresolved.")}>Link object</button>
+                    <button type="button" className={styles.button} onClick={() => { setActiveTab("links"); updateUrl({ tab: "links" }); }}>Links</button>
                     <button type="button" className={styles.button} onClick={() => openReviewScheduleEditor(currentNote)}>{currentNote.nextReviewAt ? "Edit review schedule" : "Schedule review"}</button>
                     <button
                       type="button"
@@ -2335,7 +2326,6 @@ export default function NotesWorkspace({
                     >
                       Decisions
                     </button>
-                    <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Review blockers are not available in the legacy adapter.")}>Mark reviewed</button>
                   </div>
                 </div>
                 <div className={styles.editorMeta}>
@@ -2350,15 +2340,8 @@ export default function NotesWorkspace({
               {activeTab === "body" || activeTab === "overview" ? (
                 <DetailTabPanel tabsId={detailTabsId} tabId="body" active>
                   <div className={styles.editorToolbar} role="toolbar" aria-label="Note formatting and object actions">
-                    <span className={styles.eyebrow}>Format</span>
-                    {[
-                      ["B", "Rich-text bold is unavailable in the legacy plain-text adapter"],
-                      ["I", "Rich-text italic is unavailable in the legacy plain-text adapter"],
-                      ["H", "Structured headings are unavailable in the legacy plain-text adapter"],
-                      ["Link object", "Native NoteLink persistence is unresolved"],
-                      ["Attach", "Media upload and attachment relationships are not connected"],
-                      ["Resource", "Resource creation requires native Resources persistence"]
-                    ].map(([label, reason]) => <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice(reason)} key={label}>{label}</button>)}
+                    <span className={styles.eyebrow}>Plain text</span>
+                    <span>Write freely. Manage references in Links and Attachments.</span>
                     <button
                       type="button"
                       className={styles.button}
@@ -2375,7 +2358,7 @@ export default function NotesWorkspace({
                   </div>
                   {saveError && <p className={styles.errorBanner} role="alert">{saveError}</p>}
                   {notice && <p className={styles.successBanner} role="status">{notice}</p>}
-                  <div className={styles.readOnlyNotice}><strong>Persistence boundary</strong><span>Explicit Save writes title and body through the current audited Personal Records API. Lifecycle is written only when its source is directly draft/active and you explicitly change it. Autosave and structured nodes remain unavailable. Encrypted versions are read-only on the History tab; restore remains in Vault.</span></div>
+                  <details className={styles.readOnlyNotice}><summary>Saving and history</summary><span>Choose Save to keep your changes. Autosave is off. History shows saved versions; open Vault to restore one. Unavailable fields retain their existing values.</span></details>
                   <form className={styles.editorSurface} onSubmit={(event) => { event.preventDefault(); void saveNote(); }}>
                     <label className={`${styles.editorField} ${styles.editorTitle}`}>
                       Editable title
@@ -2388,7 +2371,7 @@ export default function NotesWorkspace({
                         <label className={styles.field}>Lifecycle<input value={displayLabel(currentNote.lifecycleStatus)} readOnly aria-describedby="note-lifecycle-readonly" /></label>
                       )}
                       <label className={styles.field}>Type<input value={TYPE_LABELS[currentNote.type]} readOnly aria-describedby="note-type-readonly" /></label>
-                      <span id="note-type-readonly" className={styles.readOnlyNotice}>Type changes are unavailable because the legacy PATCH API cannot round-trip them safely.</span>
+                      <span id="note-type-readonly" className={styles.readOnlyNotice}>This note’s type is read-only.</span>
                       {!writableSelectedLifecycle && <span id="note-lifecycle-readonly" className={styles.readOnlyNotice}>This lifecycle is inferred from legacy status {displayLabel(currentNote.provenance.status)}. Saving title or body preserves that source status.</span>}
                     </div>
                     <label className={`${styles.editorField} ${styles.editorBody}`}>
@@ -2463,11 +2446,10 @@ export default function NotesWorkspace({
       <DirectoryPane className={styles.directory} ariaLabel="Notes directory and capture">
         <div className={styles.mainScroll}>
           <header className={styles.directoryHeader}>
-            <div><h1>{VIEW_LABELS[view]}</h1><p>{unavailableViewReason ? "View unavailable" : `${visibleNotes.length} shown`} · {notes.length} total internal knowledge {notes.length === 1 ? "object" : "objects"}</p></div>
+            <div><h1>{VIEW_LABELS[view]}</h1><p>{unavailableViewReason ? "View unavailable" : `${visibleNotes.length} shown`} · {notes.length} {notes.length === 1 ? "note" : "notes"}</p></div>
             <div className={styles.headerActions}>
-              <button type="button" className={styles.button} onClick={() => document.querySelector<HTMLElement>(`.${styles.chipRow}`)?.focus()}>Filter</button>
               <button type="button" className={styles.button} onClick={() => { const next = density === "compact" ? "comfortable" : "compact"; setDensity(next); updateUrl({ density: next }); }}>{density === "compact" ? "Comfortable" : "Compact"}</button>
-              <button type="button" className={styles.button} data-primary="true" onClick={openQuickCapture}><UnigentamosIcon role="plus" /> New Note</button>
+              <button type="button" className={styles.button} data-primary="true" onClick={openQuickCapture} aria-expanded={captureOpen && view === "all"} aria-controls="notes-quick-capture"><UnigentamosIcon role="plus" /> New Note</button>
             </div>
           </header>
 
@@ -2478,7 +2460,7 @@ export default function NotesWorkspace({
           </label>
 
           <div className={styles.chipRow} tabIndex={-1} aria-label="Note filters">
-            {FILTERS.map((item) => (
+            {FILTERS.filter((item) => !item.disabledReason).map((item) => (
               <button
                 type="button"
                 className={styles.chip}
@@ -2500,11 +2482,11 @@ export default function NotesWorkspace({
             ))}
           </div>
 
-          {view === "all" && (
-            <form className={styles.capture} onSubmit={submitNote}>
+          {view === "all" && captureOpen && (
+            <form id="notes-quick-capture" className={styles.capture} onSubmit={submitNote}>
               <div className={styles.captureHeader}>
-                <div><span className={styles.eyebrow}>Quick capture</span><h2>Add internal note</h2></div>
-                <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Advanced native Note creation is not connected yet.")}>Advanced create</button>
+                <div><span className={styles.eyebrow}>Quick capture</span><h2>New Note</h2></div>
+                <button type="button" className={styles.button} onClick={() => { setCaptureOpen(false); setNotice(title.trim() || body.trim() ? "Draft kept here. Choose New Note to continue." : ""); }} disabled={captureSaving}>Close</button>
               </div>
               <div className={styles.captureGrid}>
                 <label className={styles.field}>Title<input ref={captureTitleRef} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Decision, meeting, idea, or context" required /></label>
@@ -2513,7 +2495,6 @@ export default function NotesWorkspace({
               </div>
               <div className={styles.captureBody}>
                 <label className={styles.field}>Context<textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Capture context, next action, and why it matters." /></label>
-                <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Native NoteLink persistence is unresolved.")}><UnigentamosIcon role="plus" /> Link object</button>
                 <button type="submit" className={styles.button} data-primary="true" disabled={captureSaving || !title.trim()}>{captureSaving ? "Saving…" : "Save Note"}</button>
               </div>
             </form>
@@ -2545,10 +2526,9 @@ export default function NotesWorkspace({
                 ]}
               />
               <div className={styles.reviewQueueBoundary}>
-                <strong>INFERRED · 30-day rolling view · no writes</strong>
+                <strong>Last 30 days</strong>
                 <span>
-                  The approved handoff leaves the window open. This reversible default keeps the daily workspace useful without
-                  inventing saved-view persistence; search, filters, sort, selection, and view stay URL-restorable.
+                  This view updates as notes change. Your search, filters, and selection stay in the page link.
                 </span>
               </div>
             </section>
@@ -2732,7 +2712,7 @@ export default function NotesWorkspace({
               })}
             </div>
           ) : (
-            <SystemState variant="empty" title={notes.length ? "No Notes match this view" : "No Notes yet"} description={notes.length ? "Adjust search, view, or filters without losing current directory state." : "Use Quick capture to create the first persisted internal Note."} />
+            <SystemState variant="empty" title={notes.length ? "No Notes match this view" : "No Notes yet"} description={notes.length ? "Try a different search or filter." : "Choose New Note to capture an idea, meeting, or decision."} />
           )}
         </div>
       </DirectoryPane>

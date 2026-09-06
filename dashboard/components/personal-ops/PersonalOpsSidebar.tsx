@@ -232,11 +232,6 @@ export default function PersonalOpsSidebar({
           href: `${pathname}?filter=archived`,
           active: filter === "archived",
           count: counts.archived
-        }, {
-          id: "settings",
-          label: "Settings",
-          disabled: true,
-          disabledReason: "Personal settings are not connected yet."
         }] : [])
       ]
     };

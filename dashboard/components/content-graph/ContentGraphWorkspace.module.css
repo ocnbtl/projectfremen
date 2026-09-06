@@ -489,7 +489,7 @@
 
 .captureBody {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   gap: 8px;
 }
 
@@ -1337,6 +1337,30 @@
 
 .readOnlyNotice strong {
   color: var(--text-strong);
+}
+
+.readOnlyNotice > summary {
+  cursor: pointer;
+  color: var(--text-strong);
+  font-weight: 700;
+  min-height: 24px;
+  align-content: center;
+}
+
+.readOnlyNotice > summary:focus-visible {
+  outline: 2px solid var(--action-primary, #133c5e);
+  outline-offset: 4px;
+  border-radius: 3px;
+}
+
+.readOnlyNotice[open] > span {
+  display: block;
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+@media (max-width: 760px) {
+  .readOnlyNotice > summary { min-height: 44px; }
 }
 
 .emptyInspector {

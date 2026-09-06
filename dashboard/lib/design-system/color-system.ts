@@ -123,10 +123,10 @@ export function moduleColorIdForPathname(pathname: string): ModuleColorId | null
 export function moduleThemeVariables(module: ModuleColorId): Record<string, string> {
   const definition = MODULE_COLOR_SYSTEM[module];
   const variables: Record<string, string> = {
-    "--action-primary": definition.tokens.action,
-    "--action-primary-hover": definition.tokens.actionHover,
-    "--action-primary-pressed": definition.tokens.actionPressed,
-    "--action-primary-contrast": definition.tokens.textOnPrimary,
+    "--action-primary": NAVY_SCALE[600],
+    "--action-primary-hover": NAVY_SCALE[700],
+    "--action-primary-pressed": NAVY_SCALE[800],
+    "--action-primary-contrast": "#FFFFFF",
     "--selected-bg": definition.tokens.selected,
     "--module-quiet": definition.tokens.quiet,
     "--module-border": definition.tokens.border,

@@ -448,8 +448,8 @@ function FinanceSidebar({
     <ModuleSidebar
       id="finance-module-sidebar"
       title="Finance"
-      description={`${periodLabel} · native records`}
-      status={<Chip hue="green" dot>CONNECTED</Chip>}
+      description={`${periodLabel} · accounts, transactions, and plans`}
+      status={<Chip hue="green" dot>RECORDKEEPING</Chip>}
       ariaLabel="Finance sidebar"
       className="finance-module-sidebar"
       mobileOpen={mobileOpen}
@@ -700,8 +700,8 @@ function ModalShell({ modal, onClose }: { modal: ModalKind; onClose: () => void 
   if (!modal) return null;
   const content: Record<Exclude<ModalKind, null>, { title: string; body: string; fields: string[] }> = {
     record: { title: "Record a transaction", body: "Add the transaction details here. Your form stays in place if saving fails, so you can retry.", fields: ["Type", "Amount", "Linked context"] },
-    filter: { title: "Finance filters", body: "Search, URL-restorable filters, and Smart Views operate on current native records.", fields: ["Status", "Account", "Category"] },
-    account: { title: "Add an account", body: "Use the native Add account action. Labels and masks are display-only; immutable IDs own relationships.", fields: ["Account name", "Institution", "Type"] },
+    filter: { title: "Finance filters", body: "Search your records by status, account, or category. Your filter choices stay in the page link.", fields: ["Status", "Account", "Category"] },
+    account: { title: "Add an account", body: "Use Add account to keep an account record. An account name or display mask does not connect a bank.", fields: ["Account name", "Institution", "Type"] },
     category: { title: "Create a budget", body: "Use New budget to create a category cap for a specific month and entity scope.", fields: ["Category", "Monthly cap", "Period"] },
     bill: { title: "Add a bill", body: "Use Add bill to create a persistent obligation without executing payment.", fields: ["Vendor", "Amount", "Due date"] },
     columns: { title: "Transaction columns", body: "Core transaction columns are fixed in this version; filter and selection state is preserved in the URL.", fields: ["Date", "Category", "Evidence"] },

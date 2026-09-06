@@ -153,7 +153,7 @@ const VIEW_COPY: Record<PersonalOpsView, { title: string; description: string; f
   },
   goals: {
     title: "Current Goals",
-    description: "Outcomes and measurable key results, with the existing Current Goals bridge kept intact.",
+    description: "Track outcomes and key results alongside your Current Goals.",
     family: "goals"
   },
   decisions: {
@@ -168,7 +168,7 @@ const VIEW_COPY: Record<PersonalOpsView, { title: string; description: string; f
   },
   "follow-ups": {
     title: "Follow-ups",
-    description: "Actionable next contact and carry-forward work, linked back to its native source.",
+    description: "Keep the next contact or action connected to the work that prompted it.",
     family: "followUps"
   }
 };
@@ -348,7 +348,7 @@ function nativeStateLabel(item: PersonalOpsObject) {
 }
 
 function summaryForItem(item: PersonalOpsListItem) {
-  if (item.source === "legacy-goal") return `${item.entity} · existing Current Goals bridge`;
+  if (item.source === "legacy-goal") return `${item.entity} · Current Goals`;
   if (item.objectType === "goal") return item.outcome;
   if (item.objectType === "decision") return item.finalDecision || item.question;
   if (item.objectType === "obligation") return item.consequence;
@@ -356,7 +356,7 @@ function summaryForItem(item: PersonalOpsListItem) {
 }
 
 function typeLabel(item: PersonalOpsListItem) {
-  if (item.source === "legacy-goal") return "Goal bridge";
+  if (item.source === "legacy-goal") return "Current goal";
   return FAMILY_LABELS[familyForObject(item)];
 }
 
@@ -766,7 +766,7 @@ function ObjectForm({
         <header className={styles.sheetHeader}>
           <div>
             <h2 id={titleId}>{editing ? `Edit ${familyLabel}` : `New ${familyLabel}`}</h2>
-            <p>{form.sourceLabel ? `Source: ${form.sourceLabel}` : "Saved to the native Personal ledger."}</p>
+            <p>{form.sourceLabel ? `Source: ${form.sourceLabel}` : "Saved in Personal."}</p>
           </div>
           <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close form">
             <PersonalOpsIcon name="close" />
@@ -1416,7 +1416,7 @@ export default function PersonalOpsWorkspace({
       { id: "overdue", label: "Overdue", value: overdue, detail: "needs attention", tone: overdue ? "danger" : "positive", onSelect: () => updateUrl({ filter: "overdue" }), active: urlState.filter === "overdue" },
       { id: "review", label: "Needs review", value: review, detail: "explicit review state", tone: "review", onSelect: () => updateUrl({ filter: "needs-review" }), active: urlState.filter === "needs-review" },
       { id: "blocked", label: "Blocked", value: blocked, detail: "health state", tone: blocked ? "danger" : "positive", onSelect: () => updateUrl({ filter: "blocked" }), active: urlState.filter === "blocked" },
-      { id: "linked", label: "Linked", value: linked, detail: "has native context" },
+      { id: "linked", label: "Linked", value: linked, detail: "has related context" },
       { id: "complete", label: "Complete", value: complete, detail: "preserved history", tone: "positive", onSelect: () => updateUrl({ filter: "complete" }), active: urlState.filter === "complete" },
       { id: "recurring", label: "Recurring", value: recurring, detail: "manual cadence rules", onSelect: () => updateUrl({ filter: "recurring" }), active: urlState.filter === "recurring" }
     ];
@@ -1583,9 +1583,8 @@ export default function PersonalOpsWorkspace({
             {!isDecisionView && (
               <PersonalOpsStatusLine items={[
                 { id: "scope", label: `${scopedItems.length} shown` },
-                { id: "native", label: `${allNative.length} native objects`, tone: "positive" },
-                { id: "bridge", label: `${legacyGoals.length} Current Goals bridge`, tone: "attention" },
-                { id: "audit", label: `${state.auditEvents.length} native audit events` }
+                { id: "native", label: `${allNative.length} Personal records`, tone: "positive" },
+                { id: "bridge", label: `${legacyGoals.length} Current Goals` }
               ]} />
             )}
           </header>
@@ -1612,7 +1611,7 @@ export default function PersonalOpsWorkspace({
             <SystemState
               variant="empty"
               title={urlState.query || urlState.filter !== "all" ? "No objects match this scope" : `No ${VIEW_COPY[initialView].title.toLowerCase()} yet`}
-              description={urlState.query || urlState.filter !== "all" ? "Clear search or change the active filter." : "Create the first native object; nothing here is a fixture."}
+              description={urlState.query || urlState.filter !== "all" ? "Clear search or change the active filter." : "Add a follow-up, decision, obligation, or goal to get started."}
               action={urlState.query || urlState.filter !== "all"
                 ? { label: "Clear scope", onSelect: () => updateUrl({ query: "", filter: "all", selected: "" }) }
                 : { label: `Create ${FAMILY_LABELS[primaryFamily]}`, onSelect: () => openCreate(primaryFamily) }}
@@ -1665,8 +1664,8 @@ export default function PersonalOpsWorkspace({
                           {!isDecisionView && <td data-label="Type"><PersonalOpsStatusChip tone={item.source === "legacy-goal" ? "attention" : item.objectType === "follow_up" && item.sourceRefs.some((ref) => ref.module === "people") ? "people" : "neutral"}>{typeLabel(item)}</PersonalOpsStatusChip></td>}
                           <td data-label={isDecisionView ? "Decision state" : "State"}><PersonalOpsStatusChip tone={toneForState(stateLabel(item))}>{cleanLabel(stateLabel(item))}</PersonalOpsStatusChip></td>
                           <td data-label="Domain">{item.source === "legacy-goal" ? item.entity : item.domain}</td>
-                          <td data-label="Due" className={styles.mono}>{item.source === "legacy-goal" ? "Bridge" : formatDate(item.dueAt)}</td>
-                          <td data-label={isDecisionView ? "Review state" : "Review"}>{item.source === "legacy-goal" ? "Legacy" : cleanLabel(item.objectType === "decision" ? decisionReviewState(item) : item.review)}</td>
+                          <td data-label="Due" className={styles.mono}>{item.source === "legacy-goal" ? "Not set" : formatDate(item.dueAt)}</td>
+                          <td data-label={isDecisionView ? "Review state" : "Review"}>{item.source === "legacy-goal" ? "Not tracked" : cleanLabel(item.objectType === "decision" ? decisionReviewState(item) : item.review)}</td>
                         </tr>
                       );
                     })}
@@ -1722,8 +1721,8 @@ export default function PersonalOpsWorkspace({
                     { id: "source", label: "Persistence", value: "Current Goals" },
                     { id: "scope", label: "Project", value: selectedItem.projectLabel }
                   ]} />
-                  <PersonalOpsPanel title="Compatibility bridge" wide>
-                    <p>This goal remains in the existing entity-goals store so the current entity hubs keep their exact behavior. It is not presented as a native Goal with invented key results, cadence, or health.</p>
+                  <PersonalOpsPanel title="Current Goal" wide>
+                    <p>This goal is shared with its entity page. Completing or reopening it updates both views. Key results, review dates, and health are not tracked for this kind of goal.</p>
                   </PersonalOpsPanel>
                 </div>
               ) : (
