@@ -53,7 +53,7 @@ import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import OrganizationAutofill from "./people/OrganizationAutofill";
-import { ORGANIZATION_AUTOFILL_LABELS, ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, normalizeOrganizationUrl, type OrganizationSuggestion } from "../lib/modules/people/organization-autofill";
+import { ORGANIZATION_AUTOFILL_LABELS, ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, emptyOrganizationSuggestions, normalizeOrganizationUrl, type OrganizationAutofillValues, type OrganizationSuggestion } from "../lib/modules/people/organization-autofill";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
 
@@ -956,6 +956,19 @@ function newLocationEntry(input: Partial<PersonalLocationEntry> = {}): PersonalL
     location: input.location,
     address: input.address
   };
+}
+
+function applyOrganizationLocation(entries: PersonalLocationEntry[], suggestions: OrganizationSuggestion[]): PersonalLocationEntry[] {
+  const location = suggestions.find((item) => item.field === "headquarters")?.value;
+  const address = suggestions.find((item) => item.field === "streetAddress")?.value;
+  if (!location && !address) return entries;
+  const primary = entries.find((entry) => entry.location || entry.address) || entries[0];
+  const updated = newLocationEntry({ ...primary, label: primary?.label && !/^(Relevant location|Relevant place)$/i.test(primary.label) ? primary.label : "Headquarters", location: primary?.location || location, address: primary?.address || address });
+  return primary ? entries.map((entry) => entry.id === primary.id ? updated : entry) : [updated];
+}
+
+function organizationSourceNotes(suggestions: OrganizationSuggestion[], fetchedAt: string): string[] {
+  return suggestions.map((item) => `Autofill (${fetchedAt.slice(0, 10)}): ${ORGANIZATION_AUTOFILL_LABELS[item.field]} = ${item.value}. Source: ${item.sourceUrl}. ${item.evidence}.`);
 }
 
 function newEmailEntry(input: Partial<PersonalEmailEntry> = {}): PersonalEmailEntry {
@@ -2316,7 +2329,7 @@ export default function PeopleWorkspace({
     newOccupationEntry({ id: "new-contact-job-1" })
   ]);
   const [quickLocations, setQuickLocations] = useState<PersonalLocationEntry[]>([
-    newLocationEntry({ id: "new-contact-location-1", label: "Primary home" })
+    newLocationEntry({ id: "new-contact-location-1", label: initialCreateClass === "org" ? "Headquarters" : "Primary home" })
   ]);
   const [quickProjects, setQuickProjects] = useState("");
   const [lastContact, setLastContact] = useState("");
@@ -3971,17 +3984,17 @@ export default function PeopleWorkspace({
       : [...current, option]);
   }
 
-  const organizationAutofillValues = {
+  const quickOrganizationLocation = quickLocations.find((entry) => entry.location || entry.address);
+  const organizationAutofillValues: OrganizationAutofillValues = {
     name, organizationType: quickOrganizationType, industry: quickIndustry,
     foundedYear: quickFoundedYear, teamSize: quickTeamSize, context: quickContext,
-    headquarters: quickLocations.find((entry) => entry.location || entry.address)?.location || quickLocations.find((entry) => entry.address)?.address || "",
+    headquarters: quickOrganizationLocation?.location || "", streetAddress: quickOrganizationLocation?.address || "",
     website: referenceUrl, linkedin: quickLinkedIn, x: quickX, instagram: quickInstagram, tiktok: quickTikTok, youtube: quickYouTube
   };
 
   function applyOrganizationSuggestions(suggestions: OrganizationSuggestion[], fetchedAt: string) {
     const applied: OrganizationSuggestion[] = [];
-    for (const suggestion of suggestions) {
-      if (organizationAutofillValues[suggestion.field]?.trim()) continue;
+    for (const suggestion of emptyOrganizationSuggestions(suggestions, organizationAutofillValues)) {
       let value = suggestion.value.trim();
       if (!value) continue;
       if (suggestion.field === "foundedYear" && !/^\d{4}$/.test(value)) continue;
@@ -3996,7 +4009,7 @@ export default function PeopleWorkspace({
         case "foundedYear": setQuickFoundedYear(value); break;
         case "teamSize": setQuickTeamSize(value); break;
         case "context": setQuickContext(value); break;
-        case "headquarters": setQuickLocations((current) => [newLocationEntry({ label: "Headquarters", location: value }), ...current.filter((entry) => entry.location || entry.address)]); break;
+        case "headquarters": case "streetAddress": break;
         case "website": setReferenceUrl(value); break;
         case "linkedin": setQuickLinkedIn(value); break;
         case "x": setQuickX(value); break;
@@ -4006,7 +4019,28 @@ export default function PeopleWorkspace({
       }
       applied.push({ ...suggestion, value });
     }
-    if (applied.length) setQuickNotes((current) => [...current.filter((note) => note.trim()), ...applied.map((item) => `Autofill reviewed (${fetchedAt.slice(0, 10)}): ${ORGANIZATION_AUTOFILL_LABELS[item.field]} = ${item.value}. Source: ${item.sourceUrl}. ${item.evidence}.`)]);
+    if (applied.length) {
+      setQuickLocations((current) => applyOrganizationLocation(current, applied));
+      setQuickNotes((current) => [...current.filter((note) => note.trim()), ...organizationSourceNotes(applied, fetchedAt)]);
+    }
+  }
+
+  function profileAutofillValues(draft: ContactProfileDraft): OrganizationAutofillValues {
+    const primary = draft.locations.find((entry) => entry.location || entry.address);
+    return { ...draft, name: draft.fullName, headquarters: primary?.location || draft.headquarters, streetAddress: primary?.address || "" };
+  }
+
+  function applyProfileOrganizationSuggestions(suggestions: OrganizationSuggestion[], fetchedAt: string) {
+    setProfileDraft((current) => {
+      const applied = emptyOrganizationSuggestions(suggestions, profileAutofillValues(current));
+      let updated = { ...current };
+      for (const item of applied) {
+        if (item.field === "streetAddress") continue;
+        if (item.field === "name") updated.fullName = item.value;
+        else updated = { ...updated, [item.field]: item.value };
+      }
+      return { ...updated, locations: applyOrganizationLocation(current.locations, applied), notes: [current.notes, ...organizationSourceNotes(applied, fetchedAt)].filter(Boolean).join("\n") };
+    });
   }
 
   function renderAddPersonForm(extraClass = "") {
@@ -4178,7 +4212,6 @@ export default function PeopleWorkspace({
               <label className="people-org-team">Team size<input value={quickTeamSize} onChange={(event) => setQuickTeamSize(event.target.value)} placeholder="1–10, 50, global network..." /></label>
               <label className="is-wide">Description<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={3} placeholder="What this organization is and why it is relevant." /></label>
             </div>
-            <OrganizationAutofill name={name} values={organizationAutofillValues} onApply={applyOrganizationSuggestions} />
             <PeopleNotesEditor
               title="Notes"
               idPrefix="people-organization-note"
@@ -4188,9 +4221,10 @@ export default function PeopleWorkspace({
             />
           </section>
           <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" data-profile-section="links" aria-labelledby="people-organization-links-title">
-            <header className="people-profile-section-heading">
+            <header className="people-profile-section-heading people-autofill-heading">
               <span><PeopleIcon name="communication" /></span>
               <h4 id="people-organization-links-title">Links</h4>
+              <OrganizationAutofill name={name} values={organizationAutofillValues} onApply={applyOrganizationSuggestions} disabled={saving} />
             </header>
             <div className="people-profile-field-grid people-create-social-grid people-create-social-grid-no-divider">
               <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
@@ -4780,9 +4814,10 @@ export default function PeopleWorkspace({
                   {(selectedPerson.className === "org" ? ORGANIZATION_PROFILE_SECTIONS : PROFILE_SECTIONS).map((section) => (
                     <Fragment key={section.title}>
                     <section className={`people-profile-section people-themed-section module-ref-tone-${section.tone}`} data-profile-section={section.title.toLowerCase().replace(/\s+/g, "-")}>
-                      <header className="people-profile-section-heading">
+                      <header className={`people-profile-section-heading${section.title === "Links" && selectedPerson.className === "org" ? " people-autofill-heading" : ""}`}>
                         <span><PeopleIcon name={profileSectionIcon(section.title)} /></span>
                         <h4>{section.title}</h4>
+                        {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} disabled={profileSaving} />}
                       </header>
                       {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
                         <EmailEntriesEditor

@@ -2,29 +2,35 @@
 
 import { useEffect, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
-import { ORGANIZATION_AUTOFILL_LABELS, organizationSuggestionError, type OrganizationAutofillField, type OrganizationAutofillResult, type OrganizationSuggestion } from "../../lib/modules/people/organization-autofill";
+import { ORGANIZATION_AUTOFILL_LABELS, emptyOrganizationSuggestions, organizationSeedUrls, type OrganizationAutofillResult, type OrganizationAutofillValues, type OrganizationSuggestion } from "../../lib/modules/people/organization-autofill";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
-export default function OrganizationAutofill({ name, values, onApply }: {
+/** Placed directly in the Links heading; all changes remain an unsaved form draft. */
+export default function OrganizationAutofill({ name, values, onApply, disabled = false }: {
   name: string;
-  values: Partial<Record<OrganizationAutofillField, string>>;
+  values: OrganizationAutofillValues;
   onApply: (suggestions: OrganizationSuggestion[], fetchedAt: string) => void;
+  disabled?: boolean;
 }) {
-  const [url, setUrl] = useState("");
   const [result, setResult] = useState<OrganizationAutofillResult | null>(null);
-  const [selected, setSelected] = useState<OrganizationAutofillField[]>([]);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const controller = useRef<AbortController | null>(null);
+  const latest = useRef({ name, values, onApply });
+  latest.current = { name, values, onApply };
+  const urls = organizationSeedUrls(values);
+  const sourceKey = JSON.stringify(urls);
   useEffect(() => {
-    controller.current?.abort();
-    setBusy(false);
-    setResult(null);
-    setNotice("");
-    return () => controller.current?.abort();
-  }, [name, url]);
+    if (controller.current) {
+      controller.current.abort();
+      controller.current = null;
+      setBusy(false);
+      setNotice("The name or links changed. Run autofill again when ready.");
+    }
+  }, [name, sourceKey, disabled]);
+  useEffect(() => () => controller.current?.abort(), []);
 
-  async function findSuggestions() {
+  async function autofill() {
     controller.current?.abort();
     const request = new AbortController();
     controller.current = request;
@@ -34,48 +40,45 @@ export default function OrganizationAutofill({ name, values, onApply }: {
     try {
       const response = await fetch("/api/people/organizations/autofill", {
         method: "POST", headers: buildJsonHeadersWithCsrf(), signal: request.signal,
-        body: JSON.stringify({ name, url })
+        body: JSON.stringify({ name, urls })
       });
       const payload = await response.json();
-      if (!response.ok || !payload.ok || !payload.result) throw new Error(payload.error || "Suggestions could not be loaded. Your draft is still here.");
+      if (!response.ok || !payload.ok || !Array.isArray(payload.result?.suggestions)) throw new Error(payload.error || "Autofill could not finish. Your draft is still here.");
       if (request.signal.aborted) return;
+      if (latest.current.name !== name || JSON.stringify(organizationSeedUrls(latest.current.values)) !== sourceKey) {
+        setNotice("The name or links changed. Run autofill again when ready.");
+        return;
+      }
       const next = payload.result as OrganizationAutofillResult;
-      setResult(next);
-      setSelected(next.suggestions.filter((item) => !values[item.field]?.trim()).map((item) => item.field));
+      const chosen = emptyOrganizationSuggestions(next.suggestions, latest.current.values);
+      // Clear before applying: the autofilled name/links must not invalidate their own result.
+      controller.current = null;
+      latest.current.onApply(chosen, next.fetchedAt);
+      setResult({ ...next, suggestions: chosen });
+      setNotice(chosen.length ? `${chosen.length} ${chosen.length === 1 ? "field" : "fields"} filled. Review the details, then Save.` : "No additional fields could be filled. Your existing details were kept.");
     } catch (error) {
-      if (!request.signal.aborted) setNotice(error instanceof Error ? error.message : "Suggestions could not be loaded. Your draft is still here.");
-    } finally { if (!request.signal.aborted) setBusy(false); }
+      if (!request.signal.aborted) setNotice(error instanceof Error ? error.message : "Autofill could not finish. Your draft is still here.");
+    } finally {
+      if (!request.signal.aborted) { controller.current = null; setBusy(false); }
+    }
   }
-  const chosen = result?.suggestions.filter((item) => selected.includes(item.field) && !values[item.field]?.trim()) || [];
-  const invalidChoice = chosen.some((item) => organizationSuggestionError(item.field, item.value));
-  return (
-    <section className="people-organization-autofill" aria-labelledby="organization-autofill-title">
-      <header><UnigentamosIcon role="organization" /><h4 id="organization-autofill-title">Autofill from a public link</h4></header>
-      <p>Add the organization’s name above, then its website or social profile. Review suggestions before adding them to your draft.</p>
-      <div className="people-autofill-source">
-        <label>Public link<input value={url} onChange={(event) => setUrl(event.target.value)} inputMode="url" autoComplete="url" placeholder="Website, LinkedIn, or another public profile" /></label>
-        <button type="button" disabled={busy || !name.trim() || !url.trim()} onClick={() => void findSuggestions()}>{busy ? "Reading page…" : "Find suggestions"}</button>
-      </div>
-      <div role="status" aria-live="polite">{busy ? "Reading the public page. Your draft stays editable." : notice || result?.message}</div>
-      {result && result.suggestions.length > 0 && <>
-        <div className="people-autofill-review">
-          {result.suggestions.map((item) => {
-            const occupied = Boolean(values[item.field]?.trim());
-            return <div className="people-autofill-suggestion" key={item.field}>
-              <label className="people-autofill-choice"><input type="checkbox" checked={!occupied && selected.includes(item.field)} disabled={occupied} onChange={(event) => setSelected((current) => event.target.checked ? [...current, item.field] : current.filter((field) => field !== item.field))} /><span>{ORGANIZATION_AUTOFILL_LABELS[item.field]}</span></label>
-              {item.field === "context" ? <textarea aria-label={`Suggested ${ORGANIZATION_AUTOFILL_LABELS[item.field]}`} value={item.value} rows={3} maxLength={800} onChange={(event) => setResult({ ...result, suggestions: result.suggestions.map((suggestion) => suggestion.field === item.field ? { ...suggestion, value: event.target.value } : suggestion) })} />
-                : <input aria-label={`Suggested ${ORGANIZATION_AUTOFILL_LABELS[item.field]}`} value={item.value} maxLength={240} onChange={(event) => setResult({ ...result, suggestions: result.suggestions.map((suggestion) => suggestion.field === item.field ? { ...suggestion, value: event.target.value } : suggestion) })} />}
-              {!occupied && selected.includes(item.field) && organizationSuggestionError(item.field, item.value) && <small role="alert">{organizationSuggestionError(item.field, item.value)}</small>}
-              <small>{occupied ? "Your draft already has a value; it will be kept. " : ""}{item.evidence}. <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a></small>
-            </div>;
-          })}
-        </div>
-        <div className="people-autofill-footer"><span>Reviewed sources will be kept in Notes when you save.</span><button type="button" disabled={!chosen.length || invalidChoice} onClick={() => {
-          onApply(chosen, result.fetchedAt);
-          setResult(null);
-          setNotice("Selected suggestions added to your draft. Review the details, then Save when ready.");
-        }}>Use selected suggestions</button></div>
-      </>}
-    </section>
-  );
+  return <>
+    <button type="button" className="people-organization-autofill-button" aria-label="Autofill organization from links" aria-busy={busy}
+      title={urls.length ? "Autofill organization from links" : "Enter a website or social link to enable autofill"}
+      disabled={disabled || busy || !urls.length} onClick={() => void autofill()}>
+      <UnigentamosIcon role="sparkles" size={17} />
+    </button>
+    {(busy || notice || result) && <div className="people-autofill-feedback">
+      <p role="status" aria-live="polite">{busy ? "Finding connected links and organization details…" : notice}</p>
+      {result && <details className="people-autofill-sources">
+        <summary>Autofill sources</summary>
+        <p>{result.message}</p>
+        {result.suggestions.length > 0 && <ul>{result.suggestions.map((item) => <li key={item.field}>
+          <strong>{ORGANIZATION_AUTOFILL_LABELS[item.field]}</strong>: {item.value}
+          <small>{item.evidence}. <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a></small>
+        </li>)}</ul>}
+        {result.suggestions.length > 0 && <p>Sources are included in Notes when you save.</p>}
+      </details>}
+    </div>}
+  </>;
 }

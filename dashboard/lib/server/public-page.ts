@@ -36,7 +36,7 @@ export type PublicPageTarget = Awaited<ReturnType<typeof resolvePublicPage>>;
 const MAX_BYTES = 512_000;
 
 /** Use only a validated address for the socket; retain the URL hostname for TLS and Host. */
-export function requestPinnedPage({ url, address }: PublicPageTarget, signal: AbortSignal): Promise<PageResponse> {
+export function requestPinnedPage({ url, address }: PublicPageTarget, signal: AbortSignal, maxBytes = MAX_BYTES): Promise<PageResponse> {
   return new Promise((resolve, reject) => {
     const request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, {
       agent: false, signal, maxHeaderSize: 16_384,
@@ -56,7 +56,7 @@ export function requestPinnedPage({ url, address }: PublicPageTarget, signal: Ab
         response.destroy(new Error("This link does not provide a readable web page."));
         return;
       }
-      if ((headers["content-encoding"] && headers["content-encoding"] !== "identity") || Number(headers["content-length"] || 0) > MAX_BYTES) {
+      if ((headers["content-encoding"] && headers["content-encoding"] !== "identity") || Number(headers["content-length"] || 0) > maxBytes) {
         response.destroy(new Error("This page cannot be read within the size limit."));
         return;
       }
@@ -64,7 +64,7 @@ export function requestPinnedPage({ url, address }: PublicPageTarget, signal: Ab
       const chunks: Buffer[] = [];
       response.on("data", (chunk: Buffer) => {
         size += chunk.length;
-        if (size > MAX_BYTES) response.destroy(new Error("This page is too large to inspect."));
+        if (size > maxBytes) response.destroy(new Error("This page is too large to inspect."));
         else chunks.push(chunk);
       });
       response.on("end", () => resolve({ status, headers, html: Buffer.concat(chunks).toString("utf8") }));
@@ -78,6 +78,7 @@ export async function fetchPublicPage(raw: string, dependencies: {
   resolve?: Resolver;
   request?: typeof requestPinnedPage;
   timeoutMs?: number;
+  maxBytes?: number;
 } = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), dependencies.timeoutMs ?? 8_000);
@@ -87,7 +88,7 @@ export async function fetchPublicPage(raw: string, dependencies: {
     for (let redirects = 0; redirects <= 4; redirects++) {
       const target = await resolvePublicPage(next, dependencies.resolve);
       controller.signal.throwIfAborted();
-      const page = await (dependencies.request || requestPinnedPage)(target, controller.signal);
+      const page = await (dependencies.request || requestPinnedPage)(target, controller.signal, Math.min(dependencies.maxBytes ?? MAX_BYTES, 2_000_000));
       if ([301, 302, 303, 307, 308].includes(page.status)) {
         if (!page.headers.location || redirects === 4) throw new Error("This link redirects too many times.");
         next = new URL(page.headers.location, target.url).toString();
