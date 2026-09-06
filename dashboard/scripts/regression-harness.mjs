@@ -5714,8 +5714,8 @@ async function checkPeopleMemoryBrowserState(
       const operationalSection = sidebar.locator(".people-sidebar-section").filter({ hasText: "Operational" });
       assert(
         await sidebar.locator(".people-sidebar-section").count() === 3 &&
-          await sidebar.locator(".people-sidebar-section button").count() === 13 &&
-          await sidebar.locator(".people-sidebar-section button > svg").count() === 13 &&
+          await sidebar.locator(".people-sidebar-section button").count() === 14 &&
+          await sidebar.locator(".people-sidebar-section button > svg").count() === 14 &&
           await operationalSection.locator("button").count() === 4 &&
           await operationalSection.locator("button").filter({ hasText: "Duplicates" }).locator("strong").textContent() === "0" &&
           sidebarText.includes("Upcoming Birthdays") && sidebarText.includes("Organizations") && sidebarText.includes("Follow-ups") && sidebarText.includes("Relationships") &&
@@ -5724,6 +5724,10 @@ async function checkPeopleMemoryBrowserState(
         `People sidebar did not match the compact icon-led navigation at ${viewport.label}: ${sidebarText}`
       );
       for (const { id, label } of [
+        { id: "everyone", label: "Everyone" },
+        { id: "all", label: "People" },
+        { id: "organizations", label: "Organizations" },
+        { id: "upcoming", label: "Follow-ups" },
         { id: "birthdays-month", label: "Upcoming Birthdays" },
         { id: "no-contact-90", label: "No Contact > 90 Days" },
         { id: "recently-deleted", label: "Recently Deleted" }
@@ -5745,18 +5749,17 @@ async function checkPeopleMemoryBrowserState(
             headerFits: header.scrollWidth <= header.clientWidth,
             headingFits: Boolean(
               heading &&
-              headingStyle?.whiteSpace === "nowrap" &&
               headingRect &&
-              headingRect.height <= headingFontSize * 1.7
+              headingFontSize === 18 && headingRect.right <= headerRect.right + 0.5
             ),
             actionsFit: Boolean(actionsRect && actionsRect.right <= headerRect.right + 0.5),
             actionsShareRow: buttonTops.length > 0 && Math.max(...buttonTops) - Math.min(...buttonTops) < 1.5,
-            gap: headingRect && actionsRect ? actionsRect.left - headingRect.right : -1
+            noOverlap: Boolean(headingRect && actionsRect && (actionsRect.left - headingRect.right >= 6 || actionsRect.top >= headingRect.bottom))
           };
         });
         assert(
-          headingGeometry.headerFits && headingGeometry.headingFits && headingGeometry.actionsFit && headingGeometry.actionsShareRow && headingGeometry.gap >= 6,
-          `People ${label} heading or actions wrapped at ${viewport.label}: ${JSON.stringify(headingGeometry)}`
+          headingGeometry.headerFits && headingGeometry.headingFits && headingGeometry.actionsFit && headingGeometry.actionsShareRow && headingGeometry.noOverlap,
+          `People ${label} heading size or action layout regressed at ${viewport.label}: ${JSON.stringify(headingGeometry)}`
         );
       }
       await page.goto(`${baseUrl}/admin/people`, { waitUntil: "networkidle" });
@@ -6332,16 +6335,16 @@ async function checkPeopleMemoryBrowserState(
         interactionTypography.titleSize > interactionTypography.bodySize && interactionTypography.bodySize > 0,
         `Timeline title/body hierarchy was not visible at ${viewport.label}: ${JSON.stringify(interactionTypography)}`
       );
-      const timelineActionWidths = await page.locator(".people-timeline-actions button").evaluateAll((elements) =>
+      const timelineActionWidths = await page.locator(".people-profile-view-actions button").evaluateAll((elements) =>
         elements.map((element) => element.getBoundingClientRect().width)
       );
-      const timelineActionLabels = await page.locator(".people-timeline-actions .people-add-action span").allTextContents();
+      const timelineActionLabels = await page.locator(".people-profile-view-actions .people-add-action span").allTextContents();
       assert(
           timelineActionWidths.length === 2 &&
           timelineActionWidths.every((width) => width < 190) &&
           JSON.stringify(timelineActionLabels) === JSON.stringify(["Interaction", "Follow-up"]) &&
-          await page.locator('.people-timeline-actions .people-add-action svg[data-icon-role="interaction"][data-icon-candidate="message-plus"]').count() === 1 &&
-          await page.locator('.people-timeline-actions .people-add-action svg[data-icon-role="follow-up"]').count() === 1,
+          await page.locator('.people-profile-view-actions .people-add-action svg[data-icon-role="interaction"][data-icon-candidate="message-plus"]').count() === 1 &&
+          await page.locator('.people-profile-view-actions .people-add-action svg[data-icon-role="follow-up"]').count() === 1,
         `Timeline actions remained oversized at ${viewport.label}: ${JSON.stringify(timelineActionWidths)}`
       );
       const followUpPanel = page.locator('[data-people-follow-up-bridge]');
@@ -6390,7 +6393,7 @@ async function checkPeopleMemoryBrowserState(
       );
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=timeline`, { waitUntil: "networkidle" });
 
-      await page.locator(".people-timeline-actions").getByRole("button", { name: "Log Interaction" }).click();
+      await page.locator(".people-profile-view-actions").getByRole("button", { name: "Log Interaction" }).click();
       const interactionDialog = page.getByRole("dialog", { name: "Log interaction", exact: true });
       await interactionDialog.waitFor();
       assert(
@@ -6473,8 +6476,8 @@ async function checkPeopleMemoryBrowserState(
           await linksHub.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
           await page.getByText("connected media context", { exact: false }).count() === 0 &&
           await page.getByRole("button", { name: "Add object", exact: true }).count() === 1 &&
-          await page.locator('.people-links-toolbar-actions .people-add-action svg[data-icon-role="plus"][data-icon-candidate="plus"]').count() === 1 &&
-          (await page.getByRole("button", { name: "Add object", exact: true }).innerText()).trim() === "Objects" &&
+          await page.locator('.people-profile-view-actions .people-add-action svg[data-icon-role="object"][data-icon-candidate="cube"]').count() === 1 &&
+          (await page.getByRole("button", { name: "Add object", exact: true }).innerText()).trim() === "Object" &&
           await page.getByRole("heading", { name: "Add relationship", exact: true }).count() === 0 &&
           await page.getByRole("button", { name: /^(Browse|Refresh)$/ }).count() === 0,
         `Legacy Relationships route did not resolve to the unified Links hub at ${viewport.label}`
@@ -6683,7 +6686,7 @@ async function checkPeopleMemoryBrowserState(
         });
         const comesFrom = document.querySelector(".people-comes-from-field");
         const contactHeadings = Array.from(document.querySelectorAll(".people-contact-channel-section > .people-repeatable-heading"));
-        const toolbarButtons = Array.from(document.querySelectorAll(".people-edit-toolbar button"));
+        const toolbarButtons = Array.from(document.querySelectorAll(".people-profile-view-actions button"));
         const phoneRowTops = Array.from(document.querySelectorAll("[data-phone-entry]")).map((entry) => [
           entry.querySelector(".people-contact-category-fields select"),
           entry.querySelector(".people-country-code-field input"),
@@ -6789,7 +6792,7 @@ async function checkPeopleMemoryBrowserState(
         `Organization Properties retained unrelated rainbow section colors at ${viewport.label}: ${JSON.stringify(organizationSectionColors)}`
       );
       await organizationEditor.getByLabel("TikTok", { exact: true }).fill("https://tiktok.com/@discard-regression");
-      await organizationEditor.getByRole("button", { name: "Cancel", exact: true }).click();
+      await page.locator(".people-profile-view-actions").getByRole("button", { name: "Cancel", exact: true }).click();
       const peopleDiscardDialog = page.getByRole("dialog", { name: "Discard your changes?", exact: true });
       await peopleDiscardDialog.waitFor();
       assert(
@@ -6913,12 +6916,14 @@ async function checkPeopleMemoryBrowserState(
           (viewport.label === "mobile" || Math.abs(organizationLayout.foundedTop - organizationLayout.teamTop) < 2) &&
           (viewport.label === "mobile" || Math.abs(organizationLayout.removeTop - organizationLayout.cityTop) < 2) &&
           (viewport.label === "mobile" || organizationLayout.addHeadingCenterGap < 2) &&
-          Math.abs(organizationLayout.addHeight - organizationLayout.cityHeight) < 2 &&
+          (viewport.label === "mobile" ? organizationLayout.addHeight >= 44 : Math.abs(organizationLayout.addHeight - organizationLayout.cityHeight) < 2) &&
           organizationLayout.cityFamily === organizationLayout.teamFamily,
         `Organization details or Places alignment drifted at ${viewport.label}: ${JSON.stringify(organizationLayout)}`
       );
       const organizationTypeSelect = organizationForm.locator("[data-organization-type]");
       const organizationIndustrySelect = organizationForm.locator("[data-organization-industry]");
+      assert(await organizationTypeSelect.inputValue() === "", "New organizations must not assume a business type");
+      await organizationTypeSelect.selectOption("Business");
       assert(
         (await organizationIndustrySelect.locator("option").allTextContents()).includes("Technology"),
         `Business did not expose its relevant industry options at ${viewport.label}`
@@ -7136,6 +7141,7 @@ async function checkPeopleMemoryBrowserState(
         await organizationQuickForm.getByRole("group", { name: "Record type" }).getByRole("button", { name: "Organization", exact: true }).click();
         const quickOrganizationTitle = `${organizationTitle}-ui`;
         await organizationQuickForm.getByLabel("Organization name").fill(quickOrganizationTitle);
+        await organizationQuickForm.locator("[data-organization-type]").selectOption("Business");
         await organizationQuickForm.getByLabel("Industry or field").selectOption("Technology");
         await organizationQuickForm.getByLabel("Description").fill("A directly linked organization created by the regression UI.");
         await organizationQuickForm.getByLabel("YouTube", { exact: true }).fill("https://youtube.com/@regression-studio");
@@ -12896,6 +12902,16 @@ async function main() {
     assert(cookieJar.get("admin_session"), "Login did not set admin_session cookie");
     assert(cookieJar.get("admin_csrf"), "Login did not set admin_csrf cookie");
     pass("Admin login succeeded and set session cookies");
+
+    const autofillPath = "/api/people/organizations/autofill";
+    const autofillBody = JSON.stringify({ name: "Example", url: "http://127.0.0.1" });
+    const signedOutAutofill = await requestJson(server.baseUrl, new CookieJar(), autofillPath, { method: "POST", headers: { "content-type": "application/json" }, body: autofillBody });
+    assert(signedOutAutofill.response.status === 401, "Organization autofill allowed a signed-out request");
+    const noCsrfAutofill = await requestJson(server.baseUrl, cookieJar, autofillPath, { method: "POST", headers: { "content-type": "application/json" }, body: autofillBody });
+    assert(noCsrfAutofill.response.status === 403, "Organization autofill allowed a request without CSRF");
+    const privateAutofill = await requestJson(server.baseUrl, cookieJar, autofillPath, { method: "POST", headers: { "content-type": "application/json", "x-csrf-token": cookieJar.get("admin_csrf") }, body: autofillBody });
+    assert(privateAutofill.response.status === 422 && privateAutofill.response.headers.get("cache-control")?.includes("private, no-store"), "Organization autofill did not reject a private URL with private caching");
+    pass("Organization autofill requires authentication and CSRF, rejects private destinations, and keeps responses private");
 
     const authenticatedPersonalRecords = await requestJson(server.baseUrl, cookieJar, "/api/personal/records");
     assert(

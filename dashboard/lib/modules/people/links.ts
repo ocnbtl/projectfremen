@@ -16,6 +16,8 @@ export type PeopleProfileLinkKey = (typeof PEOPLE_PROFILE_LINK_KEYS)[number];
 export function withoutTrailingLinkSlash(value: string): string {
   const trimmed = value.trim();
   if (/^https?:\/\/$/i.test(trimmed)) return trimmed;
+  const suffix = trimmed.search(/[?#]/);
+  if (suffix >= 0) return trimmed.slice(0, suffix).replace(/\/+$/, "") + trimmed.slice(suffix);
   return trimmed.replace(/\/+$/, "");
 }
 

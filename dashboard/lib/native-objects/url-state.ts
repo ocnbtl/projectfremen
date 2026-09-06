@@ -83,6 +83,7 @@ const PEOPLE_SORTS = ["last-name", "recent-contact", "next-follow-up"] as const;
 const PEOPLE_VIEWS = ["list", "compact", "grid"] as const;
 const PEOPLE_TABS = ["overview", "timeline", "links", "properties"] as const;
 const PEOPLE_SIDEBARS = [
+  "everyone",
   "all",
   "organizations",
   "starred",

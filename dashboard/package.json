@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "test:organization-autofill": "node ./scripts/organization-autofill-harness.mjs",
     "test:vault": "node ./scripts/local-first-harness.mjs",
     "test:vault-browser": "node ./scripts/vault-browser-harness.mjs",
     "regress": "node ./scripts/regression-harness.mjs"

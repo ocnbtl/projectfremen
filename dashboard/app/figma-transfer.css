@@ -14606,18 +14606,19 @@ html[data-admin-preview="mobile"] .people-record-type-toggle > div {
 }
 
 .people-redesign-shell .people-directory-header {
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
 }
 
 .people-redesign-shell .people-directory-header > div:first-child,
 .people-redesign-shell .people-directory-header h1 {
   min-width: 0;
-  white-space: nowrap;
+  white-space: normal;
 }
 
-.people-redesign-shell .people-directory-header.has-compact-title h1 {
-  font-size: 16px;
-  letter-spacing: -.018em;
+.people-redesign-shell .people-directory-header h1,
+html[data-admin-preview="mobile"] .people-redesign-shell .people-directory-header h1 {
+  font-size: 18px;
+  line-height: 1.35;
 }
 
 .people-redesign-shell .people-header-actions {
@@ -14908,3 +14909,115 @@ html[data-admin-preview="mobile"] .people-redesign-shell .people-profile-panel {
     transition: none;
   }
 }
+
+/* People view actions share the non-scrolling tab row. */
+.people-redesign-shell .people-profile-view-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+  border-bottom: 1px solid var(--border-soft);
+  background: var(--surface-panel);
+}
+.people-redesign-shell .people-profile-view-bar .people-profile-tabs {
+  position: static;
+  flex: 1 1 290px;
+  min-width: 0;
+  border-bottom: 0;
+  margin: 0;
+}
+.people-redesign-shell .people-profile-view-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 4px 0;
+}
+.people-redesign-shell .people-profile-view-actions:empty { display: none; }
+.people-redesign-shell .people-profile-view-actions > button,
+.people-redesign-shell .people-organization-autofill button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 10px;
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  background: var(--surface-panel);
+  color: var(--text-strong);
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+.people-redesign-shell .people-profile-view-actions > button[type="submit"],
+.people-redesign-shell .people-profile-view-actions > .people-add-action,
+.people-redesign-shell .people-organization-autofill button {
+  background: var(--people-action, #133c5e);
+  color: #fff;
+}
+.people-redesign-shell .people-profile-view-actions svg { width: 16px; height: 16px; }
+.people-redesign-shell [data-people-location-editor] > header .people-add-action { min-height: 40px; }
+.people-redesign-shell .people-profile-view-actions button:disabled,
+.people-redesign-shell .people-organization-autofill button:disabled { opacity: .5; cursor: not-allowed; }
+.people-redesign-shell .people-profile-view-actions button:focus-visible,
+.people-redesign-shell .people-organization-autofill :is(button, input, textarea, a):focus-visible {
+  outline: 2px solid var(--module-icon, #133c5e);
+  outline-offset: 3px;
+}
+.people-redesign-shell .people-organization-autofill {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  margin-top: 12px;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  background: var(--surface-panel);
+}
+.people-organization-autofill > header { display: flex; align-items: center; gap: 8px; }
+.people-organization-autofill h4,
+.people-organization-autofill p { margin: 0; }
+.people-organization-autofill p,
+.people-organization-autofill [role="status"],
+.people-autofill-footer { font-size: 12px; line-height: 1.5; color: var(--text-subtle); }
+.people-autofill-source { display: flex; align-items: end; flex-wrap: wrap; gap: 8px; }
+.people-autofill-source > label { flex: 1 1 260px; min-width: 0; }
+.people-autofill-review { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.people-autofill-suggestion { display: grid; align-content: start; gap: 6px; min-width: 0; }
+.people-redesign-shell .people-autofill-choice { display: flex; align-items: center; gap: 8px; }
+.people-redesign-shell .people-autofill-choice input { width: 18px; height: 18px; min-height: 18px; margin: 0; }
+.people-autofill-suggestion small { color: var(--text-subtle); line-height: 1.5; overflow-wrap: anywhere; }
+.people-autofill-suggestion a { color: var(--text-strong); text-decoration: underline; }
+.people-autofill-footer { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+@media (max-width: 760px) {
+  .people-redesign-shell .people-profile-view-bar { gap: 0; }
+  .people-redesign-shell .people-profile-view-actions > button,
+  .people-redesign-shell [data-people-location-editor] > header .people-add-action,
+  .people-redesign-shell .people-organization-autofill button { min-height: 44px; }
+  .people-autofill-review { grid-template-columns: minmax(0, 1fr); }
+}
+html[data-admin-preview="mobile"] .people-autofill-review { grid-template-columns: minmax(0, 1fr); }
+
+@media (max-width: 760px) {
+  .people-redesign-shell:has(.people-profile-view-bar) {
+    height: calc(100dvh - var(--app-content-offset, 76px) - 16px);
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+    padding-bottom: 12px;
+  }
+  .people-redesign-shell:has(.people-profile-view-bar) .people-profile-panel { min-height: 0; height: 100%; }
+  .people-redesign-shell:has(.people-profile-view-bar) .people-mobile-topbar { position: static; }
+  .people-redesign-shell .people-profile-header .people-avatar { min-width: 58px; width: 58px; height: 58px; }
+}
+html[data-admin-preview="mobile"] .people-redesign-shell:has(.people-profile-view-bar) {
+  height: calc(100dvh - var(--app-content-offset, 76px) - 16px);
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+  padding-bottom: 12px;
+}
+html[data-admin-preview="mobile"] .people-redesign-shell:has(.people-profile-view-bar) .people-profile-panel { min-height: 0; height: 100%; }
+html[data-admin-preview="mobile"] .people-redesign-shell:has(.people-profile-view-bar) .people-mobile-topbar { position: static; }
+html[data-admin-preview="mobile"] .people-redesign-shell .people-profile-header .people-avatar { min-width: 58px; width: 58px; height: 58px; }

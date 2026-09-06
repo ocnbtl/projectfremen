@@ -52,6 +52,8 @@ import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
+import OrganizationAutofill from "./people/OrganizationAutofill";
+import { ORGANIZATION_AUTOFILL_LABELS, ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, normalizeOrganizationUrl, type OrganizationSuggestion } from "../lib/modules/people/organization-autofill";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
 
@@ -86,6 +88,7 @@ type PeopleFilter = "all" | "due" | "week" | "active" | "dormant" | "orgs";
 type PeopleView = "overview" | "timeline" | "links" | "properties";
 type DetailMode = "profile" | "edit" | "timeline" | "workspace";
 type PeopleSidebarView =
+  | "everyone"
   | "all"
   | "organizations"
   | "starred"
@@ -538,17 +541,6 @@ const CADENCE_OPTIONS = [
   { label: "Yearly", value: "P1Y" }
 ];
 
-const ORGANIZATION_TYPE_OPTIONS = [
-  "Business",
-  "Nonprofit",
-  "University / School",
-  "Government",
-  "Agency",
-  "Community",
-  "Association",
-  "Other"
-] as const;
-
 type OrganizationType = (typeof ORGANIZATION_TYPE_OPTIONS)[number];
 
 const ORGANIZATION_INDUSTRY_OPTIONS: Record<OrganizationType, readonly string[]> = {
@@ -673,6 +665,7 @@ const PEOPLE_SIDEBAR_SECTIONS: Array<{ title: string; items: SidebarItemConfig[]
   {
     title: "People",
     items: [
+      { id: "everyone", label: "Everyone", icon: "users" },
       { id: "all", label: "People", icon: "person" },
       { id: "organizations", label: "Organizations", icon: "organization" },
       { id: "starred", label: "Starred", icon: "star" },
@@ -1624,6 +1617,7 @@ function hasGroupLike(record: PersonalRecord, terms: string[]) {
 }
 
 function matchesSidebarView(record: PersonalRecord, view: PeopleSidebarView, interactionDate = "") {
+  if (view === "everyone") return record.className === "person" || record.className === "org";
   if (view === "all") return record.className === "person";
   if (view === "organizations") return record.className === "org";
   if (view === "starred") return record.starred === true;
@@ -1857,7 +1851,7 @@ function LocationEntriesEditor({
     <section className="people-repeatable-section people-themed-section module-ref-tone-cyan" data-people-location-editor data-profile-section="locations">
       <header className="people-repeatable-heading">
         <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>Places</h4></div>
-        <PeopleAddButton label="Place" onClick={onAdd} iconOnly />
+        <PeopleAddButton label="Place" onClick={onAdd} />
       </header>
       {!organization && onComesFromChange && (
         <label className="people-comes-from-field">Comes from<input list="people-location-suggestions" value={comesFrom} onChange={(event) => onComesFromChange(event.target.value)} placeholder="Hometown or place of origin" /></label>
@@ -2305,7 +2299,7 @@ export default function PeopleWorkspace({
   const [quickContext, setQuickContext] = useState("");
   const [quickLifeDreams, setQuickLifeDreams] = useState<string[]>([""]);
   const [quickNotes, setQuickNotes] = useState<string[]>([""]);
-  const [quickOrganizationType, setQuickOrganizationType] = useState("Business");
+  const [quickOrganizationType, setQuickOrganizationType] = useState("");
   const [quickIndustry, setQuickIndustry] = useState("");
   const [quickFoundedYear, setQuickFoundedYear] = useState("");
   const [quickTeamSize, setQuickTeamSize] = useState("");
@@ -2854,7 +2848,6 @@ export default function PeopleWorkspace({
   ].filter(Boolean).join(" ");
   const activeSidebarItem = PEOPLE_SIDEBAR_SECTIONS.flatMap((section) => section.items).find((item) => item.id === activeSidebarView);
   const activeViewLabel = activeSidebarItem?.label || "People";
-  const compactDirectoryTitle = activeSidebarView === "birthdays-month" || activeSidebarView === "no-contact-90" || activeSidebarView === "recently-deleted";
   const resolvedUtilityNotice = activeSidebarItem?.surface === "utility" && activeSidebarView !== "recently-deleted"
     ? utilityNotice || `${activeViewLabel} is a read-only People utility in this checkpoint. Stored-data actions remain disabled until matching backend support exists.`
     : utilityNotice;
@@ -3070,6 +3063,7 @@ export default function PeopleWorkspace({
 
   function getSidebarCount(view: PeopleSidebarView) {
     const counts: Partial<Record<PeopleSidebarView, number>> = {
+      everyone: stats.total,
       all: stats.people,
       organizations: stats.organizations,
       starred: stats.starred,
@@ -3482,7 +3476,7 @@ export default function PeopleWorkspace({
       setQuickContext("");
       setQuickLifeDreams([""]);
       setQuickNotes([""]);
-      setQuickOrganizationType("Business");
+      setQuickOrganizationType("");
       setQuickIndustry("");
       setQuickFoundedYear("");
       setQuickTeamSize("");
@@ -3778,7 +3772,7 @@ export default function PeopleWorkspace({
     setQuickContext("");
     setQuickLifeDreams([""]);
     setQuickNotes([""]);
-    setQuickOrganizationType("Business");
+    setQuickOrganizationType("");
     setQuickIndustry("");
     setQuickFoundedYear("");
     setQuickTeamSize("");
@@ -3977,6 +3971,44 @@ export default function PeopleWorkspace({
       : [...current, option]);
   }
 
+  const organizationAutofillValues = {
+    name, organizationType: quickOrganizationType, industry: quickIndustry,
+    foundedYear: quickFoundedYear, teamSize: quickTeamSize, context: quickContext,
+    headquarters: quickLocations.find((entry) => entry.location || entry.address)?.location || quickLocations.find((entry) => entry.address)?.address || "",
+    website: referenceUrl, linkedin: quickLinkedIn, x: quickX, instagram: quickInstagram, tiktok: quickTikTok, youtube: quickYouTube
+  };
+
+  function applyOrganizationSuggestions(suggestions: OrganizationSuggestion[], fetchedAt: string) {
+    const applied: OrganizationSuggestion[] = [];
+    for (const suggestion of suggestions) {
+      if (organizationAutofillValues[suggestion.field]?.trim()) continue;
+      let value = suggestion.value.trim();
+      if (!value) continue;
+      if (suggestion.field === "foundedYear" && !/^\d{4}$/.test(value)) continue;
+      if (suggestion.field === "organizationType" && !ORGANIZATION_TYPE_OPTIONS.includes(value as OrganizationType)) continue;
+      if (["website", "linkedin", "x", "instagram", "tiktok", "youtube"].includes(suggestion.field)) {
+        try { value = normalizeOrganizationUrl(value); } catch { continue; }
+      }
+      switch (suggestion.field) {
+        case "name": setName(value); break;
+        case "organizationType": setQuickOrganizationType(value); break;
+        case "industry": setQuickIndustry(value); break;
+        case "foundedYear": setQuickFoundedYear(value); break;
+        case "teamSize": setQuickTeamSize(value); break;
+        case "context": setQuickContext(value); break;
+        case "headquarters": setQuickLocations((current) => [newLocationEntry({ label: "Headquarters", location: value }), ...current.filter((entry) => entry.location || entry.address)]); break;
+        case "website": setReferenceUrl(value); break;
+        case "linkedin": setQuickLinkedIn(value); break;
+        case "x": setQuickX(value); break;
+        case "instagram": setQuickInstagram(value); break;
+        case "tiktok": setQuickTikTok(value); break;
+        case "youtube": setQuickYouTube(value); break;
+      }
+      applied.push({ ...suggestion, value });
+    }
+    if (applied.length) setQuickNotes((current) => [...current.filter((note) => note.trim()), ...applied.map((item) => `Autofill reviewed (${fetchedAt.slice(0, 10)}): ${ORGANIZATION_AUTOFILL_LABELS[item.field]} = ${item.value}. Source: ${item.sourceUrl}. ${item.evidence}.`)]);
+  }
+
   function renderAddPersonForm(extraClass = "") {
     return (
       <form className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
@@ -4137,6 +4169,7 @@ export default function PeopleWorkspace({
                   setQuickOrganizationType(nextType);
                   if (!organizationIndustryOptions(nextType).includes(quickIndustry)) setQuickIndustry("");
                 }}>
+                  <option value="">Select organization type</option>
                   {ORGANIZATION_TYPE_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
                 </select>
               </label>
@@ -4145,6 +4178,7 @@ export default function PeopleWorkspace({
               <label className="people-org-team">Team size<input value={quickTeamSize} onChange={(event) => setQuickTeamSize(event.target.value)} placeholder="1–10, 50, global network..." /></label>
               <label className="is-wide">Description<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={3} placeholder="What this organization is and why it is relevant." /></label>
             </div>
+            <OrganizationAutofill name={name} values={organizationAutofillValues} onApply={applyOrganizationSuggestions} />
             <PeopleNotesEditor
               title="Notes"
               idPrefix="people-organization-note"
@@ -4276,7 +4310,7 @@ export default function PeopleWorkspace({
       </aside>
 
       <main className="people-directory-panel" data-total-records={totalRecords}>
-        <header className={`people-directory-header${compactDirectoryTitle ? " has-compact-title" : ""}`}>
+        <header className="people-directory-header">
           <div>
             <h1>{activeViewLabel}</h1>
           </div>
@@ -4707,6 +4741,7 @@ export default function PeopleWorkspace({
               )}
               </header>
 
+              <div className="people-profile-view-bar">
               <DetailTabs
                 id={`people-${selectedPerson.id}`}
                 tabs={PEOPLE_VIEWS}
@@ -4715,6 +4750,18 @@ export default function PeopleWorkspace({
                 ariaLabel={`${selectedPerson.title} profile sections`}
                 className="people-profile-tabs"
               />
+              <div className="people-profile-view-actions" aria-label={`${activeView} actions`}>
+                {activeView === "properties" && <>
+                  <button type="button" onClick={requestCancelEditor} disabled={profileSaving}><PeopleIcon name="close" /><span>Cancel</span></button>
+                  <button type="submit" form="people-profile-properties-form" disabled={profileSaving}><PeopleIcon name="check" /><span>{profileSaving ? "Saving..." : "Save"}</span></button>
+                </>}
+                {activeView === "timeline" && <>
+                  <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
+                  <PeopleAddButton label="Follow-up" icon="follow-up" onClick={() => router.push(followUpCreationRoute(selectedPerson))} ariaLabel={`Schedule a Personal follow-up for ${selectedPerson.title}`} />
+                </>}
+                {activeView === "links" && <PeopleAddButton label="Object" icon="object" ariaLabel="Add object" onClick={() => setObjectLinkOpen(true)} />}
+              </div>
+              </div>
               </>
             )}
 
@@ -4729,14 +4776,7 @@ export default function PeopleWorkspace({
               renderAddPersonForm("people-empty-add")
             ) : detailMode === "edit" ? (
               <div className="people-edit-layout">
-                <form className="people-profile-form people-edit-form" onSubmit={saveProfile}>
-                  <div className="people-edit-toolbar">
-                    <strong>{selectedPerson.className === "org" ? "Edit Organization" : "Edit Profile"}</strong>
-                    <div>
-                      <button type="button" onClick={requestCancelEditor}><PeopleIcon name="close" /><span>Cancel</span></button>
-                      <button type="submit" disabled={profileSaving}><PeopleIcon name="check" /><span>{profileSaving ? "Saving..." : "Save"}</span></button>
-                    </div>
-                  </div>
+                <form id="people-profile-properties-form" aria-label={selectedPerson.className === "org" ? "Edit Organization" : "Edit Profile"} className="people-profile-form people-edit-form" onSubmit={saveProfile}>
                   {(selectedPerson.className === "org" ? ORGANIZATION_PROFILE_SECTIONS : PROFILE_SECTIONS).map((section) => (
                     <Fragment key={section.title}>
                     <section className={`people-profile-section people-themed-section module-ref-tone-${section.tone}`} data-profile-section={section.title.toLowerCase().replace(/\s+/g, "-")}>
@@ -4913,15 +4953,6 @@ export default function PeopleWorkspace({
               </div>
             ) : detailMode === "timeline" ? (
               <section className="people-timeline-panel">
-                <div className="people-timeline-actions">
-                  <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
-                  <PeopleAddButton
-                    label="Follow-up"
-                    icon="follow-up"
-                    onClick={() => router.push(followUpCreationRoute(selectedPerson))}
-                    ariaLabel={`Schedule a Personal follow-up for ${selectedPerson.title}`}
-                  />
-                </div>
                 <div className="people-timeline-layout">
                   <section className="people-timeline-stream" aria-label={`${selectedPerson.title} ${selectedPerson.className === "org" ? "organization" : "relationship"} history`}>
                     <header>
@@ -5005,7 +5036,6 @@ export default function PeopleWorkspace({
                     <strong className="people-section-count" aria-label={`${peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length} linked items`}>
                       {peopleConnections.length + organizationConnections.length + unresolvedConnections.length + selectedProjectConnections.length + selectedNativeObjectLinks.length + selectedPerson.externalSources.length}
                     </strong>
-                    <PeopleAddButton label="Objects" ariaLabel="Add object" onClick={() => setObjectLinkOpen(true)} />
                   </div>
                 </div>
                 {actionNotice && <p className="people-notice">{actionNotice}</p>}
@@ -5274,7 +5304,7 @@ export default function PeopleWorkspace({
         )}
       </section>
 
-      {!initialLoadError && <nav className="people-mobile-actionbar" aria-label="People quick actions">
+      {!initialLoadError && (mobileSurface === "directory" || addingPerson || initialMode === "new") && <nav className="people-mobile-actionbar" aria-label="People quick actions">
         {mobileSurface === "directory" ? (
           <button type="button" onClick={() => openAddPerson("person")}><PeopleIcon name="new-person" /><span>Add Person</span></button>
         ) : mobileSurface === "editor" ? (
