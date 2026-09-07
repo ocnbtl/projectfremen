@@ -7,7 +7,7 @@
 
 .shell {
   grid-template-columns: clamp(224px, 16vw, 288px) minmax(440px, 38vw) minmax(430px, 1fr);
-  height: calc(100dvh - 68px);
+  height: calc(100dvh - var(--app-content-offset, 76px));
   min-height: 0;
   overflow: hidden;
   border-top: 1px solid var(--border);
@@ -971,7 +971,7 @@
     z-index: 42;
     inset: 68px 0 0 auto;
     width: min(460px, 92vw);
-    height: calc(100dvh - 68px);
+    height: calc(100dvh - var(--app-content-offset, 76px));
     border-left: 1px solid var(--border-strong);
     box-shadow: -14px 0 38px rgb(16 32 38 / 0.14);
     transform: translateX(102%);
@@ -1026,7 +1026,7 @@
   .shell,
   .detailShell {
     display: block;
-    height: calc(100dvh - 58px);
+    height: calc(100dvh - var(--app-content-offset, 76px));
   }
 
   .shell > :global(.module-sidebar) {
@@ -1035,7 +1035,7 @@
     inset: 58px auto 0 0;
     display: flex;
     width: min(322px, 88vw);
-    height: calc(100dvh - 58px);
+    height: calc(100dvh - var(--app-content-offset, 76px));
     transform: translateX(-102%);
     transition: transform 160ms ease;
   }
@@ -1170,7 +1170,7 @@
   .shell > :global(.inspector-rail) {
     inset: 58px 0 0;
     width: 100vw;
-    height: calc(100dvh - 58px);
+    height: calc(100dvh - var(--app-content-offset, 76px));
     border-left: 0;
     box-shadow: none;
   }

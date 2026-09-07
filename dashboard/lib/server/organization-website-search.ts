@@ -14,7 +14,20 @@ export async function findOrganizationWebsiteCandidates(profileUrl: string, publ
   const handle = profile.pathname.split("/").filter(Boolean).at(-1)?.replace(/^@/, "") || "";
   const query = (publicName || handle).replace(/[^\p{L}\p{N} .&'-]/gu, " ").trim().slice(0, 120);
   if (!query) return [];
-  const searchUrl = `https://www.bing.com/search?q=${encodeURIComponent(`${query} official website`)}&count=5`;
+  const pages = await searchOrganizationPages(`${query} official website`, fetchPage, timeoutMs);
+  return [...new Set(pages.map((page) => normalizeOrganizationUrl(new URL(page).origin)))].slice(0, 2);
+}
+
+/** Search for missing workforce/type facts only within the verified official website. */
+export async function findOrganizationFactPages(website: string, name: string, fetchPage: typeof fetchPublicPage, timeoutMs: number): Promise<string[]> {
+  const domain = new URL(website).hostname.replace(/^www\./, "");
+  const query = name.replace(/[^\p{L}\p{N} .&'-]/gu, " ").slice(0, 120);
+  const pages = await searchOrganizationPages(`site:${domain} ${query} employees company size facts`, fetchPage, timeoutMs);
+  return pages.filter((page) => new URL(page).hostname.replace(/^www\./, "") === domain).slice(0, 2);
+}
+
+async function searchOrganizationPages(query: string, fetchPage: typeof fetchPublicPage, timeoutMs: number): Promise<string[]> {
+  const searchUrl = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=5`;
   const page = await fetchPage(searchUrl, { timeoutMs, maxBytes: 1_000_000 });
   if (/verify you are human|unusual traffic|<title[^>]*>[^<]*(?:sign in|captcha)/i.test(page.html)) return [];
   const candidates: string[] = [];
@@ -31,12 +44,13 @@ export async function findOrganizationWebsiteCandidates(profileUrl: string, publ
         const link = organizationProfileLink(url.toString());
         if (!link || organizationLinkField(link.url) !== "website") continue;
         if (/(?:^|\.)(?:bing|microsoft|google|facebook|wikipedia|wikidata|instagram|youtube|tiktok|linkedin|twitter|x|linktr|linktree)\.(?:com|org|ee)$/.test(url.hostname)) continue;
-        const candidate = normalizeOrganizationUrl(url.origin);
+        if (/\.(?:pdf|zip|png|jpg|svg)$/i.test(url.pathname)) continue;
+        const candidate = normalizeOrganizationUrl(url.toString());
         if (!candidates.includes(candidate)) candidates.push(candidate);
         break;
       } catch { /* Invalid search links provide no candidate. */ }
     }
-    if (candidates.length >= 2) break;
+    if (candidates.length >= 5) break;
   }
   return candidates;
 }

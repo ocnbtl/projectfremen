@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       profile: typeof body.profile === "object" && body.profile ? body.profile : {},
       resourceProfile: typeof body.resourceProfile === "object" && body.resourceProfile ? body.resourceProfile : undefined,
       interaction: typeof body.interaction === "object" && body.interaction ? body.interaction : undefined
-    });
+    }, { initialPhoto: typeof body.initialPhoto === "string" ? body.initialPhoto : undefined });
 
     await appendAuditEvent({
       at: new Date().toISOString(),

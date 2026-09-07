@@ -1819,7 +1819,7 @@ html[data-admin-preview="mobile"] .ops-header-search {
 
 @media (max-width: 760px) {
   .module-ref-shell.admin-chrome-main {
-    padding-top: 92px !important;
+    padding-top: var(--app-content-offset) !important;
   }
 
   .module-ref-header,
@@ -1880,7 +1880,7 @@ html[data-admin-preview="mobile"] .ops-header-search {
 }
 
 html[data-admin-preview="mobile"] .module-ref-shell.admin-chrome-main {
-  padding-top: 92px !important;
+  padding-top: var(--app-content-offset) !important;
 }
 
 html[data-admin-preview="mobile"] .module-ref-header,
@@ -1968,7 +1968,7 @@ html[data-admin-preview="mobile"] .people-profile-rail {
   grid-template-columns: 236px minmax(420px, 0.9fr) minmax(520px, 1.1fr);
   gap: 0;
   width: 100vw;
-  height: calc(100dvh - 56px);
+  height: calc(100dvh - var(--app-content-offset, 76px));
   margin: 0;
   overflow: hidden;
   background: var(--surface-app);
@@ -7151,7 +7151,7 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
 .module-shell {
   display: grid;
   grid-template-columns: minmax(208px, 236px) minmax(0, 1fr) minmax(0, 360px);
-  min-height: calc(100dvh - 56px);
+  min-height: calc(100dvh - var(--app-content-offset, 76px));
   background: var(--shell-bg);
   color: var(--text-strong);
 }
@@ -7925,7 +7925,7 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
   .people-redesign-shell {
     grid-template-columns: minmax(320px, 0.44fr) minmax(0, 1fr);
     width: 100vw;
-    height: calc(100dvh - 56px);
+    height: calc(100dvh - var(--app-content-offset, 76px));
     min-height: 0;
     overflow: hidden;
   }
@@ -15031,3 +15031,34 @@ html[data-admin-preview="mobile"] .people-redesign-shell:has(.people-profile-vie
 html[data-admin-preview="mobile"] .people-redesign-shell:has(.people-profile-view-bar) .people-profile-panel { min-height: 0; height: 100%; }
 html[data-admin-preview="mobile"] .people-redesign-shell:has(.people-profile-view-bar) .people-mobile-topbar { position: static; }
 html[data-admin-preview="mobile"] .people-redesign-shell .people-profile-header .people-avatar { min-width: 58px; width: 58px; height: 58px; }
+
+/* Creation pictures stay in the draft until Save. */
+.people-create-photo { display: flex; align-items: center; gap: 14px; padding: 12px 0; }
+.people-create-photo .people-avatar { flex: 0 0 72px; width: 72px; min-width: 72px; height: 72px; }
+.people-create-photo > span { color: var(--text-strong); font-size: 13px; }
+.people-create-photo small { display: block; margin-top: 4px; color: var(--text-subtle); }
+.people-redesign-shell .people-capture-form { padding-bottom: 100px; }
+.people-redesign-shell .people-capture-form :is(button, input, select, textarea) { scroll-margin-block: 100px; }
+
+@media (max-width: 760px) {
+  .people-redesign-shell:is(.is-mobile-directory, .is-mobile-editor) {
+    height: calc(100dvh - var(--app-content-offset, 76px) - 16px);
+    min-height: 0;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .people-redesign-shell:is(.is-mobile-directory, .is-mobile-editor) .people-mobile-topbar { position: static; }
+  .people-redesign-shell.is-mobile-directory .people-directory-panel,
+  .people-redesign-shell.is-mobile-editor .people-profile-panel:has(.people-capture-form) { min-height: 0; height: 100%; overflow: auto; scroll-padding-bottom: 100px; }
+}
+html[data-admin-preview="mobile"] .people-redesign-shell:is(.is-mobile-directory, .is-mobile-editor) {
+  height: calc(100dvh - var(--app-content-offset, 76px) - 16px);
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
+}
+html[data-admin-preview="mobile"] .people-redesign-shell:is(.is-mobile-directory, .is-mobile-editor) .people-mobile-topbar { position: static; }
+html[data-admin-preview="mobile"] .people-redesign-shell.is-mobile-directory .people-directory-panel,
+html[data-admin-preview="mobile"] .people-redesign-shell.is-mobile-editor .people-profile-panel:has(.people-capture-form) { min-height: 0; height: 100%; overflow: auto; scroll-padding-bottom: 100px; }

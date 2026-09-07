@@ -118,7 +118,8 @@ export default function PeopleProfilePhotoDialog({
   hasPhoto,
   onClose,
   onSaved,
-  onRemoved
+  onRemoved,
+  onPrepared
 }: {
   open: boolean;
   personId: string;
@@ -127,6 +128,7 @@ export default function PeopleProfilePhotoDialog({
   onClose: () => void;
   onSaved: (photo: PhotoMetadata) => Promise<boolean>;
   onRemoved: () => Promise<boolean>;
+  onPrepared?: (dataUrl: string) => void;
 }) {
   const uploadInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
@@ -196,6 +198,17 @@ export default function PeopleProfilePhotoDialog({
     setError("");
     try {
       const photo = await prepareProfilePhoto(photoDraft);
+      if (onPrepared) {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result));
+          reader.onerror = () => reject(new Error("The picture could not be prepared."));
+          reader.readAsDataURL(photo);
+        });
+        onPrepared(dataUrl);
+        closeDialog(true);
+        return;
+      }
       const formData = new FormData();
       formData.append("photo", photo);
       const response = await fetch(`/api/people/photos/${encodeURIComponent(personId)}`, {
@@ -233,6 +246,7 @@ export default function PeopleProfilePhotoDialog({
   }
 
   async function removePhoto() {
+    if (onPrepared) { onPrepared(""); closeDialog(true); return; }
     setSaving(true);
     setError("");
     try {
@@ -401,7 +415,7 @@ export default function PeopleProfilePhotoDialog({
         {photoDraft ? (
           <footer className="people-photo-editor-actions">
             <button type="button" onClick={() => { releasePreview(); setPhotoDraft(null); }} disabled={saving}>Choose another</button>
-            <button type="button" className="is-primary" onClick={() => void uploadEditedPhoto()} disabled={saving}>{saving ? "Saving…" : "Save picture"}</button>
+            <button type="button" className="is-primary" onClick={() => void uploadEditedPhoto()} disabled={saving}>{saving ? "Preparing…" : onPrepared ? "Use picture" : "Save picture"}</button>
           </footer>
         ) : hasPhoto && (
           <footer>

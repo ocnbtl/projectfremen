@@ -1,6 +1,6 @@
 .shell {
   grid-template-columns: clamp(232px, 17.5vw, 304px) minmax(440px, 38vw) minmax(420px, 1fr);
-  height: calc(100dvh - 68px);
+  height: calc(100dvh - var(--app-content-offset, 76px));
   min-height: 0;
   overflow: hidden;
   border-top: 1px solid var(--border);
@@ -14,7 +14,7 @@
 .loadingShell {
   display: grid;
   grid-template-columns: clamp(232px, 17.5vw, 304px) minmax(440px, 38vw) minmax(420px, 1fr);
-  min-height: calc(100dvh - 68px);
+  min-height: calc(100dvh - var(--app-content-offset, 76px));
   border-top: 1px solid var(--border);
   background: var(--shell-bg);
 }
@@ -1607,7 +1607,7 @@
   .shell,
   .detailShell {
     display: block;
-    height: calc(100dvh - 68px);
+    height: calc(100dvh - var(--app-content-offset, 76px));
     overflow: hidden;
   }
 

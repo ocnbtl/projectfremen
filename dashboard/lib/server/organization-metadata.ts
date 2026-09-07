@@ -1,4 +1,5 @@
 import { normalizeOrganizationUrl, organizationLinkField, organizationProfileLink, organizationSuggestionError, type OrganizationAutofillResult, type OrganizationAutofillField, type OrganizationSuggestion } from "../modules/people/organization-autofill";
+import { isLinkedInLogoUrl } from "./organization-logo";
 
 function text(value: unknown, limit = 800): string {
   if (typeof value !== "string" && typeof value !== "number") return "";
@@ -23,13 +24,34 @@ function organizationType(value: string): string {
   if (/^(?:non.?profit|not.for.profit|charit|ngo)/i.test(value)) return "Nonprofit";
   if (/^(?:privately held|public company|company|business|corporation|partnership|self.employed|public benefit corporation)$/i.test(value)) return "Business";
   if (/^(?:government|government agency|government organization)$/i.test(value)) return "Government";
-  if (/^(?:university|school|educational institution|higher education)$/i.test(value)) return "University / School";
+  if (/^(?:university|school|educational|educational institution|higher education|public research university|private university)$/i.test(value)) return "University / School";
   if (/^(?:agency|community|association|other)$/i.test(value)) return value[0].toUpperCase() + value.slice(1).toLowerCase();
   return "";
 }
 function host(raw: string): string { return new URL(raw).hostname.toLowerCase().replace(/^www\./, ""); }
 export type OrganizationPageLink = { url: string; kind: "website" | "detail" | "social"; priority: number };
-export type OrganizationPage = OrganizationAutofillResult & { links: OrganizationPageLink[]; blocked: boolean };
+export type OrganizationPage = OrganizationAutofillResult & { links: OrganizationPageLink[]; blocked: boolean; linkedInLogo?: string };
+
+export function conciseOrganizationDescription(value: string): string {
+  const sentences = [...new Intl.Segmenter("en", { granularity: "sentence" }).segment(value)].map((part) => part.segment.trim());
+  const short = sentences.slice(0, 2).join(" ");
+  if (short.length <= 260) return short;
+  if (sentences[0].length <= 260) return sentences[0];
+  return sentences[0].slice(0, 250).replace(/\s+\S*$/, "").replace(/[,;:]$/, "") + ".";
+}
+const US_REGIONS: Record<string, string> = Object.fromEntries("AL:Alabama|AK:Alaska|AZ:Arizona|AR:Arkansas|CA:California|CO:Colorado|CT:Connecticut|DE:Delaware|DC:District of Columbia|FL:Florida|GA:Georgia|HI:Hawaii|ID:Idaho|IL:Illinois|IN:Indiana|IA:Iowa|KS:Kansas|KY:Kentucky|LA:Louisiana|ME:Maine|MD:Maryland|MA:Massachusetts|MI:Michigan|MN:Minnesota|MS:Mississippi|MO:Missouri|MT:Montana|NE:Nebraska|NV:Nevada|NH:New Hampshire|NJ:New Jersey|NM:New Mexico|NY:New York|NC:North Carolina|ND:North Dakota|OH:Ohio|OK:Oklahoma|OR:Oregon|PA:Pennsylvania|RI:Rhode Island|SC:South Carolina|SD:South Dakota|TN:Tennessee|TX:Texas|UT:Utah|VT:Vermont|VA:Virginia|WA:Washington|WV:West Virginia|WI:Wisconsin|WY:Wyoming".split("|").map((pair) => pair.split(":")));
+function addressParts(address: Record<string, unknown>) {
+  const country = text(typeof address.addressCountry === "string" ? address.addressCountry : object(address.addressCountry).name);
+  const us = /^(?:US|USA|United States(?: of America)?)$/i.test(country);
+  const region = text(address.addressRegion);
+  return [text(address.addressLocality), us ? US_REGIONS[region.toUpperCase()] || region : region, us ? "USA" : country].filter(Boolean);
+}
+function postalAddress(address: Record<string, unknown>): string {
+  const country = text(typeof address.addressCountry === "string" ? address.addressCountry : object(address.addressCountry).name);
+  const region = text(address.addressRegion);
+  const us = /^(?:US|USA|United States(?: of America)?)$/i.test(country);
+  return [text(address.streetAddress), text(address.addressLocality), us ? US_REGIONS[region.toUpperCase()] || region : region, text(address.postalCode), us ? "USA" : country].filter(Boolean).join(", ");
+}
 
 /** Read bounded HTML as data. Never execute scripts or load JSON-LD contexts. */
 export function extractOrganizationPage(html: string, sourceUrl: string, organizationName = ""): OrganizationPage {
@@ -39,7 +61,11 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
   const links: OrganizationPageLink[] = [];
   const conflicts = new Set<OrganizationAutofillField>();
   const add = (field: OrganizationAutofillField, value: unknown, evidence: string) => {
-    const clean = text(value, field === "context" ? 800 : 240);
+    let clean = field === "context" ? conciseOrganizationDescription(text(value, 1600)) : text(value, 240);
+    if (field === "headquarters") {
+      const parts = clean.split(/,\s*/);
+      if (parts.length === 3) clean = addressParts({ addressLocality: parts[0], addressRegion: parts[1], addressCountry: parts[2] }).join(", ");
+    }
     if (!clean || organizationSuggestionError(field, clean) || conflicts.has(field)) return;
     if (!suggestions.some((item) => item.field === field)) suggestions.push({ field, value: clean, sourceUrl: source, evidence });
   };
@@ -131,15 +157,18 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     else if (/^\d+$/.test(min) && /^\d+$/.test(max) && Number(min) <= Number(max)) add("teamSize", `${min}–${max}`, "Organization structured data: numberOfEmployees range");
     const locations = [organization.location].flat().map(dereference);
     const hq = locations.find((node) => /headquarters|head office/i.test(text(node.name)));
-    const addresses = [hq?.address || organization.address].flat().filter(Boolean);
+    const publishedAddresses = [hq?.address || organization.address].flat().filter(Boolean);
+    const physical = publishedAddresses.filter((entry) => text(dereference(entry).streetAddress) && !/^(?:P\.?\s*O\.?\s*Box|Post Office)/i.test(text(dereference(entry).streetAddress)));
+    const addresses = physical.length === 1 ? physical : publishedAddresses;
     if (addresses.length === 1) {
       const address = dereference(addresses[0]);
-      const city = [address.addressLocality, address.addressRegion, typeof address.addressCountry === "string" ? address.addressCountry : object(address.addressCountry).name].map((value) => text(value)).filter(Boolean).join(", ");
+      const city = addressParts(address).join(", ");
       add("headquarters", city, "Organization structured data: published office location");
-      add("streetAddress", address.streetAddress ? [address.streetAddress, address.postalCode].map((value) => text(value)).filter(Boolean).join(", ") : typeof addresses[0] === "string" ? addresses[0] : "", "Organization structured data: postal address");
+      add("streetAddress", address.streetAddress ? postalAddress(address) : typeof addresses[0] === "string" ? addresses[0] : "", "Organization structured data: postal address");
     }
     if (organization.nonprofitStatus) add("organizationType", "Nonprofit", "Organization structured data: nonprofitStatus");
     for (const type of types(organization)) if (TYPE_LABELS[type]) add("organizationType", TYPE_LABELS[type], `Organization structured data: ${type}`);
+    if (types(organization).includes("CollegeOrUniversity")) add("industry", "Higher Education", "Organization structured data: CollegeOrUniversity");
     addLink(organization.url, "Organization structured data: website", true);
     for (const link of [organization.sameAs].flat().slice(0, 24)) addLink(link, "Organization structured data: sameAs link", true);
   }
@@ -154,7 +183,8 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     for (const link of [profile.bio_links].flat().slice(0, 6)) addLink(object(link).url, "Public profile: biography link", true);
   }
 
-  const visibleHtml = html.replace(/<(script|style|noscript|svg|article)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+  const safeHtml = html.replace(/<(head|title|script|style|noscript|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+  const visibleHtml = social ? safeHtml.replace(/<article\b[^>]*>[\s\S]*?<\/article\s*>/gi, "") : safeHtml;
   const lines = visibleHtml.replace(/<\/(?:p|div|dt|dd|li|h[1-6]|tr|td|th|section|address)>|<br\s*\/?>/gi, "\n")
     .split("\n").map((line) => text(line, 1200)).filter(Boolean).slice(0, 6000);
   const hasOtherOrganization = organizations.length > 0 && !organization && Boolean(organizationName.trim());
@@ -188,8 +218,10 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
       if (founded) add("foundedYear", founded[1], `Published statement: ${line.slice(0, 220)}`);
       const headquarters = line.match(/^(?:Our (?:global |corporate )?headquarters (?:is|are)|We are headquartered|Headquartered) in ([^.]{3,160})/i);
       if (headquarters) add("headquarters", headquarters[1], `Published statement: ${line.slice(0, 220)}`);
-      const type = line.match(/^We are (?:a|an) (?:registered |independent )?(nonprofit|non-profit|not-for-profit|charity|government agency)\b/i);
-      if (type) add("organizationType", organizationType(type[1]), `Published statement: ${line.slice(0, 220)}`);
+      const type = line.match(/^(?:We are|[\p{L}\p{N} &'’.-]+ is) (?:a|an) (?:registered |independent )?(nonprofit|non-profit|not-for-profit|charity|government agency|public research university|private university|university|school)\b/iu);
+      if (type && (/^We are\b/i.test(line) || nameKey(line.split(/ is /i)[0]) === nameKey(organizationName))) add("organizationType", organizationType(type[1]), `Published statement: ${line.slice(0, 220)}`);
+      const employees = line.match(/^(?:(?:We (?:employ|have)|Our (?:global )?team (?:includes|has)|More than|Over|Approximately|About)\s+)?(?:(?:more than|over|approximately|about)\s+)?([\d,]+\+?)\s+(?:total |global )?employees\b/i);
+      if (employees) add("teamSize", (/approximately|about/i.test(employees[0]) ? "~" : "") + employees[1] + (/more than|over/i.test(employees[0]) && !employees[1].endsWith("+") ? "+" : ""), `Published workforce total: ${line.slice(0, 220)}`);
     }
     const microValues = (property: string) => {
       const values = new Set<string>();
@@ -203,8 +235,9 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     const microFields = Object.fromEntries(addressFields.map((field) => [field, microValues(field)]));
     const micro = (field: string) => microFields[field][0] || "";
     if (micro("streetAddress") && addressFields.every((field) => microFields[field].length <= 1) && /contact|about|office/i.test(new URL(source).pathname)) {
-      add("streetAddress", [micro("streetAddress"), micro("postalCode")].filter(Boolean).join(", "), "Published contact address");
-      add("headquarters", [micro("addressLocality"), micro("addressRegion"), micro("addressCountry")].filter(Boolean).join(", "), "Published contact location");
+      const address = Object.fromEntries(addressFields.map((field) => [field, micro(field)]));
+      add("streetAddress", postalAddress(address), "Published contact address");
+      add("headquarters", addressParts(address).join(", "), "Published contact location");
     }
   }
 
@@ -220,15 +253,23 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
         const url = new URL(text(raw, 2048), source);
         if (host(url.toString()) !== host(source) || url.search || /\.(?:pdf|jpg|png|zip)$/i.test(url.pathname)) continue;
         if (/(?:sales|demo|events?|webinar|blog|press|legal|privacy|manifesto|leadership)/i.test(url.pathname)) continue;
-        if (/(?:^|[\/_-])(?:about|contact|company|who-we-are|our-story|our-company|headquarters|locations)(?:[\/_-]|$)/i.test(url.pathname) || /^(?:About(?: us| the company)?|Contact(?: us)?|Our story|Who we are|Locations|Company)$/i.test(label)) {
-          links.push({ url: normalizeOrganizationUrl(url.toString()), kind: "detail", priority: /contact|headquarters/i.test(`${url.pathname} ${label}`) ? 1 : 2 });
+        if (/(?:^|[\/_-])(?:about|contact|company|who-we-are|our-story|our-company|headquarters|locations|facts|figures|at-a-glance|university-overview)(?:[\/_-]|$)/i.test(url.pathname) || /^(?:About(?: us| the company)?|Contact(?: us)?|Our story|Who we are|Locations|Company|Facts.*|.*at a glance)$/i.test(label)) {
+          links.push({ url: normalizeOrganizationUrl(url.toString()), kind: "detail", priority: /university-overview|company-overview/i.test(url.pathname) ? 0.5 : /facts|figures|at-a-glance/i.test(url.pathname) ? 1 : /contact|headquarters/i.test(`${url.pathname} ${label}`) ? 2 : 3 });
         }
       } catch { /* Not a public navigation link. */ }
     }
   }
   if (!social) add("website", new URL(source).origin, "Organization website");
   else addLink(source, "The public profile you supplied");
-  return { suggestions, sourceUrl: source, fetchedAt: new Date().toISOString(), links: links.slice(0, 80), blocked, conflicts: [...conflicts], message: "Published details found. Review the filled fields before saving." };
+  let linkedInLogo: string | undefined;
+  if (organizationLinkField(source) === "linkedin" && socialIdentity) {
+    const logo = object(organization?.logo);
+    const candidates = [typeof organization?.logo === "string" ? organization.logo : logo.url || logo.contentUrl,
+      ...[...html.matchAll(/<img\b[^>]*>/gi)].filter((match) => /(?:top-card|org-top-card).*(?:logo|entity-image)|company.logo|organization.logo/i.test(attribute(match[0], "class") + " " + attribute(match[0], "alt"))).map((match) => attribute(match[0], "data-delayed-url") || attribute(match[0], "src")),
+      meta.get("og:image")];
+    linkedInLogo = candidates.map((value) => text(value, 2048)).find(isLinkedInLogoUrl);
+  }
+  return { suggestions, sourceUrl: source, fetchedAt: new Date().toISOString(), links: links.slice(0, 80), linkedInLogo, blocked, conflicts: [...conflicts], message: "Published details found. Review the filled fields before saving." };
 }
 
 export function extractOrganizationMetadata(html: string, sourceUrl: string, organizationName = ""): OrganizationAutofillResult {

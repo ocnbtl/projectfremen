@@ -53,7 +53,7 @@ import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import OrganizationAutofill from "./people/OrganizationAutofill";
-import { ORGANIZATION_AUTOFILL_LABELS, ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, emptyOrganizationSuggestions, normalizeOrganizationUrl, type OrganizationAutofillValues, type OrganizationSuggestion } from "../lib/modules/people/organization-autofill";
+import { ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, canCompleteOrganizationAddress, emptyOrganizationSuggestions, normalizeOrganizationUrl, type OrganizationAutofillValues, type OrganizationSuggestion } from "../lib/modules/people/organization-autofill";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
 
@@ -963,12 +963,8 @@ function applyOrganizationLocation(entries: PersonalLocationEntry[], suggestions
   const address = suggestions.find((item) => item.field === "streetAddress")?.value;
   if (!location && !address) return entries;
   const primary = entries.find((entry) => entry.location || entry.address) || entries[0];
-  const updated = newLocationEntry({ ...primary, label: primary?.label && !/^(Relevant location|Relevant place)$/i.test(primary.label) ? primary.label : "Headquarters", location: primary?.location || location, address: primary?.address || address });
+  const updated = newLocationEntry({ ...primary, label: primary?.label && !/^(Relevant location|Relevant place)$/i.test(primary.label) ? primary.label : "Headquarters", location: primary?.location || location, address: address && canCompleteOrganizationAddress(primary?.address || "", address) ? address : primary?.address || address });
   return primary ? entries.map((entry) => entry.id === primary.id ? updated : entry) : [updated];
-}
-
-function organizationSourceNotes(suggestions: OrganizationSuggestion[], fetchedAt: string): string[] {
-  return suggestions.map((item) => `Autofill (${fetchedAt.slice(0, 10)}): ${ORGANIZATION_AUTOFILL_LABELS[item.field]} = ${item.value}. Source: ${item.sourceUrl}. ${item.evidence}.`);
 }
 
 function newEmailEntry(input: Partial<PersonalEmailEntry> = {}): PersonalEmailEntry {
@@ -2310,6 +2306,8 @@ export default function PeopleWorkspace({
   const [groups, setGroups] = useState<string[]>(["Collaborator"]);
   const [status, setStatus] = useState<PersonalRecordStatus>("active");
   const [quickContext, setQuickContext] = useState("");
+  const [quickPhoto, setQuickPhoto] = useState("");
+  const [quickPhotoDialogOpen, setQuickPhotoDialogOpen] = useState(false);
   const [quickLifeDreams, setQuickLifeDreams] = useState<string[]>([""]);
   const [quickNotes, setQuickNotes] = useState<string[]>([""]);
   const [quickOrganizationType, setQuickOrganizationType] = useState("");
@@ -2342,6 +2340,7 @@ export default function PeopleWorkspace({
   const [quickLinkedIn, setQuickLinkedIn] = useState("");
   const [quickYouTube, setQuickYouTube] = useState("");
   const [profileDraft, setProfileDraft] = useState<ContactProfileDraft>({ ...EMPTY_PROFILE_DRAFT });
+  const [profilePhotoDraft, setProfilePhotoDraft] = useState("");
   const [profileGroups, setProfileGroups] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -2771,6 +2770,7 @@ export default function PeopleWorkspace({
   const deleteTarget = useMemo(() => people.find((record) => record.id === deleteTargetId), [deleteTargetId, people]);
   useEffect(() => {
     setProfileDraft(getProfile(selectedPerson));
+    setProfilePhotoDraft("");
     setProfileGroups(selectedPerson?.subjects || []);
     setExpandedContactMethod(null);
     setQuickNoteOpen(false);
@@ -2958,6 +2958,7 @@ export default function PeopleWorkspace({
       ? [{ id: "legacy-overview-education", institution: selectedProfile.universityAffiliation }]
       : [];
   const addFormDirty = [
+    quickPhoto,
     name,
     quickNickname,
     quickFirstName,
@@ -2994,6 +2995,7 @@ export default function PeopleWorkspace({
     || cadence !== "P1M";
   const profileFormDirty = Boolean(
     selectedPerson && (
+      profilePhotoDraft ||
       JSON.stringify(profileDraft) !== JSON.stringify(getProfile(selectedPerson))
       || JSON.stringify(profileGroups) !== JSON.stringify(selectedPerson.subjects)
     )
@@ -3205,6 +3207,18 @@ export default function PeopleWorkspace({
 
   async function saveProfileDraft(nextDraft: ContactProfileDraft) {
     if (!selectedPerson) return false;
+    if (profilePhotoDraft) {
+      try {
+        const image = await (await fetch(profilePhotoDraft)).blob();
+        const body = new FormData(); body.append("photo", image, "profile-picture.jpg");
+        const headers = { ...buildJsonHeadersWithCsrf() };
+        delete headers["Content-Type"]; delete headers["content-type"];
+        const response = await fetch(`/api/people/photos/${encodeURIComponent(selectedPerson.id)}`, { method: "POST", headers, body });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok || !payload.photo) throw new Error(payload.error || "The picture could not be saved. Your draft is still here.");
+        nextDraft = { ...nextDraft, photoUrl: payload.photo.url, photoUpdatedAt: payload.photo.updatedAt };
+      } catch (error) { setError(error instanceof Error ? error.message : "The picture could not be saved."); return false; }
+    }
     const builtProfile = buildProfilePayload(nextDraft);
     const profile = selectedPerson.className === "org"
       ? {
@@ -3219,7 +3233,7 @@ export default function PeopleWorkspace({
     const preservedSources = selectedPerson.externalSources.filter((source) => !previousProfileSources.has(source));
     const profileSources = [profile.website, profile.linkedin, profile.youtube, profile.instagram, profile.tiktok, profile.x]
       .filter((value): value is string => Boolean(value));
-    return patchPerson(selectedPerson.id, {
+    const saved = await patchPerson(selectedPerson.id, {
       title: profile.fullName || selectedPerson.title,
       body: profile.context,
       url: profile.website || profile.linkedin,
@@ -3233,6 +3247,8 @@ export default function PeopleWorkspace({
       projects: splitList(nextDraft.projects),
       profile
     });
+    if (saved) setProfilePhotoDraft("");
+    return saved;
   }
 
   async function saveQuickNote(event: React.FormEvent<HTMLFormElement>) {
@@ -3402,7 +3418,7 @@ export default function PeopleWorkspace({
       const response = await fetch("/api/personal/records", {
         method: "POST",
         headers: buildJsonHeadersWithCsrf(),
-        body: JSON.stringify(legacyInput)
+        body: JSON.stringify({ ...legacyInput, initialPhoto: quickPhoto || undefined })
       });
 
       const payload = (await response
@@ -3487,6 +3503,7 @@ export default function PeopleWorkspace({
       setGroups(["Collaborator"]);
       setStatus("active");
       setQuickContext("");
+      setQuickPhoto("");
       setQuickLifeDreams([""]);
       setQuickNotes([""]);
       setQuickOrganizationType("");
@@ -3848,6 +3865,7 @@ export default function PeopleWorkspace({
 
   async function saveProfilePhoto(photo: ProfilePhotoMetadata): Promise<boolean> {
     if (!selectedPerson) return false;
+    setProfilePhotoDraft("");
     return patchPerson(selectedPerson.id, {
       profile: buildProfilePayload({ ...selectedProfile, photoUrl: photo.url, photoUpdatedAt: photo.updatedAt })
     });
@@ -3855,6 +3873,7 @@ export default function PeopleWorkspace({
 
   async function clearProfilePhoto(): Promise<boolean> {
     if (!selectedPerson) return false;
+    setProfilePhotoDraft("");
     return patchPerson(selectedPerson.id, {
       profile: buildProfilePayload({ ...selectedProfile, photoUrl: "", photoUpdatedAt: "" })
     });
@@ -3896,6 +3915,8 @@ export default function PeopleWorkspace({
   }
 
   async function discardEditorChanges() {
+    setProfilePhotoDraft("");
+    setQuickPhoto("");
     const destination = pendingNavigation;
     setPendingNavigation(null);
     setCancelConfirmOpen(false);
@@ -3992,7 +4013,7 @@ export default function PeopleWorkspace({
     website: referenceUrl, linkedin: quickLinkedIn, x: quickX, instagram: quickInstagram, tiktok: quickTikTok, youtube: quickYouTube
   };
 
-  function applyOrganizationSuggestions(suggestions: OrganizationSuggestion[], fetchedAt: string) {
+  function applyOrganizationSuggestions(suggestions: OrganizationSuggestion[]) {
     const applied: OrganizationSuggestion[] = [];
     for (const suggestion of emptyOrganizationSuggestions(suggestions, organizationAutofillValues)) {
       let value = suggestion.value.trim();
@@ -4021,7 +4042,6 @@ export default function PeopleWorkspace({
     }
     if (applied.length) {
       setQuickLocations((current) => applyOrganizationLocation(current, applied));
-      setQuickNotes((current) => [...current.filter((note) => note.trim()), ...organizationSourceNotes(applied, fetchedAt)]);
     }
   }
 
@@ -4030,7 +4050,7 @@ export default function PeopleWorkspace({
     return { ...draft, name: draft.fullName, headquarters: primary?.location || draft.headquarters, streetAddress: primary?.address || "" };
   }
 
-  function applyProfileOrganizationSuggestions(suggestions: OrganizationSuggestion[], fetchedAt: string) {
+  function applyProfileOrganizationSuggestions(suggestions: OrganizationSuggestion[]) {
     setProfileDraft((current) => {
       const applied = emptyOrganizationSuggestions(suggestions, profileAutofillValues(current));
       let updated = { ...current };
@@ -4039,7 +4059,7 @@ export default function PeopleWorkspace({
         if (item.field === "name") updated.fullName = item.value;
         else updated = { ...updated, [item.field]: item.value };
       }
-      return { ...updated, locations: applyOrganizationLocation(current.locations, applied), notes: [current.notes, ...organizationSourceNotes(applied, fetchedAt)].filter(Boolean).join("\n") };
+      return { ...updated, locations: applyOrganizationLocation(current.locations, applied) };
     });
   }
 
@@ -4058,6 +4078,11 @@ export default function PeopleWorkspace({
             <button type="button" aria-pressed={className === "org"} onClick={() => switchQuickProfileType("org")}>Organization</button>
           </div>
         </fieldset>
+        <div className="people-create-photo">
+          <PeopleProfileAvatar label={name || (className === "org" ? "new organization" : "new person")} initials={name.slice(0, 2).toUpperCase() || "+"} photoUrl={quickPhoto} onSelect={() => setQuickPhotoDialogOpen(true)} />
+          <span>{quickPhoto ? "Profile picture ready" : "Add a profile picture"}<small>Saved when you save this profile.</small></span>
+        </div>
+        <PeopleProfilePhotoDialog open={quickPhotoDialogOpen} personId="" personName={name || "New profile"} hasPhoto={Boolean(quickPhoto)} onClose={() => setQuickPhotoDialogOpen(false)} onPrepared={setQuickPhoto} onSaved={async () => true} onRemoved={async () => true} />
         {className === "person" && (
           <>
             <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" data-profile-section="identity" aria-labelledby="people-create-identity-title">
@@ -4224,7 +4249,7 @@ export default function PeopleWorkspace({
             <header className="people-profile-section-heading people-autofill-heading">
               <span><PeopleIcon name="communication" /></span>
               <h4 id="people-organization-links-title">Links</h4>
-              <OrganizationAutofill name={name} values={organizationAutofillValues} onApply={applyOrganizationSuggestions} disabled={saving} />
+              <OrganizationAutofill name={name} values={organizationAutofillValues} onApply={applyOrganizationSuggestions} onPhoto={setQuickPhoto} hasPhoto={Boolean(quickPhoto)} disabled={saving} />
             </header>
             <div className="people-profile-field-grid people-create-social-grid people-create-social-grid-no-divider">
               <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
@@ -4673,8 +4698,8 @@ export default function PeopleWorkspace({
               <PeopleProfileAvatar
                 label={selectedPerson.title}
                 initials={getInitials(selectedPerson)}
-                photoUrl={selectedProfile.photoUrl}
-                photoUpdatedAt={selectedProfile.photoUpdatedAt}
+                photoUrl={profilePhotoDraft || selectedProfile.photoUrl}
+                photoUpdatedAt={profilePhotoDraft ? undefined : selectedProfile.photoUpdatedAt}
                 onSelect={() => setPhotoDialogOpen(true)}
               />
               <div className="people-profile-identity">
@@ -4817,7 +4842,7 @@ export default function PeopleWorkspace({
                       <header className={`people-profile-section-heading${section.title === "Links" && selectedPerson.className === "org" ? " people-autofill-heading" : ""}`}>
                         <span><PeopleIcon name={profileSectionIcon(section.title)} /></span>
                         <h4>{section.title}</h4>
-                        {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} disabled={profileSaving} />}
+                        {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} onPhoto={setProfilePhotoDraft} hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)} disabled={profileSaving} />}
                       </header>
                       {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
                         <EmailEntriesEditor
@@ -5548,7 +5573,8 @@ export default function PeopleWorkspace({
           open={photoDialogOpen}
           personId={selectedPerson.id}
           personName={selectedPerson.title}
-          hasPhoto={Boolean(selectedProfile.photoUrl)}
+          hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)}
+          onPrepared={profilePhotoDraft ? setProfilePhotoDraft : undefined}
           onClose={() => setPhotoDialogOpen(false)}
           onSaved={saveProfilePhoto}
           onRemoved={clearProfilePhoto}

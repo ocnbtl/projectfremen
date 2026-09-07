@@ -65,7 +65,7 @@ try {
   const values = Object.fromEntries(result.suggestions.map((item) => [item.field, item.value]));
   assert.equal(values.foundedYear, "1998");
   assert.equal(values.teamSize, "10–50");
-  assert.equal(values.headquarters, "Columbus, Ohio, US");
+  assert.equal(values.headquarters, "Columbus, Ohio, USA");
   assert.equal(values.context, "A & B research");
   assert.equal(values.organizationType, "Business");
   assert.equal(values.linkedin, "https://linkedin.com/company/example");
@@ -98,10 +98,10 @@ try {
   };
   const discovered = await discoverOrganization("", [socialLinks.instagram], { fetchPage });
   const discoveredValues = Object.fromEntries(discovered.suggestions.map((item) => [item.field, item.value]));
-  for (const [field, expected] of Object.entries({ ...socialLinks, website: "https://example.com", name: "Example", industry: "Research Services", organizationType: "Business", foundedYear: "2004", teamSize: "11–50 employees", headquarters: "Columbus, Ohio, US", streetAddress: "12 Main Street, Suite 4, 43215", context: "Tools for field research." })) assert.equal(discoveredValues[field], expected, field);
+  for (const [field, expected] of Object.entries({ ...socialLinks, website: "https://example.com", name: "Example", industry: "Research Services", organizationType: "Business", foundedYear: "2004", teamSize: "11–50 employees", headquarters: "Columbus, Ohio, USA", streetAddress: "12 Main Street, Suite 4, Columbus, Ohio, 43215, USA", context: "Tools for field research." })) assert.equal(discoveredValues[field], expected, field);
   assert.ok(fetched.includes("https://example.com/about") && fetched.includes("https://example.com/contact"), "Follow relevant company pages from a reverse social seed");
   assert.ok(!fetched.includes("https://wrong.example"), "Ignore unrelated embedded profiles");
-  assert.ok(fetched.length <= 6 && new Set(fetched).size === fetched.length, "Bound and deduplicate discovery");
+  assert.ok(fetched.length <= 10 && new Set(fetched).size === fetched.length, "Bound and deduplicate discovery");
   assert.equal(discovered.suggestions.find((item) => item.field === "streetAddress").sourceUrl, "https://example.com/contact", "Keep exact per-field source");
   const onlyMissing = emptyOrganizationSuggestions(discovered.suggestions, { context: "My own description", teamSize: "20", instagram: socialLinks.instagram });
   assert.ok(!onlyMissing.some((item) => ["context", "teamSize", "instagram"].includes(item.field)), "Keep manually entered values, including changes made while fetching");
@@ -131,9 +131,44 @@ try {
   const searchValues = Object.fromEntries(searchFallback.suggestions.map(item => [item.field, item.value]));
   assert.equal(searchValues.website, 'https://example.com', 'A hidden social website can be recovered through an exact reciprocal profile link');
   assert.equal(searchValues.foundedYear, '2004', 'Search snippets and unverified candidate facts must never enter the draft');
-  assert.ok(!searchFallback.sources.includes('https://unrelated.example') && searchedPages.length <= 6);
+  assert.ok(!searchFallback.sources.includes('https://unrelated.example') && searchedPages.length <= 10);
   assert.ok(searchFallback.message.includes('link back'));
-  console.log("Organization autofill: DNS/socket/redirect and byte limits; all six seed fields; profile-only links; reverse social discovery; complete organization details; source provenance; conflicts; draft preservation; six-page bound; blocked-page recovery passed.");
+  const { extractOrganizationPage, conciseOrganizationDescription } = require(path.join(temporary, 'server/organization-metadata.js'));
+  const { isLinkedInLogoUrl } = require(path.join(temporary, 'server/organization-logo.js'));
+  const { canCompleteOrganizationAddress } = require(path.join(temporary, 'modules/people/organization-autofill.js'));
+  assert.equal(canCompleteOrganizationAddress('1075 Risman Dr.', '1075 Risman Dr., Kent, Ohio, 44242, USA'),true);
+  assert.equal(canCompleteOrganizationAddress('12 Other Street', '1075 Risman Dr., Kent, Ohio, 44242, USA'),false);
+  const completion={field:'streetAddress',value:'1075 Risman Dr., Kent, Ohio, 44242, USA',sourceUrl:'https://university.example',evidence:'Published address'};
+  assert.equal(emptyOrganizationSuggestions([completion],{streetAddress:'1075 Risman Dr.'}).length,1);
+  assert.equal(emptyOrganizationSuggestions([completion],{streetAddress:'12 Other Street'}).length,0);
+  const factPages=[];
+  const fallback = await discoverOrganization('Example', ['https://example.com'],{fetchPage:async url=>{factPages.push(url);return {sourceUrl:url,html:url.startsWith('https://www.bing.com/search?')?'<li class="b_algo"><h2><a href="https://example.com/workforce">Example facts</a></h2><p>Invented 9999 employees</p></li>':url==='https://example.com/workforce'?'<p>More than 400 employees</p>':url==='https://example.com'?'<a href="/about">About</a>':'<p>About Example</p>'};}});
+  assert.equal(fallback.suggestions.find(x=>x.field==='teamSize')?.value,'400+','Missing facts trigger search, followed by actual official source reading');
+  assert.ok(factPages.some(url=>url.startsWith('https://www.bing.com/search?')));
+  const university = { '@type': ['CollegeOrUniversity','Organization'], name: 'Example University', url: 'https://university.example', description: 'Example University provides higher education and research. It offers undergraduate and graduate programs. A third marketing sentence.', address: [{postOfficeBoxNumber:'PO Box 10',addressLocality:'Kent',addressRegion:'OH',addressCountry:'US',postalCode:'44242'}, {streetAddress:'1075 Risman Dr.',addressLocality:'Kent',addressRegion:'OH',addressCountry:'US',postalCode:'44242'}] };
+  const universityPages = {
+    'https://university.example': '<script type="application/ld+json">'+JSON.stringify(university)+'</script><a href="/facts-figures">Facts &amp; Figures</a>',
+    'https://university.example/facts-figures': '<a href="/facts-figures/university-overview">University Overview</a>',
+    'https://university.example/facts-figures/university-overview': '<article><ul><li>More than 10,700 employees:<ul><li>2,700+ full- and part-time faculty</li><li>5,000+ student employees</li></ul></li><li>33,000 students</li></ul></article>'
+  };
+  const universityResult = await discoverOrganization('Example University', ['https://university.example'], {fetchPage: async url => {assert.ok(universityPages[url],url);return {sourceUrl:url,html:universityPages[url]};}});
+  const universityValues = Object.fromEntries(universityResult.suggestions.map(item=>[item.field,item.value]));
+  assert.equal(universityValues.teamSize,'10,700+');
+  assert.equal(universityValues.organizationType,'University / School');
+  assert.equal(universityValues.headquarters,'Kent, Ohio, USA');
+  assert.equal(universityValues.streetAddress,'1075 Risman Dr., Kent, Ohio, 44242, USA');
+  assert.equal(universityValues.context,'Example University provides higher education and research. It offers undergraduate and graduate programs.');
+  assert.ok(conciseOrganizationDescription('A very long description '.repeat(80)).length<=360);
+  assert.equal(extractOrganizationPage('<title>Example University | LinkedIn</title><dl><dt>Type</dt><dd>Educational</dd></dl>','https://linkedin.com/school/example-university','Example University').suggestions.find(x=>x.field==='organizationType')?.value,'University / School');
+  assert.equal(extractOrganizationPage('<p>5,000+ student employees</p><p>25,000 enrolled students</p>','https://university.example').suggestions.some(x=>x.field==='teamSize'),false,'Do not mistake students or a workforce subset for total employees');
+  const logoUrl='https://media.licdn.com/dms/image/v2/abc/company-logo_200_200/company-logo/image';
+  const logoPage=extractOrganizationPage('<title>Example University | LinkedIn</title><meta property="og:image" content="https://media.licdn.com/company-background/cover"><img class="top-card-layout__entity-image" alt="Example University logo" data-delayed-url="'+logoUrl+'">','https://linkedin.com/school/example-university','Example University');
+  assert.equal(logoPage.linkedInLogo,logoUrl);
+  for(const invalid of ['http://media.licdn.com/company-logo/foo','https://media.licdn.com.evil.example/company-logo/foo','https://media.licdn.com/company-background/cover','https://127.0.0.1/company-logo/foo']) assert.equal(isLinkedInLogoUrl(invalid),false);
+  console.log("Organization autofill: DNS/socket/redirect and byte limits; all six seed fields; profile-only links; reverse social discovery; complete organization details; source provenance; conflicts; draft preservation; ten-page bound; blocked-page recovery passed.");
+  if (process.argv.includes("--kent")) {
+    const r = await discoverOrganization("Kent State University", ["https://www.kent.edu"]); console.log(JSON.stringify(r,null,2));
+  }
   if (process.argv.includes("--live")) {
     for (const [name, url] of [["Mozilla", "https://www.mozilla.org/en-US/"], ["Cloudflare", "https://www.cloudflare.com/"], ["", "https://www.instagram.com/mozilla/"]]) {
       try {

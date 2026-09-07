@@ -1,20 +1,22 @@
 import { normalizeOrganizationUrl, organizationLinkField, organizationProfileLink, type OrganizationAutofillField, type OrganizationAutofillResult, type OrganizationSuggestion } from "../modules/people/organization-autofill";
 import { extractOrganizationPage, type OrganizationPageLink } from "./organization-metadata";
 import { fetchPublicPage } from "./public-page";
-import { findOrganizationWebsiteCandidates, organizationProfileKey } from "./organization-website-search";
+import { findOrganizationFactPages, findOrganizationWebsiteCandidates, organizationProfileKey } from "./organization-website-search";
+import { fetchLinkedInLogo } from "./organization-logo";
 
-const MAX_PAGES = 6;
+const MAX_PAGES = 10;
 const TOTAL_TIMEOUT_MS = 22_000;
 const comparable = (value: string) => value.toLowerCase().replace(/[\s,]+/g, " ").trim().replace(/\/+$/, "");
 
-/** One explicit click inspects at most six connected public pages, with no background crawl. */
+/** One explicit click inspects at most ten connected public pages, with no background crawl. */
 export async function discoverOrganization(name: string, urls: string[], dependencies: {
   fetchPage?: typeof fetchPublicPage;
   timeoutMs?: number;
+  fetchLogo?: typeof fetchLinkedInLogo;
 } = {}): Promise<OrganizationAutofillResult> {
   const deadline = Date.now() + (dependencies.timeoutMs ?? TOTAL_TIMEOUT_MS);
   const seeds = [...new Set(urls.map(normalizeOrganizationUrl))].slice(0, 6);
-  const queue: (OrganizationPageLink & { verifyProfile?: string })[] = seeds.map((url) => ({ url, kind: organizationLinkField(url) === "website" ? "website" : "social", priority: organizationLinkField(url) === "website" ? 0 : 3 }));
+  const queue: (OrganizationPageLink & { verifyProfile?: string; depth?: number })[] = seeds.map((url) => ({ url, kind: organizationLinkField(url) === "website" ? "website" : "social", priority: organizationLinkField(url) === "website" ? 0 : 3 }));
   const visited = new Set<string>();
   const sources: string[] = [];
   const candidates = new Map<OrganizationAutofillField, { item: OrganizationSuggestion; priority: number }>();
@@ -25,8 +27,10 @@ export async function discoverOrganization(name: string, urls: string[], depende
   let detailPages = 0;
   let resolvedName = name;
   let searched = false;
+  let searchedFacts = false;
   let verifiedSearch = false;
   let publicProfileName = "";
+  let logo: { url: string; sourceUrl: string } | undefined;
   const addCandidate = (item: OrganizationSuggestion, priority: number) => {
     const existing = candidates.get(item.field);
     if (!existing || priority < existing.priority) {
@@ -41,7 +45,8 @@ export async function discoverOrganization(name: string, urls: string[], depende
     queue.sort((a, b) => a.priority - b.priority);
     const next = queue.shift()!;
     if (next.verifyProfile && verifiedSearch) continue;
-    if (next.kind === "detail" && detailPages >= 2) continue;
+    if (next.kind === "detail" && detailPages >= 5) continue;
+    if (next.kind === "detail" && /facts|figures|glance/.test(next.url) && candidates.has("teamSize") && candidates.has("organizationType")) continue;
     const key = comparable(next.url);
     if (visited.has(key)) continue;
     visited.add(key);
@@ -57,6 +62,7 @@ export async function discoverOrganization(name: string, urls: string[], depende
         verifiedSearch = true;
       }
       sources.push(parsed.sourceUrl);
+      if (parsed.linkedInLogo && !logo) logo = { url: parsed.linkedInLogo, sourceUrl: parsed.sourceUrl };
       visited.add(comparable(parsed.sourceUrl));
       const social = organizationLinkField(parsed.sourceUrl) !== "website";
       if (social && !publicProfileName) publicProfileName = parsed.suggestions.find((item) => item.field === "name")?.value || "";
@@ -67,11 +73,12 @@ export async function discoverOrganization(name: string, urls: string[], depende
       }
       for (const field of parsed.conflicts || []) if (!candidates.has(field)) conflicts.add(field);
       for (const link of parsed.links) {
-        if (next.kind === "detail" && link.kind === "detail") continue;
+        if (link.kind === "detail" && (next.depth || 0) >= 2) continue;
+        if (link.kind === "detail" && /facts|figures|overview|glance/.test(link.url) && candidates.has("teamSize") && candidates.has("organizationType")) continue;
         if (link.kind === "website" && candidates.has("website")) continue;
         if (visited.has(comparable(link.url)) || queue.some((item) => comparable(item.url) === comparable(link.url))) continue;
         if (link.kind === "social" && !organizationProfileLink(link.url)) continue;
-        queue.push(link);
+        queue.push({ ...link, depth: (next.depth || 0) + 1 });
       }
     } catch (error) {
       firstError ??= error;
@@ -87,12 +94,27 @@ export async function discoverOrganization(name: string, urls: string[], depende
         queue.push(...websites.map((url) => ({ url, kind: "website" as const, priority: 0, verifyProfile: next.url })));
       } catch { /* A failed search does not discard directly published profile details. */ }
     }
+    const officialWebsite = candidates.get("website")?.item.value;
+    if (!searchedFacts && officialWebsite && attempted >= 2 && attempted <= MAX_PAGES - 2 && Date.now() < deadline
+      && (!candidates.has("teamSize") || !candidates.has("organizationType")) && !queue.some((item) => item.kind === "detail")) {
+      searchedFacts = true;
+      attempted++;
+      try {
+        const pages = await findOrganizationFactPages(officialWebsite, resolvedName, dependencies.fetchPage || fetchPublicPage, Math.min(4000, Math.max(1, deadline - Date.now())));
+        queue.push(...pages.map((url) => ({ url, kind: "detail" as const, priority: 1, depth: 2 })));
+      } catch { /* Search snippets never supply facts; only readable official pages can. */ }
+    }
   }
   // Preserve the endpoint's private-destination error contract when no page can be read.
   if (!sources.length && firstError instanceof Error && /^Use a public/.test(firstError.message)) throw firstError;
   const suggestions = [...candidates.values()].map(({ item }) => item).filter((item) => !conflicts.has(item.field));
+  let photo: OrganizationAutofillResult["photo"];
+  if (logo && Date.now() < deadline) {
+    try { photo = { dataUrl: await (dependencies.fetchLogo || fetchLinkedInLogo)(logo.url, Math.min(3000, deadline - Date.now())), sourceUrl: logo.sourceUrl }; }
+    catch { /* A blocked image must not discard available facts. */ }
+  }
   return {
-    suggestions, sourceUrl: sources[0] || seeds[0], sources, unavailableSources, conflicts: [...conflicts], fetchedAt: new Date().toISOString(),
+    suggestions, photo, sourceUrl: sources[0] || seeds[0], sources, unavailableSources, conflicts: [...conflicts], fetchedAt: new Date().toISOString(),
     message: sources.length
       ? `${sources.length} public ${sources.length === 1 ? "page" : "pages"} checked.${verifiedSearch ? " The website was matched by its link back to your social profile." : ""}${unavailableSources ? " Some pages could not be read or matched." : ""}${conflicts.size ? " Conflicting details were left empty." : ""} Unpublished details stay empty.`
       : "These links did not provide a readable public profile. Try adding the official website; sign-in-only pages cannot supply details."

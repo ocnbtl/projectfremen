@@ -6,18 +6,20 @@ import { ORGANIZATION_AUTOFILL_LABELS, emptyOrganizationSuggestions, organizatio
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
 /** Placed directly in the Links heading; all changes remain an unsaved form draft. */
-export default function OrganizationAutofill({ name, values, onApply, disabled = false }: {
+export default function OrganizationAutofill({ name, values, onApply, onPhoto, hasPhoto = false, disabled = false }: {
   name: string;
   values: OrganizationAutofillValues;
   onApply: (suggestions: OrganizationSuggestion[], fetchedAt: string) => void;
   disabled?: boolean;
+  onPhoto?: (dataUrl: string) => void;
+  hasPhoto?: boolean;
 }) {
   const [result, setResult] = useState<OrganizationAutofillResult | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const controller = useRef<AbortController | null>(null);
-  const latest = useRef({ name, values, onApply });
-  latest.current = { name, values, onApply };
+  const latest = useRef({ name, values, onApply, onPhoto, hasPhoto });
+  latest.current = { name, values, onApply, onPhoto, hasPhoto };
   const urls = organizationSeedUrls(values);
   const sourceKey = JSON.stringify(urls);
   useEffect(() => {
@@ -54,8 +56,10 @@ export default function OrganizationAutofill({ name, values, onApply, disabled =
       // Clear before applying: the autofilled name/links must not invalidate their own result.
       controller.current = null;
       latest.current.onApply(chosen, next.fetchedAt);
+      const pictureAdded = Boolean(next.photo && latest.current.onPhoto && !latest.current.hasPhoto && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(next.photo.dataUrl) && next.photo.dataUrl.length <= 1_000_000);
+      if (pictureAdded) latest.current.onPhoto!(next.photo!.dataUrl);
       setResult({ ...next, suggestions: chosen });
-      setNotice(chosen.length ? `${chosen.length} ${chosen.length === 1 ? "field" : "fields"} filled. Review the details, then Save.` : "No additional fields could be filled. Your existing details were kept.");
+      setNotice(chosen.length || pictureAdded ? `${chosen.length} ${chosen.length === 1 ? "field" : "fields"} filled.${pictureAdded ? " LinkedIn picture added." : ""} Review the details, then Save.` : "No additional fields could be filled. Your existing details were kept.");
     } catch (error) {
       if (!request.signal.aborted) setNotice(error instanceof Error ? error.message : "Autofill could not finish. Your draft is still here.");
     } finally {
@@ -73,11 +77,12 @@ export default function OrganizationAutofill({ name, values, onApply, disabled =
       {result && <details className="people-autofill-sources">
         <summary>Autofill sources</summary>
         <p>{result.message}</p>
+        {result.photo && <p>Picture: <a href={result.photo.sourceUrl} target="_blank" rel="noopener noreferrer">LinkedIn organization profile</a></p>}
+        {onPhoto && !hasPhoto && !result.photo && <p>The LinkedIn picture was not publicly available. You can add a picture yourself.</p>}
         {result.suggestions.length > 0 && <ul>{result.suggestions.map((item) => <li key={item.field}>
           <strong>{ORGANIZATION_AUTOFILL_LABELS[item.field]}</strong>: {item.value}
           <small>{item.evidence}. <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a></small>
         </li>)}</ul>}
-        {result.suggestions.length > 0 && <p>Sources are included in Notes when you save.</p>}
       </details>}
     </div>}
   </>;

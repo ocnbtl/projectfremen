@@ -3,6 +3,15 @@ import { deleteJsonFile, readJsonFile, writeJsonFile } from "../../file-store";
 const MAX_PROFILE_PHOTO_BYTES = 1_500_000;
 const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 
+export function decodeProfilePhoto(dataUrl: string) {
+  if (typeof dataUrl !== "string" || dataUrl.length > 1_000_000) throw new Error("The prepared profile picture is too large.");
+  const match = dataUrl.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/]+={0,2})$/);
+  if (!match) throw new Error("Choose a JPEG, PNG, or WebP profile picture.");
+  const bytes = Buffer.from(match[2], "base64");
+  if (!bytes.length || !hasExpectedSignature(bytes, match[1])) throw new Error("The profile picture is invalid.");
+  return { mimeType: match[1], bytes };
+}
+
 export type StoredPeopleProfilePhoto = {
   personId: string;
   mimeType: "image/jpeg" | "image/png" | "image/webp";

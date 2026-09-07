@@ -1,6 +1,6 @@
 .shell {
   grid-template-columns: clamp(224px, 16vw, 288px) minmax(440px, 38vw) minmax(430px, 1fr);
-  height: calc(100dvh - 68px);
+  height: calc(100dvh - var(--app-content-offset, 76px));
   min-height: 0;
   overflow: hidden;
   border-top: 1px solid var(--border);
@@ -1659,7 +1659,7 @@
   .shell,
   .detailShell {
     display: block;
-    height: calc(100dvh - 68px);
+    height: calc(100dvh - var(--app-content-offset, 76px));
     overflow: hidden;
   }
 

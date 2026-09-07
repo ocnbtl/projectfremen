@@ -21,6 +21,7 @@ export type OrganizationAutofillResult = {
   sources?: string[];
   unavailableSources?: number;
   conflicts?: OrganizationAutofillField[];
+  photo?: { dataUrl: string; sourceUrl: string };
 };
 export const ORGANIZATION_LINK_FIELDS = ["website", "linkedin", "x", "youtube", "instagram", "tiktok"] as const;
 export type OrganizationLinkField = typeof ORGANIZATION_LINK_FIELDS[number];
@@ -35,10 +36,16 @@ export function organizationSeedUrls(values: OrganizationAutofillValues): string
   }))];
 }
 
+export function canCompleteOrganizationAddress(current: string, proposed: string): boolean {
+  const key = (value: string) => value.toLowerCase().replace(/\./g, "").replace(/\s+/g, " ").trim();
+  return Boolean(current.trim()) && current.split(",").length <= 2 && proposed.split(",").length >= 4 && key(proposed).startsWith(key(current) + ",");
+}
+
 export function emptyOrganizationSuggestions(suggestions: OrganizationSuggestion[], values: OrganizationAutofillValues): OrganizationSuggestion[] {
   const seen = new Set<string>();
   return suggestions.filter((item) => {
-    if (!(item.field in ORGANIZATION_AUTOFILL_LABELS) || seen.has(item.field) || values[item.field]?.trim() || organizationSuggestionError(item.field, item.value)) return false;
+    const completesStreet = item.field === "streetAddress" && canCompleteOrganizationAddress(values.streetAddress || "", item.value);
+    if (!(item.field in ORGANIZATION_AUTOFILL_LABELS) || seen.has(item.field) || values[item.field]?.trim() && !completesStreet || organizationSuggestionError(item.field, item.value)) return false;
     const otherLocationField = item.field === "streetAddress" ? "headquarters" : item.field === "headquarters" ? "streetAddress" : null;
     if (otherLocationField && values[otherLocationField]?.trim()) {
       const supplied = suggestions.find((suggestion) => suggestion.field === otherLocationField)?.value;

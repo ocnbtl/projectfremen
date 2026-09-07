@@ -18,7 +18,7 @@
   display: grid;
   grid-template-columns: var(--ops-sidebar-width) minmax(0, 1fr) var(--ops-inspector-width);
   width: 100%;
-  height: calc(100dvh - 68px);
+  height: calc(100dvh - var(--app-content-offset, 76px));
   min-height: 0;
   overflow: hidden;
   background: var(--shell-bg);

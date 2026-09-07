@@ -2102,7 +2102,7 @@ export function getRecordsForDomain(records: PersonalRecord[], domain: string): 
 
 export async function createPersonalRecord(
   input: PersonalRecordInput,
-  options: { requestedId?: string } = {}
+  options: { requestedId?: string; initialPhoto?: string } = {}
 ): Promise<PersonalRecord[]> {
   const domain = input.domain.trim();
   if (!isAllowedDomain(domain)) {
@@ -2172,7 +2172,17 @@ export async function createPersonalRecord(
   };
   nextRecord.growth = calculateGrowth(nextRecord);
 
-  return mutateJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>, PersonalRecord[]>(FILE_NAME, [], (stored) => {
+  // A creation picture is private staged data until the explicit record Save.
+  // Never allow it to overwrite an existing requested-id picture on a retry.
+  const photos = options.initialPhoto ? await import("./modules/people/profile-photos") : null;
+  if (photos && options.initialPhoto) {
+    if (requestedId || !["person", "org"].includes(className)) throw new Error("Initial pictures are only supported for new People profiles.");
+    const image = photos.decodeProfilePhoto(options.initialPhoto);
+    const photo = await photos.writePeopleProfilePhoto(recordId, image.mimeType, image.bytes);
+    nextRecord.profile = normalizeContactProfile({ ...nextRecord.profile, photoUrl: `/api/people/photos/${recordId}`, photoUpdatedAt: photo.updatedAt }, true);
+  }
+  try {
+  return await mutateJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>, PersonalRecord[]>(FILE_NAME, [], (stored) => {
     const existing = stored.map(normalizeRecord).filter((record) => isAllowedDomain(record.domain));
     if (existing.some((record) => record.id === nextRecord.id)) {
       return { value: stored, result: existing.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)), changed: false };
@@ -2191,6 +2201,10 @@ export async function createPersonalRecord(
     const next = applyReciprocalRelations([nextRecord, ...existing], nextRecord.id);
     return { value: next, result: next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
   });
+  } catch (error) {
+    if (photos) await photos.removePeopleProfilePhoto(recordId).catch(() => {});
+    throw error;
+  }
 }
 
 export async function updatePersonalRecord(
