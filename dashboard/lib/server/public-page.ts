@@ -36,13 +36,13 @@ export type PublicPageTarget = Awaited<ReturnType<typeof resolvePublicPage>>;
 const MAX_BYTES = 512_000;
 
 /** Use only a validated address for the socket; retain the URL hostname for TLS and Host. */
-export function requestPinnedPage({ url, address }: PublicPageTarget, signal: AbortSignal, maxBytes = MAX_BYTES): Promise<PageResponse> {
+export function requestPinnedPage({ url, address }: PublicPageTarget, signal: AbortSignal, maxBytes = MAX_BYTES, format: "html" | "json" = "html"): Promise<PageResponse> {
   return new Promise((resolve, reject) => {
     const request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, {
       agent: false, signal, maxHeaderSize: 16_384,
       family: address.family,
       lookup: (_hostname, _options, callback) => callback(null, address.address, address.family),
-      headers: { Accept: "text/html,application/xhtml+xml", "Accept-Encoding": "identity", "User-Agent": "Unigentamos-Organization-Autofill/1.0" }
+      headers: { Accept: format === "json" ? "application/json" : "text/html,application/xhtml+xml", "Accept-Encoding": "identity", "User-Agent": "Unigentamos-Organization-Autofill/1.0 (+https://unigentamos.com)" }
     }, (response) => {
       const status = response.statusCode || 0;
       const headers = response.headers;
@@ -52,7 +52,7 @@ export function requestPinnedPage({ url, address }: PublicPageTarget, signal: Ab
         response.destroy();
         return;
       }
-      if (!/^(text\/html|application\/xhtml\+xml)(?:;|$)/i.test(headers["content-type"] || "")) {
+      if (!(format === "json" ? /^application\/json(?:;|$)/i : /^(text\/html|application\/xhtml\+xml)(?:;|$)/i).test(headers["content-type"] || "")) {
         response.destroy(new Error("This link does not provide a readable web page."));
         return;
       }
@@ -79,6 +79,7 @@ export async function fetchPublicPage(raw: string, dependencies: {
   request?: typeof requestPinnedPage;
   timeoutMs?: number;
   maxBytes?: number;
+  format?: "html" | "json";
 } = {}) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), dependencies.timeoutMs ?? 8_000);
@@ -88,7 +89,7 @@ export async function fetchPublicPage(raw: string, dependencies: {
     for (let redirects = 0; redirects <= 4; redirects++) {
       const target = await resolvePublicPage(next, dependencies.resolve);
       controller.signal.throwIfAborted();
-      const page = await (dependencies.request || requestPinnedPage)(target, controller.signal, Math.min(dependencies.maxBytes ?? MAX_BYTES, 2_000_000));
+      const page = await (dependencies.request || requestPinnedPage)(target, controller.signal, Math.min(dependencies.maxBytes ?? MAX_BYTES, 2_000_000), dependencies.format);
       if ([301, 302, 303, 307, 308].includes(page.status)) {
         if (!page.headers.location || redirects === 4) throw new Error("This link redirects too many times.");
         next = new URL(page.headers.location, target.url).toString();

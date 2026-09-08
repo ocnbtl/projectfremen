@@ -327,7 +327,7 @@ export default function PeopleProfilePhotoDialog({
           </div>
           <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving}><UnigentamosIcon role="close" size={18} /></button>
         </header>
-        <p>{photoDraft ? "Drag to position your picture. Zoom in to move it in both directions, or scroll over a spot to zoom there." : "Choose a picture to crop before it is saved to this private profile."}</p>
+        <p>{photoDraft ? "Drag and zoom to adjust the picture." : "Choose a picture to crop before it is saved to this private profile."}</p>
         {!photoDraft && <div className="people-photo-options">
           <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={saving}>
             <span aria-hidden="true"><UnigentamosIcon role="photo-upload" size={19} /></span><strong>Upload</strong><small>Choose a saved picture</small>

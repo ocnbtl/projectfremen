@@ -16,6 +16,45 @@ try {
   const { discoverOrganization } = require(path.join(temporary, "server/organization-discovery.js"));
   const { normalizeOrganizationUrl, organizationProfileLink, emptyOrganizationSuggestions, organizationSeedUrls } = require(path.join(temporary, "modules/people/organization-autofill.js"));
   const { withoutTrailingLinkSlash } = require(path.join(temporary, "modules/people/links.js"));
+  const { approximateTeamSize, formatTeamSize, editTeamSize } = require(path.join(temporary, "modules/people/team-size.js"));
+  for (const [input, output] of [['106523','107,000'],['8893','8,900'],['78938','80,000'],['78','78'],['347','350'],['10000','10,000'],['9999','10,000'],['100001','101,000']]) assert.equal(approximateTeamSize(input),output,input);
+  for (const value of ['', '11–50 employees', '10,001+', '~8,900', 'global network', '12,34', '1.5 million']) assert.equal(approximateTeamSize(value),value,'Preserve source qualifiers, ranges and non-exact values');
+  assert.equal(formatTeamSize('78938'),'78,938','Manual counts are formatted without rounding');
+  assert.equal(editTeamSize('107,000'),'107000','Editing removes display separators');
+  assert.equal(formatTeamSize(''),'');
+  const { extractOrganizationKnowledge } = require(path.join(temporary, 'server/organization-knowledge.js'));
+  const claim = (value, extras={}) => ({rank:'normal',mainsnak:{snaktype:'value',datavalue:{value}},...extras});
+  const entity = {id:'Q123',labels:{en:{value:'Example Inc.'}},claims:{P856:[claim('https://example.com/')],P571:[claim({time:'+1964-01-25T00:00:00Z',precision:11})],P7085:[claim('example')]}};
+  const knowledgeValues = input => Object.fromEntries(extractOrganizationKnowledge(input,'Example','https://www.example.com').map(item=>[item.field,item.value]));
+  assert.equal(knowledgeValues([entity]).foundedYear,'1964');
+  assert.equal(knowledgeValues([entity]).tiktok,'https://www.tiktok.com/@example');
+  for (const url of ['https://example.com.evil.org','https://other.example','https://example.com/other-brand']) assert.deepEqual(knowledgeValues([{...entity,claims:{...entity.claims,P856:[claim(url)]}}]),{},'Same-name entities need the exact official site');
+  assert.deepEqual(knowledgeValues([{...entity,labels:{en:{value:'Unrelated'}}}]),{});
+  assert.deepEqual(knowledgeValues([entity,{...entity,id:'Q124'}]),{},'Ambiguous entities stay empty');
+  assert.equal(knowledgeValues([{...entity,claims:{...entity.claims,P571:[...entity.claims.P571,claim({time:'+1971-01-01T00:00:00Z',precision:9})]}}]).foundedYear,undefined);
+  assert.equal(knowledgeValues([{...entity,claims:{...entity.claims,P571:[claim({time:'+1900-00-00T00:00:00Z',precision:7})]}}]).foundedYear,undefined,'Do not present century precision as a year');
+  assert.equal(knowledgeValues([{...entity,claims:{...entity.claims,P7085:[claim('old',{qualifiers:{P582:[{}]}}),claim('deprecated',{rank:'deprecated'}),claim('example')]}}]).tiktok,'https://www.tiktok.com/@example');
+  assert.equal(knowledgeValues([{...entity,claims:{...entity.claims,P7085:[claim('one'),claim('two')]}}]).tiktok,undefined,'Multiple current accounts are ambiguous');
+  assert.equal(knowledgeValues([{...entity,claims:{...entity.claims,P7085:[claim('example/video/123')]}}]).tiktok,undefined,'Never turn a post or arbitrary path into a profile');
+  const valuesOf = (html) => Object.fromEntries(extractOrganizationMetadata(html,'https://example.com/company','Example').suggestions.map(item=>[item.field,item.value]));
+  assert.equal(valuesOf('<p>Established in 1999, Example’s European Headquarters sits in the Netherlands.</p>').foundedYear,undefined);
+  assert.equal(valuesOf('<p>Founded in 2001, Another Company provides shoes.</p>').foundedYear,undefined);
+  assert.equal(valuesOf('<p>Example was founded on January 25, 1964.</p>').foundedYear,'1964');
+  assert.equal(valuesOf('<p>Founded: January 25, 1964</p>').foundedYear,'1964');
+  assert.equal(valuesOf('<p>Founded: 1964</p><p>Founded: 1971</p>').foundedYear,undefined);
+  const knowledgeRequests=[];
+  const supplemented=await discoverOrganization('Example',['https://example.com'],{fetchPage:async url=>{
+    knowledgeRequests.push(url);
+    const html=url.includes('wbsearchentities')?JSON.stringify({search:[{id:'Q123',label:'Example'},{id:'Q124',label:'Example Browser'}]}):url.includes('wbgetentities')?JSON.stringify({entities:{Q123:entity}}):'<p>Example was founded in 2004.</p><p>Company size: 106523</p>';
+    return {sourceUrl:url,html};
+  }});
+  const supplementedValues=Object.fromEntries(supplemented.suggestions.map(item=>[item.field,item.value]));
+  assert.equal(supplementedValues.foundedYear,'2004','Knowledge fallback does not replace official facts');
+  assert.equal(supplementedValues.teamSize,'107,000');
+  assert.equal(supplementedValues.tiktok,'https://www.tiktok.com/@example');
+  assert.ok(supplemented.suggestions.find(item=>item.field==='teamSize').evidence.includes('106523'),'Retain exact count in source explanation');
+  assert.equal(knowledgeRequests.length,3,'One page plus two bounded knowledge requests');
+  assert.ok(!knowledgeRequests.at(-1).includes('Q124'),'Do not download full entities for unrelated products');
   assert.equal(withoutTrailingLinkSlash("https://example.com/path/?q=/"), "https://example.com/path?q=/");
   assert.equal(withoutTrailingLinkSlash("https://example.com/path/#section/"), "https://example.com/path#section/");
   for (const address of ["127.0.0.1", "10.1.1.1", "169.254.169.254", "172.16.0.1", "192.168.1.1", "100.64.1.1", "198.18.0.1", "224.0.0.1", "0.0.0.0", "::1", "::ffff:127.0.0.1", "::ffff:8.8.8.8", "fe80::1", "fc00::1", "2001:db8::1", "2002:7f00:1::", "64:ff9b::7f00:1"]) assert.equal(isPublicAddress(address), false, address);
@@ -44,6 +83,7 @@ try {
     if (req.url === "/large") { res.writeHead(200, { "Content-Type": "text/html" }); res.end("x".repeat(512_001)); }
     else if (req.url === "/huge") { res.writeHead(200, { "Content-Type": "text/html" }); res.end("x".repeat(2_000_001)); }
     else if (req.url === "/binary") { res.writeHead(200, { "Content-Type": "image/png" }); res.end("binary"); }
+    else if (req.url === "/json") { res.writeHead(200, { "Content-Type": "application/json" }); res.end('{"ok":true}'); }
     else if (req.url === "/slow") { res.writeHead(200, { "Content-Type": "text/html" }); res.write("<html>"); }
     else { res.writeHead(200, { "Content-Type": "text/html" }); res.end(`<title>${req.headers.host}</title>`); }
   });
@@ -53,6 +93,10 @@ try {
     const target = { url, address: { address: "127.0.0.1", family: 4 } };
     const response = await requestPinnedPage(target, AbortSignal.timeout(1000));
     assert.match(response.html, /unresolvable.example/, "Socket must use pinned address and preserve Host");
+    const jsonTarget={...target,url:new URL('/json',url)};
+    await assert.rejects(()=>requestPinnedPage(jsonTarget,AbortSignal.timeout(1000)),'HTML page fetching must still reject JSON by default');
+    assert.equal(JSON.parse((await requestPinnedPage(jsonTarget,AbortSignal.timeout(1000),1000,'json')).html).ok,true,'Explicit JSON mode retains bounded pinned sockets');
+    await assert.rejects(()=>requestPinnedPage(target,AbortSignal.timeout(1000),1000,'json'),'JSON mode must reject HTML challenge pages');
     for (const pathname of ["/large", "/binary", "/slow"]) await assert.rejects(() => requestPinnedPage({ ...target, url: new URL(pathname, url) }, AbortSignal.timeout(60)));
     assert.equal((await requestPinnedPage({ ...target, url: new URL('/large', url) }, AbortSignal.timeout(1000), 2_000_000)).html.length, 512_001, "Discovery supports larger public organization pages");
     await assert.rejects(() => requestPinnedPage({ ...target, url: new URL('/huge', url) }, AbortSignal.timeout(1000), 2_000_000), /too large|size limit/, "The expanded page limit is enforced");
@@ -134,6 +178,9 @@ try {
   assert.ok(!searchFallback.sources.includes('https://unrelated.example') && searchedPages.length <= 10);
   assert.ok(searchFallback.message.includes('link back'));
   const { extractOrganizationPage, conciseOrganizationDescription } = require(path.join(temporary, 'server/organization-metadata.js'));
+  const navigation=extractOrganizationPage('<a href="https://about.example.com/en">About Example</a><a href="https://example.com.evil.org/company">Company</a>','https://example.com','Example');
+  assert.ok(navigation.links.some(link=>link.url==='https://about.example.com/en' && link.kind==='detail'),'Follow linked official corporate subdomains');
+  assert.ok(!navigation.links.some(link=>link.url.includes('evil.org')),'Reject lookalike domains');
   const { isLinkedInLogoUrl } = require(path.join(temporary, 'server/organization-logo.js'));
   const { canCompleteOrganizationAddress } = require(path.join(temporary, 'modules/people/organization-autofill.js'));
   assert.equal(canCompleteOrganizationAddress('1075 Risman Dr.', '1075 Risman Dr., Kent, Ohio, 44242, USA'),true);

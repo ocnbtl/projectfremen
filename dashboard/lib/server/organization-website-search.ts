@@ -19,11 +19,14 @@ export async function findOrganizationWebsiteCandidates(profileUrl: string, publ
 }
 
 /** Search for missing workforce/type facts only within the verified official website. */
-export async function findOrganizationFactPages(website: string, name: string, fetchPage: typeof fetchPublicPage, timeoutMs: number): Promise<string[]> {
+export async function findOrganizationFactPages(website: string, name: string, fetchPage: typeof fetchPublicPage, timeoutMs: number, missingFounded = false): Promise<string[]> {
   const domain = new URL(website).hostname.replace(/^www\./, "");
   const query = name.replace(/[^\p{L}\p{N} .&'-]/gu, " ").slice(0, 120);
-  const pages = await searchOrganizationPages(`site:${domain} ${query} employees company size facts`, fetchPage, timeoutMs);
-  return pages.filter((page) => new URL(page).hostname.replace(/^www\./, "") === domain).slice(0, 2);
+  const pages = await searchOrganizationPages(`site:${domain} ${query} ${missingFounded ? "founded established history" : "employees company size facts"}`, fetchPage, timeoutMs);
+  return pages.filter((page) => {
+    const url = new URL(page), candidate = url.hostname.replace(/^www\./, "");
+    return (candidate === domain || candidate.endsWith(`.${domain}`)) && /about|company|corporate|history|story|facts?|figures|overview|glance|investor|workforce|employees|staff|team/i.test(url.hostname + url.pathname);
+  }).slice(0, 2);
 }
 
 async function searchOrganizationPages(query: string, fetchPage: typeof fetchPublicPage, timeoutMs: number): Promise<string[]> {

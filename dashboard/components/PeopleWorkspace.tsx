@@ -53,6 +53,8 @@ import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import OrganizationAutofill from "./people/OrganizationAutofill";
+import TeamSizeInput from "./people/TeamSizeInput";
+import { formatTeamSize } from "../lib/modules/people/team-size";
 import { ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, canCompleteOrganizationAddress, emptyOrganizationSuggestions, normalizeOrganizationUrl, type OrganizationAutofillValues, type OrganizationSuggestion } from "../lib/modules/people/organization-autofill";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
@@ -2941,7 +2943,7 @@ export default function PeopleWorkspace({
     { label: "Industry", value: selectedProfile.industry, icon: "industry", group: "work" },
     { label: "Headquarters", value: selectedProfile.headquarters || selectedProfile.livesIn, icon: "location", group: "life" },
     { label: "Founded", value: selectedProfile.foundedYear, icon: "founded", group: "life" },
-    { label: "Team size", value: selectedProfile.teamSize, icon: "team", group: "relationships" },
+    { label: "Team size", value: formatTeamSize(selectedProfile.teamSize || ""), icon: "team", group: "relationships" },
     { label: "Linked people", value: selectedOrganizationPeople.length ? String(selectedOrganizationPeople.length) : "-", icon: "children", group: "relationships" }
   ] : [
     { label: "Birthday", value: selectedProfile.birthday ? formatFullDate(selectedProfile.birthday) : "-", icon: "birthday", group: "life" },
@@ -4234,7 +4236,7 @@ export default function PeopleWorkspace({
               </label>
               <label>Industry or field<OrganizationIndustrySelect organizationType={quickOrganizationType} value={quickIndustry} onChange={setQuickIndustry} /></label>
               <label className="people-org-founded">Founded year<input inputMode="numeric" pattern="\d{4}" value={quickFoundedYear} onChange={(event) => setQuickFoundedYear(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1998" /></label>
-              <label className="people-org-team">Team size<input value={quickTeamSize} onChange={(event) => setQuickTeamSize(event.target.value)} placeholder="1–10, 50, global network..." /></label>
+              <label className="people-org-team">Team size<TeamSizeInput value={quickTeamSize} onChange={setQuickTeamSize} placeholder="1–10, 50, global network..." /></label>
               <label className="is-wide">Description<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={3} placeholder="What this organization is and why it is relevant." /></label>
             </div>
             <PeopleNotesEditor
@@ -4897,6 +4899,8 @@ export default function PeopleWorkspace({
                                 value={profileDraft.industry}
                                 onChange={(value) => updateProfileDraft("industry", value)}
                               />
+                            ) : field.key === "teamSize" ? (
+                              <TeamSizeInput value={profileDraft.teamSize} onChange={(value) => updateProfileDraft("teamSize", value)} placeholder={field.placeholder} />
                             ) : field.type === "textarea" ? (
                               <textarea
                                 value={profileDraft[field.key]}

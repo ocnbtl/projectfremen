@@ -67,6 +67,12 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
       if (parts.length === 3) clean = addressParts({ addressLocality: parts[0], addressRegion: parts[1], addressCountry: parts[2] }).join(", ");
     }
     if (!clean || organizationSuggestionError(field, clean) || conflicts.has(field)) return;
+    const existing = suggestions.find((item) => item.field === field);
+    if (field === "foundedYear" && existing && existing.value !== clean && !existing.evidence.includes("structured data")) {
+      suggestions.splice(suggestions.indexOf(existing), 1);
+      conflicts.add(field);
+      return;
+    }
     if (!suggestions.some((item) => item.field === field)) suggestions.push({ field, value: clean, sourceUrl: source, evidence });
   };
   const addLink = (raw: unknown, evidence: string, discoverWebsite = false) => {
@@ -97,7 +103,7 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
         if (matchesIdentity(link.url) && !matchesIdentity(existing.value)) {
           suggestions.splice(suggestions.indexOf(existing), 1);
           add(link.field, link.url, evidence);
-          links.push({ url: link.url, kind: "social", priority: link.field === "linkedin" ? 3 : 5 });
+          links.push({ url: link.url, kind: "social", priority: link.field === "linkedin" ? 1.5 : 5 });
           return;
         }
         suggestions.splice(suggestions.indexOf(existing), 1);
@@ -105,7 +111,7 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
         return;
       }
       add(link.field, link.url, evidence);
-      links.push({ url: link.url, kind: "social", priority: link.field === "linkedin" ? 3 : 5 });
+      links.push({ url: link.url, kind: "social", priority: link.field === "linkedin" ? 1.5 : 5 });
     } catch { /* Malformed links and share/post URLs provide no profile evidence. */ }
   };
   const meta = new Map<string, string>();
@@ -204,7 +210,7 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
       const field = labels[label];
       let value = inline?.[2] || lines[index + 1] || "";
       if (!field || labels[value.toLowerCase()] || value.length > 240) continue;
-      if (field === "foundedYear") value = value.match(/^(\d{4})(?:$|[-/])/u)?.[1] || "";
+      if (field === "foundedYear") value = value.match(/^(?:[A-Za-z]+\s+\d{1,2},?\s+|\d{1,2}\s+[A-Za-z]+\s+)?(\d{4})(?:$|[-/\s;,(])/u)?.[1] || "";
       if (field === "organizationType") value = organizationType(value);
       if (field === "teamSize" && !/^\d[\d,]*(?:\s*[-–]\s*\d[\d,]*)?\+?(?:\s+employees|\s+people|\s+team members)?$/i.test(value)) continue;
       add(field, value, `Published company detail: ${label}`);
@@ -215,7 +221,17 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     if (!organizationName.trim()) add("name", social ? pageTitle.split(/\s*[(@|]/)[0] : meta.get("og:site_name"), "Public page: organization name");
     for (const line of lines) {
       const founded = line.match(/^(?:Founded|Established)(?:\s+in)?\s+(\d{4})\b/i) || line.match(/^We were founded in (\d{4})\b/i);
-      if (founded) add("foundedYear", founded[1], `Published statement: ${line.slice(0, 220)}`);
+      if (founded) {
+        const tail = line.slice(founded[0].length).trim();
+        const subject = tail.replace(/^[,;]\s*/, "").match(/^(.{1,120}?)\s+(?:is|was|has|provides|makes|offers|builds|serves)\b/i)?.[1];
+        // History pages also date offices, campuses and subsidiaries. Only accept
+        // a bare founding statement, first-person continuation, or our exact name.
+        if (!tail || /^[.!?]/.test(tail) || /^,?\s*(?:we|by|as|with|to)\b/i.test(tail) || (subject && nameKey(subject) === nameKey(organizationName))) {
+          add("foundedYear", founded[1], `Published statement: ${line.slice(0, 220)}`);
+        }
+      }
+      const namedFounding = line.match(/^(.{1,120}?) (?:was |were )?(?:founded|established)(?: on| in)? (?:[A-Za-z]+ \d{1,2},? |\d{1,2} [A-Za-z]+ )?(\d{4})\b/i);
+      if (namedFounding && nameKey(namedFounding[1]) === nameKey(organizationName)) add("foundedYear", namedFounding[2], `Published statement: ${line.slice(0, 220)}`);
       const headquarters = line.match(/^(?:Our (?:global |corporate )?headquarters (?:is|are)|We are headquartered|Headquartered) in ([^.]{3,160})/i);
       if (headquarters) add("headquarters", headquarters[1], `Published statement: ${line.slice(0, 220)}`);
       const type = line.match(/^(?:We are|[\p{L}\p{N} &'’.-]+ is) (?:a|an) (?:registered |independent )?(nonprofit|non-profit|not-for-profit|charity|government agency|public research university|private university|university|school)\b/iu);
@@ -251,9 +267,10 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     if (!social) {
       try {
         const url = new URL(text(raw, 2048), source);
-        if (host(url.toString()) !== host(source) || url.search || /\.(?:pdf|jpg|png|zip)$/i.test(url.pathname)) continue;
+        const candidateHost = host(url.toString()), sourceHost = host(source);
+        if ((candidateHost !== sourceHost && !candidateHost.endsWith(`.${sourceHost}`)) || url.search || /\.(?:pdf|jpg|png|zip)$/i.test(url.pathname)) continue;
         if (/(?:sales|demo|events?|webinar|blog|press|legal|privacy|manifesto|leadership)/i.test(url.pathname)) continue;
-        if (/(?:^|[\/_-])(?:about|contact|company|who-we-are|our-story|our-company|headquarters|locations|facts|figures|at-a-glance|university-overview)(?:[\/_-]|$)/i.test(url.pathname) || /^(?:About(?: us| the company)?|Contact(?: us)?|Our story|Who we are|Locations|Company|Facts.*|.*at a glance)$/i.test(label)) {
+        if (/(?:^|[\/_-])(?:about|contact|company|history|who-we-are|our-story|our-company|headquarters|locations|facts|figures|at-a-glance|university-overview)(?:[\/_-]|$)/i.test(url.pathname) || /^(?:About\b.*|Contact(?: us)?|Our (?:story|history)|Who we are|Locations|Company|Facts.*|.*at a glance)$/i.test(label)) {
           links.push({ url: normalizeOrganizationUrl(url.toString()), kind: "detail", priority: /university-overview|company-overview/i.test(url.pathname) ? 0.5 : /facts|figures|at-a-glance/i.test(url.pathname) ? 1 : /contact|headquarters/i.test(`${url.pathname} ${label}`) ? 2 : 3 });
         }
       } catch { /* Not a public navigation link. */ }
