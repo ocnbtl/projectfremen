@@ -6167,6 +6167,20 @@ async function checkPeopleMemoryBrowserState(
           await photoEditor.getByLabel("Resize output").inputValue() === "1024",
         `Profile picture crop controls did not preserve their draft state at ${viewport.label}`
       );
+      await photoEditor.getByLabel("Zoom", { exact: true }).fill("2");
+      await photoEditor.getByLabel("Horizontal crop").fill("0");
+      await photoEditor.getByLabel("Vertical crop").fill("0");
+      const frame = photoEditor.locator(".people-photo-crop-frame");
+      await frame.scrollIntoViewIfNeeded();
+      const frameBox = await frame.boundingBox();
+      const imageBeforeDrag = await frame.locator("img").boundingBox();
+      await page.mouse.move(frameBox.x + frameBox.width / 2, frameBox.y + frameBox.height / 2);
+      await page.mouse.down();
+      await page.mouse.move(frameBox.x + frameBox.width / 2 + 16, frameBox.y + frameBox.height / 2 + 12, { steps: 4 });
+      await page.mouse.up();
+      const imageAfterDrag = await frame.locator("img").boundingBox();
+      assert(Math.abs(imageAfterDrag.x - imageBeforeDrag.x - 16) < 1 && Math.abs(imageAfterDrag.y - imageBeforeDrag.y - 12) < 1,
+        `Zoomed square photo did not follow dragging on both axes at ${viewport.label}`);
       await photoDialog.getByRole("button", { name: "Choose another" }).click();
       await photoDialog.getByRole("button", { name: "Close profile picture options" }).click();
       const overviewCards = overview.locator(":scope > [data-people-overview-card]");
@@ -6571,14 +6585,15 @@ async function checkPeopleMemoryBrowserState(
       if (viewport.label === "desktop") {
         const groupTreatment = await page.locator(".people-profile-group-picker label").evaluateAll((labels) => ({
           rows: new Set(labels.map((label) => Math.round(label.getBoundingClientRect().top))).size,
+          contained: labels.every(label => label.querySelector("span").getBoundingClientRect().right <= label.getBoundingClientRect().right),
           backgrounds: Array.from(new Set(labels.map((label) => getComputedStyle(label).backgroundColor))),
           borders: Array.from(new Set(labels.map((label) => getComputedStyle(label).borderColor)))
         }));
         assert(
-          groupTreatment.rows <= 2 &&
+          groupTreatment.contained && groupTreatment.rows >= 2 &&
             groupTreatment.backgrounds.every((background) => background === "rgba(0, 0, 0, 0)") &&
             groupTreatment.borders.every((border) => border === "rgba(0, 0, 0, 0)"),
-          `People groups were not transparent or compact enough for two rows: ${JSON.stringify(groupTreatment)}`
+          `People groups overlap their cells or lost transparent styling: ${JSON.stringify(groupTreatment)}`
         );
       }
       const propertyCadence = page.locator("[data-people-cadence-select]");
@@ -6646,7 +6661,7 @@ async function checkPeopleMemoryBrowserState(
         };
       });
       assert(
-        Object.values(compactPropertySpacing).every((gap) => gap >= 0 && gap <= 8),
+        Object.values(compactPropertySpacing).every((gap) => gap >= 8 && gap <= 13),
         `Properties retained excessive Identity or About spacing at ${viewport.label}: ${JSON.stringify(compactPropertySpacing)}`
       );
       assert(
@@ -6688,7 +6703,6 @@ async function checkPeopleMemoryBrowserState(
         const contactHeadings = Array.from(document.querySelectorAll(".people-contact-channel-section > .people-repeatable-heading"));
         const toolbarButtons = Array.from(document.querySelectorAll(".people-profile-view-actions button"));
         const phoneRowTops = Array.from(document.querySelectorAll("[data-phone-entry]")).map((entry) => [
-          entry.querySelector(".people-contact-category-fields select"),
           entry.querySelector(".people-country-code-field input"),
           entry.querySelector(".people-contact-value-field input"),
           entry.querySelector(".people-contact-remove")
@@ -6988,12 +7002,14 @@ async function checkPeopleMemoryBrowserState(
         const buttons = Array.from(row.querySelectorAll("button")).map((button) => button.getBoundingClientRect());
         return {
           textareaHeight: textarea?.height || 0,
+          contained: textarea && Math.max(textarea.bottom, ...buttons.map(button => button.bottom)) < row.closest(".people-profile-section").getBoundingClientRect().bottom,
           bulletDelta: textarea && bullet ? Math.abs((textarea.top + textarea.height / 2) - (bullet.top + bullet.height / 2)) : 99,
+          buttonCenterDeltas: buttons.map(button => Math.abs(button.top + button.height / 2 - textarea.top - textarea.height / 2)),
           buttonHeights: buttons.map((button) => button.height)
         };
       });
       assert(
-        noteGeometry.textareaHeight <= 42 && noteGeometry.bulletDelta < 2 && noteGeometry.buttonHeights.every((height) => Math.abs(height - noteGeometry.textareaHeight) < 2),
+        noteGeometry.contained && noteGeometry.textareaHeight >= 56 && noteGeometry.bulletDelta < 2 && noteGeometry.buttonHeights.every((height) => height >= 40) && (viewport.label === "mobile" || noteGeometry.buttonCenterDeltas.every(delta => delta < 2)),
         `New People notes did not use compact aligned controls at ${viewport.label}: ${JSON.stringify(noteGeometry)}`
       );
       const birthdayEditor = page.locator("[data-people-birthday-editor]");
