@@ -1,0 +1,46 @@
+import type { PersonalRecord } from "../../personal-records-store";
+import { normalizePhoneForStorage } from "./phone";
+
+export type DuplicateMatch = { left: PersonalRecord; right: PersonalRecord; reasons: string[]; confidence: "Strong match" | "Review name" };
+const nameKey = (value: string) => value.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+function publicIdentity(value: string, website: boolean) {
+  try {
+    const url = new URL(/^https?:/i.test(value) ? value : `https://${value}`);
+    const host = url.hostname.toLowerCase().replace(/^www\./, "");
+    const path = url.pathname.replace(/\/+$/, "").toLowerCase();
+    if (!host.includes(".")) return "";
+    // A hosting/social platform alone is not an organization's identity.
+    if (/^(facebook|instagram|linkedin|twitter|x|youtube|tiktok|sites\.google|linktr|wixsite|wordpress)\./.test(host) && !path) return "";
+    return website ? `${host}${path}` : `${host === "twitter.com" ? "x.com" : host}${path}`;
+  } catch {return "";}
+}
+/** Review candidates only: no transitive merges and no mutation of the source records. */
+export function findPeopleDuplicates(records: readonly PersonalRecord[]): DuplicateMatch[] {
+  const buckets = new Map<string, {record:PersonalRecord; reason:string}[]>();
+  const pairs = new Map<string, DuplicateMatch>();
+  for (const record of records) {
+    if (!["person","org"].includes(record.className) || Boolean(record.archivedAt)) continue;
+    const profile = record.profile;
+    const keys: [string,string][] = [];
+    const normalizedName = nameKey(profile?.fullName || record.title);
+    if (normalizedName.length > 2) keys.push([`name:${normalizedName}`,"Same name"]);
+    const emails = [...(profile?.emails || []).map(entry => entry.address),profile?.primaryEmail,profile?.workEmail,profile?.universityEmail];
+    emails.forEach(email => {const key=email?.trim().toLowerCase(); if (key?.includes("@")) keys.push([`email:${key}`,"Same email"]);});
+    const phones = [...(profile?.phones || []).map(entry => normalizePhoneForStorage(entry.number,entry.countryCode)),normalizePhoneForStorage(profile?.phoneNumber || "",profile?.phoneCountryCode)];
+    phones.forEach(phone => {if (phone.replace(/\D/g,"").length >= 7) keys.push([`phone:${phone}`,"Same phone"]);});
+    for (const field of ["linkedin","instagram","x","tiktok","youtube"] as const) {const key=publicIdentity(profile?.[field] || "",false); if (key) keys.push([`social:${field}:${key}`,`Same ${field === "x" ? "X" : field} profile`]);}
+    if (record.className === "org") {const key=publicIdentity(profile?.website || record.url || "",true); if (key) keys.push([`website:${key}`,"Same website"]);}
+    for (const [key,reason] of new Map(keys)) {
+      const scoped = `${record.className}:${key}`;
+      for (const previous of buckets.get(scoped) || []) {
+        const pairKey=[previous.record.id,record.id].sort().join(":");
+        const match=pairs.get(pairKey) || {left:previous.record,right:record,reasons:[],confidence:"Review name" as const};
+        if (!match.reasons.includes(reason)) match.reasons.push(reason);
+        if (!key.startsWith("name:")) match.confidence="Strong match";
+        pairs.set(pairKey,match);
+      }
+      buckets.set(scoped,[...(buckets.get(scoped) || []),{record,reason}]);
+    }
+  }
+  return [...pairs.values()].sort((a,b) => b.reasons.length-a.reasons.length || a.left.title.localeCompare(b.left.title));
+}

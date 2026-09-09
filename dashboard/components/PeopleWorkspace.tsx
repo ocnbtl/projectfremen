@@ -16,10 +16,10 @@ import { createProjectsRepository } from "../lib/modules/projects/repository";
 import { peopleCreateInputToLegacy, peopleUpdateInputToLegacy } from "../lib/modules/people/legacy-adapter";
 import { birthdayForStorage, formatBirthday, parseBirthday } from "../lib/modules/people/birthday";
 import {
-  PHONE_COUNTRY_FORMATS,
+  PHONE_COUNTRY_CHOICES,
   canonicalCountryCode,
+  phoneCountryCodeForValue,
   formatInternationalPhone,
-  normalizeCountryCodeInput,
   normalizePhoneForStorage,
   rebasePhoneCountryCode,
   validateInternationalPhone
@@ -55,6 +55,9 @@ import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeoplePr
 import OrganizationAutofill from "./people/OrganizationAutofill";
 import TeamSizeInput from "./people/TeamSizeInput";
 import SelectField from "./ui/SelectField";
+import TimeField from "./people/TimeField";
+import InlineOrganizationDialog from "./people/InlineOrganizationDialog";
+import { findPeopleDuplicates } from "../lib/modules/people/duplicates";
 import { organizationIndustryOptions, normalizeOrganizationIndustry } from "../lib/modules/people/organization-industries";
 import { formatTeamSize } from "../lib/modules/people/team-size";
 import { ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, canCompleteOrganizationAddress, emptyOrganizationSuggestions, normalizeOrganizationUrl, type OrganizationAutofillValues, type OrganizationSuggestion } from "../lib/modules/people/organization-autofill";
@@ -796,8 +799,8 @@ function formatInteractionTime(startTime?: string, endTime?: string) {
     const date = new Date(2000, 0, 1, hours, minutes);
     return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
   };
-  if (!startTime) return "";
-  return endTime ? `${format(startTime)}–${format(endTime)}` : format(startTime);
+  if (!startTime) return endTime ? `Ended at ${format(endTime)}` : "";
+  return endTime ? `${format(startTime)}–${format(endTime)}` : `Started at ${format(startTime)}`;
 }
 
 function splitList(value: string) {
@@ -1595,7 +1598,7 @@ function BirthdayEditor({ value, onChange, label = "Birthday" }: { value: string
       <span className="people-birthday-icon" aria-hidden="true"><PeopleIcon name="birthday" /></span>
       <label aria-label={`${label} month`}>
         <span className="people-visually-hidden">Month</span>
-        <SelectField value={month} onChange={(event) => {
+        <SelectField columns={3} value={month} onChange={(event) => {
           const next = event.target.value;
           setMonth(next);
           commit(next, day, year);
@@ -1608,7 +1611,7 @@ function BirthdayEditor({ value, onChange, label = "Birthday" }: { value: string
       </label>
       <label aria-label={`${label} day`}>
         <span className="people-visually-hidden">Day</span>
-        <SelectField value={day} onChange={(event) => {
+        <SelectField columns={5} value={day} onChange={(event) => {
           const next = event.target.value;
           setDay(next);
           commit(month, next, year);
@@ -1640,10 +1643,12 @@ function EducationEntriesEditor({
   organizations,
   onChange,
   onAdd,
-  onRemove
+  onRemove,
+  onCreateOrganization
 }: {
   entries: PersonalEducationEntry[];
   organizations: OrganizationOption[];
+  onCreateOrganization: (entryId:string) => void;
   onChange: (id: string, patch: Partial<PersonalEducationEntry>) => void;
   onAdd: () => void;
   onRemove: (id: string) => void;
@@ -1659,7 +1664,7 @@ function EducationEntriesEditor({
           <div className="people-repeatable-fields people-repeatable-fields-education">
             <label>
               <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>University</span>
-              <SelectField
+              <SelectField searchable onCreate={() => onCreateOrganization(entry.id)}
                 aria-label={`Education ${index + 1} organization`}
                 value={entry.organizationId || ""}
                 onChange={(event) => {
@@ -1690,10 +1695,12 @@ function OccupationEntriesEditor({
   organizations,
   onChange,
   onAdd,
-  onRemove
+  onRemove,
+  onCreateOrganization
 }: {
   entries: PersonalOccupationEntry[];
   organizations: OrganizationOption[];
+  onCreateOrganization: (entryId:string) => void;
   onChange: (id: string, patch: Partial<PersonalOccupationEntry>) => void;
   onAdd: () => void;
   onRemove: (id: string) => void;
@@ -1710,7 +1717,7 @@ function OccupationEntriesEditor({
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Occupation</span><input aria-label={`Occupation ${index + 1} title`} value={entry.title} onChange={(event) => onChange(entry.id, { title: event.target.value })} placeholder="Product designer" /></label>
             <label>
               <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Employer</span>
-              <SelectField
+              <SelectField searchable onCreate={() => onCreateOrganization(entry.id)}
                 aria-label={`Job ${index + 1} organization`}
                 value={entry.organizationId || ""}
                 onChange={(event) => {
@@ -1928,163 +1935,31 @@ function QuickObjectsEditor({
   );
 }
 
-function EmailEntriesEditor({
-  entries,
-  onChange,
-  onAdd,
-  onRemove
-}: {
-  entries: PersonalEmailEntry[];
-  onChange: (id: string, patch: Partial<PersonalEmailEntry>) => void;
-  onAdd: () => void;
-  onRemove: (id: string) => void;
-}) {
-  return (
-    <section className="people-contact-channel-section" data-people-email-editor>
-      <header className="people-repeatable-heading">
-        <div><h4>Email addresses</h4></div>
-        <PeopleAddButton label="Email" onClick={onAdd} />
-      </header>
-      {entries.length > 0 ? entries.map((entry, index) => (
-        <article className="people-contact-channel-entry" data-email-entry={entry.id} key={entry.id}>
-          <div className="people-contact-channel-fields">
-            <div className="people-contact-category-fields">
-              <label>
-                Category
-                <SelectField
-                  aria-label={`Email ${index + 1} category`}
-                  value={entry.category}
-                  onChange={(event) => onChange(entry.id, { category: event.target.value as PersonalContactEntryCategory })}
-                >
-                  {CONTACT_CATEGORY_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-                </SelectField>
-              </label>
-              {entry.category === "custom" && (
-                <label>
-                  Custom category
-                  <input
-                    value={entry.customLabel || ""}
-                    onChange={(event) => onChange(entry.id, { customLabel: event.target.value })}
-                    placeholder="Alumni, volunteer, club..."
-                    required={Boolean(entry.address.trim())}
-                  />
-                </label>
-              )}
-            </div>
-            <label className="people-contact-value-field">
-              Email
-              <input
-                type="email"
-                value={entry.address}
-                onChange={(event) => onChange(entry.id, { address: event.target.value })}
-                placeholder="name@example.com"
-              />
-            </label>
-            <RemoveIconButton className="people-contact-remove" label={`Remove email ${index + 1}`} onClick={() => onRemove(entry.id)} />
-          </div>
-        </article>
-      )) : null}
-    </section>
-  );
+function ContactCategory({label,value,onChange}:{label:string;value:PersonalContactEntryCategory;onChange:(value:PersonalContactEntryCategory)=>void}) {
+  const icons:Record<string,string>={primary:"star",personal:"person",work:"briefcase",university:"university",custom:"edit"};
+  return <SelectField aria-label={label} title={CONTACT_CATEGORY_OPTIONS.find(option=>option.value===value)?.label} className="people-category-icon" triggerContent={<UnigentamosIcon role={icons[value] || "person"} size={18}/>} value={value} onChange={event=>onChange(event.target.value as PersonalContactEntryCategory)}>{CONTACT_CATEGORY_OPTIONS.map(option=><option value={option.value} key={option.value}><UnigentamosIcon role={icons[option.value] || "person"} size={16}/>{option.label}</option>)}</SelectField>;
 }
-
-function PhoneEntriesEditor({
-  entries,
-  onChange,
-  onAdd,
-  onRemove
-}: {
-  entries: PersonalPhoneEntry[];
-  onChange: (id: string, patch: Partial<PersonalPhoneEntry>) => void;
-  onAdd: () => void;
-  onRemove: (id: string) => void;
-}) {
-  return (
-    <section className="people-contact-channel-section" data-people-phone-editor>
-      <header className="people-repeatable-heading">
-        <div><h4>Phone numbers</h4></div>
-        <PeopleAddButton label="Phone" onClick={onAdd} />
-      </header>
-      {entries.length > 0 ? entries.map((entry, index) => {
-        const phoneError = entry.number.trim() && canonicalCountryCode(entry.countryCode, "")
-          ? validateInternationalPhone(entry.number, entry.countryCode)
-          : null;
-        return (
-        <article className="people-contact-channel-entry" data-phone-entry={entry.id} key={entry.id}>
-          <div className="people-contact-channel-fields">
-            <div className="people-contact-category-fields">
-              <label>
-                Category
-                <SelectField
-                  aria-label={`Phone ${index + 1} category`}
-                  value={entry.category}
-                  onChange={(event) => onChange(entry.id, { category: event.target.value as PersonalContactEntryCategory })}
-                >
-                  {CONTACT_CATEGORY_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-                </SelectField>
-              </label>
-              {entry.category === "custom" && (
-                <label>
-                  Custom category
-                  <input
-                    value={entry.customLabel || ""}
-                    onChange={(event) => onChange(entry.id, { customLabel: event.target.value })}
-                    placeholder="Studio, travel, emergency..."
-                    required={Boolean(entry.number.trim())}
-                  />
-                </label>
-              )}
-            </div>
-            <div className="people-phone-value-fields">
-              <label className="people-country-code-field">
-                Code
-                <input
-                  aria-label={`Phone ${index + 1} country code`}
-                  inputMode="tel"
-                  list="people-country-code-suggestions"
-                  value={entry.countryCode}
-                  onChange={(event) => {
-                    const nextCode = normalizeCountryCodeInput(event.target.value);
-                    onChange(entry.id, {
-                      countryCode: nextCode,
-                      number: /^\+\d{1,4}$/.test(nextCode) && nextCode !== entry.countryCode
-                        ? rebasePhoneCountryCode(entry.number, entry.countryCode, nextCode)
-                        : entry.number
-                    });
-                  }}
-                  onBlur={(event) => {
-                    const nextCode = canonicalCountryCode(event.target.value, "");
-                    if (!nextCode) return;
-                    onChange(entry.id, { countryCode: nextCode });
-                  }}
-                  placeholder="+1"
-                  required={Boolean(entry.number.trim())}
-                />
-              </label>
-              <label className="people-contact-value-field">
-                Phone
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  value={entry.number}
-                  onChange={(event) => onChange(entry.id, { number: event.target.value })}
-                  onBlur={() => onChange(entry.id, { number: formatInternationalPhone(entry.number, entry.countryCode) })}
-                  placeholder={entry.countryCode === "+51" ? "987-654-321" : "614-796-3848"}
-                  aria-describedby={phoneError ? `people-phone-error-${entry.id}` : undefined}
-                />
-              </label>
-            </div>
-            <RemoveIconButton className="people-contact-remove" label={`Remove phone ${index + 1}`} onClick={() => onRemove(entry.id)} />
-          </div>
-          {phoneError && <p id={`people-phone-error-${entry.id}`} className="people-phone-error" role="status">{phoneError}</p>}
-        </article>
-      );
-      }) : null}
-      <datalist id="people-country-code-suggestions">
-        {PHONE_COUNTRY_FORMATS.map((country) => <option value={country.code} label={`${country.country} · ${country.localDigits} digits`} key={country.code} />)}
-      </datalist>
-    </section>
-  );
+function EmailEntriesEditor({entries,onChange,onAdd,onRemove}:{entries:PersonalEmailEntry[];onChange:(id:string,patch:Partial<PersonalEmailEntry>)=>void;onAdd:()=>void;onRemove:(id:string)=>void}) {
+  return <section className="people-contact-channel-section" data-people-email-editor><header className="people-repeatable-heading"><div><h4>Email addresses</h4></div><PeopleAddButton label="Email" onClick={onAdd}/></header>{entries.map((entry,index)=><article className="people-contact-channel-entry" data-email-entry={entry.id} key={entry.id}><div className="people-contact-channel-fields">
+    <ContactCategory label={`Email ${index+1} category`} value={entry.category} onChange={category=>onChange(entry.id,{category})}/>
+    <label className="people-contact-value-field"><span className="people-visually-hidden">Email</span><input type="email" value={entry.address} onChange={event=>onChange(entry.id,{address:event.target.value})} placeholder="name@example.com"/></label><RemoveIconButton className="people-contact-remove" label={`Remove email ${index+1}`} onClick={()=>onRemove(entry.id)}/>
+  </div>{entry.category === "custom" && <label className="people-custom-category">Custom category<input value={entry.customLabel || ""} onChange={event=>onChange(entry.id,{customLabel:event.target.value})} required={!!entry.address.trim()}/></label>}</article>)}</section>;
+}
+function PhoneEntriesEditor({entries,onChange,onAdd,onRemove}:{entries:PersonalPhoneEntry[];onChange:(id:string,patch:Partial<PersonalPhoneEntry>)=>void;onAdd:()=>void;onRemove:(id:string)=>void}) {
+  const [editing,setEditing]=useState<string|null>(null);
+  return <section className="people-contact-channel-section" data-people-phone-editor><header className="people-repeatable-heading"><div><h4>Phone numbers</h4></div><PeopleAddButton label="Phone" onClick={onAdd}/></header>{entries.map((entry,index)=>{
+    const phoneError=entry.number.trim() && editing!==entry.id?validateInternationalPhone(entry.number,entry.countryCode):null;
+    return <article className="people-contact-channel-entry" data-phone-entry={entry.id} key={entry.id}><div className="people-contact-channel-fields">
+      <ContactCategory label={`Phone ${index+1} category`} value={entry.category} onChange={category=>onChange(entry.id,{category})}/>
+      <div className="people-phone-value-fields"><SelectField searchable aria-label={`Phone ${index+1} country code`} className="people-country-code-select" triggerContent={entry.countryCode} value={entry.countryCode} onChange={event=>onChange(entry.id,{countryCode:event.target.value,number:rebasePhoneCountryCode(entry.number,entry.countryCode,event.target.value)})}>
+        {!PHONE_COUNTRY_CHOICES.some(country=>country.code===entry.countryCode) && <option value={entry.countryCode}>{entry.countryCode}</option>}
+        {PHONE_COUNTRY_CHOICES.map(country=><option key={country.code} value={country.code}><span className="people-country-option"><strong>{country.code}</strong><span>{country.country}</span><svg className="people-country-flag" width="27" height="18" viewBox="0 0 513 342" aria-hidden="true"><use href={`/country-flags.svg#flag-${country.iso}`} /></svg><small>{country.digits} digits</small></span></option>)}
+      </SelectField><label className="people-contact-value-field"><span className="people-visually-hidden">Phone</span><input type="tel" inputMode="tel" value={entry.number} onFocus={()=>setEditing(entry.id)} onChange={event=>onChange(entry.id,{number:event.target.value})} onBlur={()=>{setEditing(null);onChange(entry.id,{number:formatInternationalPhone(entry.number,entry.countryCode),countryCode:phoneCountryCodeForValue(entry.number,entry.countryCode)});}} placeholder="Phone number" aria-describedby={phoneError?`people-phone-error-${entry.id}`:undefined}/></label></div>
+      <RemoveIconButton className="people-contact-remove" label={`Remove phone ${index+1}`} onClick={()=>onRemove(entry.id)}/></div>
+      {entry.category==="custom" && <label className="people-custom-category">Custom category<input value={entry.customLabel || ""} onChange={event=>onChange(entry.id,{customLabel:event.target.value})} required={!!entry.number.trim()}/></label>}
+      {phoneError && <p className="people-phone-error" id={`people-phone-error-${entry.id}`} role="status">{phoneError}</p>}
+    </article>;
+  })}</section>;
 }
 
 function PeopleNotesEditor({
@@ -2102,7 +1977,7 @@ function PeopleNotesEditor({
   editorKind?: string;
   placeholder?: string;
 }) {
-  const rows = notes.length > 0 ? notes : [""];
+  const rows = notes;
 
   function updateNote(index: number, value: string) {
     onChange(rows.map((note, noteIndex) => noteIndex === index ? value : note));
@@ -2110,7 +1985,7 @@ function PeopleNotesEditor({
 
   function removeNote(index: number) {
     const next = rows.filter((_, noteIndex) => noteIndex !== index);
-    onChange(next.length > 0 ? next : [""]);
+    onChange(next);
   }
 
   function addNote(afterIndex: number) {
@@ -2202,8 +2077,8 @@ export default function PeopleWorkspace({
   const [quickContext, setQuickContext] = useState("");
   const [quickPhoto, setQuickPhoto] = useState("");
   const [quickPhotoDialogOpen, setQuickPhotoDialogOpen] = useState(false);
-  const [quickLifeDreams, setQuickLifeDreams] = useState<string[]>([""]);
-  const [quickNotes, setQuickNotes] = useState<string[]>([""]);
+  const [quickLifeDreams, setQuickLifeDreams] = useState<string[]>([]);
+  const [quickNotes, setQuickNotes] = useState<string[]>([]);
   const [quickOrganizationType, setQuickOrganizationType] = useState("");
   const [quickIndustry, setQuickIndustry] = useState("");
   const [quickFoundedYear, setQuickFoundedYear] = useState("");
@@ -2233,9 +2108,12 @@ export default function PeopleWorkspace({
   const [quickX, setQuickX] = useState("");
   const [quickLinkedIn, setQuickLinkedIn] = useState("");
   const [quickYouTube, setQuickYouTube] = useState("");
-  const [profileDraft, setProfileDraft] = useState<ContactProfileDraft>({ ...EMPTY_PROFILE_DRAFT });
+  const [profileDraft, setProfileDraft] = useState<ContactProfileDraft>(() => getProfile(initialPeople.find(record => record.id === selectedId)));
+  const [profileDraftOwnerId, setProfileDraftOwnerId] = useState(selectedId);
   const [profilePhotoDraft, setProfilePhotoDraft] = useState("");
-  const [profileGroups, setProfileGroups] = useState<string[]>([]);
+  const [aboutExtras,setAboutExtras]=useState({dream:false,notes:false});
+  const [inlineOrganization,setInlineOrganization]=useState<{kind:"job"|"education";entryId:string;quick:boolean}|null>(null);
+  const [profileGroups, setProfileGroups] = useState<string[]>(() => initialPeople.find(record => record.id === selectedId)?.subjects || []);
   const [saving, setSaving] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [error, setError] = useState("");
@@ -2385,7 +2263,7 @@ export default function PeopleWorkspace({
     const dialog = interactionDialogRef.current;
     dialog?.querySelector<HTMLElement>("input, select, textarea, button")?.focus();
     const handleDialogKey = (event: KeyboardEvent) => {
-      if (!interactionDialogRef.current) return;
+      if (!interactionDialogRef.current || document.querySelector(".app-select-menu")) return;
       if (event.key === "Escape" && !interactionSavingRef.current) {
         event.preventDefault();
         setInteractionOpen(false);
@@ -2586,6 +2464,7 @@ export default function PeopleWorkspace({
     return dates;
   }, [allInteractionItems]);
   const recentInteractionItems = allInteractionItems.slice(0, 8);
+  const duplicateMatches = useMemo(() => findPeopleDuplicates(people), [people]);
   const organizationOptions = useMemo<OrganizationOption[]>(
     () => activePeople
       .filter((record) => record.className === "org")
@@ -2673,9 +2552,11 @@ export default function PeopleWorkspace({
   const deleteTarget = useMemo(() => people.find((record) => record.id === deleteTargetId), [deleteTargetId, people]);
   useEffect(() => {
     setProfileDraft(getProfile(selectedPerson));
+    setProfileDraftOwnerId(selectedPerson?.id || "");
     setProfilePhotoDraft("");
     setProfileGroups(selectedPerson?.subjects || []);
     setExpandedContactMethod(null);
+    setAboutExtras({dream:false,notes:false});
     setQuickNoteOpen(false);
     setQuickNoteDraft("");
   }, [selectedPerson?.id]);
@@ -2897,7 +2778,7 @@ export default function PeopleWorkspace({
     || status !== "active"
     || cadence !== "P1M";
   const profileFormDirty = Boolean(
-    selectedPerson && (
+    selectedPerson && profileDraftOwnerId === selectedPerson.id && (
       profilePhotoDraft ||
       JSON.stringify(profileDraft) !== JSON.stringify(getProfile(selectedPerson))
       || JSON.stringify(profileGroups) !== JSON.stringify(selectedPerson.subjects)
@@ -2965,6 +2846,12 @@ export default function PeopleWorkspace({
   useEffect(() => {
     if (detailMode !== "edit") return;
     const handleEditorShortcut = (event: KeyboardEvent) => {
+      if (document.querySelector(".people-photo-dialog, .app-select-menu")) return;
+      const nested = document.querySelector<HTMLFormElement>(".people-inline-org-dialog form");
+      if (nested) {
+        if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {event.preventDefault(); nested.requestSubmit();}
+        return;
+      }
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
         event.preventDefault();
         const selector = addingPerson ? ".people-capture-form" : ".people-edit-form";
@@ -3001,7 +2888,7 @@ export default function PeopleWorkspace({
       "new-people": stats.newPeople,
       "profile-gaps": stats.profileGaps,
       dormant: stats.dormant,
-      duplicates: 0,
+      duplicates: duplicateMatches.length,
       "recently-deleted": archivedPeople.length
     };
     return counts[view];
@@ -3087,9 +2974,9 @@ export default function PeopleWorkspace({
     });
   }
 
-  function selectPerson(record: PersonalRecord) {
+  function selectPerson(record: PersonalRecord, sidebar?: PeopleSidebarView) {
     const destination = buildPeopleDestination(
-      { person: "", tab: "overview" },
+      { person: "", tab: "overview", ...(sidebar ? {sidebar} : {}) },
       {
         path: getNativeObjectRoute({
           module: "people",
@@ -3189,7 +3076,7 @@ export default function PeopleWorkspace({
   async function saveInteraction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!interactionDate || !interactionTitle.trim() || interactionParticipantIds.length === 0) return;
-    if (interactionEndTime && (!interactionStartTime || interactionEndTime < interactionStartTime)) {
+    if (interactionEndTime && interactionStartTime && interactionEndTime < interactionStartTime) {
       setError("Choose a start time before the end time, and keep the end after the start.");
       return;
     }
@@ -3407,8 +3294,8 @@ export default function PeopleWorkspace({
       setStatus("active");
       setQuickContext("");
       setQuickPhoto("");
-      setQuickLifeDreams([""]);
-      setQuickNotes([""]);
+      setQuickLifeDreams([]);
+      setQuickNotes([]);
       setQuickOrganizationType("");
       setQuickIndustry("");
       setQuickFoundedYear("");
@@ -3703,8 +3590,8 @@ export default function PeopleWorkspace({
     setQuickLastName("");
     setQuickBirthday("");
     setQuickContext("");
-    setQuickLifeDreams([""]);
-    setQuickNotes([""]);
+    setQuickLifeDreams([]);
+    setQuickNotes([]);
     setQuickOrganizationType("");
     setQuickIndustry("");
     setQuickFoundedYear("");
@@ -4016,20 +3903,20 @@ export default function PeopleWorkspace({
             <section className="people-profile-section people-themed-section module-ref-tone-crimson people-capture-section" data-profile-section="about" aria-labelledby="people-create-about-title">
               <header className="people-profile-section-heading">
                 <span><PeopleIcon name="notes" /></span>
-                <h4 id="people-create-about-title">About</h4>
+                <h4 id="people-create-about-title">About</h4><div className="people-about-additions"><PeopleAddButton label="Life dream" icon="star" iconOnly onClick={()=>setQuickLifeDreams(current=>[...current, ""])}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setQuickNotes(current=>[...current, ""])}/></div>
               </header>
               <div className="people-profile-field-grid">
                 <label className="is-wide">Relationship context<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={4} /></label>
               </div>
-              <PeopleNotesEditor
+              {quickLifeDreams.length > 0 && <PeopleNotesEditor
                 title="Life dream"
                 idPrefix="people-life-dream"
                 editorKind="life-dream"
                 placeholder="Add a life dream…"
                 notes={quickLifeDreams}
                 onChange={setQuickLifeDreams}
-              />
-              <PeopleNotesEditor notes={quickNotes} onChange={setQuickNotes} />
+              />}
+              {quickNotes.length > 0 && <PeopleNotesEditor notes={quickNotes} onChange={setQuickNotes} />}
             </section>
             <section className="people-profile-section people-themed-section module-ref-tone-purple people-capture-section" data-profile-section="groups" aria-labelledby="people-create-groups-title">
               <header className="people-profile-section-heading">
@@ -4077,14 +3964,14 @@ export default function PeopleWorkspace({
             </section>
             <OccupationEntriesEditor
               entries={quickOccupations}
-              organizations={organizationOptions}
+              organizations={organizationOptions} onCreateOrganization={(entryId)=>setInlineOrganization({kind:"job",entryId,quick:true})}
               onChange={(id, patch) => setQuickOccupations((current) => updateEntry(current, id, patch))}
               onAdd={() => setQuickOccupations((current) => [...current, newOccupationEntry()])}
               onRemove={(id) => setQuickOccupations((current) => removeEntry(current, id))}
             />
             <EducationEntriesEditor
               entries={quickEducation}
-              organizations={organizationOptions}
+              organizations={organizationOptions} onCreateOrganization={(entryId)=>setInlineOrganization({kind:"education",entryId,quick:true})}
               onChange={(id, patch) => setQuickEducation((current) => updateEntry(current, id, patch))}
               onAdd={() => setQuickEducation((current) => [...current, newEducationEntry()])}
               onRemove={(id) => setQuickEducation((current) => removeEntry(current, id))}
@@ -4144,7 +4031,7 @@ export default function PeopleWorkspace({
               title="Notes"
               idPrefix="people-organization-note"
               editorKind="notes"
-              notes={quickNotes}
+              notes={quickNotes.length ? quickNotes : [""]}
               onChange={setQuickNotes}
             />
           </section>
@@ -4434,7 +4321,7 @@ export default function PeopleWorkspace({
         ) : resolvedUtilityNotice ? (
           <section className="people-utility-surface">
             <h2>{activeViewLabel}</h2>
-            <p>{resolvedUtilityNotice}</p>
+            {!["duplicates","import","export","import-export"].includes(activeSidebarView) && <p>{resolvedUtilityNotice}</p>}
             {activeSidebarView === "all-lists" && (
               <div className="people-utility-grid">
                 {PEOPLE_SIDEBAR_SECTIONS[1].items.slice(0, 6).map((item) => (
@@ -4445,17 +4332,9 @@ export default function PeopleWorkspace({
                 ))}
               </div>
             )}
-            {activeSidebarView === "duplicates" && (
-              <div className="notes-empty-state">
-                <h3>No duplicate groups found</h3>
-                <p>Duplicate review will compare names, emails, and phone numbers when enough records exist.</p>
-              </div>
-            )}
+            {activeSidebarView === "duplicates" && <div className="people-duplicate-review"><p>{duplicateMatches.length} possible {duplicateMatches.length===1?"duplicate pair":"duplicate pairs"} across people and organizations. Matching details are suggestions for review; no records are changed.</p>{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):<div className="notes-empty-state"><UnigentamosIcon role="duplicates" size={24}/><h3>No duplicate candidates</h3><p>Checked names, email addresses, phone numbers, social profiles, and organization websites. Similar names alone may belong to different people.</p></div>}</div>}
             {(activeSidebarView === "import-export" || activeSidebarView === "import" || activeSidebarView === "export") && (
-              <div className="people-utility-grid">
-                {(activeSidebarView === "import-export" || activeSidebarView === "import") && <button type="button" disabled aria-describedby="people-unavailable-actions">Import preview not connected</button>}
-                {(activeSidebarView === "import-export" || activeSidebarView === "export") && <button type="button" disabled aria-describedby="people-unavailable-actions">Export people data unavailable</button>}
-              </div>
+              <div className="people-transfer-preview"><span className="people-transfer-status">Planned</span><h3>{activeSidebarView === "export"?"Your contacts, ready to travel":"Bring your contacts together"}</h3><p>{activeSidebarView === "export"?"Choose people and organizations, review the details to include, then download or share a clean contact card.":"Choose where your contacts live, preview their details, and review duplicates before importing."}</p><div>{(activeSidebarView === "export"?["Contact cards","CSV / CRM","Full backup","Share sheet"]:["Apple Contacts","Google Contacts","Outlook","CRM / CSV"]).map(label=><span key={label}><PeopleIcon name={activeSidebarView === "export"?"export":"person"}/>{label}</span>)}</div><small>Connections and transfer actions will be available in a future update.</small></div>
             )}
             {activeSidebarView === "customize" && (
               <div className="people-utility-grid">
@@ -4721,6 +4600,7 @@ export default function PeopleWorkspace({
                       <header className={`people-profile-section-heading${section.title === "Links" && selectedPerson.className === "org" ? " people-autofill-heading" : ""}`}>
                         <span><PeopleIcon name={profileSectionIcon(section.title)} /></span>
                         <h4>{section.title}</h4>
+                        {section.title === "About" && selectedPerson.className === "person" && <div className="people-about-additions"><PeopleAddButton label="Life dream" icon="star" iconOnly onClick={()=>setAboutExtras(current=>({...current,dream:true}))}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setAboutExtras(current=>({...current,notes:true}))}/></div>}
                         {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} onPhoto={setProfilePhotoDraft} hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)} disabled={profileSaving} />}
                       </header>
                       {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
@@ -4804,23 +4684,23 @@ export default function PeopleWorkspace({
                       )}
                       {section.title === "About" && (
                         <>
-                          {selectedPerson.className === "person" && (
+                          {selectedPerson.className === "person" && (profileDraft.lifeDream || aboutExtras.dream) && (
                             <PeopleNotesEditor
                               title="Life dream"
                               idPrefix="people-life-dream"
                               editorKind="life-dream"
                               placeholder="Add a life dream…"
                               notes={profileDraft.lifeDream ? profileDraft.lifeDream.split(/\r?\n/) : [""]}
-                              onChange={(dreams) => updateProfileDraft("lifeDream", dreams.join("\n"))}
+                              onChange={(dreams) => {updateProfileDraft("lifeDream", dreams.join("\n"));if(!dreams.length)setAboutExtras(current=>({...current,dream:false}));}}
                             />
                           )}
-                          <PeopleNotesEditor
+                          {(selectedPerson.className === "org" || profileDraft.notes || aboutExtras.notes) && <PeopleNotesEditor
                             title={selectedPerson.className === "org" ? "Organization notes" : "Notes"}
                             idPrefix="people-about-note"
                             editorKind="notes"
                             notes={profileDraft.notes ? profileDraft.notes.split(/\r?\n/) : [""]}
-                            onChange={(notes) => updateProfileDraft("notes", notes.join("\n"))}
-                          />
+                            onChange={(notes) => {updateProfileDraft("notes", notes.join("\n"));if(!notes.length)setAboutExtras(current=>({...current,notes:false}));}}
+                          />}
                         </>
                       )}
                     </section>
@@ -4845,14 +4725,14 @@ export default function PeopleWorkspace({
                           <>
                             <OccupationEntriesEditor
                               entries={profileDraft.occupations}
-                              organizations={organizationOptions}
+                              organizations={organizationOptions} onCreateOrganization={(entryId)=>setInlineOrganization({kind:"job",entryId,quick:false})}
                               onChange={updateProfileOccupation}
                               onAdd={() => setProfileDraft((current) => ({ ...current, occupations: [...current.occupations, newOccupationEntry()] }))}
                               onRemove={(id) => setProfileDraft((current) => ({ ...current, occupations: removeEntry(current.occupations, id) }))}
                             />
                             <EducationEntriesEditor
                               entries={profileDraft.education}
-                              organizations={organizationOptions}
+                              organizations={organizationOptions} onCreateOrganization={(entryId)=>setInlineOrganization({kind:"education",entryId,quick:false})}
                               onChange={updateProfileEducation}
                               onAdd={() => setProfileDraft((current) => ({ ...current, education: [...current.education, newEducationEntry()] }))}
                               onRemove={(id) => setProfileDraft((current) => ({ ...current, education: removeEntry(current.education, id) }))}
@@ -5256,17 +5136,24 @@ export default function PeopleWorkspace({
             </button>
       </nav>}
 
+      {inlineOrganization && <InlineOrganizationDialog existingIds={people.map(record=>record.id)} onClose={()=>setInlineOrganization(null)} onSaved={(record,records)=>{
+        const pending=inlineOrganization;setPeople(records.filter(item=>item.className === "person" || item.className === "org"));
+        if(pending.kind === "job") {const patch={organizationId:record.id,employer:record.title};if(pending.quick)setQuickOccupations(current=>updateEntry(current,pending.entryId,patch));else setProfileDraft(current=>({...current,occupations:updateEntry(current.occupations,pending.entryId,patch)}));}
+        else {const patch={organizationId:record.id,institution:record.title};if(pending.quick)setQuickEducation(current=>updateEntry(current,pending.entryId,patch));else setProfileDraft(current=>({...current,education:updateEntry(current.education,pending.entryId,patch)}));}
+        setInlineOrganization(null);
+      }}/>}
       {interactionOpen && (
         <div className="people-dialog-backdrop" role="presentation">
           <form ref={interactionDialogRef} className="people-interaction-dialog" role="dialog" aria-modal="true" aria-labelledby="log-interaction-title" onSubmit={saveInteraction}>
             <header>
               <div>
                 <h2 id="log-interaction-title">Log interaction</h2>
-                <p>Tag everyone involved once; the same entry appears on each profile.</p>
+
               </div>
               <button className="people-dialog-close" type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}><UnigentamosIcon role="close" size={18} /></button>
             </header>
             <div className="people-interaction-fields">
+              <div className="people-interaction-settings is-wide"><label><span className="people-visually-hidden">Approach</span><SelectField aria-label="Approach" value={interactionApproach} onChange={event=>setInteractionApproach(event.target.value as PersonalInteractionApproach || "")}><option value="">Approach</option><option value="cold">Cold</option><option value="warm">Warm</option></SelectField></label><label className="people-check-row"><input type="checkbox" checked={interactionMeaningful} onChange={event=>setInteractionMeaningful(event.target.checked)}/>Use this as the latest contact date</label></div>
               <label>
                 Type
                 <SelectField value={interactionKind} onChange={(event) => setInteractionKind(event.target.value as InteractionKind)}>
@@ -5284,25 +5171,7 @@ export default function PeopleWorkspace({
                 Date
                 <input type="date" value={interactionDate} onChange={(event) => setInteractionDate(event.target.value)} required />
               </label>
-              <fieldset className="people-interaction-time is-wide">
-                <legend>Time <span>Optional</span></legend>
-                <div>
-                  <label>
-                    Start
-                    <input type="time" value={interactionStartTime} onChange={(event) => {
-                      const nextStart = event.target.value;
-                      setInteractionStartTime(nextStart);
-                      if (!nextStart) setInteractionEndTime("");
-                    }} />
-                  </label>
-                  <span aria-hidden="true">to</span>
-                  <label>
-                    End
-                    <input type="time" value={interactionEndTime} min={interactionStartTime || undefined} disabled={!interactionStartTime} onChange={(event) => setInteractionEndTime(event.target.value)} />
-                  </label>
-                </div>
-                <p>Leave both blank for an untimed interaction, or add a start time by itself.</p>
-              </fieldset>
+              <fieldset className="people-interaction-time is-wide"><legend>Time <span>Optional</span></legend><div><TimeField label="Start" value={interactionStartTime} onChange={setInteractionStartTime}/><TimeField label="End" value={interactionEndTime} onChange={setInteractionEndTime}/></div></fieldset>
               <label className="is-wide">
                 Title
                 <input value={interactionTitle} onChange={(event) => setInteractionTitle(event.target.value)} placeholder="Coffee, call, introduction, or shared moment" required />
@@ -5313,8 +5182,8 @@ export default function PeopleWorkspace({
               </label>
               <fieldset className="people-interaction-participant-picker is-wide">
                 <legend>People and organizations</legend>
-                <div>
-                  {activePeople.map((record) => (
+                <div className="people-participant-columns">{(["person","org"] as const).map(kind=><section key={kind}><h4>{kind === "person"?"People":"Organizations"}</h4><div className="people-participant-scroll">
+                  {activePeople.filter(record=>record.className===kind).sort((a,b)=>a.title.localeCompare(b.title)).map((record) => (
                     <label key={record.id}>
                       <input
                         type="checkbox"
@@ -5334,34 +5203,14 @@ export default function PeopleWorkspace({
                       <span>{record.title}</span>
                     </label>
                   ))}
-                </div>
+                </div></section>)}</div>
               </fieldset>
-              <fieldset className="people-interaction-approach is-wide">
-                <legend>Approach</legend>
-                <div>
-                  {(["", "cold", "warm"] as const).map((value) => (
-                    <label key={value || "unset"}>
-                      <input
-                        type="radio"
-                        name="interaction-approach"
-                        value={value}
-                        checked={interactionApproach === value}
-                        onChange={() => setInteractionApproach(value)}
-                      />
-                      <span>{value ? labelize(value) : "Not specified"}</span>
-                    </label>
-                  ))}
-                </div>
-              </fieldset>
-              <label className="people-check-row is-wide">
-                <input type="checkbox" checked={interactionMeaningful} onChange={(event) => setInteractionMeaningful(event.target.checked)} />
-                Use this as the latest contact date
-              </label>
+
             </div>
             {error && <p className="personal-record-error">{error}</p>}
             <footer className="people-dialog-actions">
               <button className="people-dialog-action" type="button" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}>Cancel</button>
-              <button className="people-dialog-action is-primary" type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate || interactionParticipantIds.length === 0 || Boolean(interactionEndTime && (!interactionStartTime || interactionEndTime < interactionStartTime))}>
+              <button className="people-dialog-action is-primary" type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate || interactionParticipantIds.length === 0 || Boolean(interactionEndTime && interactionStartTime && interactionEndTime < interactionStartTime)}>
                 {interactionSaving ? "Saving..." : "Save interaction"}
               </button>
             </footer>

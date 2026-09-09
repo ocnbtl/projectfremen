@@ -677,9 +677,6 @@ function normalizeInteractionDetails(value: unknown, strict = false): PersonalIn
   if (strict && endTime && !timePattern.test(endTime)) {
     throw new Error("Interaction end time is invalid");
   }
-  if (strict && endTime && !startTime) {
-    throw new Error("Interaction end time requires a start time");
-  }
   if (strict && startTime && endTime && endTime < startTime) {
     throw new Error("Interaction end time must be after the start time");
   }
@@ -694,7 +691,7 @@ function normalizeInteractionDetails(value: unknown, strict = false): PersonalIn
     kind,
     occurredOn,
     ...(timePattern.test(startTime) ? { startTime } : {}),
-    ...(timePattern.test(endTime) && timePattern.test(startTime) && endTime >= startTime ? { endTime } : {}),
+    ...(timePattern.test(endTime) && (!startTime || timePattern.test(startTime) && endTime >= startTime) ? { endTime } : {}),
     ...(approach ? { approach } : {}),
     updatesLastContact: raw.updatesLastContact !== false
   };

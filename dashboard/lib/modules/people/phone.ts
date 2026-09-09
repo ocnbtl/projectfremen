@@ -1,3 +1,19 @@
+import { getCountries, getCountryCallingCode, parsePhoneNumberFromString } from "libphonenumber-js/min";
+import metadata from "libphonenumber-js/metadata.min.json";
+
+const countryNames = new Intl.DisplayNames(["en"], {type:"region"});
+export const PHONE_COUNTRY_CHOICES = Object.values([...getCountries()].sort((a,b)=>Number(["US","GB","RU","AU"].includes(b))-Number(["US","GB","RU","AU"].includes(a))).reduce<Record<string,{code:string;country:string;flag:string;digits:string;iso:string}>>((result,iso) => {
+  const code=`+${getCountryCallingCode(iso)}`;
+  const country=countryNames.of(iso) || iso;
+  const flag=String.fromCodePoint(...[...iso].map(letter=>127397+letter.charCodeAt(0)));
+  const lengths=(metadata.countries[iso] as unknown as unknown[])[3] as number[];
+  const typical=({AU:9,PE:9,GB:10,FR:9,US:10,CA:10} as Record<string,number>)[iso];
+  const range=lengths.length === 1 ? `${lengths[0]}` : `${Math.min(...lengths)}–${Math.max(...lengths)}`;
+  const digits=typical && lengths.length > 1 ? `${typical} typical; ${range} supported` : range;
+  if (result[code]) {result[code].country+=` / ${country}`;result[code].flag+=` ${flag}`;} else result[code]={code,country,flag,digits,iso};
+  return result;
+},{})).sort((a,b)=>a.country.localeCompare(b.country));
+
 export type PhoneCountryFormat = {
   code: string;
   country: string;
@@ -77,6 +93,8 @@ export function normalizePhoneForStorage(value: string, countryCode = "+1"): str
   const digits = clean.replace(/\D/g, "");
   if (!digits) return "";
   if (clean.startsWith("+")) return `+${digits}`;
+  const parsed = parsePhoneNumberFromString(clean, {defaultCallingCode: canonicalCountryCode(countryCode).slice(1)});
+  if (parsed?.isPossible()) return parsed.number;
   const code = canonicalCountryCode(countryCode, "").replace(/\D/g, "");
   return code ? `+${code}${digits}` : "";
 }
@@ -88,10 +106,17 @@ export function phoneLocalDigits(value: string, countryCode: string): string {
   return code && canonical.startsWith(code) ? canonical.slice(code.length) : canonical;
 }
 
+export function phoneCountryCodeForValue(value: string, fallback: string): string {
+  const parsed = value.trim().startsWith("+") ? parsePhoneNumberFromString(value) : undefined;
+  return parsed ? `+${parsed.countryCallingCode}` : canonicalCountryCode(fallback);
+}
+
 export function validateInternationalPhone(value: string, countryCode: string): string | null {
   const canonical = normalizePhoneForStorage(value, countryCode);
   const digits = canonical.replace(/\D/g, "");
   if (digits.length < 7 || digits.length > 15) return "Phone numbers must contain 7 to 15 international digits.";
+  const parsed = parsePhoneNumberFromString(canonical);
+  if (parsed?.isValid()) return null;
   const code = detectCode(digits, countryCode);
   const format = formatForCode(code);
   if (format) {
@@ -100,11 +125,13 @@ export function validateInternationalPhone(value: string, countryCode: string): 
       return `${format.country} phone numbers use ${format.localDigits} digits after ${format.code}.`;
     }
   }
-  return null;
+  return parsed && !parsed.isValid() ? "Check the phone number and country code." : null;
 }
 
 export function formatInternationalPhone(value: string, countryCode = "+1"): string {
   const canonical = normalizePhoneForStorage(value, countryCode);
+  const parsed = parsePhoneNumberFromString(canonical);
+  if (parsed?.isPossible()) return parsed.formatInternational().replace(/\s/g, "-").replace(/^\+(\d+)-/, "+$1 ");
   const digits = canonical.replace(/\D/g, "");
   if (!digits) return "";
   const code = detectCode(digits, countryCode);
