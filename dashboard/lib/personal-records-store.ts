@@ -1,4 +1,5 @@
 import { mutateJsonFile, readJsonFile } from "./file-store";
+import { normalizeOrganizationIndustry } from "./modules/people/organization-industries";
 import { normalizeBirthday } from "./modules/people/birthday";
 import {
   canonicalCountryCode,
@@ -2126,6 +2127,7 @@ export async function createPersonalRecord(
     throw new Error("Invalid requested personal record id");
   }
   const className = pickClass(input.className || input.kind);
+  if (className === "org" && profile) profile.industry = normalizeOrganizationIndustry(profile.organizationType || "", profile.industry || "");
   const recordId = requestedId || `personal-${crypto.randomUUID()}`;
   const nextRecord: PersonalRecord = {
     id: recordId,
@@ -2258,6 +2260,9 @@ export async function updatePersonalRecord(
   const nextStarred = typeof patch.starred === "boolean" ? patch.starred : current.starred === true;
 
   const nextProfile = resolveOrganizationReferences(mergeContactProfile(current.profile, profilePatch), existing, true);
+  if (current.className === "org" && nextProfile && profilePatch && ("industry" in profilePatch || "organizationType" in profilePatch)) {
+    nextProfile.industry = normalizeOrganizationIndustry(nextProfile.organizationType || "", nextProfile.industry || "");
+  }
   let nextResourceProfile = current.className === "resource"
     ? mergeResourceProfile(current.resourceProfile, patch.resourceProfile, current.id, current.createdAt)
     : current.resourceProfile;

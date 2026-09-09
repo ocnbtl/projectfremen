@@ -54,6 +54,8 @@ import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import OrganizationAutofill from "./people/OrganizationAutofill";
 import TeamSizeInput from "./people/TeamSizeInput";
+import SelectField from "./ui/SelectField";
+import { organizationIndustryOptions, normalizeOrganizationIndustry } from "../lib/modules/people/organization-industries";
 import { formatTeamSize } from "../lib/modules/people/team-size";
 import { ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, canCompleteOrganizationAddress, emptyOrganizationSuggestions, normalizeOrganizationUrl, type OrganizationAutofillValues, type OrganizationSuggestion } from "../lib/modules/people/organization-autofill";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
@@ -281,8 +283,7 @@ function PeopleFilterSelect({
 }) {
   return (
     <span className="people-filter-select">
-      <select aria-label={ariaLabel} value={value} onChange={(event) => onChange(event.target.value)}>{children}</select>
-      <PeopleIcon name="chevron" />
+      <SelectField aria-label={ariaLabel} value={value} onChange={(event) => onChange(event.target.value)}>{children}</SelectField>
     </span>
   );
 }
@@ -544,114 +545,6 @@ const CADENCE_OPTIONS = [
 ];
 
 type OrganizationType = (typeof ORGANIZATION_TYPE_OPTIONS)[number];
-
-const ORGANIZATION_INDUSTRY_OPTIONS: Record<OrganizationType, readonly string[]> = {
-  Business: [
-    "Technology",
-    "Professional services",
-    "Retail & consumer",
-    "Finance & insurance",
-    "Healthcare",
-    "Media & entertainment",
-    "Manufacturing",
-    "Construction & real estate",
-    "Hospitality & travel",
-    "Transportation & logistics",
-    "Agriculture & food",
-    "Energy & utilities",
-    "Fashion & apparel",
-    "Other"
-  ],
-  Nonprofit: [
-    "Arts & culture",
-    "Education",
-    "Environment",
-    "Health",
-    "Human services",
-    "Civil rights & advocacy",
-    "Community development",
-    "International development",
-    "Religion & faith",
-    "Research",
-    "Animal welfare",
-    "Other"
-  ],
-  "University / School": [
-    "Primary / secondary education",
-    "College / university",
-    "Vocational / technical",
-    "Research institute",
-    "Online education",
-    "Student organization",
-    "Alumni organization",
-    "Other"
-  ],
-  Government: [
-    "Federal",
-    "State / provincial",
-    "Local / municipal",
-    "Judicial / legal",
-    "Public safety",
-    "Public health",
-    "Transportation",
-    "Economic development",
-    "Education",
-    "International / diplomatic",
-    "Other"
-  ],
-  Agency: [
-    "Creative / design",
-    "Marketing / advertising",
-    "Talent / modeling",
-    "Public relations",
-    "Consulting",
-    "Staffing / recruiting",
-    "Digital / product",
-    "Media / production",
-    "Real estate",
-    "Government / regulatory",
-    "Other"
-  ],
-  Community: [
-    "Neighborhood",
-    "Professional network",
-    "Cultural",
-    "Religious / faith",
-    "Sports / recreation",
-    "Arts / creative",
-    "Mutual aid",
-    "Online community",
-    "Social club",
-    "Other"
-  ],
-  Association: [
-    "Trade association",
-    "Professional association",
-    "Industry group",
-    "Alumni association",
-    "Standards body",
-    "Labor / worker organization",
-    "Membership organization",
-    "Advocacy coalition",
-    "Other"
-  ],
-  Other: [
-    "Education",
-    "Healthcare",
-    "Technology",
-    "Arts & culture",
-    "Public service",
-    "Research",
-    "Media",
-    "Community",
-    "Professional services",
-    "Other"
-  ]
-};
-
-function organizationIndustryOptions(type: string): readonly string[] {
-  return ORGANIZATION_INDUSTRY_OPTIONS[type as OrganizationType] || ORGANIZATION_INDUSTRY_OPTIONS.Other;
-}
 
 const PEOPLE_VIEWS: Array<{ id: PeopleView; label: string }> = [
   { id: "overview", label: "Overview" },
@@ -1702,7 +1595,7 @@ function BirthdayEditor({ value, onChange, label = "Birthday" }: { value: string
       <span className="people-birthday-icon" aria-hidden="true"><PeopleIcon name="birthday" /></span>
       <label aria-label={`${label} month`}>
         <span className="people-visually-hidden">Month</span>
-        <select value={month} onChange={(event) => {
+        <SelectField value={month} onChange={(event) => {
           const next = event.target.value;
           setMonth(next);
           commit(next, day, year);
@@ -1711,18 +1604,18 @@ function BirthdayEditor({ value, onChange, label = "Birthday" }: { value: string
           {Array.from({ length: 12 }, (_, index) => index + 1).map((number) => (
             <option value={number} key={number}>{new Intl.DateTimeFormat("en-US", { month: "long" }).format(new Date(2000, number - 1, 1))}</option>
           ))}
-        </select>
+        </SelectField>
       </label>
       <label aria-label={`${label} day`}>
         <span className="people-visually-hidden">Day</span>
-        <select value={day} onChange={(event) => {
+        <SelectField value={day} onChange={(event) => {
           const next = event.target.value;
           setDay(next);
           commit(month, next, year);
         }}>
           <option value="">Day</option>
           {Array.from({ length: 31 }, (_, index) => index + 1).map((number) => <option value={number} key={number}>{number}</option>)}
-        </select>
+        </SelectField>
       </label>
       <label aria-label={`${label} year`}>
         <span className="people-visually-hidden">Year</span>
@@ -1766,7 +1659,7 @@ function EducationEntriesEditor({
           <div className="people-repeatable-fields people-repeatable-fields-education">
             <label>
               <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>University</span>
-              <select
+              <SelectField
                 aria-label={`Education ${index + 1} organization`}
                 value={entry.organizationId || ""}
                 onChange={(event) => {
@@ -1779,11 +1672,11 @@ function EducationEntriesEditor({
                   <option value={entry.organizationId}>{entry.institution || "Unavailable organization"} · unavailable</option>
                 )}
                 {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.title}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Degree</span><input aria-label={`Education ${index + 1} degree`} value={entry.degree || ""} onChange={(event) => onChange(entry.id, { degree: event.target.value })} placeholder="Bachelor’s, Master’s, PhD..." /></label>
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Field of study</span><input aria-label={`Education ${index + 1} field of study`} value={entry.fieldOfStudy || ""} onChange={(event) => onChange(entry.id, { fieldOfStudy: event.target.value })} placeholder="Economics, design, engineering..." /></label>
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>When</span><select aria-label={`Education ${index + 1} timing`} value={entry.status || ""} onChange={(event) => onChange(entry.id, { status: event.target.value ? event.target.value as PersonalEducationEntry["status"] : undefined })}><option value="">Not set</option><option value="current">Current</option><option value="past">Past</option></select></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>When</span><SelectField aria-label={`Education ${index + 1} timing`} value={entry.status || ""} onChange={(event) => onChange(entry.id, { status: event.target.value ? event.target.value as PersonalEducationEntry["status"] : undefined })}><option value="">Not set</option><option value="current">Current</option><option value="past">Past</option></SelectField></label>
             <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove university ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
         </article>
@@ -1817,7 +1710,7 @@ function OccupationEntriesEditor({
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Occupation</span><input aria-label={`Occupation ${index + 1} title`} value={entry.title} onChange={(event) => onChange(entry.id, { title: event.target.value })} placeholder="Product designer" /></label>
             <label>
               <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Employer</span>
-              <select
+              <SelectField
                 aria-label={`Job ${index + 1} organization`}
                 value={entry.organizationId || ""}
                 onChange={(event) => {
@@ -1830,9 +1723,9 @@ function OccupationEntriesEditor({
                   <option value={entry.organizationId}>{entry.employer || "Unavailable organization"} · unavailable</option>
                 )}
                 {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.title}</option>)}
-              </select>
+              </SelectField>
             </label>
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>When</span><select aria-label={`Occupation ${index + 1} timing`} value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></select></label>
+            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>When</span><SelectField aria-label={`Occupation ${index + 1} timing`} value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></SelectField></label>
             <RemoveIconButton className="people-repeatable-inline-remove" label={`Remove job ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
         </article>
@@ -1891,13 +1784,12 @@ function OrganizationIndustrySelect({
   onChange: (value: string) => void;
 }) {
   const options = organizationIndustryOptions(organizationType);
-  const hasLegacyValue = Boolean(value && !options.includes(value));
+
   return (
-    <select data-organization-industry value={value} onChange={(event) => onChange(event.target.value)}>
+    <SelectField data-organization-industry value={normalizeOrganizationIndustry(organizationType, value)} onChange={(event) => onChange(event.target.value)}>
       <option value="">Select industry or field</option>
-      {hasLegacyValue && <option value={value}>{value} · current</option>}
       {options.map((option) => <option value={option} key={option}>{option}</option>)}
-    </select>
+    </SelectField>
   );
 }
 
@@ -1941,10 +1833,10 @@ function OrganizationPeopleEditor({
       <div className="people-organization-link-controls">
         <label>
           <span className="people-visually-hidden">Person</span>
-          <select aria-label="Person to link" value={pendingId} onChange={(event) => setPendingId(event.target.value)}>
+          <SelectField aria-label="Person to link" value={pendingId} onChange={(event) => setPendingId(event.target.value)}>
             <option value="">Select a person</option>
             {availablePeople.map((person) => <option value={person.id} key={person.id}>{person.title}</option>)}
-          </select>
+          </SelectField>
         </label>
         <PeopleAddButton label="Person" onClick={addPerson} disabled={!pendingId} iconOnly />
       </div>
@@ -2005,7 +1897,7 @@ function QuickObjectsEditor({
       <div className="people-object-create-controls">
         <label>
           Object
-          <select aria-label="Object to link" value={pendingId} onChange={(event) => setPendingId(event.target.value)}>
+          <SelectField aria-label="Object to link" value={pendingId} onChange={(event) => setPendingId(event.target.value)}>
             <option value="">Select an object</option>
             {Array.from(new Set(availableTargets.map((target) => target.module))).map((module) => (
               <optgroup label={labelize(module)} key={module}>
@@ -2015,7 +1907,7 @@ function QuickObjectsEditor({
                 })}
               </optgroup>
             ))}
-          </select>
+          </SelectField>
         </label>
         <PeopleAddButton label="Object" onClick={addObject} disabled={!pendingId} />
       </div>
@@ -2059,13 +1951,13 @@ function EmailEntriesEditor({
             <div className="people-contact-category-fields">
               <label>
                 Category
-                <select
+                <SelectField
                   aria-label={`Email ${index + 1} category`}
                   value={entry.category}
                   onChange={(event) => onChange(entry.id, { category: event.target.value as PersonalContactEntryCategory })}
                 >
                   {CONTACT_CATEGORY_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-                </select>
+                </SelectField>
               </label>
               {entry.category === "custom" && (
                 <label>
@@ -2123,13 +2015,13 @@ function PhoneEntriesEditor({
             <div className="people-contact-category-fields">
               <label>
                 Category
-                <select
+                <SelectField
                   aria-label={`Phone ${index + 1} category`}
                   value={entry.category}
                   onChange={(event) => onChange(entry.id, { category: event.target.value as PersonalContactEntryCategory })}
                 >
                   {CONTACT_CATEGORY_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-                </select>
+                </SelectField>
               </label>
               {entry.category === "custom" && (
                 <label>
@@ -2398,6 +2290,12 @@ export default function PeopleWorkspace({
   const suppressDirtyPopRef = useRef(false);
 
   useEffect(() => {
+    const closeLocalMenus = () => { setMobileMenuOpen(false); setFiltersOpen(false); setSortOpen(false); };
+    window.addEventListener("app-mobile-navigation-open", closeLocalMenus);
+    return () => window.removeEventListener("app-mobile-navigation-open", closeLocalMenus);
+  }, []);
+
+  useEffect(() => {
     const handleProfileHistory = (event: PopStateEvent) => {
       if (suppressDirtyPopRef.current) return;
       const nextUrlState = parsePeopleUrlState(new URLSearchParams(window.location.search));
@@ -2453,15 +2351,16 @@ export default function PeopleWorkspace({
     setSortMode(next.sort);
     setListMode(next.view);
     setAiOpen(next.ai);
-    if (initialSelectedId || next.person) {
-      setSelectedId(initialSelectedId || next.person);
+    const pathId = pathname.match(/^\/admin\/people\/([^/]+)/)?.[1];
+    if ((pathId && pathId !== "new") || next.person) {
+      setSelectedId(pathId && pathId !== "new" ? decodeURIComponent(pathId) : next.person);
     }
-    if (initialMode === "edit") {
+    if (pathname.endsWith("/edit")) {
       setEditorReturnView(next.tab === "properties" ? "overview" : next.tab);
       setActiveView("properties");
       setDetailMode("edit");
       setAddingPerson(false);
-    } else if (initialMode === "new") {
+    } else if (pathname === "/admin/people/new") {
       setClassName(searchParams.get("type") === "organization" ? "org" : "person");
       setAddingPerson(true);
       setDetailMode("edit");
@@ -2478,7 +2377,7 @@ export default function PeopleWorkspace({
       );
       setAddingPerson(false);
     }
-  }, [initialMode, initialSelectedId, searchParamKey]);
+  }, [pathname, searchParamKey]);
 
   useEffect(() => {
     if (!interactionOpen) return;
@@ -2553,6 +2452,7 @@ export default function PeopleWorkspace({
     );
     controls()[0]?.focus();
     const handleOverlayKey = (event: KeyboardEvent) => {
+      if (document.querySelector(".app-select-menu")) return;
       if (event.key === "Escape") {
         event.preventDefault();
         if (mobileMenuOpen) setMobileMenuOpen(false);
@@ -2575,7 +2475,7 @@ export default function PeopleWorkspace({
     document.addEventListener("keydown", handleOverlayKey);
     return () => {
       document.removeEventListener("keydown", handleOverlayKey);
-      previousFocus?.focus();
+      if (document.activeElement === document.body || container.contains(document.activeElement)) previousFocus?.focus();
     };
   }, [filtersOpen, mobileMenuOpen]);
 
@@ -2584,6 +2484,7 @@ export default function PeopleWorkspace({
     if (sortOpen) sortMenuRef.current?.querySelector<HTMLElement>("[role='menuitemradio']")?.focus();
     const closeDetachedMenu = (event: MouseEvent) => {
       const target = event.target as Node;
+      if (target instanceof Element && target.closest(".app-select-menu")) return;
       if (
         filterSheetRef.current?.contains(target)
         || sortMenuRef.current?.contains(target)
@@ -2596,6 +2497,7 @@ export default function PeopleWorkspace({
     };
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== "Escape") return;
+      if (document.querySelector(".app-select-menu")) return;
       const returnFocus = sortOpen ? sortTriggerRef.current : filterTriggerRef.current;
       setFiltersOpen(false);
       setSortOpen(false);
@@ -2637,7 +2539,7 @@ export default function PeopleWorkspace({
   ) {
     const destination = buildPeopleDestination(partial, options);
     if (options.native && typeof window !== "undefined") {
-      const nextState = { ...(window.history.state || {}), __unigentamosPeopleSidebar: true };
+      const nextState = { __unigentamosPeopleSidebar: true };
       if (options.history === "push") {
         window.history.pushState(nextState, "", destination);
       } else {
@@ -2659,7 +2561,6 @@ export default function PeopleWorkspace({
   ) {
     if (typeof window === "undefined") return;
     const nextState = {
-      ...(window.history.state || {}),
       __unigentamosPeopleRoute: state
     };
     if (history === "replace") window.history.replaceState(nextState, "", destination);
@@ -2850,8 +2751,8 @@ export default function PeopleWorkspace({
     + (relationshipFilter ? 1 : 0)
     + (locationFilter ? 1 : 0)
     + (lastContactFilter === "any" ? 0 : 1);
-  const filteringActive = detailMode === "profile" && activeFilterCount > 0;
-  const mobileSurface = addingPerson || initialMode === "new" || detailMode === "edit" || initialMode === "edit"
+  const filteringActive = detailMode === "profile" && activeFilterCount > 0 && pathname === getModuleRoute("people");
+  const mobileSurface = addingPerson || detailMode === "edit"
     ? "editor"
     : pathname === getModuleRoute("people")
       ? "directory"
@@ -3410,7 +3311,7 @@ export default function PeopleWorkspace({
       },
       areas: ["Relationships"],
       subjects: className === "org" ? [] : groups,
-      projects: splitList(quickProjects),
+      projects: className === "org" ? [] : splitList(quickProjects),
       externalSources: [profile.website, profile.instagram, profile.tiktok, profile.x, profile.linkedin, profile.youtube]
         .filter((value): value is string => Boolean(value)),
       sourceUrl: profile.website
@@ -3441,10 +3342,10 @@ export default function PeopleWorkspace({
 
       let linkedObjectCount = 0;
       let failedObjectCount = 0;
-      if (createdPerson && className === "person" && quickObjectTargetIds.length > 0) {
+      if (createdPerson && quickObjectTargetIds.length > 0) {
         const source = createNativeObjectRef({
           module: "people",
-          objectType: "person",
+          objectType: className === "org" ? "organization" : "person",
           objectId: createdPerson.id,
           label: createdPerson.title,
           versionId: createdPerson.updatedAt
@@ -3455,7 +3356,7 @@ export default function PeopleWorkspace({
         });
         const results = await Promise.all(selectedTargets.map(async (target) => {
           try {
-            if (target.module === "projects" && target.objectType === "project") {
+            if (className === "person" && target.module === "projects" && target.objectType === "project") {
               const result = await projectsRepository.create("links", {
                 projectId: target.objectId,
                 source,
@@ -3829,7 +3730,7 @@ export default function PeopleWorkspace({
     setDetailMode("edit");
     setActiveView("overview");
     setProfileMenuOpen(false);
-    router.push(destination);
+    commitPeopleRoute(destination, { selectedId, view: "overview", mode: "edit" });
   }
 
   function updateQuickName(value: string) {
@@ -4028,7 +3929,7 @@ export default function PeopleWorkspace({
       switch (suggestion.field) {
         case "name": setName(value); break;
         case "organizationType": setQuickOrganizationType(value); break;
-        case "industry": setQuickIndustry(value); break;
+        case "industry": setQuickIndustry(normalizeOrganizationIndustry(quickOrganizationType || suggestions.find((item) => item.field === "organizationType")?.value || "", value)); break;
         case "foundedYear": setQuickFoundedYear(value); break;
         case "teamSize": setQuickTeamSize(value); break;
         case "context": setQuickContext(value); break;
@@ -4061,13 +3962,13 @@ export default function PeopleWorkspace({
         if (item.field === "name") updated.fullName = item.value;
         else updated = { ...updated, [item.field]: item.value };
       }
-      return { ...updated, locations: applyOrganizationLocation(current.locations, applied) };
+      return { ...updated, industry: normalizeOrganizationIndustry(updated.organizationType, updated.industry), locations: applyOrganizationLocation(current.locations, applied) };
     });
   }
 
   function renderAddPersonForm(extraClass = "") {
     return (
-      <form className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
+      <form data-profile-class={className} className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
         <div className="people-edit-toolbar">
           <button type="button" onClick={requestCancelEditor}><PeopleIcon name="close" /><span>Cancel</span></button>
           <strong>{className === "org" ? "New Organization" : "New Person"}</strong>
@@ -4202,8 +4103,8 @@ export default function PeopleWorkspace({
                 <h4 id="people-create-cadence-title">Cadence</h4>
               </header>
               <div className="people-profile-field-grid">
-                <label>Status<select value={status} onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}><option value="active">Active</option><option value="next">Next</option><option value="idea">Loose tie</option><option value="inactive">Dormant</option></select></label>
-                <label>Cadence<select data-people-cadence-select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</select></label>
+                <label>Status<SelectField value={status} onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}><option value="active">Active</option><option value="next">Next</option><option value="idea">Loose tie</option><option value="inactive">Dormant</option></SelectField></label>
+                <label>Cadence<SelectField data-people-cadence-select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</SelectField></label>
                 <label>Last contact<input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} /></label>
                 <label>Next contact<input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></label>
                 <label className="is-wide">Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
@@ -4225,14 +4126,14 @@ export default function PeopleWorkspace({
               </label>
               <label>
                 Organization type
-                <select data-organization-type value={quickOrganizationType} onChange={(event) => {
+                <SelectField data-organization-type value={quickOrganizationType} onChange={(event) => {
                   const nextType = event.target.value;
                   setQuickOrganizationType(nextType);
                   if (!organizationIndustryOptions(nextType).includes(quickIndustry)) setQuickIndustry("");
                 }}>
                   <option value="">Select organization type</option>
                   {ORGANIZATION_TYPE_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
-                </select>
+                </SelectField>
               </label>
               <label>Industry or field<OrganizationIndustrySelect organizationType={quickOrganizationType} value={quickIndustry} onChange={setQuickIndustry} /></label>
               <label className="people-org-founded">Founded year<input inputMode="numeric" pattern="\d{4}" value={quickFoundedYear} onChange={(event) => setQuickFoundedYear(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1998" /></label>
@@ -4260,7 +4161,7 @@ export default function PeopleWorkspace({
               <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(withoutTrailingLinkSlash(event.target.value))} placeholder="https://instagram.com/..." /></label>
               <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(withoutTrailingLinkSlash(event.target.value))} placeholder="https://tiktok.com/@..." /></label>
               <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
-              <label className="is-wide">Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
+
             </div>
           </section>
           <LocationEntriesEditor
@@ -4270,7 +4171,7 @@ export default function PeopleWorkspace({
             onAdd={() => setQuickLocations((current) => [...current, newLocationEntry({ label: current.length === 0 ? "Relevant location" : "" })])}
             onRemove={(id) => setQuickLocations((current) => removeEntry(current, id))}
           />
-          <OrganizationPeopleEditor people={personOptions} selectedIds={quickOrganizationPeople} onChange={setQuickOrganizationPeople} />
+          <QuickObjectsEditor targets={quickObjectTargets} selectedIds={quickObjectTargetIds} onChange={setQuickObjectTargetIds} />
           </>
         )}
         <datalist id="people-location-suggestions">
@@ -4286,34 +4187,7 @@ export default function PeopleWorkspace({
       <span id="people-unavailable-actions" className="sr-only">
         This action is intentionally unavailable until its native owner or persistence path is connected.
       </span>
-      <div className="people-mobile-topbar">
-        {mobileSurface === "directory" ? (
-          <button type="button" aria-label="Open people menu" onClick={() => setMobileMenuOpen(true)}>
-            <UnigentamosIcon role="menu" size={18} />
-          </button>
-        ) : (
-          <button
-            type="button"
-            aria-label={mobileSurface === "editor" ? "Cancel editing" : "Back to People directory"}
-            onClick={() => mobileSurface === "editor" ? requestCancelEditor() : router.push(getModuleRoute("people"))}
-          >
-            <UnigentamosIcon role="back" size={18} />
-          </button>
-        )}
-        <span className="people-mobile-brand">U</span>
-        <strong>{mobileSurface === "editor"
-          ? addingPerson
-            ? className === "org" ? "New Organization" : "New Person"
-            : selectedPerson?.className === "org" ? "Edit Organization" : "Edit Person"
-          : mobileSurface === "profile" ? labelize(activeView) : "People"}</strong>
-        <button type="button" aria-label="Search people" onClick={() => searchInputRef.current?.focus()}>
-          <PeopleIcon name="search" />
-        </button>
-        <button ref={mobileFilterTriggerRef} type="button" aria-label={filtersOpen ? "Close filters" : "Open filters"} aria-expanded={filtersOpen} aria-controls="people-filter-sheet" onClick={() => setFiltersOpen((current) => !current)}>
-          <PeopleIcon name="filter" />
-        </button>
-      </div>
-
+      {mobileMenuOpen && <button className="people-mobile-menu-backdrop" aria-label="Dismiss people navigation" onClick={() => setMobileMenuOpen(false)} />}
       <div
         ref={mobileMenuRef}
         className={`people-mobile-menu${mobileMenuOpen ? " is-open" : ""}`}
@@ -4321,9 +4195,10 @@ export default function PeopleWorkspace({
         aria-modal="true"
         aria-label="People module navigation"
         aria-hidden={!mobileMenuOpen}
+        inert={!mobileMenuOpen}
       >
         <button type="button" aria-label="Close people menu" onClick={() => setMobileMenuOpen(false)}>
-          x
+          <PeopleIcon name="close" />
         </button>
         {PEOPLE_SIDEBAR_SECTIONS.map((section) => (
           <div className="people-sidebar-section" key={section.title}>
@@ -4372,7 +4247,8 @@ export default function PeopleWorkspace({
 
       <main className="people-directory-panel" data-total-records={totalRecords}>
         <header className="people-directory-header">
-          <div>
+          <div className="people-directory-heading">
+            <button type="button" className="people-mobile-nav-trigger" aria-label="Open people navigation" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)}><UnigentamosIcon role="menu" size={20} /></button>
             <h1>{activeViewLabel}</h1>
           </div>
           <div className="people-header-actions">
@@ -4685,6 +4561,7 @@ export default function PeopleWorkspace({
       </main>
 
       <section className="people-profile-panel" aria-label="Selected profile">
+        {!addingPerson && detailMode !== "edit" && <button type="button" className="people-mobile-profile-back" onClick={() => updatePeopleUrl({}, { path: getModuleRoute("people"), history: "push", native: true })}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /><span>Back to {activeViewLabel}</span></button>}
         {initialLoadError ? (
           <SystemState
             variant="error"
@@ -4874,15 +4751,15 @@ export default function PeopleWorkspace({
                           <label className={`${field.type === "textarea" ? "is-wide " : ""}people-profile-field-${field.key}`} key={field.key}>
                             {field.label}
                             {field.key === "contactCadence" ? (
-                              <select
+                              <SelectField
                                 data-people-cadence-select
                                 value={profileDraft.contactCadence}
                                 onChange={(event) => updateProfileDraft("contactCadence", event.target.value)}
                               >
                                 {CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-                              </select>
+                              </SelectField>
                             ) : field.key === "organizationType" ? (
-                              <select data-organization-type value={profileDraft.organizationType} onChange={(event) => {
+                              <SelectField data-organization-type value={profileDraft.organizationType} onChange={(event) => {
                                 const nextType = event.target.value;
                                 setProfileDraft((current) => ({
                                   ...current,
@@ -4892,7 +4769,7 @@ export default function PeopleWorkspace({
                               }}>
                                 <option value="">Select type</option>
                                 {ORGANIZATION_TYPE_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
-                              </select>
+                              </SelectField>
                             ) : field.key === "industry" && selectedPerson.className === "org" ? (
                               <OrganizationIndustrySelect
                                 organizationType={profileDraft.organizationType}
@@ -5368,11 +5245,7 @@ export default function PeopleWorkspace({
         )}
       </section>
 
-      {!initialLoadError && (mobileSurface === "directory" || addingPerson || initialMode === "new") && <nav className="people-mobile-actionbar" aria-label="People quick actions">
-        {mobileSurface === "directory" ? (
-          <button type="button" onClick={() => openAddPerson("person")}><PeopleIcon name="new-person" /><span>Add Person</span></button>
-        ) : mobileSurface === "editor" ? (
-          <>
+      {!initialLoadError && mobileSurface === "editor" && <nav className="people-mobile-actionbar" aria-label="People quick actions">
             <button type="button" onClick={requestCancelEditor}><PeopleIcon name="close" /><span>Cancel</span></button>
             <button
               type="button"
@@ -5381,13 +5254,6 @@ export default function PeopleWorkspace({
             >
               <PeopleIcon name="check" /><span>{saving || profileSaving ? "Saving…" : "Save"}</span>
             </button>
-          </>
-        ) : (
-          <>
-            <button type="button" onClick={() => openInteractionComposer(selectedPerson)}><PeopleIcon name="interaction" /><span>Log Interaction</span></button>
-            <button type="button" onClick={() => setProfileMenuOpen(true)}><PeopleIcon name="more" /><span>More</span></button>
-          </>
-        )}
       </nav>}
 
       {interactionOpen && (
@@ -5403,7 +5269,7 @@ export default function PeopleWorkspace({
             <div className="people-interaction-fields">
               <label>
                 Type
-                <select value={interactionKind} onChange={(event) => setInteractionKind(event.target.value as InteractionKind)}>
+                <SelectField value={interactionKind} onChange={(event) => setInteractionKind(event.target.value as InteractionKind)}>
                   <option value="call">Call</option>
                   <option value="message">Message</option>
                   <option value="email">Email</option>
@@ -5412,7 +5278,7 @@ export default function PeopleWorkspace({
                   <option value="note">Note</option>
                   <option value="memory">Memory</option>
                   <option value="milestone">Milestone</option>
-                </select>
+                </SelectField>
               </label>
               <label>
                 Date
@@ -5518,7 +5384,7 @@ export default function PeopleWorkspace({
             <div className="people-object-link-fields">
               <label>
                 Object
-                <select value={objectLinkTargetId} onChange={(event) => setObjectLinkTargetId(event.target.value)} required>
+                <SelectField value={objectLinkTargetId} onChange={(event) => setObjectLinkTargetId(event.target.value)} required>
                   <option value="">Choose an object</option>
                   {Array.from(new Set(availableObjectTargets.map((target) => target.module))).map((module) => (
                     <optgroup label={module === "personal_ops" ? "Lists" : labelize(module)} key={module}>
@@ -5529,11 +5395,11 @@ export default function PeopleWorkspace({
                       ))}
                     </optgroup>
                   ))}
-                </select>
+                </SelectField>
               </label>
               <label>
                 Relationship
-                <select value={objectLinkRelationship} onChange={(event) => setObjectLinkRelationship(event.target.value)}>
+                <SelectField value={objectLinkRelationship} onChange={(event) => setObjectLinkRelationship(event.target.value)}>
                   <option value="related">Related</option>
                   <option value="member">Member</option>
                   <option value="participant">Participant</option>
@@ -5541,7 +5407,7 @@ export default function PeopleWorkspace({
                   <option value="client">Client</option>
                   <option value="advisor">Advisor</option>
                   <option value="subject">Subject</option>
-                </select>
+                </SelectField>
               </label>
             </div>
             {error && <p className="personal-record-error">{error}</p>}

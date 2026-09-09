@@ -19,6 +19,23 @@ const steps = [];
 const skips = [];
 const testRunId = `regression-${Date.now()}`;
 
+
+async function chooseField(locator, value) {
+  if (await locator.evaluate(element => element.tagName === 'SELECT')) return locator.selectOption(value);
+  await locator.click();
+  await locator.page().locator('[role="option"][data-select-value=' + JSON.stringify(value) + ']').click();
+  await locator.page().locator('.app-select-menu').waitFor({ state: 'hidden' });
+}
+async function fieldOptions(locator) {
+  if (await locator.evaluate(element => element.tagName === 'SELECT')) return locator.locator('option').allTextContents();
+  await locator.click();
+  await locator.page().getByRole('option').first().waitFor();
+  const options = await locator.page().getByRole('option').allTextContents();
+  await locator.page().keyboard.press('Escape');
+  await locator.page().locator('.app-select-menu').waitFor({ state: 'hidden' });
+  return options;
+}
+
 function spawnNpm(args, options) {
   if (!npmExecPath && args[0] === "run" && args[1] === "typecheck") {
     return spawn(process.execPath, [tscCliPath, "--noEmit"], options);
@@ -5831,14 +5848,12 @@ async function checkPeopleMemoryBrowserState(
           await viewCycle.locator("path").first().getAttribute("d") !== initialViewPath,
         `People View control did not morph and cycle at ${viewport.label}`
       );
-      const filterTrigger = viewport.label === "mobile"
-        ? page.locator('.people-mobile-topbar button[aria-controls="people-filter-sheet"]').last()
-        : page.locator('.people-primary-search .people-control-trigger[aria-controls="people-filter-sheet"]');
+      const filterTrigger = page.locator('.people-primary-search .people-control-trigger[aria-controls="people-filter-sheet"]');
       await filterTrigger.click();
       const filterSheet = page.locator("#people-filter-sheet");
       await filterSheet.waitFor();
       assert(
-        await filterSheet.locator("select").count() === 4 &&
+        await filterSheet.getByRole("combobox").count() === 4 &&
           await filterSheet.locator(".people-filter-select").count() === 4 &&
           await filterSheet.locator("header").getByRole("button", { name: "Reset" }).count() === 0 &&
           await filterSheet.locator("footer").getByRole("button", { name: "Reset" }).count() === 1 &&
@@ -5870,9 +5885,9 @@ async function checkPeopleMemoryBrowserState(
           popoverMotion.position === "absolute",
         `People filter did not use the attached origin-aware menu motion at ${viewport.label}: ${JSON.stringify(popoverMotion)}`
       );
-      await filterSheet.getByLabel("Relationship").selectOption("Advisor");
-      await filterSheet.getByLabel("Location").selectOption("Columbus, Ohio, USA");
-      await filterSheet.getByLabel("Last contact").selectOption("90d");
+      await chooseField(filterSheet.getByLabel("Relationship"), "Advisor");
+      await chooseField(filterSheet.getByLabel("Location"), "Columbus, Ohio, USA");
+      await chooseField(filterSheet.getByLabel("Last contact"), "90d");
       assert(
         await page.locator(".people-directory-row").filter({ hasText: personTitle }).count() === 1,
         `People relationship, location, and last-contact filters did not retain the matching profile at ${viewport.label}`
@@ -6161,7 +6176,7 @@ async function checkPeopleMemoryBrowserState(
       await photoEditor.getByRole("button", { name: "Zoom in" }).click();
       await photoEditor.getByLabel("Horizontal crop").fill("0.2");
       await photoEditor.getByLabel("Vertical crop").fill("-0.2");
-      await photoEditor.getByLabel("Resize output").selectOption("1024");
+      await chooseField(photoEditor.getByLabel("Resize output"), "1024");
       assert(
         Number(await photoEditor.getByLabel("Zoom", { exact: true }).inputValue()) > 1 &&
           await photoEditor.getByLabel("Resize output").inputValue() === "1024",
@@ -6411,8 +6426,8 @@ async function checkPeopleMemoryBrowserState(
       const interactionDialog = page.getByRole("dialog", { name: "Log interaction", exact: true });
       await interactionDialog.waitFor();
       assert(
-        (await interactionDialog.getByLabel("Type").locator("option").allTextContents()).includes("Catch-up") &&
-          (await interactionDialog.getByLabel("Type").locator("option").allTextContents()).includes("Memory") &&
+        (await fieldOptions(interactionDialog.getByLabel("Type"))).includes("Catch-up") &&
+          (await fieldOptions(interactionDialog.getByLabel("Type"))).includes("Memory") &&
           await interactionDialog.getByLabel("Start").count() === 1 &&
           await interactionDialog.getByLabel("End").count() === 1 &&
           await interactionDialog.getByLabel("End").isDisabled(),
@@ -6433,13 +6448,13 @@ async function checkPeopleMemoryBrowserState(
           interactionComposerState.warmOptions === 1,
         `Interaction composer did not preselect the profile or expose optional approach choices at ${viewport.label}: ${JSON.stringify(interactionComposerState)}`
       );
-      await interactionDialog.getByLabel("Type").selectOption("catch-up");
+      await chooseField(interactionDialog.getByLabel("Type"), "catch-up");
       await interactionDialog.getByLabel("Title").fill("Quick catch-up");
       await interactionDialog.getByLabel("Warm").check();
       await interactionDialog.getByLabel("Start").fill("15:00");
       await interactionDialog.getByLabel("End").fill("16:00");
       assert(
-        await interactionDialog.getByLabel("Type").inputValue() === "catch-up" &&
+        await interactionDialog.getByLabel("Type").getAttribute("data-value") === "catch-up" &&
           await interactionDialog.getByLabel("Warm").isChecked() &&
           await interactionDialog.getByLabel("Start").inputValue() === "15:00" &&
           await interactionDialog.getByLabel("End").inputValue() === "16:00",
@@ -6598,8 +6613,8 @@ async function checkPeopleMemoryBrowserState(
       }
       const propertyCadence = page.locator("[data-people-cadence-select]");
       assert(
-        await propertyCadence.inputValue() === "NONE" &&
-          (await propertyCadence.locator("option").allTextContents()).includes("No cadence"),
+        await propertyCadence.getAttribute("data-value") === "NONE" &&
+          (await fieldOptions(propertyCadence)).includes("No cadence"),
         `Properties did not expose the persisted No cadence choice at ${viewport.label}`
       );
       assert(
@@ -6641,7 +6656,7 @@ async function checkPeopleMemoryBrowserState(
       assert(
         await page.locator("[data-email-entry]").count() === 3 &&
           await page.locator("[data-phone-entry]").count() === 2 &&
-          await page.getByLabel("Email 3 category").inputValue() === "custom" &&
+          await page.getByLabel("Email 3 category").getAttribute("data-value") === "custom" &&
           await page.getByLabel("Custom category").first().inputValue() === "Alumni" &&
           await page.locator(".people-contact-entry-advanced").count() === 0 &&
           await page.locator(".people-phone-value-fields").count() === 2 &&
@@ -6712,7 +6727,7 @@ async function checkPeopleMemoryBrowserState(
         ));
         const repeatableBottomGaps = alignedRemoveButtons.flatMap((button) => {
           const fields = button.closest(".people-repeatable-fields, .people-contact-channel-fields");
-          const field = fields?.querySelector("input, select, textarea");
+          const field = fields?.querySelector('input, button[role="combobox"], textarea');
           if (!field) return [];
           return [Math.abs(field.getBoundingClientRect().bottom - button.getBoundingClientRect().bottom)];
         });
@@ -6936,33 +6951,33 @@ async function checkPeopleMemoryBrowserState(
       );
       const organizationTypeSelect = organizationForm.locator("[data-organization-type]");
       const organizationIndustrySelect = organizationForm.locator("[data-organization-industry]");
-      assert(await organizationTypeSelect.inputValue() === "", "New organizations must not assume a business type");
-      await organizationTypeSelect.selectOption("Business");
+      assert(await organizationTypeSelect.getAttribute("data-value") === "", "New organizations must not assume a business type");
+      await chooseField(organizationTypeSelect, "Business");
       assert(
-        (await organizationIndustrySelect.locator("option").allTextContents()).includes("Technology"),
+        (await fieldOptions(organizationIndustrySelect)).includes("Technology"),
         `Business did not expose its relevant industry options at ${viewport.label}`
       );
-      await organizationTypeSelect.selectOption("University / School");
-      const universityIndustryOptions = await organizationIndustrySelect.locator("option").allTextContents();
+      await chooseField(organizationTypeSelect, "University / School");
+      const universityIndustryOptions = await fieldOptions(organizationIndustrySelect);
       assert(
         universityIndustryOptions.includes("College / university") && !universityIndustryOptions.includes("Finance & insurance"),
         `Organization industry options did not respond to University / School at ${viewport.label}`
       );
-      await organizationTypeSelect.selectOption("Business");
+      await chooseField(organizationTypeSelect, "Business");
       assert(
         await organizationForm.locator("[data-location-entry]").first().locator("input").first().inputValue() === "Relevant location" &&
-          await organizationForm.getByRole("heading", { name: "People", exact: true }).count() === 1,
+          await organizationForm.getByRole("heading", { name: "Objects", exact: true }).count() === 1,
         `Organization location and people controls were not purpose-built at ${viewport.label}`
       );
-      await organizationForm.getByLabel("Person to link").selectOption(personId);
-      await organizationForm.getByRole("button", { name: "Add person" }).click();
+      await chooseField(organizationForm.getByLabel("Object to link"), `people:person:${personId}`);
+      await organizationForm.getByRole("button", { name: "Add object" }).click();
       assert(
-        await organizationForm.locator(`[data-linked-person="${personId}"]`).count() === 1,
+        await organizationForm.locator(".people-object-create-list").getByText(personTitle, { exact: true }).count() === 1,
         `Organization people picker did not add a selected Person at ${viewport.label}`
       );
-      await organizationForm.getByRole("button", { name: `Remove direct link to ${personTitle}` }).click();
+      await organizationForm.getByRole("button", { name: `Remove ${personTitle}` }).click();
       assert(
-        await organizationForm.locator(`[data-linked-person="${personId}"]`).count() === 0,
+        await organizationForm.locator(".people-object-create-list").getByText(personTitle, { exact: true }).count() === 0,
         `Organization people picker did not remove a direct draft link at ${viewport.label}`
       );
       await personTypeButton.click();
@@ -6980,7 +6995,7 @@ async function checkPeopleMemoryBrowserState(
           await page.getByLabel("Object to link").count() === 1,
         `New People did not expose the create-time Objects section at ${viewport.label}`
       );
-      await page.getByLabel("Object to link").selectOption(`people:organization:${organizationId}`);
+      await chooseField(page.getByLabel("Object to link"), `people:organization:${organizationId}`);
       await page.getByRole("button", { name: "Add object" }).click();
       assert(
         await page.locator("[data-people-create-objects]").getByText(organizationTitle, { exact: true }).count() === 1,
@@ -7013,13 +7028,13 @@ async function checkPeopleMemoryBrowserState(
         `New People notes did not use compact aligned controls at ${viewport.label}: ${JSON.stringify(noteGeometry)}`
       );
       const birthdayEditor = page.locator("[data-people-birthday-editor]");
-      await birthdayEditor.locator("select").nth(0).selectOption("3");
-      await birthdayEditor.locator("select").nth(1).selectOption("14");
+      await chooseField(birthdayEditor.locator("button[role=combobox]").nth(0), "3");
+      await chooseField(birthdayEditor.locator("button[role=combobox]").nth(1), "14");
       const unknownYearBirthdayState = {
         year: await birthdayEditor.locator("input").inputValue(),
         legend: (await birthdayEditor.locator("legend").innerText()).trim(),
-        month: await birthdayEditor.locator("select").nth(0).inputValue(),
-        day: await birthdayEditor.locator("select").nth(1).inputValue(),
+        month: await birthdayEditor.locator("button[role=combobox]").nth(0).getAttribute("data-value"),
+        day: await birthdayEditor.locator("button[role=combobox]").nth(1).getAttribute("data-value"),
         cakeIcon: await birthdayEditor.locator('svg[data-icon-role="birthday"][data-icon-candidate="cake"]').count(),
         yearPlaceholder: await birthdayEditor.locator("input").getAttribute("placeholder")
       };
@@ -7038,7 +7053,7 @@ async function checkPeopleMemoryBrowserState(
         JSON.stringify(createGroups) === JSON.stringify(expectedGroupOptions),
         `New People did not render alphabetized People groups with Other last at ${viewport.label}: ${JSON.stringify(createGroups)}`
       );
-      const createCadenceOptions = await page.locator("[data-people-cadence-select] option").allTextContents();
+      const createCadenceOptions = await fieldOptions(page.locator("[data-people-cadence-select]"));
       assert(createCadenceOptions.includes("No cadence"), `New People omitted No cadence at ${viewport.label}`);
       assert(
         await page.locator("[data-email-entry]").count() === 1 &&
@@ -7071,10 +7086,10 @@ async function checkPeopleMemoryBrowserState(
         await addEmailButton.click();
         await addPhoneButton.click();
       }
-      await page.getByLabel("Email 2 category").selectOption("custom");
+      await chooseField(page.getByLabel("Email 2 category"), "custom");
       await page.getByLabel("Custom category").fill("Alumni");
       await page.getByLabel("Email", { exact: true }).nth(1).fill("avery.alumni@example.edu");
-      await page.getByLabel("Phone 2 category").selectOption("work");
+      await chooseField(page.getByLabel("Phone 2 category"), "work");
       await page.getByLabel("Phone 2 country code").fill("+1");
       await page.getByLabel("Phone", { exact: true }).nth(1).fill("6145550142");
       assert(
@@ -7095,8 +7110,8 @@ async function checkPeopleMemoryBrowserState(
         await addJobButton.click();
         await addLocationButton.click();
       }
-      await page.getByLabel("Education 1 organization").selectOption(organizationId);
-      await page.getByLabel("Job 1 organization").selectOption(organizationId);
+      await chooseField(page.getByLabel("Education 1 organization"), organizationId);
+      await chooseField(page.getByLabel("Job 1 organization"), organizationId);
       assert(
         await page.locator("[data-education-entry]").count() === 1 &&
           await page.locator("[data-occupation-entry]").count() === 2 &&
@@ -7157,21 +7172,29 @@ async function checkPeopleMemoryBrowserState(
         await organizationQuickForm.getByRole("group", { name: "Record type" }).getByRole("button", { name: "Organization", exact: true }).click();
         const quickOrganizationTitle = `${organizationTitle}-ui`;
         await organizationQuickForm.getByLabel("Organization name").fill(quickOrganizationTitle);
-        await organizationQuickForm.locator("[data-organization-type]").selectOption("Business");
-        await organizationQuickForm.getByLabel("Industry or field").selectOption("Technology");
+        await chooseField(organizationQuickForm.locator("[data-organization-type]"), "Business");
+        await chooseField(organizationQuickForm.getByLabel("Industry or field"), "Technology");
         await organizationQuickForm.getByLabel("Description").fill("A directly linked organization created by the regression UI.");
         await organizationQuickForm.getByLabel("YouTube", { exact: true }).fill("https://youtube.com/@regression-studio");
         await organizationQuickForm.locator("[data-location-entry]").first().locator("input").nth(1).fill("Columbus, Ohio, USA");
-        await organizationQuickForm.getByLabel("Person to link").selectOption(personId);
-        await organizationQuickForm.getByRole("button", { name: "Add person" }).click();
-        const [organizationCreateResponse] = await Promise.all([
+        await chooseField(organizationQuickForm.getByLabel("Object to link"), `people:person:${personId}`);
+        await organizationQuickForm.getByRole("button", { name: "Add object" }).click();
+        const [organizationCreateResponse, objectLinkResponse] = await Promise.all([
           page.waitForResponse((response) =>
             response.url().endsWith("/api/personal/records") && response.request().method() === "POST"
+          ),
+          page.waitForResponse((response) =>
+            response.url().endsWith("/api/native-links") && response.request().method() === "POST"
           ),
           organizationQuickForm.getByRole("button", { name: "Save", exact: true }).click()
         ]);
         const organizationCreatePayload = await organizationCreateResponse.json();
         const createdFromOrganizationQuickEntry = organizationCreatePayload?.items?.find((item) => item.title === quickOrganizationTitle);
+        const createdObjectLink = await objectLinkResponse.json();
+        assert(objectLinkResponse.ok() && createdObjectLink.item?.source.objectType === "organization"
+          && createdObjectLink.item.source.objectId === createdFromOrganizationQuickEntry?.id
+          && createdObjectLink.item.target.objectId === personId,
+        "Organization creation did not persist its canonical Object link to the selected person");
         assert(
           organizationCreateResponse.ok() &&
             createdFromOrganizationQuickEntry?.profile?.organizationType === "Business" &&
@@ -7180,7 +7203,6 @@ async function checkPeopleMemoryBrowserState(
             createdFromOrganizationQuickEntry.profile.youtube === "https://youtube.com/@regression-studio" &&
             createdFromOrganizationQuickEntry.profile.headquarters === "Columbus, Ohio, USA" &&
             createdFromOrganizationQuickEntry.profile.locations?.[0]?.label === "Relevant location" &&
-            createdFromOrganizationQuickEntry.profile.associatedPeople?.includes(personId) &&
             createdFromOrganizationQuickEntry.profile.emails?.length === 0 &&
             createdFromOrganizationQuickEntry.profile.phones?.length === 0 &&
             createdFromOrganizationQuickEntry.subjects?.length === 0 &&
@@ -7481,8 +7503,8 @@ async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, 
     const objectDialog = page.getByRole("dialog", { name: new RegExp(`Add ${personTitle} to an object`) });
     await objectDialog.waitFor();
     assert(
-      await objectDialog.getByLabel("Object").locator("option").count() > 1 &&
-        await objectDialog.getByLabel("Relationship").locator("option").count() >= 5,
+      (await fieldOptions(objectDialog.getByLabel("Object", { exact: true }))).length > 1 &&
+        (await fieldOptions(objectDialog.getByLabel("Relationship", { exact: true }))).length >= 5,
       "People Add to object did not expose real object and relationship choices"
     );
     await objectDialog.getByRole("button", { name: "Close object picker" }).click();

@@ -15122,3 +15122,132 @@ html[data-admin-preview="mobile"] .people-redesign-shell.is-mobile-editor .peopl
   .people-redesign-shell .people-profile-group-picker label { min-height: 44px; }
   .people-redesign-shell .people-contact-channel-fields .people-contact-remove { width: 44px !important; min-width: 44px !important; }
 }
+/* Shared field menus: portaled, keyboard accessible, and sized to their trigger. */
+.app-select-trigger {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  width: 100%; min-width: 0; min-height: 40px; padding: 8px 10px;
+  border: 1px solid var(--border-soft, #d6dfe4); border-radius: 10px;
+  background: var(--surface-panel, #fff); color: var(--text-strong, #163449);
+  font: inherit; font-size: 13px; text-align: left; cursor: pointer;
+}
+.app-select-trigger > span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.app-select-trigger > span:last-child { flex-shrink: 0; display: flex; transition: transform 180ms ease; }
+.app-select-trigger[data-state="open"] > span:last-child { transform: rotate(180deg); }
+.app-select-trigger:focus-visible { outline: 2px solid var(--people-action, #133c5e); outline-offset: 2px; }
+.app-select-trigger:disabled { opacity: .5; cursor: default; }
+.app-select-menu {
+  z-index: 1000; min-width: var(--radix-select-trigger-width); max-width: calc(100vw - 24px);
+  max-height: min(360px, var(--radix-select-content-available-height)); overflow: hidden;
+  padding: 6px; border: 1px solid var(--border-soft, #d6dfe4); border-radius: 16px;
+  background: var(--surface-panel, #fff); color: var(--text-strong, #163449);
+  box-shadow: 0 12px 36px #16344924; transform-origin: var(--radix-select-content-transform-origin);
+  animation: app-field-menu-in 160ms ease-out;
+}
+.app-select-item { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 38px; padding: 8px 12px; border-radius: 10px; font-size: 13px; cursor: pointer; outline: none; }
+.app-select-item[data-highlighted] { background: var(--module-quiet, #edf3f5); }
+.app-select-item[data-state="checked"] { color: var(--people-action, #133c5e); font-weight: 600; }
+.app-select-item[data-disabled] { opacity: .45; pointer-events: none; }
+.app-select-label { padding: 10px 12px 4px; color: var(--text-subtle, #617680); font-size: 11px; }
+.app-select-scroll { text-align: center; padding: 4px; }
+@keyframes app-field-menu-in { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .app-select-menu { animation: none; } .app-select-trigger > span:last-child { transition: none; } }
+/* Phone records use one navigation layer and a full-width directory/profile surface. */
+.people-directory-heading { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.people-mobile-nav-trigger, .people-mobile-profile-back, .people-mobile-menu-backdrop { display: none; }
+.people-redesign-shell .app-select-trigger { font-weight: 400; }
+.app-top-nav__mobile-menu { border-radius: 22px; background: color-mix(in srgb, var(--surface-panel, #fff) 94%, transparent); backdrop-filter: blur(18px); }
+.app-top-nav__mobile-menu a { border-radius: 12px; font-weight: 500; }
+.app-top-nav__mobile-menu a.is-active { box-shadow: none; }
+@media (max-width: 760px) {
+  .app-select-trigger, .app-select-item { min-height: 44px; font-size: 16px; }
+  .admin-workspace:has(.people-redesign-shell), .admin-content:has(.people-redesign-shell) { padding-inline: 0; }
+  .people-redesign-shell, .people-redesign-shell:has(.people-profile-view-bar), .people-redesign-shell:is(.is-mobile-directory, .is-mobile-editor) {
+    display: grid; grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr);
+    width: 100%; max-width: none; height: calc(100dvh - var(--app-content-offset, 76px));
+    min-height: 0; margin: 0; padding: 0; gap: 0; overflow: hidden; border: 0; border-radius: 0;
+  }
+  .people-redesign-shell .people-directory-panel, .people-redesign-shell .people-profile-panel {
+    min-width: 0; width: 100%; min-height: 0; height: 100%; margin: 0; padding: 12px;
+    border: 0; border-radius: 0; box-shadow: none; overscroll-behavior-y: contain;
+  }
+  .people-redesign-shell.is-mobile-directory .people-profile-panel, .people-redesign-shell:is(.is-mobile-profile, .is-mobile-editor) .people-directory-panel { display: none; }
+  .people-redesign-shell.is-mobile-directory .people-directory-panel { display: flex; flex-direction: column; overflow: auto; scroll-padding-bottom: 16px; }
+  .people-redesign-shell .people-directory-header { align-items: center; flex-wrap: nowrap; gap: 8px; margin-bottom: 12px; }
+  .people-redesign-shell .people-directory-header h1 { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 18px; }
+  .people-redesign-shell .people-header-actions { display: flex; gap: 4px; }
+  .people-redesign-shell .people-header-actions button, .people-redesign-shell .people-header-actions button:nth-child(2) { display: inline-flex; min-width: 44px; width: 44px; height: 44px; padding: 0; border-radius: 14px; align-items: center; justify-content: center; }
+  .people-redesign-shell .people-header-actions button span { display: none; }
+  .people-redesign-shell .people-mobile-nav-trigger { display: inline-flex; align-items: center; justify-content: center; width: 44px; min-width: 44px; height: 44px; padding: 0; border: 0; background: transparent; border-radius: 14px; }
+  .people-redesign-shell .people-directory-tools { display: grid; grid-template-columns: minmax(0, 1fr) 44px; gap: 8px; }
+  .people-redesign-shell .people-primary-search { min-width: 0; height: 48px; padding-left: 10px; border-radius: 16px; }
+  .people-redesign-shell .people-primary-search input { min-width: 0; font-size: 16px; }
+  .people-redesign-shell .people-primary-search .people-control-trigger { width: 44px; min-width: 44px; height: 44px; min-height: 44px; }
+  .people-redesign-shell .people-search-controls { gap: 0; padding-left: 0; }
+  .people-redesign-shell .people-view-cycle { height: 48px; width: 44px; min-width: 44px; margin: 0; border-radius: 14px; }
+  .people-redesign-shell .people-directory-list { flex-shrink: 0; padding: 0; border: 0; }
+  .people-redesign-shell .people-directory-row { border-inline: 0; border-radius: 0; }
+  .people-redesign-shell .people-directory-row-body { padding-inline: 4px; }
+  .people-redesign-shell .people-profile-panel { overflow: auto; display: flex; flex-direction: column; gap: 12px; }
+  .people-redesign-shell .people-profile-header { flex-shrink: 0; padding: 0; }
+  .people-redesign-shell .people-profile-view-bar { flex-shrink: 0; }
+  .people-redesign-shell .people-mobile-profile-back { display: flex; flex-shrink: 0; align-items: center; gap: 8px; width: fit-content; min-height: 44px; padding: 0 4px; border: 0; background: transparent; color: var(--text-strong); }
+  .people-redesign-shell .people-profile-section { border-inline: 0; border-radius: 0; }
+  .people-redesign-shell .people-mobile-menu-backdrop { display: block; position: fixed; inset: var(--app-content-offset, 76px) 0 0; z-index: 88; border: 0; background: #16344933; backdrop-filter: blur(3px); }
+  .people-redesign-shell .people-mobile-menu, .people-redesign-shell .people-mobile-menu.is-open {
+    display: grid; position: fixed; inset: calc(var(--app-content-offset, 76px) + 8px) auto max(12px, env(safe-area-inset-bottom)) 8px;
+    z-index: 90; width: min(86vw, 340px); padding: 12px; overflow-y: auto; overscroll-behavior: contain;
+    border: 1px solid var(--border-soft); border-radius: 24px; background: var(--surface-panel);
+    box-shadow: 0 12px 36px #16344924; gap: 8px; align-content: start;
+    opacity: 0; visibility: hidden; transform: translateX(-24px); transition: opacity 180ms ease, transform 180ms ease, visibility 180ms;
+  }
+  .people-redesign-shell .people-mobile-menu.is-open { opacity: 1; visibility: visible; transform: none; }
+  .people-redesign-shell .people-mobile-menu .people-sidebar-section button { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; min-height: 44px; gap: 8px; padding: 8px 10px; border-radius: 12px; }
+  .people-redesign-shell .people-control-popover { right: -52px !important; border-radius: 18px; }
+  .people-redesign-shell.is-mobile-editor .people-profile-panel { padding-bottom: calc(80px + env(safe-area-inset-bottom)); }
+}
+@media (prefers-reduced-motion: reduce) { .people-redesign-shell .people-mobile-menu { transition: none; } }
+.people-redesign-shell button.app-select-trigger { background: var(--surface-panel, #fff); color: var(--text-strong, #163449); border: 1px solid var(--border-soft, #d6dfe4); border-radius: 10px; justify-content: space-between; text-align: left; padding: 8px 10px; font-weight: 400; }
+@media (max-width: 760px) { .people-redesign-shell .people-mobile-nav-trigger { color: var(--text-strong, #163449); } }
+@media (max-width: 760px) {
+  .people-redesign-shell .people-capture-form, .people-redesign-shell .people-edit-form { padding-inline: 0 !important; border: 0; border-radius: 0; background: transparent; }
+  .people-redesign-shell .people-profile-section { margin-inline: 0; border: 0 !important; border-bottom: 1px solid var(--border-soft) !important; border-radius: 0 !important; background: transparent !important; }
+  .people-redesign-shell .people-profile-section > :is(.people-profile-field-grid, .people-contact-channel-grid, .people-notes-editor, .people-birthday-field) { margin-inline: 0; }
+  .people-redesign-shell .people-profile-section > header { padding-inline: 0; border-radius: 0; background: transparent; }
+  .people-redesign-shell .people-profile-section > h4 { padding-inline: 0; }
+  .people-redesign-shell .people-repeatable-section.people-themed-section > :is(.people-repeatable-entry, .people-repeatable-empty, .people-comes-from-field) { margin-inline: 0; }
+  .people-redesign-shell .people-profile-header { border: 0; border-radius: 0; background: transparent; }
+  .people-redesign-shell .people-profile-section input, .people-redesign-shell .people-profile-section textarea { font-size: 16px; }
+}
+.people-redesign-shell :is([data-profile-class="org"], [aria-label="Edit Organization"]) .people-note-row textarea { min-height: 40px; height: 40px; }
+@media (max-width: 760px) { .people-redesign-shell :is([data-profile-class="org"], [aria-label="Edit Organization"]) .people-note-row textarea { min-height: 44px; height: 44px; } }
+@media (max-width: 760px) { .people-redesign-shell .people-capture-form .people-edit-toolbar { display: none; } }
+@media (max-width: 760px) {
+  .people-redesign-shell .people-directory-header { position: sticky; top: 0; z-index: 8; background: var(--surface-panel); min-height: 44px; }
+  .people-redesign-shell .people-directory-tools { position: sticky; top: 56px; z-index: 7; background: var(--surface-panel); }
+  .people-redesign-shell .people-directory-row { background: transparent; border: 0; border-bottom: 1px solid var(--border-soft); box-shadow: none; }
+  .people-redesign-shell .people-directory-row.is-selected { background: var(--module-quiet); border-radius: 12px; }
+  .people-redesign-shell :is(.people-themed-section, .people-object-create-editor) { border: 0 !important; border-bottom: 1px solid var(--border-soft) !important; border-radius: 0 !important; background: transparent !important; }
+  .people-redesign-shell :is(.people-themed-section, .people-object-create-editor) > header { border-radius: 0; background: transparent; padding-inline: 0; }
+  .people-redesign-shell button.app-select-trigger { font-size: 16px; }
+}
+/* Keep the floating launcher from intercepting fields while editing a record. */
+body:has(.people-redesign-shell.is-mobile-editor) .shared-ai-dock:not(.is-open) { visibility: hidden; pointer-events: none; }
+.people-redesign-shell :is([data-profile-class="org"], [aria-label="Edit Organization"]) input { min-height: 40px; }
+@media (max-width: 760px) { .people-redesign-shell :is([data-profile-class="org"], [aria-label="Edit Organization"]) input { min-height: 44px; } }
+.people-redesign-shell button.app-select-trigger { width: 100%; min-width: 0; min-height: 40px; height: auto; }
+.people-redesign-shell button.app-select-trigger > span:first-child { font: inherit; color: inherit; }
+@media (max-width: 1180px) {
+  .people-redesign-shell .people-search-controls { position: static; }
+  .people-redesign-shell .people-control-popover { left: 0 !important; right: auto !important; width: min(430px, calc(100vw - 24px)) !important; }
+}
+@media (max-width: 760px) { .people-redesign-shell button.app-select-trigger { min-height: 44px; } }
+
+@media (max-width: 760px) { .people-directory-heading { flex: 1; } .people-redesign-shell .people-header-actions { flex-shrink: 0; } }
+@media (max-width: 760px) { .people-redesign-shell :is(.people-smart-panel, .people-desktop-sidebar) { display: none !important; } }
+@media (max-width: 760px) {
+  .people-redesign-shell .people-profile-panel { display: grid; grid-template-rows: auto auto auto minmax(0, 1fr); overflow: hidden; }
+  .people-redesign-shell.is-mobile-editor .people-profile-panel { grid-template-rows: auto auto minmax(0, 1fr); }
+  .people-redesign-shell.is-mobile-editor .people-profile-panel:has(.people-capture-form) { grid-template-rows: minmax(0, 1fr); overflow: hidden; }
+  .people-redesign-shell .people-profile-panel > .people-capture-form { min-height: 0; overflow-y: auto; }
+}
+.people-redesign-shell .people-primary-search .people-control-trigger { position: relative; }

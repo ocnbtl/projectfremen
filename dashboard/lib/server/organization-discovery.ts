@@ -5,6 +5,7 @@ import { findOrganizationFactPages, findOrganizationWebsiteCandidates, organizat
 import { fetchLinkedInLogo } from "./organization-logo";
 import { findOrganizationKnowledge } from "./organization-knowledge";
 import { approximateTeamSize } from "../modules/people/team-size";
+import { normalizeOrganizationIndustry } from "../modules/people/organization-industries";
 
 const MAX_PAGES = 10;
 const TOTAL_TIMEOUT_MS = 22_000;
@@ -122,6 +123,10 @@ export async function discoverOrganization(name: string, urls: string[], depende
     } catch { /* An unavailable secondary source never discards official-page results. */ }
   }
   const suggestions = [...candidates.values()].map(({ item }) => {
+    if (item.field === "industry") {
+      const value = normalizeOrganizationIndustry(candidates.get("organizationType")?.item.value || "", item.value);
+      return { ...item, value, evidence: value !== item.value ? `${item.evidence}; mapped from ${item.value} to the curated category` : item.evidence };
+    }
     if (item.field !== "teamSize") return item;
     const value = approximateTeamSize(item.value);
     return { ...item, value, evidence: value.replace(/,/g, "") !== item.value.replace(/,/g, "") ? `${item.evidence}; rounded estimate from published count ${item.value}` : item.evidence };

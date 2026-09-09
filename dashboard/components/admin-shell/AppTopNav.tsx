@@ -6,7 +6,7 @@ import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { ADMIN_NAV_ITEMS } from "../../lib/admin-navigation";
 import { moduleColorIdForPathname, moduleThemeVariables } from "../../lib/design-system/color-system";
-import PersonalViewportToggle from "../PersonalViewportToggle";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
 export type AppTopNavProps = {
@@ -31,6 +31,11 @@ export default function AppTopNav({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const reduceMotion = useReducedMotion();
+  useEffect(() => {
+    delete document.documentElement.dataset.adminPreview;
+    delete document.documentElement.dataset.personalPreview;
+  }, []);
   const [commandQuery, setCommandQuery] = useState("");
   const mobileNavRef = useRef<HTMLDivElement>(null);
   const mobileNavTriggerRef = useRef<HTMLButtonElement>(null);
@@ -134,16 +139,19 @@ export default function AppTopNav({
             setMobileNavOpen((current) => !current);
           }}
         >
-          <span>Menu</span>
           {activeNavItem ? <UnigentamosIcon role={activeNavItem.iconRole} size={16} /> : null}
           <strong>{activeNavItem?.label || "Home"}</strong>
           <UnigentamosIcon role="chevron-down" size={12} />
         </button>
-        <nav
+        <AnimatePresence>{mobileNavOpen && <motion.nav
           id="app-mobile-primary-navigation"
           className="app-top-nav__mobile-menu"
           aria-label="Mobile primary navigation"
-          hidden={!mobileNavOpen}
+          initial={{ opacity: 0, y: reduceMotion ? 0 : -8, scale: reduceMotion ? 1 : 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: reduceMotion ? 0 : -6, scale: reduceMotion ? 1 : 0.98 }}
+          transition={{ duration: reduceMotion ? 0 : 0.18 }}
+          style={{ x: "-50%" }}
         >
           {ADMIN_NAV_ITEMS.map((item) => {
             const itemHref = item.href ?? "/admin";
@@ -166,7 +174,7 @@ export default function AppTopNav({
           <Link href="/vault?focus=search" data-module="vault" onClick={() => setMobileNavOpen(false)}>
             Search all records
           </Link>
-        </nav>
+        </motion.nav>}</AnimatePresence>
       </div>
 
       <nav className="admin-global-links app-top-nav__links" aria-label="Primary navigation">
@@ -192,7 +200,6 @@ export default function AppTopNav({
       </nav>
 
       <div className="app-top-nav__utilities">
-        <PersonalViewportToggle />
         {showCommandSearch && (
           <form
             className="admin-command-search app-top-nav__search"

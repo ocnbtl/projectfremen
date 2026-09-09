@@ -16,6 +16,16 @@ try {
   const { discoverOrganization } = require(path.join(temporary, "server/organization-discovery.js"));
   const { normalizeOrganizationUrl, organizationProfileLink, emptyOrganizationSuggestions, organizationSeedUrls } = require(path.join(temporary, "modules/people/organization-autofill.js"));
   const { withoutTrailingLinkSlash } = require(path.join(temporary, "modules/people/links.js"));
+  const { normalizeOrganizationIndustry, ORGANIZATION_INDUSTRY_OPTIONS } = require(path.join(temporary, "modules/people/organization-industries.js"));
+  for (const [type, source, expected] of [
+    ['Business', 'Retail', 'Retail & consumer'], ['Business', 'Retail.Current', 'Retail & consumer'],
+    ['Business', 'Entertainment Providers', 'Media & entertainment'], ['Business', 'Construction', 'Construction & real estate'],
+    ['University / School', 'Higher Education', 'College / university'], ['Business', 'Hospitality', 'Hospitality & travel'],
+    ['Business', 'unknown source category', 'Other'], ['Business', '', '']
+  ]) assert.equal(normalizeOrganizationIndustry(type, source), expected);
+  for (const [type, options] of Object.entries(ORGANIZATION_INDUSTRY_OPTIONS)) for (const option of options) {
+    assert.equal(normalizeOrganizationIndustry(type, option), option, 'Preserve every curated option');
+  }
   const { approximateTeamSize, formatTeamSize, editTeamSize } = require(path.join(temporary, "modules/people/team-size.js"));
   for (const [input, output] of [['106523','107,000'],['8893','8,900'],['78938','80,000'],['78','78'],['347','350'],['10000','10,000'],['9999','10,000'],['100001','101,000']]) assert.equal(approximateTeamSize(input),output,input);
   for (const value of ['', '11–50 employees', '10,001+', '~8,900', 'global network', '12,34', '1.5 million']) assert.equal(approximateTeamSize(value),value,'Preserve source qualifiers, ranges and non-exact values');
@@ -142,7 +152,7 @@ try {
   };
   const discovered = await discoverOrganization("", [socialLinks.instagram], { fetchPage });
   const discoveredValues = Object.fromEntries(discovered.suggestions.map((item) => [item.field, item.value]));
-  for (const [field, expected] of Object.entries({ ...socialLinks, website: "https://example.com", name: "Example", industry: "Research Services", organizationType: "Business", foundedYear: "2004", teamSize: "11–50 employees", headquarters: "Columbus, Ohio, USA", streetAddress: "12 Main Street, Suite 4, Columbus, Ohio, 43215, USA", context: "Tools for field research." })) assert.equal(discoveredValues[field], expected, field);
+  for (const [field, expected] of Object.entries({ ...socialLinks, website: "https://example.com", name: "Example", industry: "Professional services", organizationType: "Business", foundedYear: "2004", teamSize: "11–50 employees", headquarters: "Columbus, Ohio, USA", streetAddress: "12 Main Street, Suite 4, Columbus, Ohio, 43215, USA", context: "Tools for field research." })) assert.equal(discoveredValues[field], expected, field);
   assert.ok(fetched.includes("https://example.com/about") && fetched.includes("https://example.com/contact"), "Follow relevant company pages from a reverse social seed");
   assert.ok(!fetched.includes("https://wrong.example"), "Ignore unrelated embedded profiles");
   assert.ok(fetched.length <= 10 && new Set(fetched).size === fetched.length, "Bound and deduplicate discovery");
