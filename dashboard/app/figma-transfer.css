@@ -15253,7 +15253,9 @@ body:has(.people-redesign-shell.is-mobile-editor) .shared-ai-dock:not(.is-open) 
 .app-choice-menu.is-grid .app-select-item[data-select-value=''] { grid-column: 1 / -1; font-size: 11px; color: var(--text-subtle); }
 .app-choice-search { display: flex; gap: 6px; padding: 4px 4px 8px; flex-shrink: 0; }
 .app-choice-search input { height: 40px; min-width: 0; width: 100%; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface-panel-soft); color: var(--text-strong); padding: 0 12px; font: inherit; font-size: 14px; }
-.app-choice-search button { width: 40px; flex-shrink: 0; border: 0; border-radius: 10px; background: var(--surface-panel-soft); color: var(--text-strong); }
+.app-select-menu .app-choice-search > button { display: inline-flex; align-items: center; justify-content: center; width: 40px; min-width: 40px; height: 40px; min-height: 40px; flex: 0 0 40px; padding: 0; margin: 0; border: 0; border-radius: 10px; background: var(--surface-panel-soft); color: var(--text-strong); }
+.app-select-menu .app-choice-search > button svg { display: block; width: 18px; height: 18px; margin: 0; flex: none; }
+.app-select-menu .app-choice-search > button:hover { background: color-mix(in srgb, #397357 12%, white); }
 .app-choice-empty { padding: 12px; color: var(--text-subtle); font-size: 13px; }
 .app-select-trigger > span:first-child { display: block; transform: none !important; }
 .app-select-trigger > svg { flex-shrink: 0; }
@@ -15367,3 +15369,46 @@ body:has(.people-redesign-shell.is-mobile-editor) .shared-ai-dock:not(.is-open) 
 .people-country-option > span:not([aria-hidden]) { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .people-redesign-shell .people-group-picker input { inset: 0; width: 100%; height: 100%; min-height: 0; z-index: 2; cursor: pointer; }
 .people-country-flag { border-radius: 2px; flex: none; box-shadow: 0 0 0 1px #16344916; }
+
+/* People utilities share one compact navigation shelf on desktop and mobile. */
+.people-redesign-shell .people-operational-row { display: flex; gap: 4px; align-items: center; padding-top: 12px; border-top: 1px solid var(--border-soft); }
+.people-redesign-shell .people-operational-row > p,
+.people-redesign-shell .people-sidebar-section.people-operational-row > button > span,
+.people-redesign-shell .people-sidebar-section.people-operational-row > button::before,
+.people-redesign-shell .people-sidebar-section.people-operational-row > button::after { display: none; }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button { display: inline-flex; align-items: center; justify-content: center; gap: 4px; width: 44px; min-width: 44px; height: 44px; min-height: 44px; padding: 0; margin: 0; border: 1px solid transparent; border-radius: 14px; background: transparent; flex: 0 0 auto; }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button:hover { background: var(--surface-row-hover); }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button > svg { width: 20px; height: 20px; color: inherit; flex: none; }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button.is-active { background: var(--surface-selected); border-color: var(--border-strong); }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button[data-utility="recently-deleted"] { width: auto; padding: 0 8px; }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button strong { font: 500 11px var(--font-body); font-variant-numeric: tabular-nums; min-width: 0; padding: 0; color: inherit; }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="clear"] { color: #26704d; background: #e4f0e7; }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="warning"] { color: #a62d35; background: #fce9e8; animation: people-duplicate-glow 2.4s ease-in-out infinite; }
+@keyframes people-duplicate-glow { 0%,100% { box-shadow: 0 0 0 0 #b4231826; } 50% { box-shadow: 0 0 0 4px #b4231814, 0 0 12px #b4231824; } }
+@media (min-width: 761px) and (max-width: 1280px) {
+  .people-redesign-shell .people-sidebar-section.people-operational-row > button { width: 40px; min-width: 40px; height: 40px; min-height: 40px; }
+}
+
+.people-redesign-shell .people-group-picker label { transition: transform 240ms cubic-bezier(.2,1.4,.4,1), border-color 180ms; }
+.people-redesign-shell .people-group-picker label::before { inset: -60% -20%; border-radius: 48%; background: #c4e5d4; transform: translateX(-105%) rotate(-18deg) scale(.6); transform-origin: left center; transition: transform 300ms cubic-bezier(.16,1.25,.4,1); }
+.people-redesign-shell .people-group-picker label:has(input:checked)::before { transform: translateX(0) rotate(8deg) scale(1.15); }
+.people-redesign-shell .people-group-picker label:active { transform: scale(.95); }
+.people-redesign-shell .people-group-picker label span,
+.people-redesign-shell .people-group-picker label:has(input:checked) span { color: #153d36 !important; font: 550 12px var(--font-body); }
+
+.people-redesign-shell .people-profile-view-bar { background: #fff; padding-right: 8px; }
+.people-redesign-shell .people-profile-view-actions { background: transparent; border-radius: 14px; padding: 6px; }
+.people-redesign-shell .people-profile-view-actions > button,
+.people-redesign-shell .people-profile-view-actions > .people-add-action { border-radius: 12px; padding: 6px 8px; background: #fff; color: var(--people-action, #133c5e); border-color: var(--border-soft); box-shadow: none; }
+.people-redesign-shell .people-profile-view-actions > button[type="submit"] { background: #e4f0e7; color: #215b40; }
+.people-redesign-shell .people-profile-view-actions > button:hover { background: #edf4ef; }
+.people-redesign-shell .people-profile-view-actions > button > span { background: transparent; }
+.people-redesign-shell .people-timeline-entry-meta { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 12px; align-items: start; }
+.people-redesign-shell .people-timeline-entry-meta .people-timeline-date { grid-column: 1; grid-row: 1; color: #306b58; font: 550 12px/1.5 var(--font-body); letter-spacing: 0; }
+.people-redesign-shell .people-timeline-entry-meta .people-timeline-time { grid-column: 1; grid-row: 2; color: #3c6386; font: 450 12px/1.5 var(--font-body); font-variant-numeric: tabular-nums; }
+.people-redesign-shell .people-timeline-entry-meta .people-timeline-kind { grid-column: 2; grid-row: 1 / span 2; justify-self: end; background: #f8e9dc; color: #874516; font: 550 11px/1.4 var(--font-body); letter-spacing: 0; padding: 5px 10px; }
+.people-redesign-shell .people-timeline-entry-meta .people-approach-badge { grid-column: 1 / -1; justify-self: start; font-family: var(--font-body); }
+@media (prefers-reduced-motion: reduce) {
+  .people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="warning"] { animation: none; }
+  .people-redesign-shell .people-group-picker label, .people-redesign-shell .people-group-picker label::before { transition: none; }
+}

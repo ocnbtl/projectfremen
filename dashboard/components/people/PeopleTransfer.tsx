@@ -25,27 +25,28 @@ import { normalizeOrganizationIndustry } from "../../lib/modules/people/organiza
 import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { PeopleProfileAvatar } from "./PeopleProfilePhoto";
+import ContactExportPreview, { type ExportPreview } from "./ContactExportPreview";
 
 const SOURCES = [
   {
     name: "Apple Contacts",
-    icon: "person",
-    help: "On iPhone, open Contacts → Lists, touch and hold a list, then choose Export. On iCloud.com, select contacts and export a vCard.",
+    logo: "/contact-sources/apple.svg",
+    help: [{ label: "On iPhone", text: "Open Contacts → Lists, touch and hold a list, then choose Export." }, { label: "On iCloud.com", text: "Select contacts and export a vCard." }],
   },
   {
     name: "Google Contacts",
-    icon: "people",
-    help: "At contacts.google.com, select contacts → Export → Google CSV or vCard. Upload that file here.",
+    logo: "/contact-sources/google-contacts.png",
+    help: [{ label: "Google Contacts", text: "At contacts.google.com, select contacts → Export → Google CSV or vCard. Upload that file here." }],
   },
   {
     name: "Outlook",
-    icon: "email",
-    help: "In Outlook People, choose Manage contacts → Export contacts, then upload the CSV.",
+    logo: "/contact-sources/outlook.svg",
+    help: [{ label: "Outlook People", text: "Choose Manage contacts → Export contacts, then upload the CSV." }],
   },
   {
     name: "CRM / CSV",
-    icon: "organization",
-    help: "Export contacts from your CRM as CSV. Name, email, phone, company, and job title are recognized automatically. Adjust columns only if needed.",
+    logo: "",
+    help: [{ label: "From your CRM", text: "Export contacts as CSV. Name, email, phone, company, and job title are recognized automatically. Adjust columns only if needed." }],
   },
 ];
 type Research = {
@@ -79,6 +80,10 @@ export default function PeopleTransfer({
   onBusy,
 }: Props) {
   const [ready, setReady] = useState(false);
+  const [preview, setPreview] = useState<ExportPreview | null>(null);
+  const [previewing, setPreviewing] = useState(false);
+  const previewAnchor = useRef<HTMLDivElement>(null);
+  useEffect(() => { if (preview) previewAnchor.current?.scrollIntoView({ block: "start" }); }, [preview]);
   useEffect(() => setReady(true), []);
   const [source, setSource] = useState(0),
     [drafts, setDrafts] = useState<ContactDraft[]>([]),
@@ -405,7 +410,26 @@ export default function PeopleTransfer({
       setBusy(false);
     }
   }
+  async function previewExport() {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setPreviewing(true);
+    setError("");
+    setPreview(null);
+    try {
+      const response = await fetch("/api/people/transfer", {
+        method: "POST", headers: buildJsonHeadersWithCsrf(),
+        body: JSON.stringify({ action: "preview", ids: [...selected], options, format, pictures }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error);
+      setPreview(data);
+    } catch (reason) { setError(errorMessage(reason)); }
+    finally { lock.current = false; setBusy(false); setPreviewing(false); }
+  }
   async function prepareExport() {
+    if (!preview) return;
     if (lock.current) return;
     lock.current = true;
     setBusy(true);
@@ -455,6 +479,7 @@ export default function PeopleTransfer({
   }
   useEffect(() => {
     setShareFile(null);
+    setPreview(null);
     setNotice("");
   }, [selected, options, format, pictures]);
   return (
@@ -505,12 +530,12 @@ export default function PeopleTransfer({
                     aria-pressed={source === index}
                     onClick={() => setSource(index)}
                   >
-                    <UnigentamosIcon role={item.icon} size={22} />
+                    {item.logo ? <img className="people-source-logo" src={item.logo} width={32} height={32} alt="" /> : <UnigentamosIcon role="contact-file" size={32} />}
                     <span>{item.name}</span>
                   </button>
                 ))}
               </div>
-              <p>{SOURCES[source].help}</p>
+              <div className="people-transfer-instructions">{SOURCES[source].help.map(step => <p key={step.label}><strong>{step.label}</strong><span>{step.text}</span></p>)}</div>
               <label className="people-transfer-file">
                 Choose contact file
                 <input
@@ -1010,16 +1035,18 @@ export default function PeopleTransfer({
               </p>
               {(
                 [
-                  ["notes", "Notes and memories"],
-                  ["dreams", "Life dreams"],
-                  ["interactions", "Interaction history"],
-                  ["objects", "Linked people and objects"],
-                  ["extras", "Additional imported fields"],
+                  ["notes", "Profile notes & saved memories", "Text saved in Notes, plus memory entries and their dates. Interaction logs are separate.", "notes"],
+                  ["dreams", "Life dreams", "Personal aspirations entered in the About section.", "life-dream"],
+                  ["interactions", "Logged interactions", "Conversation titles, summaries, dates, times, approaches, and participant names.", "interaction"],
+                  ["objects", "Relationships & linked objects", "Family and associated people, employers, schools, projects, and other object references. Linked profiles are not exported in full unless selected.", "object"],
+                  ["extras", "Original file fields & research sources", "Unmapped columns, original values preserved during import, and employer research source URLs.", "contact-file"],
                 ] as const
-              ).map(([key, label]) => (
+              ).map(([key, label, description, icon]) => (
                 <label className="people-transfer-toggle" key={key}>
                   <input
                     type="checkbox"
+                    role="switch"
+                    aria-label={label}
                     checked={options[key]}
                     onChange={(e) =>
                       setOptions((current) => ({
@@ -1028,19 +1055,19 @@ export default function PeopleTransfer({
                       }))
                     }
                   />
-                  <span>{label}</span>
+                  <UnigentamosIcon role={icon} size={20}/><span><strong>{label}</strong><small>{description}</small></span><i className="people-transfer-switch" aria-hidden="true" />
                 </label>
               ))}
               <label className="people-transfer-toggle">
                 <input
                   type="checkbox"
+                  role="switch"
+                  aria-label="Profile pictures"
                   checked={pictures}
                   disabled={format === "csv"}
                   onChange={(e) => setPictures(e.target.checked)}
                 />
-                <span>
-                  Pictures {format === "csv" && <small>(vCard / JSON)</small>}
-                </span>
+                <UnigentamosIcon role="person" size={20}/><span><strong>Profile pictures</strong><small>{format === "csv" ? "Pictures are available in vCard and JSON files." : "Embed the saved profile photos in the file."}</small></span><i className="people-transfer-switch" aria-hidden="true" />
               </label>
               <label>
                 Format
@@ -1060,6 +1087,7 @@ export default function PeopleTransfer({
               </small>
             </aside>
           </div>
+          <div ref={previewAnchor}>{preview && <ContactExportPreview preview={preview}/>}</div>
           <footer className="people-transfer-footer">
             <div>
               <strong>{selected.size} profiles selected</strong>
@@ -1073,9 +1101,9 @@ export default function PeopleTransfer({
               className="is-primary"
               type="button"
               disabled={busy || !selected.size || selected.size > 500}
-              onClick={() => void prepareExport()}
+              onClick={() => void (preview ? prepareExport() : previewExport())}
             >
-              {busy ? "Preparing…" : "Prepare export"}
+              {busy ? (previewing ? "Loading preview…" : "Preparing…") : preview ? "Prepare export" : "Preview export"}
             </button>
           </footer>
           {shareFile && (

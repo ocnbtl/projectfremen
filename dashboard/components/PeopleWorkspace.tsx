@@ -181,6 +181,9 @@ type PeopleIconName =
   | "interaction"
   | "follow-up"
   | "new-person"
+  | "life-dream"
+  | "object-add"
+  | "follow-up-add"
   | "more"
   | "star"
   | "export"
@@ -202,7 +205,7 @@ type PeopleIconName =
 
 function PeopleIcon({ name }: { name: PeopleIconName }) {
   const roles: Readonly<Record<PeopleIconName, string>> = {
-    person: "person",
+    person: "person", "life-dream": "life-dream", "object-add": "object-add", "follow-up-add": "follow-up-add",
     birthday: "birthday", location: "location", hometown: "hometown", occupation: "briefcase",
     employer: "employer", university: "university", partner: "partner", children: "users",
     organization: "organization", industry: "industry", founded: "clock", team: "users", edit: "edit",
@@ -581,7 +584,7 @@ const PEOPLE_SIDEBAR_SECTIONS: Array<{ title: string; items: SidebarItemConfig[]
     items: [
       { id: "no-contact-90", label: "No Contact > 90 Days", icon: "no-contact" },
       { id: "birthdays-month", label: "Upcoming Birthdays", icon: "birthday" },
-      { id: "new-people", label: "New People", icon: "new-person" },
+      { id: "new-people", label: "New People", icon: "recent-people" },
       { id: "profile-gaps", label: "Profile Gaps", icon: "profile-gaps" }
     ]
   },
@@ -3911,7 +3914,7 @@ export default function PeopleWorkspace({
             <section className="people-profile-section people-themed-section module-ref-tone-crimson people-capture-section" data-profile-section="about" aria-labelledby="people-create-about-title">
               <header className="people-profile-section-heading">
                 <span><PeopleIcon name="notes" /></span>
-                <h4 id="people-create-about-title">About</h4><div className="people-about-additions"><PeopleAddButton label="Life dream" icon="star" iconOnly onClick={()=>setQuickLifeDreams(current=>[...current, ""])}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setQuickNotes(current=>[...current, ""])}/></div>
+                <h4 id="people-create-about-title">About</h4><div className="people-about-additions"><PeopleAddButton label="Life dream" icon="life-dream" iconOnly onClick={()=>setQuickLifeDreams(current=>[...current, ""])}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setQuickNotes(current=>[...current, ""])}/></div>
               </header>
               <div className="people-profile-field-grid">
                 <label className="is-wide">Relationship context<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={4} /></label>
@@ -4096,7 +4099,7 @@ export default function PeopleWorkspace({
           <PeopleIcon name="close" />
         </button>
         {PEOPLE_SIDEBAR_SECTIONS.map((section) => (
-          <div className="people-sidebar-section" key={section.title}>
+          <div className={`people-sidebar-section${section.title === "Operational" ? " people-operational-row" : ""}`} key={section.title}>
             <p>{section.title}</p>
             {section.items.map((item) => {
               const count = getSidebarCount(item.id);
@@ -4105,11 +4108,16 @@ export default function PeopleWorkspace({
                   type="button"
                   className={`${item.tone ? `module-ref-tone-${item.tone}` : ""}${activeSidebarView === item.id ? " is-active" : ""}`}
                   onClick={() => selectSidebarView(item)}
+                  aria-label={section.title === "Operational" ? (item.id === "duplicates" ? `Duplicates: ${count || 0} possible pairs` : item.id === "recently-deleted" ? `Recently Deleted: ${count || 0}` : item.label) : undefined}
+                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} possible duplicate pairs — review` : "No duplicate candidates" : item.label) : undefined}
+                  aria-current={activeSidebarView === item.id ? "page" : undefined}
+                  data-utility={section.title === "Operational" ? item.id : undefined}
+                  data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
                   key={item.id}
                 >
-                  <UnigentamosIcon role={item.icon} size={16} />
+                  <UnigentamosIcon role={item.icon} candidate={item.id === "duplicates" ? "zoom-check" : undefined} size={section.title === "Operational" ? 20 : 16} />
                   <span>{item.label}</span>
-                  {typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
+                  {section.title === "Operational" ? item.id === "recently-deleted" && <strong>{count || 0}</strong> : typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
                 </button>
               );
             })}
@@ -4119,7 +4127,7 @@ export default function PeopleWorkspace({
 
       <aside className="people-desktop-sidebar" aria-label="People navigation">
         {PEOPLE_SIDEBAR_SECTIONS.map((section) => (
-          <div className="people-sidebar-section" key={section.title}>
+          <div className={`people-sidebar-section${section.title === "Operational" ? " people-operational-row" : ""}`} key={section.title}>
             <p>{section.title}</p>
             {section.items.map((item) => {
               const count = getSidebarCount(item.id);
@@ -4128,11 +4136,16 @@ export default function PeopleWorkspace({
                   className={`${item.tone ? `module-ref-tone-${item.tone}` : ""}${activeSidebarView === item.id ? " is-active" : ""}`}
                   type="button"
                   onClick={() => selectSidebarView(item)}
+                  aria-label={section.title === "Operational" ? (item.id === "duplicates" ? `Duplicates: ${count || 0} possible pairs` : item.id === "recently-deleted" ? `Recently Deleted: ${count || 0}` : item.label) : undefined}
+                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} possible duplicate pairs — review` : "No duplicate candidates" : item.label) : undefined}
+                  aria-current={activeSidebarView === item.id ? "page" : undefined}
+                  data-utility={section.title === "Operational" ? item.id : undefined}
+                  data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
                   key={item.id}
                 >
-                  <UnigentamosIcon role={item.icon} size={16} />
+                  <UnigentamosIcon role={item.icon} candidate={item.id === "duplicates" ? "zoom-check" : undefined} size={section.title === "Operational" ? 20 : 16} />
                   <span>{item.label}</span>
-                  {typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
+                  {section.title === "Operational" ? item.id === "recently-deleted" && <strong>{count || 0}</strong> : typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
                 </button>
               );
             })}
@@ -4582,9 +4595,9 @@ export default function PeopleWorkspace({
                 </>}
                 {activeView === "timeline" && <>
                   <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
-                  <PeopleAddButton label="Follow-up" icon="follow-up" onClick={() => router.push(followUpCreationRoute(selectedPerson))} ariaLabel={`Schedule a Personal follow-up for ${selectedPerson.title}`} />
+                  <PeopleAddButton label="Follow-up" icon="follow-up-add" onClick={() => router.push(followUpCreationRoute(selectedPerson))} ariaLabel={`Schedule a Personal follow-up for ${selectedPerson.title}`} />
                 </>}
-                {activeView === "links" && <PeopleAddButton label="Object" icon="object" ariaLabel="Add object" onClick={() => setObjectLinkOpen(true)} />}
+                {activeView === "links" && <PeopleAddButton label="Object" icon="object-add" ariaLabel="Add object" onClick={() => setObjectLinkOpen(true)} />}
               </div>
               </div>
               </>
@@ -4608,7 +4621,7 @@ export default function PeopleWorkspace({
                       <header className={`people-profile-section-heading${section.title === "Links" && selectedPerson.className === "org" ? " people-autofill-heading" : ""}`}>
                         <span><PeopleIcon name={profileSectionIcon(section.title)} /></span>
                         <h4>{section.title}</h4>
-                        {section.title === "About" && selectedPerson.className === "person" && <div className="people-about-additions"><PeopleAddButton label="Life dream" icon="star" iconOnly onClick={()=>setAboutExtras(current=>({...current,dream:true}))}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setAboutExtras(current=>({...current,notes:true}))}/></div>}
+                        {section.title === "About" && selectedPerson.className === "person" && <div className="people-about-additions"><PeopleAddButton label="Life dream" icon="life-dream" iconOnly onClick={()=>setAboutExtras(current=>({...current,dream:true}))}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setAboutExtras(current=>({...current,notes:true}))}/></div>}
                         {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} onPhoto={setProfilePhotoDraft} hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)} disabled={profileSaving} />}
                       </header>
                       {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
@@ -4794,7 +4807,7 @@ export default function PeopleWorkspace({
                       {timelineItems.length > 0 ? timelineItems.map((item) => item.kind === "memory" ? (
                         <article className="people-timeline-memory" data-memory-id={item.memory.id} data-memory-date={item.memory.occurredOn || ""} key={`memory-${item.id}`}>
                           <div className="people-timeline-entry-meta">
-                            <span>{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
+                            <span className="people-timeline-date">{item.memory.occurredOn ? formatFullDate(item.memory.occurredOn) : "Date not set"}</span>
                             <span className="people-timeline-kind">Memory</span>
                           </div>
                           <strong className="people-timeline-entry-title">{item.memory.text}</strong>
@@ -4802,8 +4815,8 @@ export default function PeopleWorkspace({
                       ) : (
                         <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
                           <div className="people-timeline-entry-meta">
-                            <span>{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) ? formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id)) : "Date unknown"}{formatInteractionTime(item.interaction.startTime, item.interaction.endTime) ? ` · ${formatInteractionTime(item.interaction.startTime, item.interaction.endTime)}` : ""}</span>
-                            {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind}</span>}
+                            <span className="people-timeline-date">{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) ? formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id)) : "Date unknown"}</span>{formatInteractionTime(item.interaction.startTime, item.interaction.endTime) && <span className="people-timeline-time">{formatInteractionTime(item.interaction.startTime, item.interaction.endTime)}</span>}
+                            {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind === "catch-up" ? "Catch-up" : labelize(item.interaction.kind)}</span>}
                             {item.interaction.approach && <span className={`people-approach-badge is-${item.interaction.approach}`}>{labelize(item.interaction.approach)}</span>}
                           </div>
                           <strong className="people-timeline-entry-title">{item.interaction.title}</strong>

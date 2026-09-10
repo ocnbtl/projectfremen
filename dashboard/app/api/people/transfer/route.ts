@@ -87,7 +87,7 @@ export async function POST(request: Request) {
         items: await undoPeopleImport(String(body.batch || "")),
       });
     if (
-      body.action !== "export" ||
+      !["export", "preview"].includes(body.action) ||
       !Array.isArray(body.ids) ||
       body.ids.length > 500 ||
       !body.ids.length ||
@@ -183,6 +183,8 @@ export async function POST(request: Request) {
       throw new Error(
         "This export is too large. Choose fewer contacts or fewer optional fields.",
       );
+    if (body.action === "preview")
+      return json({ ok: true, contacts, extras, bytes: Buffer.byteLength(output), format: body.format });
     return new Response(output, {
       headers: {
         ...headers,

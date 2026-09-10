@@ -13,6 +13,7 @@ const npmCommand = npmExecPath
     : "npm";
 const npmPrefixArgs = npmExecPath ? [npmExecPath] : [];
 const dashboardDir = process.cwd();
+const iconRegistryCount = JSON.parse(await readFile(path.join(dashboardDir, "lib/icons/icon-registry.json"), "utf8")).length;
 const nextCliPath = path.join(dashboardDir, "node_modules", "next", "dist", "bin", "next");
 const tscCliPath = path.join(dashboardDir, "node_modules", "typescript", "bin", "tsc");
 const steps = [];
@@ -5734,7 +5735,10 @@ async function checkPeopleMemoryBrowserState(
           await sidebar.locator(".people-sidebar-section button").count() === 14 &&
           await sidebar.locator(".people-sidebar-section button > svg").count() === 14 &&
           await operationalSection.locator("button").count() === 4 &&
-          Number(await operationalSection.locator("button").filter({ hasText: "Duplicates" }).locator("strong").textContent()) >= 0 &&
+          ["clear", "warning"].includes(await operationalSection.locator('[data-utility="duplicates"]').getAttribute("data-duplicate-state")) &&
+          /^Duplicates: \d+ possible pairs$/.test(await operationalSection.locator('[data-utility="duplicates"]').getAttribute("aria-label")) &&
+          await operationalSection.locator('[data-utility="duplicates"] strong').count() === 0 &&
+          Number(await operationalSection.locator('[data-utility="recently-deleted"] strong').textContent()) >= 0 &&
           sidebarText.includes("Upcoming Birthdays") && sidebarText.includes("Organizations") && sidebarText.includes("Follow-ups") && sidebarText.includes("Relationships") &&
           !sidebarText.includes("All People") && !sidebarText.includes("Upcoming Follow-ups") && !sidebarText.includes("Relationship Map") &&
           !["Recently Contacted", "Needs Attention", "Dormant", "Customize People", "Close Friends", "Health & Wellness", "All Lists"].some((label) => sidebarText.includes(label)),
@@ -6373,7 +6377,7 @@ async function checkPeopleMemoryBrowserState(
           timelineActionWidths.every((width) => width < 190) &&
           JSON.stringify(timelineActionLabels) === JSON.stringify(["Interaction", "Follow-up"]) &&
           await page.locator('.people-profile-view-actions .people-add-action svg[data-icon-role="interaction"][data-icon-candidate="message-plus"]').count() === 1 &&
-          await page.locator('.people-profile-view-actions .people-add-action svg[data-icon-role="follow-up"]').count() === 1,
+          await page.locator('.people-profile-view-actions .people-add-action svg[data-icon-role="follow-up-add"][data-icon-candidate="calendar-plus"]').count() === 1,
         `Timeline actions remained oversized at ${viewport.label}: ${JSON.stringify(timelineActionWidths)}`
       );
       const followUpPanel = page.locator('[data-people-follow-up-bridge]');
@@ -6505,7 +6509,7 @@ async function checkPeopleMemoryBrowserState(
           await linksHub.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
           await page.getByText("connected media context", { exact: false }).count() === 0 &&
           await page.getByRole("button", { name: "Add object", exact: true }).count() === 1 &&
-          await page.locator('.people-profile-view-actions .people-add-action svg[data-icon-role="object"][data-icon-candidate="cube"]').count() === 1 &&
+          await page.locator('.people-profile-view-actions .people-add-action svg[data-icon-role="object-add"][data-icon-candidate="cube-plus"]').count() === 1 &&
           (await page.getByRole("button", { name: "Add object", exact: true }).innerText()).trim() === "Object" &&
           await page.getByRole("heading", { name: "Add relationship", exact: true }).count() === 0 &&
           await page.getByRole("button", { name: /^(Browse|Refresh)$/ }).count() === 0,
@@ -9764,8 +9768,8 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
       }
       assert(await page.getByText("Resources remain authoritative.", { exact: false }).count() >= 1, `Style Guide did not disclose the Resource ownership boundary at ${viewport.label}`);
       assert(await page.locator('section[aria-label="Guide identity"] input').count() === 2, `Style Guide identity was not editable at ${viewport.label}`);
-      assert(await page.locator('[data-icon-registry-count="108"]').count() === 1, `Style Guide did not expose all 108 canonical icon roles at ${viewport.label}`);
-      assert(await page.locator('input[aria-label$=" usage"]').count() === 108, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
+      assert(await page.locator(`[data-icon-registry-count="${iconRegistryCount}"]`).count() === 1, `Style Guide did not expose all ${iconRegistryCount} canonical icon roles at ${viewport.label}`);
+      assert(await page.locator('input[aria-label$=" usage"]').count() === iconRegistryCount, `Style Guide did not expose the concise usage breadcrumb for every icon at ${viewport.label}`);
       assert(await page.locator('[class*="iconCandidate"]').count() >= 420, `Style Guide did not expose five curated recommendations for each unselected icon at ${viewport.label}`);
       for (const candidate of ["social", "radar-2", "ripple", "heart-minus", "user-pause"]) {
         assert(
@@ -11858,7 +11862,8 @@ async function checkProjectReviewContextBrowserState(
       const page = await context.newPage();
       observe(page);
       const projectRoute = `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=timeline&item=${encodeURIComponent(blocker.id)}&probe=keep`;
-      await page.goto(projectRoute, { waitUntil: "domcontentloaded" });
+      // Let the initial Reviews request settle before injecting a failed refresh.
+      await page.goto(projectRoute, { waitUntil: "networkidle" });
       await page.getByRole("heading", { name: blocker.title }).waitFor();
       assert(
         await page.getByRole("heading", { name: "Reviews", exact: true }).count() >= 1,
@@ -13314,7 +13319,7 @@ async function main() {
         initialStyleGuide.payload?.state?.typography?.length >= 6 &&
         initialStyleGuide.payload?.state?.colors?.length >= 18 &&
         initialStyleGuide.payload?.state?.modules?.length === 9 &&
-        initialStyleGuide.payload?.state?.icons?.length === 108 &&
+        initialStyleGuide.payload?.state?.icons?.length === iconRegistryCount &&
         initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.primaryName === "Signal Red" &&
         initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.tokens?.action === "#B42318" &&
         ["module-projects", "module-notes", "module-people", "module-media", "module-personal", "module-reviews", "module-resources", "module-finance", "module-vault", "interaction", "discard-changes"].every((role) => initialStyleGuide.payload.state.icons.some((item) => item.icon === role)) &&
