@@ -13,13 +13,19 @@ import {
 
 export const runtime = "nodejs";
 
+function financeJson(body: unknown, init?: ResponseInit) {
+  const headers = new Headers(init?.headers);
+  headers.set("Cache-Control", "private, no-store, max-age=0");
+  return NextResponse.json(body, { ...init, headers });
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
 function errorResponse(error: unknown) {
   if (error instanceof FinanceStoreError) {
-    return NextResponse.json(
+    return financeJson(
       {
         ok: false,
         error: error.message,
@@ -29,7 +35,7 @@ function errorResponse(error: unknown) {
       { status: error.status }
     );
   }
-  return NextResponse.json(
+  return financeJson(
     { ok: false, error: error instanceof Error ? error.message : "Finance request failed" },
     { status: 500 }
   );
@@ -54,7 +60,7 @@ async function auditRequest(
 
 async function requireReadAccess(): Promise<NextResponse | null> {
   if (!(await hasAdminSession())) {
-    return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
+    return financeJson({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   return null;
 }
@@ -64,7 +70,7 @@ async function requireMutationAccess(request: Request): Promise<NextResponse | n
   if (authError) return authError;
   if (!isCsrfRequestValid(request)) {
     await auditRequest(request, "finance.csrf_failed", "denied");
-    return NextResponse.json({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
+    return financeJson({ ok: false, error: "Invalid CSRF token" }, { status: 403 });
   }
   return null;
 }
@@ -73,7 +79,7 @@ export async function GET() {
   const accessError = await requireReadAccess();
   if (accessError) return accessError;
   try {
-    return NextResponse.json({ ok: true, state: await readFinanceState() });
+    return financeJson({ ok: true, state: await readFinanceState() });
   } catch (error) {
     return errorResponse(error);
   }
@@ -86,17 +92,17 @@ export async function POST(request: Request) {
   try {
     const body: unknown = await request.json();
     if (!isRecord(body)) {
-      return NextResponse.json({ ok: false, error: "Request body must be an object" }, { status: 400 });
+      return financeJson({ ok: false, error: "Request body must be an object" }, { status: 400 });
     }
     operation = typeof body.operation === "string" ? body.operation : "create";
     if (operation === "preview_import") {
       const preview = await previewFinanceCsv(body.input, { actorId: "admin" });
       await auditRequest(request, "finance.import.previewed", "ok", `${preview.counts.accepted}/${preview.rows.length}`);
-      return NextResponse.json({ ok: true, preview });
+      return financeJson({ ok: true, preview });
     }
     const idempotencyKey = request.headers.get("idempotency-key")?.trim() || "";
     if (!idempotencyKey) {
-      return NextResponse.json({ ok: false, error: "Idempotency-Key header is required" }, { status: 400 });
+      return financeJson({ ok: false, error: "Idempotency-Key header is required" }, { status: 400 });
     }
     const result = operation === "confirm_import"
       ? await confirmFinanceImport(body.input, { actorId: "admin", idempotencyKey })
@@ -107,7 +113,7 @@ export async function POST(request: Request) {
       "ok",
       result.item.id
     );
-    return NextResponse.json({
+    return financeJson({
       ok: true,
       item: result.item,
       state: result.state,
@@ -135,11 +141,11 @@ export async function PATCH(request: Request) {
   try {
     const body: unknown = await request.json();
     if (!isRecord(body)) {
-      return NextResponse.json({ ok: false, error: "Request body must be an object" }, { status: 400 });
+      return financeJson({ ok: false, error: "Request body must be an object" }, { status: 400 });
     }
     const result = await updateFinanceRecord(body.input, { actorId: "admin" });
     await auditRequest(request, "finance.update.success", "ok", result.item.id);
-    return NextResponse.json({
+    return financeJson({
       ok: true,
       item: result.item,
       state: result.state,

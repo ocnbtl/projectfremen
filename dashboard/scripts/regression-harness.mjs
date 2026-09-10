@@ -777,9 +777,11 @@ async function checkNativeFinanceLifecycle(baseUrl, cookieJar) {
 
   const anonymous = await requestJson(baseUrl, new CookieJar(), "/api/finance");
   assert(anonymous.response.status === 401, "Finance API allowed an unauthenticated read");
+  assert(anonymous.response.headers.get("cache-control") === "private, no-store, max-age=0", "Finance denied response may be cached");
 
   const initial = await requestJson(baseUrl, cookieJar, "/api/finance");
   assert(initial.response.ok && initial.payload?.ok, "Finance API did not return its initial state");
+  assert(initial.response.headers.get("cache-control") === "private, no-store, max-age=0", "Finance private records may be cached");
   for (const collection of ["accounts", "transactions", "transfers", "savingsMovements", "bills", "budgets", "closePeriods", "rules", "importPreviews", "importBatches"]) {
     assert(initial.payload.state[collection].length === 0, `Finance production fallback was not empty: ${collection}`);
   }
@@ -790,6 +792,7 @@ async function checkNativeFinanceLifecycle(baseUrl, cookieJar) {
     body: JSON.stringify({ operation: "create", input: { kind: "account", name: "Blocked" } })
   });
   assert(csrfBlocked.response.status === 403, "Finance mutation did not enforce CSRF");
+  assert(csrfBlocked.response.headers.get("cache-control") === "private, no-store, max-age=0", "Finance mutation error may be cached");
 
   const operatingInput = {
     kind: "account", accountKind: "Checking", name: "Operating", currentBalance: 2500,
