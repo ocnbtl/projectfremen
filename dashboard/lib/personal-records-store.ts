@@ -1,4 +1,6 @@
 import { mutateJsonFile, readJsonFile } from "./file-store";
+import { createHash } from "node:crypto";
+import { draftMatches, transferNameKey, type ContactDraft } from "./modules/people/transfer";
 import { normalizeOrganizationIndustry } from "./modules/people/organization-industries";
 import { normalizeBirthday } from "./modules/people/birthday";
 import {
@@ -302,6 +304,7 @@ export type PersonalContactProfile = {
 };
 
 export type PersonalRecord = {
+  importMeta?: { key: string; batch: string; importedAt: string; extra: Record<string,string> };
   id: string;
   domain: string;
   title: string;
@@ -2008,6 +2011,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     ? (raw.statusBeforeArchive as PersonalRecordStatus)
     : undefined;
   const record: PersonalRecord = {
+    ...(raw.importMeta ? { importMeta: raw.importMeta } : {}),
     id: recordId,
     domain: typeof raw.domain === "string" ? raw.domain : "notes-docs",
     title: typeof raw.title === "string" ? raw.title : "Untitled",
@@ -2204,6 +2208,315 @@ export async function createPersonalRecord(
     if (photos) await photos.removePeopleProfilePhoto(recordId).catch(() => {});
     throw error;
   }
+}
+
+export type ImportCompany = {
+  name: string;
+  existingId?: string;
+  profile?: Partial<PersonalContactProfile>;
+  photo?: string;
+  sources?: string[];
+};
+
+/** One compare-and-swap mutation creates the selected contacts and their employers together. */
+export async function importPeopleContacts(
+  drafts: (ContactDraft & { allowDuplicate?: boolean })[],
+  companies: ImportCompany[],
+  batch: string,
+) {
+  if (!drafts.length || drafts.length > 500 || !/^[\w-]{16,80}$/.test(batch))
+    throw new Error("Choose between 1 and 500 contacts.");
+  const now = new Date().toISOString();
+  const keyFor = (draft: ContactDraft) =>
+    createHash("sha256")
+      .update(
+        JSON.stringify([
+          draft.kind,
+          draft.name.trim(),
+          draft.employer,
+          draft.profile.emails,
+          draft.profile.phones,
+          draft.profile.birthday,
+        ]),
+      )
+      .digest("hex");
+  const prepare = (draft: ContactDraft) => {
+    if (
+      !draft.name?.trim() ||
+      draft.name.length > 240 ||
+      !["person", "org"].includes(draft.kind)
+    )
+      throw new Error("Every selected contact needs a name.");
+    const { photoUrl, photoUpdatedAt, occupations, education, ...profile } =
+      draft.profile || {};
+    void photoUrl;
+    void photoUpdatedAt;
+    const record = normalizeRecord({
+      id: `personal-${crypto.randomUUID()}`,
+      domain: "notes-docs",
+      className: draft.kind,
+      title: draft.name.trim(),
+      status: "active",
+      privacy: "private",
+      areas: ["Relationships"],
+      createdAt: now,
+      updatedAt: now,
+      profile: normalizeContactProfile(
+        {
+          ...profile,
+          fullName: draft.name,
+          occupations: occupations?.map(({ organizationId, ...job }) => {
+            void organizationId;
+            return job;
+          }),
+          education: education?.map(({ organizationId, ...school }) => {
+            void organizationId;
+            return school;
+          }),
+        },
+        true,
+      ),
+      importMeta: {
+        key: keyFor(draft),
+        batch,
+        importedAt: now,
+        extra: draft.extra || {},
+      },
+    });
+    if (record.className === "org" && record.profile)
+      record.profile.industry = normalizeOrganizationIndustry(
+        record.profile.organizationType || "",
+        record.profile.industry || "",
+      );
+    return record;
+  };
+  const prepared = drafts.map((draft) => ({ draft, record: prepare(draft) }));
+  const preparedCompanies = companies.map((company) => ({
+    company,
+    record: prepare({
+      key: "",
+      name: company.name,
+      kind: "org",
+      profile: company.profile || {},
+      employer: "",
+      employerWebsite: "",
+      extra: company.sources?.length
+        ? { "Public autofill sources": company.sources.slice(0, 12).join("\n") }
+        : {},
+      warnings: [],
+    }),
+  }));
+  const photos = await import("./modules/people/profile-photos");
+  const staged: string[] = [];
+  try {
+    for (const item of [
+      ...prepared.map(({ draft, record }) => ({ photo: draft.photo, record })),
+      ...preparedCompanies.map(({ company, record }) => ({
+        photo: company.photo,
+        record,
+      })),
+    ]) {
+      if (!item.photo) continue;
+      const image = photos.decodeProfilePhoto(item.photo);
+      const photo = await photos.writePeopleProfilePhoto(
+        item.record.id,
+        image.mimeType,
+        image.bytes,
+      );
+      staged.push(item.record.id);
+      item.record.profile = {
+        ...item.record.profile!,
+        photoUrl: `/api/people/photos/${item.record.id}`,
+        photoUpdatedAt: photo.updatedAt,
+      };
+    }
+    const result = await mutateJsonFile<
+      Array<Partial<PersonalRecord> & Record<string, unknown>>,
+      {
+        items: PersonalRecord[];
+        createdIds: string[];
+        skipped: number;
+        batch: string;
+      }
+    >(FILE_NAME, [], (stored) => {
+      const existing = stored.map(normalizeRecord),
+        next = [...existing],
+        createdIds: string[] = [];
+      let skipped = 0;
+      const add = (record: PersonalRecord) => {
+        next.push(record);
+        createdIds.push(record.id);
+        return record;
+      };
+      // Explicit organization cards are available to occupations in this same transaction.
+      const ordered = [...prepared].sort(
+        (a, b) =>
+          Number(b.record.className === "org") -
+          Number(a.record.className === "org"),
+      );
+      for (const { draft, record } of ordered) {
+        if (
+          next.some(
+            (item) =>
+              item.importMeta?.key === record.importMeta?.key &&
+              (!item.archivedAt || item.importMeta?.batch === batch),
+          ) ||
+          (!draft.allowDuplicate &&
+            draftMatches(
+              { ...draft, key: record.id },
+              next.filter((item) => !item.archivedAt),
+            ).length)
+        ) {
+          skipped++;
+          continue;
+        }
+        if (record.className === "person" && draft.employer.trim()) {
+          const companyKey = transferNameKey(draft.employer),
+            planned = preparedCompanies.find(
+              (item) => transferNameKey(item.company.name) === companyKey,
+            );
+          const matches = next.filter(
+            (item) =>
+              item.className === "org" &&
+              !item.archivedAt &&
+              transferNameKey(item.title) === companyKey,
+          );
+          let organization = planned?.company.existingId
+            ? next.find(
+                (item) =>
+                  item.id === planned.company.existingId &&
+                  item.className === "org" &&
+                  !item.archivedAt,
+              )
+            : undefined;
+          if (planned?.company.existingId && !organization)
+            throw new Error(
+              `The chosen employer for ${draft.name} is no longer available.`,
+            );
+          if (!organization && matches.length > 1)
+            throw new Error(
+              `Choose which ${draft.employer} organization to link before importing.`,
+            );
+          organization ||= matches[0];
+          if (!organization) {
+            const companyRecord =
+              planned?.record ||
+              prepare({
+                key: "",
+                name: draft.employer,
+                kind: "org",
+                profile: {
+                  fullName: draft.employer,
+                  website: draft.employerWebsite,
+                },
+                employer: "",
+                employerWebsite: "",
+                extra: {},
+                warnings: [],
+              });
+            organization = add(companyRecord);
+          }
+          record.profile = {
+            ...record.profile!,
+            primaryEmployer: organization.title,
+            occupations: [
+              {
+                id: "job-1",
+                title: record.profile?.primaryOccupation || "",
+                employer: organization.title,
+                organizationId: organization.id,
+                status: "current",
+              },
+            ],
+          };
+        }
+        add(record);
+      }
+      for (const id of createdIds) {
+        const record = next.find((item) => item.id === id)!;
+        record.profile = resolveOrganizationReferences(
+          record.profile,
+          next,
+          true,
+        );
+      }
+      return {
+        value: next,
+        result: { items: next, createdIds, skipped, batch },
+        changed: createdIds.length > 0,
+      };
+    });
+    await Promise.all(
+      staged
+        .filter((id) => !result.createdIds.includes(id))
+        .map((id) => photos.removePeopleProfilePhoto(id).catch(() => {})),
+    );
+    return result;
+  } catch (error) {
+    // If a network response was lost after commit, retain pictures that records reference.
+    const persisted = await readPersonalRecords().catch(() => null);
+    if (persisted)
+      await Promise.all(
+        staged
+          .filter((id) => !persisted.some((record) => record.id === id))
+          .map((id) => photos.removePeopleProfilePhoto(id).catch(() => {})),
+      );
+    throw error;
+  }
+}
+
+export async function undoPeopleImport(batch: string) {
+  if (!/^[\w-]{16,80}$/.test(batch)) throw new Error("Invalid import batch.");
+  const { readNativeObjectLinks } = await import("./native-objects/link-store");
+  const links = await readNativeObjectLinks();
+  return mutateJsonFile<
+    Array<Partial<PersonalRecord> & Record<string, unknown>>,
+    PersonalRecord[]
+  >(FILE_NAME, [], (stored) => {
+    const records = stored.map(normalizeRecord),
+      targets = records.filter(
+        (record) => record.importMeta?.batch === batch && !record.archivedAt,
+      ),
+      ids = new Set(targets.map((record) => record.id));
+    if (
+      targets.some(
+        (record) => record.updatedAt !== record.importMeta?.importedAt,
+      ) ||
+      links.some(
+        (link) =>
+          link.status === "active" &&
+          (ids.has(link.source.objectId) || ids.has(link.target.objectId)),
+      ) ||
+      records.some(
+        (record) =>
+          !ids.has(record.id) &&
+          !record.archivedAt &&
+          (record.interaction?.participantIds.some((id) => ids.has(id)) ||
+            record.profile?.occupations.some((job) =>
+              ids.has(job.organizationId || ""),
+            ) ||
+            record.profile?.education.some((school) =>
+              ids.has(school.organizationId || ""),
+            )),
+      )
+    )
+      throw new Error(
+        "Some imported profiles have been edited or linked since import. Review them individually in People.",
+      );
+    const now = new Date().toISOString();
+    const next = records.map((record) =>
+      ids.has(record.id)
+        ? {
+            ...record,
+            archivedAt: now,
+            archiveReason: "Import undone",
+            statusBeforeArchive: record.status,
+            updatedAt: now,
+          }
+        : record,
+    );
+    return { value: next, result: next, changed: targets.length > 0 };
+  });
 }
 
 export async function updatePersonalRecord(

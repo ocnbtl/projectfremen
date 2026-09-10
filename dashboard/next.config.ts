@@ -3,6 +3,8 @@ import type { NextConfig } from "next";
 const workspaceRoot = process.cwd();
 
 const nextConfig: NextConfig = {
+  // Keep development startup from generating instruction files in the checkout.
+  agentRules: false,
   // Vercel's injected Next 16.2 build adapter currently emits source paths
   // that its later packaging pass has already moved. An explicit empty value
   // takes precedence over NEXT_ADAPTER_PATH and keeps the established Vercel

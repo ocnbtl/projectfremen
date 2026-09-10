@@ -6,6 +6,7 @@ import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/inconsolata/wght.css";
 import "./globals.css";
 import "./figma-transfer.css";
+import "./people-transfer.css";
 import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
 
 export const metadata: Metadata = {

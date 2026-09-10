@@ -1,0 +1,499 @@
+.people-redesign-shell.is-transfer {
+  grid-template-columns: 208px minmax(0, 1fr);
+}
+.people-redesign-shell.is-transfer > .people-profile-panel,
+.people-redesign-shell.is-transfer > .people-smart-panel,
+.people-redesign-shell.is-transfer .people-directory-tools,
+.people-redesign-shell.is-transfer .people-header-actions {
+  display: none;
+}
+.people-redesign-shell.is-transfer .people-utility-surface {
+  max-width: 1100px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px 24px 32px;
+  box-sizing: border-box;
+}
+.people-redesign-shell.is-transfer .people-utility-surface > h2 {
+  display: none;
+}
+.people-transfer-workflow {
+  --transfer-ink: #153d59;
+  --transfer-muted: #5d706f;
+  --transfer-green: #d5e6da;
+  --transfer-orange: #f3e4da;
+  color: var(--transfer-ink);
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.people-transfer-workflow * {
+  box-sizing: border-box;
+}
+.people-transfer-intro {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin: 0 0 24px;
+}
+.people-transfer-intro > span {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  background: var(--transfer-green);
+  flex: none;
+}
+.people-transfer-workflow h3 {
+  font-size: 23px;
+  letter-spacing: -0.5px;
+  margin: 0 0 6px;
+}
+.people-transfer-workflow p {
+  margin: 6px 0 12px;
+  line-height: 1.5;
+}
+.people-transfer-intro p,
+.people-transfer-workflow small,
+.people-transfer-hint {
+  color: var(--transfer-muted);
+  font-size: 12px;
+}
+.people-transfer-workflow button {
+  width: auto;
+  min-height: 40px;
+  border: 1px solid #cad6d9;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--transfer-ink);
+  padding: 8px 14px;
+  cursor: pointer;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  transition:
+    background 0.18s,
+    transform 0.18s;
+}
+.people-transfer-workflow button:hover:not(:disabled) {
+  background: #edf3ef;
+}
+.people-transfer-workflow button:active:not(:disabled) {
+  transform: scale(0.98);
+}
+.people-transfer-workflow button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.people-transfer-workflow :is(button, input, summary):focus-visible {
+  outline: 2px solid #cd6d34;
+  outline-offset: 3px;
+}
+.people-transfer-workflow input:not([type="checkbox"]):not([type="file"]) {
+  width: 100%;
+  min-width: 0;
+  min-height: 40px;
+  border: 1px solid #c8d6dc;
+  background: #fff;
+  border-radius: 10px;
+  padding: 8px 12px;
+  color: var(--transfer-ink);
+  font: inherit;
+  font-size: 14px;
+}
+.people-transfer-workflow input[type="checkbox"] {
+  appearance: auto;
+  accent-color: #397357;
+  width: 18px;
+  height: 18px;
+  min-height: 18px;
+  flex: none;
+  margin: 0;
+  cursor: pointer;
+}
+.people-transfer-sources {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+.people-transfer-sources button {
+  display: flex;
+  align-items: center;
+  flex-direction: column;
+  justify-content: center;
+  gap: 12px;
+  min-height: 100px;
+  border-radius: 18px;
+}
+.people-transfer-sources button[aria-pressed="true"] {
+  background: var(--transfer-green);
+  border-color: #83a38e;
+}
+.people-transfer-start > p {
+  max-width: 680px;
+  min-height: 42px;
+  margin: 20px 0;
+}
+.people-transfer-file {
+  display: flex;
+  gap: 12px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed #9eafa8;
+  background: #f5f8f4;
+  border-radius: 20px;
+  padding: 32px 20px;
+  font-weight: 600;
+}
+.people-transfer-file input {
+  max-width: 100%;
+  font: inherit;
+}
+.people-transfer-file input::file-selector-button {
+  border: 0;
+  border-radius: 10px;
+  padding: 12px 16px;
+  background: var(--transfer-ink);
+  color: #fff;
+  margin-right: 12px;
+  cursor: pointer;
+}
+.people-transfer-country {
+  display: grid;
+  grid-template-columns: auto 80px;
+  gap: 8px 12px;
+  align-items: center;
+  width: fit-content;
+  margin-top: 20px;
+  font-size: 13px;
+}
+.people-transfer-country small {
+  grid-column: 1/-1;
+}
+.people-transfer-file-bar,
+.people-transfer-toolbar,
+.people-transfer-footer,
+.people-transfer-ready {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.people-transfer-file-bar {
+  justify-content: space-between;
+  margin-bottom: 16px;
+  font-size: 13px;
+}
+.people-transfer-file-bar > span {
+  overflow-wrap: anywhere;
+}
+.people-transfer-toolbar {
+  flex-wrap: wrap;
+  margin: 16px 0 8px;
+}
+.people-transfer-toolbar > input {
+  flex: 1 1 220px;
+}
+.people-redesign-shell .people-transfer-toolbar > .app-select-trigger {
+  width: auto;
+  min-width: 140px;
+}
+.people-transfer-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 480px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 4px;
+  scrollbar-width: thin;
+}
+.people-transfer-list article {
+  border-radius: 14px;
+  background: #faf9f6;
+  border: 1px solid transparent;
+}
+.people-transfer-list article.is-selected,
+.people-transfer-choice.is-selected {
+  background: #edf4ee;
+  border-color: #c4dacb;
+}
+.people-transfer-choice {
+  display: flex;
+  gap: 12px;
+  min-height: 64px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 14px;
+  cursor: pointer;
+}
+.people-transfer-choice > span:not(.people-row-avatar) {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+.people-transfer-choice > .people-row-avatar {
+  flex: 0 0 40px;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.people-transfer-choice strong {
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.people-transfer-choice small {
+  overflow-wrap: anywhere;
+}
+.people-transfer-choice em {
+  font-size: 10px;
+  font-style: normal;
+  padding: 4px 8px;
+  border-radius: 20px;
+  background: var(--transfer-orange);
+  flex: none;
+}
+.people-transfer-list details {
+  padding: 0 12px 10px 42px;
+}
+.people-transfer-workflow summary {
+  cursor: pointer;
+  font-size: 12px;
+  min-height: 28px;
+  padding: 4px 0;
+}
+.people-transfer-contact-edit,
+.people-transfer-mapping > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 12px 0;
+}
+.people-transfer-contact-edit label,
+.people-transfer-mapping label,
+.people-transfer-inclusions > label:not(.people-transfer-toggle) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+.people-transfer-mapping > div {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.people-transfer-mapping summary small {
+  margin-left: 8px;
+}
+.people-transfer-employers {
+  padding: 16px;
+  margin-top: 20px;
+  background: #f5f3ed;
+  border-radius: 16px;
+}
+.people-transfer-employers > summary {
+  font-size: 14px;
+  font-weight: 600;
+}
+.people-transfer-employers article {
+  display: grid;
+  gap: 6px;
+  margin: 12px 0;
+  padding: 12px 0;
+  border-top: 1px solid #dedfd4;
+}
+.people-transfer-employers article a {
+  display: inline-block;
+  margin-right: 12px;
+  font-size: 12px;
+  color: var(--transfer-ink);
+}
+.people-transfer-footer {
+  justify-content: space-between;
+  position: sticky;
+  bottom: 0;
+  z-index: 3;
+  padding: 16px 120px 8px 0;
+  margin-top: 20px;
+  background: #fffcf7f2;
+  backdrop-filter: blur(16px);
+  border-top: 1px solid #dedfd4;
+}
+.people-transfer-footer > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.people-transfer-footer strong {
+  font-size: 14px;
+}
+.people-transfer-workflow button.is-primary {
+  background: var(--transfer-ink);
+  color: #fff;
+  border-color: var(--transfer-ink);
+  min-width: 160px;
+}
+.people-transfer-workflow button.is-primary:hover:not(:disabled) {
+  background: #245471;
+}
+.people-transfer-complete {
+  text-align: center;
+  padding: 40px 16px;
+  background: #eef5ed;
+  border-radius: 20px;
+}
+.people-transfer-notice {
+  background: #e1eee0;
+  padding: 12px 16px;
+  border-radius: 12px;
+}
+.people-transfer-error {
+  background: #f9e7df;
+  padding: 12px 16px;
+  border-radius: 12px;
+  color: #853b27;
+}
+.people-transfer-export-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(260px, 1fr);
+  gap: 24px;
+  margin-top: 20px;
+}
+.people-transfer-inclusions {
+  padding: 20px;
+  border-radius: 18px;
+  background: #f4f1eb;
+  align-self: start;
+}
+.people-transfer-inclusions h4 {
+  margin: 0;
+  font-size: 16px;
+}
+.people-transfer-inclusions p {
+  font-size: 12px;
+  color: var(--transfer-muted);
+}
+.people-transfer-toggle {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.people-transfer-inclusions > small {
+  display: block;
+  margin-top: 12px;
+  line-height: 1.5;
+}
+.people-transfer-ready {
+  flex-wrap: wrap;
+  padding: 20px;
+  background: #e6efe3;
+  border-radius: 16px;
+  margin-top: 16px;
+}
+.people-transfer-ready > span {
+  display: flex;
+  flex: 1;
+  min-width: 150px;
+  flex-direction: column;
+  gap: 4px;
+}
+.people-transfer-ready > small {
+  width: 100%;
+}
+@media (max-width: 1000px) {
+  .people-redesign-shell.is-transfer {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .people-transfer-sources {
+    gap: 8px;
+  }
+  .people-transfer-export-grid {
+    gap: 16px;
+  }
+}
+@media (max-width: 600px) {
+  .people-redesign-shell.is-transfer .people-utility-surface {
+    padding: 16px 8px 24px;
+    border: 0;
+    background: transparent;
+  }
+  .people-transfer-intro {
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+  .people-transfer-workflow h3 {
+    font-size: 20px;
+  }
+  .people-transfer-intro > span {
+    width: 40px;
+    height: 40px;
+  }
+  .people-transfer-sources {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .people-transfer-sources button {
+    min-height: 88px;
+  }
+  .people-transfer-workflow button,
+  .people-transfer-workflow input:not([type="checkbox"]):not([type="file"]) {
+    min-height: 44px;
+  }
+  .people-transfer-toolbar {
+    gap: 8px;
+  }
+  .people-transfer-toolbar > input {
+    flex-basis: 100%;
+  }
+  .people-transfer-toolbar > .app-select-trigger {
+    min-width: 120px;
+    flex: 1;
+  }
+  .people-transfer-export-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .people-transfer-list {
+    max-height: 400px;
+  }
+  .people-transfer-choice {
+    padding: 10px 8px;
+    gap: 8px;
+  }
+  .people-transfer-choice em {
+    padding: 4px 6px;
+  }
+  .people-transfer-contact-edit,
+  .people-transfer-mapping > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .people-transfer-footer {
+    align-items: stretch;
+    flex-direction: column;
+    padding-right: 0;
+  }
+  .people-transfer-footer > div {
+    padding-right: 52px;
+  }
+  .people-transfer-footer button {
+    width: 100%;
+  }
+  .people-transfer-file-bar {
+    align-items: flex-start;
+  }
+  .people-transfer-file-bar button {
+    flex: none;
+  }
+  .people-transfer-list summary {
+    min-height: 36px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .people-transfer-workflow button {
+    transition: none;
+  }
+}

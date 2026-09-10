@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit",
     "test:organization-autofill": "node ./scripts/organization-autofill-harness.mjs",
     "test:people-refinements": "node ./scripts/people-refinements-harness.cjs",
+    "test:people-transfer": "node ./scripts/people-transfer-harness.cjs",
     "test:profile-photo": "node ./scripts/profile-photo-crop-harness.mjs",
     "test:vault": "node ./scripts/local-first-harness.mjs",
     "test:vault-browser": "node ./scripts/vault-browser-harness.mjs",
@@ -28,7 +29,8 @@
     "d3-geo": "3.1.1",
     "libphonenumber-js": "^1.13.12",
     "motion": "^12.0.0",
-    "next": "16.2.12",
+    "next": "16.3.4",
+    "papaparse": "5.5.3",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "topojson-client": "3.1.0",
@@ -38,17 +40,18 @@
     "@playwright/test": "1.61.0",
     "@types/d3-geo": "3.1.0",
     "@types/node": "^22.14.1",
+    "@types/papaparse": "5.3.16",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
     "@types/topojson-client": "3.1.5",
     "country-flag-icons": "^1.6.20",
     "eslint": "^9.23.0",
-    "eslint-config-next": "16.2.12",
+    "eslint-config-next": "16.3.4",
     "typescript": "^5.8.2"
   },
   "overrides": {
     "nanoid": "3.3.18",
     "postcss": "8.5.25",
-    "sharp": "0.35.3"
+    "sharp": "0.35.4"
   }
 }

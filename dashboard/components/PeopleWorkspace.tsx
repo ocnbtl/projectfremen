@@ -58,11 +58,16 @@ import SelectField from "./ui/SelectField";
 import TimeField from "./people/TimeField";
 import InlineOrganizationDialog from "./people/InlineOrganizationDialog";
 import { findPeopleDuplicates } from "../lib/modules/people/duplicates";
+import dynamic from "next/dynamic";
 import { organizationIndustryOptions, normalizeOrganizationIndustry } from "../lib/modules/people/organization-industries";
 import { formatTeamSize } from "../lib/modules/people/team-size";
 import { ORGANIZATION_TYPES as ORGANIZATION_TYPE_OPTIONS, canCompleteOrganizationAddress, emptyOrganizationSuggestions, normalizeOrganizationUrl, type OrganizationAutofillValues, type OrganizationSuggestion } from "../lib/modules/people/organization-autofill";
 import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
+
+const PeopleTransfer = dynamic(() => import("./people/PeopleTransfer"), {
+  loading: () => <p role="status">Opening contact transfer…</p>
+});
 
 type RecordsResponse = {
   ok: boolean;
@@ -2043,6 +2048,7 @@ export default function PeopleWorkspace({
   const initialCreateClass = initialMode === "new" && searchParams.get("type") === "organization" ? "org" : "person";
   const projectsRepository = useMemo(() => createProjectsRepository(), []);
   const [people, setPeople] = useState(initialPeople);
+  const [transferBusy, setTransferBusy] = useState(false);
   const [interactionRecords, setInteractionRecords] = useState(initialInteractions);
   const {
     followUps,
@@ -2640,6 +2646,7 @@ export default function PeopleWorkspace({
       : "profile";
   const shellClassName = [
     "people-redesign-shell",
+    ["import", "export", "import-export"].includes(activeSidebarView) ? "is-transfer" : "",
     filteringActive ? "is-filtering" : "",
     `is-mobile-${mobileSurface}`
   ].filter(Boolean).join(" ");
@@ -2895,6 +2902,7 @@ export default function PeopleWorkspace({
   }
 
   function selectSidebarView(item: SidebarItemConfig) {
+    if (transferBusy) { setActionNotice("Please wait for the contact transfer to finish."); return; }
     const destination = buildPeopleDestination(
       {
         sidebar: item.id,
@@ -4334,7 +4342,7 @@ export default function PeopleWorkspace({
             )}
             {activeSidebarView === "duplicates" && <div className="people-duplicate-review"><p>{duplicateMatches.length} possible {duplicateMatches.length===1?"duplicate pair":"duplicate pairs"} across people and organizations. Matching details are suggestions for review; no records are changed.</p>{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):<div className="notes-empty-state"><UnigentamosIcon role="duplicates" size={24}/><h3>No duplicate candidates</h3><p>Checked names, email addresses, phone numbers, social profiles, and organization websites. Similar names alone may belong to different people.</p></div>}</div>}
             {(activeSidebarView === "import-export" || activeSidebarView === "import" || activeSidebarView === "export") && (
-              <div className="people-transfer-preview"><span className="people-transfer-status">Planned</span><h3>{activeSidebarView === "export"?"Your contacts, ready to travel":"Bring your contacts together"}</h3><p>{activeSidebarView === "export"?"Choose people and organizations, review the details to include, then download or share a clean contact card.":"Choose where your contacts live, preview their details, and review duplicates before importing."}</p><div>{(activeSidebarView === "export"?["Contact cards","CSV / CRM","Full backup","Share sheet"]:["Apple Contacts","Google Contacts","Outlook","CRM / CSV"]).map(label=><span key={label}><PeopleIcon name={activeSidebarView === "export"?"export":"person"}/>{label}</span>)}</div><small>Connections and transfer actions will be available in a future update.</small></div>
+              <PeopleTransfer key={activeSidebarView} mode={activeSidebarView === "export" ? "export" : "import"} people={people} onBusy={setTransferBusy} onChanged={records=>setPeople(records.filter(record=>record.className === "person" || record.className === "org"))}/>
             )}
             {activeSidebarView === "customize" && (
               <div className="people-utility-grid">
