@@ -22,8 +22,53 @@ require.extensions[".ts"] = (module, filename) =>
     filename,
   );
 const t = require("../lib/modules/people/transfer.ts");
+const { findPeopleDuplicates, createPeopleDuplicateIndex } = require("../lib/modules/people/duplicates.ts");
 const store = require("../lib/personal-records-store.ts");
 (async () => {
+  const fixture = (id, title, profile = {}, extra = {}) => ({ id, title, className: "person", profile, ...extra });
+  const directory = [
+    fixture("saved-name", "José Santos"),
+    fixture("saved-email", "Email owner", { primaryEmail: "SHARED@example.com " }),
+    fixture("saved-phone", "Phone owner", { phoneNumber: "6145550142", phoneCountryCode: "+1" }),
+    fixture("saved-social", "Social owner", { x: "https://twitter.com/example" }),
+    fixture("saved-org", "Studio", { website: "https://www.studio.example/?ref=import" }, { className: "org" }),
+    fixture("archived", "Archived contact", {}, { archivedAt: "2026-09-01" }),
+    fixture("note", "A note", { primaryEmail: "note@example.com" }, { className: "note" }),
+  ];
+  const candidates = [
+    fixture("draft-name", "Jose Santos", { emails: [{ address: "shared@example.com" }] }),
+    fixture("draft-phone", "Different name", { phones: [{ number: "+1 614-555-0142", countryCode: "+1" }] }),
+    fixture("draft-social", "Another name", { x: "https://x.com/example/" }),
+    fixture("draft-org", "Studio Incorporated", { website: "http://studio.example" }, { className: "org" }),
+    fixture("draft-person", "Studio", { website: "https://studio.example" }),
+    fixture("draft-archived", "Archived contact"),
+    fixture("draft-note", "Not a note", { primaryEmail: "note@example.com" }),
+    fixture("draft-within-file", "A second incoming contact", { primaryEmail: "shared@example.com" }),
+  ];
+  const snapshot = JSON.stringify([directory, candidates]);
+  const index = createPeopleDuplicateIndex(directory), seen = [...directory];
+  for (const candidate of candidates) {
+    const expected = findPeopleDuplicates([...seen, candidate]).filter(match => match.right.id === candidate.id);
+    assert.deepEqual(index.find(candidate), expected, `indexed matching preserves rules for ${candidate.id}`);
+    index.add(candidate);
+    seen.push(candidate);
+  }
+  assert.equal(JSON.stringify([directory, candidates]), snapshot, "review does not mutate records");
+  // Count source reads instead of relying on machine-dependent wall-clock thresholds.
+  let profileReads = 0;
+  const largeDirectory = Array.from({ length: 1000 }, (_, i) => ({
+    ...fixture(`existing-${i}`, `Existing ${i}`),
+    get profile() { profileReads++; return { primaryEmail: `existing-${i}@example.com` }; },
+  }));
+  const largeCsv = t.readCsv("Name,Email\n" + Array.from({ length: 500 }, (_, i) => `Incoming ${i},incoming-${i}@example.com`).join("\n"));
+  const largeDrafts = t.csvContacts(largeCsv.rows, t.suggestCsvMapping(largeCsv.headers));
+  largeDrafts[1].profile.emails[0].address = "existing-1@example.com";
+  largeDrafts[2].profile.emails[0].address = largeDrafts[0].profile.emails[0].address;
+  const reviewed = t.reviewContactDrafts(largeDrafts, largeDirectory);
+  assert.equal(profileReads, 1000, "a 500-contact review indexes the saved directory once");
+  assert.deepEqual(reviewed[1].matches, [{ id: "existing-1", reasons: ["Same email"] }]);
+  assert.deepEqual(reviewed[2].matches, [{ id: "csv-0", reasons: ["Same email"] }]);
+  assert.equal(reviewed.filter(row => !row.matches.length).length, 498);
   const csv = t.readCsv(
     'Name,Email,Phone,Company,Job Title,Custom\r\n"Jane, Smith",jane@example.com,+61412345678,Acme,Designer,"Line 1\nLine 2"\r\nSam Lee,sam@example.com,,Acme,Director,=SUM(A1)',
   );
@@ -232,8 +277,18 @@ const store = require("../lib/personal-records-store.ts");
     )[0].profile.birthday,
     "--02-29",
   );
+  const bulk = await store.importPeopleContacts(largeDrafts, [], "bulk-index-00000001");
+  assert.equal(bulk.createdIds.length, 499, "transaction index sees earlier contacts from its own batch");
+  assert.equal(bulk.skipped, 1);
+  const allowed = await store.importPeopleContacts([
+    { ...largeDrafts[2], name: "Intentionally separate person", allowDuplicate: true },
+  ], [], "bulk-index-00000002");
+  assert.equal(allowed.createdIds.length, 1, "explicit duplicate creation remains available");
+  const bulkRetry = await store.importPeopleContacts(largeDrafts, [], "bulk-index-00000001");
+  assert.equal(bulkRetry.createdIds.length, 0, "bulk retries do not create more profiles");
+  assert.equal(bulkRetry.skipped, 500);
   console.log(
-    "PASS: CSV/vCard parsing, private-field exclusion, formula protection, atomic employer linking, retries, duplicates, rollback, and undo.",
+    "PASS: CSV/vCard parsing, private-field exclusion, formula protection, atomic employer linking, indexed 500-contact review/import, retries, duplicates, rollback, and undo.",
   );
 })().catch((error) => {
   console.error(error);

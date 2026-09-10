@@ -3,7 +3,7 @@ import type {
   PersonalContactProfile,
   PersonalRecord,
 } from "../../personal-records-store";
-import { findPeopleDuplicates } from "./duplicates";
+import { createPeopleDuplicateIndex } from "./duplicates";
 import {
   normalizePhoneForStorage,
   phoneCountryCodeForValue,
@@ -431,14 +431,21 @@ export function draftRecord(draft: ContactDraft): PersonalRecord {
   } as PersonalRecord;
 }
 export function draftMatches(draft: ContactDraft, existing: PersonalRecord[]) {
-  return findPeopleDuplicates([...existing, draftRecord(draft)])
-    .filter(
-      (match) => match.left.id === draft.key || match.right.id === draft.key,
-    )
-    .map((match) => ({
-      id: match.left.id === draft.key ? match.right.id : match.left.id,
+  return createPeopleDuplicateIndex(existing).find(draftRecord(draft))
+    .map((match) => ({ id: match.left.id, reasons: match.reasons }));
+}
+/** Earlier file rows participate in review, even when they start unchecked. */
+export function reviewContactDrafts(drafts: ContactDraft[], existing: PersonalRecord[]) {
+  const index = createPeopleDuplicateIndex(existing);
+  return drafts.map((draft) => {
+    const record = draftRecord(draft);
+    const matches = index.find(record).map((match) => ({
+      id: match.left.id,
       reasons: match.reasons,
     }));
+    index.add(record);
+    return { draft, matches };
+  });
 }
 export type ExportOptions = {
   notes: boolean;

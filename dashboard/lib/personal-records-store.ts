@@ -1,6 +1,7 @@
 import { mutateJsonFile, readJsonFile } from "./file-store";
 import { createHash } from "node:crypto";
-import { draftMatches, transferNameKey, type ContactDraft } from "./modules/people/transfer";
+import { draftRecord, transferNameKey, type ContactDraft } from "./modules/people/transfer";
+import { createPeopleDuplicateIndex } from "./modules/people/duplicates";
 import { normalizeOrganizationIndustry } from "./modules/people/organization-industries";
 import { normalizeBirthday } from "./modules/people/birthday";
 import {
@@ -2342,9 +2343,12 @@ export async function importPeopleContacts(
       const existing = stored.map(normalizeRecord),
         next = [...existing],
         createdIds: string[] = [];
+      // Build inside each compare-and-swap attempt so concurrent imports are rechecked.
+      const duplicateIndex = createPeopleDuplicateIndex(existing);
       let skipped = 0;
       const add = (record: PersonalRecord) => {
         next.push(record);
+        duplicateIndex.add(record);
         createdIds.push(record.id);
         return record;
       };
@@ -2362,10 +2366,7 @@ export async function importPeopleContacts(
               (!item.archivedAt || item.importMeta?.batch === batch),
           ) ||
           (!draft.allowDuplicate &&
-            draftMatches(
-              { ...draft, key: record.id },
-              next.filter((item) => !item.archivedAt),
-            ).length)
+            duplicateIndex.find(draftRecord({ ...draft, key: record.id })).length)
         ) {
           skipped++;
           continue;

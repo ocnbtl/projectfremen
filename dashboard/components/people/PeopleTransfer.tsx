@@ -11,8 +11,7 @@ import {
   readCsv,
   suggestCsvMapping,
   vcardContacts,
-  draftMatches,
-  draftRecord,
+  reviewContactDrafts,
   transferNameKey,
   CSV_FIELDS,
   PRIVATE_EXPORT_DEFAULTS,
@@ -124,14 +123,7 @@ export default function PeopleTransfer({
         .sort((a, b) => a.title.localeCompare(b.title)),
     [people],
   );
-  const reviewed = useMemo(() => {
-    const seen = [...active];
-    return drafts.map((draft) => {
-      const matches = draftMatches(draft, seen);
-      seen.push(draftRecord(draft));
-      return { draft, matches };
-    });
-  }, [drafts, active]);
+  const reviewed = useMemo(() => reviewContactDrafts(drafts, active), [drafts, active]);
   const employers = useMemo(
     () =>
       [
@@ -252,12 +244,11 @@ export default function PeopleTransfer({
   }, [busy]);
   function initialize(rows: ContactDraft[], newFile = true) {
     if (!rows.length) throw new Error("No contacts were found in that file.");
-    const seen = [...active],
-      next = new Set<string>();
-    for (const draft of rows) {
-      if (draft.name && !draftMatches(draft, seen).length) next.add(draft.key);
-      seen.push(draftRecord(draft));
-    }
+    const next = new Set(
+      reviewContactDrafts(rows, active)
+        .filter(({ draft, matches }) => draft.name && !matches.length)
+        .map(({ draft }) => draft.key),
+    );
     setDrafts(rows);
     setSelected(
       !newFile && drafts.some((draft) => draft.name)
