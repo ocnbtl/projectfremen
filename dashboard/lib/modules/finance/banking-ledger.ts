@@ -56,7 +56,7 @@ function recordFor(connectionId: string, tx: BankTransaction, accountId: string,
     category: before && (!bank || before.category !== bank.category) ? before.category : tx.category,
     amount: tx.amount, direction: tx.direction, currency: "USD", entityScope: "personal", memo: before?.memo || "",
     status: tx.pending ? "pending" : "cleared", reviewed: changed ? false : before?.reviewed || false, reimbursable: before?.reimbursable || false,
-    source: { kind: "plaid", bank: { connectionId, transactionId: tx.id, pendingId: tx.pendingId, merchant: tx.merchant, category: tx.category } } };
+    source: { ...before?.source, kind: "plaid", bank: { connectionId, transactionId: tx.id, pendingId: tx.pendingId, merchant: tx.merchant, category: tx.category } } };
 }
 
 export function reconcileBankBatch(state: BankingFinanceState, connectionId: string, mappings: Record<string, string>, accounts: BankAccount[], transactions: BankTransaction[], removed: string[], now: string) {

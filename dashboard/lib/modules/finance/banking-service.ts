@@ -49,7 +49,8 @@ export async function bankingView(): Promise<BankingView> {
   const config = bankingConfig();
   if (!config.configured) return { configured: false, environment: config.environment, connectionsUsed: 0, connections: [] };
   const state = await readStore();
-  return { configured: true, environment: config.environment, origin: config.origin, connectionsUsed: state.connectionsUsed,
+  const reserved = state.sessions.filter(session => session.expires > Date.now() && !session.connectionId && !session.exchangeStarted && !session.completed).length;
+  return { configured: true, environment: config.environment, origin: config.origin, connectionsUsed: state.connectionsUsed + reserved,
     connections: state.connections.map(item => ({ id: item.id, name: item.name, status: item.status, accounts: item.accounts, mappings: item.mappings,
       lastSyncedAt: item.lastSyncedAt, initialComplete: item.initialComplete, error: item.error })) };
 }

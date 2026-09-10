@@ -85,11 +85,12 @@ async function main() {
   check('possible duplicates remain outside totals until explicit match; replay is safe', () => {
     const state = newState(), mapping = ledger.bindBankAccounts(state, 'c', 'Bank', [bank], { [bank.id]: 'new' }, now);
     ledger.reconcileBankBatch(state, 'c', mapping, [bank], [tx()], [], now);
-    const manual = state.transactions[0]; manual.source = { kind: 'manual' }; manual.memo = 'Keep me'; manual.category = 'Custom';
+    const manual = state.transactions[0]; manual.source = { kind: 'csv_import', importBatchId: 'existing-batch', sourceRowFingerprint: 'original-row' }; manual.memo = 'Keep me'; manual.category = 'Custom';
     ledger.reconcileBankBatch(state, 'c', mapping, [bank], [tx()], [], now);
     assert.equal(state.transactions.length, 1); assert.equal(state.bankReviews.length, 1);
     ledger.resolveBankReview(state, state.bankReviews[0].id, 'match', manual.id, now);
     assert.equal(state.transactions.length, 1); assert.equal(state.transactions[0].memo, 'Keep me'); assert.equal(state.transactions[0].category, 'Custom');
+    assert.equal(state.transactions[0].source.importBatchId, 'existing-batch'); assert.equal(state.transactions[0].source.sourceRowFingerprint, 'original-row');
     ledger.reconcileBankBatch(state, 'c', mapping, [bank], [tx()], [], now); assert.equal(state.transactions.length, 1);
     assert.throws(() => ledger.resolveBankReview(state, state.bankReviews[0].id, 'import', undefined, now));
   });
