@@ -161,12 +161,12 @@ export default function FinanceRulesRouteView({
   onRunVisibleTests: () => void;
   onNotice: (message: string) => void;
 }) {
-  const [filtersExpanded, setFiltersExpanded] = useState(true);
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
   const counts = model.counts;
   const metrics = [
     { id: "active", label: "Active", value: counts.active, detail: `${counts.stable} stable · ${counts.watch} watch`, tone: "positive" as const },
     { id: "draft", label: "Draft", value: counts.draft, detail: "approval needed" },
-    { id: "review", label: "Review", value: counts.needsReview, detail: "overfire / repair", tone: "attention" as const },
+    { id: "review", label: "Review", value: counts.needsReview, detail: "rules needing attention", tone: "attention" as const },
     { id: "category", label: "Cat rules", value: counts.categorization, detail: "merchant context" },
     { id: "receipts", label: "Receipts", value: counts.receipts, detail: "evidence requests" },
     { id: "recurring", label: "Recurring", value: counts.recurring, detail: "bills / subs detect" },
@@ -178,51 +178,12 @@ export default function FinanceRulesRouteView({
 
   return (
     <>
-      <WorkspaceHeader
-        title="Rules / Automation"
-        subtitle="Categorization, evidence, recurrence, import repair, and close-blocker rules."
-        actions={(
-          <>
-            <HeaderAction icon="Filter" onClick={() => setFiltersExpanded((current) => !current)}>
-              {filtersExpanded ? "Hide filters" : "Filter"}
-            </HeaderAction>
-            <HeaderAction
-              icon="Sliders"
-              disabled
-              title="Rule grouping is not persisted. Use filters and attention sorting in this checkpoint."
-            >
-              Group
-            </HeaderAction>
-            <HeaderAction icon="Check" primary onClick={onRunVisibleTests}>Test rules</HeaderAction>
-            <HeaderAction icon="Plus" disabled title={RULE_MUTATION_REASON}>New rule</HeaderAction>
-          </>
-        )}
-      />
 
-      <MetricStrip className={styles.metrics} ariaLabel="Finance rule metrics" items={metrics} />
+      <MetricStrip className={styles.metrics} ariaLabel="Finance rule metrics" items={metrics.filter(item => ["active", "draft", "review"].includes(item.id))} />
 
       <section className={styles.scopeBar} aria-label="Rule search and filters">
-        <label className={styles.search}>
-          <Icon name="Search" />
-          <span className="sr-only">Search rules</span>
-          <input
-            type="search"
-            value={model.query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search rules, trigger, action, linked object, blocker, or source module..."
-          />
-        </label>
-        <button
-          type="button"
-          className={styles.unavailableButton}
-          aria-disabled="true"
-          title={SAVED_VIEW_REASON}
-          onClick={(event) => event.preventDefault()}
-        >
-          Save view
-          <span className="sr-only">{SAVED_VIEW_REASON}</span>
-        </button>
-        <button type="button" className={styles.auditButton} onClick={onRunVisibleTests}>Run safe audit</button>
+        <button type="button" className={styles.filterButton} aria-expanded={filtersExpanded} onClick={() => setFiltersExpanded(current => !current)}>Filter rules</button>
+        <button type="button" className={styles.auditButton} onClick={onRunVisibleTests}>Test rules</button>
         <label className={styles.sortLabel}>
           Sort
           <select value={model.sort} onChange={(event) => onSortChange(event.target.value as FinanceSort)}>
@@ -251,7 +212,7 @@ export default function FinanceRulesRouteView({
         <div className={styles.ledgerToolbar}>
           <div>
             <strong>Rules ledger</strong>
-            <span>auditable automation preview</span>
+            <span>Review suggestions before applying</span>
           </div>
           <div>
             <code>{model.visibleCount} / {model.sourceCount} rules</code>
@@ -290,8 +251,8 @@ export default function FinanceRulesRouteView({
           <SystemState
             className={styles.empty}
             variant="empty"
-            title="No rules match this scope"
-            description="Clear the query or choose All to return to all current Finance rules."
+            title={model.sourceCount ? "No matching rules" : "Build your first rule"}
+            description={model.sourceCount ? "Try another search or choose All." : "Create a rule to suggest categories, flag recurring activity or support your monthly review."}
             action={{
               label: "Clear scope",
               onSelect: () => {

@@ -85,6 +85,7 @@ function transactionRows(state: FinanceState): FinanceTransaction[] {
     return {
       id: item.id,
       date: parts.label,
+      occurredOn: item.occurredOn,
       quarter: parts.quarter,
       quarterYear: parts.quarterYear,
       week: parts.week,
@@ -121,8 +122,8 @@ function budgetRows(state: FinanceState, period: string, transactions: readonly 
       id: item.id,
       category: item.category,
       hue: hue(index + 2),
-      spent: transactions
-        .filter((transaction) => transaction.io === "expense" && transaction.category === item.category)
+      spent: active(state.transactions)
+        .filter((transaction) => transaction.direction === "expense" && transaction.category === item.category && transaction.occurredOn.startsWith(period) && transaction.entityScope === item.entityScope)
         .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
       limit: item.limit,
       icon: "Circle"

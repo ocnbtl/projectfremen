@@ -50,45 +50,21 @@ export default function FinanceTransactionsView({
 
   return (
     <>
-      <WorkspaceHeader
-        title="Transactions"
-        subtitle="Search, classify, reconcile, and inspect persistent money movement"
-        actions={(
-          <>
-            <HeaderAction icon="Filter" onClick={onOpenFilterPreview}>Filter</HeaderAction>
-            <HeaderAction icon="Sliders" onClick={onOpenColumnsPreview}>Columns</HeaderAction>
-          </>
-        )}
-      />
 
       <MetricStrip
         className={styles.metrics}
         ariaLabel="Transaction scope metrics"
         items={[
-          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.sourceCount} native records` },
-          { id: "income", label: "Income", value: money(model.totals.income, { cents: true }), detail: `${model.counts.income} classified`, tone: "positive" },
-          { id: "spending", label: "Spending", value: money(model.totals.spending, { cents: true }), detail: `${model.counts.expense} classified` },
-          { id: "pending", label: "Pending", value: model.counts.pending, detail: "Needs review", tone: model.counts.pending ? "attention" : "default" },
-          { id: "receipts", label: "Receipts missing", value: model.counts.receiptMissing, detail: "Literal empty receipt fields", tone: model.counts.receiptMissing ? "attention" : "default" },
-          { id: "savings", label: "Savings rows", value: money(model.totals.savingsMovement, { cents: true }), detail: `${model.counts.savings} classified · independent of income/spend` }
+          { id: "visible", label: "Transactions", value: model.visibleCount, detail: `${model.sourceCount} transactions recorded` },
+          { id: "income", label: "Income", value: money(model.totals.income), detail: `${model.counts.income} classified`, tone: "positive" },
+          { id: "spending", label: "Spending", value: money(model.totals.spending), detail: `${model.counts.expense} classified` },
         ]}
       />
 
       <div className={styles.scopeBar}>
-        <label className={styles.search}>
-          <Icon name="Search" />
-          <span className="sr-only">Search transactions</span>
-          <input
-            aria-label="Search transactions"
-            value={model.query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search merchant, entity, amount, memo, receipt, category, account, or TX ID"
-          />
-        </label>
         <div className={styles.filterGroup} role="group" aria-label="Transaction filters">
           <button type="button" className={styles.filterButton} data-active={effectiveFilter === ""} aria-pressed={effectiveFilter === ""} onClick={() => onFilterChange("")}>All</button>
           <button type="button" className={styles.filterButton} data-active={effectiveFilter === "unreviewed"} aria-pressed={effectiveFilter === "unreviewed"} onClick={() => onFilterChange("unreviewed")}>Unreviewed</button>
-          <button type="button" className={styles.filterButton} onClick={onOpenFilterPreview}>More filters</button>
         </div>
         <label className={styles.sortLabel}>
           Sort
@@ -110,7 +86,7 @@ export default function FinanceTransactionsView({
       <Panel className={`${styles.ledger} finance-transaction-table`}>
         <div className={styles.ledgerToolbar}>
           <div className={styles.ledgerSummary} aria-live="polite">
-            <strong>{model.visibleCount} this period</strong>
+            <strong>{model.visibleCount} transactions</strong>
             <code>{money(model.totals.income, { cents: true })} in</code>
             <code>{money(model.totals.spending, { cents: true })} out</code>
             <code>{money(model.totals.savingsMovement, { cents: true })} savings</code>
@@ -175,8 +151,8 @@ export default function FinanceTransactionsView({
           <SystemState
             variant="empty"
             className={styles.empty}
-            title="No transactions match this scope"
-            description="Clear the search or return to All. Filter changes never mutate records."
+            title={model.sourceCount ? "No matching transactions" : "Your transaction stream starts here"}
+            description={model.sourceCount ? "Try another search or return to All." : "Record a transaction or import a CSV statement from one of your accounts."}
             action={{ label: "Clear filters", onSelect: () => { onQueryChange(""); onFilterChange(""); } }}
           />
         )}

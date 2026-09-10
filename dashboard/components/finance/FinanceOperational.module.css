@@ -4,6 +4,44 @@
   grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 
+/* The shared workspace owns search and page actions. Route controls stay compact. */
+.scopeBar.scopeBar {
+  width: 100%; grid-template-columns: minmax(0, 1fr) auto; padding: 0;
+  margin-bottom: 20px; border: 0; background: transparent; gap: 12px;
+}
+.filterButton.filterButton,.sortSelect.sortSelect {
+  min-height: 40px; border-radius: 8px; font-size: 12px; font-weight: 500;
+}
+.filterButton.filterButton[data-active="true"] { border-color: var(--module-primary-200); box-shadow: none; color: var(--module-primary-700); }
+.filterGroup.filterGroup { gap: 8px; }
+.filterGroup.filterGroup > button { width: auto; flex: 0 0 auto; }
+.sortLabel.sortLabel { width: auto; justify-self: end; }
+.sortSelect.sortSelect { width: auto; }
+.ledger.ledger,.accountInventory.accountInventory { width: 100%; }
+.columnHeaderBody.columnHeaderBody,.transactionBody.transactionBody { grid-template-columns: 84px minmax(160px,1.4fr) minmax(110px,1fr) minmax(105px,.9fr) 86px 105px; }
+.columnHeader.columnHeader,.transactionRow.transactionRow { min-width: 760px; }
+.columnHeaderBody > :nth-child(3),.transactionBody > :nth-child(3) { display: none; }
+.transactionBody.transactionBody { min-height: 72px; }
+.transactionRow.transactionRow[data-selected="true"] { box-shadow: inset 3px 0 0 var(--module-primary-500); }
+.columnHeader.columnHeader { font-family: "Inter Variable",sans-serif; font-size: 11px; font-weight: 500; text-transform: none; letter-spacing: 0; }
+.primaryCell.primaryCell strong,.secondaryCell.secondaryCell strong { font-size: 12px; font-weight: 550; }
+.primaryCell.primaryCell span,.secondaryCell.secondaryCell span { font-family: "Inter Variable",sans-serif; font-size: 10px; }
+.amount.amount { font-family: "Inter Variable",sans-serif; font-size: 13px; font-weight: 550; font-variant-numeric: tabular-nums; }
+.ledgerToolbar.ledgerToolbar { padding: 14px 18px; }
+.sortLabel.sortLabel { font-weight: 500; }
+.empty.empty { border-radius: 12px; min-height: 170px; }
+.evidenceValue.evidenceValue,.compactRow.compactRow small { font-family: "Inter Variable",sans-serif; font-weight: 400; }
+.boundary.boundary { border-color: #e8dfc8; background: #f7f3e8; color: #6a5228; }
+@media(max-width:760px) {
+  .filterButton.filterButton,.sortSelect.sortSelect { min-height: 44px; }
+  .scopeBar.scopeBar { grid-template-columns: minmax(0,1fr); }
+  .columnHeader.columnHeader { display: none; }
+  .transactionRow.transactionRow { min-width: 0; margin-bottom: 0; border-radius: 0; border-width: 0 0 1px; }
+  .transactionBody.transactionBody { grid-template-columns: minmax(0,1fr) auto; min-height: 136px; }
+  .ledger.ledger { overflow: hidden; }
+  .ledgerToolbar.ledgerToolbar { border: 0; border-bottom: 1px solid var(--border); margin-bottom: 0; }
+}
+
 .metrics :global(.metric-strip__item) {
   min-height: 82px;
 }

@@ -69,46 +69,22 @@ export default function FinanceBillsView({
 
   return (
     <>
-      <WorkspaceHeader
-        title="Bills & Subscriptions"
-        subtitle="Persistent obligations, timing, recurrence, and evidence-gated observed payments"
-        actions={(
-          <>
-            <HeaderAction icon="Filter" onClick={onOpenFilterPreview}>More filters</HeaderAction>
-            <HeaderAction icon="Send" onClick={onOpenPaymentPreview}>Payment boundary</HeaderAction>
-          </>
-        )}
-      />
 
       <MetricStrip
         className={styles.metrics}
         ariaLabel="Bill scope metrics"
         items={[
-          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.sourceCount} native obligations` },
           { id: "urgent", label: "Due / overdue", value: model.counts.due + model.counts.overdue, detail: `${model.counts.overdue} overdue`, tone: model.counts.overdue ? "danger" : "default" },
-          { id: "week", label: "Due this week", value: model.counts.dueThisWeek, detail: "Literal due-date window", tone: model.counts.dueThisWeek ? "attention" : "default" },
-          { id: "recurring", label: "Monthly recurring", value: money(model.totals.monthlyRecurring, { cents: true }), detail: `${model.counts.recurring} recurring rows` },
-          { id: "autopay", label: "Autopay", value: model.counts.autopay, detail: `${model.counts.manual} manual-payment rows` },
-          { id: "value", label: "Visible nominal value", value: money(model.totals.nominalAmount, { cents: true }), detail: "Not a paid, forecast, or cashflow total" }
+          { id: "week", label: "Due this week", value: model.counts.dueThisWeek, detail: "Next seven days", tone: model.counts.dueThisWeek ? "attention" : "default" },
+          { id: "recurring", label: "Monthly recurring", value: money(model.totals.monthlyRecurring), detail: `${model.counts.recurring} recurring bills` },
         ]}
       />
 
       <div className={styles.scopeBar}>
-        <label className={styles.search}>
-          <Icon name="Search" />
-          <span className="sr-only">Search bills and subscriptions</span>
-          <input
-            aria-label="Search bills and subscriptions"
-            value={model.query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search bill, account, category, cadence, status, or amount"
-          />
-        </label>
         <div className={styles.filterGroup} role="group" aria-label="Bill filters">
           <button type="button" className={styles.filterButton} data-active={filter === ""} aria-pressed={filter === ""} onClick={() => onFilterChange("")}>All</button>
           <button type="button" className={styles.filterButton} data-active={filter === "due-week"} aria-pressed={filter === "due-week"} onClick={() => onFilterChange("due-week")}>Due this week</button>
           <button type="button" className={styles.filterButton} data-active={filter === "recurring"} aria-pressed={filter === "recurring"} onClick={() => onFilterChange("recurring")}>Recurring</button>
-          <button type="button" className={styles.filterButton} onClick={onOpenFilterPreview}>More</button>
         </div>
         <label className={styles.sortLabel}>
           Sort
@@ -129,7 +105,7 @@ export default function FinanceBillsView({
 
       <Panel hue="orange" className={`${styles.ledger} finance-ledger-panel`}>
         <div className="finance-panel-heading">
-          <h2>Payment queue <span>{model.visibleCount} shown · grouped by literal status</span></h2>
+          <h2>Payment queue <span>{model.visibleCount} shown · grouped by status</span></h2>
         </div>
         {BILL_GROUPS.map((status) => {
           const rows = model.rows.filter(({ bill }) => bill.status === status);
@@ -161,7 +137,7 @@ export default function FinanceBillsView({
                           <small>{bill.account} · {bill.category}</small>
                           <span className={styles.accountRowMeta}>
                             <Chip hue={bill.autopay ? "cyan" : "neutral"}>{bill.autopay ? "Autopay on" : "Manual payment"}</Chip>
-                            <Chip hue={bill.recurring ? "violet" : "neutral"}>{bill.recurring ? `${bill.recurring} cadence` : "One-time / cadence unset"}</Chip>
+                            <Chip hue={bill.recurring ? "violet" : "neutral"}>{bill.recurring ? `${bill.recurring} cadence` : "One-time"}</Chip>
                           </span>
                         </span>
                         <span>
@@ -183,8 +159,8 @@ export default function FinanceBillsView({
           <SystemState
             variant="empty"
             className={styles.empty}
-            title="No bills match this scope"
-            description="Clear the search or return to All. Filtering never changes an obligation."
+            title={filter === "due-week" ? "No bills due this week" : filter === "recurring" ? "No recurring bills in this view" : model.sourceCount ? "No matching bills" : "Keep your bills in view"}
+            description={model.sourceCount ? "Try another search or return to All." : "Add your bills and subscriptions to track due dates, amounts and payment records."}
             action={{ label: "Clear filters", onSelect: () => { onQueryChange(""); onFilterChange(""); } }}
           />
         )}

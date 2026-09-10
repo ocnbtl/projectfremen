@@ -1115,7 +1115,7 @@ async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
         assert(undersized.length === 0, `Finance mobile targets below 44px: ${JSON.stringify(undersized)}`);
       }
       await page.goto(`${baseUrl}/admin/finance/accounts?query=${encodeURIComponent("Regression credit card")}`, { waitUntil: "networkidle" });
-      await page.getByRole("heading", { level: 1, name: "Accounts & Cashflow" }).waitFor();
+      await page.getByRole("heading", { level: 1, name: "Accounts" }).waitFor();
       const creditRow = page.locator("[data-finance-account-id]").filter({ hasText: "Regression credit card" });
       await creditRow.waitFor();
       assert((await creditRow.innerText()).includes("-$1,400.00"), `Finance ${viewport.label} did not display a positive credit-card amount as a liability`);
@@ -1135,10 +1135,10 @@ async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
           text: document.body.innerText
         };
       });
-      assert(workbenchDiagnostics.railRatio >= (viewport.width <= 390 ? 0.95 : 0.48), `Finance ${viewport.label} inspector is not a half-width workbench: ${JSON.stringify(workbenchDiagnostics)}`);
+      assert(workbenchDiagnostics.railRatio >= (viewport.width <= 390 ? 0.95 : 0.19) && workbenchDiagnostics.railRatio <= (viewport.width <= 390 ? 1 : 421 / viewport.width), `Finance ${viewport.label} inspector is not a bounded detail sheet: ${JSON.stringify(workbenchDiagnostics)}`);
       assert(!workbenchDiagnostics.text.includes("Native Finance · persistent and auditable") && !workbenchDiagnostics.text.includes("Manual facts and confirmed CSV imports only"), `Finance ${viewport.label} retained removed technical status copy`);
       if (viewport.width >= 768) {
-        assert(workbenchDiagnostics.actionHeight <= 48 && workbenchDiagnostics.actionButtonHeights.every((height) => height <= 32), `Finance ${viewport.label} action bar is still oversized: ${JSON.stringify(workbenchDiagnostics)}`);
+        assert(workbenchDiagnostics.actionHeight <= 52 && workbenchDiagnostics.actionButtonHeights.every((height) => height >= 40 && height <= 48), `Finance ${viewport.label} action bar is still oversized: ${JSON.stringify(workbenchDiagnostics)}`);
       }
       if (viewport.width === 1440) {
         await inspector.getByRole("button", { name: "Import CSV", exact: true }).click();
@@ -13694,13 +13694,13 @@ async function main() {
     pass("Finance API enforces auth, CSRF, idempotency, concurrency, evidence gates, paired transfers, imports, close checks, rules, audit, and archive/restore");
 
     const nativeFinanceRoutes = [
-      ["/admin/finance", "Command", "Finance command view"],
-      ["/admin/finance/accounts?view=transactions", "Accounts &amp; Cashflow", 'data-finance-account-id='],
+      ["/admin/finance", "Overview", "Finance command view"],
+      ["/admin/finance/accounts?view=transactions", "Accounts", 'data-finance-account-id='],
       ["/admin/finance/transactions?view=review", "Transactions", 'aria-label="Finance transactions"'],
-      ["/admin/finance/bills?view=budgets", "Bills &amp; Subscriptions", "Payment queue"],
+      ["/admin/finance/bills?view=budgets", "Bills &amp; subscriptions", "Payment queue"],
       ["/admin/finance/budgets?view=bills", "Budgets", 'aria-label="Budget categories"'],
-      ["/admin/finance/monthly-review?view=accounts", "Monthly Review", "Close checklist"],
-      ["/admin/finance/rules?view=accounts", "Rules / Automation", 'data-finance-rule-id=']
+      ["/admin/finance/monthly-review?view=accounts", "Monthly review", "Close checklist"],
+      ["/admin/finance/rules?view=accounts", "Rules &amp; automation", 'data-finance-rule-id=']
     ];
     for (const [pathname, heading, marker] of nativeFinanceRoutes) {
       const route = await requestText(server.baseUrl, cookieJar, pathname);

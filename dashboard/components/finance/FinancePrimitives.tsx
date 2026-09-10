@@ -27,21 +27,13 @@ export type FinanceHueStyle = CSSProperties & {
   "--finance-hue-solid": string;
 };
 
+const JADE = { fg: "#0A5A36", tint: "#E8F5EE", border: "#80CCA8", solid: "#0E7848" };
+const BRONZE = { fg: "#6A5228", tint: "#F7F3E8", border: "#DDD0AF", solid: "#9A7840" };
 export const HUES: Readonly<Record<FinanceHue, FinanceHueTokens>> = {
-  neutral: { fg: "#71717a", tint: "#f4f4f5", border: "#d4d4d8", solid: "#71717a" },
-  green: { fg: "#15803d", tint: "#ecfdf3", border: "#bbf7d0", solid: "#22c55e" },
-  lime: { fg: "#4d7c0f", tint: "#f7fee7", border: "#d9f99d", solid: "#84cc16" },
-  yellow: { fg: "#a16207", tint: "#fefce8", border: "#fde68a", solid: "#eab308" },
-  orange: { fg: "#c2410c", tint: "#fff7ed", border: "#fed7aa", solid: "#f97316" },
-  brown: { fg: "#8a6238", tint: "#f5f0ea", border: "#dac8b3", solid: "#9a6b43" },
-  crimson: { fg: "#be123c", tint: "#fff1f2", border: "#fecdd3", solid: "#e11d48" },
-  pink: { fg: "#be185d", tint: "#fdf2f8", border: "#fbcfe8", solid: "#ec4899" },
-  purple: { fg: "#7e22ce", tint: "#faf5ff", border: "#e9d5ff", solid: "#a855f7" },
-  violet: { fg: "#6d28d9", tint: "#f5f3ff", border: "#ddd6fe", solid: "#8b5cf6" },
-  indigo: { fg: "#4f46e5", tint: "#eef2ff", border: "#c7d2fe", solid: "#6366f1" },
-  blue: { fg: "#2563eb", tint: "#eff6ff", border: "#bfdbfe", solid: "#3b82f6" },
-  cyan: { fg: "#0891b2", tint: "#ecfeff", border: "#a5f3fc", solid: "#06b6d4" },
-  teal: { fg: "#0f766e", tint: "#f0fdfa", border: "#99f6e4", solid: "#14b8a6" }
+  neutral: { fg: "#606A64", tint: "#F2F4F1", border: "#DCE3DD", solid: "#68756C" },
+  green: JADE, lime: JADE, teal: JADE, indigo: JADE, blue: JADE, cyan: JADE,
+  yellow: BRONZE, orange: BRONZE, brown: BRONZE, pink: BRONZE, purple: BRONZE, violet: BRONZE,
+  crimson: { fg: "#A33832", tint: "#FCF0EE", border: "#EAC3BC", solid: "#B64B43" }
 };
 
 export function hueStyle(hue: FinanceHue): FinanceHueStyle {
@@ -341,78 +333,4 @@ export interface CashflowChartProps {
   readonly ariaLabel?: string;
 }
 
-export function CashflowChart({ cashflow, summary, compact = false, ariaLabel }: CashflowChartProps) {
-  const { income, spend, savings, months } = cashflow;
-  const width = 920;
-  const height = compact ? 185 : 210;
-  const padX = 48;
-  const padY = 24;
-  const plotH = height - padY * 2;
-  const yMin = -4;
-  const yMax = 16;
-  const instanceId = useId().replace(/[^a-zA-Z0-9_-]/g, "");
-  const descriptionId = `finance-cashflow-summary-${instanceId}`;
-  const spendGradientId = `finance-spend-gradient-${instanceId}`;
-  const incomeGradientId = `finance-income-gradient-${instanceId}`;
-  const toPoints = (values: readonly number[]) => values
-    .map((value, index) => {
-      const x = padX + (index / Math.max(values.length - 1, 1)) * (width - padX - 12);
-      const y = padY + ((yMax - value) / (yMax - yMin)) * plotH;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(" ");
-  const spendPoints = toPoints(spend);
-  const incomePoints = toPoints(income);
-  const savingsPoints = toPoints(savings);
-  const spendArea = `${padX},${height - padY} ${spendPoints} ${width - 12},${height - padY}`;
-  const zeroY = padY + ((yMax - 0) / (yMax - yMin)) * plotH;
-  const chartLabel = ariaLabel || `Cashflow over ${months.length} months`;
-
-  return (
-    <div className={classNames("finance-chart", compact && "is-compact")}>
-      <svg
-        viewBox={`0 0 ${width} ${height}`}
-        preserveAspectRatio="none"
-        role="img"
-        aria-label={chartLabel}
-        aria-describedby={descriptionId}
-      >
-        <defs>
-          <linearGradient id={spendGradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#f97316" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#f97316" stopOpacity="0" />
-          </linearGradient>
-          <linearGradient id={incomeGradientId} x1="0" x2="0" y1="0" y2="1">
-            <stop offset="0%" stopColor="#14b8a6" stopOpacity="0.16" />
-            <stop offset="100%" stopColor="#14b8a6" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {[16, 12, 8, 4, 0, -4].map((tick) => {
-          const y = padY + ((yMax - tick) / (yMax - yMin)) * plotH;
-          return (
-            <g key={tick}>
-              <line className={tick === 0 ? "zero-line" : ""} x1={padX} x2={width - 12} y1={y} y2={y} />
-              <text x="12" y={y + 4}>{tick}k</text>
-            </g>
-          );
-        })}
-        <line className="savings-baseline" x1={padX} x2={width - 12} y1={zeroY} y2={zeroY} />
-        <polygon points={spendArea} fill={`url(#${spendGradientId})`} />
-        <polyline className="income-line" points={incomePoints} />
-        <polyline className="spend-line" points={spendPoints} />
-        <polyline className="savings-line" points={savingsPoints} />
-        {months.map((label, index) => (
-          <text
-            className="axis-month"
-            key={`${label}-${index}`}
-            x={padX + (index / Math.max(months.length - 1, 1)) * (width - padX - 12)}
-            y={height - 4}
-          >
-            {label}
-          </text>
-        ))}
-      </svg>
-      <p id={descriptionId} className="sr-only">{summary}</p>
-    </div>
-  );
-}
+export { default as CashflowChart } from "./FinanceCashflowChart";

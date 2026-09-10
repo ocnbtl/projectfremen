@@ -311,7 +311,7 @@ export function parseFinanceUrlState(searchParams: UrlSearchParamsInput): Financ
 }
 
 const FINANCE_FILTERS_BY_VIEW: Readonly<Record<FinanceView, readonly FinanceFilter[]>> = {
-  overview: [""],
+  overview: ["", "attention"],
   accounts: [""],
   transactions: ["", "unreviewed"],
   bills: ["", "due-week", "recurring"],

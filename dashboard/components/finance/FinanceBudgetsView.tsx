@@ -53,45 +53,21 @@ export default function FinanceBudgetsView({
 
   return (
     <>
-      <WorkspaceHeader
-        title="Budgets"
-        subtitle="Literal caps, spend, and remaining amounts; forecasting stays unavailable until its formula is approved"
-        actions={(
-          <>
-            <HeaderAction icon="Calendar" onClick={onOpenPeriodPreview}>Period preview</HeaderAction>
-            <HeaderAction icon="Filter" onClick={onOpenFilterPreview}>More filters</HeaderAction>
-          </>
-        )}
-      />
 
       <MetricStrip
         className={styles.metrics}
         ariaLabel="Budget scope metrics"
         items={[
-          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.sourceCount} native categories` },
-          { id: "spent", label: "Spent", value: money(model.totals.spent, { cents: true }), detail: "Derived current spending" },
-          { id: "cap", label: "Cap", value: money(model.totals.limit, { cents: true }), detail: "Visible literal caps" },
-          { id: "remaining", label: "Remaining", value: money(model.totals.remaining, { cents: true }), detail: `${percent(model.totals.usedPercent)} used`, tone: model.totals.remaining < 0 ? "danger" : "positive" },
-          { id: "over", label: "Over cap", value: model.counts.overBudget, detail: `${model.counts.atOrUnderBudget} at or under`, tone: model.counts.overBudget ? "danger" : "default" },
-          { id: "forecast", label: "Forecast", value: "Unavailable", detail: "No approved formula or connected source" }
+          { id: "spent", label: "Spent", value: money(model.totals.spent), detail: "Recorded expenses" },
+          { id: "cap", label: "Cap", value: money(model.totals.limit), detail: "Category limits" },
+          { id: "remaining", label: "Remaining", value: money(model.totals.remaining), detail: `${percent(model.totals.usedPercent)} used`, tone: model.totals.remaining < 0 ? "danger" : "positive" },
         ]}
       />
 
       <div className={styles.scopeBar}>
-        <label className={styles.search}>
-          <Icon name="Search" />
-          <span className="sr-only">Search budgets</span>
-          <input
-            aria-label="Search budgets"
-            value={model.query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search category, cap, spend, or remaining amount"
-          />
-        </label>
         <div className={styles.filterGroup} role="group" aria-label="Budget filters">
           <button type="button" className={styles.filterButton} data-active={filter === ""} aria-pressed={filter === ""} onClick={() => onFilterChange("")}>All</button>
           <button type="button" className={styles.filterButton} data-active={filter === "over-budget"} aria-pressed={filter === "over-budget"} onClick={() => onFilterChange("over-budget")}>Over cap</button>
-          <button type="button" className={styles.filterButton} onClick={onOpenFilterPreview}>More</button>
         </div>
         <label className={styles.sortLabel}>
           Sort
@@ -109,26 +85,6 @@ export default function FinanceBudgetsView({
           </select>
         </label>
       </div>
-
-      <Panel hue="teal" className={styles.accountInventory}>
-        <div className="finance-budget-summary">
-          <div>
-            <span>Visible spend / cap</span>
-            <strong>{money(model.totals.spent, { cents: true })} <em>/ {money(model.totals.limit, { cents: true })}</em></strong>
-          </div>
-          <Chip hue={model.totals.remaining < 0 ? "crimson" : "green"}>{percent(model.totals.usedPercent)} literal use</Chip>
-        </div>
-        <div className={styles.compactList}>
-          <div className={styles.compactRow}>
-            <span><strong>Remaining</strong><small>Cap minus spend across the visible scope</small></span>
-            <span className={`${styles.evidenceValue} ${model.totals.remaining >= 0 ? styles.positive : ""}`}>{money(model.totals.remaining, { cents: true })}</span>
-          </div>
-          <div className={styles.compactRow}>
-            <span><strong>Forecast</strong><small>No approved formula or durable forecast source</small></span>
-            <span className={styles.evidenceValue}>Unavailable</span>
-          </div>
-        </div>
-      </Panel>
 
       <ul className={`finance-budget-grid ${styles.semanticList}`} aria-label="Budget categories">
         {model.rows.map(({ budget, remaining, usedPercent, forecast }) => {
@@ -153,7 +109,7 @@ export default function FinanceBudgetsView({
                 <span>
                   <strong>{budget.category} {over ? <Chip hue="crimson">Over cap</Chip> : null}</strong>
                   <small>{money(budget.spent, { cents: true })} spent · {money(budget.limit, { cents: true })} cap</small>
-                  <small>{money(remaining, { cents: true })} remaining · forecast {forecast === null ? "unavailable" : forecast}</small>
+                  <small>{money(Math.abs(remaining), { cents: true })} {over ? "over budget" : "remaining"}</small>
                 </span>
                 <strong className={over ? "is-negative" : ""}>{percent(usedPercent)}</strong>
                 <Meter value={usedPercent ?? 0} hue={budget.hue} over={over} />
@@ -167,8 +123,8 @@ export default function FinanceBudgetsView({
         <SystemState
           variant="empty"
           className={styles.empty}
-          title="No budgets match this scope"
-          description="Clear the search or return to All. No cap or spend value was changed."
+          title={model.sourceCount ? "No matching budgets" : "Make a plan for this month"}
+          description={model.sourceCount ? "Try another category or return to All." : "Create a category budget to compare your spending with a monthly limit."}
           action={{ label: "Clear filters", onSelect: () => { onQueryChange(""); onFilterChange(""); } }}
         />
       )}

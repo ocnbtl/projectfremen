@@ -91,11 +91,11 @@ export function buildFinanceViewModel(dataset: FinanceDataset): FinanceViewModel
       reviewItems: dataset.reviewItems.length,
       reminders: dataset.reminders.length,
       linkedContext: dataset.linkedContext.length,
-      attention: dataset.snapshot.attentionItems.length,
+      attention: dataset.bills.filter(bill => bill.status !== "paid" && (bill.status === "overdue" || bill.dueIn < 0)).length + dataset.transactions.filter(transaction => transaction.status === "pending" || !transaction.ufInit).length + overBudget + dataset.reviewItems.filter(item => !item.done).length,
       dueThisWeek: dataset.bills.filter(
         (bill) => bill.status !== "overdue" && bill.status !== "paid" && bill.dueIn >= 0 && bill.dueIn <= 7
       ).length,
-      pendingTransactions: dataset.transactions.filter((transaction) => transaction.status === "pending").length,
+      pendingTransactions: dataset.transactions.filter((transaction) => transaction.status === "pending" || !transaction.ufInit).length,
       recurringBills: dataset.bills.filter((bill) => Boolean(bill.recurring)).length,
       linkedProjects: dataset.linkedContext.filter((item) => item.type === "Project").length,
       overBudget,

@@ -61,6 +61,8 @@ export interface FinanceBill {
 }
 
 export interface FinanceTransaction {
+  /** ISO date retained for chronological sorting, independent of import order. */
+  occurredOn?: string;
   id: string;
   date: string;
   quarter: "Q1" | "Q2" | "Q3" | "Q4";

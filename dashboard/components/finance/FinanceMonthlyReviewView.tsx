@@ -75,46 +75,21 @@ export default function FinanceMonthlyReviewView({
 
   return (
     <>
-      <WorkspaceHeader
-        title="Monthly Review"
-        subtitle="Finance owns the monthly close; Reviews coordinates through linked references"
-        actions={(
-          <>
-            <HeaderAction icon="Link" onClick={onOpenReviews}>Open Reviews</HeaderAction>
-            <HeaderAction icon="Filter" onClick={onOpenFilterPreview}>More filters</HeaderAction>
-            <HeaderAction icon="Check" primary disabled title={closeReason}>Close gate</HeaderAction>
-          </>
-        )}
-      />
 
       <MetricStrip
         className={styles.metrics}
         ariaLabel="Monthly close literal metrics"
         items={[
-          { id: "complete", label: "Complete", value: overallComplete, detail: `${model.sourceCount} literal checklist items`, tone: "positive" },
+          { id: "complete", label: "Complete", value: overallComplete, detail: `${model.sourceCount} review checks`, tone: "positive" },
           { id: "open", label: "Open", value: overallOpen, detail: "Each required open item blocks close", tone: overallOpen ? "attention" : "default" },
-          { id: "visible", label: "Visible", value: model.visibleCount, detail: `${model.visibleCompletion.complete} complete · ${model.visibleCompletion.open} open in current scope` },
-          { id: "actual-savings", label: "Actual savings movement", value: money(model.savings.actualSnapshotMovement.amount, { sign: true, cents: true }), detail: "Native first-class movement facts", tone: "positive" },
-          { id: "proposal", label: "Savings proposals", value: model.savings.proposalReminders.rows.length, detail: "Reminder candidates; not persisted movement" },
-          { id: "readiness", label: "Readiness score", value: "Not calculated", detail: "No approved weighted formula" }
+          { id: "actual-savings", label: "Actual savings movement", value: money(model.savings.actualSnapshotMovement.amount, { sign: true, cents: true }), detail: "Recorded savings transfers", tone: "positive" },
         ]}
       />
 
       <div className={styles.scopeBar}>
-        <label className={styles.search}>
-          <Icon name="Search" />
-          <span className="sr-only">Search close checklist</span>
-          <input
-            aria-label="Search close checklist"
-            value={model.query}
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="Search close checklist labels or IDs"
-          />
-        </label>
         <div className={styles.filterGroup} role="group" aria-label="Monthly review filters">
           <button type="button" className={styles.filterButton} data-active={filter === ""} aria-pressed={filter === ""} onClick={() => onFilterChange("")}>All</button>
           <button type="button" className={styles.filterButton} data-active={filter === "incomplete"} aria-pressed={filter === "incomplete"} onClick={() => onFilterChange("incomplete")}>Open</button>
-          <button type="button" className={styles.filterButton} onClick={onOpenFilterPreview}>More</button>
         </div>
         <label className={styles.sortLabel}>
           Sort
@@ -167,8 +142,8 @@ export default function FinanceMonthlyReviewView({
             <SystemState
               variant="empty"
               className={styles.empty}
-              title="No checklist items match this scope"
-              description="Clear the search or return to All. No close state was changed."
+              title={model.sourceCount ? "No matching checks" : "Start your monthly review"}
+              description={model.sourceCount ? "Try another search or return to All." : "Use Start close to create the checklist for your month."}
               action={{ label: "Clear filters", onSelect: () => { onQueryChange(""); onFilterChange(""); } }}
             />
           )}
@@ -176,12 +151,12 @@ export default function FinanceMonthlyReviewView({
 
         <div className="finance-side-stack">
           <Panel hue="teal">
-            <div className="finance-panel-heading"><h2>Savings evidence <span>movement versus proposal</span></h2></div>
+            <div className="finance-panel-heading"><h2>Savings this month</h2></div>
             <div className={styles.compactList}>
               <div className={styles.compactRow}>
                 <span>
-                  <strong>Actual snapshot movement</strong>
-                  <small>Current first-class movement total for the selected close period</small>
+                  <strong>Net savings moved</strong>
+                  <small>Recorded deposits minus withdrawals for this review period</small>
                 </span>
                 <span className={`${styles.evidenceValue} ${styles.positive}`}>{money(model.savings.actualSnapshotMovement.amount, { sign: true, cents: true })}</span>
               </div>
@@ -211,14 +186,14 @@ export default function FinanceMonthlyReviewView({
           </Panel>
 
           <Panel hue="orange">
-            <div className="finance-panel-heading"><h2>Close boundary</h2></div>
+            <div className="finance-panel-heading"><h2>Finish the month</h2></div>
             <div className={styles.compactList}>
               <div className={styles.compactRow}>
-                <span><strong>Required blockers</strong><small>Open named checklist items; no decorative readiness percentage</small></span>
+                <span><strong>Checks remaining</strong><small>Open a check to add evidence and update its status.</small></span>
                 <span className={styles.evidenceValue}>{overallOpen}</span>
               </div>
               <div className={styles.compactRow}>
-                <span><strong>Close persistence</strong><small>Completion, audit, carry-forward, and reopen behavior remain unresolved</small></span>
+                <span><strong>Monthly close</strong><small>Complete the required checks, then close the month using the action above.</small></span>
                 <Chip hue={overallOpen ? "yellow" : "green"}>{overallOpen ? "Open" : "Resolved"}</Chip>
               </div>
             </div>

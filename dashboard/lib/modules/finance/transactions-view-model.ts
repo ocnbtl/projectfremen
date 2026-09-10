@@ -7,6 +7,7 @@ import type {
 
 export type FinanceTransactionsFilter =
   | "all"
+  | "unreviewed"
   | "pending"
   | "cleared"
   | "income"
@@ -72,7 +73,8 @@ const DEFAULT_SORT: FinanceTransactionsSort = "date-desc";
 
 function normalizeFilter(value: string | undefined): FinanceTransactionsFilter {
   if (
-    value === "pending"
+    value === "unreviewed"
+    || value === "pending"
     || value === "cleared"
     || value === "income"
     || value === "expense"
@@ -100,6 +102,7 @@ function normalizeSort(value: string | undefined): FinanceTransactionsSort {
 
 function matchesFilter(transaction: FinanceTransaction, filter: FinanceTransactionsFilter): boolean {
   if (filter === "all") return true;
+  if (filter === "unreviewed") return transaction.status === "pending" || !transaction.ufInit;
   if (filter === "pending" || filter === "cleared") return transaction.status === filter;
   if (filter === "reimbursable") return transaction.reimbursable;
   if (filter === "receipt-missing") return !transaction.receipt.trim();
@@ -152,7 +155,9 @@ export function buildFinanceTransactionsViewModel(
     .filter(({ transaction }) => matchesFilter(transaction, filter))
     .filter(({ transaction }) => !query || transactionSearchText(transaction).includes(query))
     .sort((left, right) => {
-      if (sort === "date-asc") return right.sourceIndex - left.sourceIndex;
+      if (sort === "date-asc") return left.transaction.occurredOn && right.transaction.occurredOn
+        ? left.transaction.occurredOn.localeCompare(right.transaction.occurredOn) || left.sourceIndex - right.sourceIndex
+        : right.sourceIndex - left.sourceIndex;
       if (sort === "amount-desc") {
         return right.transaction.amount - left.transaction.amount || left.sourceIndex - right.sourceIndex;
       }
@@ -163,7 +168,9 @@ export function buildFinanceTransactionsViewModel(
         return left.transaction.merchant.localeCompare(right.transaction.merchant)
           || left.sourceIndex - right.sourceIndex;
       }
-      return left.sourceIndex - right.sourceIndex;
+      return left.transaction.occurredOn && right.transaction.occurredOn
+        ? right.transaction.occurredOn.localeCompare(left.transaction.occurredOn) || left.sourceIndex - right.sourceIndex
+        : left.sourceIndex - right.sourceIndex;
     });
   const rows = visibleWithSourceOrder.map(({ transaction }) => transaction);
   const hasRequestedSelection = input.selectedId !== undefined;

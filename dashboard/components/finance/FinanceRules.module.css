@@ -4,6 +4,41 @@
   grid-template-columns: repeat(5, minmax(0, 1fr));
 }
 
+.scopeBar.scopeBar { width: 100%; grid-template-columns: auto auto minmax(0,1fr); padding: 0; margin-bottom: 20px; border: 0; background: transparent; gap: 10px; }
+.scopeBar .sortLabel { justify-self: end; font-weight: 500; }
+.scopeBar .sortLabel { width: auto; }
+.scopeBar .sortLabel select { width: auto; }
+.scopeBar > button { width: auto; align-self: start; }
+.scopeBar .filterGroup > button { width: auto; flex: 0 0 auto; }
+.scopeBar .filterGroup { flex-wrap: wrap; overflow: visible; }
+.filterButton.filterButton,.auditButton.auditButton,.sortLabel.sortLabel select { min-height: 40px; border-radius: 8px; font-size: 12px; font-weight: 500; }
+.filterButton.filterButton[data-active="true"] { border-color: var(--module-primary-200); box-shadow: none; color: var(--module-primary-700); }
+.ledger.ledger { width: 100%; }
+.semanticList.semanticList { min-width: 0; }
+.columnHeader.columnHeader,.ruleRow.ruleRow { grid-template-columns: minmax(170px,1.4fr) minmax(170px,1fr) minmax(150px,1fr) 110px 95px; min-width: 790px; }
+.columnHeader > :nth-child(2),.columnHeader > :nth-child(3),.columnHeader > :nth-child(7),.columnHeader > :nth-child(9),.columnHeader > :nth-child(10),
+.ruleRow > :nth-child(2),.ruleRow > :nth-child(3),.ruleRow > :nth-child(7),.ruleRow > :nth-child(9),.ruleRow > :nth-child(10) { display: none; }
+.columnHeader.columnHeader { font: 500 11px "Inter Variable",sans-serif; text-transform: none; letter-spacing: 0; }
+.ruleRow.ruleRow { min-height: 86px; }
+.primaryCell.primaryCell strong,.secondaryCell.secondaryCell strong { font-size: 12px; font-weight: 550; }
+.primaryCell.primaryCell small,.secondaryCell.secondaryCell small { font-family: "Inter Variable",sans-serif; font-size: 10px; }
+.ruleRow .primaryCell small { display: none; }
+.ledgerToolbar.ledgerToolbar { padding: 16px 18px; }
+.ledgerToolbar.ledgerToolbar span,.ledgerToolbar.ledgerToolbar code { font: 400 11px "Inter Variable",sans-serif; }
+.ledgerToolbar.ledgerToolbar > div:last-child > span { display: none; }
+@media(max-width:760px) {
+  .filterButton.filterButton,.auditButton.auditButton,.sortLabel.sortLabel select { min-height: 44px; }
+  .scopeBar.scopeBar { grid-template-columns: auto auto; }
+  .scopeBar .sortLabel { grid-column: 1 / -1; justify-self: stretch; }
+  .columnHeader.columnHeader { display: none; }
+  .ruleRow.ruleRow { grid-template-columns: minmax(0,1fr) auto; min-width: 0; padding: 18px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; margin: 0; }
+  .ruleRow.ruleRow > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .ruleRow.ruleRow > :nth-child(4) { grid-column: 1; grid-row: 2; }
+  .ruleRow.ruleRow > :nth-child(5) { grid-column: 1; grid-row: 3; }
+  .ruleRow.ruleRow > :nth-child(6) { grid-column: 2; grid-row: 1; }
+  .ruleRow.ruleRow > :nth-child(8) { grid-column: 2; grid-row: 2; }
+}
+
 .metrics :global(.metric-strip__item) {
   min-height: 76px;
 }

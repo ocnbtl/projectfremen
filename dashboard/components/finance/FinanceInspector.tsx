@@ -285,7 +285,7 @@ export default function FinanceInspector({
           identity={initials(objectTitle)}
           states={<>{stateChip}<Chip hue="green">Native</Chip></>}
           metadata={accountRow
-            ? `${money(accountRow.account.balance, { cents: true })} · ${accountRow.account.delta30 >= 0 ? "+" : ""}${accountRow.account.delta30}% over 30d`
+            ? `${money(accountRow.account.balance, { cents: true })} · recorded balance`
             : transaction
               ? money(transaction.amount, { sign: true, cents: true })
               : billRow
@@ -387,19 +387,19 @@ export default function FinanceInspector({
           <DetailTabPanel tabsId="finance-object-tabs" tabId="overview" active={safeTab === "overview"} className={styles.inspectorPanel}>
             <div className={styles.factGrid}>
               <div><span>Current balance</span><strong>{money(accountRow.account.balance, { cents: true })}</strong></div>
-              <div><span>30-day delta</span><strong>{accountRow.account.delta30 >= 0 ? "+" : ""}{accountRow.account.delta30}%</strong></div>
+              <div><span>Balance as of</span><strong>{financeState.accounts.find(item => item.id === accountRow.account.id)?.balanceAsOf.slice(0, 10) || "Not recorded"}</strong></div>
               <div><span>Matched transactions</span><strong>{accountRow.activity.transactions.length}</strong></div>
               <div><span>Matched bills</span><strong>{accountRow.activity.bills.length}</strong></div>
-              <div><span>Available balance</span><strong>Not recorded</strong></div>
-              <div><span>Import health</span><strong>Not calculated</strong></div>
+              <div><span>Balance source</span><strong>{financeState.accounts.find(item => item.id === accountRow.account.id)?.balanceSource || "Not recorded"}</strong></div>
+              <div><span>Imports</span><strong>{financeState.importBatches.filter(item => item.accountId === accountRow.account.id).length}</strong></div>
             </div>
             <section className={styles.inspectorSection}>
-              <h3>Native account activity</h3>
-              <p>{accountRow.activity.transactions.length} transactions and {accountRow.activity.bills.length} bills resolve to this account through immutable Finance IDs.</p>
+              <h3>Account activity</h3>
+              <p>{accountRow.activity.transactions.length} transactions and {accountRow.activity.bills.length} bills are linked to this account. Open a tab above to review them.</p>
             </section>
             <div className={styles.boundary}>
-              <strong>Explicit balance boundary</strong>
-              <span>Transfers, savings movements, and imports persist with audit history, but none silently rewrites this account’s balance snapshot.</span>
+              <strong>About this balance</strong>
+              <span>Transactions and imports do not update this recorded balance. Use Update balance when you have a newer statement or account balance.</span>
             </div>
             <a className={styles.compactRow} href={getModuleViewRoute("finance", "review")}>
               <span><strong>Finance Monthly Review</strong><small>Finance owns monthly close; this account is not yet durably linked</small></span>
@@ -454,7 +454,7 @@ export default function FinanceInspector({
               <div><span>Mask</span><strong>{accountRow.account.mask}</strong></div>
               <div><span>Kind</span><strong>{accountRow.account.kind}</strong></div>
               <div><span>Current balance</span><strong>{money(accountRow.account.balance, { cents: true })}</strong></div>
-              <div><span>30-day delta</span><strong>{accountRow.account.delta30}%</strong></div>
+              <div><span>Balance history</span><strong>Comparison unavailable</strong></div>
               <div><span>Persistence</span><strong>Native Finance store</strong></div>
             </div>
           </DetailTabPanel>
