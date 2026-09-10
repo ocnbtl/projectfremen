@@ -79,6 +79,19 @@ function MappingSelect({ label, name, headers }: { label: string; name: string; 
 }
 
 function EditFields({ state, selection, record }: { state: FinanceState; selection: Selection; record: Record<string, unknown> }) {
+  if (selection?.kind === "account" && record.bankLink) return <>
+    <p>The bank supplies the balance, type and currency. Sync the connection to retrieve updates.</p>
+    <Field label="Account name" name="name" defaultValue={String(record.name || "")} required maxLength={160} />
+    <Field label="Institution" name="institution" defaultValue={String(record.institution || "")} maxLength={160} />
+    <Field label="Last four digits" name="mask" defaultValue={String(record.mask || "")} maxLength={4} />
+  </>;
+  if (selection?.kind === "transaction" && (record.source as { kind?: string })?.kind === "plaid") return <>
+    <p>The bank supplies this entry’s date, amount and posting status. Your notes and category are preserved when it syncs.</p>
+    <Field label="Merchant or source" name="merchant" defaultValue={String(record.merchant || "")} required maxLength={240} />
+    <Field label="Category" name="category" defaultValue={String(record.category || "Uncategorized")} required maxLength={160} />
+    <Field label="Memo" name="memo" defaultValue={String(record.memo || "")} maxLength={1000} />
+    <label><span>Reviewed</span><input name="reviewed" type="checkbox" defaultChecked={Boolean(record.reviewed)} /></label>
+  </>;
   if (selection?.kind === "account") return <>
     <Field label="Account name" name="name" defaultValue={String(record.name || "")} required maxLength={160} />
     <Select label="Type" name="kind" defaultValue={String(record.kind || "Checking")}>{["Checking", "Savings", "Credit", "Brokerage", "Cash", "Business"].map((item) => <option key={item}>{item}</option>)}</Select>
@@ -313,7 +326,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
       if (selection.kind === "bill") fields.autopay = form.has("autopay");
       result = await repository.patch({ kind: selection.kind, id: selection.id, expectedUpdatedAt: record.updatedAt, action: "update", fields });
     } else if (operation === "transaction_review" && selection && record) {
-      result = await repository.patch({ kind: selection.kind, id: selection.id, expectedUpdatedAt: record.updatedAt, action: "update", fields: { reviewed: true, status: "cleared" } });
+      result = await repository.patch({ kind: selection.kind, id: selection.id, expectedUpdatedAt: record.updatedAt, action: "update", fields: { reviewed: true, ...((record.source as { kind?: string })?.kind === "plaid" ? {} : { status: "cleared" }) } });
     } else if (operation === "payment" && selection && record) {
       const evidenceObjectId = value(form, "evidenceObjectId");
       result = await repository.patch({

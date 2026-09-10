@@ -299,7 +299,7 @@ export default function FinanceInspector({
       footer={<div className={styles.inspectorFooter}>
         {accountSelection && <WorkbenchActions>
           <WorkbenchAction onClick={() => onOperation("edit", accountSelection)}>Edit account</WorkbenchAction>
-          <WorkbenchAction onClick={() => onOperation("balance", accountSelection)}>Update balance</WorkbenchAction>
+          {!financeState.accounts.find(item => item.id === accountSelection.id)?.bankLink && <WorkbenchAction onClick={() => onOperation("balance", accountSelection)}>Update balance</WorkbenchAction>}
           <WorkbenchAction onClick={() => onOperation("transaction", accountSelection)}>Add transaction</WorkbenchAction>
           <WorkbenchAction primary onClick={() => onOperation("import", accountSelection)}>Import CSV</WorkbenchAction>
           <WorkbenchAction onClick={() => onOperation("archive", accountSelection)}>Archive</WorkbenchAction>
@@ -422,7 +422,7 @@ export default function FinanceInspector({
           </DetailTabPanel>
 
           <DetailTabPanel tabsId="finance-object-tabs" tabId="reconcile" active={safeTab === "reconcile"} className={styles.inspectorPanel}>
-            <WorkbenchActions><WorkbenchAction onClick={() => onOperation("balance", accountSelection!)}>Update balance</WorkbenchAction></WorkbenchActions>
+            {!financeState.accounts.find(item => item.id === accountSelection?.id)?.bankLink && <WorkbenchActions><WorkbenchAction onClick={() => onOperation("balance", accountSelection!)}>Update balance</WorkbenchAction></WorkbenchActions>}
             {accountUnreconciled.length ? <div className={styles.compactList}>{accountUnreconciled.map((item) => <article className={styles.workbenchRow} key={item.id}>
               <span><strong>{item.merchant}</strong><small>{item.occurredOn} · {item.category || "Uncategorized"}</small></span>
               <span>{money(item.direction === "expense" ? -item.amount : item.amount, { sign: true, cents: true })}</span>

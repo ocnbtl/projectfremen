@@ -31,3 +31,7 @@ vault-companion/data/
 vault-companion/backups/
 *.sqlite3-wal
 *.sqlite3-shm
+
+# Encrypted banking runtime belongs in the durable server store, never a release bundle.
+**/finance-banking-production.json
+**/finance-banking-sandbox.json

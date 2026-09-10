@@ -62,7 +62,8 @@ export function financeAccountSignedBalance(kind: FinanceAccount["kind"], balanc
 
 function accountRows(state: FinanceState): FinanceAccount[] {
   return active(state.accounts).map((item, index) => {
-    const balance = financeAccountSignedBalance(item.kind, item.currentBalance);
+    // Plaid credit balances already distinguish amounts owed from card overpayments.
+    const balance = item.balanceSource === "plaid" && item.kind === "Credit" ? -item.currentBalance : financeAccountSignedBalance(item.kind, item.currentBalance);
     return {
       id: item.id,
       name: item.name,

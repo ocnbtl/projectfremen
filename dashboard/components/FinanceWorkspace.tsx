@@ -388,6 +388,9 @@ export default function FinanceWorkspace({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const [inspectorDismissed, setInspectorDismissed] = useState(false);
   const [utility, setUtility] = useState<FinanceUtility | null>(null);
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).has("oauth_state_id")) setUtility("settings");
+  }, []);
   const [query, setQuery] = useState(initialUrlState.query);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const aiButtonRef = useRef<HTMLButtonElement>(null);
@@ -878,6 +881,7 @@ export default function FinanceWorkspace({
               />
           : showContext
             ? <FinanceUtilityRail utility={utility!} state={financeState} onClose={() => setUtility(null)} onView={navigateView}
+                onBankChanged={async () => { const refreshed = await createFinanceRepository().readState(); if (refreshed.ok) setFinanceState(refreshed.data); else throw new Error(refreshed.error.message); }}
                 onCategory={(category) => { setUtility(null); setView("transactions"); setSelectedAccountId(""); setSelectedTxnId(""); setSelectedSecondaryId(""); setSmartFilter(""); setSort("default"); setTab("overview"); setCheckedTxnIds(new Set()); setInspectorOpen(false); setQuery(category); updateFinanceUrl({ view: "transactions", query: category, filter: "", selected: "", tab: "overview", sort: "default" }, { history: "push" }); }}
                 onImport={() => { setUtility(null); setOperationTarget(null); setOperation(accounts.length ? "import" : "account"); }} />
             : undefined
@@ -929,7 +933,7 @@ export default function FinanceWorkspace({
           hasAccounts={financeState.accounts.some((item) => !item.archivedAt)}
           closeStatus={activeClose?.status || "none"}
           onOperation={(nextOperation) => { setOperationTarget(null); setOperation(nextOperation); }}
-        /><button type="button" className="finance-action finance-activity-trigger" onClick={() => { setAiOpen(false); setUtility("activity"); }} aria-label="Recent activity" title="Recent activity" aria-expanded={utility === "activity"}><UnigentamosIcon role="clock" /><span>Activity</span></button><button ref={aiButtonRef} type="button" className="finance-action finance-assistant-trigger" aria-label={aiOpen ? "Close AI assistant" : "Open AI assistant"} aria-expanded={aiOpen} title="Finance assistant" onClick={() => { setAiOpen(!aiOpen); setUtility(null); setInspectorOpen(false); updateFinanceUrl({ ai: !aiOpen }, { native: true }); }}><Icon name="Sparkles" /></button></div>
+        />{view === "accounts" && <button type="button" className="finance-action" onClick={() => { setAiOpen(false); setInspectorOpen(false); setUtility("settings"); }}><Icon name="Link" />Bank connections</button>}<button type="button" className="finance-action finance-activity-trigger" onClick={() => { setAiOpen(false); setUtility("activity"); }} aria-label="Recent activity" title="Recent activity" aria-expanded={utility === "activity"}><UnigentamosIcon role="clock" /><span>Activity</span></button><button ref={aiButtonRef} type="button" className="finance-action finance-assistant-trigger" aria-label={aiOpen ? "Close AI assistant" : "Open AI assistant"} aria-expanded={aiOpen} title="Finance assistant" onClick={() => { setAiOpen(!aiOpen); setUtility(null); setInspectorOpen(false); updateFinanceUrl({ ai: !aiOpen }, { native: true }); }}><Icon name="Sparkles" /></button></div>
         </header>
         <div className="finance-search-row"><label className="finance-global-search"><Icon name="Search" /><input type="search" aria-label={view === "overview" ? "Search finance" : view === "bills" ? "Search bills and subscriptions" : view === "review" ? "Search monthly review" : `Search ${view}`} value={query} placeholder={view === "overview" ? "Search accounts, transactions, bills and budgets" : `Search ${activeView.label.toLowerCase()}`} onChange={(event) => { setQuery(event.target.value); setCheckedTxnIds(new Set()); setInspectorDismissed(false); updateFinanceUrl({ query: event.target.value }, { native: true }); }} /></label></div>
 

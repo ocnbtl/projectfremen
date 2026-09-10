@@ -256,3 +256,31 @@
   .finance-module-shell > .inspector-rail { top: 0; width: min(420px,100vw); }
 }
 @media(prefers-reduced-motion:reduce) { .finance-module-shell * { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+.finance-bank-connections { display: grid; gap: 14px; min-width: 0; padding: 24px; }
+.finance-module-shell .finance-utility-rail { flex-direction: column; }
+.finance-utility-rail > .inspector-rail__header { flex: 0 0 auto; }
+.finance-module-shell > .finance-utility-rail > .inspector-rail__content { width: 100%; min-width: 0; overflow-x: hidden; }
+.finance-module-shell > .finance-utility-rail .inspector-rail__content > .finance-action { width: auto; max-width: calc(100% - 48px); }
+.finance-bank-connections .finance-utility-intro { padding: 0; }
+.finance-bank-heading { display: flex; align-items: center; gap: 12px; }
+.finance-bank-heading h3, .finance-bank-heading p, .finance-bank-card p { margin: 0; }
+.finance-bank-heading h3, .finance-bank-review h3 { font-size: 15px; font-weight: 650; }
+.finance-bank-heading p, .finance-bank-footnote { font-size: 12px; line-height: 1.6; color: var(--text-muted); }
+.finance-bank-plan { margin: 0; font-size: 12px; font-weight: 600; color: var(--module-accent); }
+.finance-bank-card { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--border); min-width: 0; }
+.finance-bank-card-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.finance-bank-card-heading strong { overflow-wrap: anywhere; font-size: 14px; }
+.finance-bank-card-heading > span { font-size: 11px; white-space: nowrap; color: var(--text-muted); }
+.finance-bank-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; }
+.finance-bank-actions button, .finance-bank-review button { white-space: normal; text-align: left; }
+.finance-bank-matching { display: grid; gap: 16px; font-size: 13px; line-height: 1.6; }
+.finance-bank-matching > p { color: var(--text-muted); }
+.finance-bank-matching label { display: grid; gap: 5px; min-width: 0; }
+.finance-bank-matching small { color: var(--text-muted); }
+.finance-bank-matching select { width: 100%; min-width: 0; min-height: 42px; padding: 9px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.finance-bank-confirm { padding: 14px; border: 1px solid var(--border); border-radius: 10px; display: grid; gap: 12px; font-size: 13px; line-height: 1.6; }
+.finance-bank-notice { font-size: 13px; line-height: 1.6; color: var(--module-accent); }
+.finance-bank-error { font-size: 13px; line-height: 1.6; color: var(--danger, #b4533c); overflow-wrap: anywhere; }
+.finance-bank-review { font-size: 13px; line-height: 1.6; }
+.finance-bank-account-list { padding-left: 18px; margin: 0; font-size: 13px; line-height: 1.8; }
+.finance-bank-connections button:disabled { opacity: .5; cursor: not-allowed; }

@@ -4,14 +4,15 @@ import type { FinanceState } from "../../lib/modules/finance/native-types";
 import type { FinanceView } from "../../lib/native-objects/url-state";
 import InspectorRail from "../admin-shell/InspectorRail";
 import { Icon, money } from "./FinancePrimitives";
+import FinanceBankConnections from "./FinanceBankConnections";
 
 export type FinanceUtility = "activity" | "data" | "categories" | "settings";
 const titles = { activity: "Recent activity", data: "Accounts data", categories: "Categories", settings: "Finance settings" };
 const date = (value: string) => new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default function FinanceUtilityRail({ utility, state, onClose, onView, onCategory, onImport }: {
+export default function FinanceUtilityRail({ utility, state, onClose, onView, onCategory, onImport, onBankChanged }: {
   utility: FinanceUtility; state: FinanceState; onClose: () => void; onView: (view: FinanceView) => void;
-  onCategory: (category: string) => void; onImport: () => void;
+  onCategory: (category: string) => void; onImport: () => void; onBankChanged: () => Promise<void>;
 }) {
   const accounts = state.accounts.filter(item => !item.archivedAt);
   const transactions = state.transactions.filter(item => !item.archivedAt);
@@ -34,6 +35,6 @@ export default function FinanceUtilityRail({ utility, state, onClose, onView, on
     </>}
     {utility === "data" && <><p className="finance-utility-intro">Balance dates and sources for your recorded accounts.</p>{accounts.map(account => <div className="finance-utility-record" key={account.id}><strong>{account.name}</strong><p>{account.institution || "Manual account"}{account.mask ? ` · ${account.mask}` : ""}</p><dl><dt>Balance</dt><dd>{money(account.currentBalance, { cents: true })}</dd><dt>As of</dt><dd>{account.balanceAsOf.slice(0, 10)}</dd><dt>Source</dt><dd>{account.balanceSource}</dd><dt>Scope</dt><dd>{account.entityScope} · {account.currency}</dd></dl></div>)}{!accounts.length && <p className="finance-inline-empty">No accounts recorded yet.</p>}<button className="finance-text-action" onClick={() => onView("accounts")}>Manage accounts ↗</button></>}
     {utility === "categories" && <><p className="finance-utility-intro">Categories used by your transactions, bills and budgets. Choose one to search the ledger.</p><div className="finance-category-list">{categories.map(category => <button key={category} onClick={() => onCategory(category)}><span>{category}</span><small>{transactions.filter(item => item.category === category).length} transactions</small><Icon name="Chevron" /></button>)}</div>{!categories.length && <p className="finance-inline-empty">Choose a category when you record a transaction or create a budget.</p>}<button className="finance-text-action" onClick={() => onView("budgets")}>Manage category budgets ↗</button></>}
-    {utility === "settings" && <><p className="finance-utility-intro">Your current Finance setup</p><div className="finance-utility-record"><dl><dt>Currency</dt><dd>US dollar (USD)</dd><dt>Accounts</dt><dd>Manual records</dd><dt>Transaction imports</dt><dd>CSV statements</dd><dt>Bank connections</dt><dd>Not connected</dd><dt>Last saved</dt><dd>{state.updatedAt ? date(state.updatedAt) : "No changes yet"}</dd></dl></div><p className="finance-utility-intro">Balances use the date and source you record. Import a statement to add transactions, then review and categorize them in the ledger.</p><button className="finance-action" onClick={onImport}><Icon name="Link" />Import a statement</button></>}
+    {utility === "settings" && <><FinanceBankConnections state={state} onChanged={onBankChanged} /><h3 className="finance-utility-heading">Finance preferences</h3><div className="finance-utility-record"><dl><dt>Currency</dt><dd>US dollar (USD)</dd><dt>Last saved</dt><dd>{state.updatedAt ? date(state.updatedAt) : "No changes yet"}</dd></dl></div><button className="finance-action" onClick={onImport}><Icon name="Link" />Import a statement</button></>}
   </InspectorRail>;
 }

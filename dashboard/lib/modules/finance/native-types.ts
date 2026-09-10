@@ -1,4 +1,5 @@
 import type { NativeObjectRef } from "../../native-objects/types";
+import type { BankReview } from "./banking-types";
 import type {
   FinanceAccountKind,
   FinanceBillStatus,
@@ -42,13 +43,16 @@ export interface FinanceAccountRecord extends FinanceRecordBase {
   mask: string;
   currentBalance: number;
   balanceAsOf: string;
-  balanceSource: "manual" | "imported";
+  balanceSource: "manual" | "imported" | "plaid";
+  bankLink?: { connectionId: string; accountId: string };
+  balanceRetrievedAt?: string;
   currency: FinanceCurrency;
   entityScope: FinanceEntityScope;
 }
 
 export interface FinanceTransactionSource {
-  kind: "manual" | "csv_import" | "transfer";
+  kind: "manual" | "csv_import" | "transfer" | "plaid";
+  bank?: { connectionId: string; transactionId: string; pendingId?: string; merchant: string; category: string };
   importBatchId?: string;
   sourceRowFingerprint?: string;
   sourceFilename?: string;
@@ -239,6 +243,7 @@ export interface FinanceIdempotencyRecord {
 }
 
 export interface FinanceState {
+  bankReviews?: BankReview[];
   schemaVersion: typeof FINANCE_SCHEMA_VERSION;
   updatedAt: string | null;
   accounts: FinanceAccountRecord[];
