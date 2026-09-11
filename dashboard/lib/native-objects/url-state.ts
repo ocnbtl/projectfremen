@@ -86,6 +86,7 @@ const PEOPLE_SIDEBARS = [
   "everyone",
   "all",
   "organizations",
+  "interactions",
   "starred",
   "recent",
   "upcoming",

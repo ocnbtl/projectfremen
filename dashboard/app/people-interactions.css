@@ -1,0 +1,61 @@
+/* Interaction history uses the existing People shell and orange/olive tokens. */
+.people-redesign-shell.is-interactions { grid-template-columns: 220px minmax(0, 1fr); }
+.people-redesign-shell.is-interactions .people-directory-panel { grid-column: 2; min-width: 0; }
+.people-interactions-workspace { min-width: 0; }
+.people-interactions-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.people-interactions-tools .people-primary-search { flex: 1 1 260px; min-width: 0; }
+.people-interactions-tools .people-primary-search input { min-width: 0; width: 100%; }
+.people-interactions-tools > label { display: flex; width: auto; flex: 0 0 auto; align-items: center; gap: 8px; color: var(--text-body); font-size: 12px; }
+.people-interactions-tools select { width: auto; min-height: 42px; padding: 8px 28px 8px 10px; border: 1px solid var(--border-soft); border-radius: 8px; color: var(--text-strong); background: var(--surface-panel); font: inherit; }
+.people-interactions-count { color: var(--text-body); font-size: 12px; margin: 16px 0 24px; }
+.people-interaction-groups > section + section { margin-top: 32px; }
+.people-interaction-groups h2 { margin: 0 0 8px; color: var(--text-strong); font-size: 15px; font-weight: 650; }
+.people-interaction-groups ul { list-style: none; margin: 0; padding: 0; }
+.people-interaction-groups li { border-bottom: 1px solid var(--border-soft); }
+.people-redesign-shell .people-interaction-row { display: grid; grid-template-columns: 88px minmax(0, 1fr) 90px 18px; gap: 20px; align-items: start; width: 100%; border: 0; border-radius: 8px; padding: 18px 12px; background: transparent; box-shadow: none; color: var(--text-body); text-align: left; font-weight: 400; }
+.people-redesign-shell .people-interaction-row:hover { background: var(--module-quiet); }
+.people-interaction-row-date { display: grid; gap: 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.people-interaction-row-date small { font-size: 11px; }
+.people-interaction-row-main { min-width: 0; display: grid; gap: 5px; }
+.people-interaction-row-main strong { color: var(--text-strong); font-size: 15px; line-height: 1.45; font-weight: 650; overflow-wrap: anywhere; }
+.people-interaction-row-main > span { color: var(--text-body); font-size: 12px; overflow-wrap: anywhere; }
+.people-interaction-row-main p { margin: 3px 0 0; max-width: 72ch; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.65; white-space: pre-wrap; color: var(--text-body); overflow-wrap: anywhere; }
+.people-interaction-type { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--module-icon); }
+.people-interaction-row > svg { color: var(--module-icon); margin-top: 3px; }
+.people-interactions-more { display: block; width: auto; margin: 24px auto; min-height: 44px; background: var(--surface-panel); border: 1px solid var(--border-soft); border-radius: 8px; color: var(--text-strong); padding: 8px 16px; }
+.people-interaction-detail { position: fixed; inset: 0 0 0 auto; width: min(760px, 52vw); min-width: 520px; max-width: 100vw; height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border: 0; border-radius: 16px 0 0 16px; overflow: auto; overscroll-behavior: contain; color: var(--text-body); background: var(--surface-panel); box-shadow: -12px 0 48px rgb(20 32 28 / 16%); }
+.people-interaction-detail::backdrop { background: rgb(20 32 28 / 24%); }
+.people-interaction-detail-content { min-height: 100%; padding: 0 32px 40px; }
+.people-interaction-detail-content > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; position: sticky; top: 0; z-index: 1; min-height: 76px; margin-bottom: 20px; background: var(--surface-panel); color: var(--text-body); font-size: 13px; }
+.people-interaction-detail-content > header button { display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; border: 0; border-radius: 8px; color: var(--text-strong); background: var(--surface-panel-soft); }
+.people-interaction-detail-heading h2 { margin: 16px 0 12px; font-size: clamp(22px, 2vw, 30px); line-height: 1.35; font-weight: 650; color: var(--text-strong); overflow-wrap: anywhere; }
+.people-interaction-detail-heading p { margin: 0; font-size: 13px; line-height: 1.6; }
+.people-interaction-detail-content > section { margin-top: 32px; }
+.people-interaction-detail h3 { margin: 0 0 12px; font-size: 15px; color: var(--text-strong); }
+.people-interaction-detail-participants { display: flex; flex-wrap: wrap; gap: 8px; }
+.people-interaction-detail-participants button { display: inline-flex; align-items: center; gap: 8px; width: auto; max-width: 100%; min-height: 44px; padding: 8px 12px; background: var(--module-quiet); border: 0; border-radius: 8px; color: var(--text-strong); font-size: 13px; }
+.people-interaction-detail-participants button span { overflow-wrap: anywhere; }
+.people-interaction-detail-participants button svg { flex-shrink: 0; }
+.people-interaction-detail-notes p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 72ch; font-size: 15px; line-height: 1.75; }
+.people-interaction-detail-facts { margin: 36px 0 0; padding-top: 20px; border-top: 1px solid var(--border-soft); display: grid; gap: 16px; font-size: 13px; }
+.people-interaction-detail-facts > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; }
+.people-interaction-detail-facts dt { color: var(--text-body); }
+.people-interaction-detail-facts dd { margin: 0; color: var(--text-strong); }
+.people-interactions-workspace :is(button, input, select):focus-visible, .people-interaction-detail button:focus-visible { outline: 2px solid var(--module-focus); outline-offset: 3px; }
+@media (max-width: 1100px) {
+  .people-redesign-shell.is-interactions { grid-template-columns: minmax(0, 1fr); }
+  .people-redesign-shell.is-interactions .people-directory-panel { grid-column: 1; }
+}
+@media (max-width: 760px) {
+  .people-interactions-tools { gap: 10px; }
+  .people-interactions-tools .people-primary-search { flex-basis: 100%; }
+  .people-interactions-tools > label { flex: 1; min-width: 0; display: grid; gap: 5px; }
+  .people-interactions-tools select { width: 100%; min-width: 0; min-height: 44px; font-size: 14px; }
+  .people-redesign-shell .people-interaction-row { grid-template-columns: 60px minmax(0, 1fr) 16px; gap: 12px; padding: 16px 4px; }
+  .people-interaction-row > .people-interaction-type { grid-column: 2; grid-row: 2; }
+  .people-interaction-row > svg { grid-column: 3; grid-row: 1; }
+  .people-interaction-row-main strong { font-size: 14px; }
+  .people-interaction-detail { width: 100%; min-width: 0; border-radius: 0; }
+  .people-interaction-detail-content { padding: 0 20px 32px; }
+  .people-interaction-detail-content > header { min-height: 64px; }
+}

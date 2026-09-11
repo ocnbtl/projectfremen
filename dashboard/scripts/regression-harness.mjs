@@ -5747,14 +5747,14 @@ async function checkPeopleMemoryBrowserState(
       const operationalSection = sidebar.locator(".people-sidebar-section").filter({ hasText: "Operational" });
       assert(
         await sidebar.locator(".people-sidebar-section").count() === 3 &&
-          await sidebar.locator(".people-sidebar-section button").count() === 14 &&
-          await sidebar.locator(".people-sidebar-section button > svg").count() === 14 &&
+          await sidebar.locator(".people-sidebar-section button").count() === 15 &&
+          await sidebar.locator(".people-sidebar-section button > svg").count() === 15 &&
           await operationalSection.locator("button").count() === 4 &&
           ["clear", "warning"].includes(await operationalSection.locator('[data-utility="duplicates"]').getAttribute("data-duplicate-state")) &&
           /^Duplicates: \d+ possible pairs$/.test(await operationalSection.locator('[data-utility="duplicates"]').getAttribute("aria-label")) &&
           await operationalSection.locator('[data-utility="duplicates"] strong').count() === 0 &&
           Number(await operationalSection.locator('[data-utility="recently-deleted"] strong').textContent()) >= 0 &&
-          sidebarText.includes("Upcoming Birthdays") && sidebarText.includes("Organizations") && sidebarText.includes("Follow-ups") && sidebarText.includes("Relationships") &&
+          sidebarText.includes("Upcoming Birthdays") && sidebarText.includes("Organizations") && sidebarText.includes("Interactions") && sidebarText.includes("Follow-ups") && sidebarText.includes("Relationships") &&
           !sidebarText.includes("All People") && !sidebarText.includes("Upcoming Follow-ups") && !sidebarText.includes("Relationship Map") &&
           !["Recently Contacted", "Needs Attention", "Dormant", "Customize People", "Close Friends", "Health & Wellness", "All Lists"].some((label) => sidebarText.includes(label)),
         `People sidebar did not match the compact icon-led navigation at ${viewport.label}: ${sidebarText}`
@@ -5966,15 +5966,35 @@ async function checkPeopleMemoryBrowserState(
           `People row hover did not lift the complete card cleanly: ${JSON.stringify(hoverTreatment)}`
         );
       }
-      const recentInteractions = page.locator(".people-recent-interactions");
-      await recentInteractions.waitFor();
-      assert(
-        (await recentInteractions.innerText()).includes("Shared regression introduction") &&
-          (await recentInteractions.innerText()).includes(personTitle) &&
-          await recentInteractions.getByRole("button", { name: "Log interaction" }).count() === 1,
-        `People directory did not expose recent shared interactions at ${viewport.label}`
-      );
-      await assertNoOverflow(page, `People recent interactions ${viewport.label}`);
+      assert(await page.locator(".people-recent-interactions").count() === 0, `People directory retained its footer feed at ${viewport.label}`);
+      const directoryReturnUrl = page.url();
+      await page.goto(`${baseUrl}/admin/people?sidebar=interactions`, { waitUntil: "networkidle" });
+      const interactionHistory = page.getByRole("region", { name: "Interaction history", exact: true });
+      await interactionHistory.waitFor();
+      assert((await interactionHistory.innerText()).includes("Shared regression introduction") && (await interactionHistory.innerText()).includes(personTitle), `Dedicated interaction history lost shared records at ${viewport.label}`);
+      await assertNoOverflow(page, `People interactions ${viewport.label}`);
+      await page.getByLabel("Search interactions", { exact: true }).fill("Shared regression introduction");
+      const interactionRow = page.getByRole("button", { name: "View interaction: Shared regression introduction", exact: true });
+      await interactionRow.click();
+      const interactionDetail = page.getByRole("dialog", { name: "Shared regression introduction", exact: true });
+      await interactionDetail.waitFor();
+      assert((await interactionDetail.innerText()).includes(personTitle) && (await interactionDetail.innerText()).includes("Approach"), `Interaction inspector lost participants or approach at ${viewport.label}`);
+      const detailUrl = page.url();
+      assert(new URL(detailUrl).searchParams.has("interaction"), "Interaction selection was not represented in the URL");
+      await page.reload({ waitUntil: "networkidle" });
+      await interactionDetail.waitFor();
+      const detailBounds = await interactionDetail.boundingBox();
+      assert(detailBounds && detailBounds.x >= -1 && detailBounds.width <= viewport.width + 1, `Interaction detail overflowed at ${viewport.label}`);
+      await page.keyboard.press("Escape");
+      await interactionDetail.waitFor({ state: "hidden" });
+      await page.goBack({ waitUntil: "networkidle" });
+      await interactionDetail.waitFor();
+      await interactionDetail.getByRole("button", { name: "Close interaction details" }).click();
+      await page.getByLabel("Search interactions", { exact: true }).fill("no-interaction-match-xyz");
+      await page.getByRole("heading", { name: "No matching interactions" }).waitFor();
+      await page.getByRole("button", { name: "Clear filters", exact: true }).click();
+      await interactionRow.waitFor();
+      await page.goto(directoryReturnUrl, { waitUntil: "networkidle" });
       if (viewport.label === "desktop") {
         const aiLauncher = page.getByRole("button", { name: "Open AI assistant" });
         const aiLauncherTreatment = await aiLauncher.evaluate((button) => ({

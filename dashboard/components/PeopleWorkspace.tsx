@@ -52,6 +52,7 @@ import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
 import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
+import PeopleInteractions from "./people/PeopleInteractions";
 import OrganizationAutofill from "./people/OrganizationAutofill";
 import TeamSizeInput from "./people/TeamSizeInput";
 import SelectField from "./ui/SelectField";
@@ -103,6 +104,7 @@ type PeopleSidebarView =
   | "everyone"
   | "all"
   | "organizations"
+  | "interactions"
   | "starred"
   | "recent"
   | "upcoming"
@@ -574,6 +576,7 @@ const PEOPLE_SIDEBAR_SECTIONS: Array<{ title: string; items: SidebarItemConfig[]
       { id: "everyone", label: "Everyone", icon: "users" },
       { id: "all", label: "People", icon: "person" },
       { id: "organizations", label: "Organizations", icon: "organization" },
+      { id: "interactions", label: "Interactions", icon: "interaction" },
       { id: "starred", label: "Starred", icon: "star" },
       { id: "upcoming", label: "Follow-ups", icon: "follow-up" },
       { id: "relationship-map", label: "Relationships", icon: "relationship-map", surface: "profile" }
@@ -1044,7 +1047,7 @@ function sortTimelineItems(items: PeopleTimelineItem[]): PeopleTimelineItem[] {
 }
 
 function canonicalInteractionItem(record: PersonalRecord): PeopleTimelineItem | null {
-  if (record.className !== "interaction" || !record.interaction) return null;
+  if (record.className !== "interaction" || !record.interaction || record.archivedAt) return null;
   return {
     kind: "interaction",
     id: record.id,
@@ -2417,6 +2420,9 @@ export default function PeopleWorkspace({
       },
       searchParams
     );
+    if ((partial.sidebar || activeSidebarView) !== "interactions" || path !== getModuleRoute("people")) {
+      for (const key of ["interaction", "kind", "order"]) params.delete(key);
+    }
     return `${path}${params.size ? `?${params.toString()}` : ""}`;
   }
 
@@ -2472,7 +2478,7 @@ export default function PeopleWorkspace({
     }
     return dates;
   }, [allInteractionItems]);
-  const recentInteractionItems = allInteractionItems.slice(0, 8);
+  const isInteractions = activeSidebarView === "interactions" && pathname === getModuleRoute("people");
   const duplicateMatches = useMemo(() => findPeopleDuplicates(people), [people]);
   const organizationOptions = useMemo<OrganizationOption[]>(
     () => activePeople
@@ -2649,6 +2655,7 @@ export default function PeopleWorkspace({
       : "profile";
   const shellClassName = [
     "people-redesign-shell",
+    isInteractions ? "is-interactions" : "",
     ["import", "export", "import-export"].includes(activeSidebarView) ? "is-transfer" : "",
     filteringActive ? "is-filtering" : "",
     `is-mobile-${mobileSurface}`
@@ -2881,6 +2888,7 @@ export default function PeopleWorkspace({
       everyone: stats.total,
       all: stats.people,
       organizations: stats.organizations,
+      interactions: allInteractionItems.length,
       starred: stats.starred,
       recent: stats.recent,
       upcoming: stats.upcoming,
@@ -2909,6 +2917,7 @@ export default function PeopleWorkspace({
     const destination = buildPeopleDestination(
       {
         sidebar: item.id,
+        query: item.id === "interactions" || activeSidebarView === "interactions" ? "" : query,
         filter: "all",
         person: "",
         tab: item.surface === "profile" || item.id === "relationship-map" ? "links" : "overview"
@@ -2917,6 +2926,8 @@ export default function PeopleWorkspace({
     );
     if (guardDirtyNavigation(destination)) return;
     setActiveSidebarView(item.id);
+    const nextQuery = item.id === "interactions" || activeSidebarView === "interactions" ? "" : query;
+    setQuery(nextQuery);
     setActiveFilter("all");
     setFiltersOpen(false);
     setSortOpen(false);
@@ -2944,7 +2955,7 @@ export default function PeopleWorkspace({
     }
     setDetailMode("profile");
     updatePeopleUrl(
-      { sidebar: item.id, filter: "all", person: "" },
+      { sidebar: item.id, query: nextQuery, filter: "all", person: "", tab: "overview" },
       { path: getModuleRoute("people"), history: "push", native: true }
     );
   }
@@ -4163,15 +4174,29 @@ export default function PeopleWorkspace({
             <button type="button" aria-label="Log interaction" onClick={() => openInteractionComposer()}>
               <PeopleIcon name="interaction" /><span>Interaction</span>
             </button>
+            {!isInteractions && <>
             <button type="button" aria-label="Add organization" onClick={() => openAddPerson("org")}>
               <PeopleIcon name="organization" /><span>Organization</span>
             </button>
             <button type="button" aria-label="Add person" onClick={() => openAddPerson("person")}>
               <PeopleIcon name="new-person" /><span>Person</span>
             </button>
+            </>}
           </div>
         </header>
 
+        {isInteractions ? <PeopleInteractions
+          items={allInteractionItems.map(item => ({
+            id: item.id, date: item.date, participantIds: item.participantIds,
+            ...(item.kind === "interaction" ? { ...item.interaction, kind: item.interaction.kind || "note" } : { title: item.memory.text, kind: "memory" }),
+            source: item.id.startsWith("legacy-") ? "profile" as const : "record" as const
+          }))}
+          people={people}
+          query={query}
+          onQueryChange={value => { setQuery(value); updatePeopleUrl({ query: value }, { native: true }); }}
+          onOpenPerson={selectPerson}
+          error={initialLoadError}
+        /> : <>
         <div className="people-directory-tools">
           <div className="people-primary-search">
             <PeopleIcon name="search" />
@@ -4410,40 +4435,7 @@ export default function PeopleWorkspace({
               );
             })}
           </div>
-          <section className="people-recent-interactions" aria-labelledby="people-recent-interactions-title">
-            <header>
-              <div>
-                <h2 id="people-recent-interactions-title">Recent interactions</h2>
-                <span>Shared activity across People</span>
-              </div>
-              <button type="button" onClick={() => openInteractionComposer()}><PeopleIcon name="interaction" /><span>Log interaction</span></button>
-            </header>
-            <div className="people-recent-interaction-list">
-              {recentInteractionItems.length > 0 ? recentInteractionItems.map((item) => {
-                const interaction = item.kind === "interaction"
-                  ? item.interaction
-                  : { kind: "memory", title: item.memory.text, summary: "" };
-                const participants = item.participantIds
-                  .map((participantId) => activePeople.find((record) => record.id === participantId))
-                  .filter((record): record is PersonalRecord => Boolean(record));
-                return (
-                  <article key={`recent-${item.id}`}>
-                    <span className="people-recent-kind">{interaction.kind || "Interaction"}</span>
-                    <div>
-                      <strong>{interaction.title}</strong>
-                      <span>{participants.map((record) => record.title).join(" · ") || "Profile unavailable"}</span>
-                    </div>
-                    {item.kind === "interaction" && item.interaction.approach && (
-                      <span className={`people-approach-badge is-${item.interaction.approach}`}>{labelize(item.interaction.approach)}</span>
-                    )}
-                    <time dateTime={item.date}>{item.date ? formatFullDate(item.date) : "Date unknown"}{item.kind === "interaction" && formatInteractionTime(item.interaction.startTime, item.interaction.endTime) ? ` · ${formatInteractionTime(item.interaction.startTime, item.interaction.endTime)}` : ""}</time>
-                  </article>
-                );
-              }) : (
-                <p>No interactions logged yet.</p>
-              )}
-            </div>
-          </section>
+
           </>
         ) : (
           <div className="notes-empty-state">
@@ -4458,9 +4450,10 @@ export default function PeopleWorkspace({
             </button>
           </div>
         )}
+        </>}
       </main>
 
-      <section className="people-profile-panel" aria-label="Selected profile">
+      {!isInteractions && <section className="people-profile-panel" aria-label="Selected profile">
         {!addingPerson && detailMode !== "edit" && <button type="button" className="people-mobile-profile-back" onClick={() => updatePeopleUrl({}, { path: getModuleRoute("people"), history: "push", native: true })}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /><span>Back to {activeViewLabel}</span></button>}
         {initialLoadError ? (
           <SystemState
@@ -5146,6 +5139,7 @@ export default function PeopleWorkspace({
         )}
       </section>
 
+      }
       {!initialLoadError && mobileSurface === "editor" && <nav className="people-mobile-actionbar" aria-label="People quick actions">
             <button type="button" onClick={requestCancelEditor}><PeopleIcon name="close" /><span>Cancel</span></button>
             <button
@@ -5364,7 +5358,7 @@ export default function PeopleWorkspace({
         }}
         context={{
           module: "people",
-          object: selectedPerson
+          object: !isInteractions && selectedPerson
             ? {
                 module: "people",
                 objectType: selectedPerson.className === "org" ? "organization" : "person",
