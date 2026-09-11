@@ -19,7 +19,8 @@ const native = require('../lib/file-store.ts');
 const pair = crypto.generateKeyPairSync('ec', { namedCurve: 'P-256' });
 const credentials = { keyName: 'organizations/test-org/apiKeys/test-key', privateKey: pair.privateKey.export({ type: 'sec1', format: 'pem' }) };
 let passed = 0, mode = 'normal', calls = [], price = '80000';
-const permissions = { can_view: true, can_trade: false, can_transfer: false, can_receive: false };
+// Match Coinbase's documented response: there is no can_receive field.
+const permissions = { can_view: true, can_trade: false, can_transfer: false, portfolio_uuid: 'test-portfolio', portfolio_type: 'DEFAULT' };
 const response = (value, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'content-type': 'application/json' } });
 const page = (data, next = null) => response({ data, pagination: { next_uri: next } });
 global.fetch = async (input, options) => {
@@ -67,13 +68,16 @@ async function main() {
     assert.notEqual(first, second); const claims = JSON.parse(Buffer.from(first.split('.')[1], 'base64url'));
     assert.equal(claims.iss, 'cdp'); assert.equal(claims.exp - claims.nbf, 120);
   });
-  await check('keys with any write permission or unknown permission are rejected', () => {
+  await check('documented permission responses pass; write or ambiguous capabilities are rejected', () => {
     provider.assertCoinbaseViewOnly(permissions);
-    for (const key of ['can_trade', 'can_transfer', 'can_receive']) {
-      assert.throws(() => provider.assertCoinbaseViewOnly({ ...permissions, [key]: true }));
+    provider.assertCoinbaseViewOnly({ ...permissions, can_receive: false });
+    for (const key of ['can_trade', 'can_transfer']) {
       const missing = { ...permissions }; delete missing[key]; assert.throws(() => provider.assertCoinbaseViewOnly(missing));
     }
-    assert.throws(() => provider.assertCoinbaseViewOnly({ ...permissions, can_view: false }));
+    for (const key of ['can_trade', 'can_transfer', 'can_receive', 'can_export', 'can_manage']) {
+      for (const value of [true, null, 'false', 0]) assert.throws(() => provider.assertCoinbaseViewOnly({ ...permissions, [key]: value }));
+    }
+    for (const value of [false, undefined, null, 'true', 1]) assert.throws(() => provider.assertCoinbaseViewOnly({ ...permissions, can_view: value }));
   });
   await check('no arbitrary host, transfer endpoint, fragment or query can be signed', () => {
     for (const url of ['https://evil.example/v2/accounts', '//evil.example/v2/accounts', '/v2/accounts/btc/addresses', '/api/v3/brokerage/orders', '/v2/accounts?callback=https://evil.example', '/v2/accounts#private']) assert.throws(() => provider.coinbasePath(url));

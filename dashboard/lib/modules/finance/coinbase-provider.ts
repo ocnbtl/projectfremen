@@ -33,7 +33,11 @@ export function coinbaseJwt(credentials: CoinbaseCredentials, path: string) {
   return `${head}.${body}.${sign("sha256", Buffer.from(`${head}.${body}`), { key: credentials.privateKey, dsaEncoding: "ieee-p1363" }).toString("base64url")}`;
 }
 export function assertCoinbaseViewOnly(value: Record<string, unknown>) {
-  if (value.can_view !== true || value.can_trade !== false || value.can_transfer !== false || value.can_receive !== false) {
+  // key_permissions documents View, Trade and Transfer; it omits Receive.
+  // Require the documented restrictions and reject any additional enabled or
+  // ambiguous capability if Coinbase starts returning it. Transport stays GET-only.
+  if (value.can_view !== true || value.can_trade !== false || value.can_transfer !== false ||
+    Object.entries(value).some(([name, allowed]) => name.startsWith("can_") && name !== "can_view" && allowed !== false)) {
     throw new BankingError("coinbase_permissions", "This key is not View only. In Coinbase, enable View and turn off Trade, Transfer and Receive, then try again.", 422);
   }
 }

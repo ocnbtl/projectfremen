@@ -2,7 +2,7 @@
 
 Open Finance → Accounts → Connections (or Finance Settings) → Coinbase. Create a Coinbase App Secret API key with **View only** and **ECDSA / ES256**. Trade, Transfer and Receive must be disabled. Select the personal portfolio you intend to view, paste the complete key name and private key in the protected form, and match an existing personal Brokerage account or create a Coinbase record. An empty portfolio response is treated as missing access, not a zero balance.
 
-The server verifies key permissions before every connection and sync. All Coinbase transport calls are GET requests to a fixed endpoint allowlist on api.coinbase.com. The key cannot be used by this connector to trade, send funds, create addresses or call arbitrary endpoints. The owner can use Sync Coinbase for a fresh snapshot, with a one-minute cooldown. No background refresh, OAuth partner registration, paid aggregator, Plaid Item or trading feature is involved.
+The server verifies View is enabled and Trade and Transfer are disabled before every connection and sync. Coinbase's key_permissions response does not include a Receive flag; leave Receive disabled when creating the key. Any additional can_* capability returned by Coinbase must be explicitly false. All Coinbase transport calls are GET requests to a fixed endpoint allowlist on api.coinbase.com. The key cannot be used by this connector to trade, send funds, create addresses or call arbitrary endpoints. The owner can use Sync Coinbase for a fresh snapshot, with a one-minute cooldown. No background refresh, OAuth partner registration, paid aggregator, Plaid Item or trading feature is involved.
 
 ## Storage and ownership
 
