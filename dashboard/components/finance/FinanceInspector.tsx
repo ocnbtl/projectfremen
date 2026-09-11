@@ -468,17 +468,19 @@ export default function FinanceInspector({
               <div><span>Amount</span><strong>{money(billRow.bill.amount, { cents: true })}</strong></div>
               <div><span>Payment status</span><strong>{billRow.bill.status}</strong></div>
               <div><span>Cadence</span><strong>{billRow.bill.recurring || "Not recorded"}</strong></div>
-              <div><span>Autopay</span><strong>{billRow.bill.autopay ? "On" : "Manual"}</strong></div>
+              <div><span>Autopay</span><strong>{billRow.bill.evidence && !billRow.bill.autopayConfirmed ? "Unconfirmed" : billRow.bill.autopay ? "On" : "Manual"}</strong></div>
               <div><span>Account</span><strong>{billRow.bill.account}</strong></div>
               <div><span>Category</span><strong>{billRow.bill.category}</strong></div>
             </div>
             <section className={styles.inspectorSection}>
-              <h3>Payment and value stay separate</h3>
+              <h3>{billRow.bill.evidence ? "Detected from your transactions" : "Payment and value stay separate"}</h3>
+              {billRow.bill.evidence && <p>{billRow.bill.evidence.basis}</p>}
               <p>{billRow.bill.name} is {billRow.bill.status}. Payment outcome, recurrence, autopay, canonical evidence, or an explicit exception remain separate facts.</p>
             </section>
             <div className={styles.boundary}><strong>No payment execution</strong><span>Finance records an observed payment only with evidence or an explicit audited exception; it never sends money.</span></div>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="payments" active={safeTab === "payments"}>
+            {billRow.bill.evidence && <section className={styles.inspectorSection}><h3>Observed payments</h3><p>These transactions support the recurring estimate. They do not confirm payment of the next bill.</p><div className={styles.compactList}>{financeState.transactions.filter(t => billRow.bill.evidence?.transactionIds.includes(t.id)).map(t => <a key={t.id} className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?selected=${encodeURIComponent(t.id)}`}><span><strong>{t.merchant}</strong><small>{t.occurredOn} · {t.status}{t.archivedAt ? " · archived" : ""}</small></span><strong>{money(t.amount, { cents: true })}</strong></a>)}</div></section>}
             <AuditTimeline events={nativeAuditEvents.filter((event) => event.action.includes("paid"))} />
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="value" active={safeTab === "value"} className={styles.inspectorPanel}>
@@ -508,7 +510,7 @@ export default function FinanceInspector({
             <div className={styles.factGrid}>
               <div><span>Bill ID</span><strong>{billRow.bill.id}</strong></div><div><span>Name</span><strong>{billRow.bill.name}</strong></div>
               <div><span>Due</span><strong>{billRow.bill.due}</strong></div><div><span>Due offset</span><strong>{billRow.bill.dueIn} days</strong></div>
-              <div><span>Recurring</span><strong>{billRow.bill.recurring || "No"}</strong></div><div><span>Autopay</span><strong>{billRow.bill.autopay ? "Yes" : "No"}</strong></div>
+              <div><span>Recurring</span><strong>{billRow.bill.recurring || "No"}</strong></div><div><span>Autopay</span><strong>{billRow.bill.evidence && !billRow.bill.autopayConfirmed ? "Unconfirmed" : billRow.bill.autopay ? "Yes" : "No"}</strong></div>
               <div><span>Account</span><strong>{billRow.bill.account}</strong></div><div><span>Persistence</span><strong>Native Finance store</strong></div>
             </div>
           </DetailTabPanel>
@@ -526,7 +528,7 @@ export default function FinanceInspector({
               <div><span>Forecast</span><strong>Not calculated</strong></div>
               <div><span>Review state</span><strong>{budgetRow.remaining < 0 ? "Literal overage" : "No literal overage"}</strong></div>
             </div>
-            <section className={styles.inspectorSection}><h3>Literal variance only</h3><p>{budgetRow.budget.category} has {money(budgetRow.remaining, { cents: true })} remaining from its persistent cap. No forecast, confidence, project allocation, or decision is inferred.</p></section>
+            <section className={styles.inspectorSection}><h3>{budgetRow.budget.evidence ? "Budget basis" : "Spending against your limit"}</h3>{budgetRow.budget.evidence && <p>{budgetRow.budget.evidence.basis}</p>}<p>{budgetRow.budget.category} has {money(budgetRow.remaining, { cents: true })} remaining from its persistent cap. No forecast, confidence, project allocation, or decision is inferred.</p></section>
             <LinkedDecisionsPanel
               source={budgetDecisionSource!}
               decisions={decisions}

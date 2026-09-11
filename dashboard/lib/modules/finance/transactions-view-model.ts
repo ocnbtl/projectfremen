@@ -1,3 +1,4 @@
+import { financeSpendingGroup } from "./planning";
 import type {
   FinanceAccount,
   FinanceDataset,
@@ -102,7 +103,7 @@ function normalizeSort(value: string | undefined): FinanceTransactionsSort {
 
 function matchesFilter(transaction: FinanceTransaction, filter: FinanceTransactionsFilter): boolean {
   if (filter === "all") return true;
-  if (filter === "unreviewed") return transaction.status === "pending" || !transaction.ufInit;
+  if (filter === "unreviewed") return !transaction.ufInit;
   if (filter === "pending" || filter === "cleared") return transaction.status === filter;
   if (filter === "reimbursable") return transaction.reimbursable;
   if (filter === "receipt-missing") return !transaction.receipt.trim();
@@ -112,6 +113,8 @@ function matchesFilter(transaction: FinanceTransaction, filter: FinanceTransacti
 function transactionSearchText(transaction: FinanceTransaction): string {
   return [
     transaction.id,
+    transaction.occurredOn || "",
+    financeSpendingGroup(transaction.category),
     transaction.date,
     transaction.quarter,
     transaction.quarterYear,

@@ -105,7 +105,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const openFollowUps = personalOps?.followUps.filter((item) => item.lifecycle !== "archived" && !["complete", "carried_forward"].includes(item.followUpState)) || [];
   const currentReviews = reviews?.runs.filter((item) => !item.archivedAt && item.current && !["completed", "canceled"].includes(item.lifecycle)) || [];
   const activeAccounts = finance?.accounts.filter((item) => !item.archivedAt) || [];
-  const pendingTransactions = finance?.transactions.filter((item) => !item.archivedAt && (item.status === "pending" || !item.reviewed)) || [];
+  const pendingTransactions = finance?.transactions.filter((item) => !item.archivedAt && !item.reviewed) || [];
   const dueBills = finance?.bills.filter((item) => !item.archivedAt && ["due", "overdue"].includes(item.status)) || [];
   const currentClose = finance?.closePeriods.filter((item) => !item.archivedAt).sort((left, right) => right.period.localeCompare(left.period))[0];
   const openCloseChecks = currentClose?.checks.filter((item) => item.required && item.resolution === "open") || [];
@@ -231,7 +231,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     { name: "People", href: "/admin/people", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "person").length} records` : "Unavailable", tone: "people" },
     { name: "Resources", href: "/admin/resources", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "resource").length} records` : "Unavailable", tone: "resources" },
     { name: "Media", href: "/admin/media", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "file").length} records` : "Unavailable", tone: "media" },
-    { name: "Finance", href: "/admin/finance", available: Boolean(finance), value: finance ? `${activeAccounts.length} accounts · ${pendingTransactions.length} pending` : "Unavailable", tone: "finance" },
+    { name: "Finance", href: "/admin/finance", available: Boolean(finance), value: finance ? `${activeAccounts.length} accounts · ${pendingTransactions.length} to review` : "Unavailable", tone: "finance" },
     { name: "Reviews", href: "/admin/reviews/weekly", available: Boolean(reviews), value: reviews ? `${currentReviews.length} current runs` : "Unavailable", tone: "reviews" }
   ];
 

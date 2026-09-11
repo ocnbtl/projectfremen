@@ -3,6 +3,7 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import FinanceOverviewView from "./finance/FinanceOverviewView";
+import FinancePlanningPanel from "./finance/FinancePlanningPanel";
 import FinanceUtilityRail, { type FinanceUtility } from "./finance/FinanceUtilityRail";
 import { HUES } from "./finance/FinancePrimitives";
 import ModuleShell from "./admin-shell/ModuleShell";
@@ -69,10 +70,11 @@ const VIEWS: Array<{ id: ViewId; label: string; icon: string }> = [
 ];
 
 const SMART_VIEWS: Array<{ id: FinanceFilter; label: string; icon: string; hue: Hue; view: ViewId }> = [
-  { id: "attention", label: "Needs attention", icon: "alert", hue: "brown", view: "overview" },
+  { id: "unreviewed", label: "To review", icon: "check", hue: "brown", view: "transactions" },
   { id: "due-week", label: "Due this week", icon: "week", hue: "brown", view: "bills" },
-  { id: "unreviewed", label: "Unreviewed", icon: "check", hue: "brown", view: "transactions" },
-  { id: "recurring", label: "Recurring", icon: "routine", hue: "green", view: "bills" }
+  { id: "over-budget", label: "Over budget", icon: "piggy-bank", hue: "brown", view: "budgets" },
+  { id: "recurring", label: "Recurring commitments", icon: "routine", hue: "green", view: "bills" },
+  { id: "transfer", label: "Transfers", icon: "banknote", hue: "green", view: "transactions" }
 ];
 
 function hueStyle(hue: Hue) {
@@ -172,10 +174,11 @@ function HeaderAction({
       }}
       aria-disabled={disabled || undefined}
       title={title}
+      aria-label={typeof children === "string" ? children : undefined}
       style={disabled ? { borderColor: "#dedee2", background: "#f4f4f5", color: "#71717a", cursor: "not-allowed" } : undefined}
     >
       <Icon name={icon} />
-      {children}
+      <span>{children}</span>
     </button>
   );
 }
@@ -210,7 +213,7 @@ function FinanceSidebar({ smartCounts, view, smartFilter, onSmart, onUtility, on
 }) {
   return <ModuleSidebar id="finance-module-sidebar" title="Finance" ariaLabel="Finance sidebar" className="finance-module-sidebar" mobileOpen={mobileOpen} onClose={onClose}
     sections={[
-      { id: "finance-views", items: VIEWS.map(item => ({ id: item.id, label: item.label, icon: <UnigentamosIcon role={item.icon} />, active: view === item.id && !smartFilter, href: getModuleViewRoute("finance", item.id) })) },
+      { id: "finance-views", label: "Finance", items: VIEWS.map(item => ({ id: item.id, label: item.label, icon: <UnigentamosIcon role={item.icon} />, active: view === item.id && !smartFilter, href: getModuleViewRoute("finance", item.id) })) },
       { id: "finance-smart-views", label: "Smart views", items: SMART_VIEWS.map(item => ({ id: item.id, label: item.label, icon: <UnigentamosIcon role={item.icon} />, count: smartCounts[item.id] || 0, active: smartFilter === item.id, onSelect: () => onSmart(item.id) })) }
     ]}
     footer={<div className="finance-sidebar-utilities" aria-label="Finance data tools">
@@ -381,6 +384,7 @@ export default function FinanceWorkspace({
   const [checkedTxnIds, setCheckedTxnIds] = useState<ReadonlySet<string>>(() => new Set());
   const [modal, setModal] = useState<ModalKind>(null);
   const [notice, setNotice] = useState("");
+  const [planning, setPlanning] = useState<"plan" | "review" | null>(null);
   const [smartFilter, setSmartFilter] = useState<FinanceFilter>(initialUrlState.filter);
   const [sort, setSort] = useState<FinanceSort>(initialUrlState.sort);
   const [tab, setTab] = useState<FinanceTab>(initialUrlState.tab);
@@ -393,7 +397,6 @@ export default function FinanceWorkspace({
   }, []);
   const [query, setQuery] = useState(initialUrlState.query);
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
-  const aiButtonRef = useRef<HTMLButtonElement>(null);
   const [ruleTestRuns, setRuleTestRuns] = useState<Readonly<Record<string, FinanceRuleTestRun>>>({});
   const smartCounts = useMemo(() => Object.fromEntries(SMART_VIEWS.map((item) => [item.id, getFinanceSmartViewCount(financeViewModel, item.id)])), [financeViewModel]);
   const searchParamKey = searchParams.toString();
@@ -404,7 +407,7 @@ export default function FinanceWorkspace({
   });
   const transactionsModel = buildFinanceTransactionsViewModel(financeDataset, {
     query: view === "transactions" ? query : "",
-    filter: smartFilter === "unreviewed" ? "unreviewed" : "all",
+    filter: smartFilter === "unreviewed" || smartFilter === "transfer" || smartFilter === "pending" ? smartFilter : "all",
     sort,
     selectedId: selectedTxnId
   });
@@ -888,12 +891,10 @@ export default function FinanceWorkspace({
       }
       aiDock={
         <SharedAIDock
-          className="finance-header-assistant"
           open={aiOpen}
           onOpenChange={(open) => {
             setAiOpen(open);
             if (open) setInspectorOpen(false);
-            else requestAnimationFrame(() => aiButtonRef.current?.focus());
             updateFinanceUrl({ ai: open }, { native: true });
           }}
           context={{
@@ -912,38 +913,29 @@ export default function FinanceWorkspace({
       }
     >
       <span className="module-ref-regression-sentinel">Finance command view</span>
-      <button
-        type="button"
-        className="finance-mobile-menu"
-        onClick={() => setMobileSidebarOpen(true)}
-        aria-label="Open Finance sidebar"
-        aria-expanded={mobileSidebarOpen}
-        aria-controls="finance-module-sidebar"
-      >
-        Finance
-      </button>
       {mobileSidebarOpen && <button type="button" className="finance-mobile-scrim" onClick={() => setMobileSidebarOpen(false)} aria-label="Close Finance sidebar" />}
       {(showContext || (showRail && inspectorOpen)) && <button type="button" className="finance-inspector-scrim" onClick={closeInspector} aria-label="Close Finance panel" />}
       <div className="finance-main-workspace">
         <header className="finance-page-header">
-          <div className="finance-page-title"><span className="finance-title-icon"><UnigentamosIcon role={activeSmart?.icon || activeView.icon} /></span><h1>{activeSmart?.label || activeView.label}</h1></div>
-          <div className="finance-page-actions"><NativeActionBar
+          <div className="finance-page-title"><button type="button" className="finance-mobile-menu" onClick={() => setMobileSidebarOpen(true)} aria-label="Open Finance sidebar" aria-expanded={mobileSidebarOpen} aria-controls="finance-module-sidebar"><UnigentamosIcon role="menu" /></button><h1>{activeSmart?.label || activeView.label}</h1></div>
+          <div className="finance-page-actions">{["overview", "budgets", "bills"].includes(view) && <button type="button" aria-label="Plan from history" title="Plan from history" className="finance-action finance-plan-trigger" onClick={() => setPlanning("plan")}><Icon name="Sliders" /><span>Plan from history</span></button>}{view === "transactions" && smartCounts.unreviewed > 0 && <button type="button" aria-label="Approve all transactions" title="Approve all transactions" className="finance-action finance-review-trigger" onClick={() => setPlanning("review")}><Icon name="Check" /><span>Approve all</span></button>}<NativeActionBar
           view={view}
           hasSelection={hasRouteSelection}
           hasAccounts={financeState.accounts.some((item) => !item.archivedAt)}
           closeStatus={activeClose?.status || "none"}
           onOperation={(nextOperation) => { setOperationTarget(null); setOperation(nextOperation); }}
-        />{view === "accounts" && <button type="button" className="finance-action" onClick={() => { setAiOpen(false); setInspectorOpen(false); setUtility("settings"); }}><Icon name="Link" />Connections</button>}<button type="button" className="finance-action finance-activity-trigger" onClick={() => { setAiOpen(false); setUtility("activity"); }} aria-label="Recent activity" title="Recent activity" aria-expanded={utility === "activity"}><UnigentamosIcon role="clock" /><span>Activity</span></button><button ref={aiButtonRef} type="button" className="finance-action finance-assistant-trigger" aria-label={aiOpen ? "Close AI assistant" : "Open AI assistant"} aria-expanded={aiOpen} title="Finance assistant" onClick={() => { setAiOpen(!aiOpen); setUtility(null); setInspectorOpen(false); updateFinanceUrl({ ai: !aiOpen }, { native: true }); }}><Icon name="Sparkles" /></button></div>
+        />{view === "accounts" && <button type="button" className="finance-action" onClick={() => { setAiOpen(false); setInspectorOpen(false); setUtility("settings"); }}><Icon name="Link" />Connections</button>}<button type="button" className="finance-action finance-activity-trigger" onClick={() => { setAiOpen(false); setUtility("activity"); }} aria-label="Recent activity" title="Recent activity" aria-expanded={utility === "activity"}><UnigentamosIcon role="clock" /><span>Activity</span></button></div>
         </header>
         <div className="finance-search-row"><label className="finance-global-search"><Icon name="Search" /><input type="search" aria-label={view === "overview" ? "Search finance" : view === "bills" ? "Search bills and subscriptions" : view === "review" ? "Search monthly review" : `Search ${view}`} value={query} placeholder={view === "overview" ? "Search accounts, transactions, bills and budgets" : `Search ${activeView.label.toLowerCase()}`} onChange={(event) => { setQuery(event.target.value); setCheckedTxnIds(new Set()); setInspectorDismissed(false); updateFinanceUrl({ query: event.target.value }, { native: true }); }} /></label></div>
 
+        {planning && <FinancePlanningPanel key={planning} reviewOnly={planning === "review"} onClose={() => setPlanning(null)} onApplied={(state, message) => { setFinanceState(state); setNotice(message); setPlanning(null); setCheckedTxnIds(new Set()); router.refresh(); }} />}
         {financeError && <div className="finance-notice is-error" role="alert"><Swatch hue="crimson" /><span className="finance-notice__message">{financeError}</span></div>}
         <ArchivedFinanceRecords
           state={financeState}
           onRestore={(selection) => { setOperationTarget(selection); setOperation("restore"); }}
         />
         {notice && <div className="finance-notice" role="status" aria-live="polite"><Swatch hue={activeSmart?.hue || "indigo"} /><span className="finance-notice__message">{notice}</span><button type="button" onClick={() => setNotice("")}>Clear</button></div>}
-        {view === "overview" && <FinanceOverviewView state={financeState} dataset={financeDataset} query={query} attentionOnly={smartFilter === "attention"} onView={navigateView} onSmart={handleSmart} onAddAccount={() => setOperation("account")} onOpen={(nextView, id) => { if (nextView === "accounts") { const account = accounts.find(item => item.id === id); if (account) selectAccount(account); } else navigateToSelected(nextView, id); }} />}
+        {view === "overview" && <FinanceOverviewView state={financeState} dataset={financeDataset} query={query} attentionOnly={smartFilter === "attention"} onView={navigateView} onSmart={handleSmart} onAddAccount={() => setOperation("account")} onPeriod={period => { navigateView("transactions"); setQuery(period); updateFinanceUrl({ view: "transactions", query: period, filter: "", selected: "" }, { history: "push" }); }} onOpen={(nextView, id) => { if (nextView === "accounts") { const account = accounts.find(item => item.id === id); if (account) selectAccount(account); } else navigateToSelected(nextView, id); }} />}
         {view === "accounts" && (
           <FinanceAccountsRouteView
             model={accountsModel}

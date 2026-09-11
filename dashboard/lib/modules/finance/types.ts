@@ -34,6 +34,8 @@ export interface FinanceAccount {
 }
 
 export interface FinanceBudget {
+  evidence?: import("./planning").PlanningEvidence;
+  period?: string;
   id: string;
   category: string;
   hue: FinanceHue;
@@ -43,6 +45,8 @@ export interface FinanceBudget {
 }
 
 export interface FinanceBill {
+  autopayConfirmed?: boolean;
+  evidence?: import("./planning").PlanningEvidence;
   id: string;
   name: string;
   amount: number;
@@ -124,6 +128,9 @@ export interface FinanceAttentionItem {
 }
 
 export interface FinanceCashflowSeries {
+  periods?: readonly string[];
+  firstObservedOn?: string;
+  lastObservedOn?: string;
   readonly months: readonly string[];
   readonly income: readonly number[];
   readonly spend: readonly number[];

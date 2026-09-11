@@ -12583,30 +12583,6 @@ html[data-admin-preview="mobile"] .people-repeatable-fields-location .is-wide {
   stroke-linejoin: round;
 }
 
-@media (max-width: 1100px) {
-  .shared-ai-dock--finance {
-    display: none;
-  }
-}
-
-@media (min-width: 1101px) {
-  .shared-ai-dock--finance .shared-ai-dock__launcher {
-    width: 52px;
-    min-width: 52px;
-    padding-inline: 0;
-    justify-content: center;
-  }
-
-  .shared-ai-dock--finance .shared-ai-dock__launcher-label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-  }
-}
-
 @media (max-width: 760px) {
   .people-overview-facts {
     grid-template-columns: minmax(0, 1fr) !important;

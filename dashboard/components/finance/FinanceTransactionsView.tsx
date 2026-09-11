@@ -46,7 +46,7 @@ export default function FinanceTransactionsView({
   onOpenColumnsPreview
 }: FinanceTransactionsViewProps) {
   const displayedSort = model.sort;
-  const effectiveFilter = filter === "unreviewed" ? "unreviewed" : "";
+  const effectiveFilter = filter;
 
   return (
     <>
@@ -64,7 +64,9 @@ export default function FinanceTransactionsView({
       <div className={styles.scopeBar}>
         <div className={styles.filterGroup} role="group" aria-label="Transaction filters">
           <button type="button" className={styles.filterButton} data-active={effectiveFilter === ""} aria-pressed={effectiveFilter === ""} onClick={() => onFilterChange("")}>All</button>
-          <button type="button" className={styles.filterButton} data-active={effectiveFilter === "unreviewed"} aria-pressed={effectiveFilter === "unreviewed"} onClick={() => onFilterChange("unreviewed")}>Unreviewed</button>
+          <button type="button" className={styles.filterButton} data-active={effectiveFilter === "unreviewed"} aria-pressed={effectiveFilter === "unreviewed"} onClick={() => onFilterChange("unreviewed")}>To review</button>
+          <button type="button" className={styles.filterButton} data-active={filter === "pending"} aria-pressed={filter === "pending"} onClick={() => onFilterChange("pending")}>Pending at bank</button>
+          <button type="button" className={styles.filterButton} data-active={filter === "transfer"} aria-pressed={filter === "transfer"} onClick={() => onFilterChange("transfer")}>Transfers</button>
         </div>
         <label className={styles.sortLabel}>
           Sort

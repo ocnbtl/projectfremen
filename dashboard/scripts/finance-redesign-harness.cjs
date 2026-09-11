@@ -21,9 +21,9 @@ const state = { schemaVersion: 1, updatedAt: null, accounts: [{ ...common, id: '
 const before = JSON.stringify(state), dataset = financeStateToDataset(state);
 assert.equal(dataset.budgets.find(item => item.id === 'food-personal').spent, 120);
 assert.equal(dataset.budgets.find(item => item.id === 'food-business').spent, 100);
-assert.deepEqual(buildFinanceTransactionsViewModel(dataset, { filter: 'unreviewed' }).rows.map(item => item.id).sort(), ['pending', 'unreviewed']);
-assert.equal(buildFinanceViewModel(dataset).counts.pendingTransactions, 2);
-assert.equal(buildFinanceViewModel(dataset).counts.attention, 3);
+assert.deepEqual(buildFinanceTransactionsViewModel(dataset, { filter: 'unreviewed' }).rows.map(item => item.id).sort(), ['unreviewed']);
+assert.equal(buildFinanceViewModel(dataset).counts.pendingTransactions, 1);
+assert.equal(buildFinanceViewModel(dataset).counts.attention, 1);
 assert.equal(buildFinanceTransactionsViewModel(dataset, { sort: 'date-asc' }).rows[0].id, 'prior-month');
 assert.equal(buildFinanceTransactionsViewModel(dataset, { sort: 'date-desc' }).rows.at(-1).id, 'prior-month');
 assert.equal(JSON.stringify(state), before, 'Derived views must not mutate records');

@@ -44,6 +44,7 @@ import { bindBankAccounts, reconcileBankBatch, resolveBankReview, unlinkBankAcco
 import type { BankAccount, BankTransaction } from "./banking-types";
 import type { CoinbaseSnapshot } from "./coinbase-types";
 import { applyCoinbasePortfolio, unlinkCoinbasePortfolio } from "./coinbase-ledger";
+import { buildFinancePlan, financeSpendingGroup } from "./planning";
 
 const FILE_NAME = "finance.json";
 const MAX_AUDIT_EVENTS = 4000;
@@ -279,6 +280,64 @@ export async function readFinanceState(): Promise<FinanceState> {
     const persisted = assertState(value);
     const state = pruneExpiredImportPreviews(persisted);
     return { value: state, result: state, changed: state !== persisted };
+  });
+}
+
+function planningFingerprint(state: FinanceState, asOf: string) {
+  return createHash("sha256").update(canonicalJson({ asOf, accounts: state.accounts, transactions: state.transactions, budgets: state.budgets, bills: state.bills })).digest("hex");
+}
+
+export async function previewFinancePlan() {
+  const state = await readFinanceState();
+  const asOf = new Date().toISOString().slice(0, 10);
+  return { ...buildFinancePlan(state, asOf), fingerprint: planningFingerprint(state, asOf) };
+}
+
+export async function applyFinancePlan(rawInput: unknown, options: { actorId?: string; idempotencyKey: string }) {
+  if (!isRecord(rawInput)) validation("input must be an object", "input");
+  const input = rawInput;
+  const key = requiredText(options.idempotencyKey, "idempotencyKey", 240);
+  const fingerprint = requiredText(input.fingerprint, "fingerprint", 64);
+  const actorId = options.actorId || "admin";
+  if (![input.budgets, input.bills, input.review].every(v => typeof v === "boolean") || !(input.budgets || input.bills || input.review)) validation("Choose at least one planning action.");
+  const requestHash = idempotencyRequestHash(actorId, "apply_plan", input);
+  return mutateFinanceState(async (state) => {
+    const prior = state.planningReceipts?.find(r => r.key === key);
+    if (prior) {
+      if (prior.requestHash !== requestHash) throw new FinanceStoreError("conflict", "This request key already belongs to another plan.");
+      return { state, result: { state, counts: prior.counts, replayed: true }, changed: false };
+    }
+    const now = new Date().toISOString(), asOf = now.slice(0, 10);
+    if (fingerprint !== planningFingerprint(state, asOf)) throw new FinanceStoreError("stale", "Finance changed since this preview. Refresh the plan before applying it.");
+    const plan = buildFinancePlan(state, asOf);
+    if (plan.reviewIds.length > 5000 || plan.budgets.length > 100 || plan.bills.length > 200) validation("This plan is too large to apply at once.");
+    let next = state;
+    const recordIds: string[] = [];
+    const counts = { budgets: 0, bills: 0, reviewed: 0 };
+    if (input.budgets) for (const draft of plan.budgets) {
+      const item: FinanceBudgetRecord = { ...createBudget(draft, actorId, now), categoryGroup: draft.categoryGroup, evidence: draft.evidence };
+      ensureNoDuplicateCreate(next, "budget", item);
+      const { stateFields } = appendMutation(next, item, "budget", "finance.budget.planned", actorId, now, null, undefined, draft.evidence.basis);
+      next = { ...next, budgets: [...next.budgets, item], ...stateFields }; counts.budgets++; recordIds.push(item.id);
+    }
+    if (input.bills) for (const draft of plan.bills) {
+      const item: FinanceBillRecord = { ...createBill({ ...draft, status: "scheduled", autopay: false }, next, actorId, now), evidence: draft.evidence };
+      const { stateFields } = appendMutation(next, item, "bill", "finance.bill.detected", actorId, now, null, undefined, draft.evidence.basis);
+      next = { ...next, bills: [...next.bills, item], ...stateFields }; counts.bills++; recordIds.push(item.id);
+    }
+    if (input.review) {
+      const ids = new Set(plan.reviewIds);
+      const transactions = next.transactions.map(before => {
+        if (!ids.has(before.id)) return before;
+        const item = { ...before, reviewed: true, updatedAt: monotonicTimestamp(before.updatedAt) };
+        const { stateFields } = appendMutation(next, item, "transaction", "finance.transaction.reviewed", actorId, now, before, undefined, "Approved through the reviewed transaction snapshot. Bank settlement status preserved.");
+        next = { ...next, ...stateFields }; counts.reviewed++; recordIds.push(item.id); return item;
+      });
+      next = { ...next, transactions };
+    }
+    next = { ...next, updatedAt: now, planningReceipts: [...(next.planningReceipts || []), { id: `finance-plan-${crypto.randomUUID()}`, key, actorId, source: "finance_history_plan_v1" as const, expectedFingerprint: fingerprint, recordIds, requestHash, counts, createdAt: now }].slice(-100) };
+    assertFiniteNumbers(next);
+    return { state: next, result: { state: next, counts, replayed: false } };
   });
 }
 
@@ -633,7 +692,7 @@ function ensureNoDuplicateCreate(state: FinanceState, kind: FinanceRecordKind, i
     }
   } else if (kind === "budget") {
     const budget = item as FinanceBudgetRecord;
-    if (state.budgets.some((candidate) => !candidate.archivedAt && candidate.period === budget.period && candidate.entityScope === budget.entityScope && candidate.category.toLowerCase() === budget.category.toLowerCase())) {
+    if (state.budgets.some((candidate) => !candidate.archivedAt && candidate.period === budget.period && candidate.entityScope === budget.entityScope && (candidate.category.toLowerCase() === budget.category.toLowerCase() || (budget.categoryGroup && (candidate.categoryGroup || financeSpendingGroup(candidate.category)) === budget.categoryGroup) || (candidate.categoryGroup && financeSpendingGroup(budget.category) === candidate.categoryGroup)))) {
       throw new FinanceStoreError("conflict", "This budget category already exists for the period and entity scope.", { status: 409 });
     }
   } else if (kind === "close_period") {
@@ -1106,7 +1165,7 @@ function applyGenericUpdate(kind: FinanceRecordKind, before: FinanceRecord, fiel
     if (fields.accountId !== undefined) item.accountId = requireActiveAccount(state, fields.accountId, "fields.accountId").id;
     if (fields.status !== undefined && fields.status !== "paid") item.status = billStatus(fields.status);
     if (fields.recurring !== undefined) item.recurring = cadence(fields.recurring);
-    if (fields.autopay !== undefined) item.autopay = booleanValue(fields.autopay);
+    if (fields.autopay !== undefined) { item.autopay = booleanValue(fields.autopay); item.autopayConfirmed = true; }
     if (fields.entityScope !== undefined) item.entityScope = entityScope(fields.entityScope);
     item.updatedAt = now;
     return item;
@@ -1114,7 +1173,11 @@ function applyGenericUpdate(kind: FinanceRecordKind, before: FinanceRecord, fiel
   if (kind === "budget") {
     const item = clone(before as FinanceBudgetRecord);
     if (fields.period !== undefined) item.period = periodValue(fields.period, "fields.period");
-    if (fields.category !== undefined) item.category = requiredText(fields.category, "fields.category", 160);
+    if (fields.category !== undefined) {
+      const category = requiredText(fields.category, "fields.category", 160);
+      if (category !== item.category) delete item.categoryGroup;
+      item.category = category;
+    }
     if (fields.limit !== undefined) item.limit = positiveNumber(fields.limit, "fields.limit", true);
     if (fields.entityScope !== undefined) item.entityScope = entityScope(fields.entityScope);
     item.updatedAt = now;
@@ -1223,6 +1286,7 @@ export async function updateFinanceRecord(
         throw new FinanceStoreError("conflict", "These facts come from the bank. Sync the connection to update them; notes and categories remain editable.", { status: 409 });
       }
       item = applyGenericUpdate(kind, before, rawInput.fields, now, state);
+      if (kind === "budget") ensureNoDuplicateCreate({ ...state, budgets: state.budgets.filter(b => b.id !== before.id) }, kind, item);
     } else if (action === "mark_paid") {
       if (kind !== "bill") validation("mark_paid only supports bills", "action");
       const bill = clone(before as FinanceBillRecord);

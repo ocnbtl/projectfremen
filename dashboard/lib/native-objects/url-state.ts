@@ -196,6 +196,8 @@ export function serializePeopleUrlState(
 
 const FINANCE_VIEWS = ["overview", "accounts", "budgets", "bills", "review", "transactions", "rules"] as const;
 const FINANCE_FILTERS = [
+  "transfer",
+  "pending",
   "",
   "attention",
   "due-week",
@@ -313,7 +315,7 @@ export function parseFinanceUrlState(searchParams: UrlSearchParamsInput): Financ
 const FINANCE_FILTERS_BY_VIEW: Readonly<Record<FinanceView, readonly FinanceFilter[]>> = {
   overview: ["", "attention"],
   accounts: [""],
-  transactions: ["", "unreviewed"],
+  transactions: ["", "unreviewed", "transfer", "pending"],
   bills: ["", "due-week", "recurring"],
   budgets: ["", "over-budget"],
   review: ["", "incomplete"],

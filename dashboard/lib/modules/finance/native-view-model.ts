@@ -11,6 +11,7 @@ import type {
   FinanceTransaction
 } from "./types";
 import type { FinanceState } from "./native-types";
+import { financeSpendingGroup } from "./planning";
 
 const HUES: readonly FinanceHue[] = [
   "indigo", "blue", "teal", "orange", "violet", "green", "cyan", "yellow", "pink", "brown"
@@ -123,8 +124,10 @@ function budgetRows(state: FinanceState, period: string, transactions: readonly 
       id: item.id,
       category: item.category,
       hue: hue(index + 2),
+      evidence: item.evidence,
+      period: item.period,
       spent: active(state.transactions)
-        .filter((transaction) => transaction.direction === "expense" && transaction.category === item.category && transaction.occurredOn.startsWith(period) && transaction.entityScope === item.entityScope)
+        .filter((transaction) => transaction.direction === "expense" && (item.categoryGroup ? financeSpendingGroup(transaction.category) === item.categoryGroup : transaction.category === item.category) && transaction.occurredOn.startsWith(period) && transaction.entityScope === item.entityScope)
         .reduce((sum, transaction) => sum + Math.abs(transaction.amount), 0),
       limit: item.limit,
       icon: "Circle"
@@ -142,6 +145,7 @@ function billRows(state: FinanceState): FinanceBill[] {
       id: item.id,
       name: item.name,
       amount: item.amount,
+      evidence: item.evidence,
       due: due.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       dueIn,
       status: item.status,
@@ -151,6 +155,7 @@ function billRows(state: FinanceState): FinanceBill[] {
       hue: item.status === "overdue" ? "crimson" : item.status === "paid" ? "green" : hue(index + 3),
       recurring: item.recurring,
       autopay: item.autopay,
+      autopayConfirmed: item.autopayConfirmed,
       icon: "Calendar",
       brandColors: ["#6366f1", "#818cf8", "#c7d2fe"]
     };
@@ -183,22 +188,23 @@ export function financeStateToDataset(state: FinanceState): FinanceDataset {
   const budgets = budgetRows(state, period, transactions);
   const bills = billRows(state);
   const close = active(state.closePeriods).find((item) => item.period === period) || null;
-  const periodTransactions = active(state.transactions).filter((item) => item.occurredOn.startsWith(period));
+  const periodTransactions = active(state.transactions).filter((item) => item.occurredOn.startsWith(period) && item.status === "cleared");
   const monthIncome = periodTransactions.filter((item) => item.direction === "income").reduce((sum, item) => sum + item.amount, 0);
   const monthSpend = periodTransactions.filter((item) => item.direction === "expense").reduce((sum, item) => sum + item.amount, 0);
   const monthSaved = active(state.savingsMovements).filter((item) => item.occurredOn.startsWith(period))
     .reduce((sum, item) => sum + (item.direction === "to_savings" ? item.amount : -item.amount), 0);
   const overdue = bills.filter((item) => item.status === "overdue");
-  const pending = transactions.filter((item) => item.status === "pending" || !item.ufInit);
+  const pending = transactions.filter((item) => !item.ufInit);
   const openChecks = close?.checks.filter((item) => item.required && item.resolution === "open") || [];
+  const observedDates = active(state.transactions).map(t => t.occurredOn).sort();
   const cashflowPeriods = Array.from({ length: 6 }, (_, offset) => {
     const date = new Date(`${period}-01T12:00:00Z`);
     date.setUTCMonth(date.getUTCMonth() - (5 - offset));
     return date.toISOString().slice(0, 7);
-  });
+  }).filter(p => observedDates[0] && p >= observedDates[0].slice(0, 7));
   const cashflowFor = (candidatePeriod: string, direction: "income" | "expense") =>
     active(state.transactions)
-      .filter((item) => item.occurredOn.startsWith(candidatePeriod) && item.direction === direction)
+      .filter((item) => item.occurredOn.startsWith(candidatePeriod) && item.direction === direction && item.status === "cleared")
       .reduce((sum, item) => sum + item.amount, 0);
   const savingsFor = (candidatePeriod: string) => active(state.savingsMovements)
     .filter((item) => item.occurredOn.startsWith(candidatePeriod))
@@ -217,18 +223,19 @@ export function financeStateToDataset(state: FinanceState): FinanceDataset {
     reminders: [],
     linkedContext: linkedContexts(state),
     snapshot: {
-      lastMonthOut: cashflowFor(cashflowPeriods[4], "expense"),
+      lastMonthOut: cashflowFor(cashflowPeriods.at(-2) || "unavailable", "expense"),
       netWorthDeltaLabel: "No comparison snapshot",
       liquidDeltaLabel: "Balances are explicit facts",
       debtDeltaLabel: "No comparison snapshot",
       netThisMonth: monthIncome - monthSpend,
-      averageBurn: cashflowPeriods.map((item) => cashflowFor(item, "expense")).reduce((sum, value) => sum + value, 0) / 6,
+      averageBurn: cashflowPeriods.map((item) => cashflowFor(item, "expense")).reduce((sum, value) => sum + value, 0) / Math.max(cashflowPeriods.length, 1),
       savingsRate: monthIncome > 0 ? Math.round((monthSaved / monthIncome) * 100) : 0,
       monthIncome,
       monthSpend,
       monthSaved,
       accountDetailCode: "Native Finance record",
       cashflow: {
+        periods: cashflowPeriods, firstObservedOn: observedDates[0], lastObservedOn: observedDates.at(-1),
         months: cashflowPeriods.map((item) => new Date(`${item}-01T12:00:00Z`).toLocaleDateString("en-US", { month: "short", timeZone: "UTC" })),
         income: cashflowPeriods.map((item) => cashflowFor(item, "income")),
         spend: cashflowPeriods.map((item) => cashflowFor(item, "expense")),

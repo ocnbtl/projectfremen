@@ -17,7 +17,7 @@ export default function FinanceUtilityRail({ utility, state, onClose, onView, on
 }) {
   const accounts = state.accounts.filter(item => !item.archivedAt);
   const transactions = state.transactions.filter(item => !item.archivedAt);
-  const unreviewed = transactions.filter(item => !item.reviewed || item.status === "pending");
+  const unreviewed = transactions.filter(item => !item.reviewed);
   const events = [...state.auditEvents].sort((a, b) => b.occurredAt.localeCompare(a.occurredAt)).slice(0, 30);
   const categories = [...new Set([...transactions.map(item => item.category), ...state.budgets.filter(item => !item.archivedAt).map(item => item.category), ...state.bills.filter(item => !item.archivedAt).map(item => item.category)])].filter(Boolean).sort();
   const recordLabels = new Map<string, string>([

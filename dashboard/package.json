@@ -13,6 +13,7 @@
     "test:organization-autofill": "node ./scripts/organization-autofill-harness.mjs",
     "test:people-refinements": "node ./scripts/people-refinements-harness.cjs",
     "test:finance-redesign": "node ./scripts/finance-redesign-harness.cjs",
+    "test:finance-planning": "node ./scripts/finance-planning-harness.cjs",
     "test:finance-banking": "node ./scripts/finance-banking-harness.cjs",
     "test:finance-investments": "node ./scripts/finance-investments-harness.cjs",
     "test:finance-coinbase": "node ./scripts/finance-coinbase-harness.cjs",

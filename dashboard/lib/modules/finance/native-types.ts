@@ -102,6 +102,8 @@ export interface FinanceSavingsMovementRecord extends FinanceRecordBase {
 }
 
 export interface FinanceBillRecord extends FinanceRecordBase {
+  autopayConfirmed?: boolean;
+  evidence?: import("./planning").PlanningEvidence;
   name: string;
   amount: number;
   dueDate: string;
@@ -118,6 +120,8 @@ export interface FinanceBillRecord extends FinanceRecordBase {
 }
 
 export interface FinanceBudgetRecord extends FinanceRecordBase {
+  categoryGroup?: string;
+  evidence?: import("./planning").PlanningEvidence;
   period: string;
   category: string;
   limit: number;
@@ -244,6 +248,7 @@ export interface FinanceIdempotencyRecord {
 }
 
 export interface FinanceState {
+  planningReceipts?: { id: string; key: string; actorId: string; source: "finance_history_plan_v1"; expectedFingerprint: string; recordIds: string[]; requestHash: string; counts: { budgets: number; bills: number; reviewed: number }; createdAt: string }[];
   bankReviews?: BankReview[];
   schemaVersion: typeof FINANCE_SCHEMA_VERSION;
   updatedAt: string | null;

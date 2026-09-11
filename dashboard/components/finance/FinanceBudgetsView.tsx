@@ -54,12 +54,13 @@ export default function FinanceBudgetsView({
   return (
     <>
 
+      {model.rows.some(r => r.budget.evidence) && <p className="finance-view-explainer">{model.rows[0]?.budget.period} · Starter limits based on recorded history. Spending includes pending payments; transfers are excluded. Open a category to see its basis and adjust the limit.</p>}
       <MetricStrip
         className={styles.metrics}
         ariaLabel="Budget scope metrics"
         items={[
           { id: "spent", label: "Spent", value: money(model.totals.spent), detail: "Recorded expenses" },
-          { id: "cap", label: "Cap", value: money(model.totals.limit), detail: "Category limits" },
+          { id: "cap", label: "Planned", value: money(model.totals.limit), detail: "Monthly category limits" },
           { id: "remaining", label: "Remaining", value: money(model.totals.remaining), detail: `${percent(model.totals.usedPercent)} used`, tone: model.totals.remaining < 0 ? "danger" : "positive" },
         ]}
       />
@@ -67,7 +68,7 @@ export default function FinanceBudgetsView({
       <div className={styles.scopeBar}>
         <div className={styles.filterGroup} role="group" aria-label="Budget filters">
           <button type="button" className={styles.filterButton} data-active={filter === ""} aria-pressed={filter === ""} onClick={() => onFilterChange("")}>All</button>
-          <button type="button" className={styles.filterButton} data-active={filter === "over-budget"} aria-pressed={filter === "over-budget"} onClick={() => onFilterChange("over-budget")}>Over cap</button>
+          <button type="button" className={styles.filterButton} data-active={filter === "over-budget"} aria-pressed={filter === "over-budget"} onClick={() => onFilterChange("over-budget")}>Over budget</button>
         </div>
         <label className={styles.sortLabel}>
           Sort
@@ -108,7 +109,7 @@ export default function FinanceBudgetsView({
                 <IconTile hue={budget.hue} icon={budget.icon} />
                 <span>
                   <strong>{budget.category} {over ? <Chip hue="crimson">Over cap</Chip> : null}</strong>
-                  <small>{money(budget.spent, { cents: true })} spent · {money(budget.limit, { cents: true })} cap</small>
+                  <small>{money(budget.spent, { cents: true })} spent · {money(budget.limit, { cents: true })} monthly limit</small>
                   <small>{money(Math.abs(remaining), { cents: true })} {over ? "over budget" : "remaining"}</small>
                 </span>
                 <strong className={over ? "is-negative" : ""}>{percent(usedPercent)}</strong>

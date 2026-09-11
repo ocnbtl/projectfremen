@@ -4,6 +4,8 @@ import { appendAuditEvent as appendGlobalAuditEvent, getRequestIp } from "../../
 import { isCsrfRequestValid } from "../../../lib/csrf";
 import {
   confirmFinanceImport,
+  previewFinancePlan,
+  applyFinancePlan,
   createFinanceRecord,
   FinanceStoreError,
   previewFinanceCsv,
@@ -95,6 +97,7 @@ export async function POST(request: Request) {
       return financeJson({ ok: false, error: "Request body must be an object" }, { status: 400 });
     }
     operation = typeof body.operation === "string" ? body.operation : "create";
+    if (operation === "preview_plan") return financeJson({ ok: true, plan: await previewFinancePlan() });
     if (operation === "preview_import") {
       const preview = await previewFinanceCsv(body.input, { actorId: "admin" });
       await auditRequest(request, "finance.import.previewed", "ok", `${preview.counts.accepted}/${preview.rows.length}`);
@@ -104,6 +107,12 @@ export async function POST(request: Request) {
     if (!idempotencyKey) {
       return financeJson({ ok: false, error: "Idempotency-Key header is required" }, { status: 400 });
     }
+    if (operation === "apply_plan") {
+      const result = await applyFinancePlan(body.input, { actorId: "admin", idempotencyKey });
+      await auditRequest(request, "finance.plan.applied", "ok", JSON.stringify(result.counts));
+      return financeJson({ ok: true, ...result });
+    }
+    if (operation !== "create" && operation !== "confirm_import") return financeJson({ ok: false, error: "Unsupported Finance operation" }, { status: 400 });
     const result = operation === "confirm_import"
       ? await confirmFinanceImport(body.input, { actorId: "admin", idempotencyKey })
       : await createFinanceRecord(body.input, { actorId: "admin", idempotencyKey });

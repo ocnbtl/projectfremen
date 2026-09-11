@@ -1108,7 +1108,19 @@ async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
       });
       assert(!diagnostics.overflow, `Finance ${viewport.label} has horizontal overflow`);
       assert(!diagnostics.dockOverlap, `Finance ${viewport.label} action bar overlaps the AI dock`);
-      assert(!diagnostics.dockDataOverlap, `Finance ${viewport.label} ledger data overlaps the AI dock: ${JSON.stringify(diagnostics)}`);
+      // Finance now intentionally uses the same floating launcher as People.
+      // It may float over scrolled content, but must stay in the viewport and leave primary controls usable.
+      assert(diagnostics.dockRect && diagnostics.dockRect.left >= 0 && diagnostics.dockRect.right <= viewport.width && diagnostics.dockRect.top >= 0 && diagnostics.dockRect.bottom <= viewport.height, `Finance ${viewport.label} assistant is outside the viewport`);
+      if (viewport.width >= 1100) {
+        const dock = page.getByRole("button", { name: "Open AI assistant", exact: true });
+        const beforeDrag = await dock.boundingBox();
+        await page.mouse.move(beforeDrag.x + beforeDrag.width / 2, beforeDrag.y + beforeDrag.height / 2);
+        await page.mouse.down();
+        await page.mouse.move(beforeDrag.x - 100, beforeDrag.y - 100, { steps: 8 });
+        await page.mouse.up();
+        const afterDrag = await dock.boundingBox();
+        assert(afterDrag.x < beforeDrag.x - 50 && afterDrag.y < beforeDrag.y - 50, "Finance shared Assistant did not drag");
+      }
       await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}-transactions.png`), fullPage: true });
       if (viewport.width === 390) {
         const undersized = await page.locator("button:visible, a[href]:visible, input:visible, select:visible").evaluateAll((elements) => elements.map((element) => {
@@ -1212,7 +1224,7 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
   const mutations = [];
   const screenshotDir = path.join(dashboardDir, "output", "playwright", "command-center-native");
   await mkdir(screenshotDir, { recursive: true });
-  const pending = financeState.transactions.filter((item) => !item.archivedAt && (item.status === "pending" || !item.reviewed)).length;
+  const pending = financeState.transactions.filter((item) => !item.archivedAt && !item.reviewed).length;
   const accounts = financeState.accounts.filter((item) => !item.archivedAt).length;
   try {
     for (const viewport of [
@@ -1245,7 +1257,7 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
       await command.waitFor();
       assert(await page.locator('[aria-label="Open AI assistant"]').count() === 0, `Command Center ${viewport.label} reintroduced the floating AI control`);
       const text = await command.innerText();
-      assert(text.includes(`${accounts} accounts · ${pending} pending`), `Command Center ${viewport.label} did not derive the current Finance module count`);
+      assert(text.includes(`${accounts} accounts · ${pending} to review`), `Command Center ${viewport.label} did not derive the current Finance module count`);
       assert(text.toLowerCase().includes("attention horizon") && text.toLowerCase().includes("live worklist"), `Command Center ${viewport.label} omitted the detailed attention horizon`);
       assert(await command.locator(".command-attention-summary > div").count() === 4, `Command Center ${viewport.label} did not render total/now/next/watch summaries`);
       assert(await command.locator(".command-attention-row").count() >= pending, `Command Center ${viewport.label} omitted Finance owner records from its live worklist`);
@@ -13700,7 +13712,7 @@ async function main() {
       ["/admin/finance", "Overview", "Finance command view"],
       ["/admin/finance/accounts?view=transactions", "Accounts", 'data-finance-account-id='],
       ["/admin/finance/transactions?view=review", "Transactions", 'aria-label="Finance transactions"'],
-      ["/admin/finance/bills?view=budgets", "Bills &amp; subscriptions", "Payment queue"],
+      ["/admin/finance/bills?view=budgets", "Bills &amp; subscriptions", "Payment calendar"],
       ["/admin/finance/budgets?view=bills", "Budgets", 'aria-label="Budget categories"'],
       ["/admin/finance/monthly-review?view=accounts", "Monthly review", "Close checklist"],
       ["/admin/finance/rules?view=accounts", "Rules &amp; automation", 'data-finance-rule-id=']

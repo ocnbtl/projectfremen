@@ -105,7 +105,7 @@ export default function FinanceBillsView({
 
       <Panel hue="orange" className={`${styles.ledger} finance-ledger-panel`}>
         <div className="finance-panel-heading">
-          <h2>Payment queue <span>{model.visibleCount} shown · grouped by status</span></h2>
+          <h2>{filter === "recurring" ? "Recurring commitments" : filter === "due-week" ? "Expected this week" : "Payment calendar"} <span>{model.visibleCount} shown · grouped by status</span></h2>
         </div>
         {BILL_GROUPS.map((status) => {
           const rows = model.rows.filter(({ bill }) => bill.status === status);
@@ -136,16 +136,16 @@ export default function FinanceBillsView({
                           <strong>{bill.name}</strong>
                           <small>{bill.account} · {bill.category}</small>
                           <span className={styles.accountRowMeta}>
-                            <Chip hue={bill.autopay ? "cyan" : "neutral"}>{bill.autopay ? "Autopay on" : "Manual payment"}</Chip>
+                            <Chip hue={bill.autopay ? "cyan" : "neutral"}>{bill.evidence && !bill.autopayConfirmed ? "Autopay unconfirmed" : bill.autopay ? "Autopay on" : "Manual payment"}</Chip>
                             <Chip hue={bill.recurring ? "violet" : "neutral"}>{bill.recurring ? `${bill.recurring} cadence` : "One-time"}</Chip>
                           </span>
                         </span>
                         <span>
                           <strong>{money(bill.amount, { cents: true })}</strong>
-                          <small>{bill.due} · {dueDetail(bill.status, bill.dueIn)}</small>
+                          <small>{bill.evidence ? `Expected ${bill.due} · estimated` : `${bill.due} · ${dueDetail(bill.status, bill.dueIn)}`}</small>
                           {bill.recurring ? <small>{money(monthlyEquivalent, { cents: true })}/mo equivalent</small> : null}
                         </span>
-                        <Chip hue={BILL_STATUS_HUES[bill.status]} solid={bill.status === "overdue"}>{BILL_STATUS_LABELS[bill.status]}</Chip>
+                        <Chip hue={BILL_STATUS_HUES[bill.status]} solid={bill.status === "overdue"}>{bill.evidence ? "Estimated" : BILL_STATUS_LABELS[bill.status]}</Chip>
                       </button>
                     </li>
                   );

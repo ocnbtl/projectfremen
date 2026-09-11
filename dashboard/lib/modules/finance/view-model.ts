@@ -20,6 +20,7 @@ export interface FinanceViewModel {
     readonly attention: number;
     readonly dueThisWeek: number;
     readonly pendingTransactions: number;
+    readonly transfers: number;
     readonly recurringBills: number;
     readonly linkedProjects: number;
     readonly overBudget: number;
@@ -91,11 +92,12 @@ export function buildFinanceViewModel(dataset: FinanceDataset): FinanceViewModel
       reviewItems: dataset.reviewItems.length,
       reminders: dataset.reminders.length,
       linkedContext: dataset.linkedContext.length,
-      attention: dataset.bills.filter(bill => bill.status !== "paid" && (bill.status === "overdue" || bill.dueIn < 0)).length + dataset.transactions.filter(transaction => transaction.status === "pending" || !transaction.ufInit).length + overBudget + dataset.reviewItems.filter(item => !item.done).length,
+      attention: dataset.bills.filter(bill => !bill.evidence && bill.status !== "paid" && (bill.status === "overdue" || bill.dueIn < 0)).length + overBudget + dataset.reviewItems.filter(item => !item.done).length,
       dueThisWeek: dataset.bills.filter(
         (bill) => bill.status !== "overdue" && bill.status !== "paid" && bill.dueIn >= 0 && bill.dueIn <= 7
       ).length,
-      pendingTransactions: dataset.transactions.filter((transaction) => transaction.status === "pending" || !transaction.ufInit).length,
+      pendingTransactions: dataset.transactions.filter((transaction) => !transaction.ufInit).length,
+      transfers: dataset.transactions.filter(t => t.io === "transfer").length,
       recurringBills: dataset.bills.filter((bill) => Boolean(bill.recurring)).length,
       linkedProjects: dataset.linkedContext.filter((item) => item.type === "Project").length,
       overBudget,
@@ -122,7 +124,7 @@ export function buildFinanceViewModel(dataset: FinanceDataset): FinanceViewModel
       total: dataset.reviewItems.length,
       percent: dataset.reviewItems.length ? Math.round((reviewDone / dataset.reviewItems.length) * 100) : 0
     },
-    cashflowSummary: `Latest plotted values are income $${formatThousands(latestIncome)} thousand, spend $${formatThousands(latestSpend)} thousand, and savings $${formatThousands(latestSavings)} thousand. Savings ${savingsDirection} from $${formatThousands(firstSavings)} thousand at the start to $${formatThousands(latestSavings)} thousand and ranged from ${signedThousands(minimumSavings)} thousand to $${formatThousands(maximumSavings)} thousand.`
+    cashflowSummary: `Latest recorded month: income $${latestIncome.toFixed(2)}, spending $${latestSpend.toFixed(2)}, net $${(latestIncome - latestSpend).toFixed(2)}. Transfers excluded.`
   };
 }
 
@@ -130,6 +132,8 @@ export function getFinanceSmartViewCount(viewModel: FinanceViewModel, id: string
   if (id === "attention") return viewModel.counts.attention;
   if (id === "due-week") return viewModel.counts.dueThisWeek;
   if (id === "unreviewed") return viewModel.counts.pendingTransactions;
+  if (id === "over-budget") return viewModel.counts.overBudget;
+  if (id === "transfer") return viewModel.counts.transfers;
   if (id === "recurring") return viewModel.counts.recurringBills;
   if (id === "linked-projects") return viewModel.counts.linkedProjects;
   if (id === "savings-movement") return viewModel.counts.savingsMovements;
