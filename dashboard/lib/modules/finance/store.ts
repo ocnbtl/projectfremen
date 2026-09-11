@@ -692,7 +692,7 @@ function ensureNoDuplicateCreate(state: FinanceState, kind: FinanceRecordKind, i
     }
   } else if (kind === "budget") {
     const budget = item as FinanceBudgetRecord;
-    if (state.budgets.some((candidate) => !candidate.archivedAt && candidate.period === budget.period && candidate.entityScope === budget.entityScope && (candidate.category.toLowerCase() === budget.category.toLowerCase() || (budget.categoryGroup && (candidate.categoryGroup || financeSpendingGroup(candidate.category)) === budget.categoryGroup) || (candidate.categoryGroup && financeSpendingGroup(budget.category) === candidate.categoryGroup)))) {
+    if (state.budgets.some((candidate) => !candidate.archivedAt && candidate.period === budget.period && candidate.entityScope === budget.entityScope && (candidate.category.toLowerCase() === budget.category.toLowerCase() || (budget.categoryGroup && (candidate.categoryGroup || financeSpendingGroup(candidate.category)) === budget.categoryGroup) || (candidate.categoryGroup && (budget.categoryGroup || financeSpendingGroup(budget.category)) === candidate.categoryGroup)))) {
       throw new FinanceStoreError("conflict", "This budget category already exists for the period and entity scope.", { status: 409 });
     }
   } else if (kind === "close_period") {

@@ -18,6 +18,9 @@ async function main() {
   state.transactions = [txn('first', '2026-06-15', 999), txn('jul', '2026-07-03', 100), txn('aug', '2026-08-03', 200), txn('pending', '2026-09-03', 500, { status: 'pending' }), txn('transfer', '2026-07-04', 9999, { direction: 'transfer' }), txn('business', '2026-07-05', 50, { entityScope: 'business' })];
   const subscription = (id, d, amount = 20, extra = {}) => txn(id, d, amount, { merchant: 'Design subscription', category: 'General services other general services', ...extra });
   state.transactions.push(subscription('sub-jul', '2026-07-31'), subscription('sub-aug', '2026-08-31'));
+  // An explicit Other spending group must not collide with the display names
+  // of distinct groups, whose text is not an original bank category.
+  state.transactions.push(txn('education', '2026-07-20', 250, { category: 'General services education' }), txn('coffee', '2026-08-20', 40, { category: 'Food and drink coffee' }));
   await check('planning excludes partial months, pending, transfers and preserves entity scopes', () => {
     const before = JSON.stringify(state), plan = buildFinancePlan(state, '2026-09-11');
     assert.deepEqual(plan.periods, ['2026-07', '2026-08']);
@@ -61,6 +64,7 @@ async function main() {
     assert(result.state.transactions.every(t => t.reviewed)); assert.equal(result.state.transactions.find(t => t.id === 'pending').status, 'pending');
     assert.equal(result.state.auditEvents.filter(e => e.action === 'finance.transaction.reviewed').length, result.counts.reviewed);
     assert.equal(result.counts.budgets, result.state.budgets.length);
+    if (today.startsWith('2026-09')) assert.equal(result.counts.budgets, 5, 'distinct explicit groups coexist with Other spending');
     assert(result.state.budgets.every(b => b.categoryGroup && b.evidence.transactionIds.length));
     const groceries = financeStateToDataset(result.state).budgets.find(b => b.category === 'Groceries' && b.limit === 150);
     if (today.startsWith('2026-09')) assert.equal(groceries.spent, 500, 'pending spending reserves budget capacity');
