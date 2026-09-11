@@ -2,11 +2,13 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FinanceState } from "../../lib/modules/finance/native-types";
-import type { BankingView, BankConnectionView } from "../../lib/modules/finance/banking-types";
+import type { BankingView, BankConnectionView, BankingProduct } from "../../lib/modules/finance/banking-types";
+import { matchingAccounts, suggestInvestmentMatches } from "../../lib/modules/finance/banking-matching";
+import FinanceInvestmentSnapshot from "./FinanceInvestmentSnapshot";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import { Icon, money } from "./FinancePrimitives";
 
-type LinkSession = { sessionId: string; linkToken: string; expiresAt: string; update: boolean };
+type LinkSession = { sessionId: string; linkToken: string; expiresAt: string; update: boolean; product?: BankingProduct };
 type LinkHandler = { open: () => void; destroy: () => void };
 type PlaidWindow = Window & { Plaid?: { create: (options: { token: string; receivedRedirectUri?: string; onSuccess: (token: string) => void; onExit: (error: unknown) => void }) => LinkHandler } };
 const sessionKey = "unigentamos.plaid.link-session";
@@ -35,15 +37,15 @@ async function requestBank(body?: Record<string, unknown>) {
 const date = (value: string) => new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 
 function AccountMatching({ connection, state, busy, onSave }: { connection: BankConnectionView; state: FinanceState; busy: boolean; onSave: (choices: Record<string, string>) => void }) {
-  const [choices, setChoices] = useState<Record<string, string>>({});
+  const [choices, setChoices] = useState<Record<string, string>>(() => suggestInvestmentMatches(connection, state));
   return <form className="finance-bank-matching" onSubmit={event => { event.preventDefault(); onSave(choices); }}>
-    <p>Match each account to a record you already keep, create a new one, or skip it. Connecting updates its balance and imports up to 90 days of available transactions.</p>
+    <p>{connection.product === "investments" ? "Review the suggested matches, choose a new account, or skip an account. Connecting retrieves balances, holdings and up to 90 days of investment activity. Your first sync may take a couple of minutes." : "Match each account to a record you already keep, create a new one, or skip it. Connecting updates its balance and imports up to 90 days of available transactions."}</p>
     {connection.accounts.map(account => <label key={account.id}><span><strong>{account.name}</strong>{account.mask ? ` · ••${account.mask}` : ""}</span>
       <small>{account.kind} · {account.currency}{account.balance !== null ? ` · ${money(account.balance, { cents: true })}` : " · Balance unavailable"}</small>
       {account.supported ? <select aria-label={`Match ${account.name}`} required disabled={busy} value={choices[account.id] || ""} onChange={event => setChoices({ ...choices, [account.id]: event.target.value })}>
         <option value="">Choose where this belongs</option><option value="skip">Skip this account</option><option value="new">Create a new Finance account</option>
-        {state.accounts.filter(item => !item.archivedAt && (!item.bankLink || (item.bankLink.connectionId === connection.id && item.bankLink.accountId === account.id)) && item.entityScope === "personal" && item.kind === account.kind).map(item => <option key={item.id} value={item.id}>{item.name}{item.mask ? ` · ••${item.mask}` : ""}</option>)}
-      </select> : <small>USD checking, savings and credit-card accounts are supported in this first release.</small>}
+        {matchingAccounts(connection, account, state).map(item => <option key={item.id} value={item.id}>{item.name}{item.mask ? ` · ••${item.mask}` : ""}</option>)}
+      </select> : <small>{connection.product === "investments" ? "Only USD investment accounts are supported here." : "USD checking, savings and credit-card accounts are supported here."}</small>}
     </label>)}
     <button type="submit" className="finance-action" disabled={busy || !connection.accounts.some(item => item.supported)}>Save matches & sync</button>
   </form>;
@@ -119,7 +121,7 @@ export default function FinanceBankConnections({ state, onChanged }: { state: Fi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const connect = async (connectionId?: string) => {
+  const connect = async (connectionId?: string, product: BankingProduct = "transactions") => {
     if (banking?.origin && window.location.origin !== banking.origin) {
       window.location.assign(`${banking.origin}/admin/finance/accounts`);
       return;
@@ -127,7 +129,7 @@ export default function FinanceBankConnections({ state, onChanged }: { state: Fi
     setBusy(true); setError(""); setNotice("");
     let session: LinkSession | undefined;
     try {
-      const result = await requestBank({ operation: "link", connectionId });
+      const result = await requestBank({ operation: "link", connectionId, product });
       session = result.link;
       if (!session) throw new Error("A bank sign-in session could not be created.");
       await openLink(session);
@@ -148,17 +150,22 @@ export default function FinanceBankConnections({ state, onChanged }: { state: Fi
       <p className="finance-bank-plan">{banking.environment === "sandbox" ? "Sandbox · test data only" : "Free personal Trial"} · {banking.connectionsUsed}/10 connection slots used or reserved</p>
       <p className="finance-utility-intro">Connect USD checking, savings, credit cards and supported PayPal accounts. Your sign-in stays inside Plaid. Updates arrive when your institution makes them available.</p>
       <button className="finance-action" disabled={busy || banking.connectionsUsed >= 10} onClick={() => void connect()}><Icon name="Link" />Connect an institution</button>
-      <p className="finance-bank-footnote">One institution login can contain several accounts. Removing a connection does not restore its Trial slot. Vanguard and other investment accounts need a separate Investments connection. Use the Coinbase section for your personal crypto portfolio.</p>
+      <div className="finance-investment-connect"><strong>Investments</strong><p className="finance-utility-intro">Link Vanguard and supported brokerage or retirement accounts for balances, holdings and investment activity. Included in your personal Plaid Trial.</p>
+        <button className="finance-action" disabled={busy || banking.connectionsUsed >= 10} onClick={() => void connect(undefined, "investments")}><Icon name="Link" />Connect investments</button>
+      </div>
+      <p className="finance-bank-footnote">Banks and investments share ten lifetime Trial slots. One institution login can contain several accounts. Removing a connection does not restore its slot. Coinbase uses its separate connection above.</p>
       {banking.connections.map(connection => <article className="finance-bank-card" key={connection.id}>
         <div className="finance-bank-card-heading"><strong>{connection.name}</strong><span>{connection.status === "mapping" ? "Match accounts" : connection.status === "reconnect" ? "Needs attention" : connection.status === "disconnected" ? "Disconnected" : "Connected"}</span></div>
+        {connection.product === "investments" && <p className="finance-bank-plan">Investments · Read only</p>}
         {connection.error && <p className="finance-bank-error">{connection.error}</p>}
-        {connection.lastSyncedAt && <p className="finance-bank-footnote">Last retrieved {date(connection.lastSyncedAt)}. Bank data may be older.</p>}
+        {connection.lastSyncedAt && <p className="finance-bank-footnote">Last retrieved {date(connection.lastSyncedAt)}. Institution data may be older.</p>}
         {connection.status === "connected" && !connection.initialComplete && <p className="finance-bank-footnote">Initial history may still be arriving. Plaid will notify the site when more is ready.</p>}
         {!!Object.keys(connection.mappings).length && connection.status !== "disconnected" && <ul className="finance-bank-account-list">{Object.entries(connection.mappings).map(([bankId, nativeId]) => <li key={bankId}>{state.accounts.find(item => item.id === nativeId)?.name || "Connected account"}</li>)}</ul>}
-        {connection.status === "mapping" && connection.accounts.length > 0 && <AccountMatching connection={connection} state={state} busy={busy} onSave={choices => void run({ operation: "map", connectionId: connection.id, choices }, "Accounts matched and available transactions synced.")} />}
+        {connection.status === "mapping" && connection.accounts.length > 0 && <AccountMatching connection={connection} state={state} busy={busy} onSave={choices => void run({ operation: "map", connectionId: connection.id, choices }, "Accounts matched and available data synced.")} />}
+        {connection.investments && <FinanceInvestmentSnapshot connection={connection} state={state} />}
         {connection.status !== "disconnected" && <div className="finance-bank-actions">
           {connection.status === "mapping" && !connection.accounts.length && <button className="finance-action" disabled={busy} onClick={() => void run({ operation: "accounts", connectionId: connection.id }, "Accounts loaded.")}>Load accounts</button>}
-          {connection.status === "connected" && <button className="finance-action" disabled={busy} onClick={() => void run({ operation: "sync", connectionId: connection.id }, "Available bank data synced.")}>Sync now</button>}
+          {connection.status === "connected" && <button className="finance-action" disabled={busy} onClick={() => void run({ operation: "sync", connectionId: connection.id }, "Available institution data synced.")}>{busy ? "Updating…" : "Sync now"}</button>}
           {connection.status === "reconnect" && <button className="finance-action" disabled={busy} onClick={() => void connect(connection.id)}>Reconnect</button>}
           <button className="finance-text-action" disabled={busy} onClick={() => setDisconnectId(connection.id)}>Disconnect</button>
         </div>}

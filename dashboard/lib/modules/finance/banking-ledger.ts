@@ -20,7 +20,7 @@ export function bindBankAccounts(state: FinanceState, connectionId: string, inst
   const targets = new Set<string>();
   for (const [bankId, target] of selected) {
     const bank = accounts.find(item => item.id === bankId && item.supported);
-    if (!bank) throw new BankingError("unsupported_account", "This account is not supported. Choose a USD checking, savings or credit-card account.");
+    if (!bank) throw new BankingError("unsupported_account", "Choose a supported USD account for this connection type.");
     const id = target === "new" ? bankRecordId(connectionId, bankId) : target;
     if (state.accounts.some(item => item.id !== id && item.bankLink?.connectionId === connectionId && item.bankLink.accountId === bankId)) {
       throw new BankingError("already_linked", "This bank account is already matched to a Finance account. Select that existing account to recover the match.", 409);

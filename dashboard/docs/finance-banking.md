@@ -1,6 +1,6 @@
 # Personal banking with Plaid Trial
 
-This integration serves the existing authenticated owner of the private Finance workspace. It supports USD depository and credit-card accounts through Transactions. It does not create a public banking service, enable payments, or request investment access. Brokerage holdings and crypto need a separate integration pass.
+This integration serves the existing authenticated owner of the private Finance workspace. Connect an institution supports USD depository and credit-card accounts through Transactions. The separate **Connect investments** flow supports brokerage and retirement accounts through [Plaid Investments](finance-investments.md). Personal crypto uses the [Coinbase connection](finance-coinbase.md). These read-only integrations do not enable payments or create a public banking service.
 
 ## Server configuration
 

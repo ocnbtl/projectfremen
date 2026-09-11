@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { mutateJsonFile, readJsonFile } from "../../file-store";
-import type { BankAccount, BankConnectionView, BankingView } from "./banking-types";
+import type { BankAccount, BankConnectionView, BankingView, BankingProduct } from "./banking-types";
+import { fetchInvestments } from "./investments-provider";
 import { BankingError, bankingConfig, requireBankingConfig, encryptBanking, decryptBanking, plaid, normalizeAccounts, normalizeTransaction, type EncryptedBanking, type ProviderTransaction } from "./banking-provider";
 import { applyFinanceBankBatch, connectFinanceBankAccounts, disconnectFinanceBankAccounts } from "./store";
 
@@ -13,6 +14,7 @@ interface Connection extends BankConnectionView {
   disconnectPending?: boolean;
 }
 interface LinkSession {
+  product?: BankingProduct;
   id: string;
   expires: number;
   linkToken?: string;
@@ -52,10 +54,12 @@ export async function bankingView(): Promise<BankingView> {
   const reserved = state.sessions.filter(session => session.expires > Date.now() && !session.connectionId && !session.exchangeStarted && !session.completed).length;
   return { configured: true, environment: config.environment, origin: config.origin, connectionsUsed: state.connectionsUsed + reserved,
     connections: state.connections.map(item => ({ id: item.id, name: item.name, status: item.status, accounts: item.accounts, mappings: item.mappings,
+      product: item.product || "transactions", investments: item.investments,
       lastSyncedAt: item.lastSyncedAt, initialComplete: item.initialComplete, error: item.error })) };
 }
 
-export async function createBankLink(connectionId?: string) {
+export async function createBankLink(connectionId?: string, product: BankingProduct = "transactions") {
+  if (product !== "transactions" && product !== "investments") throw new BankingError("invalid_request", "Choose a supported connection type.");
   const config = requireBankingConfig();
   const id = randomUUID(), now = Date.now();
   const existing = await mutateStore(state => {
@@ -70,14 +74,14 @@ export async function createBankLink(connectionId?: string) {
     const reserved = state.sessions.filter(session => !session.connectionId && !session.exchangeStarted && !session.completed).length;
     if (!current && state.connectionsUsed + reserved >= 10) throw new BankingError("trial_limit", "All ten Trial connection slots are used or reserved. Disconnecting does not restore the lifetime allowance.", 409);
     state.lastLinkAt = now;
-    state.sessions.push({ id, expires: now + 30 * 60_000, connectionId });
-    return current ? { accessToken: current.accessToken } : null;
+    state.sessions.push({ id, expires: now + 30 * 60_000, connectionId, product: current?.product || (current ? "transactions" : product) });
+    return current ? { accessToken: current.accessToken, product: current.product || "transactions" } : null;
   });
   try {
     const response = await plaid<{ link_token: string; expiration: string }>("/link/token/create", {
       client_name: "Unigentamos", user: { client_user_id: "unigentamos-personal-owner" }, country_codes: ["US"], language: "en",
       redirect_uri: `${config.origin}/admin/finance/accounts`, webhook: `${config.origin}/api/finance/banking/webhook`,
-      ...(existing ? { access_token: existing.accessToken } : { products: ["transactions"], transactions: { days_requested: 90 },
+      ...(existing ? { access_token: existing.accessToken } : product === "investments" ? { products: ["investments"], account_filters: { investment: { account_subtypes: ["all"] } } } : { products: ["transactions"], transactions: { days_requested: 90 },
         account_filters: { depository: { account_subtypes: ["checking", "savings", "money market", "cash management", "cd", "paypal"] }, credit: { account_subtypes: ["credit card"] } } })
     });
     await mutateStore(state => {
@@ -86,7 +90,7 @@ export async function createBankLink(connectionId?: string) {
       session.linkToken = response.link_token;
       session.expires = Math.min(session.expires, Date.parse(response.expiration));
     });
-    return { sessionId: id, linkToken: response.link_token, expiresAt: new Date(now + 30 * 60_000).toISOString(), update: Boolean(existing) };
+    return { sessionId: id, linkToken: response.link_token, expiresAt: new Date(now + 30 * 60_000).toISOString(), update: Boolean(existing), product: existing?.product || product };
   } catch (error) {
     await mutateStore(state => { state.sessions = state.sessions.filter(item => item.id !== id); });
     throw error;
@@ -127,7 +131,7 @@ export async function exchangeBankLink(rawId: unknown, rawToken: unknown) {
   const connectionId = randomUUID();
   await mutateStore(state => {
     state.connections.push({ id: connectionId, name: "Bank connection", itemId: response.item_id, accessToken: response.access_token,
-      status: "mapping", accounts: [], mappings: {} });
+      product: session.product || "transactions", status: "mapping", accounts: [], mappings: {} });
     state.sessions.find(item => item.id === id)!.completed = connectionId;
   });
   // Credentials are durable before any subsequent request. A metadata failure is recoverable from the panel.
@@ -169,7 +173,7 @@ async function withConnection<T>(id: string, fn: (connection: Connection) => Pro
 
 async function providerAccounts(connection: Connection) {
   const data = await plaid<{ accounts: Parameters<typeof normalizeAccounts>[0]; item: { institution_id: string | null } }>("/accounts/get", { access_token: connection.accessToken });
-  return { accounts: normalizeAccounts(data.accounts), institutionId: data.item.institution_id };
+  return { accounts: normalizeAccounts(data.accounts, connection.product), institutionId: data.item.institution_id };
 }
 
 export async function refreshBankAccounts(id: string) {
@@ -196,7 +200,18 @@ interface SyncResponse { added: ProviderTransaction[]; modified: ProviderTransac
 export async function syncBankConnection(id: string) {
   return withConnection(id, async connection => {
     if (connection.disconnectPending) throw new BankingError("disconnect_pending", "Finish disconnecting this institution first.", 409);
-    if (!Object.keys(connection.mappings).length) throw new BankingError("mapping_required", "Match your accounts before syncing transactions.", 409);
+    if (!Object.keys(connection.mappings).length) throw new BankingError("mapping_required", "Match your accounts before syncing.", 409);
+    if (connection.product === "investments") {
+      const { accounts, snapshot } = await fetchInvestments(connection.accessToken, Object.keys(connection.mappings), connection.investments);
+      // Account balances are authoritative. Holdings and investment cash flows never enter spending totals.
+      await applyFinanceBankBatch(id, connection.mappings, accounts, [], []);
+      await mutateStore(state => {
+        const item = connectionFor(state, id);
+        item.accounts = accounts; item.investments = snapshot; item.lastSyncedAt = snapshot.retrievedAt;
+        item.initialComplete = snapshot.activityReady; item.error = undefined; item.status = "connected";
+      });
+      return;
+    }
     const { accounts } = await providerAccounts(connection);
     for (let attempt = 0; attempt < 2; attempt += 1) {
       let cursor = connection.cursor, complete = false, updateStatus = "";
@@ -254,7 +269,11 @@ export async function handleBankWebhook(body: Record<string, unknown>) {
   const state = await readStore();
   const connection = state.connections.find(item => item.itemId === body.item_id && item.status !== "disconnected");
   if (!connection || connection.disconnectPending) return;
-  if (body.webhook_type === "TRANSACTIONS" && body.webhook_code === "SYNC_UPDATES_AVAILABLE" && Object.keys(connection.mappings).length) {
+  const investmentUpdate = connection.product === "investments" &&
+    ((body.webhook_type === "HOLDINGS" && body.webhook_code === "DEFAULT_UPDATE") ||
+      (body.webhook_type === "INVESTMENTS_TRANSACTIONS" && ["DEFAULT_UPDATE", "HISTORICAL_UPDATE"].includes(String(body.webhook_code))));
+  const bankUpdate = connection.product !== "investments" && body.webhook_type === "TRANSACTIONS" && body.webhook_code === "SYNC_UPDATES_AVAILABLE";
+  if ((investmentUpdate || bankUpdate) && Object.keys(connection.mappings).length) {
     // Busy/cooldown means retry: do not acknowledge a notification before its data is durable.
     await syncBankConnection(connection.id);
   } else if (body.webhook_type === "ITEM" && ["ERROR", "PENDING_EXPIRATION", "PENDING_DISCONNECT", "USER_PERMISSION_REVOKED"].includes(String(body.webhook_code))) {

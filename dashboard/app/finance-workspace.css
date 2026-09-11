@@ -306,3 +306,13 @@
 .finance-coinbase-list li > :last-child { text-align: right; }
 .finance-coinbase-list span { color: var(--text-muted); font-size: 11px; }
 .finance-coinbase :is(input,textarea,summary):focus-visible { outline: 2px solid var(--action-primary); outline-offset: 3px; }
+
+.finance-investment-connect { display: grid; gap: 12px; padding: 16px 0; border-top: 1px solid var(--border); }
+.finance-investment-snapshot { font-size: 13px; line-height: 1.7; min-width: 0; }
+.finance-investment-snapshot summary { cursor: pointer; color: var(--action-primary); font-weight: 600; padding: 10px 0; min-height: 44px; }
+.finance-investment-snapshot summary:focus-visible { outline: 2px solid var(--action-primary); outline-offset: 3px; }
+.finance-investment-list { padding: 0; margin: 0; list-style: none; }
+.finance-investment-list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.finance-investment-list li > div { display: grid; min-width: 0; gap: 3px; }
+.finance-investment-list li > :last-child { text-align: right; flex-shrink: 0; max-width: 45%; }
+.finance-investment-list span { color: var(--text-muted); font-size: 11px; }

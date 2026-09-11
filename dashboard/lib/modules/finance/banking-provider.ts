@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, createHash, createPublicKey, randomBytes, timingSafeEqual, verify } from "node:crypto";
-import type { BankAccount, BankTransaction } from "./banking-types";
+import type { BankAccount, BankTransaction, BankingProduct } from "./banking-types";
 
 export class BankingError extends Error {
   constructor(public code: string, message: string, public status = 400) { super(message); }
@@ -52,12 +52,12 @@ export function decryptBanking<T>(value: EncryptedBanking): T {
   } catch { throw new BankingError("storage_locked", "The encrypted bank store could not be opened. Check the server encryption key; do not replace or reset the store.", 503); }
 }
 
-export async function plaid<T>(endpoint: string, input: Record<string, unknown>): Promise<T> {
+export async function plaid<T>(endpoint: string, input: Record<string, unknown>, timeoutMs = 12_000): Promise<T> {
   const config = requireBankingConfig();
   let response: Response;
   try {
     response = await fetch(`https://${config.environment}.plaid.com${endpoint}`, {
-      method: "POST", cache: "no-store", redirect: "error", signal: AbortSignal.timeout(12_000),
+      method: "POST", cache: "no-store", redirect: "error", signal: AbortSignal.timeout(Math.min(120_000, Math.max(1, timeoutMs))),
       headers: { "Content-Type": "application/json", "Plaid-Version": "2020-09-14" },
       body: JSON.stringify({ ...input, client_id: config.clientId, secret: config.secret })
     });
@@ -68,8 +68,9 @@ export async function plaid<T>(endpoint: string, input: Record<string, unknown>)
     const messages: Record<string, string> = {
       ITEM_LOGIN_REQUIRED: "Reconnect this institution to resume updates.",
       INVALID_CREDENTIALS: "The server Plaid credentials need attention.",
-      INVALID_PRODUCT: "Transactions is not enabled for this connection.",
-      ACCESS_NOT_GRANTED: "Transactions access was not granted. Reconnect and review the account permissions.",
+      INVALID_PRODUCT: "The requested Plaid product is not enabled for this connection.",
+      ACCESS_NOT_GRANTED: "Access was not granted. Reconnect and review the account permissions.",
+      PRODUCT_NOT_READY: "Your institution is preparing its data. Try syncing again in a few minutes; saved data is preserved.",
       RATE_LIMIT_EXCEEDED: "Plaid asked us to wait. Try again later.",
       ITEM_NOT_FOUND: "The institution connection no longer exists.",
       INVALID_ACCESS_TOKEN: "The saved institution connection is no longer valid.",
@@ -81,16 +82,16 @@ export async function plaid<T>(endpoint: string, input: Record<string, unknown>)
 }
 
 type ProviderAccount = { account_id: string; name: string; mask?: string; type: string; subtype?: string; balances: { current: number | null; iso_currency_code?: string } };
-export function normalizeAccounts(accounts: ProviderAccount[]): BankAccount[] {
+export function normalizeAccounts(accounts: ProviderAccount[], product: BankingProduct = "transactions"): BankAccount[] {
   if (!Array.isArray(accounts) || accounts.length > 100) throw new BankingError("invalid_data", "The bank returned invalid account data.", 502);
   return accounts.map(account => {
     if (typeof account.account_id !== "string" || !account.balances) throw new BankingError("invalid_data", "The bank returned invalid account data.", 502);
     const balance = account.balances.current;
     const currency = account.balances.iso_currency_code || "Unknown";
-    const kind = account.type === "credit" ? "Credit" : account.subtype === "savings" || account.subtype === "money market" ? "Savings" : "Checking";
+    const kind = account.type === "investment" ? "Brokerage" : account.type === "credit" ? "Credit" : account.subtype === "savings" || account.subtype === "money market" ? "Savings" : "Checking";
     return { id: account.account_id, name: String(account.name || "Bank account").slice(0, 160), mask: String(account.mask || "").slice(-4), kind,
       balance: typeof balance === "number" && Number.isFinite(balance) && Number.isSafeInteger(Math.round(balance * 100)) ? Math.round(balance * 100) / 100 : null,
-      currency, supported: currency === "USD" && (account.type === "depository" || account.type === "credit") };
+      currency, supported: currency === "USD" && (product === "investments" ? account.type === "investment" : account.type === "depository" || account.type === "credit") };
   });
 }
 export interface ProviderTransaction {

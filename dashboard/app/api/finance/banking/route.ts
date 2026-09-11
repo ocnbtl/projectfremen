@@ -26,7 +26,10 @@ export async function POST(request: Request) {
     if (!input || typeof input !== "object" || Array.isArray(input)) throw new BankingError("invalid_request", "Invalid request.");
     const body = input as Record<string, unknown>;
     const id = typeof body.connectionId === "string" && body.connectionId.length <= 100 ? body.connectionId : "";
-    if (body.operation === "link") return json({ ok: true, link: await createBankLink(id || undefined) });
+    if (body.operation === "link") {
+      if (body.product !== undefined && body.product !== "transactions" && body.product !== "investments") throw new BankingError("invalid_request", "Choose a supported connection type.");
+      return json({ ok: true, link: await createBankLink(id || undefined, body.product) });
+    }
     if (body.operation === "exchange") return json({ ok: true, connectionId: await exchangeBankLink(body.sessionId, body.publicToken) });
     if (body.operation === "cancel") { await cancelBankLink(String(body.sessionId || "")); return json({ ok: true }); }
     if (body.operation === "review") {
