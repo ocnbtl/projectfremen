@@ -43,7 +43,11 @@ function resourceBody(role: string, candidate: string): string {
   return encodeStyleGuideComponent({
     visual: `${candidateLabel(candidate)} from Streamline’s Tabler Line set. 24 × 24 grid, 2 px stroke, round caps and joins, currentColor by default. Usage: ${usage}.`,
     code: `<UnigentamosIcon role="${role}" />`,
-    animation: "Static semantic icon. Color may inherit the owning module token; motion is not applied to the glyph itself."
+    animation: role === "duplicates-warning"
+      ? "The red X magnifier gently pulses in the People sidebar. Only the glyph changes opacity and scale; its button stays neutral. Reduced motion keeps the glyph static."
+      : role === "duplicates"
+        ? "Static green check magnifier. Neutral button with no colored box or pulse. Tooltip: No duplicates detected."
+        : "Static semantic icon. Color may inherit the owning module token; motion is not applied to the glyph itself."
   });
 }
 

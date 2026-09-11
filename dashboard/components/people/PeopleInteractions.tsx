@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { PersonalRecord } from "../../lib/personal-records-store";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -26,23 +27,22 @@ const timeLabel = (value?: string) => {
   return `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${hour >= 12 ? "PM" : "AM"}`;
 };
 
-function InteractionDetail({ item, people, onClose, onOpenPerson }: {
-  item?: InteractionEntry; people: PersonalRecord[]; onClose: () => void; onOpenPerson: (person: PersonalRecord) => void;
+function InteractionDetail({ item, people, explicitSelection, empty, error, onBack, onOpenPerson }: {
+  item?: InteractionEntry; people: PersonalRecord[]; explicitSelection: boolean; empty: boolean; error?: string;
+  onBack: () => void; onOpenPerson: (person: PersonalRecord) => void;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
+  const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
-    const dialog = ref.current;
-    const previous = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    dialog?.showModal();
-    return () => { dialog?.close(); if (previous?.isConnected) previous.focus({ preventScroll: true }); };
-  }, []);
-  return <dialog ref={ref} className="people-interaction-detail" aria-labelledby="interaction-detail-title"
-    onCancel={event => { event.preventDefault(); onClose(); }} onClick={event => { if (event.target === event.currentTarget) onClose(); }}>
+    if (explicitSelection && window.matchMedia("(max-width: 760px)").matches) headingRef.current?.focus({ preventScroll: true });
+  }, [item?.id, explicitSelection]);
+  return <div className="people-interaction-detail" role="region" aria-labelledby="interaction-detail-title">
     <div className="people-interaction-detail-content">
-      <header><span>Interaction details</span><button type="button" autoFocus aria-label="Close interaction details" onClick={onClose}><UnigentamosIcon role="close" size={20} /></button></header>
-      {item ? <>
-        <div className="people-interaction-detail-heading"><span className="people-interaction-type"><UnigentamosIcon role="interaction" size={18} />{label(item.kind)}</span><h2 id="interaction-detail-title">{item.title}</h2>
-          <p><time dateTime={validDate(item.date) ? item.date : undefined}>{dateLabel(item.date)}</time>{item.startTime ? ` · ${timeLabel(item.startTime)}${item.endTime ? `–${timeLabel(item.endTime)}` : ""}` : ""}</p>
+      <button type="button" className="people-mobile-profile-back" onClick={onBack}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /><span>Back to interactions</span></button>
+      <header><UnigentamosIcon role="interaction-history" size={20} /><span>Interaction details</span></header>
+      {!error && item ? <>
+        <div className="people-interaction-detail-heading"><span className="people-interaction-type">{label(item.kind)}</span><h2 ref={headingRef} tabIndex={-1} id="interaction-detail-title">{item.title}</h2>
+          <div className="people-interaction-timing"><p><UnigentamosIcon role="calendar" size={18} /><time dateTime={validDate(item.date) ? item.date : undefined}>{dateLabel(item.date)}</time></p>
+            {item.startTime && <p><UnigentamosIcon role="clock" size={18} /><span>{timeLabel(item.startTime)}{item.endTime ? ` – ${timeLabel(item.endTime)}` : ""}</span></p>}</div>
         </div>
         <section aria-label="Participants"><h3>Participants</h3><div className="people-interaction-detail-participants">{item.participantIds.map(id => {
           const person = people.find(p => p.id === id);
@@ -52,17 +52,17 @@ function InteractionDetail({ item, people, onClose, onOpenPerson }: {
         <section className="people-interaction-detail-notes"><h3>Notes</h3><p>{item.summary || "No additional notes recorded."}</p></section>
         <dl className="people-interaction-detail-facts">
           {item.approach && <div><dt>Approach</dt><dd>{label(item.approach)}</dd></div>}
-          <div><dt>Source</dt><dd>{item.source === "profile" ? "Profile history" : "Logged interaction"}</dd></div>
         </dl>
         <InteractionCheckbox checked={Boolean(item.updatesLastContact)} />
-      </> : <div className="notes-empty-state"><h2 id="interaction-detail-title">Interaction unavailable</h2><p>This interaction may have been removed or its profile is unavailable. Close this panel to return to your history.</p></div>}
+        <section className="people-interaction-source" aria-label="Interaction source"><UnigentamosIcon role={item.source === "profile" ? "module-people" : "interaction-history"} size={20} /><div><span>Source</span><strong>{item.source === "profile" ? "Profile history" : "Logged interaction"}</strong></div></section>
+      </> : <div className="notes-empty-state"><UnigentamosIcon role="interaction-history" size={28} /><h2 ref={headingRef} tabIndex={-1} id="interaction-detail-title">{error ? "Interactions could not be loaded" : empty ? "No interactions to show" : "Interaction unavailable"}</h2><p>{error || (empty ? "Your latest matching interaction will appear here. Select any interaction to read its details." : "This interaction may have been removed or its profile is unavailable. Select another interaction from your history.")}</p></div>}
     </div>
-  </dialog>;
+  </div>;
 }
 
-export default function PeopleInteractions({ items, people, query, onQueryChange, onOpenPerson, error }: {
+export default function PeopleInteractions({ items, people, query, onQueryChange, onOpenPerson, error, detailTarget }: {
   items: InteractionEntry[]; people: PersonalRecord[]; query: string; onQueryChange: (value: string) => void;
-  onOpenPerson: (person: PersonalRecord) => void; error?: string;
+  onOpenPerson: (person: PersonalRecord) => void; error?: string; detailTarget: HTMLElement | null;
 }) {
   const params = useSearchParams(), pathname = usePathname();
   const selectedId = params.get("interaction") || "";
@@ -91,6 +91,20 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
         return (order === "oldest" ? comparison : -comparison) || a.title.localeCompare(b.title) || a.id.localeCompare(b.id);
       });
   }, [items, people, query, kind, order, approach, contact]);
+  // The default is always the newest match, even if the list is sorted oldest first.
+  const newest = filtered.reduce<InteractionEntry | undefined>((latest, item) => {
+    const timestamp = (entry: InteractionEntry) => validDate(entry.date) ? `${entry.date}T${entry.startTime || "00:00"}` : "";
+    return !latest || timestamp(item) > timestamp(latest) ? item : latest;
+  }, undefined);
+  const selected = selectedId ? items.find(item => item.id === selectedId) : newest;
+  useEffect(() => { if (detailTarget) detailTarget.scrollTop = 0; }, [detailTarget, selected?.id]);
+  function backToList() {
+    navigate({ interaction: "" }, true);
+    requestAnimationFrame(() => {
+      const row = Array.from(document.querySelectorAll<HTMLButtonElement>(".people-interaction-row")).find(element => element.dataset.interactionId === selectedId);
+      (row || document.querySelector<HTMLInputElement>('input[aria-label="Search interactions"]'))?.focus({ preventScroll: true });
+    });
+  }
   const groups = new Map<string, InteractionEntry[]>();
   for (const item of filtered.slice(0, limit)) {
     const key = validDate(item.date) ? item.date!.slice(0, 7) : "unknown";
@@ -127,14 +141,14 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
     {error ? <div role="alert" className="notes-empty-state"><h2>Interactions could not be loaded</h2><p>{error}</p><button onClick={() => window.location.reload()}>Reload</button></div> : <>
       <p className="people-visually-hidden" role="status">{filtered.length} matching interactions</p>
       {filtered.length ? <div className="people-interaction-groups">{[...groups].map(([month, entries]) => <section key={month} aria-label={month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}>
-        <h2>{month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}</h2><ul>{entries.map(item => <li key={item.id}><button className="people-interaction-row" aria-haspopup="dialog" aria-label={`View interaction: ${item.title}`} onClick={() => navigate({ interaction: item.id }, true)}>
+        <h2>{month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}</h2><ul>{entries.map(item => <li key={item.id}><button className="people-interaction-row" data-interaction-id={item.id} aria-current={selected?.id === item.id ? "true" : undefined} aria-controls="people-interaction-panel" aria-label={`View interaction: ${item.title}`} onClick={() => navigate({ interaction: item.id }, true)}>
           <span className="people-interaction-row-date"><time dateTime={validDate(item.date) ? item.date : undefined}>{validDate(item.date) ? new Date(`${item.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "Undated"}</time><small>{timeLabel(item.startTime)}</small></span>
-          <span className="people-interaction-row-main"><strong>{item.title}</strong><span>{item.participantIds.map(id => people.find(p => p.id === id)?.title || "Profile unavailable").join(" · ") || "No participants recorded"}</span>{item.summary && <p>{item.summary}</p>}</span>
-          <span className="people-interaction-type">{label(item.kind)}</span><UnigentamosIcon role="chevron-right" size={18} />
+          <span className="people-interaction-row-main"><strong>{item.title}</strong><span className="people-interaction-type">{label(item.kind)}</span><span>{item.participantIds.map(id => people.find(p => p.id === id)?.title || "Profile unavailable").join(" · ") || "No participants recorded"}</span>{item.summary && <p>{item.summary}</p>}</span>
+          <UnigentamosIcon role="chevron-right" size={18} />
         </button></li>)}</ul>
-      </section>)}</div> : <div className="notes-empty-state"><UnigentamosIcon role="interaction" size={26} /><h2>{items.length ? "No matching interactions" : "Your history starts here"}</h2><p>{items.length ? "Try another name, phrase or filter." : "Log an interaction above to keep conversations, meetings and memories together."}</p>{(query || filterCount > 0) && <button onClick={() => { onQueryChange(""); navigate({ kind: "", approach: "", contact: "", query: "" }); }}>Clear filters</button>}</div>}
+      </section>)}</div> : <div className="notes-empty-state"><UnigentamosIcon role="interaction-history" size={26} /><h2>{items.length ? "No matching interactions" : "Your history starts here"}</h2><p>{items.length ? "Try another name, phrase or filter." : "Log an interaction above to keep conversations, meetings and memories together."}</p>{(query || filterCount > 0) && <button onClick={() => { onQueryChange(""); navigate({ kind: "", approach: "", contact: "", query: "" }); }}>Clear filters</button>}</div>}
       {filtered.length > limit && <button className="people-interactions-more" onClick={() => setLimit(current => current + 50)}>Show more · {filtered.length - limit} remaining</button>}
-      {selectedId && <InteractionDetail key={selectedId} item={items.find(item => item.id === selectedId)} people={people} onClose={() => navigate({ interaction: "" }, true)} onOpenPerson={onOpenPerson} />}
     </>}
+    {detailTarget && createPortal(<InteractionDetail key={selected?.id || selectedId || "empty"} item={selected} people={people} explicitSelection={Boolean(selectedId)} empty={!selectedId && !filtered.length} error={error} onBack={backToList} onOpenPerson={onOpenPerson} />, detailTarget)}
   </section>;
 }

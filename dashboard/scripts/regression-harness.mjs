@@ -5968,15 +5968,27 @@ async function checkPeopleMemoryBrowserState(
       }
       assert(await page.locator(".people-recent-interactions").count() === 0, `People directory retained its footer feed at ${viewport.label}`);
       const directoryReturnUrl = page.url();
+      const profilePaneBounds = await page.locator('.people-profile-panel').boundingBox();
       await page.goto(`${baseUrl}/admin/people?sidebar=interactions`, { waitUntil: "networkidle" });
       const interactionHistory = page.getByRole("region", { name: "Interaction history", exact: true });
       await interactionHistory.waitFor();
       assert((await interactionHistory.innerText()).includes("Shared regression introduction") && (await interactionHistory.innerText()).includes(personTitle), `Dedicated interaction history lost shared records at ${viewport.label}`);
       await assertNoOverflow(page, `People interactions ${viewport.label}`);
+      const selectedPane = page.getByRole('region', { name: 'Selected interaction', exact: true });
+      if (viewport.width > 760) {
+        await selectedPane.waitFor();
+        const dockBounds = await selectedPane.boundingBox();
+        assert(profilePaneBounds && dockBounds && Math.abs(dockBounds.x - profilePaneBounds.x) < 2 && Math.abs(dockBounds.y - profilePaneBounds.y) < 2, `Interaction pane drifted from People profiles at ${viewport.label}: ${JSON.stringify({profilePaneBounds,dockBounds})}`);
+        const newestTitle = await page.locator('.people-interaction-row-main strong').first().innerText();
+        assert(await selectedPane.getByRole('heading', {name:newestTitle,exact:true}).isVisible(), 'Newest interaction was not opened automatically');
+        assert(!new URL(page.url()).searchParams.has('interaction'), 'Automatic selection unexpectedly added navigation history');
+      } else {
+        assert(!(await selectedPane.isVisible()), 'Mobile history opened details before selecting a row');
+      }
       await page.getByLabel("Search interactions", { exact: true }).fill("Shared regression introduction");
       const interactionRow = page.getByRole("button", { name: "View interaction: Shared regression introduction", exact: true });
       await interactionRow.click();
-      const interactionDetail = page.getByRole("dialog", { name: "Shared regression introduction", exact: true });
+      const interactionDetail = page.getByRole("region", { name: "Shared regression introduction", exact: true });
       await interactionDetail.waitFor();
       assert((await interactionDetail.innerText()).includes(personTitle) && (await interactionDetail.innerText()).includes("Approach"), `Interaction inspector lost participants or approach at ${viewport.label}`);
       const detailUrl = page.url();
@@ -5986,12 +5998,18 @@ async function checkPeopleMemoryBrowserState(
       const detailBounds = await interactionDetail.boundingBox();
       assert(detailBounds && detailBounds.x >= -1 && detailBounds.width <= viewport.width + 1, `Interaction detail overflowed at ${viewport.label}`);
       await page.keyboard.press("Escape");
-      await interactionDetail.waitFor({ state: "hidden" });
+      assert(await interactionDetail.isVisible(), 'Persistent interaction pane was dismissed by Escape');
+      if (viewport.width <= 760) {
+        await interactionDetail.getByRole('button', {name:'Back to interactions',exact:true}).click();
+        await interactionDetail.waitFor({state:'hidden'});
+        await page.goBack({waitUntil:'networkidle'});
+        await interactionDetail.waitFor();
+      }
       await page.goBack({ waitUntil: "networkidle" });
-      await interactionDetail.waitFor();
-      await interactionDetail.getByRole("button", { name: "Close interaction details" }).click();
+      await page.getByLabel("Search interactions", { exact: true }).waitFor();
       await page.getByLabel("Search interactions", { exact: true }).fill("no-interaction-match-xyz");
       await page.getByRole("heading", { name: "No matching interactions" }).waitFor();
+      if (viewport.width > 760) await selectedPane.getByRole('heading',{name:'No interactions to show',exact:true}).waitFor();
       await page.getByRole("button", { name: "Clear filters", exact: true }).click();
       await interactionRow.waitFor();
       assert(await page.locator('.people-interactions-count').count() === 0, "Interaction history retained its redundant count line");
@@ -6587,10 +6605,13 @@ async function checkPeopleMemoryBrowserState(
       const savedControls = (await (await context.request.get(`${baseUrl}/api/personal/records`)).json()).items.find(item => item.title === `Interaction controls ${viewport.label}`);
       assert(savedControls?.interaction?.occurredOn === '2024-03-01' && savedControls.interaction.startTime === '15:00' && savedControls.interaction.endTime === '16:00' && savedControls.interaction.updatesLastContact === false && !savedControls.interaction.approach, "Saved interaction did not preserve calendar, AM/PM, unspecified approach and unchecked contact state");
       await page.goto(`${baseUrl}/admin/people?sidebar=interactions&interaction=${encodeURIComponent(savedControls.id)}`, { waitUntil: "networkidle" });
-      const savedControlDetail = page.getByRole("dialog", { name: `Interaction controls ${viewport.label}`, exact: true });
+      const savedControlDetail = page.getByRole("region", { name: `Interaction controls ${viewport.label}`, exact: true });
       assert(await savedControlDetail.getByRole("checkbox", { name: "Use this as the latest contact date", exact: true }).getAttribute('aria-checked') === 'false', "Detail checkbox did not reflect its saved setting");
       assert(await savedControlDetail.locator('.people-profile-photo').count() > 0, "Interaction participants did not reuse profile avatars");
-      await savedControlDetail.getByRole("button", { name: "Close interaction details" }).click();
+      const photoBackgrounds = await savedControlDetail.locator('.people-profile-photo').evaluateAll(elements => elements.map(element => getComputedStyle(element).backgroundImage));
+      assert(photoBackgrounds.every(background => background === 'none'), 'Participant avatars retained a gradient placeholder');
+      const timingRows = await savedControlDetail.locator('.people-interaction-timing p').evaluateAll(elements => elements.map(element=>element.getBoundingClientRect().top));
+      assert(timingRows.length === 2 && timingRows[1] > timingRows[0], 'Interaction time did not move below its date');
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=relations`, { waitUntil: "networkidle" });
       const linksHub = page.locator(".people-links-hub");

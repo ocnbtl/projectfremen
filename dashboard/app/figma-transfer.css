@@ -15358,9 +15358,10 @@ body:has(.people-redesign-shell.is-mobile-editor) .shared-ai-dock:not(.is-open) 
 .people-redesign-shell .people-sidebar-section.people-operational-row > button.is-active { background: var(--surface-selected); border-color: var(--border-strong); }
 .people-redesign-shell .people-sidebar-section.people-operational-row > button[data-utility="recently-deleted"] { width: auto; padding: 0 8px; }
 .people-redesign-shell .people-sidebar-section.people-operational-row > button strong { font: 500 11px var(--font-body); font-variant-numeric: tabular-nums; min-width: 0; padding: 0; color: inherit; }
-.people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="clear"] { color: #26704d; background: #e4f0e7; }
-.people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="warning"] { color: #a62d35; background: #fce9e8; animation: people-duplicate-glow 2.4s ease-in-out infinite; }
-@keyframes people-duplicate-glow { 0%,100% { box-shadow: 0 0 0 0 #b4231826; } 50% { box-shadow: 0 0 0 4px #b4231814, 0 0 12px #b4231824; } }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="clear"] { color: #26704d; background: transparent; }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="warning"] { color: #a62d35; background: transparent; }
+.people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="warning"] > svg { animation: people-duplicate-pulse 2.4s ease-in-out infinite; transform-origin: center; }
+@keyframes people-duplicate-pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: .55; transform: scale(1.12); } }
 @media (min-width: 761px) and (max-width: 1280px) {
   .people-redesign-shell .people-sidebar-section.people-operational-row > button { width: 40px; min-width: 40px; height: 40px; min-height: 40px; }
 }
@@ -15385,6 +15386,9 @@ body:has(.people-redesign-shell.is-mobile-editor) .shared-ai-dock:not(.is-open) 
 .people-redesign-shell .people-timeline-entry-meta .people-timeline-kind { grid-column: 2; grid-row: 1 / span 2; justify-self: end; background: #f8e9dc; color: #874516; font: 550 11px/1.4 var(--font-body); letter-spacing: 0; padding: 5px 10px; }
 .people-redesign-shell .people-timeline-entry-meta .people-approach-badge { grid-column: 1 / -1; justify-self: start; font-family: var(--font-body); }
 @media (prefers-reduced-motion: reduce) {
-  .people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="warning"] { animation: none; }
+  .people-redesign-shell .people-sidebar-section.people-operational-row > button[data-duplicate-state="warning"] > svg { animation: none; }
   .people-redesign-shell .people-group-picker label, .people-redesign-shell .people-group-picker label::before { transition: none; }
 }
+
+/* Photos stay neutral while loading, including person and organization switches. */
+.people-redesign-shell :is(.people-profile-photo, .people-profile-photo-trigger) { background: var(--surface-panel); background-image: none; }

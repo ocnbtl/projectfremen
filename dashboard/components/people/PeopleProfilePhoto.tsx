@@ -46,13 +46,25 @@ export function PeopleProfileAvatar({
   compact?: boolean;
   onSelect?: () => void;
 }) {
-  const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [photoUrl, photoUpdatedAt]);
-  const image = photoUrl && !failed ? (
+  const source = photoUrl ? `${photoUrl}${photoUpdatedAt ? `${photoUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(photoUpdatedAt)}` : ""}` : "";
+  const [loadedSource, setLoadedSource] = useState("");
+  const [failedSource, setFailedSource] = useState("");
+  const photoState = !source ? "empty" : failedSource === source ? "failed" : loadedSource === source ? "ready" : "loading";
+  const image = source && photoState !== "failed" ? (
     <img
-      src={`${photoUrl}${photoUpdatedAt ? `?v=${encodeURIComponent(photoUpdatedAt)}` : ""}`}
+      key={source}
+      src={source}
       alt=""
-      onError={() => setFailed(true)}
+      ref={element => {
+        // Cached images can finish before hydration attaches load/error handlers.
+        if (element?.complete) {
+          if (element.naturalWidth > 0) setLoadedSource(source);
+          else setFailedSource(source);
+        }
+      }}
+      style={{ visibility: photoState === "ready" ? "visible" : "hidden" }}
+      onLoad={() => setLoadedSource(source)}
+      onError={() => setFailedSource(source)}
     />
   ) : <span aria-hidden="true">{initials}</span>;
 
@@ -61,6 +73,7 @@ export function PeopleProfileAvatar({
       <button
         type="button"
         className={`people-avatar people-profile-photo-trigger${compact ? " is-compact" : ""}`}
+        data-photo-state={photoState}
         aria-label={`${photoUrl ? "Change" : "Add"} profile picture for ${label}`}
         onClick={onSelect}
       >
@@ -69,7 +82,7 @@ export function PeopleProfileAvatar({
       </button>
     );
   }
-  return <span className={`people-row-avatar people-profile-photo${compact ? " is-compact" : ""}`}>{image}</span>;
+  return <span className={`people-row-avatar people-profile-photo${compact ? " is-compact" : ""}`} data-photo-state={photoState}>{image}</span>;
 }
 
 async function prepareProfilePhoto(editor: PhotoEditorDraft): Promise<File> {

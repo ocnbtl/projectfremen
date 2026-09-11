@@ -579,7 +579,7 @@ const PEOPLE_SIDEBAR_SECTIONS: Array<{ title: string; items: SidebarItemConfig[]
       { id: "everyone", label: "Everyone", icon: "users" },
       { id: "all", label: "People", icon: "person" },
       { id: "organizations", label: "Organizations", icon: "organization" },
-      { id: "interactions", label: "Interactions", icon: "interaction" },
+      { id: "interactions", label: "Interactions", icon: "interaction-history" },
       { id: "starred", label: "Starred", icon: "star" },
       { id: "upcoming", label: "Follow-ups", icon: "follow-up" },
       { id: "relationship-map", label: "Relationships", icon: "relationship-map", surface: "profile" }
@@ -2057,6 +2057,7 @@ export default function PeopleWorkspace({
   const initialCreateClass = initialMode === "new" && searchParams.get("type") === "organization" ? "org" : "person";
   const projectsRepository = useMemo(() => createProjectsRepository(), []);
   const [people, setPeople] = useState(initialPeople);
+  const [interactionDetailTarget, setInteractionDetailTarget] = useState<HTMLElement | null>(null);
   const [transferBusy, setTransferBusy] = useState(false);
   const [interactionRecords, setInteractionRecords] = useState(initialInteractions);
   const {
@@ -2650,9 +2651,10 @@ export default function PeopleWorkspace({
     + (relationshipFilter ? 1 : 0)
     + (locationFilter ? 1 : 0)
     + (lastContactFilter === "any" ? 0 : 1);
-  const filteringActive = detailMode === "profile" && activeFilterCount > 0 && pathname === getModuleRoute("people");
+  const filteringActive = !isInteractions && detailMode === "profile" && activeFilterCount > 0 && pathname === getModuleRoute("people");
   const mobileSurface = addingPerson || detailMode === "edit"
     ? "editor"
+    : isInteractions && searchParams.get("interaction") ? "profile"
     : pathname === getModuleRoute("people")
       ? "directory"
       : "profile";
@@ -4123,13 +4125,13 @@ export default function PeopleWorkspace({
                   className={`${item.tone ? `module-ref-tone-${item.tone}` : ""}${activeSidebarView === item.id ? " is-active" : ""}`}
                   onClick={() => selectSidebarView(item)}
                   aria-label={section.title === "Operational" ? (item.id === "duplicates" ? `Duplicates: ${count || 0} possible pairs` : item.id === "recently-deleted" ? `Recently Deleted: ${count || 0}` : item.label) : undefined}
-                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} possible duplicate pairs — review` : "No duplicate candidates" : item.label) : undefined}
+                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} possible duplicate pairs — review` : "No duplicates detected" : item.label) : undefined}
                   aria-current={activeSidebarView === item.id ? "page" : undefined}
                   data-utility={section.title === "Operational" ? item.id : undefined}
                   data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
                   key={item.id}
                 >
-                  <UnigentamosIcon role={item.icon} candidate={item.id === "duplicates" ? "zoom-check" : undefined} size={section.title === "Operational" ? 20 : 16} />
+                  <UnigentamosIcon role={item.id === "duplicates" && count ? "duplicates-warning" : item.icon} candidate={item.id === "duplicates" ? count ? "zoom-cancel" : "zoom-check" : undefined} size={section.title === "Operational" ? 20 : 16} />
                   <span>{item.label}</span>
                   {section.title === "Operational" ? item.id === "recently-deleted" && <strong>{count || 0}</strong> : typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
                 </button>
@@ -4151,13 +4153,13 @@ export default function PeopleWorkspace({
                   type="button"
                   onClick={() => selectSidebarView(item)}
                   aria-label={section.title === "Operational" ? (item.id === "duplicates" ? `Duplicates: ${count || 0} possible pairs` : item.id === "recently-deleted" ? `Recently Deleted: ${count || 0}` : item.label) : undefined}
-                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} possible duplicate pairs — review` : "No duplicate candidates" : item.label) : undefined}
+                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} possible duplicate pairs — review` : "No duplicates detected" : item.label) : undefined}
                   aria-current={activeSidebarView === item.id ? "page" : undefined}
                   data-utility={section.title === "Operational" ? item.id : undefined}
                   data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
                   key={item.id}
                 >
-                  <UnigentamosIcon role={item.icon} candidate={item.id === "duplicates" ? "zoom-check" : undefined} size={section.title === "Operational" ? 20 : 16} />
+                  <UnigentamosIcon role={item.id === "duplicates" && count ? "duplicates-warning" : item.icon} candidate={item.id === "duplicates" ? count ? "zoom-cancel" : "zoom-check" : undefined} size={section.title === "Operational" ? 20 : 16} />
                   <span>{item.label}</span>
                   {section.title === "Operational" ? item.id === "recently-deleted" && <strong>{count || 0}</strong> : typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
                 </button>
@@ -4179,7 +4181,7 @@ export default function PeopleWorkspace({
             </button>
             {!isInteractions && <>
             <button type="button" aria-label="Add organization" onClick={() => openAddPerson("org")}>
-              <PeopleIcon name="organization" /><span>Organization</span>
+              <UnigentamosIcon role="organization-add" size={18} /><span>Organization</span>
             </button>
             <button type="button" aria-label="Add person" onClick={() => openAddPerson("person")}>
               <PeopleIcon name="new-person" /><span>Person</span>
@@ -4189,6 +4191,7 @@ export default function PeopleWorkspace({
         </header>
 
         {isInteractions ? <PeopleInteractions
+          detailTarget={interactionDetailTarget}
           items={allInteractionItems.map(item => ({
             id: item.id, date: item.date, participantIds: item.participantIds,
             ...(item.kind === "interaction" ? { ...item.interaction, kind: item.interaction.kind || "note" } : { title: item.memory.text, kind: "memory" }),
@@ -4381,7 +4384,7 @@ export default function PeopleWorkspace({
                 ))}
               </div>
             )}
-            {activeSidebarView === "duplicates" && <div className="people-duplicate-review"><p>{duplicateMatches.length} possible {duplicateMatches.length===1?"duplicate pair":"duplicate pairs"} across people and organizations. Matching details are suggestions for review; no records are changed.</p>{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):<div className="notes-empty-state"><UnigentamosIcon role="duplicates" size={24}/><h3>No duplicate candidates</h3><p>Checked names, email addresses, phone numbers, social profiles, and organization websites. Similar names alone may belong to different people.</p></div>}</div>}
+            {activeSidebarView === "duplicates" && <div className="people-duplicate-review"><p>{duplicateMatches.length} possible {duplicateMatches.length===1?"duplicate pair":"duplicate pairs"} across people and organizations. Matching details are suggestions for review; no records are changed.</p>{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):<div className="notes-empty-state"><UnigentamosIcon role="duplicates" size={24}/><h3>No duplicates detected</h3><p>Checked names, email addresses, phone numbers, social profiles, and organization websites. Similar names alone may belong to different people.</p></div>}</div>}
             {(activeSidebarView === "import-export" || activeSidebarView === "import" || activeSidebarView === "export") && (
               <PeopleTransfer key={activeSidebarView} mode={activeSidebarView === "export" ? "export" : "import"} people={people} onBusy={setTransferBusy} onChanged={records=>setPeople(records.filter(record=>record.className === "person" || record.className === "org"))}/>
             )}
@@ -4456,6 +4459,7 @@ export default function PeopleWorkspace({
         </>}
       </main>
 
+      {isInteractions && <section ref={setInteractionDetailTarget} id="people-interaction-panel" className="people-profile-panel people-interaction-panel" aria-label="Selected interaction" />}
       {!isInteractions && <section className="people-profile-panel" aria-label="Selected profile">
         {!addingPerson && detailMode !== "edit" && <button type="button" className="people-mobile-profile-back" onClick={() => updatePeopleUrl({}, { path: getModuleRoute("people"), history: "push", native: true })}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /><span>Back to {activeViewLabel}</span></button>}
         {initialLoadError ? (

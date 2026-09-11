@@ -385,6 +385,17 @@
       <path d="M9 5a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1a2.4 2.4 0 0 0 2 1a2.4 2.4 0 0 0 2 -1a2.4 2.4 0 0 1 2 -1a2.4 2.4 0 0 1 2 1" />
       <path d="M3 21l19 0" />
   </symbol>
+  <symbol id="tabler-building-plus" viewBox="0 0 24 24">
+    <path d="M3 21h9" />
+      <path d="M9 8h1" />
+      <path d="M9 12h1" />
+      <path d="M9 16h1" />
+      <path d="M14 8h1" />
+      <path d="M14 12h1" />
+      <path d="M5 21v-16c0 -.53 .211 -1.039 .586 -1.414c.375 -.375 .884 -.586 1.414 -.586h10c.53 0 1.039 .211 1.414 .586c.375 .375 .586 .884 .586 1.414v7" />
+      <path d="M16 19h6" />
+      <path d="M19 16v6" />
+  </symbol>
   <symbol id="tabler-building-skyscraper" viewBox="0 0 24 24">
     <path d="M3 21l18 0" />
       <path d="M5 21v-14l8 -4v18" />
@@ -782,6 +793,12 @@
       <path d="M11 14h6" />
       <path d="M14 11v6" />
   </symbol>
+  <symbol id="tabler-copy-x" viewBox="0 0 24 24">
+    <path d="M7 9.667a2.667 2.667 0 0 1 2.667 -2.667h8.666a2.667 2.667 0 0 1 2.667 2.667v8.666a2.667 2.667 0 0 1 -2.667 2.667h-8.666a2.667 2.667 0 0 1 -2.667 -2.667l0 -8.666" />
+      <path d="M4.012 16.737a2 2 0 0 1 -1.012 -1.737v-10c0 -1.1 .9 -2 2 -2h10c.75 0 1.158 .385 1.5 1" />
+      <path d="M11.5 11.5l4.9 5" />
+      <path d="M16.5 11.5l-5.1 5" />
+  </symbol>
   <symbol id="tabler-corner-up-left" viewBox="0 0 24 24">
     <path d="M18 18v-6a3 3 0 0 0 -3 -3h-10l4 -4m0 8l-4 -4" />
   </symbol>
@@ -1173,6 +1190,12 @@
       <path d="M9 21v-6a2 2 0 0 1 2 -2h2c.39 0 .754 .112 1.061 .304" />
       <path d="M19 21.5l2.518 -2.58a1.74 1.74 0 0 0 0 -2.413a1.627 1.627 0 0 0 -2.346 0l-.168 .172l-.168 -.172a1.627 1.627 0 0 0 -2.346 0a1.74 1.74 0 0 0 0 2.412l2.51 2.59l0 -.009" />
   </symbol>
+  <symbol id="tabler-home-plus" viewBox="0 0 24 24">
+    <path d="M19 12h2l-9 -9l-9 9h2v7a2 2 0 0 0 2 2h5.5" />
+      <path d="M9 21v-6a2 2 0 0 1 2 -2h2a2 2 0 0 1 2 2" />
+      <path d="M16 19h6" />
+      <path d="M19 16v6" />
+  </symbol>
   <symbol id="tabler-id" viewBox="0 0 24 24">
     <path d="M3 7a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v10a3 3 0 0 1 -3 3h-12a3 3 0 0 1 -3 -3l0 -10" />
       <path d="M7 10a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
@@ -1379,6 +1402,11 @@
     <path d="M8 9h8" />
       <path d="M8 13h6" />
       <path d="M18 4a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-5l-5 3v-3h-2a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12" />
+  </symbol>
+  <symbol id="tabler-message-2" viewBox="0 0 24 24">
+    <path d="M8 9h8" />
+      <path d="M8 13h6" />
+      <path d="M9 18h-3a3 3 0 0 1 -3 -3v-8a3 3 0 0 1 3 -3h12a3 3 0 0 1 3 3v8a3 3 0 0 1 -3 3h-3l-3 3l-3 -3" />
   </symbol>
   <symbol id="tabler-message-circle" viewBox="0 0 24 24">
     <path d="M3 20l1.3 -3.9c-2.324 -3.437 -1.426 -7.872 2.1 -10.374c3.526 -2.501 8.59 -2.296 11.845 .48c3.255 2.777 3.695 7.266 1.029 10.501c-2.666 3.235 -7.615 4.215 -11.574 2.293l-4.7 1" />
@@ -2197,16 +2225,34 @@
     <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
       <path d="M21 21l-6 -6" />
   </symbol>
+  <symbol id="tabler-zoom-cancel" viewBox="0 0 24 24">
+    <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+      <path d="M8 8l4 4" />
+      <path d="M12 8l-4 4" />
+      <path d="M21 21l-6 -6" />
+  </symbol>
   <symbol id="tabler-zoom-check" viewBox="0 0 24 24">
     <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
       <path d="M21 21l-6 -6" />
       <path d="M7 10l2 2l4 -4" />
+  </symbol>
+  <symbol id="tabler-zoom-exclamation" viewBox="0 0 24 24">
+    <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+      <path d="M21 21l-6 -6" />
+      <path d="M10 13v.01" />
+      <path d="M10 7v3" />
   </symbol>
   <symbol id="tabler-zoom-in" viewBox="0 0 24 24">
     <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
       <path d="M7 10l6 0" />
       <path d="M10 7l0 6" />
       <path d="M21 21l-6 -6" />
+  </symbol>
+  <symbol id="tabler-zoom-question" viewBox="0 0 24 24">
+    <path d="M3 10a7 7 0 1 0 14 0a7 7 0 1 0 -14 0" />
+      <path d="M21 21l-6 -6" />
+      <path d="M10 13l0 .01" />
+      <path d="M10 10a1.5 1.5 0 1 0 -1.14 -2.474" />
   </symbol>
   <symbol id="tabler-zoom-scan" viewBox="0 0 24 24">
     <path d="M8 11a3 3 0 1 0 6 0a3 3 0 0 0 -6 0" />
