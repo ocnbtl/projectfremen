@@ -28,7 +28,7 @@ export function bindBankAccounts(state: FinanceState, connectionId: string, inst
     if (targets.has(id)) throw new BankingError("duplicate_mapping", "Each bank account needs its own Finance account.");
     targets.add(id);
     let account = state.accounts.find(item => item.id === id);
-    if (account && (account.archivedAt || account.entityScope !== "personal" || account.kind !== bank.kind ||
+    if (account && (account.archivedAt || account.coinbaseLink || account.entityScope !== "personal" || account.kind !== bank.kind ||
       (account.bankLink && (account.bankLink.connectionId !== connectionId || account.bankLink.accountId !== bankId)))) {
       throw new BankingError("account_conflict", "Choose an active personal account of the same type that is not already connected.", 409);
     }

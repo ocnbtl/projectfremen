@@ -146,9 +146,9 @@ export default function FinanceBankConnections({ state, onChanged }: { state: Fi
     {banking && !banking.configured && <div className="finance-inline-empty"><strong>Secure setup is still needed</strong><p>Plaid Trial is ready. The site needs its server credentials, encryption key and registered return address before your first connection.</p><p>Keep using manual accounts and CSV imports while setup is completed.</p></div>}
     {banking?.configured && <>
       <p className="finance-bank-plan">{banking.environment === "sandbox" ? "Sandbox · test data only" : "Free personal Trial"} · {banking.connectionsUsed}/10 connection slots used or reserved</p>
-      <p className="finance-utility-intro">Connect USD checking, savings and credit cards. Your bank sign-in stays inside Plaid. Updates arrive when your institution makes them available.</p>
+      <p className="finance-utility-intro">Connect USD checking, savings, credit cards and supported PayPal accounts. Your sign-in stays inside Plaid. Updates arrive when your institution makes them available.</p>
       <button className="finance-action" disabled={busy || banking.connectionsUsed >= 10} onClick={() => void connect()}><Icon name="Link" />Connect an institution</button>
-      <p className="finance-bank-footnote">One institution login can contain several accounts. Removing a connection does not restore its Trial slot. Brokerage and crypto connections are not included in this first release.</p>
+      <p className="finance-bank-footnote">One institution login can contain several accounts. Removing a connection does not restore its Trial slot. Vanguard and other investment accounts need a separate Investments connection. Use the Coinbase section for your personal crypto portfolio.</p>
       {banking.connections.map(connection => <article className="finance-bank-card" key={connection.id}>
         <div className="finance-bank-card-heading"><strong>{connection.name}</strong><span>{connection.status === "mapping" ? "Match accounts" : connection.status === "reconnect" ? "Needs attention" : connection.status === "disconnected" ? "Disconnected" : "Connected"}</span></div>
         {connection.error && <p className="finance-bank-error">{connection.error}</p>}

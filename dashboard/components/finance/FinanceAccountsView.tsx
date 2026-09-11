@@ -30,7 +30,7 @@ export default function FinanceAccountsView({ model, state, onAddAccount, onQuer
           return <li key={account.id}><button type="button" className="finance-account-card" data-finance-account-id={account.id} aria-pressed={model.selectedId === account.id} aria-controls="finance-inspector" onClick={() => onSelect(account.id)}>
             <span className="finance-account-card-top"><IconTile hue={account.kind === "Credit" ? "brown" : "green"} icon={accountIcon(account.kind)} /><span>{account.kind}</span><Icon name="Chevron" /></span>
             <strong className="finance-account-card-name">{account.name}</strong><span className="finance-account-institution">{account.inst}{account.mask !== "—" ? ` · ${account.mask}` : ""}</span>
-            <strong className="finance-account-balance">{money(account.balance, { cents: true })}</strong><span className="finance-account-asof">{native?.balanceSource === "plaid" ? "Bank" : native?.balanceSource === "imported" ? "Imported" : "Recorded"}{" "}{native?.balanceSource === "plaid" ? "balance retrieved" : "balance"} · {native?.balanceAsOf.slice(0, 10) || "Date unavailable"}</span>
+            <strong className="finance-account-balance">{money(account.balance, { cents: true })}</strong><span className="finance-account-asof">{native?.balanceSource === "coinbase" ? "Coinbase estimate" : native?.balanceSource === "plaid" ? "Bank balance retrieved" : native?.balanceSource === "imported" ? "Imported balance" : "Recorded balance"} · {native?.balanceAsOf.slice(0, 10) || "Date unavailable"}</span>
             <span className="finance-account-card-foot"><span>{activity.transactions.length} transactions</span><span>{activity.bills.length} bills</span></span>
           </button></li>;
         })}</ul>

@@ -78,7 +78,7 @@ export async function createBankLink(connectionId?: string) {
       client_name: "Unigentamos", user: { client_user_id: "unigentamos-personal-owner" }, country_codes: ["US"], language: "en",
       redirect_uri: `${config.origin}/admin/finance/accounts`, webhook: `${config.origin}/api/finance/banking/webhook`,
       ...(existing ? { access_token: existing.accessToken } : { products: ["transactions"], transactions: { days_requested: 90 },
-        account_filters: { depository: { account_subtypes: ["checking", "savings", "money market", "cash management", "cd"] }, credit: { account_subtypes: ["credit card"] } } })
+        account_filters: { depository: { account_subtypes: ["checking", "savings", "money market", "cash management", "cd", "paypal"] }, credit: { account_subtypes: ["credit card"] } } })
     });
     await mutateStore(state => {
       const session = state.sessions.find(item => item.id === id);

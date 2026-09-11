@@ -284,3 +284,25 @@
 .finance-bank-review { font-size: 13px; line-height: 1.6; }
 .finance-bank-account-list { padding-left: 18px; margin: 0; font-size: 13px; line-height: 1.8; }
 .finance-bank-connections button:disabled { opacity: .5; cursor: not-allowed; }
+.finance-coinbase { border-bottom: 1px solid var(--border); }
+.finance-coinbase-setup, .finance-coinbase-snapshot { font-size: 13px; line-height: 1.7; min-width: 0; }
+.finance-coinbase summary { cursor: pointer; color: var(--action-primary); font-weight: 600; padding: 8px 0; }
+.finance-coinbase-setup ol { padding-left: 20px; color: var(--text-muted); }
+.finance-coinbase-setup li + li { margin-top: 8px; }
+.finance-coinbase a { color: var(--action-primary); text-decoration: underline; }
+.finance-coinbase-form input:not([type=checkbox]), .finance-coinbase-form textarea { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font: inherit; }
+.finance-coinbase-form textarea { resize: vertical; }
+.finance-coinbase-secret { -webkit-text-security: disc; }
+.finance-coinbase-form .finance-coinbase-consent { display: flex; align-items: flex-start; gap: 10px; }
+.finance-coinbase-form .finance-coinbase-consent { min-height: 44px; }
+.finance-coinbase-consent input { margin-top: 5px; width: 18px; min-width: 18px; max-width: 18px; height: 18px; flex: 0 0 18px; accent-color: var(--action-primary); }
+.finance-coinbase-consent span { min-width: 0; white-space: normal; }
+.finance-coinbase-total { display: grid; gap: 4px; padding: 14px 0; }
+.finance-coinbase-total > strong { font-size: 26px; letter-spacing: -.7px; }
+.finance-coinbase-total > span { color: var(--text-muted); }
+.finance-coinbase-list { padding: 0; margin: 0; list-style: none; }
+.finance-coinbase-list li { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); overflow-wrap: anywhere; }
+.finance-coinbase-list li > div { display: grid; min-width: 0; gap: 3px; }
+.finance-coinbase-list li > :last-child { text-align: right; }
+.finance-coinbase-list span { color: var(--text-muted); font-size: 11px; }
+.finance-coinbase :is(input,textarea,summary):focus-visible { outline: 2px solid var(--action-primary); outline-offset: 3px; }

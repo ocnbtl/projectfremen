@@ -42,6 +42,8 @@ import {
 import { runFinanceRuleTests } from "./rules-view-model";
 import { bindBankAccounts, reconcileBankBatch, resolveBankReview, unlinkBankAccounts } from "./banking-ledger";
 import type { BankAccount, BankTransaction } from "./banking-types";
+import type { CoinbaseSnapshot } from "./coinbase-types";
+import { applyCoinbasePortfolio, unlinkCoinbasePortfolio } from "./coinbase-ledger";
 
 const FILE_NAME = "finance.json";
 const MAX_AUDIT_EVENTS = 4000;
@@ -293,6 +295,12 @@ async function mutateFinanceState<Result>(
 
 export async function connectFinanceBankAccounts(connectionId: string, institution: string, accounts: BankAccount[], choices: Record<string, string>) {
   return mutateFinanceState(async state => ({ state, result: bindBankAccounts(state, connectionId, institution, accounts, choices, new Date().toISOString()) }));
+}
+export async function syncFinanceCoinbasePortfolio(target: string, snapshot: CoinbaseSnapshot) {
+  return mutateFinanceState(async state => ({ state, result: applyCoinbasePortfolio(state, target, snapshot) }));
+}
+export async function disconnectFinanceCoinbasePortfolio() {
+  return mutateFinanceState(async state => { unlinkCoinbasePortfolio(state); return { state, result: undefined }; });
 }
 export async function applyFinanceBankBatch(connectionId: string, mappings: Record<string, string>, accounts: BankAccount[], transactions: BankTransaction[], removed: string[]) {
   return mutateFinanceState(async state => {
@@ -1162,7 +1170,7 @@ export async function updateFinanceRecord(
     if (before.archivedAt && action !== "restore") {
       throw new FinanceStoreError("conflict", "Archived Finance records are read-only until restored.", { status: 409 });
     }
-    if (kind === "account" && (before as FinanceAccountRecord).bankLink && action === "archive") {
+    if (kind === "account" && ((before as FinanceAccountRecord).bankLink || (before as FinanceAccountRecord).coinbaseLink) && action === "archive") {
       throw new FinanceStoreError("conflict", "Disconnect the institution in Finance settings before archiving this account.", { status: 409 });
     }
     if (kind === "transaction" && before.archivedBy === "plaid" && action === "restore") {
@@ -1207,7 +1215,7 @@ export async function updateFinanceRecord(
       auditAction = `finance.${kind}.restored`;
     } else if (action === "update") {
       if (!isRecord(rawInput.fields)) validation("fields must be an object", "fields");
-      const bankOwnedFields = kind === "account" && (before as FinanceAccountRecord).bankLink
+      const bankOwnedFields = kind === "account" && ((before as FinanceAccountRecord).bankLink || (before as FinanceAccountRecord).coinbaseLink)
         ? ["kind", "currentBalance", "balanceAsOf", "balanceSource", "entityScope"]
         : kind === "transaction" && (before as FinanceTransactionRecord).source.kind === "plaid"
           ? ["occurredOn", "accountId", "amount", "direction", "status", "entityScope"] : [];

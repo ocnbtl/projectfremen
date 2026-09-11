@@ -35,3 +35,4 @@ vault-companion/backups/
 # Encrypted banking runtime belongs in the durable server store, never a release bundle.
 **/finance-banking-production.json
 **/finance-banking-sandbox.json
+**/finance-coinbase-personal.json

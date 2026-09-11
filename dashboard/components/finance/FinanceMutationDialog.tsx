@@ -79,8 +79,8 @@ function MappingSelect({ label, name, headers }: { label: string; name: string; 
 }
 
 function EditFields({ state, selection, record }: { state: FinanceState; selection: Selection; record: Record<string, unknown> }) {
-  if (selection?.kind === "account" && record.bankLink) return <>
-    <p>The bank supplies the balance, type and currency. Sync the connection to retrieve updates.</p>
+  if (selection?.kind === "account" && (record.bankLink || record.coinbaseLink)) return <>
+    <p>The connected provider supplies the balance, type and currency. Sync the connection in Finance settings to retrieve updates.</p>
     <Field label="Account name" name="name" defaultValue={String(record.name || "")} required maxLength={160} />
     <Field label="Institution" name="institution" defaultValue={String(record.institution || "")} maxLength={160} />
     <Field label="Last four digits" name="mask" defaultValue={String(record.mask || "")} maxLength={4} />

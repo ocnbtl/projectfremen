@@ -137,6 +137,7 @@ async function main() {
   let connectionId;
   await checkAsync('Link exchange is one-use/idempotent and credentials stay encrypted and out of DTOs', async () => {
     const link = await service.createBankLink();
+    assert(calls.find(call => call.endpoint === '/link/token/create').body.account_filters.depository.account_subtypes.includes('paypal'));
     const results = await Promise.allSettled([service.exchangeBankLink(link.sessionId, 'public-test'), service.exchangeBankLink(link.sessionId, 'public-test')]);
     assert.equal(results.filter(item => item.status === 'fulfilled').length, 1);
     connectionId = results.find(item => item.status === 'fulfilled').value;

@@ -14,6 +14,7 @@
     "test:people-refinements": "node ./scripts/people-refinements-harness.cjs",
     "test:finance-redesign": "node ./scripts/finance-redesign-harness.cjs",
     "test:finance-banking": "node ./scripts/finance-banking-harness.cjs",
+    "test:finance-coinbase": "node ./scripts/finance-coinbase-harness.cjs",
     "test:people-transfer": "node ./scripts/people-transfer-harness.cjs",
     "test:profile-photo": "node ./scripts/profile-photo-crop-harness.mjs",
     "test:vault": "node ./scripts/local-first-harness.mjs",

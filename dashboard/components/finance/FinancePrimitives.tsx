@@ -93,6 +93,7 @@ export type FinanceIconName =
   | "Sliders"
   | "Check"
   | "Link"
+  | "Refresh"
   | "Sparkles"
   | "Send"
   | "X"
@@ -114,6 +115,7 @@ const ICON_ROLE: Readonly<Record<FinanceIconName, string>> = {
   Sliders: "sliders",
   Check: "check",
   Link: "link",
+  Refresh: "routine",
   Sparkles: "sparkles",
   Send: "send",
   X: "close",

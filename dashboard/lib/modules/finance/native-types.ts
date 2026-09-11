@@ -43,8 +43,9 @@ export interface FinanceAccountRecord extends FinanceRecordBase {
   mask: string;
   currentBalance: number;
   balanceAsOf: string;
-  balanceSource: "manual" | "imported" | "plaid";
+  balanceSource: "manual" | "imported" | "plaid" | "coinbase";
   bankLink?: { connectionId: string; accountId: string };
+  coinbaseLink?: boolean;
   balanceRetrievedAt?: string;
   currency: FinanceCurrency;
   entityScope: FinanceEntityScope;

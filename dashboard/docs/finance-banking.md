@@ -24,7 +24,7 @@ For local tests, use PLAID_ENV=sandbox with an explicit FREMEN_DATA_DIR outside 
 
 ## Connecting
 
-1. Open Finance → Accounts → Bank connections, or Finance settings.
+1. Open Finance → Accounts → Connections, then Bank connections, or open Finance settings.
 2. Connect an institution and complete its authentication and consent inside Plaid Link.
 3. Match each returned account to an existing personal account of the same type, create a new account, or skip it. Save matches to enable balance and transaction imports. One bank login can contain several accounts.
 4. Review possible duplicate entries in the connection panel before including them in totals. Matched manual entries retain their notes and category. Review normal bank entries in Transactions.
