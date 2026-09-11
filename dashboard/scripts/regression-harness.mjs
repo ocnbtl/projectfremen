@@ -5994,6 +5994,23 @@ async function checkPeopleMemoryBrowserState(
       await page.getByRole("heading", { name: "No matching interactions" }).waitFor();
       await page.getByRole("button", { name: "Clear filters", exact: true }).click();
       await interactionRow.waitFor();
+      assert(await page.locator('.people-interactions-count').count() === 0, "Interaction history retained its redundant count line");
+      await page.getByRole("button", { name: "Show filters", exact: true }).click();
+      const historyFilters = page.getByRole("dialog", { name: "Filter interactions", exact: true });
+      await historyFilters.getByLabel("Interaction type").click();
+      await page.getByRole("option", { name: "Call", exact: true }).click();
+      assert(await historyFilters.isVisible() && new URL(page.url()).searchParams.get("kind") === "call", "Nested type selection lost the filter panel or URL state");
+      await historyFilters.getByRole("button", { name: "Show results", exact: true }).click();
+      await page.reload({ waitUntil: "networkidle" });
+      assert(new URL(page.url()).searchParams.get("kind") === "call", "Interaction filters did not survive reload");
+      await page.getByRole("button", { name: "Show filters", exact: true }).click();
+      await historyFilters.getByRole("button", { name: "Reset", exact: true }).click();
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: "Show sorting", exact: true }).click();
+      await page.getByRole("menuitemradio", { name: "Oldest first", exact: true }).click();
+      assert(new URL(page.url()).searchParams.get("order") === "oldest", "Interaction sort did not update its URL");
+      await page.getByRole("menuitemradio", { name: "Newest first", exact: true }).click();
+      await page.keyboard.press("Escape");
       await page.goto(directoryReturnUrl, { waitUntil: "networkidle" });
       if (viewport.label === "desktop") {
         const aiLauncher = page.getByRole("button", { name: "Open AI assistant" });
@@ -6476,8 +6493,8 @@ async function checkPeopleMemoryBrowserState(
         hasRemovedEyebrow: (await interactionDialog.textContent()).includes("Meaningful interaction"),
         checkedParticipants: await interactionDialog.locator('.people-interaction-participant-picker input[type="checkbox"]:checked').count(),
         checkedParticipantIds: await interactionDialog.locator('.people-interaction-participant-picker input[type="checkbox"]:checked').evaluateAll((inputs) => inputs.map((input) => input.value)),
-        coldOptions: (await fieldOptions(interactionDialog.getByLabel("Approach", {exact:true}))).filter(value => value === "Cold").length,
-        warmOptions: (await fieldOptions(interactionDialog.getByLabel("Approach", {exact:true}))).filter(value => value === "Warm").length
+        coldOptions: await interactionDialog.getByRole("radio", { name: "Cold", exact: true }).count(),
+        warmOptions: await interactionDialog.getByRole("radio", { name: "Warm", exact: true }).count()
       };
       assert(
         !interactionComposerState.hasRemovedEyebrow &&
@@ -6489,14 +6506,42 @@ async function checkPeopleMemoryBrowserState(
       );
       await chooseField(interactionDialog.getByLabel("Type"), "catch-up");
       await interactionDialog.getByLabel("Title").fill("Quick catch-up");
-      await chooseField(interactionDialog.getByLabel("Approach", {exact:true}), "warm");
-      await interactionDialog.getByLabel("Start", { exact:true }).fill("15:00");
-      await interactionDialog.getByLabel("End", { exact:true }).fill("16:00");
+      assert(await interactionDialog.getByRole("radio", { name: "Unspecified" }).getAttribute("aria-checked") === "true", "Approach must begin unspecified");
+      await interactionDialog.getByRole("radio", { name: "Warm", exact: true }).click();
+      async function chooseTime(label, hour, period) {
+        await interactionDialog.getByLabel(label, { exact: true }).click();
+        const wheel = page.getByRole("dialog", { name: `${label} time`, exact: true });
+        await wheel.getByRole("group", { name: `${label} hour`, exact: true }).getByRole("button", { name: hour, exact: true }).click();
+        await wheel.getByRole("group", { name: `${label} am/pm`, exact: true }).getByRole("button", { name: period, exact: true }).click();
+        await wheel.getByRole("button", { name: "Done", exact: true }).click();
+      }
+      await chooseTime("Start", "12", "AM");
+      assert(await interactionDialog.getByLabel("Start", { exact: true }).getAttribute("data-value") === "00:00", "Midnight must store as 00:00");
+      await chooseTime("Start", "12", "PM");
+      assert(await interactionDialog.getByLabel("Start", { exact: true }).getAttribute("data-value") === "12:00", "Noon must store as 12:00");
+      await chooseTime("Start", "3", "PM");
+      await chooseTime("End", "4", "PM");
+      await interactionDialog.getByLabel("Date", { exact: true }).click();
+      const calendar = page.getByRole("dialog", { name: "Choose date", exact: true });
+      await calendar.getByLabel("Calendar year").fill("2024");
+      await calendar.getByLabel("Calendar month").click();
+      await page.getByRole("option", { name: "February", exact: true }).click();
+      await calendar.getByRole("button", { name: "February 29, 2024", exact: true }).click();
+      assert(await interactionDialog.getByLabel("Date", { exact: true }).getAttribute("data-value") === "2024-02-29", "Calendar did not retain leap day");
+      await interactionDialog.getByLabel("Date", { exact: true }).click();
+      await calendar.getByRole("button", { name: "February 29, 2024", exact: true }).press("ArrowRight");
+      await page.keyboard.press("Enter");
+      assert(await interactionDialog.getByLabel("Date", { exact: true }).getAttribute("data-value") === "2024-03-01", "Calendar keyboard navigation did not cross the month");
+      await interactionDialog.getByLabel("Date", { exact: true }).click();
+      await calendar.waitFor({ state: "visible" });
+      await page.keyboard.press("Escape");
+      await calendar.waitFor({ state: "hidden" });
+      assert(await interactionDialog.isVisible(), "Closing the calendar closed the composer");
       assert(
         await interactionDialog.getByLabel("Type").getAttribute("data-value") === "catch-up" &&
-          await interactionDialog.getByLabel("Approach", {exact:true}).getAttribute("data-value") === "warm" &&
-          await interactionDialog.getByLabel("Start", { exact:true }).inputValue() === "15:00" &&
-          await interactionDialog.getByLabel("End", { exact:true }).inputValue() === "16:00",
+          await interactionDialog.getByRole("radio", { name: "Warm", exact: true }).getAttribute("aria-checked") === "true" &&
+          await interactionDialog.getByLabel("Start", { exact:true }).getAttribute("data-value") === "15:00" &&
+          await interactionDialog.getByLabel("End", { exact:true }).getAttribute("data-value") === "16:00",
         `Interaction composer did not accept Catch-up and Warm approach at ${viewport.label}`
       );
       const participantGeometry = await interactionDialog.locator(".people-interaction-participant-picker label").evaluateAll((labels) => labels.map((label) => {
@@ -6532,7 +6577,20 @@ async function checkPeopleMemoryBrowserState(
         path: path.join(screenshotDir, `people-interaction-dialog-${viewport.label}.png`),
         fullPage: true
       });
-      await interactionDialog.getByRole("button", { name: "Close interaction composer" }).click();
+      await interactionDialog.getByLabel("Use this as the latest contact date", { exact: true }).uncheck();
+      await interactionDialog.getByLabel("Title", { exact: true }).fill(`Interaction controls ${viewport.label}`);
+      await interactionDialog.getByRole("radio", { name: "Unspecified", exact: true }).click();
+      const controlSave = page.waitForResponse(response => response.url().endsWith('/api/personal/records') && response.request().method() === 'POST');
+      await interactionDialog.getByRole("button", { name: "Save interaction", exact: true }).click();
+      assert((await controlSave).ok(), "Interaction control save failed");
+      await interactionDialog.waitFor({ state: "hidden" });
+      const savedControls = (await (await context.request.get(`${baseUrl}/api/personal/records`)).json()).items.find(item => item.title === `Interaction controls ${viewport.label}`);
+      assert(savedControls?.interaction?.occurredOn === '2024-03-01' && savedControls.interaction.startTime === '15:00' && savedControls.interaction.endTime === '16:00' && savedControls.interaction.updatesLastContact === false && !savedControls.interaction.approach, "Saved interaction did not preserve calendar, AM/PM, unspecified approach and unchecked contact state");
+      await page.goto(`${baseUrl}/admin/people?sidebar=interactions&interaction=${encodeURIComponent(savedControls.id)}`, { waitUntil: "networkidle" });
+      const savedControlDetail = page.getByRole("dialog", { name: `Interaction controls ${viewport.label}`, exact: true });
+      assert(await savedControlDetail.getByRole("checkbox", { name: "Use this as the latest contact date", exact: true }).getAttribute('aria-checked') === 'false', "Detail checkbox did not reflect its saved setting");
+      assert(await savedControlDetail.locator('.people-profile-photo').count() > 0, "Interaction participants did not reuse profile avatars");
+      await savedControlDetail.getByRole("button", { name: "Close interaction details" }).click();
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=relations`, { waitUntil: "networkidle" });
       const linksHub = page.locator(".people-links-hub");

@@ -57,6 +57,9 @@ import OrganizationAutofill from "./people/OrganizationAutofill";
 import TeamSizeInput from "./people/TeamSizeInput";
 import SelectField from "./ui/SelectField";
 import TimeField from "./people/TimeField";
+import DateField from "./people/DateField";
+import InteractionApproach from "./people/InteractionApproach";
+import InteractionCheckbox from "./people/InteractionCheckbox";
 import InlineOrganizationDialog from "./people/InlineOrganizationDialog";
 import { findPeopleDuplicates } from "../lib/modules/people/duplicates";
 import dynamic from "next/dynamic";
@@ -2421,7 +2424,7 @@ export default function PeopleWorkspace({
       searchParams
     );
     if ((partial.sidebar || activeSidebarView) !== "interactions" || path !== getModuleRoute("people")) {
-      for (const key of ["interaction", "kind", "order"]) params.delete(key);
+      for (const key of ["interaction", "kind", "order", "approach", "contact"]) params.delete(key);
     }
     return `${path}${params.size ? `?${params.toString()}` : ""}`;
   }
@@ -5168,7 +5171,7 @@ export default function PeopleWorkspace({
               <button className="people-dialog-close" type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}><UnigentamosIcon role="close" size={18} /></button>
             </header>
             <div className="people-interaction-fields">
-              <div className="people-interaction-settings is-wide"><label><span className="people-visually-hidden">Approach</span><SelectField aria-label="Approach" value={interactionApproach} onChange={event=>setInteractionApproach(event.target.value as PersonalInteractionApproach || "")}><option value="">Approach</option><option value="cold">Cold</option><option value="warm">Warm</option></SelectField></label><label className="people-check-row"><input type="checkbox" checked={interactionMeaningful} onChange={event=>setInteractionMeaningful(event.target.checked)}/>Use this as the latest contact date</label></div>
+              <div className="people-interaction-settings is-wide"><InteractionApproach value={interactionApproach} onChange={setInteractionApproach} /><InteractionCheckbox checked={interactionMeaningful} onChange={setInteractionMeaningful} /></div>
               <label>
                 Type
                 <SelectField value={interactionKind} onChange={(event) => setInteractionKind(event.target.value as InteractionKind)}>
@@ -5182,10 +5185,7 @@ export default function PeopleWorkspace({
                   <option value="milestone">Milestone</option>
                 </SelectField>
               </label>
-              <label>
-                Date
-                <input type="date" value={interactionDate} onChange={(event) => setInteractionDate(event.target.value)} required />
-              </label>
+              <DateField label="Date" value={interactionDate} onChange={setInteractionDate} />
               <fieldset className="people-interaction-time is-wide"><legend>Time <span>Optional</span></legend><div><TimeField label="Start" value={interactionStartTime} onChange={setInteractionStartTime}/><TimeField label="End" value={interactionEndTime} onChange={setInteractionEndTime}/></div></fieldset>
               <label className="is-wide">
                 Title

@@ -5,9 +5,6 @@
 .people-interactions-tools { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .people-interactions-tools .people-primary-search { flex: 1 1 260px; min-width: 0; }
 .people-interactions-tools .people-primary-search input { min-width: 0; width: 100%; }
-.people-interactions-tools > label { display: flex; width: auto; flex: 0 0 auto; align-items: center; gap: 8px; color: var(--text-body); font-size: 12px; }
-.people-interactions-tools select { width: auto; min-height: 42px; padding: 8px 28px 8px 10px; border: 1px solid var(--border-soft); border-radius: 8px; color: var(--text-strong); background: var(--surface-panel); font: inherit; }
-.people-interactions-count { color: var(--text-body); font-size: 12px; margin: 16px 0 24px; }
 .people-interaction-groups > section + section { margin-top: 32px; }
 .people-interaction-groups h2 { margin: 0 0 8px; color: var(--text-strong); font-size: 15px; font-weight: 650; }
 .people-interaction-groups ul { list-style: none; margin: 0; padding: 0; }
@@ -49,8 +46,6 @@
 @media (max-width: 760px) {
   .people-interactions-tools { gap: 10px; }
   .people-interactions-tools .people-primary-search { flex-basis: 100%; }
-  .people-interactions-tools > label { flex: 1; min-width: 0; display: grid; gap: 5px; }
-  .people-interactions-tools select { width: 100%; min-width: 0; min-height: 44px; font-size: 14px; }
   .people-redesign-shell .people-interaction-row { grid-template-columns: 60px minmax(0, 1fr) 16px; gap: 12px; padding: 16px 4px; }
   .people-interaction-row > .people-interaction-type { grid-column: 2; grid-row: 2; }
   .people-interaction-row > svg { grid-column: 3; grid-row: 1; }
@@ -59,3 +54,97 @@
   .people-interaction-detail-content { padding: 0 20px 32px; }
   .people-interaction-detail-content > header { min-height: 64px; }
 }
+
+/* Interaction controls share the People palette, including portaled menus. */
+.people-date-calendar, .people-time-wheel, .people-interactions-menu {
+  --module-icon: #963a08; --module-quiet: #fff5ed; --module-border: #ffbb80; --module-focus: #e87020;
+  --module-secondary-700: #5a6040;
+  font-family: "Inter Variable", "Segoe UI", sans-serif;
+  max-height: min(560px, var(--radix-popover-content-available-height));
+  overflow: auto; overscroll-behavior: contain;
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+.people-interactions-tools { margin-bottom: 28px; }
+.people-interactions-tools .people-primary-search { width: 100%; }
+.people-interactions-menu { width: min(350px, calc(100vw - 24px)); padding: 16px; }
+.people-interactions-menu > header { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; color: var(--module-icon); }
+.people-interactions-menu h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.people-interactions-filter-fields { display: grid; gap: 16px; }
+.people-interactions-filter-fields > label { display: grid; gap: 6px; font-size: 13px; font-weight: 500; color: var(--text-body); }
+.people-interactions-filter-fields .app-select-trigger { width: 100%; min-height: 44px; font-size: 13px; font-weight: 400; }
+.people-interactions-menu footer, .people-date-calendar footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; }
+.people-interactions-menu footer button, .people-date-calendar footer button { min-height: 40px; padding: 8px 12px; border: 0; border-radius: 8px; color: var(--module-icon); background: var(--module-quiet); font-family: inherit; font-size: 13px; font-weight: 500; }
+.people-interactions-menu footer button:last-child { color: #fff; background: var(--module-icon); }
+.people-interactions-sort { width: 240px; padding: 12px; }
+.people-interactions-sort .people-sort-options { position: relative; }
+.people-interactions-sort .people-sort-options > button { position: relative; display: flex; justify-content: space-between; align-items: center; width: 100%; height: 42px; min-height: 42px; padding: 0 10px; border: 0; background: transparent; color: var(--text-body); font-size: 13px; font-weight: 500; }
+.people-interactions-sort .people-sort-options > button[aria-checked="true"] { color: var(--module-icon); }
+.people-interactions-sort .people-sort-selection { position: absolute; inset: 0 0 auto; height: 42px; border-radius: 8px; background: var(--module-quiet); transition: transform 180ms cubic-bezier(.2, .8, .2, 1); }
+.people-interactions-sort .people-sort-check { opacity: 0; display: inline-flex; }
+.people-interactions-sort .people-sort-check.is-visible { opacity: 1; }
+.people-interaction-dialog .people-interaction-fields > label,
+.people-interaction-dialog .people-date-field > span,
+.people-interaction-dialog .people-time-field > span,
+.people-interaction-dialog .people-interaction-fields legend { font-size: 13px; font-weight: 500; line-height: 1.5; color: var(--text-body); }
+.people-interaction-dialog .people-interaction-fields :is(input, textarea, .app-select-trigger) { font-family: "Inter Variable", "Segoe UI", sans-serif; font-size: 14px; font-weight: 400; }
+.people-interaction-dialog .people-interaction-settings { grid-template-columns: minmax(0, 1fr); gap: 16px; padding-bottom: 4px; }
+.people-interaction-dialog .people-interaction-approach { padding: 0; margin: 0; border: 0; min-width: 0; }
+.people-interaction-approach legend { padding: 0; margin-bottom: 6px; }
+.people-approach-switch { position: relative; isolation: isolate; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; padding: 4px; border-radius: 12px; background: var(--surface-panel-soft); }
+.people-approach-switch .people-approach-selection { position: absolute; inset: 4px auto 4px 4px; width: calc((100% - 8px) / 3); border-radius: 9px; background: var(--module-quiet); box-shadow: 0 2px 5px rgb(36 31 28 / 8%); transform: translateX(calc(var(--approach-index) * 100%)); transition: transform 200ms cubic-bezier(.2, .8, .2, 1); z-index: -1; }
+.people-approach-switch button { min-height: 40px; padding: 8px; border: 0; border-radius: 8px; background: transparent; color: var(--text-body); font: inherit; font-size: 13px; font-weight: 500; }
+.people-approach-switch button[aria-checked="true"] { color: var(--module-icon); }
+.people-interaction-checkbox { position: relative; display: flex !important; align-items: center; gap: 10px; width: auto; min-height: 32px; color: var(--text-body); font-size: 13px; font-weight: 400; line-height: 1.5; cursor: pointer; }
+.people-interaction-checkbox input { position: absolute; width: 1px !important; height: 1px !important; min-height: 0 !important; padding: 0 !important; margin: 0; opacity: 0; }
+.people-interaction-checkmark { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 22px; width: 22px; height: 22px; border: 1.5px solid var(--border-strong, #aab6b4); border-radius: 6px; background: var(--surface-panel); color: #fff; transition: background 140ms ease, border-color 140ms ease; }
+.people-interaction-checkmark svg { opacity: 0; transform: scale(.75); transition: opacity 140ms ease, transform 140ms ease; }
+.people-interaction-checkbox input:checked + .people-interaction-checkmark,
+.people-interaction-checkbox[aria-checked="true"] .people-interaction-checkmark { background: var(--module-secondary-700, #5a6040); border-color: var(--module-secondary-700, #5a6040); }
+.people-interaction-checkbox input:checked + .people-interaction-checkmark svg,
+.people-interaction-checkbox[aria-checked="true"] .people-interaction-checkmark svg { opacity: 1; transform: scale(1); }
+.people-interaction-checkbox input:focus-visible + .people-interaction-checkmark { outline: 2px solid var(--module-focus); outline-offset: 3px; }
+.people-interaction-checkbox.is-readonly { cursor: default; }
+.people-interaction-detail-facts + .people-interaction-checkbox { margin-top: 24px; }
+.people-interaction-detail-participants .people-profile-photo { flex: 0 0 32px; width: 32px; height: 32px; border-radius: 50%; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; background: var(--module-quiet); font-size: 11px; }
+.people-interaction-detail-participants .people-profile-photo img { width: 100%; height: 100%; object-fit: cover; }
+.people-date-field, .people-time-field { display: grid; gap: 6px; align-items: stretch; min-width: 0; }
+.people-interaction-dialog :is(.people-date-trigger, .people-time-trigger) { width: 100%; height: 44px; min-height: 44px; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface-panel); color: var(--text-strong); font: inherit; font-size: 14px; font-weight: 400; }
+.people-date-trigger > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.people-date-trigger > svg { flex-shrink: 0; }
+.people-time-icon { width: 24px; height: 100%; display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; }
+.people-time-icon svg { display: block; margin: 0; }
+.people-time-wheel { width: 280px; padding: 16px; }
+.people-time-wheel-columns { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.people-time-wheel-columns [role="group"] { position: relative; }
+.people-time-wheel-columns > div:last-child [role="group"] { height: auto; }
+.people-time-wheel-columns button { min-height: 40px; font: 500 15px "Inter Variable", "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+.people-time-wheel-columns button[aria-pressed="true"] { color: var(--module-icon); background: var(--module-quiet); }
+.people-time-wheel footer button { min-height: 40px; font: inherit; font-size: 13px; }
+.people-date-calendar { width: min(340px, calc(100vw - 24px)); padding: 12px; }
+.people-date-calendar header { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+.people-date-calendar header > button:not(.app-select-trigger) { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 32px; width: 32px; height: 40px; padding: 0; background: transparent; border: 0; border-radius: 8px; color: var(--text-body); }
+.people-date-calendar header .app-select-trigger { flex: 1; min-width: 0; padding: 8px; font-size: 13px; }
+.people-date-calendar header input { width: 62px; min-width: 0; min-height: 40px; padding: 4px; border: 0; border-radius: 6px; background: var(--surface-panel-soft); color: var(--text-strong); font-size: 14px; text-align: center; appearance: textfield; }
+.people-date-calendar header input::-webkit-inner-spin-button { appearance: none; }
+.people-date-calendar table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.people-date-calendar :is(th, td) { height: 40px; padding: 1px; border: 0; text-align: center; }
+.people-date-calendar th { height: 28px; font-size: 11px; font-weight: 500; color: var(--text-body); }
+.people-date-calendar td button { width: 100%; height: 38px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--text-strong); font: 400 13px "Inter Variable", "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+.people-date-calendar td button:hover { background: var(--module-quiet); }
+.people-date-calendar td button[aria-current="date"] { box-shadow: inset 0 0 0 1px var(--module-border); color: var(--module-icon); }
+.people-date-calendar td[aria-selected="true"] button { color: #fff; background: var(--module-icon); font-weight: 600; }
+.people-date-calendar :is(button, input):focus-visible, .people-time-wheel button:focus-visible, .people-interactions-menu button:focus-visible, .people-approach-switch button:focus-visible { outline: 2px solid var(--module-focus); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .people-interactions-tools .people-primary-search { flex-basis: auto; }
+  .people-interactions-tools .people-primary-search input { width: 0; flex: 1; }
+  .people-interaction-dialog .people-interaction-fields :is(input, textarea, .app-select-trigger, .people-date-trigger, .people-time-trigger) { font-size: 16px; }
+  .people-approach-switch button { min-height: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .people-approach-selection, .people-interaction-checkmark, .people-interaction-checkmark svg, .people-interactions-sort .people-sort-selection { transition: none; }
+}
+.people-interaction-approach > .people-approach-switch { display: grid; gap: 0; }
+.people-date-calendar table { display: table; overflow: visible; }
+.people-date-calendar button[aria-label="Previous month"] svg { transform: rotate(180deg); }
+.people-interaction-dialog .people-interaction-checkbox > span:last-child { font-size: 13px; font-weight: 400; line-height: 1.5; }
+.people-interaction-dialog .people-interaction-time { border: 0; border-radius: 0; padding: 0; background: transparent; }
