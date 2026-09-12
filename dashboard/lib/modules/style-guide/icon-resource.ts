@@ -4,6 +4,7 @@ import { createPersonalRecord, readPersonalRecords, updatePersonalRecord, type P
 import { resourceCreateInputToLegacy, resourceUpdateInputToLegacy } from "../resources/legacy-adapter";
 import { encodeStyleGuideComponent, STYLE_GUIDE_AREA } from "./component-resource";
 import { formatIconResourceTitle } from "./icon-title";
+import customIcons from "../../icons/custom-icons.json";
 
 const ROLE_PREFIX = "Icon role:";
 const CANDIDATE_PREFIX = "Tabler Line:";
@@ -40,13 +41,14 @@ function resourceBody(role: string, candidate: string): string {
   const entry = ICON_REGISTRY_BY_ID.get(role);
   if (!entry) throw new Error("Unknown icon role");
   const usage = entry.usages.map((item) => `${item.module} › ${item.breadcrumb}`).join("; ");
+  const custom = customIcons[candidate as keyof typeof customIcons];
   return encodeStyleGuideComponent({
-    visual: `${candidateLabel(candidate)} from Streamline’s Tabler Line set. 24 × 24 grid, 2 px stroke, round caps and joins, currentColor by default. Usage: ${usage}.`,
+    visual: `${custom?.description || `${candidateLabel(candidate)} from Streamline’s Tabler Line set`}. 24 × 24 grid, 2 px stroke, round caps and joins, currentColor by default. Usage: ${usage}.`,
     code: `<UnigentamosIcon role="${role}" />`,
     animation: role === "duplicates-warning"
       ? "The red X magnifier gently pulses in the People sidebar. Only the glyph changes opacity and scale; its button stays neutral. Reduced motion keeps the glyph static."
       : role === "duplicates"
-        ? "Static green check magnifier. Neutral button with no colored box or pulse. Tooltip: No duplicates detected."
+        ? "Static green check magnifier. Neutral button with no colored box or pulse. Tooltip: No Duplicates Detected."
         : "Static semantic icon. Color may inherit the owning module token; motion is not applied to the glyph itself."
   });
 }

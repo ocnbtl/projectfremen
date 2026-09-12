@@ -10,22 +10,25 @@ const iconDirectory = path.join(projectDirectory, "node_modules", "@tabler", "ic
 const outputPath = path.join(projectDirectory, "public", "tabler-line-sprite.svg");
 
 const registry = JSON.parse(await readFile(registryPath, "utf8"));
+const customIcons = JSON.parse(await readFile(path.join(projectDirectory, "lib", "icons", "custom-icons.json"), "utf8"));
 const candidates = [...new Set(registry.flatMap((entry) => entry.candidates))].sort();
 const symbols = [];
 
 for (const candidate of candidates) {
-  const source = await readFile(path.join(iconDirectory, `${candidate}.svg`), "utf8");
+  const custom = customIcons[candidate];
+  const source = await readFile(path.join(iconDirectory, `${custom?.source || candidate}.svg`), "utf8");
   const match = source.match(/<svg[^>]*>([\s\S]*?)<\/svg>/i);
   if (!match) throw new Error(`Tabler SVG ${candidate} could not be parsed`);
   const body = match[1]
     .replace(/<path\s+stroke="none"\s+d="M0 0h24v24H0z"\s+fill="none"\s*\/>/i, "")
+    .replace(/<path\s+d="([^"]+)"\s*\/>/g, (path, geometry) => custom?.omitPaths.includes(geometry) ? "" : path)
     .trim();
   symbols.push(`  <symbol id="tabler-${candidate}" viewBox="0 0 24 24">\n    ${body.replace(/\n/g, "\n    ")}\n  </symbol>`);
 }
 
 const output = [
   '<svg xmlns="http://www.w3.org/2000/svg">',
-  "  <!-- Tabler Icons 3.46.0. MIT licensed. Generated from lib/icons/icon-registry.json. -->",
+  "  <!-- Tabler Icons 3.46.0. MIT licensed. Generated from lib/icons/icon-registry.json with adaptations in custom-icons.json. -->",
   ...symbols,
   "</svg>",
   ""

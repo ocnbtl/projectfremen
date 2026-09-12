@@ -1,4 +1,5 @@
 import registryJson from "./icon-registry.json";
+import customIcons from "./custom-icons.json";
 
 export const ICON_MODULES = [
   "System",
@@ -47,7 +48,8 @@ export function candidateLabel(candidate: string): string {
 }
 
 export function streamlineIconUrl(candidate: string): string {
-  return `https://www.streamlinehq.com/icons/download/${encodeURIComponent(candidate)}--29169`;
+  const source = customIcons[candidate as keyof typeof customIcons]?.source || candidate;
+  return `https://www.streamlinehq.com/icons/download/${encodeURIComponent(source)}--29169`;
 }
 
 export function iconModules(entry: IconRegistryEntry): IconModuleName[] {

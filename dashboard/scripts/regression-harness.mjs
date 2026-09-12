@@ -5987,6 +5987,7 @@ async function checkPeopleMemoryBrowserState(
       }
       await page.getByLabel("Search interactions", { exact: true }).fill("Shared regression introduction");
       const interactionRow = page.getByRole("button", { name: "View interaction: Shared regression introduction", exact: true });
+      assert(await interactionRow.locator('.people-profile-photo').count() === 2, 'Shared interaction list card lost participant portraits');
       await interactionRow.click();
       const interactionDetail = page.getByRole("region", { name: "Shared regression introduction", exact: true });
       await interactionDetail.waitFor();
@@ -6012,6 +6013,14 @@ async function checkPeopleMemoryBrowserState(
       if (viewport.width > 760) await selectedPane.getByRole('heading',{name:'No interactions to show',exact:true}).waitFor();
       await page.getByRole("button", { name: "Clear filters", exact: true }).click();
       await interactionRow.waitFor();
+      const untimedRow = page.locator('.people-interaction-row').filter({hasNot:page.locator('.people-interaction-row-date small')}).first();
+      await untimedRow.click();
+      const untimedDetail = page.locator('.people-interaction-detail');
+      await untimedDetail.getByRole('img', {name:'Time not recorded',exact:true}).waitFor();
+      assert(await untimedDetail.locator('.people-interaction-timing p').nth(1).locator('span').innerText() === '', 'Missing time should keep its icon and a blank value');
+      assert(await untimedDetail.locator('[data-icon-role="interaction-date"]').getAttribute('data-icon-candidate') === 'calendar-blank', 'Interaction date did not use its plain calendar');
+      await page.goBack({waitUntil:'networkidle'});
+      await page.getByLabel('Search interactions',{exact:true}).waitFor();
       assert(await page.locator('.people-interactions-count').count() === 0, "Interaction history retained its redundant count line");
       await page.getByRole("button", { name: "Show filters", exact: true }).click();
       const historyFilters = page.getByRole("dialog", { name: "Filter interactions", exact: true });
@@ -6606,7 +6615,8 @@ async function checkPeopleMemoryBrowserState(
       assert(savedControls?.interaction?.occurredOn === '2024-03-01' && savedControls.interaction.startTime === '15:00' && savedControls.interaction.endTime === '16:00' && savedControls.interaction.updatesLastContact === false && !savedControls.interaction.approach, "Saved interaction did not preserve calendar, AM/PM, unspecified approach and unchecked contact state");
       await page.goto(`${baseUrl}/admin/people?sidebar=interactions&interaction=${encodeURIComponent(savedControls.id)}`, { waitUntil: "networkidle" });
       const savedControlDetail = page.getByRole("region", { name: `Interaction controls ${viewport.label}`, exact: true });
-      assert(await savedControlDetail.getByRole("checkbox", { name: "Use this as the latest contact date", exact: true }).getAttribute('aria-checked') === 'false', "Detail checkbox did not reflect its saved setting");
+      assert(await savedControlDetail.locator('.people-interaction-detail-participants').getByRole('img', {name:'Latest contact: not included',exact:true}).count() === 1, 'Participant latest-contact marker did not reflect its saved setting');
+      assert(await savedControlDetail.getByRole('checkbox').count() === 0, 'Interaction detail retained its old checkbox');
       assert(await savedControlDetail.locator('.people-profile-photo').count() > 0, "Interaction participants did not reuse profile avatars");
       const photoBackgrounds = await savedControlDetail.locator('.people-profile-photo').evaluateAll(elements => elements.map(element => getComputedStyle(element).backgroundImage));
       assert(photoBackgrounds.every(background => background === 'none'), 'Participant avatars retained a gradient placeholder');

@@ -5,18 +5,18 @@
 .people-interactions-tools .people-primary-search input { min-width: 0; width: 100%; }
 .people-interaction-groups > section + section { margin-top: 32px; }
 .people-interaction-groups h2 { margin: 0 0 8px; color: var(--text-strong); font-size: 15px; font-weight: 650; }
-.people-interaction-groups ul { list-style: none; margin: 0; padding: 0; }
-.people-interaction-groups li { border-bottom: 1px solid var(--border-soft); }
-.people-redesign-shell .people-interaction-row { display: grid; grid-template-columns: 66px minmax(0, 1fr) 18px; gap: 12px; align-items: start; width: 100%; border: 0; border-radius: 8px; padding: 18px 12px; background: transparent; box-shadow: none; color: var(--text-body); text-align: left; font-weight: 400; }
-.people-redesign-shell .people-interaction-row:hover { background: var(--module-quiet); }
-.people-interaction-row-date { display: grid; gap: 4px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.people-interaction-groups ul { display: grid; gap: 12px; list-style: none; margin: 0; padding: 0; }
+.people-interaction-groups li { min-width: 0; }
+.people-redesign-shell .people-interaction-row { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; width: 100%; padding: 18px; border: 1px solid var(--border-soft); border-radius: 16px; background: var(--surface-panel); box-shadow: none; color: var(--text-body); text-align: left; font-weight: 400; transition: background 150ms ease, border-color 150ms ease, transform 180ms ease; }
+.people-redesign-shell .people-interaction-row:hover { background: var(--module-quiet); border-color: var(--module-border); transform: translateY(-1px); }
+.people-interaction-row-date { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; font-size: 12px; font-variant-numeric: tabular-nums; }
 .people-interaction-row-date small { font-size: 11px; }
 .people-interaction-row-main { min-width: 0; display: grid; gap: 5px; }
 .people-interaction-row-main strong { color: var(--text-strong); font-size: 15px; line-height: 1.45; font-weight: 650; overflow-wrap: anywhere; }
 .people-interaction-row-main > span { color: var(--text-body); font-size: 12px; overflow-wrap: anywhere; }
-.people-interaction-row-main p { margin: 3px 0 0; max-width: 72ch; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.65; white-space: pre-wrap; color: var(--text-body); overflow-wrap: anywhere; }
+.people-interaction-row-notes { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 13px; line-height: 1.65; white-space: pre-wrap; color: var(--text-body); overflow-wrap: anywhere; }
 .people-interaction-type { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--module-icon); }
-.people-interaction-row > svg { color: var(--module-icon); margin-top: 3px; }
+
 .people-interactions-more { display: block; width: auto; margin: 24px auto; min-height: 44px; background: var(--surface-panel); border: 1px solid var(--border-soft); border-radius: 8px; color: var(--text-strong); padding: 8px 16px; }
 .people-redesign-shell .people-interaction-panel { display: block; overflow: auto; overscroll-behavior: contain; }
 .people-interaction-detail { min-width: 0; color: var(--text-body); }
@@ -26,8 +26,8 @@
 .people-interaction-detail-heading p { margin: 0; font-size: 13px; line-height: 1.6; }
 .people-interaction-detail-content > section { margin-top: 32px; }
 .people-interaction-detail h3 { margin: 0 0 12px; font-size: 15px; color: var(--text-strong); }
-.people-interaction-detail-participants { display: grid; gap: 10px; }
-.people-interaction-detail-participants button { display: inline-flex; align-items: center; gap: 14px; width: 100%; max-width: 100%; min-height: 76px; padding: 14px 16px; background: var(--surface-panel); border: 1px solid var(--border-soft); border-radius: 12px; color: var(--text-strong); font-size: 15px; }
+.people-interaction-detail-participants { display: flex; align-items: flex-start; flex-wrap: wrap; gap: 12px; }
+.people-interaction-detail-participants button { display: inline-flex; align-items: center; gap: 12px; width: auto; max-width: 100%; min-height: 72px; padding: 12px 16px; background: var(--surface-panel); border: 1px solid var(--border-soft); border-radius: 12px; color: var(--text-strong); font-size: 15px; }
 .people-interaction-detail-participants button span { overflow-wrap: anywhere; }
 .people-interaction-detail-participants button svg { flex-shrink: 0; }
 .people-interaction-detail-notes p { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 72ch; font-size: 15px; line-height: 1.75; }
@@ -39,8 +39,7 @@
 @media (max-width: 760px) {
   .people-interactions-tools { gap: 10px; }
   .people-interactions-tools .people-primary-search { flex-basis: 100%; }
-  .people-redesign-shell .people-interaction-row { grid-template-columns: 60px minmax(0, 1fr) 16px; gap: 12px; padding: 16px 4px; }
-  .people-interaction-row > svg { grid-column: 3; grid-row: 1; }
+  .people-redesign-shell .people-interaction-row { gap: 12px; padding: 16px; }
   .people-interaction-row-main strong { font-size: 14px; }
   .people-interaction-detail { width: 100%; min-width: 0; border-radius: 0; }
   .people-interaction-detail-content { padding: 0 0 20px; }
@@ -96,8 +95,7 @@
 .people-interaction-checkbox[aria-checked="true"] .people-interaction-checkmark svg { opacity: 1; transform: scale(1); }
 .people-interaction-checkbox input:focus-visible + .people-interaction-checkmark { outline: 2px solid var(--module-focus); outline-offset: 3px; }
 .people-interaction-checkbox.is-readonly { cursor: default; }
-.people-interaction-detail-facts + .people-interaction-checkbox { margin-top: 24px; }
-.people-interaction-detail-participants .people-profile-photo { flex: 0 0 48px; width: 48px; height: 48px; border-radius: 50%; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; background: var(--module-quiet); font-size: 11px; }
+.people-interaction-detail-participants .people-profile-photo { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 50%; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; background: var(--module-quiet); font-size: 11px; }
 .people-interaction-detail-participants .people-profile-photo img { width: 100%; height: 100%; object-fit: cover; }
 .people-date-field, .people-time-field { display: grid; gap: 6px; align-items: stretch; min-width: 0; }
 .people-interaction-dialog :is(.people-date-trigger, .people-time-trigger) { width: 100%; height: 44px; min-height: 44px; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface-panel); color: var(--text-strong); font: inherit; font-size: 14px; font-weight: 400; }
@@ -142,8 +140,7 @@
 .people-interaction-dialog .people-interaction-time { border: 0; border-radius: 0; padding: 0; background: transparent; }
 
 /* Docked details share the profile pane boundary and scroll independently. */
-.people-redesign-shell .people-interaction-row[aria-current="true"] { background: var(--module-quiet); box-shadow: inset 3px 0 var(--module-icon); }
-.people-interaction-row-main > .people-interaction-type { color: var(--module-icon); font-size: 11px; font-weight: 500; }
+.people-redesign-shell .people-interaction-row[aria-current="true"] { background: var(--module-quiet); border-color: var(--module-border); box-shadow: none; }
 .people-interaction-timing { display: grid; gap: 8px; }
 .people-interaction-timing p { display: flex; align-items: center; gap: 10px; }
 .people-interaction-timing svg { color: var(--module-secondary-700); flex-shrink: 0; }
@@ -155,3 +152,24 @@
 .people-interaction-source span { font-size: 11px; color: var(--text-muted); }
 .people-interaction-source strong { font-size: 13px; font-weight: 500; }
 .people-interactions-tools .people-primary-search input { width: 0; flex: 1; }
+
+/* Portrait-led history cards and compact participant identities. */
+.people-interaction-row-identity { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.people-interaction-row-avatars { display: inline-flex; align-items: center; flex-shrink: 0; isolation: isolate; }
+.people-interaction-row-avatars:empty { display: none; }
+.people-interaction-row-avatars .people-profile-photo { width: 44px; height: 44px; flex: 0 0 44px; border-radius: 50%; border: 2px solid var(--surface-panel); font-size: 12px; }
+.people-interaction-row-avatars .people-profile-photo + .people-profile-photo { margin-left: -16px; }
+.people-interaction-extra-participants { margin-left: 4px; font-size: 11px; color: var(--text-muted); }
+.people-interaction-row-footer { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.people-interaction-row-footer .people-interaction-type { margin-left: auto; padding: 4px 8px; border-radius: 6px; background: var(--people-olive-soft); color: var(--people-olive-strong); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.people-interaction-row-footer > svg { color: var(--module-icon); flex-shrink: 0; }
+.people-interaction-participant-name { display: grid; gap: 6px; max-width: 220px; min-width: 0; text-align: left; }
+.people-latest-contact-mark { display: inline-flex; align-items: center; gap: 6px; width: fit-content; color: var(--text-muted); font-size: 11px; line-height: 1.5; font-weight: 500; }
+.people-latest-contact-mark[data-included="true"] { color: var(--people-olive-strong); }
+.people-latest-contact-orbit { position: relative; display: inline-block; width: 14px; height: 14px; flex: 0 0 14px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; transform: rotate(-35deg); }
+.people-latest-contact-orbit::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: currentColor; opacity: 0; }
+.people-latest-contact-mark[data-included="true"] .people-latest-contact-orbit::after { opacity: 1; }
+.people-interaction-timing p { min-height: 22px; }
+@media (prefers-reduced-motion: reduce) {
+  .people-redesign-shell .people-interaction-row { transition: none; transform: none; }
+}

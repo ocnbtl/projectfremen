@@ -8,7 +8,6 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import * as Popover from "@radix-ui/react-popover";
 import SelectField from "../ui/SelectField";
 import { PeopleProfileAvatar } from "./PeopleProfilePhoto";
-import InteractionCheckbox from "./InteractionCheckbox";
 
 export type InteractionEntry = {
   id: string; date?: string; kind: string; title: string; summary?: string;
@@ -17,6 +16,7 @@ export type InteractionEntry = {
 };
 const kinds = ["call", "message", "email", "meeting", "catch-up", "note", "memory", "milestone"];
 const label = (value: string) => value ? value[0].toUpperCase() + value.slice(1).replace(/-/g, " ") : "Interaction";
+const initials = (value: string) => value.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase();
 const validDate = (value?: string) => Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T12:00:00Z`)));
 const dateLabel = (value?: string, month = false) => validDate(value)
   ? new Date(`${value}T12:00:00Z`).toLocaleDateString("en-US", { timeZone: "UTC", year: "numeric", month: "long", ...(month ? {} : { day: "numeric" }) })
@@ -41,19 +41,22 @@ function InteractionDetail({ item, people, explicitSelection, empty, error, onBa
       <header><UnigentamosIcon role="interaction-history" size={20} /><span>Interaction details</span></header>
       {!error && item ? <>
         <div className="people-interaction-detail-heading"><span className="people-interaction-type">{label(item.kind)}</span><h2 ref={headingRef} tabIndex={-1} id="interaction-detail-title">{item.title}</h2>
-          <div className="people-interaction-timing"><p><UnigentamosIcon role="calendar" size={18} /><time dateTime={validDate(item.date) ? item.date : undefined}>{dateLabel(item.date)}</time></p>
-            {item.startTime && <p><UnigentamosIcon role="clock" size={18} /><span>{timeLabel(item.startTime)}{item.endTime ? ` – ${timeLabel(item.endTime)}` : ""}</span></p>}</div>
+          <div className="people-interaction-timing"><p><UnigentamosIcon role="interaction-date" size={18} /><time dateTime={validDate(item.date) ? item.date : undefined}>{dateLabel(item.date)}</time></p>
+            <p><UnigentamosIcon role="clock" size={18} title={!item.startTime ? "Time not recorded" : undefined} /><span>{item.startTime ? `${timeLabel(item.startTime)}${item.endTime ? ` – ${timeLabel(item.endTime)}` : ""}` : ""}</span></p></div>
         </div>
         <section aria-label="Participants"><h3>Participants</h3><div className="people-interaction-detail-participants">{item.participantIds.map(id => {
           const person = people.find(p => p.id === id);
-          return person && !person.archivedAt ? <button key={id} onClick={() => onOpenPerson(person)}><PeopleProfileAvatar label={person.title} initials={person.title.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase()} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /><span>{person.title}</span><UnigentamosIcon role="chevron-right" size={16} /></button>
+          return person && !person.archivedAt ? <button key={id} onClick={() => onOpenPerson(person)}>
+            <PeopleProfileAvatar label={person.title} initials={initials(person.title)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact />
+            <span className="people-interaction-participant-name"><span>{person.title}</span>
+              <span className="people-latest-contact-mark" data-included={Boolean(item.updatesLastContact)} role="img" aria-label={`Latest contact: ${item.updatesLastContact ? "included" : "not included"}`} title={item.updatesLastContact ? "Counts toward this profile's latest contact date" : "Does not update this profile's latest contact date"}><span className="people-latest-contact-orbit" aria-hidden="true" /><span>Latest contact</span></span>
+            </span><UnigentamosIcon role="chevron-right" size={16} /></button>
             : <p key={id}>{person ? `${person.title} (archived)` : "Profile unavailable"}</p>;
         })}{!item.participantIds.length && <p>No participants recorded.</p>}</div></section>
         <section className="people-interaction-detail-notes"><h3>Notes</h3><p>{item.summary || "No additional notes recorded."}</p></section>
         <dl className="people-interaction-detail-facts">
           {item.approach && <div><dt>Approach</dt><dd>{label(item.approach)}</dd></div>}
         </dl>
-        <InteractionCheckbox checked={Boolean(item.updatesLastContact)} />
         <section className="people-interaction-source" aria-label="Interaction source"><UnigentamosIcon role={item.source === "profile" ? "module-people" : "interaction-history"} size={20} /><div><span>Source</span><strong>{item.source === "profile" ? "Profile history" : "Logged interaction"}</strong></div></section>
       </> : <div className="notes-empty-state"><UnigentamosIcon role="interaction-history" size={28} /><h2 ref={headingRef} tabIndex={-1} id="interaction-detail-title">{error ? "Interactions could not be loaded" : empty ? "No interactions to show" : "Interaction unavailable"}</h2><p>{error || (empty ? "Your latest matching interaction will appear here. Select any interaction to read its details." : "This interaction may have been removed or its profile is unavailable. Select another interaction from your history.")}</p></div>}
     </div>
@@ -142,9 +145,14 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
       <p className="people-visually-hidden" role="status">{filtered.length} matching interactions</p>
       {filtered.length ? <div className="people-interaction-groups">{[...groups].map(([month, entries]) => <section key={month} aria-label={month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}>
         <h2>{month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}</h2><ul>{entries.map(item => <li key={item.id}><button className="people-interaction-row" data-interaction-id={item.id} aria-current={selected?.id === item.id ? "true" : undefined} aria-controls="people-interaction-panel" aria-label={`View interaction: ${item.title}`} onClick={() => navigate({ interaction: item.id }, true)}>
-          <span className="people-interaction-row-date"><time dateTime={validDate(item.date) ? item.date : undefined}>{validDate(item.date) ? new Date(`${item.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "Undated"}</time><small>{timeLabel(item.startTime)}</small></span>
-          <span className="people-interaction-row-main"><strong>{item.title}</strong><span className="people-interaction-type">{label(item.kind)}</span><span>{item.participantIds.map(id => people.find(p => p.id === id)?.title || "Profile unavailable").join(" · ") || "No participants recorded"}</span>{item.summary && <p>{item.summary}</p>}</span>
-          <UnigentamosIcon role="chevron-right" size={18} />
+          <span className="people-interaction-row-identity"><span className="people-interaction-row-avatars" aria-hidden="true">{item.participantIds.slice(0, 2).map(id => {
+            const person = people.find(person => person.id === id);
+            return <PeopleProfileAvatar key={id} label={person?.title || "Profile unavailable"} initials={person ? initials(person.title) : "?"} photoUrl={person?.profile?.photoUrl} photoUpdatedAt={person?.profile?.photoUpdatedAt} compact />;
+          })}{item.participantIds.length > 2 && <span className="people-interaction-extra-participants">+{item.participantIds.length - 2}</span>}</span>
+            <span className="people-interaction-row-main"><strong>{item.title}</strong><span>{item.participantIds.map(id => people.find(p => p.id === id)?.title || "Profile unavailable").join(" · ") || "No participants recorded"}</span></span>
+          </span>
+          {item.summary && <span className="people-interaction-row-notes">{item.summary}</span>}
+          <span className="people-interaction-row-footer"><span className="people-interaction-row-date"><time dateTime={validDate(item.date) ? item.date : undefined}>{validDate(item.date) ? new Date(`${item.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "Undated"}</time>{item.startTime && <small>{timeLabel(item.startTime)}</small>}</span><span className="people-interaction-type">{label(item.kind)}</span><UnigentamosIcon role="chevron-right" size={16} /></span>
         </button></li>)}</ul>
       </section>)}</div> : <div className="notes-empty-state"><UnigentamosIcon role="interaction-history" size={26} /><h2>{items.length ? "No matching interactions" : "Your history starts here"}</h2><p>{items.length ? "Try another name, phrase or filter." : "Log an interaction above to keep conversations, meetings and memories together."}</p>{(query || filterCount > 0) && <button onClick={() => { onQueryChange(""); navigate({ kind: "", approach: "", contact: "", query: "" }); }}>Clear filters</button>}</div>}
       {filtered.length > limit && <button className="people-interactions-more" onClick={() => setLimit(current => current + 50)}>Show more · {filtered.length - limit} remaining</button>}

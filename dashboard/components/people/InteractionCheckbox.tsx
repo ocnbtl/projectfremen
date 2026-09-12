@@ -1,7 +1,7 @@
 "use client";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
-/** A saved setting in the detail panel; an editable checkbox in the composer. */
+/** The composer control for whether an interaction updates latest contact. */
 export default function InteractionCheckbox({ checked, onChange, label = "Use this as the latest contact date" }: {
   checked: boolean; onChange?: (checked: boolean) => void; label?: string;
 }) {

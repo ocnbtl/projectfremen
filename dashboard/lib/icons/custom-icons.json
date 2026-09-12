@@ -1,0 +1,7 @@
+{
+  "calendar-blank": {
+    "source": "calendar",
+    "omitPaths": ["M11 15h1", "M12 15v3"],
+    "description": "Unigentamos adaptation of Tabler Calendar with the day numeral removed"
+  }
+}
