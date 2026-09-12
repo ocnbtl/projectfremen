@@ -170,9 +170,9 @@
 .people-interaction-timing p { min-height: 22px; }
 .people-interaction-timing .people-interaction-date-badge,
 .people-interaction-timing .people-interaction-time-badge { width: fit-content; max-width: 100%; padding: 7px 11px; border-radius: 10px; min-height: 34px; }
-.people-interaction-timing .people-interaction-date-badge { background: var(--module-quiet, #fff3e7); color: var(--module-icon, #9e522b); }
+.people-interaction-timing .people-interaction-date-badge { background: var(--people-olive-soft, #e4e8d8); color: var(--people-olive-strong, #5a6040); }
 .people-interaction-timing .people-interaction-date-badge svg { color: inherit; }
-.people-interaction-timing .people-interaction-time-badge { background: var(--people-olive-soft, #edf0e4); color: var(--people-olive-strong, #5a6040); }
+.people-interaction-timing .people-interaction-time-badge { background: color-mix(in srgb, var(--people-olive-soft, #e4e8d8) 50%, var(--surface-panel, #fff)); color: var(--people-olive-strong, #5a6040); }
 .people-interaction-detail { animation: none; }
 .people-date-calendar header :is(input, .app-select-trigger) {
   box-sizing: border-box; height: 40px; min-height: 40px; max-height: 40px; margin: 0; padding: 8px;
