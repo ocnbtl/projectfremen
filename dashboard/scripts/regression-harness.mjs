@@ -45,7 +45,23 @@ async function choosePeopleObject(trigger, value, title) {
   await picker.getByRole("searchbox", { name: "Search objects" }).fill(title);
   await picker.locator('[role="option"][data-select-value=' + JSON.stringify(value) + ']').click();
   await picker.waitFor({ state: "hidden" });
-  assert(await trigger.getAttribute("data-value") === value, "Object search selected the wrong canonical target");
+  assert(await trigger.page().locator('[data-people-create-objects] article[data-object-key=' + JSON.stringify(value) + ']').count() === 1, "Object search did not immediately stage the canonical target");
+  assert(await trigger.page().locator('[data-people-create-objects]').getByRole("button", { name: "Add object", exact: true }).count() === 0, "Draft object linking retained the redundant Add button");
+}
+
+async function choosePeopleDate(trigger, value) {
+  await trigger.click();
+  const calendar = trigger.page().locator('.people-date-calendar');
+  if (!value) await calendar.getByRole('button', { name: 'Clear date', exact: true }).click();
+  else {
+    const [year, month] = value.split('-').map(Number);
+    await calendar.getByLabel('Calendar year').fill(String(year));
+    await calendar.getByLabel('Calendar month').click();
+    await trigger.page().locator('[role="option"][data-select-value=' + JSON.stringify(String(month - 1)) + ']').click();
+    await calendar.locator('[data-date=' + JSON.stringify(value) + ']').click();
+  }
+  await calendar.waitFor({ state: 'hidden' });
+  assert(await trigger.getAttribute('data-value') === value, 'Custom calendar did not retain the selected or cleared date');
 }
 
 function spawnNpm(args, options) {
@@ -6751,6 +6767,8 @@ async function checkPeopleMemoryBrowserState(
         );
       }
       const propertyCadence = page.locator("[data-people-cadence-select]");
+      const channelTypography = await page.locator('.people-contact-channel-section h4').evaluateAll(headings => headings.map(heading => ({ family: getComputedStyle(heading).fontFamily, weight: getComputedStyle(heading).fontWeight })));
+      assert(channelTypography.length === 2 && channelTypography.every(style => style.family.startsWith('"Inter Variable"') && style.weight === '500'), `Contact labels did not use the normal body typography at ${viewport.label}`);
       assert(
         await propertyCadence.getAttribute("data-value") === "NONE" &&
           (await fieldOptions(propertyCadence)).includes("No cadence"),
@@ -7105,7 +7123,6 @@ async function checkPeopleMemoryBrowserState(
         `Organization location and people controls were not purpose-built at ${viewport.label}`
       );
       await choosePeopleObject(organizationForm.getByLabel("Object to link"), `people:person:${personId}`, personTitle);
-      await organizationForm.getByRole("button", { name: "Add object" }).click();
       assert(
         await organizationForm.locator(".people-object-create-list").getByText(personTitle, { exact: true }).count() === 1,
         `Organization people picker did not add a selected Person at ${viewport.label}`
@@ -7131,8 +7148,17 @@ async function checkPeopleMemoryBrowserState(
         `New People did not expose the create-time Objects section at ${viewport.label}`
       );
       assert(await page.locator('.people-capture-form').getByLabel("Projects", { exact: true }).count() === 0, "New People still has a separate free-text Projects field");
+      const cadenceLayout = await page.locator('.people-cadence-fields').evaluate(grid => {
+        const controls = Array.from(grid.querySelectorAll('.app-select-trigger, .people-date-trigger'));
+        return { count: controls.length, tops: controls.map(control => control.getBoundingClientRect().top), contained: controls.every(control => control.getBoundingClientRect().right <= grid.getBoundingClientRect().right + 1) };
+      });
+      assert(cadenceLayout.count === 4 && Math.max(...cadenceLayout.tops) - Math.min(...cadenceLayout.tops) < 2 && cadenceLayout.contained, `Cadence controls did not share one row at ${viewport.label}: ${JSON.stringify(cadenceLayout)}`);
+      const createLastContact = page.getByRole('button', { name: 'Last contact', exact: true });
+      assert(await createLastContact.getAttribute('aria-required') === 'false', 'Optional contact date was marked required');
+      await choosePeopleDate(createLastContact, '2024-02-29');
+      await choosePeopleDate(createLastContact, '');
+      assert(!(await page.locator('[data-people-create-objects]').innerText()).includes('Browse by type or search') && (await page.getByLabel('Object to link').innerText()).trim() === 'Link an Object', 'Object picker retained the old copy');
       await choosePeopleObject(page.getByLabel("Object to link"), `people:organization:${organizationId}`, organizationTitle);
-      await page.getByRole("button", { name: "Add object" }).click();
       assert(
         await page.locator("[data-people-create-objects]").getByText(organizationTitle, { exact: true }).count() === 1,
         `New People did not stage the selected Object at ${viewport.label}`
@@ -7314,7 +7340,6 @@ async function checkPeopleMemoryBrowserState(
         await organizationQuickForm.getByLabel("YouTube", { exact: true }).fill("https://youtube.com/@regression-studio");
         await organizationQuickForm.locator("[data-location-entry]").first().locator("input").nth(1).fill("Columbus, Ohio, USA");
         await choosePeopleObject(organizationQuickForm.getByLabel("Object to link"), `people:person:${personId}`, personTitle);
-        await organizationQuickForm.getByRole("button", { name: "Add object" }).click();
         const [organizationCreateResponse, objectLinkResponse] = await Promise.all([
           page.waitForResponse((response) =>
             response.url().endsWith("/api/personal/records") && response.request().method() === "POST"
@@ -7450,8 +7475,8 @@ async function checkPeopleUnknownLastContactBrowserState(baseUrl, cookieJar, per
 
     await editorPage.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
     const lastContactInput = editorPage.getByLabel("Last contact", { exact: true });
-    assert(await lastContactInput.inputValue() === currentContactDate, "People last-contact clear fixture did not begin with the persisted date");
-    await lastContactInput.fill(olderContactDate);
+    assert(await lastContactInput.getAttribute('data-value') === currentContactDate, "People last-contact clear fixture did not begin with the persisted date");
+    await choosePeopleDate(lastContactInput, olderContactDate);
     const [olderDateResponse] = await Promise.all([
       editorPage.waitForResponse((response) =>
         response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"
@@ -7504,8 +7529,8 @@ async function checkPeopleUnknownLastContactBrowserState(baseUrl, cookieJar, per
 
     await editorPage.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}/edit?tab=properties`, { waitUntil: "networkidle" });
     const priorYearLastContactInput = editorPage.getByLabel("Last contact", { exact: true });
-    assert(await priorYearLastContactInput.inputValue() === olderContactDate, "People prior-year last-contact fixture did not persist before clearing");
-    await priorYearLastContactInput.fill("");
+    assert(await priorYearLastContactInput.getAttribute('data-value') === olderContactDate, "People prior-year last-contact fixture did not persist before clearing");
+    await choosePeopleDate(priorYearLastContactInput, "");
     const [clearResponse] = await Promise.all([
       editorPage.waitForResponse((response) =>
         response.url().endsWith("/api/personal/records") && response.request().method() === "PATCH"

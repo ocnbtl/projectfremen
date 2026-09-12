@@ -1898,7 +1898,6 @@ function QuickObjectsEditor({
   selectedIds: string[];
   onChange: (selectedIds: string[]) => void;
 }) {
-  const [pendingId, setPendingId] = useState("");
   const selected = new Set(selectedIds);
   const availableTargets = targets.filter((target) => !selected.has(`${target.module}:${target.objectType}:${target.objectId}`));
   const selectedTargets = selectedIds.flatMap((targetId) => {
@@ -1906,27 +1905,22 @@ function QuickObjectsEditor({
     return target ? [target] : [];
   });
 
-  function addObject() {
-    if (!pendingId || selected.has(pendingId)) return;
-    onChange([...selectedIds, pendingId]);
-    setPendingId("");
-  }
-
   return (
     <section className="people-object-create-editor people-themed-section module-ref-tone-blue" data-people-create-objects data-profile-section="objects">
       <header className="people-repeatable-heading">
         <div className="people-repeatable-title"><span><PeopleIcon name="object" /></span><h4>Objects</h4></div>
       </header>
       <div className="people-object-create-controls">
-        <PeopleObjectPicker targets={availableTargets} value={pendingId} onChange={setPendingId} />
-        <PeopleAddButton label="Object" onClick={addObject} disabled={!pendingId} />
+        <PeopleObjectPicker targets={availableTargets} value="" onChange={id => {
+          if (!selected.has(id)) onChange([...selectedIds, id]);
+        }} />
       </div>
       {selectedTargets.length > 0 && (
         <div className="people-object-create-list" aria-label="Objects to link">
           {selectedTargets.map((target) => {
             const key = `${target.module}:${target.objectType}:${target.objectId}`;
             return (
-              <article key={key}>
+              <article key={key} data-object-key={key}>
                 <span><small>{labelize(target.module)}</small><strong>{target.label}</strong></span>
                 <RemoveIconButton label={`Remove ${target.label}`} onClick={() => onChange(selectedIds.filter((id) => id !== key))} />
               </article>
@@ -3993,11 +3987,11 @@ export default function PeopleWorkspace({
                 <span><PeopleIcon name="cadence" /></span>
                 <h4 id="people-create-cadence-title">Cadence</h4>
               </header>
-              <div className="people-profile-field-grid">
+              <div className="people-profile-field-grid people-cadence-fields">
                 <label>Status<SelectField value={status} onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}><option value="active">Active</option><option value="next">Next</option><option value="idea">Loose tie</option><option value="inactive">Dormant</option></SelectField></label>
                 <label>Cadence<SelectField data-people-cadence-select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</SelectField></label>
-                <label>Last contact<input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} /></label>
-                <label>Next contact<input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></label>
+                <DateField label="Last contact" value={lastContact} onChange={setLastContact} required={false} compact />
+                <DateField label="Next contact" value={nextContact} onChange={setNextContact} required={false} compact />
               </div>
             </section>
           </>
@@ -4623,8 +4617,10 @@ export default function PeopleWorkspace({
                           onRemove={(id) => setProfileDraft((current) => ({ ...current, phones: removeEntry(current.phones, id) }))}
                         />
                       </div>}
-                      <div className={`people-profile-field-grid${section.title === "Identity" && selectedPerson.className === "person" ? " people-profile-identity-grid" : ""}`}>
-                        {section.fields.map((field) => (
+                      <div className={`people-profile-field-grid${section.title === "Identity" && selectedPerson.className === "person" ? " people-profile-identity-grid" : ""}${section.title === "Cadence" ? " people-cadence-fields is-profile" : ""}`}>
+                        {section.fields.map((field) => field.type === "date" ? (
+                          <DateField key={field.key} label={field.label} value={profileDraft[field.key]} onChange={value => updateProfileDraft(field.key, value)} required={false} compact />
+                        ) : (
                           <label className={`${field.type === "textarea" ? "is-wide " : ""}people-profile-field-${field.key}`} key={field.key}>
                             {field.label}
                             {field.key === "contactCadence" ? (

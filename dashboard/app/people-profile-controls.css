@@ -1,35 +1,70 @@
-/* People group selection: a rising green fill with a crest that settles once. */
+/* A slow horizontal pour; the chip swells past its resting footprint, then settles. */
 .people-redesign-shell .people-group-picker .people-group-choice { transition: transform 160ms ease-out, border-color 220ms ease; }
 .people-redesign-shell .people-group-picker .people-group-choice::before { content: none; }
 .people-redesign-shell .people-group-picker .people-group-choice > .people-group-fill,
 .people-redesign-shell .people-group-picker .people-group-choice > .people-group-crest {
-  position: absolute; pointer-events: none; z-index: 0; inset: -12px -16px 0;
-  border-radius: 42% 48% 0 0; background: #c4e5d4;
-  transform: translateY(110%) rotate(-9deg); transform-origin: center bottom;
-  transition: transform 520ms cubic-bezier(.16, 1, .3, 1);
+  position: absolute; pointer-events: none; z-index: 0; inset: -6px -8px;
+  border-radius: 999px; background: #c4e5d4;
+  transform: translateX(-112%) skewX(-12deg); transform-origin: left center;
+  transition: transform 1250ms cubic-bezier(.3, .08, .2, 1);
 }
 .people-redesign-shell .people-group-picker .people-group-choice > .people-group-crest {
-  background: #e0f0d7; opacity: .8; transform: translateY(120%) rotate(12deg);
-  transition-duration: 400ms;
+  background: #e0f0d7; opacity: .7; transform: translateX(-125%) skewX(-15deg);
+  transition-duration: 1450ms;
 }
-.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) > .people-group-fill { transform: translateY(0) rotate(0); }
-.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) > .people-group-crest { transform: translateY(-115%) rotate(-12deg); }
+.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) > .people-group-fill { transform: translateX(0) skewX(0); }
+.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) > .people-group-crest { transform: translateX(125%) skewX(-15deg); }
+.people-redesign-shell .people-group-picker .people-group-choice.is-filling:has(input:checked) { animation: people-group-swell 1450ms cubic-bezier(.2, .65, .3, 1) both; }
+@keyframes people-group-swell {
+  0%, 28% { transform: scale(1); box-shadow: 0 0 0 0 #8fc3a500; }
+  68% { transform: scale(1.045, 1.12); box-shadow: 0 3px 9px #8fc3a52e; }
+  84% { transform: scale(1.012, 1.025); box-shadow: 0 1px 4px #8fc3a512; }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 #8fc3a500; }
+}
 .people-redesign-shell .people-group-picker .people-group-choice > .people-group-label { position: relative; z-index: 1; pointer-events: none; }
 .people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) { border-color: #78a58b; }
 .people-redesign-shell .people-group-picker .people-group-choice:active { transform: scale(.96); }
 
 /* Contact values use the same readable body face as the rest of a profile. */
+.people-redesign-shell .people-contact-channel-section > .people-repeatable-heading h4 {
+  font: 500 12px/1.4 var(--font-body, "Inter Variable", sans-serif) !important;
+  letter-spacing: 0; text-transform: none;
+}
 .people-redesign-shell .people-contact-channel-fields .people-contact-value-field input,
 .people-redesign-shell .people-phone-value-fields input,
 .people-redesign-shell a[href^="mailto:"],
 .people-redesign-shell a[href^="tel:"] {
   font-family: var(--font-body, "Inter Variable", sans-serif) !important;
-  font-size: 14px; font-weight: 400; letter-spacing: 0;
+  font-size: 14px; font-weight: 400; letter-spacing: 0 !important;
+}
+
+.people-redesign-shell [data-profile-section="cadence"] { container-type: inline-size; }
+.people-redesign-shell .people-profile-field-grid.people-cadence-fields {
+  display: grid; grid-template-columns: minmax(0, .85fr) minmax(0, 1fr) repeat(2, minmax(0, 1.25fr)) !important; gap: 8px;
+}
+.people-redesign-shell .people-profile-field-grid.people-cadence-fields.is-profile { grid-template-columns: repeat(2, minmax(0, 1.25fr)) minmax(0, 1fr) !important; }
+.people-redesign-shell .people-cadence-fields > label,
+.people-redesign-shell .people-cadence-fields > .people-date-field {
+  display: grid; grid-template-columns: minmax(0, 1fr); align-content: start; gap: 6px;
+  min-width: 0; margin: 0; color: var(--text-subtle); font: 500 11px/1.4 var(--font-body);
+}
+.people-redesign-shell .people-cadence-fields :is(.app-select-trigger, .people-date-trigger) {
+  display: flex; align-items: center; justify-content: space-between; gap: 5px; width: 100%; min-width: 0;
+  height: 42px; min-height: 42px; padding: 0 8px; border: 1px solid var(--border-soft); border-radius: 10px;
+  background: var(--surface-panel); color: var(--text-strong); box-shadow: none; font: 400 12px/1.4 var(--font-body);
+}
+.people-redesign-shell .people-cadence-fields .people-date-trigger svg { width: 16px; height: 16px; }
+.people-date-display-narrow { display: none; }
+.people-cadence-fields .people-date-trigger:focus-visible { outline: 2px solid var(--module-focus, #133c5e); outline-offset: 2px; }
+@container (max-width: 440px) {
+  .people-cadence-fields .people-date-display-wide { display: none; }
+  .people-cadence-fields .people-date-display-narrow { display: inline; }
+  .people-redesign-shell .people-cadence-fields :is(.app-select-trigger, .people-date-trigger) { padding-inline: 5px; gap: 3px; font-size: 11px; }
 }
 
 .people-redesign-shell .people-object-create-controls { display: flex; align-items: center; gap: 10px; }
 .people-redesign-shell .people-object-picker-trigger {
-  display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; min-height: 58px;
+  display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; min-height: 48px;
   padding: 10px 14px; border: 1px solid var(--border-soft, #dce3df); border-radius: 12px;
   background: var(--surface-panel, #fff); color: var(--people-olive-strong, #5a6040);
   text-align: left; font-family: var(--font-body); cursor: pointer;
@@ -79,6 +114,7 @@
 .people-object-picker-more { width: 100%; margin-top: 8px; }
 .people-object-picker-menu button:focus-visible, .people-object-picker-trigger:focus-visible { outline: 2px solid #133c5e; outline-offset: -2px; }
 @media (max-width: 760px) {
+  .people-redesign-shell .people-cadence-fields :is(.app-select-trigger, .people-date-trigger) { min-height: 44px; height: 44px; }
   .people-object-picker-menu { padding: 12px; }
   .people-object-picker-types button { flex: 1 0 40px; min-height: 44px; padding: 10px 6px; }
   .people-object-picker-types button span { display: none; }
@@ -87,5 +123,5 @@
 @media (prefers-reduced-motion: reduce) {
   .people-redesign-shell .people-group-picker .people-group-choice,
   .people-redesign-shell .people-group-picker .people-group-choice > .people-group-fill,
-  .people-redesign-shell .people-group-picker .people-group-choice > .people-group-crest { transition: none; }
+  .people-redesign-shell .people-group-picker .people-group-choice > .people-group-crest { transition: none; animation: none !important; }
 }

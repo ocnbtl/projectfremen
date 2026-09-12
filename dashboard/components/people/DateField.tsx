@@ -17,7 +17,9 @@ const parse = (value: string) => {
   return iso(date) === value ? date : null;
 };
 
-export default function DateField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+export default function DateField({ label, value, onChange, required = true, compact = false }: {
+  label: string; value: string; onChange: (value: string) => void; required?: boolean; compact?: boolean;
+}) {
   const [open, setOpen] = useState(false), [focusDate, setFocusDate] = useState(() => parse(value) || new Date());
   const [month, setMonth] = useState(() => parse(value) || new Date());
   const grid = useRef<HTMLTableElement>(null), pendingFocus = useRef(false), titleId = useId();
@@ -31,7 +33,10 @@ export default function DateField({ label, value, onChange }: { label: string; v
   return <div className="people-date-field"><span>{label}</span><Popover.Root open={open} onOpenChange={next => {
     if (next) { const initial = parse(value) || new Date(); setMonth(initial); setFocusDate(initial); } setOpen(next);
   }}>
-    <Popover.Trigger asChild><button type="button" className="people-date-trigger" aria-label={label} data-value={value} aria-required="true"><span>{selected ? display(selected) : "Choose a date"}</span><UnigentamosIcon role="calendar" size={18} /></button></Popover.Trigger>
+    <Popover.Trigger asChild><button type="button" className="people-date-trigger" aria-label={label} aria-description={selected ? display(selected) : "No date selected"} title={selected ? display(selected) : label} data-value={value} aria-required={required}>
+      {compact ? <><span className="people-date-display-wide">{selected ? selected.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }) : "Set date"}</span><span className="people-date-display-narrow" aria-hidden="true">{selected ? selected.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }) : "Set date"}</span></> : <span>{selected ? display(selected) : "Choose a date"}</span>}
+      <UnigentamosIcon role="interaction-date" size={18} />
+    </button></Popover.Trigger>
     <Popover.Portal><Popover.Content className="app-select-menu people-date-calendar" sideOffset={6} collisionPadding={12} aria-labelledby={titleId}
       onEscapeKeyDown={event => event.stopImmediatePropagation()} onOpenAutoFocus={event => { event.preventDefault(); grid.current?.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus(); }}>
       <h3 id={titleId} className="people-visually-hidden">Choose {label.toLowerCase()}</h3>
@@ -40,7 +45,7 @@ export default function DateField({ label, value, onChange }: { label: string; v
         <input aria-label="Calendar year" type="number" min="1" max="9999" value={year} onChange={event => { const y = Number(event.target.value); if (y >= 1 && y <= 9999) { const next = dateAt(y, monthIndex, 1); setMonth(next); setFocusDate(next); } }} />
         <button type="button" aria-label="Next month" onClick={() => moveMonth(1)}><UnigentamosIcon role="chevron-right" size={18} /></button></header>
       <p className="people-visually-hidden" aria-live="polite">{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
-      <table ref={grid} role="grid" aria-label="Choose interaction date"><thead><tr>{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(day => <th key={day} scope="col" abbr={day}>{day.slice(0, 2)}</th>)}</tr></thead>
+      <table ref={grid} role="grid" aria-label={label === "Date" ? "Choose interaction date" : `Choose ${label.toLowerCase()}`}><thead><tr>{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(day => <th key={day} scope="col" abbr={day}>{day.slice(0, 2)}</th>)}</tr></thead>
         <tbody>{Array.from({ length: Math.ceil((first.getDay() + days) / 7) }, (_, week) => <tr key={week}>{Array.from({ length: 7 }, (_, weekday) => {
           const day = week * 7 + weekday - first.getDay() + 1;
           if (day < 1 || day > days) return <td key={weekday} />;
@@ -56,7 +61,7 @@ export default function DateField({ label, value, onChange }: { label: string; v
               pendingFocus.current = true; setFocusDate(next); setMonth(next);
             }}>{day}</button></td>;
         })}</tr>)}</tbody></table>
-      <footer><button type="button" onClick={() => choose(today)}>Today</button><button type="button" onClick={() => setOpen(false)}>Done</button></footer>
+      <footer><button type="button" onClick={() => choose(today)}>Today</button>{!required && <button type="button" onClick={() => { onChange(""); setOpen(false); }}>Clear date</button>}<button type="button" onClick={() => setOpen(false)}>Done</button></footer>
     </Popover.Content></Popover.Portal>
   </Popover.Root></div>;
 }

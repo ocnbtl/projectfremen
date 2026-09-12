@@ -57,7 +57,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
     <Popover.Trigger asChild>
       <button type="button" className="people-object-picker-trigger" aria-label="Object to link" aria-description={selected ? `${selected.label} · ${typeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
         <UnigentamosIcon role={kinds.find(item => item.id === (selected ? kindOf(selected) : "all"))!.icon} size={20} />
-        <span><strong>{selected?.label || "Find an object"}</strong><small>{selected ? typeLabel(selected) : "Browse by type or search"}</small></span>
+        <span><strong>{selected?.label || "Link an Object"}</strong>{selected && <small>{typeLabel(selected)}</small>}</span>
         <UnigentamosIcon role="chevron-down" size={16} />
       </button>
     </Popover.Trigger>
@@ -65,7 +65,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
       <Popover.Content className="people-object-picker-menu" sideOffset={8} collisionPadding={12} aria-label="Link an object"
         onEscapeKeyDown={event => event.stopImmediatePropagation()}
         onOpenAutoFocus={event => { event.preventDefault(); search.current?.focus(); }}>
-        <header><strong>Find an object</strong><Popover.Close aria-label="Close object search"><UnigentamosIcon role="close" size={18} /></Popover.Close></header>
+        <header><strong>Link an Object</strong><Popover.Close aria-label="Close object search"><UnigentamosIcon role="close" size={18} /></Popover.Close></header>
         <div className="people-object-picker-types" role="group" aria-label="Object types">
           {kinds.map(item => <button type="button" key={item.id} aria-label={item.label} title={item.label} aria-pressed={kind === item.id} onClick={() => { setKind(item.id); setLimit(60); }}>
             <UnigentamosIcon role={item.icon} size={20} /><span>{item.label}</span>
