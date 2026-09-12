@@ -4,7 +4,7 @@ const ts = require('typescript');
 // Load these pure TypeScript modules in a separate test process.
 require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText, filename);
 const {findPeopleDuplicates} = require('../lib/modules/people/duplicates.ts');
-const {formatInternationalPhone,normalizePhoneForStorage,validateInternationalPhone,PHONE_COUNTRY_CHOICES} = require('../lib/modules/people/phone.ts');
+const {formatInternationalPhone,formatLocalPhone,normalizePhoneForStorage,validateInternationalPhone,PHONE_COUNTRY_CHOICES} = require('../lib/modules/people/phone.ts');
 const person=(id,title,profile={},extra={})=>({id,title,className:'person',profile,status:'active',...extra});
 const organization=(id,title,profile={},extra={})=>person(id,title,profile,{className:'org',...extra});
 assert.equal(findPeopleDuplicates([person('a','Alice'),person('b','Bob')]).length,0);
@@ -32,4 +32,8 @@ assert(PHONE_COUNTRY_CHOICES.some(item=>item.code==='+61' && item.digits.startsW
 assert.equal(normalizePhoneForStorage('0412 345 678','+61'),'+61412345678');
 assert.equal(validateInternationalPhone('98765432','+51') !== null,true);
 assert.equal(new Set(PHONE_COUNTRY_CHOICES.map(item=>item.code)).size,PHONE_COUNTRY_CHOICES.length);
+for (const [stored, code, display] of [['+16145550142','+1','614-555-0142'],['+51987654321','+51','987-654-321'],['+442079460018','+44','20-7946-0018'],['+61412345678','+61','412-345-678'],['','+1','']]) {
+  assert.equal(formatLocalPhone(stored, code), display);
+  assert.equal(normalizePhoneForStorage(display, code), stored);
+}
 console.log('People duplicate and phone refinements: passed');

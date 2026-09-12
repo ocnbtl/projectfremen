@@ -25,9 +25,9 @@
 .people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) { border-color: #78a58b; }
 .people-redesign-shell .people-group-picker .people-group-choice:active { transform: scale(.96); }
 
-/* Contact values use the same readable body face as the rest of a profile. */
+/* Match the existing identity/social labels and inputs, including their weights. */
 .people-redesign-shell .people-contact-channel-section > .people-repeatable-heading h4 {
-  font: 500 12px/1.4 var(--font-body, "Inter Variable", sans-serif) !important;
+  font: 720 10px/1.3 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif !important;
   letter-spacing: 0; text-transform: none;
 }
 .people-redesign-shell .people-contact-channel-fields .people-contact-value-field input,
@@ -36,6 +36,64 @@
 .people-redesign-shell a[href^="tel:"] {
   font-family: var(--font-body, "Inter Variable", sans-serif) !important;
   font-size: 14px; font-weight: 400; letter-spacing: 0 !important;
+}
+.people-redesign-shell .people-profile-form .people-contact-value-field input {
+  font: 720 12px/1.3 "Inter Variable", "Plus Jakarta Sans Variable", "Segoe UI", sans-serif !important;
+}
+.people-redesign-shell .people-capture-form .people-contact-value-field input {
+  font: 560 12px/1.35 "Plus Jakarta Sans Variable", "Inter Variable", "Segoe UI", sans-serif !important;
+}
+
+/* Country rows own their height so long country names and metadata stay inside. */
+.app-choice-menu.people-country-menu { width: min(310px, calc(100vw - 24px)); min-width: 0; }
+.people-country-menu .app-select-item { height: auto; min-height: 64px; padding: 10px 8px; gap: 8px; flex-shrink: 0; }
+.people-country-menu .people-country-option { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; gap: 8px; width: 100%; min-width: 0; }
+.people-country-menu .people-country-option > .people-country-copy { display: grid; gap: 4px; min-width: 0; overflow: visible; }
+.people-country-copy > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; font-size: 12px; line-height: 1.4; }
+.people-country-menu .people-country-option small { grid-column: auto; display: block; white-space: normal; font-size: 10px; line-height: 1.4; }
+.people-country-menu .people-country-flag { display: block; width: 24px; height: 16px; min-width: 24px; align-self: center; margin: 0; }
+.people-country-menu .people-country-option strong { font-size: 12px; font-weight: 550; white-space: nowrap; }
+.people-country-menu .app-select-item > svg { flex: 0 0 14px; }
+.people-redesign-shell .people-phone-value-fields { grid-template-columns: 48px minmax(0, 1fr); }
+.people-redesign-shell .people-country-code-select { width: 48px; padding-inline: 4px !important; justify-content: center !important; }
+
+/* One compact row per place; origin is global and appears only in the first row. */
+.people-redesign-shell .people-repeatable-fields.people-place-row {
+  display: grid; grid-template-columns: minmax(0, .8fr) 36px minmax(0, 1fr) minmax(0, 1.35fr) 32px !important;
+  gap: 8px; align-items: end;
+}
+.people-redesign-shell .people-repeatable-fields.people-place-row.is-organization { grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1.35fr) 32px !important; }
+.people-redesign-shell .people-place-row > * { grid-column: auto !important; grid-row: auto !important; min-width: 0; margin: 0; }
+.people-redesign-shell .people-place-row .people-location-remove { align-self: end; width: 32px !important; min-width: 0; }
+.people-redesign-shell .people-place-row input { width: 100%; min-width: 0; height: 40px; min-height: 40px; }
+.people-redesign-shell .people-comes-from-field {
+  display: flex; align-items: center; gap: 5px; width: 100%; max-width: none; padding: 0; margin: 0; min-height: 40px;
+}
+.people-redesign-shell .people-comes-from-field > svg { flex: 0 0 18px; color: var(--people-olive-strong); }
+.people-redesign-shell .people-comes-from-field input { flex: 1; width: 0; min-width: 0; height: 40px; min-height: 40px; padding-inline: 7px; }
+.people-redesign-shell .people-comes-from-field.is-standalone { max-width: 180px; }
+.people-redesign-shell .people-place-label-trigger {
+  display: grid; place-items: center; width: 36px; height: 40px; min-height: 40px; padding: 0;
+  border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface-panel); color: var(--people-olive-strong); cursor: pointer;
+}
+.people-place-label-menu { width: min(300px, calc(100vw - 24px)); padding: 14px; font: 400 13px/1.4 var(--font-body); }
+.people-place-label-menu > strong { font-size: 14px; font-weight: 600; }
+.people-place-label-options { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-block: 12px 16px; }
+.people-place-label-options button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 7px; padding: 10px 4px; min-height: 70px; border: 0; border-radius: 10px; background: transparent; color: var(--people-olive-strong, #5a6040); font: 500 11px/1.4 var(--font-body); cursor: pointer; }
+.people-place-label-options button:hover, .people-place-label-options button[aria-pressed="true"] { background: var(--people-olive-soft, #edf0e4); }
+.people-place-label-menu label { display: grid; gap: 6px; font: 500 12px/1.4 var(--font-body); }
+.people-place-label-menu input { width: 100%; min-width: 0; height: 40px; padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 10px; font: 400 13px var(--font-body); }
+.people-place-label-apply { width: 100%; min-height: 40px; margin-top: 10px; border: 0; border-radius: 10px; padding: 8px 12px; background: #133c5e; color: white; font: 500 12px var(--font-body); cursor: pointer; }
+.people-place-label-apply:disabled { opacity: .5; cursor: default; }
+.people-place-label-menu :is(button,input):focus-visible, .people-place-label-trigger:focus-visible { outline: 2px solid var(--module-focus); outline-offset: 2px; }
+@media (max-width: 760px) {
+  .people-redesign-shell :is(.people-profile-form, .people-capture-form) .people-contact-value-field input { font-size: 16px !important; }
+  .people-redesign-shell .people-repeatable-fields.people-place-row { grid-template-columns: minmax(0, .85fr) 32px minmax(0, 1fr) minmax(0, 1.25fr) 32px !important; gap: 5px; }
+  .people-redesign-shell .people-repeatable-fields.people-place-row.is-organization { grid-template-columns: 32px minmax(0, 1fr) minmax(0, 1.25fr) 32px !important; }
+  .people-redesign-shell .people-place-row :is(input, .people-place-label-trigger, .people-location-remove) { height: 44px; min-height: 44px; padding-inline: 4px; font-size: 11px; }
+  .people-redesign-shell .people-place-row :is(.people-place-label-trigger, .people-location-remove) { width: 32px !important; min-width: 0; }
+  .people-redesign-shell .people-comes-from-field { gap: 3px; }
+  .people-redesign-shell .people-comes-from-field > svg { flex-basis: 16px; width: 16px; }
 }
 
 .people-redesign-shell [data-profile-section="cadence"] { container-type: inline-size; }

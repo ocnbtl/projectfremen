@@ -18,6 +18,7 @@ import { birthdayForStorage, formatBirthday, parseBirthday } from "../lib/module
 import {
   PHONE_COUNTRY_CHOICES,
   canonicalCountryCode,
+  formatLocalPhone,
   phoneCountryCodeForValue,
   formatInternationalPhone,
   normalizePhoneForStorage,
@@ -58,6 +59,7 @@ import TeamSizeInput from "./people/TeamSizeInput";
 import SelectField from "./ui/SelectField";
 import TimeField from "./people/TimeField";
 import DateField from "./people/DateField";
+import PlaceLabelPicker from "./people/PlaceLabelPicker";
 import InteractionApproach from "./people/InteractionApproach";
 import InteractionCheckbox from "./people/InteractionCheckbox";
 import PeopleObjectPicker from "./people/PeopleObjectPicker";
@@ -1780,13 +1782,12 @@ function LocationEntriesEditor({
         <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>Places</h4></div>
         <PeopleAddButton label="Place" onClick={onAdd} />
       </header>
-      {!organization && onComesFromChange && (
-        <label className="people-comes-from-field">Comes from<input list="people-location-suggestions" value={comesFrom} onChange={(event) => onComesFromChange(event.target.value)} placeholder="Hometown or place of origin" /></label>
-      )}
+      {!organization && onComesFromChange && !entries.length && <label className="people-comes-from-field is-standalone" title="Comes from"><UnigentamosIcon role="hometown" size={18} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="Origin" /></label>}
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
-          <div className="people-repeatable-fields people-repeatable-fields-location">
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Label</span><input aria-label={`Place ${index + 1} label`} value={entry.label || ""} onChange={(event) => onChange(entry.id, { label: event.target.value })} placeholder={organization ? "Relevant place" : index === 0 ? "Primary home" : "Second home"} /></label>
+          <div className={`people-repeatable-fields people-repeatable-fields-location people-place-row${organization ? " is-organization" : ""}`}>
+            {!organization && (index === 0 && onComesFromChange ? <label className="people-comes-from-field" title="Comes from"><UnigentamosIcon role="hometown" size={18} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="Origin" /></label> : <span className="people-place-origin-spacer" aria-hidden="true" />)}
+            <PlaceLabelPicker value={entry.label || ""} index={index} onChange={label => onChange(entry.id, { label })} />
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City</span><input aria-label={`Place ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing…" /></label>
             <label className="people-location-address-field"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><input aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street address" /></label>
             <RemoveIconButton className="people-location-remove" label={`Remove place ${index + 1}`} onClick={() => onRemove(entry.id)} />
@@ -1944,14 +1945,15 @@ function EmailEntriesEditor({entries,onChange,onAdd,onRemove}:{entries:PersonalE
 }
 function PhoneEntriesEditor({entries,onChange,onAdd,onRemove}:{entries:PersonalPhoneEntry[];onChange:(id:string,patch:Partial<PersonalPhoneEntry>)=>void;onAdd:()=>void;onRemove:(id:string)=>void}) {
   const [editing,setEditing]=useState<string|null>(null);
+  const [localInput, setLocalInput] = useState("");
   return <section className="people-contact-channel-section" data-people-phone-editor><header className="people-repeatable-heading"><div><h4>Phone numbers</h4></div><PeopleAddButton label="Phone" onClick={onAdd}/></header>{entries.map((entry,index)=>{
     const phoneError=entry.number.trim() && editing!==entry.id?validateInternationalPhone(entry.number,entry.countryCode):null;
     return <article className="people-contact-channel-entry" data-phone-entry={entry.id} key={entry.id}><div className="people-contact-channel-fields">
       <ContactCategory label={`Phone ${index+1} category`} value={entry.category} onChange={category=>onChange(entry.id,{category})}/>
-      <div className="people-phone-value-fields"><SelectField searchable aria-label={`Phone ${index+1} country code`} className="people-country-code-select" triggerContent={entry.countryCode} value={entry.countryCode} onChange={event=>onChange(entry.id,{countryCode:event.target.value,number:rebasePhoneCountryCode(entry.number,entry.countryCode,event.target.value)})}>
+      <div className="people-phone-value-fields"><SelectField searchable aria-label={`Phone ${index+1} country code`} className="people-country-code-select" menuClassName="people-country-menu" triggerContent={entry.countryCode} value={entry.countryCode} onChange={event=>onChange(entry.id,{countryCode:event.target.value,number:rebasePhoneCountryCode(entry.number,entry.countryCode,event.target.value)})}>
         {!PHONE_COUNTRY_CHOICES.some(country=>country.code===entry.countryCode) && <option value={entry.countryCode}>{entry.countryCode}</option>}
-        {PHONE_COUNTRY_CHOICES.map(country=><option key={country.code} value={country.code}><span className="people-country-option"><strong>{country.code}</strong><span>{country.country}</span><svg className="people-country-flag" width="27" height="18" viewBox="0 0 513 342" aria-hidden="true"><use href={`/country-flags.svg#flag-${country.iso}`} /></svg><small>{country.digits} digits</small></span></option>)}
-      </SelectField><label className="people-contact-value-field"><span className="people-visually-hidden">Phone</span><input type="tel" inputMode="tel" value={entry.number} onFocus={()=>setEditing(entry.id)} onChange={event=>onChange(entry.id,{number:event.target.value})} onBlur={()=>{setEditing(null);onChange(entry.id,{number:formatInternationalPhone(entry.number,entry.countryCode),countryCode:phoneCountryCodeForValue(entry.number,entry.countryCode)});}} placeholder="Phone number" aria-describedby={phoneError?`people-phone-error-${entry.id}`:undefined}/></label></div>
+        {PHONE_COUNTRY_CHOICES.map(country=><option key={country.code} value={country.code}><span className="people-country-option"><svg className="people-country-flag" width="24" height="16" viewBox="0 0 513 342" aria-hidden="true"><use href={`/country-flags.svg#flag-${country.iso}`} /></svg><span className="people-country-copy"><span title={country.country}>{country.country}</span><small>{country.digits} digits</small></span><strong>{country.code}</strong></span></option>)}
+      </SelectField><label className="people-contact-value-field"><span className="people-visually-hidden">Phone</span><input type="tel" inputMode="tel" value={editing === entry.id ? localInput : formatLocalPhone(entry.number,entry.countryCode)} onFocus={()=>{setLocalInput(formatLocalPhone(entry.number,entry.countryCode));setEditing(entry.id);}} onChange={event=>{setLocalInput(event.target.value);onChange(entry.id,{number:event.target.value});}} onBlur={()=>{setEditing(null);onChange(entry.id,{number:formatInternationalPhone(entry.number,entry.countryCode),countryCode:phoneCountryCodeForValue(entry.number,entry.countryCode)});}} placeholder="Phone number" aria-describedby={phoneError?`people-phone-error-${entry.id}`:undefined}/></label></div>
       <RemoveIconButton className="people-contact-remove" label={`Remove phone ${index+1}`} onClick={()=>onRemove(entry.id)}/></div>
       {entry.category==="custom" && <label className="people-custom-category">Custom category<input value={entry.customLabel || ""} onChange={event=>onChange(entry.id,{customLabel:event.target.value})} required={!!entry.number.trim()}/></label>}
       {phoneError && <p className="people-phone-error" id={`people-phone-error-${entry.id}`} role="status">{phoneError}</p>}
@@ -2097,6 +2099,7 @@ export default function PeopleWorkspace({
   const [quickLocations, setQuickLocations] = useState<PersonalLocationEntry[]>([
     newLocationEntry({ id: "new-contact-location-1", label: initialCreateClass === "org" ? "Headquarters" : "Primary home" })
   ]);
+  const [quickComesFrom, setQuickComesFrom] = useState("");
   const [lastContact, setLastContact] = useState("");
   const [nextContact, setNextContact] = useState("");
   const [cadence, setCadence] = useState("P1M");
@@ -2768,6 +2771,7 @@ export default function PeopleWorkspace({
     || cleanEducationEntries(quickEducation).length > 0
     || cleanOccupationEntries(quickOccupations).length > 0
     || cleanLocationEntries(quickLocations).length > 0
+    || Boolean(quickComesFrom.trim())
     || quickOrganizationPeople.length > 0
     || quickObjectTargetIds.length > 0
     || className !== "person"
@@ -3177,6 +3181,7 @@ export default function PeopleWorkspace({
       education: className === "person" ? quickEducation : [],
       occupations: className === "person" ? quickOccupations : [],
       locations: quickLocations,
+      comesFrom: className === "person" ? quickComesFrom : "",
       lastContact: className === "person" ? lastContact : "",
       nextContact: className === "person" ? nextContact : "",
       contactCadence: className === "person" ? cadence : "",
@@ -3310,6 +3315,7 @@ export default function PeopleWorkspace({
       setQuickEducation([]);
       setQuickOccupations([newOccupationEntry({ id: "new-contact-job-1" })]);
       setQuickLocations([newLocationEntry({ id: "new-contact-location-1", label: "Primary home" })]);
+      setQuickComesFrom("");
       setLastContact("");
       setNextContact("");
       setCadence("P1M");
@@ -3610,6 +3616,7 @@ export default function PeopleWorkspace({
     setQuickPhones([newPhoneEntry({ id: "new-contact-phone-1", category: "primary", countryCode: "+1" })]);
     setQuickEducation([]);
     setQuickOccupations(type === "person" ? [newOccupationEntry({ id: "new-contact-job-1" })] : []);
+    setQuickComesFrom("");
     setQuickLocations([newLocationEntry({
       id: "new-contact-location-1",
       label: type === "org" ? "Relevant location" : "Primary home"
@@ -3976,6 +3983,8 @@ export default function PeopleWorkspace({
             />
             <LocationEntriesEditor
               entries={quickLocations}
+              comesFrom={quickComesFrom}
+              onComesFromChange={setQuickComesFrom}
               organization={false}
               onChange={(id, patch) => setQuickLocations((current) => updateEntry(current, id, patch))}
               onAdd={() => setQuickLocations((current) => [...current, newLocationEntry({ label: current.length === 0 ? "Primary home" : "" })])}

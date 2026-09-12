@@ -41,15 +41,15 @@ function InteractionDetail({ item, people, explicitSelection, empty, error, onBa
       <header><UnigentamosIcon role="interaction-history" size={20} /><span>Interaction details</span></header>
       {!error && item ? <>
         <div className="people-interaction-detail-heading"><span className="people-interaction-type">{label(item.kind)}</span><h2 ref={headingRef} tabIndex={-1} id="interaction-detail-title">{item.title}</h2>
-          <div className="people-interaction-timing"><p><UnigentamosIcon role="interaction-date" size={18} /><time dateTime={validDate(item.date) ? item.date : undefined}>{dateLabel(item.date)}</time></p>
-            <p><UnigentamosIcon role="clock" size={18} title={!item.startTime ? "Time not recorded" : undefined} /><span>{item.startTime ? `${timeLabel(item.startTime)}${item.endTime ? ` – ${timeLabel(item.endTime)}` : ""}` : ""}</span></p></div>
+          <div className="people-interaction-timing"><p className="people-interaction-date-badge"><UnigentamosIcon role="interaction-date" size={18} /><time dateTime={validDate(item.date) ? item.date : undefined}>{dateLabel(item.date)}</time></p>
+            <p className="people-interaction-time-badge"><UnigentamosIcon role="clock" size={18} title={!item.startTime ? "Time not recorded" : undefined} /><span>{item.startTime ? `${timeLabel(item.startTime)}${item.endTime ? ` – ${timeLabel(item.endTime)}` : ""}` : ""}</span></p></div>
         </div>
         <section aria-label="Participants"><h3>Participants</h3><div className="people-interaction-detail-participants">{item.participantIds.map(id => {
           const person = people.find(p => p.id === id);
           return person && !person.archivedAt ? <button key={id} onClick={() => onOpenPerson(person)}>
             <PeopleProfileAvatar label={person.title} initials={initials(person.title)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact />
             <span className="people-interaction-participant-name"><span>{person.title}</span>
-              <span className="people-latest-contact-mark" data-included={Boolean(item.updatesLastContact)} role="img" aria-label={`Latest contact: ${item.updatesLastContact ? "included" : "not included"}`} title={item.updatesLastContact ? "Counts toward this profile's latest contact date" : "Does not update this profile's latest contact date"}><span className="people-latest-contact-orbit" aria-hidden="true" /><span>Latest contact</span></span>
+              <span className="people-latest-contact-mark" data-included={Boolean(item.updatesLastContact)} role="img" aria-label={`Latest contact: ${item.updatesLastContact ? "included" : "not included"}`} title={item.updatesLastContact ? "Counts toward this profile's latest contact date" : "Does not update this profile's latest contact date"}><UnigentamosIcon role={item.updatesLastContact ? "check" : "close"} size={16} /><span>Latest contact</span></span>
             </span><UnigentamosIcon role="chevron-right" size={16} /></button>
             : <p key={id}>{person ? `${person.title} (archived)` : "Profile unavailable"}</p>;
         })}{!item.participantIds.length && <p>No participants recorded.</p>}</div></section>
@@ -157,6 +157,6 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
       </section>)}</div> : <div className="notes-empty-state"><UnigentamosIcon role="interaction-history" size={26} /><h2>{items.length ? "No matching interactions" : "Your history starts here"}</h2><p>{items.length ? "Try another name, phrase or filter." : "Log an interaction above to keep conversations, meetings and memories together."}</p>{(query || filterCount > 0) && <button onClick={() => { onQueryChange(""); navigate({ kind: "", approach: "", contact: "", query: "" }); }}>Clear filters</button>}</div>}
       {filtered.length > limit && <button className="people-interactions-more" onClick={() => setLimit(current => current + 50)}>Show more · {filtered.length - limit} remaining</button>}
     </>}
-    {detailTarget && createPortal(<InteractionDetail key={selected?.id || selectedId || "empty"} item={selected} people={people} explicitSelection={Boolean(selectedId)} empty={!selectedId && !filtered.length} error={error} onBack={backToList} onOpenPerson={onOpenPerson} />, detailTarget)}
+    {detailTarget && createPortal(<InteractionDetail item={selected} people={people} explicitSelection={Boolean(selectedId)} empty={!selectedId && !filtered.length} error={error} onBack={backToList} onOpenPerson={onOpenPerson} />, detailTarget)}
   </section>;
 }

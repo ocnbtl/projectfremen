@@ -6012,12 +6012,16 @@ async function checkPeopleMemoryBrowserState(
       } else {
         assert(!(await selectedPane.isVisible()), 'Mobile history opened details before selecting a row');
       }
+      const retainedInteractionHeading = await page.locator('#interaction-detail-title').elementHandle();
       await page.getByLabel("Search interactions", { exact: true }).fill("Shared regression introduction");
       const interactionRow = page.getByRole("button", { name: "View interaction: Shared regression introduction", exact: true });
       assert(await interactionRow.locator('.people-profile-photo').count() === 2, 'Shared interaction list card lost participant portraits');
       await interactionRow.click();
       const interactionDetail = page.getByRole("region", { name: "Shared regression introduction", exact: true });
       await interactionDetail.waitFor();
+      assert(await retainedInteractionHeading.evaluate(node => node.isConnected && node === document.querySelector('#interaction-detail-title')), 'Switching interactions replaced the detail heading instead of updating it in place');
+      const timingColors = await interactionDetail.locator('.people-interaction-timing p').evaluateAll(rows => rows.map(row => getComputedStyle(row).backgroundColor));
+      assert(timingColors.length === 2 && timingColors[0] !== timingColors[1] && timingColors.every(color => color !== 'rgba(0, 0, 0, 0)'), 'Interaction date and time lost their orange and olive surfaces');
       assert((await interactionDetail.innerText()).includes(personTitle) && (await interactionDetail.innerText()).includes("Approach"), `Interaction inspector lost participants or approach at ${viewport.label}`);
       const detailUrl = page.url();
       assert(new URL(detailUrl).searchParams.has("interaction"), "Interaction selection was not represented in the URL");
@@ -6578,6 +6582,8 @@ async function checkPeopleMemoryBrowserState(
       await interactionDialog.getByLabel("Date", { exact: true }).click();
       const calendar = page.getByRole("dialog", { name: "Choose date", exact: true });
       await calendar.getByLabel("Calendar year").fill("2024");
+      const calendarControls = await calendar.evaluate(element => ['input[aria-label="Calendar year"]', 'button[aria-label="Calendar month"]'].map(selector => { const node = element.querySelector(selector), rect = node.getBoundingClientRect(); return { height: rect.height, top: rect.top, radius: getComputedStyle(node).borderRadius }; }));
+      assert(Math.abs(calendarControls[0].height - calendarControls[1].height) < 1 && Math.abs(calendarControls[0].top - calendarControls[1].top) < 1 && calendarControls[0].radius === calendarControls[1].radius, `Calendar month and year controls do not align: ${JSON.stringify(calendarControls)}`);
       await calendar.getByLabel("Calendar month").click();
       await page.getByRole("option", { name: "February", exact: true }).click();
       await calendar.getByRole("button", { name: "February 29, 2024", exact: true }).click();
@@ -6767,8 +6773,11 @@ async function checkPeopleMemoryBrowserState(
         );
       }
       const propertyCadence = page.locator("[data-people-cadence-select]");
-      const channelTypography = await page.locator('.people-contact-channel-section h4').evaluateAll(headings => headings.map(heading => ({ family: getComputedStyle(heading).fontFamily, weight: getComputedStyle(heading).fontWeight })));
-      assert(channelTypography.length === 2 && channelTypography.every(style => style.family.startsWith('"Inter Variable"') && style.weight === '500'), `Contact labels did not use the normal body typography at ${viewport.label}`);
+      const channelTypography = await page.evaluate(() => {
+        const font = element => { const s = getComputedStyle(element); return [s.fontFamily, s.fontSize, s.fontWeight, s.lineHeight].join('|'); };
+        return { label: font(document.querySelector('.people-profile-field-firstName')), labels: Array.from(document.querySelectorAll('.people-contact-channel-section h4')).map(font), input: font(document.querySelector('.people-profile-field-firstName input')), inputs: Array.from(document.querySelectorAll('.people-contact-value-field input')).map(font) };
+      });
+      assert(channelTypography.labels.length === 2 && channelTypography.labels.every(font => font === channelTypography.label) && channelTypography.inputs.every(font => font === channelTypography.input), `Contact typography did not match the identity fields at ${viewport.label}: ${JSON.stringify(channelTypography)}`);
       assert(
         await propertyCadence.getAttribute("data-value") === "NONE" &&
           (await fieldOptions(propertyCadence)).includes("No cadence"),
@@ -7076,7 +7085,7 @@ async function checkPeopleMemoryBrowserState(
         const locationInputs = location ? Array.from(location.querySelectorAll("input")) : [];
         const remove = location?.querySelector(".people-remove-icon")?.getBoundingClientRect();
         const add = document.querySelector("[data-people-location-editor] > .people-repeatable-heading .people-add-action")?.getBoundingClientRect();
-        const city = locationInputs[1]?.getBoundingClientRect();
+        const city = location?.querySelector('input[aria-label="Place 1 city"]')?.getBoundingClientRect();
         const cityLabel = location?.querySelector(".people-field-label:nth-of-type(1)") || location?.querySelectorAll(".people-field-label")[1];
         const teamLabel = document.querySelector('[class~="people-org-team"]');
         return {
@@ -7118,7 +7127,7 @@ async function checkPeopleMemoryBrowserState(
       );
       await chooseField(organizationTypeSelect, "Business");
       assert(
-        await organizationForm.locator("[data-location-entry]").first().locator("input").first().inputValue() === "Relevant location" &&
+        await organizationForm.getByRole("combobox", { name: "Place 1 label", exact: true }).getAttribute('data-value') === "Relevant location" &&
           await organizationForm.getByRole("heading", { name: "Objects", exact: true }).count() === 1,
         `Organization location and people controls were not purpose-built at ${viewport.label}`
       );
@@ -7230,12 +7239,16 @@ async function checkPeopleMemoryBrowserState(
       await page.getByLabel("Email", { exact: true }).first().fill("avery.north@example.com");
       const firstPhoneEntry = page.locator("[data-phone-entry]").first();
       const firstCountryCode = firstPhoneEntry.getByLabel("Phone 1 country code");
+      await firstCountryCode.click();
+      const countryGeometry = await page.locator('.people-country-menu').evaluate(menu => ({ width: menu.getBoundingClientRect().width, contained: Array.from(menu.querySelectorAll('.app-select-item')).every(row => { const bounds = row.getBoundingClientRect(); return Array.from(row.querySelectorAll('.people-country-flag, .people-country-copy, small')).every(child => { const rect = child.getBoundingClientRect(); return rect.top >= bounds.top && rect.bottom <= bounds.bottom && rect.left >= bounds.left && rect.right <= bounds.right; }); }) }));
+      assert(countryGeometry.width <= 311 && countryGeometry.contained, `Country flags or digit notes overflow their rows at ${viewport.label}: ${JSON.stringify(countryGeometry)}`);
+      await page.keyboard.press('Escape');
       await chooseField(firstCountryCode, "+51");
       await page.getByLabel("Phone", { exact: true }).first().fill("987654321");
       await page.getByLabel("Phone", { exact: true }).first().blur();
       assert(
         await firstCountryCode.getAttribute("data-value") === "+51" &&
-          await page.getByLabel("Phone", { exact: true }).first().inputValue() === "+51 987-654-321" &&
+          await page.getByLabel("Phone", { exact: true }).first().inputValue() === "987-654-321" &&
           await firstPhoneEntry.locator(".people-phone-error").count() === 0,
         `New People did not format a nine-digit Peru phone number at ${viewport.label}`
       );
@@ -7274,6 +7287,15 @@ async function checkPeopleMemoryBrowserState(
       }
       await chooseField(page.getByLabel("Education 1 organization"), organizationId);
       await chooseField(page.getByLabel("Job 1 organization"), organizationId);
+      await page.getByRole('combobox', { name: 'Place 1 label', exact: true }).click();
+      const placePicker = page.getByRole('dialog', { name: 'Place label', exact: true });
+      await placePicker.getByLabel('Custom place label').fill('Family home');
+      await placePicker.getByRole('button', { name: 'Use custom label', exact: true }).click();
+      await page.getByLabel('Comes from', { exact: true }).fill('Dayton, Ohio');
+      await page.getByLabel('Place 1 city', { exact: true }).fill('Columbus, Ohio');
+      assert(await page.getByRole('combobox', { name: 'Place 1 label', exact: true }).getAttribute('data-value') === 'Family home', 'Custom place label was not retained in the draft');
+      const placeRows = await page.locator('.people-place-row').evaluateAll(rows => rows.map(row => Array.from(row.querySelectorAll('input,.people-place-label-trigger,.people-location-remove')).map(control => control.getBoundingClientRect().bottom)));
+      assert(placeRows.every(bottoms => Math.max(...bottoms) - Math.min(...bottoms) < 2), `Place controls did not stay aligned on one row at ${viewport.label}: ${JSON.stringify(placeRows)}`);
       assert(
         await page.locator("[data-education-entry]").count() === 1 &&
           await page.locator("[data-occupation-entry]").count() === 2 &&
@@ -7323,6 +7345,8 @@ async function checkPeopleMemoryBrowserState(
             createdFromQuickEntry.profile?.phones?.length === 2 &&
             createdFromQuickEntry.profile.phones[0].number === "+51987654321" &&
             createdFromQuickEntry.profile.phones[1].category === "work" &&
+            createdFromQuickEntry.profile.locations?.[0]?.label === "Family home" &&
+            createdFromQuickEntry.profile.comesFrom === "Dayton, Ohio" &&
             createdFromQuickEntry.profile.youtube === "https://youtube.com/@avery-north" &&
             createdFromQuickEntry.profile.occupations[0].organizationId === organizationId &&
             createdFromQuickEntry.profile.education[0].organizationId === organizationId,
@@ -7338,7 +7362,7 @@ async function checkPeopleMemoryBrowserState(
         await chooseField(organizationQuickForm.getByLabel("Industry or field"), "Technology");
         await organizationQuickForm.getByLabel("Description").fill("A directly linked organization created by the regression UI.");
         await organizationQuickForm.getByLabel("YouTube", { exact: true }).fill("https://youtube.com/@regression-studio");
-        await organizationQuickForm.locator("[data-location-entry]").first().locator("input").nth(1).fill("Columbus, Ohio, USA");
+        await organizationQuickForm.getByLabel("Place 1 city", { exact: true }).fill("Columbus, Ohio, USA");
         await choosePeopleObject(organizationQuickForm.getByLabel("Object to link"), `people:person:${personId}`, personTitle);
         const [organizationCreateResponse, objectLinkResponse] = await Promise.all([
           page.waitForResponse((response) =>

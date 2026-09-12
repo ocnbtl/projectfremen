@@ -144,6 +144,11 @@ export function formatInternationalPhone(value: string, countryCode = "+1"): str
   return `${code || "+"} ${grouped.join("-")}`.trim();
 }
 
+/** The calling code is displayed by the adjacent picker; storage stays international. */
+export function formatLocalPhone(value: string, countryCode = "+1"): string {
+  return formatInternationalPhone(value, countryCode).replace(/^\+\d+\s*/, "");
+}
+
 export function rebasePhoneCountryCode(value: string, previousCode: string, nextCode: string): string {
   const canonicalNext = canonicalCountryCode(nextCode, "");
   if (!value.trim() || !canonicalNext) return value;

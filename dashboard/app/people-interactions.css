@@ -166,10 +166,20 @@
 .people-interaction-participant-name { display: grid; gap: 6px; max-width: 220px; min-width: 0; text-align: left; }
 .people-latest-contact-mark { display: inline-flex; align-items: center; gap: 6px; width: fit-content; color: var(--text-muted); font-size: 11px; line-height: 1.5; font-weight: 500; }
 .people-latest-contact-mark[data-included="true"] { color: var(--people-olive-strong); }
-.people-latest-contact-orbit { position: relative; display: inline-block; width: 14px; height: 14px; flex: 0 0 14px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; transform: rotate(-35deg); }
-.people-latest-contact-orbit::after { content: ""; position: absolute; inset: 3px; border-radius: 50%; background: currentColor; opacity: 0; }
-.people-latest-contact-mark[data-included="true"] .people-latest-contact-orbit::after { opacity: 1; }
+.people-latest-contact-mark > svg { flex: 0 0 16px; margin: 0; stroke-width: 2.5; }
 .people-interaction-timing p { min-height: 22px; }
+.people-interaction-timing .people-interaction-date-badge,
+.people-interaction-timing .people-interaction-time-badge { width: fit-content; max-width: 100%; padding: 7px 11px; border-radius: 10px; min-height: 34px; }
+.people-interaction-timing .people-interaction-date-badge { background: var(--module-quiet, #fff3e7); color: var(--module-icon, #9e522b); }
+.people-interaction-timing .people-interaction-date-badge svg { color: inherit; }
+.people-interaction-timing .people-interaction-time-badge { background: var(--people-olive-soft, #edf0e4); color: var(--people-olive-strong, #5a6040); }
+.people-interaction-detail { animation: none; }
+.people-date-calendar header :is(input, .app-select-trigger) {
+  box-sizing: border-box; height: 40px; min-height: 40px; max-height: 40px; margin: 0; padding: 8px;
+  border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface-panel);
+  font: 400 13px/1.4 var(--font-body); box-shadow: none;
+}
+.people-date-calendar header :is(input, .app-select-trigger):focus-visible { outline: 2px solid var(--module-focus); outline-offset: 2px; box-shadow: none; }
 @media (prefers-reduced-motion: reduce) {
   .people-redesign-shell .people-interaction-row { transition: none; transform: none; }
 }
