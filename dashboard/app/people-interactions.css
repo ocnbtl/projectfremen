@@ -161,7 +161,8 @@
 .people-interaction-row-avatars .people-profile-photo + .people-profile-photo { margin-left: -16px; }
 .people-interaction-extra-participants { margin-left: 4px; font-size: 11px; color: var(--text-muted); }
 .people-interaction-row-footer { display: flex; align-items: center; gap: 8px; min-width: 0; }
-.people-interaction-row-footer .people-interaction-type { margin-left: auto; padding: 4px 8px; border-radius: 6px; background: var(--people-olive-soft); color: var(--people-olive-strong); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.people-interaction-row-footer .people-interaction-type { margin-left: auto; padding: 4px 8px; border-radius: 6px; background: var(--module-primary-100); color: var(--module-icon); font-size: 11px; font-weight: 500; white-space: nowrap; }
+.people-interaction-row-date > :is(time, small) { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 6px; white-space: nowrap; }
 .people-interaction-row-footer > svg { color: var(--module-icon); flex-shrink: 0; }
 .people-interaction-participant-name { display: grid; gap: 6px; max-width: 220px; min-width: 0; text-align: left; }
 .people-latest-contact-mark { display: inline-flex; align-items: center; gap: 6px; width: fit-content; color: var(--text-muted); font-size: 11px; line-height: 1.5; font-weight: 500; }
@@ -170,9 +171,11 @@
 .people-interaction-timing p { min-height: 22px; }
 .people-interaction-timing .people-interaction-date-badge,
 .people-interaction-timing .people-interaction-time-badge { width: fit-content; max-width: 100%; padding: 7px 11px; border-radius: 10px; min-height: 34px; }
-.people-interaction-timing .people-interaction-date-badge { background: var(--people-olive-soft, #e4e8d8); color: var(--people-olive-strong, #5a6040); }
+.people-interaction-timing .people-interaction-date-badge,
+.people-interaction-row-date > time { background: var(--people-olive-soft, #e4e8d8); color: var(--people-olive-strong, #5a6040); }
 .people-interaction-timing .people-interaction-date-badge svg { color: inherit; }
-.people-interaction-timing .people-interaction-time-badge { background: color-mix(in srgb, var(--people-olive-soft, #e4e8d8) 50%, var(--surface-panel, #fff)); color: var(--people-olive-strong, #5a6040); }
+.people-interaction-timing .people-interaction-time-badge,
+.people-interaction-row-date > small { background: color-mix(in srgb, var(--people-olive-soft, #e4e8d8) 50%, var(--surface-panel, #fff)); color: var(--people-olive-strong, #5a6040); }
 .people-interaction-detail { animation: none; }
 .people-date-calendar header :is(input, .app-select-trigger) {
   box-sizing: border-box; height: 40px; min-height: 40px; max-height: 40px; margin: 0; padding: 8px;
