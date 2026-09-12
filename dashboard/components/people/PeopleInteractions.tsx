@@ -8,6 +8,7 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import * as Popover from "@radix-ui/react-popover";
 import SelectField from "../ui/SelectField";
 import { PeopleProfileAvatar } from "./PeopleProfilePhoto";
+import InteractionTypeBadge from "./InteractionTypeBadge";
 
 export type InteractionEntry = {
   id: string; date?: string; kind: string; title: string; summary?: string;
@@ -40,7 +41,7 @@ function InteractionDetail({ item, people, explicitSelection, empty, error, onBa
       <button type="button" className="people-mobile-profile-back" onClick={onBack}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /><span>Back to interactions</span></button>
       <header><UnigentamosIcon role="interaction-history" size={20} /><span>Interaction details</span></header>
       {!error && item ? <>
-        <div className="people-interaction-detail-heading"><span className="people-interaction-type">{label(item.kind)}</span><h2 ref={headingRef} tabIndex={-1} id="interaction-detail-title">{item.title}</h2>
+        <div className="people-interaction-detail-heading"><InteractionTypeBadge kind={item.kind} detail /><h2 ref={headingRef} tabIndex={-1} id="interaction-detail-title">{item.title}</h2>
           <div className="people-interaction-timing"><p className="people-interaction-date-badge"><UnigentamosIcon role="interaction-date" size={18} /><time dateTime={validDate(item.date) ? item.date : undefined}>{dateLabel(item.date)}</time></p>
             <p className="people-interaction-time-badge"><UnigentamosIcon role="clock" size={18} title={!item.startTime ? "Time not recorded" : undefined} /><span>{item.startTime ? `${timeLabel(item.startTime)}${item.endTime ? ` – ${timeLabel(item.endTime)}` : ""}` : ""}</span></p></div>
         </div>
@@ -152,7 +153,7 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
             <span className="people-interaction-row-main"><strong>{item.title}</strong><span>{item.participantIds.map(id => people.find(p => p.id === id)?.title || "Profile unavailable").join(" · ") || "No participants recorded"}</span></span>
           </span>
           {item.summary && <span className="people-interaction-row-notes">{item.summary}</span>}
-          <span className="people-interaction-row-footer"><span className="people-interaction-row-date"><time dateTime={validDate(item.date) ? item.date : undefined}>{validDate(item.date) ? new Date(`${item.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "Undated"}</time>{item.startTime && <small>{timeLabel(item.startTime)}</small>}</span><span className="people-interaction-type">{label(item.kind)}</span><UnigentamosIcon role="chevron-right" size={16} /></span>
+          <span className="people-interaction-row-footer"><span className="people-interaction-row-date"><time dateTime={validDate(item.date) ? item.date : undefined}>{validDate(item.date) ? new Date(`${item.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "Undated"}</time>{item.startTime && <small>{timeLabel(item.startTime)}</small>}</span><InteractionTypeBadge kind={item.kind} /><UnigentamosIcon role="chevron-right" size={16} /></span>
         </button></li>)}</ul>
       </section>)}</div> : <div className="notes-empty-state"><UnigentamosIcon role="interaction-history" size={26} /><h2>{items.length ? "No matching interactions" : "Your history starts here"}</h2><p>{items.length ? "Try another name, phrase or filter." : "Log an interaction above to keep conversations, meetings and memories together."}</p>{(query || filterCount > 0) && <button onClick={() => { onQueryChange(""); navigate({ kind: "", approach: "", contact: "", query: "" }); }}>Clear filters</button>}</div>}
       {filtered.length > limit && <button className="people-interactions-more" onClick={() => setLimit(current => current + 50)}>Show more · {filtered.length - limit} remaining</button>}

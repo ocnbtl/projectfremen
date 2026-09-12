@@ -31,3 +31,16 @@ The list uses rounded People-style cards with participant portraits beside the t
 Icon roles distinguish `interaction-history` (messages) from the existing plus-bearing `interaction` action, and `organization-add` (building-plus) from organization navigation. Duplicate status uses `duplicates` (zoom-check, static green) or `duplicates-warning` (zoom-cancel, red glyph-only pulse). Both utility buttons have neutral backgrounds; the clear tooltip reads No Duplicates Detected. Reduced-motion preferences disable the warning pulse. Detail date uses `interaction-date` / `calendar-blank`, a documented Tabler Calendar adaptation that omits the day numeral. The clock always renders and an unrecorded time leaves its value blank. The registry, generated sprite, usage descriptions and generated Style Guide component descriptions record these choices; adapted icons link to their original source glyph and retain its license.
 
 Date uses the Warm Olive 100 surface; time uses a lighter, 50% tint of that same swatch against the panel surface. Both retain Warm Olive 700 text and icons. List date/time pills share those exact color rules; the interaction-type pill uses the People orange surface and text. Latest contact uses a clear check when included and an X when excluded, replacing the orbit mark; its meaning remains the saved inclusion setting. Switching between interactions updates one stable detail component instead of remounting its content and participant photos. URL history, mobile focus and explicit unavailable states remain intact.
+
+`InteractionTypeBadge` shares the type label and icon between the compact list pill and the larger orange detail badge. Each type has an independent Style Guide role with five curated alternatives, so changing an interaction icon does not change unrelated profile fields. Existing Style Guide selections are preserved; new roles appear through the registry's normal merge. Unknown types retain their label and use the interaction-history fallback.
+
+| Type | Style Guide role | Default Tabler icon |
+| --- | --- | --- |
+| Call | interaction-call | phone-call |
+| Message | interaction-message | message-circle |
+| Email | interaction-email | mail |
+| Meeting | interaction-meeting | users-group |
+| Catch-up | interaction-catch-up | coffee |
+| Note | interaction-note | pencil |
+| Memory | interaction-memory | photo-heart |
+| Milestone | interaction-milestone | flag-3 |
