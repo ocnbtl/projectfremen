@@ -8,6 +8,7 @@ import "./globals.css";
 import "./figma-transfer.css";
 import "./people-transfer.css";
 import "./people-interactions.css";
+import "./people-profile-controls.css";
 import "./finance-workspace.css";
 import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
 

@@ -37,6 +37,17 @@ async function fieldOptions(locator) {
   return options;
 }
 
+async function choosePeopleObject(trigger, value, title) {
+  await trigger.click();
+  const picker = trigger.page().getByRole("dialog", { name: "Link an object", exact: true });
+  const kind = value.startsWith("people:organization:") ? "Organizations" : value.startsWith("people:person:") ? "People" : value.startsWith("projects:") ? "Projects" : "All";
+  await picker.getByRole("button", { name: kind, exact: true }).click();
+  await picker.getByRole("searchbox", { name: "Search objects" }).fill(title);
+  await picker.locator('[role="option"][data-select-value=' + JSON.stringify(value) + ']').click();
+  await picker.waitFor({ state: "hidden" });
+  assert(await trigger.getAttribute("data-value") === value, "Object search selected the wrong canonical target");
+}
+
 function spawnNpm(args, options) {
   if (!npmExecPath && args[0] === "run" && args[1] === "typecheck") {
     return spawn(process.execPath, [tscCliPath, "--noEmit"], options);
@@ -6728,7 +6739,7 @@ async function checkPeopleMemoryBrowserState(
       if (viewport.label === "desktop") {
         const groupTreatment = await page.locator(".people-profile-group-picker label").evaluateAll((labels) => ({
           rows: new Set(labels.map((label) => Math.round(label.getBoundingClientRect().top))).size,
-          contained: labels.every(label => label.querySelector("span").getBoundingClientRect().right <= label.getBoundingClientRect().right),
+          contained: labels.every(label => label.querySelector(".people-group-label").getBoundingClientRect().right <= label.getBoundingClientRect().right),
           backgrounds: Array.from(new Set(labels.map((label) => getComputedStyle(label).backgroundColor))),
           borders: Array.from(new Set(labels.map((label) => getComputedStyle(label).borderColor)))
         }));
@@ -7093,7 +7104,7 @@ async function checkPeopleMemoryBrowserState(
           await organizationForm.getByRole("heading", { name: "Objects", exact: true }).count() === 1,
         `Organization location and people controls were not purpose-built at ${viewport.label}`
       );
-      await chooseField(organizationForm.getByLabel("Object to link"), `people:person:${personId}`);
+      await choosePeopleObject(organizationForm.getByLabel("Object to link"), `people:person:${personId}`, personTitle);
       await organizationForm.getByRole("button", { name: "Add object" }).click();
       assert(
         await organizationForm.locator(".people-object-create-list").getByText(personTitle, { exact: true }).count() === 1,
@@ -7119,7 +7130,8 @@ async function checkPeopleMemoryBrowserState(
           await page.getByLabel("Object to link").count() === 1,
         `New People did not expose the create-time Objects section at ${viewport.label}`
       );
-      await chooseField(page.getByLabel("Object to link"), `people:organization:${organizationId}`);
+      assert(await page.locator('.people-capture-form').getByLabel("Projects", { exact: true }).count() === 0, "New People still has a separate free-text Projects field");
+      await choosePeopleObject(page.getByLabel("Object to link"), `people:organization:${organizationId}`, organizationTitle);
       await page.getByRole("button", { name: "Add object" }).click();
       assert(
         await page.locator("[data-people-create-objects]").getByText(organizationTitle, { exact: true }).count() === 1,
@@ -7301,7 +7313,7 @@ async function checkPeopleMemoryBrowserState(
         await organizationQuickForm.getByLabel("Description").fill("A directly linked organization created by the regression UI.");
         await organizationQuickForm.getByLabel("YouTube", { exact: true }).fill("https://youtube.com/@regression-studio");
         await organizationQuickForm.locator("[data-location-entry]").first().locator("input").nth(1).fill("Columbus, Ohio, USA");
-        await chooseField(organizationQuickForm.getByLabel("Object to link"), `people:person:${personId}`);
+        await choosePeopleObject(organizationQuickForm.getByLabel("Object to link"), `people:person:${personId}`, personTitle);
         await organizationQuickForm.getByRole("button", { name: "Add object" }).click();
         const [organizationCreateResponse, objectLinkResponse] = await Promise.all([
           page.waitForResponse((response) =>
@@ -7626,11 +7638,21 @@ async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, 
     await actionMenu.getByRole("menuitem", { name: "Add to object" }).click();
     const objectDialog = page.getByRole("dialog", { name: new RegExp(`Add ${personTitle} to an object`) });
     await objectDialog.waitFor();
-    assert(
-      (await fieldOptions(objectDialog.getByLabel("Object", { exact: true }))).length > 1 &&
-        (await fieldOptions(objectDialog.getByLabel("Relationship", { exact: true }))).length >= 5,
-      "People Add to object did not expose real object and relationship choices"
-    );
+    assert((await fieldOptions(objectDialog.getByLabel("Relationship", { exact: true }))).length >= 5, "People Add to object lost relationship choices");
+    await objectDialog.getByRole("button", { name: "Object to link" }).click();
+    const objectSearch = page.getByRole("dialog", { name: "Link an object", exact: true });
+    assert(await objectSearch.getByRole("group", { name: "Object types" }).getByRole("button").count() === 7 && await objectSearch.getByRole("option").count() > 0, "Object picker did not expose categorized canonical targets");
+    await objectSearch.getByRole("button", { name: "Projects", exact: true }).click();
+    assert((await objectSearch.getByRole("option").evaluateAll(options => options.map(option => option.getAttribute("data-select-value")))).every(key => key.startsWith("projects:")), "Project filter included a different object type");
+    await objectSearch.getByRole("searchbox", { name: "Search objects" }).fill("nonexistent-object-qazwsx");
+    assert(await objectSearch.getByText("No matching objects", { exact: true }).isVisible(), "Object search has no empty recovery state");
+    await objectSearch.getByRole("button", { name: "Clear object search" }).click();
+    await objectSearch.getByRole("button", { name: "All", exact: true }).click();
+    await objectSearch.getByRole("searchbox", { name: "Search objects" }).press("ArrowDown");
+    assert(await objectSearch.getByRole("option").first().evaluate(option => option === document.activeElement), "Object search did not support keyboard result navigation");
+    await page.keyboard.press("Escape");
+    await objectSearch.waitFor({ state: "hidden" });
+    assert(await objectDialog.isVisible(), "Dismissing object search also dismissed the linking dialog");
     await objectDialog.getByRole("button", { name: "Close object picker" }).click();
 
     const statusTrigger = page.getByRole("button", { name: `Change relationship status. Current status: Active`, exact: true });

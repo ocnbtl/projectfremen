@@ -46,7 +46,7 @@ function resourceBody(role: string, candidate: string): string {
     visual: `${custom?.description || `${candidateLabel(candidate)} from Streamline’s Tabler Line set`}. 24 × 24 grid, 2 px stroke, round caps and joins, currentColor by default. Usage: ${usage}.`,
     code: `<UnigentamosIcon role="${role}" />`,
     animation: role === "duplicates-warning"
-      ? "The red X magnifier gently pulses in the People sidebar. Only the glyph changes opacity and scale; its button stays neutral. Reduced motion keeps the glyph static."
+      ? "The red X magnifier gently pulses in the People sidebar. Only the glyph changes opacity and scale; its button stays neutral. Reduced motion keeps the glyph static. Tooltip: 1 Possible Duplicate, or N Possible Duplicates."
       : role === "duplicates"
         ? "Static green check magnifier. Neutral button with no colored box or pulse. Tooltip: No Duplicates Detected."
         : "Static semantic icon. Color may inherit the owning module token; motion is not applied to the glyph itself."

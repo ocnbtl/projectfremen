@@ -60,6 +60,8 @@ import TimeField from "./people/TimeField";
 import DateField from "./people/DateField";
 import InteractionApproach from "./people/InteractionApproach";
 import InteractionCheckbox from "./people/InteractionCheckbox";
+import PeopleObjectPicker from "./people/PeopleObjectPicker";
+import PeopleGroupChoice from "./people/PeopleGroupChoice";
 import InlineOrganizationDialog from "./people/InlineOrganizationDialog";
 import { findPeopleDuplicates } from "../lib/modules/people/duplicates";
 import dynamic from "next/dynamic";
@@ -1916,20 +1918,7 @@ function QuickObjectsEditor({
         <div className="people-repeatable-title"><span><PeopleIcon name="object" /></span><h4>Objects</h4></div>
       </header>
       <div className="people-object-create-controls">
-        <label>
-          Object
-          <SelectField aria-label="Object to link" value={pendingId} onChange={(event) => setPendingId(event.target.value)}>
-            <option value="">Select an object</option>
-            {Array.from(new Set(availableTargets.map((target) => target.module))).map((module) => (
-              <optgroup label={labelize(module)} key={module}>
-                {availableTargets.filter((target) => target.module === module).map((target) => {
-                  const key = `${target.module}:${target.objectType}:${target.objectId}`;
-                  return <option value={key} key={key}>{target.label}</option>;
-                })}
-              </optgroup>
-            ))}
-          </SelectField>
-        </label>
+        <PeopleObjectPicker targets={availableTargets} value={pendingId} onChange={setPendingId} />
         <PeopleAddButton label="Object" onClick={addObject} disabled={!pendingId} />
       </div>
       {selectedTargets.length > 0 && (
@@ -2114,7 +2103,6 @@ export default function PeopleWorkspace({
   const [quickLocations, setQuickLocations] = useState<PersonalLocationEntry[]>([
     newLocationEntry({ id: "new-contact-location-1", label: initialCreateClass === "org" ? "Headquarters" : "Primary home" })
   ]);
-  const [quickProjects, setQuickProjects] = useState("");
   const [lastContact, setLastContact] = useState("");
   const [nextContact, setNextContact] = useState("");
   const [cadence, setCadence] = useState("P1M");
@@ -2731,12 +2719,7 @@ export default function PeopleWorkspace({
     !selectedPersonRef ||
     !(target.module === selectedPersonRef.module && target.objectType === selectedPersonRef.objectType && target.objectId === selectedPersonRef.objectId)
   ) && !linkedNativeTargetKeys.has(`${target.module}:${target.objectType}:${target.objectId}`));
-  const quickObjectTargets = initialObjectTargets.filter((target) => (
-    target.module === "projects" ||
-    target.module === "people" ||
-    target.module === "resources" ||
-    target.module === "notes"
-  ));
+  const quickObjectTargets = initialObjectTargets;
   const timelineItems = selectedInteractionItems.slice(0, 20);
   const selectedTags = Array.from(new Set([
     ...(fallbackPerson?.subjects || []).slice(0, 3),
@@ -2777,7 +2760,6 @@ export default function PeopleWorkspace({
     quickIndustry,
     quickFoundedYear,
     quickTeamSize,
-    quickProjects,
     lastContact,
     nextContact,
     referenceUrl,
@@ -3225,7 +3207,7 @@ export default function PeopleWorkspace({
       },
       areas: ["Relationships"],
       subjects: className === "org" ? [] : groups,
-      projects: className === "org" ? [] : splitList(quickProjects),
+      projects: [],
       externalSources: [profile.website, profile.instagram, profile.tiktok, profile.x, profile.linkedin, profile.youtube]
         .filter((value): value is string => Boolean(value)),
       sourceUrl: profile.website
@@ -3334,7 +3316,6 @@ export default function PeopleWorkspace({
       setQuickEducation([]);
       setQuickOccupations([newOccupationEntry({ id: "new-contact-job-1" })]);
       setQuickLocations([newLocationEntry({ id: "new-contact-location-1", label: "Primary home" })]);
-      setQuickProjects("");
       setLastContact("");
       setNextContact("");
       setCadence("P1M");
@@ -3625,7 +3606,6 @@ export default function PeopleWorkspace({
     setQuickTeamSize("");
     setQuickOrganizationPeople([]);
     setQuickObjectTargetIds([]);
-    setQuickProjects("");
     setReferenceUrl("");
     setQuickInstagram("");
     setQuickTikTok("");
@@ -3952,10 +3932,7 @@ export default function PeopleWorkspace({
               </header>
               <fieldset className="people-group-picker people-profile-group-picker">
                 <legend className="sr-only">Groups</legend>
-                <div>{GROUP_OPTIONS.map((option) => <label key={option}>
-                  <input type="checkbox" checked={groups.includes(option)} onChange={() => toggleGroup(option)} />
-                  <span>{option}</span>
-                </label>)}</div>
+                <div>{GROUP_OPTIONS.map((option) => <PeopleGroupChoice key={option} label={option} checked={groups.includes(option)} onChange={() => toggleGroup(option)} />)}</div>
               </fieldset>
             </section>
             <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" data-profile-section="communication" aria-labelledby="people-create-communication-title">
@@ -4021,7 +3998,6 @@ export default function PeopleWorkspace({
                 <label>Cadence<SelectField data-people-cadence-select value={cadence} onChange={(event) => setCadence(event.target.value)}>{CADENCE_OPTIONS.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}</SelectField></label>
                 <label>Last contact<input type="date" value={lastContact} onChange={(event) => setLastContact(event.target.value)} /></label>
                 <label>Next contact<input type="date" value={nextContact} onChange={(event) => setNextContact(event.target.value)} /></label>
-                <label className="is-wide">Projects<input value={quickProjects} onChange={(event) => setQuickProjects(event.target.value)} placeholder="Comma-separated project names" /></label>
               </div>
             </section>
           </>
@@ -4125,7 +4101,7 @@ export default function PeopleWorkspace({
                   className={`${item.tone ? `module-ref-tone-${item.tone}` : ""}${activeSidebarView === item.id ? " is-active" : ""}`}
                   onClick={() => selectSidebarView(item)}
                   aria-label={section.title === "Operational" ? (item.id === "duplicates" ? `Duplicates: ${count || 0} possible pairs` : item.id === "recently-deleted" ? `Recently Deleted: ${count || 0}` : item.label) : undefined}
-                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} possible duplicate pairs — review` : "No Duplicates Detected" : item.label) : undefined}
+                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} Possible ${count === 1 ? "Duplicate" : "Duplicates"}` : "No Duplicates Detected" : item.label) : undefined}
                   aria-current={activeSidebarView === item.id ? "page" : undefined}
                   data-utility={section.title === "Operational" ? item.id : undefined}
                   data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
@@ -4153,7 +4129,7 @@ export default function PeopleWorkspace({
                   type="button"
                   onClick={() => selectSidebarView(item)}
                   aria-label={section.title === "Operational" ? (item.id === "duplicates" ? `Duplicates: ${count || 0} possible pairs` : item.id === "recently-deleted" ? `Recently Deleted: ${count || 0}` : item.label) : undefined}
-                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} possible duplicate pairs — review` : "No Duplicates Detected" : item.label) : undefined}
+                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} Possible ${count === 1 ? "Duplicate" : "Duplicates"}` : "No Duplicates Detected" : item.label) : undefined}
                   aria-current={activeSidebarView === item.id ? "page" : undefined}
                   data-utility={section.title === "Operational" ? item.id : undefined}
                   data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
@@ -4733,10 +4709,7 @@ export default function PeopleWorkspace({
                         </header>
                         <fieldset className="people-group-picker people-profile-group-picker">
                           <legend className="people-visually-hidden">Groups</legend>
-                          <div>{GROUP_OPTIONS.map((option) => <label key={option}>
-                            <input type="checkbox" checked={profileGroups.includes(option)} onChange={() => toggleProfileGroup(option)} />
-                            <span>{option}</span>
-                          </label>)}</div>
+                          <div>{GROUP_OPTIONS.map((option) => <PeopleGroupChoice key={option} label={option} checked={profileGroups.includes(option)} onChange={() => toggleProfileGroup(option)} />)}</div>
                         </fieldset>
                       </section>
                     )}
@@ -5245,26 +5218,12 @@ export default function PeopleWorkspace({
             <header>
               <div>
                 <h2 id="people-object-link-title">Add {selectedPerson.title} to an object</h2>
-                <p>Create one durable relationship without copying either record.</p>
+                <p>Find a person, project, resource, or another object to connect.</p>
               </div>
               <button className="people-dialog-close" type="button" aria-label="Close object picker" onClick={() => setObjectLinkOpen(false)} disabled={objectLinkSaving}><PeopleIcon name="close" /></button>
             </header>
             <div className="people-object-link-fields">
-              <label>
-                Object
-                <SelectField value={objectLinkTargetId} onChange={(event) => setObjectLinkTargetId(event.target.value)} required>
-                  <option value="">Choose an object</option>
-                  {Array.from(new Set(availableObjectTargets.map((target) => target.module))).map((module) => (
-                    <optgroup label={module === "personal_ops" ? "Lists" : labelize(module)} key={module}>
-                      {availableObjectTargets.filter((target) => target.module === module).map((target) => (
-                        <option value={`${target.module}:${target.objectType}:${target.objectId}`} key={`${target.module}:${target.objectType}:${target.objectId}`}>
-                          {target.label}
-                        </option>
-                      ))}
-                    </optgroup>
-                  ))}
-                </SelectField>
-              </label>
+              <PeopleObjectPicker targets={availableObjectTargets} value={objectLinkTargetId} onChange={setObjectLinkTargetId} disabled={objectLinkSaving} />
               <label>
                 Relationship
                 <SelectField value={objectLinkRelationship} onChange={(event) => setObjectLinkRelationship(event.target.value)}>
