@@ -11,9 +11,9 @@ export type FinanceUtility = "activity" | "data" | "categories" | "settings";
 const titles = { activity: "Recent activity", data: "Accounts data", categories: "Categories", settings: "Finance settings" };
 const date = (value: string) => new Date(value).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
 
-export default function FinanceUtilityRail({ utility, state, onClose, onView, onCategory, onImport, onBankChanged }: {
+export default function FinanceUtilityRail({ utility, state, onClose, onView, onCategory, onImport, onBankChanged, mobile = false }: {
   utility: FinanceUtility; state: FinanceState; onClose: () => void; onView: (view: FinanceView) => void;
-  onCategory: (category: string) => void; onImport: () => void; onBankChanged: () => Promise<void>;
+  onCategory: (category: string) => void; onImport: () => void; onBankChanged: () => Promise<void>; mobile?: boolean;
 }) {
   const accounts = state.accounts.filter(item => !item.archivedAt);
   const transactions = state.transactions.filter(item => !item.archivedAt);
@@ -26,7 +26,7 @@ export default function FinanceUtilityRail({ utility, state, onClose, onView, on
     ...state.rules.map(item => [item.id, item.name] as const), ...state.closePeriods.map(item => [item.id, `${item.period} review`] as const),
     ...state.importBatches.map(item => [item.id, item.sourceFilename] as const)
   ]);
-  return <InspectorRail id="finance-inspector" title={titles[utility]} className="finance-utility-rail is-mobile-open" ariaLabel={titles[utility]} overlay overlayOpen onRequestClose={onClose}
+  return <InspectorRail id="finance-inspector" title={titles[utility]} className="finance-utility-rail is-mobile-open" ariaLabel={titles[utility]} overlay={mobile} overlayOpen onRequestClose={onClose}
     actions={<button className="finance-rail-close" onClick={onClose} aria-label={`Close ${titles[utility]}`}><Icon name="X" /></button>}>
     {utility === "activity" && <>
       <div className="finance-activity-summary"><strong>{unreviewed.length} awaiting review</strong><span>{transactions.length} transactions · {state.importBatches.length} imports</span><button className="finance-text-action" onClick={() => onView("transactions")}>Open transactions ↗</button></div>

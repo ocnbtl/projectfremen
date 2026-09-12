@@ -778,3 +778,44 @@
     transition: none;
   }
 }
+
+/* The directory adapts to its own width, including alongside a desktop inspector. */
+@container finance-list (max-width: 850px) {
+  .scopeBar.scopeBar { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .sortLabel.sortLabel { justify-self: start; }
+  .filterGroup.filterGroup { flex-wrap: wrap; overflow: visible; }
+  .columnHeader.columnHeader { display: none; }
+  .transactionRow.transactionRow { grid-template-columns: 44px minmax(0,1fr); min-width: 0; margin: 10px; border: 1px solid var(--border); border-radius: 12px; overflow: hidden; box-shadow: none; }
+  .transactionRow.transactionRow[data-selected="true"] { border-color: var(--module-primary-300); background: var(--module-primary-50); box-shadow: none; }
+  .transactionBody.transactionBody { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 9px 12px; min-height: 120px; padding: 15px 14px 15px 4px; }
+  .transactionBody > :nth-child(1) { grid-column: 1; grid-row: 3; }
+  .transactionBody > :nth-child(1) > span { display: none; }
+  .transactionBody > :nth-child(2) { grid-column: 1; grid-row: 1; }
+  .transactionBody > :nth-child(2) > span { display: none; }
+  .transactionBody > :nth-child(4) { grid-column: 1; grid-row: 2; }
+  .transactionBody > :nth-child(4) > span { display: none; }
+  .transactionBody > :nth-child(5) { grid-column: 2; grid-row: 2; justify-self: end; max-width: 135px; }
+  .transactionBody > :nth-child(6) { grid-column: 2; grid-row: 3; justify-self: end; }
+  .transactionBody > :nth-child(7) { grid-column: 2; grid-row: 1; justify-self: end; }
+  .transactionBody .primaryCell strong { font-size: 13px; white-space: normal; overflow-wrap: anywhere; }
+  .ledgerToolbar.ledgerToolbar { flex-wrap: wrap; gap: 10px; }
+  .ledgerSummary.ledgerSummary { flex-wrap: wrap; }
+  .reviewChecklist > .semanticListItem > button { grid-template-columns: 22px minmax(0,1fr); gap: 12px; border-radius: 12px; }
+  .reviewChecklist > .semanticListItem > button > :last-child { grid-column: 2; justify-self: start; }
+}
+/* Record facts are readable sections, with actions anchored at the bottom. */
+.inspectorHeader.inspectorHeader { gap: 14px; }
+.factGrid.factGrid { border: 0; border-radius: 0; gap: 0 24px; background: transparent; }
+.factGrid.factGrid > div { padding: 15px 0; background: transparent; border-bottom: 1px solid var(--border); gap: 8px; }
+.factGrid.factGrid span { font: 400 12px/1.4 var(--font-body); letter-spacing: 0; text-transform: none; color: var(--text-muted); }
+.factGrid.factGrid strong { font: 550 13px/1.5 var(--font-body); }
+.inspectorSection.inspectorSection { border: 0; border-radius: 0; background: transparent; padding: 18px 0 8px; gap: 10px; }
+.inspectorSection.inspectorSection h3 { font: 600 14px/1.5 var(--font-heading); }
+.inspectorSection.inspectorSection p { font: 400 13px/1.7 var(--font-body); color: var(--text-muted); }
+.inspectorPanel.inspectorPanel { gap: 18px; }
+.inspectorFooter.inspectorFooter { padding: 16px 22px; }
+.inspectorActions.inspectorActions { display: flex; flex-wrap: wrap; gap: 8px; }
+.inspectorActions.inspectorActions :global(.finance-action) { width: auto; min-height: 40px; }
+.compactRow.compactRow { border-radius: 10px; padding: 14px; }
+.compactRow.compactRow strong { font-weight: 550; }
+@media(max-width:760px) { .inspectorActions.inspectorActions :global(.finance-action) { min-height: 44px; } }

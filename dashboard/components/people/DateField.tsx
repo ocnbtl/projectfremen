@@ -1,6 +1,7 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
+import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 
@@ -17,8 +18,8 @@ const parse = (value: string) => {
   return iso(date) === value ? date : null;
 };
 
-export default function DateField({ label, value, onChange, required = true, compact = false }: {
-  label: string; value: string; onChange: (value: string) => void; required?: boolean; compact?: boolean;
+export default function DateField({ label, value, onChange, required = true, compact = false, theme }: {
+  label: string; value: string; onChange: (value: string) => void; required?: boolean; compact?: boolean; theme?: "finance";
 }) {
   const [open, setOpen] = useState(false), [focusDate, setFocusDate] = useState(() => parse(value) || new Date());
   const [month, setMonth] = useState(() => parse(value) || new Date());
@@ -37,7 +38,7 @@ export default function DateField({ label, value, onChange, required = true, com
       {compact ? <><span className="people-date-display-wide">{selected ? selected.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" }) : "Set date"}</span><span className="people-date-display-narrow" aria-hidden="true">{selected ? selected.toLocaleDateString("en-US", { month: "numeric", day: "numeric", year: "2-digit" }) : "Set date"}</span></> : <span>{selected ? display(selected) : "Choose a date"}</span>}
       <UnigentamosIcon role="interaction-date" size={18} />
     </button></Popover.Trigger>
-    <Popover.Portal><Popover.Content className="app-select-menu people-date-calendar" sideOffset={6} collisionPadding={12} aria-labelledby={titleId}
+    <Popover.Portal><Popover.Content className="app-select-menu people-date-calendar" style={theme ? moduleThemeVariables(theme) as CSSProperties : undefined} sideOffset={6} collisionPadding={12} aria-labelledby={titleId}
       onEscapeKeyDown={event => event.stopImmediatePropagation()} onOpenAutoFocus={event => { event.preventDefault(); grid.current?.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus(); }}>
       <h3 id={titleId} className="people-visually-hidden">Choose {label.toLowerCase()}</h3>
       <header><button type="button" aria-label="Previous month" onClick={() => moveMonth(-1)}><UnigentamosIcon role="chevron-right" size={18} /></button>

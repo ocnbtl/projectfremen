@@ -667,3 +667,24 @@
     transition: none;
   }
 }
+
+@container finance-list (max-width: 850px) {
+  .scopeBar.scopeBar { grid-template-columns: auto auto; justify-content: start; }
+  .scopeBar .sortLabel { grid-column: 1/-1; justify-self: start; }
+  .columnHeader.columnHeader { display: none; }
+  .semanticList.semanticList { min-width: 0; }
+  .ruleRow.ruleRow { grid-template-columns: minmax(0,1fr) auto; min-width: 0; width: calc(100% - 20px); padding: 16px; border: 1px solid var(--border); border-radius: 12px; margin: 10px; gap: 12px; }
+  .ruleRow.ruleRow[data-selected="true"] { box-shadow: none; border-color: var(--module-primary-300); background: var(--module-primary-50); }
+  .ruleRow.ruleRow > :nth-child(1) { grid-column: 1; grid-row: 1; }
+  .ruleRow.ruleRow > :nth-child(4) { grid-column: 1; grid-row: 2; }
+  .ruleRow.ruleRow > :nth-child(5) { grid-column: 1; grid-row: 3; }
+  .ruleRow.ruleRow > :nth-child(6) { grid-column: 2; grid-row: 1; }
+  .ruleRow.ruleRow > :nth-child(8) { grid-column: 2; grid-row: 2; }
+  .ruleRow .primaryCell strong,.ruleRow .secondaryCell strong,.ruleRow .secondaryCell small { white-space: normal; overflow-wrap: anywhere; }
+  .ledgerToolbar.ledgerToolbar { flex-wrap: wrap; }
+}
+.inspectorHeader.inspectorHeader { gap: 14px; }
+.factGrid.factGrid { border: 0; border-radius: 0; gap: 0 20px; background: transparent; }
+.factGrid.factGrid > div { padding: 15px 0; border-bottom: 1px solid var(--border); background: transparent; }
+.factGrid.factGrid span { font: 400 12px var(--font-body); text-transform: none; letter-spacing: 0; color: var(--text-muted); }
+.factGrid.factGrid strong { font: 550 13px/1.5 var(--font-body); }

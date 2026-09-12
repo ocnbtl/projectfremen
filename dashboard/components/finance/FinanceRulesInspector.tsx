@@ -90,10 +90,10 @@ export default function FinanceRulesInspector({
         <ObjectHeader
           headingLevel="h2"
           className={styles.inspectorHeader}
-          objectType="Selected Finance rule"
+          objectType="Rule & automation"
           title={rule.name}
-          subtitle={`${rule.id} · ${rule.scope}`}
-          identity={initials(rule.name)}
+          subtitle={rule.scope}
+          identity={<Icon name="Sliders" />}
           states={(
             <>
               <Chip hue={rule.enabled ? "green" : rule.mode === "draft" ? "neutral" : "brown"}>{rule.enabled ? "active" : rule.mode}</Chip>

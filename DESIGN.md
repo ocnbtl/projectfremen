@@ -64,3 +64,12 @@ Colors must be expressed through shared semantic tokens wherever practical. Modu
 - Focus-visible treatment must remain obvious, and touch targets should be at least 44px where they are primary mobile controls.
 
 This system is inferred from Ocean's explicit product direction and the established Unigentamos interface. Revisit it only when a new surface genuinely requires a different mode, not for page-by-page decoration.
+
+## Finance split workspace (September 2026)
+
+- Finance keeps its directory on the left and a persistent detail pane on the right, using the same dividing point as People. Each record view selects a relevant visible record on entry; an empty result keeps a useful empty detail pane. On smaller screens, details open as a dismissible sheet.
+- Overview is centered on a shared, URL-backed transaction scope: date range, account, category, budget, settlement status, direction, and text search. Its graph, spending breakdown and detail totals must agree. Clicking a period, category or transaction reveals its supporting records.
+- The single React-owned SVG uses jade for income and warm bronze for spending, a zero-based dollar scale, responsive labels, keyboard/touch selection, a period table, and reduced-motion support. Transitions update the line geometry without inventing intermediate data. Pending transactions are opt-in; transfers never count as income or spending.
+- History coverage is explicit. Unobserved dates beyond the recorded range are not plotted as zero. Budget filtering respects the budget month, category/group, and personal/business scope.
+- Detail headers use the existing wallet, banknote, calendar, piggy-bank, review and sliders icon roles. Facts use Inter; prominent amounts use Plus Jakarta Sans. Record actions stay at the bottom of the detail pane.
+- Shared navigation is a full-width white surface joined to module content. Modules have no colored top rule; their palette remains in icons, selection, focus, and meaningful content.

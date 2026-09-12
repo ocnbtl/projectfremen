@@ -3,6 +3,8 @@
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import FinanceOverviewView from "./finance/FinanceOverviewView";
+import FinanceOverviewInspector from "./finance/FinanceOverviewInspector";
+import { buildFinanceOverview, readOverviewUrl, writeOverviewUrl, type OverviewFilters, type OverviewSelection } from "../lib/modules/finance/overview-model";
 import FinancePlanningPanel from "./finance/FinancePlanningPanel";
 import FinanceUtilityRail, { type FinanceUtility } from "./finance/FinanceUtilityRail";
 import { HUES } from "./finance/FinancePrimitives";
@@ -390,12 +392,30 @@ export default function FinanceWorkspace({
   const [tab, setTab] = useState<FinanceTab>(initialUrlState.tab);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
-  const [inspectorDismissed, setInspectorDismissed] = useState(false);
+
+  const autoSelectionRef = useRef("");
+  const [mobileDetail, setMobileDetail] = useState(false);
+  const [overviewState, setOverviewState] = useState(() => readOverviewUrl(new URLSearchParams(searchParams.toString())));
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 1000px)");
+    const sync = () => setMobileDetail(media.matches);
+    sync(); media.addEventListener("change", sync);
+    return () => media.removeEventListener("change", sync);
+  }, []);
   const [utility, setUtility] = useState<FinanceUtility | null>(null);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has("oauth_state_id")) setUtility("settings");
   }, []);
   const [query, setQuery] = useState(initialUrlState.query);
+  const overviewModel = useMemo(() => buildFinanceOverview(financeState, overviewState.filters, view === "overview" ? query : ""), [financeState, overviewState.filters, query, view]);
+  function updateOverview(filters: OverviewFilters, selection: OverviewSelection, inspect = false) {
+    setOverviewState({ filters, selection });
+    setUtility(null);
+    if (inspect) setInspectorOpen(true);
+    const params = writeOverviewUrl(new URLSearchParams(window.location.search), filters, selection);
+    // Let Next sync its navigation hooks; reusing its internal state bypasses that sync.
+    window.history.pushState(null, "", `${pathname}${params.size ? `?${params}` : ""}`);
+  }
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const [ruleTestRuns, setRuleTestRuns] = useState<Readonly<Record<string, FinanceRuleTestRun>>>({});
   const smartCounts = useMemo(() => Object.fromEntries(SMART_VIEWS.map((item) => [item.id, getFinanceSmartViewCount(financeViewModel, item.id)])), [financeViewModel]);
@@ -403,37 +423,37 @@ export default function FinanceWorkspace({
   const accountsModel = buildFinanceAccountsViewModel(financeDataset, {
     query: view === "accounts" ? query : "",
     sort,
-    selectedId: selectedAccountId
+    selectedId: selectedAccountId || undefined
   });
   const transactionsModel = buildFinanceTransactionsViewModel(financeDataset, {
     query: view === "transactions" ? query : "",
     filter: smartFilter === "unreviewed" || smartFilter === "transfer" || smartFilter === "pending" ? smartFilter : "all",
     sort,
-    selectedId: selectedTxnId
+    selectedId: selectedTxnId || undefined
   });
   const billsModel = buildFinanceBillsViewModel(financeDataset, {
     query: view === "bills" ? query : "",
     filter: smartFilter === "due-week" ? "due-this-week" : smartFilter === "recurring" ? "recurring" : "all",
     sort,
-    selectedId: selectedSecondaryId
+    selectedId: selectedSecondaryId || undefined
   });
   const budgetsModel = buildFinanceBudgetsViewModel(financeDataset, {
     query: view === "budgets" ? query : "",
     filter: smartFilter === "over-budget" ? "over-budget" : "all",
     sort,
-    selectedId: selectedSecondaryId
+    selectedId: selectedSecondaryId || undefined
   });
   const monthlyReviewModel = buildFinanceMonthlyReviewViewModel(financeDataset, {
     query: view === "review" ? query : "",
     filter: smartFilter === "incomplete" ? "open" : "all",
     sort,
-    selectedId: selectedSecondaryId
+    selectedId: selectedSecondaryId || undefined
   });
   const rulesModel = buildFinanceRulesViewModel(financeRulesDataset, {
     query: view === "rules" ? query : "",
     filter: view === "rules" ? smartFilter : "",
     sort,
-    selectedId: selectedSecondaryId
+    selectedId: selectedSecondaryId || undefined
   });
   const selectedAccount = accounts.find((account) => account.id === accountsModel.selectedId) || null;
   const activeClose = activeCloseForState(financeState);
@@ -464,6 +484,7 @@ export default function FinanceWorkspace({
     setSmartFilter(next.filter);
     setSort(next.sort);
     setQuery(next.query);
+    setOverviewState(readOverviewUrl(new URLSearchParams(searchParams.toString())));
     setAiOpen(next.ai);
     setTab(
       nextView === "rules"
@@ -472,7 +493,7 @@ export default function FinanceWorkspace({
           ? next.tab
           : "overview"
     );
-    setInspectorDismissed((current) => current && !next.selected);
+
     if (nextView === "overview" || nextView === "accounts") {
       setSelectedAccountId(next.selected);
     } else {
@@ -489,7 +510,7 @@ export default function FinanceWorkspace({
       setSelectedSecondaryId("");
     }
     setCheckedTxnIds(new Set());
-    setInspectorOpen(Boolean(next.selected && ["accounts", "transactions", "bills", "budgets", "review", "rules"].includes(nextView)));
+    if (nextView !== "overview") setInspectorOpen(Boolean(next.selected) && next.selected !== autoSelectionRef.current);
     const canonicalParams = serializeFinanceUrlState(next, searchParams);
     if (initialView) canonicalParams.delete("view");
     if (canonicalParams.toString() !== searchParams.toString()) {
@@ -502,7 +523,7 @@ export default function FinanceWorkspace({
   }, [initialView, pathname, searchParamKey, searchParams]);
 
   useEffect(() => {
-    if (inspectorDismissed || !["accounts", "transactions", "bills", "budgets", "review", "rules"].includes(view)) return;
+    if (!["accounts", "transactions", "bills", "budgets", "review", "rules"].includes(view)) return;
     const resolvedSelectedId = view === "accounts"
       ? accountsModel.selectedId || ""
       : view === "transactions"
@@ -520,9 +541,10 @@ export default function FinanceWorkspace({
         ? selectedTxnId
         : selectedSecondaryId;
     if (currentSelectedId === resolvedSelectedId) return;
+    autoSelectionRef.current = resolvedSelectedId;
     const selectionBecameHidden = Boolean(currentSelectedId && !resolvedSelectedId);
     if (selectionBecameHidden) {
-      setInspectorDismissed(true);
+
       setInspectorOpen(false);
       setTab("overview");
     }
@@ -547,7 +569,7 @@ export default function FinanceWorkspace({
     accountsModel.selectedId,
     aiOpen,
     initialView,
-    inspectorDismissed,
+
     pathname,
     billsModel.selectedId,
     budgetsModel.selectedId,
@@ -626,7 +648,7 @@ export default function FinanceWorkspace({
     setSelectedTxnId("");
     setSelectedSecondaryId("");
     setCheckedTxnIds(new Set());
-    setInspectorDismissed(false);
+
     setInspectorOpen(false);
     setNotice("");
     updateFinanceUrl({ view: next, filter: "", sort: "default", query: "", selected: "", tab: "overview" }, { history: "push" });
@@ -646,7 +668,8 @@ export default function FinanceWorkspace({
     setSelectedTxnId(next === "transactions" ? selectedId : "");
     setSelectedSecondaryId(next === "transactions" ? "" : selectedId);
     setCheckedTxnIds(new Set());
-    setInspectorDismissed(false);
+
+    autoSelectionRef.current = "";
     setInspectorOpen(true);
     setNotice("");
     updateFinanceUrl(
@@ -668,7 +691,8 @@ export default function FinanceWorkspace({
     }
     setSelectedAccountId(account.id);
     setTab("overview");
-    setInspectorDismissed(false);
+
+    autoSelectionRef.current = "";
     setInspectorOpen(true);
     updateFinanceUrl(
       view === "overview"
@@ -682,7 +706,8 @@ export default function FinanceWorkspace({
     setUtility(null);
     setSelectedTxnId(id);
     setTab("overview");
-    setInspectorDismissed(false);
+
+    autoSelectionRef.current = "";
     setInspectorOpen(true);
     updateFinanceUrl({ selected: id, tab: "overview" }, { history: "push" });
   }
@@ -691,13 +716,14 @@ export default function FinanceWorkspace({
     setUtility(null);
     setSelectedSecondaryId(id);
     setTab("overview");
-    setInspectorDismissed(false);
+
+    autoSelectionRef.current = "";
     setInspectorOpen(true);
     updateFinanceUrl({ selected: id, tab: "overview" }, { history: "push" });
   }
 
-  const showRail = !utility && !aiOpen
-    && !inspectorDismissed
+  const showRail = !utility
+
     && (
       (view === "accounts" && Boolean(accountsModel.selected))
       || (view === "transactions" && Boolean(transactionsModel.selected))
@@ -706,7 +732,7 @@ export default function FinanceWorkspace({
       || (view === "review" && Boolean(monthlyReviewModel.selected))
       || (view === "rules" && Boolean(rulesModel.selected))
     );
-  const showContext = !aiOpen && Boolean(utility);
+  const showContext = Boolean(utility);
   const activeSmart = useMemo(() => SMART_VIEWS.find((item) => item.id === smartFilter), [smartFilter]);
   const activeView = VIEWS.find((item) => item.id === view) || VIEWS[0];
   const selectedTransaction = view === "transactions" ? transactionsModel.selected || undefined : undefined;
@@ -740,7 +766,7 @@ export default function FinanceWorkspace({
       setSelectedTxnId("");
       setSelectedSecondaryId("");
       setCheckedTxnIds(new Set());
-      setInspectorDismissed(false);
+
       setInspectorOpen(false);
       setNotice("");
       updateFinanceUrl({ view: smart.view, filter: nextFilter, sort: "default", query: "", selected: "", tab: "overview" }, { history: "push" });
@@ -752,12 +778,7 @@ export default function FinanceWorkspace({
 
   function closeInspector() {
     setUtility(null);
-    setInspectorDismissed(true);
-    if (view === "accounts") setSelectedAccountId("");
-    if (view === "transactions") setSelectedTxnId("");
-    if (view === "bills" || view === "budgets" || view === "review" || view === "rules") setSelectedSecondaryId("");
-    setTab("overview");
-    updateFinanceUrl({ selected: "", tab: "overview" });
+    autoSelectionRef.current = view === "accounts" ? accountsModel.selectedId || "" : view === "transactions" ? transactionsModel.selectedId || "" : selectedSecondaryId;
     setInspectorOpen(false);
   }
 
@@ -825,9 +846,9 @@ export default function FinanceWorkspace({
   return (
     <ModuleShell
       module="finance"
-      mode={showRail ? "detail" : "directory"}
+      mode="detail"
       ariaLabel="Finance workspace"
-      className={classNames("finance-workspace", "finance-module-shell", showContext && "has-context", showRail && "has-rail")}
+      className={classNames("finance-workspace", "finance-module-shell", "finance-split-workspace", "has-rail", showContext && "has-context")}
       sidebar={<FinanceSidebar
         smartCounts={smartCounts}
         view={view}
@@ -852,7 +873,7 @@ export default function FinanceWorkspace({
                 onRunTests={runSelectedRuleTests}
                 onClose={closeInspector}
                 mobileOpen={inspectorOpen}
-                overlay={true}
+                overlay={mobileDetail}
                 overlayOpen={inspectorOpen}
               />
             : <FinanceInspector
@@ -879,15 +900,15 @@ export default function FinanceWorkspace({
                 }}
                 onClose={closeInspector}
                 mobileOpen={inspectorOpen}
-                overlay={true}
+                overlay={mobileDetail}
                 overlayOpen={inspectorOpen}
               />
           : showContext
-            ? <FinanceUtilityRail utility={utility!} state={financeState} onClose={() => setUtility(null)} onView={navigateView}
+            ? <FinanceUtilityRail mobile={mobileDetail} utility={utility!} state={financeState} onClose={() => setUtility(null)} onView={navigateView}
                 onBankChanged={async () => { const refreshed = await createFinanceRepository().readState(); if (refreshed.ok) setFinanceState(refreshed.data); else throw new Error(refreshed.error.message); }}
                 onCategory={(category) => { setUtility(null); setView("transactions"); setSelectedAccountId(""); setSelectedTxnId(""); setSelectedSecondaryId(""); setSmartFilter(""); setSort("default"); setTab("overview"); setCheckedTxnIds(new Set()); setInspectorOpen(false); setQuery(category); updateFinanceUrl({ view: "transactions", query: category, filter: "", selected: "", tab: "overview", sort: "default" }, { history: "push" }); }}
                 onImport={() => { setUtility(null); setOperationTarget(null); setOperation(accounts.length ? "import" : "account"); }} />
-            : undefined
+            : <FinanceOverviewInspector model={overviewModel} selection={overviewState.selection} mobile={mobileDetail} mobileOpen={inspectorOpen} onClose={() => setInspectorOpen(false)} onSelect={selection => updateOverview(overviewState.filters, selection, true)} onOpenTransaction={id => navigateToSelected("transactions", id)} emptyView={view !== "overview" ? activeSmart?.label || activeView.label : undefined} />
       }
       aiDock={
         <SharedAIDock
@@ -914,7 +935,7 @@ export default function FinanceWorkspace({
     >
       <span className="module-ref-regression-sentinel">Finance command view</span>
       {mobileSidebarOpen && <button type="button" className="finance-mobile-scrim" onClick={() => setMobileSidebarOpen(false)} aria-label="Close Finance sidebar" />}
-      {(showContext || (showRail && inspectorOpen)) && <button type="button" className="finance-inspector-scrim" onClick={closeInspector} aria-label="Close Finance panel" />}
+      {mobileDetail && (showContext || inspectorOpen) && <button type="button" className="finance-inspector-scrim" onClick={closeInspector} aria-label="Close Finance panel" />}
       <div className="finance-main-workspace">
         <header className="finance-page-header">
           <div className="finance-page-title"><button type="button" className="finance-mobile-menu" onClick={() => setMobileSidebarOpen(true)} aria-label="Open Finance sidebar" aria-expanded={mobileSidebarOpen} aria-controls="finance-module-sidebar"><UnigentamosIcon role="menu" /></button><h1>{activeSmart?.label || activeView.label}</h1></div>
@@ -926,7 +947,7 @@ export default function FinanceWorkspace({
           onOperation={(nextOperation) => { setOperationTarget(null); setOperation(nextOperation); }}
         />{view === "accounts" && <button type="button" className="finance-action" onClick={() => { setAiOpen(false); setInspectorOpen(false); setUtility("settings"); }}><Icon name="Link" />Connections</button>}<button type="button" className="finance-action finance-activity-trigger" onClick={() => { setAiOpen(false); setUtility("activity"); }} aria-label="Recent activity" title="Recent activity" aria-expanded={utility === "activity"}><UnigentamosIcon role="clock" /><span>Activity</span></button></div>
         </header>
-        <div className="finance-search-row"><label className="finance-global-search"><Icon name="Search" /><input type="search" aria-label={view === "overview" ? "Search finance" : view === "bills" ? "Search bills and subscriptions" : view === "review" ? "Search monthly review" : `Search ${view}`} value={query} placeholder={view === "overview" ? "Search accounts, transactions, bills and budgets" : `Search ${activeView.label.toLowerCase()}`} onChange={(event) => { setQuery(event.target.value); setCheckedTxnIds(new Set()); setInspectorDismissed(false); updateFinanceUrl({ query: event.target.value }, { native: true }); }} /></label></div>
+        <div className="finance-search-row"><label className="finance-global-search"><Icon name="Search" /><input type="search" aria-label={view === "overview" ? "Search finance" : view === "bills" ? "Search bills and subscriptions" : view === "review" ? "Search monthly review" : `Search ${view}`} value={query} placeholder={view === "overview" ? "Search transactions, merchants or categories" : `Search ${activeView.label.toLowerCase()}`} onChange={(event) => { setQuery(event.target.value); setCheckedTxnIds(new Set()); updateFinanceUrl({ query: event.target.value }, { native: true }); }} /></label></div>
 
         {planning && <FinancePlanningPanel key={planning} reviewOnly={planning === "review"} onClose={() => setPlanning(null)} onApplied={(state, message) => { setFinanceState(state); setNotice(message); setPlanning(null); setCheckedTxnIds(new Set()); router.refresh(); }} />}
         {financeError && <div className="finance-notice is-error" role="alert"><Swatch hue="crimson" /><span className="finance-notice__message">{financeError}</span></div>}
@@ -935,7 +956,7 @@ export default function FinanceWorkspace({
           onRestore={(selection) => { setOperationTarget(selection); setOperation("restore"); }}
         />
         {notice && <div className="finance-notice" role="status" aria-live="polite"><Swatch hue={activeSmart?.hue || "indigo"} /><span className="finance-notice__message">{notice}</span><button type="button" onClick={() => setNotice("")}>Clear</button></div>}
-        {view === "overview" && <FinanceOverviewView state={financeState} dataset={financeDataset} query={query} attentionOnly={smartFilter === "attention"} onView={navigateView} onSmart={handleSmart} onAddAccount={() => setOperation("account")} onPeriod={period => { navigateView("transactions"); setQuery(period); updateFinanceUrl({ view: "transactions", query: period, filter: "", selected: "" }, { history: "push" }); }} onOpen={(nextView, id) => { if (nextView === "accounts") { const account = accounts.find(item => item.id === id); if (account) selectAccount(account); } else navigateToSelected(nextView, id); }} />}
+        {view === "overview" && <FinanceOverviewView state={financeState} model={overviewModel} filters={overviewState.filters} selection={overviewState.selection} onFilters={filters => updateOverview(filters, { kind: "summary", id: "" })} onSelect={selection => updateOverview(overviewState.filters, selection, true)} onAddAccount={() => setOperation("account")} />}
         {view === "accounts" && (
           <FinanceAccountsRouteView
             model={accountsModel}
@@ -946,7 +967,7 @@ export default function FinanceWorkspace({
             actualSavingsMovement={snapshot.monthSaved}
             onQueryChange={(nextQuery) => {
               setQuery(nextQuery);
-              setInspectorDismissed(false);
+
               updateFinanceUrl({ query: nextQuery }, { native: true });
             }}
             onSortChange={(nextSort) => {
@@ -1035,12 +1056,12 @@ export default function FinanceWorkspace({
             filter={smartFilter}
             onQueryChange={(nextQuery) => {
               setQuery(nextQuery);
-              setInspectorDismissed(false);
+
               updateFinanceUrl({ query: nextQuery }, { native: true });
             }}
             onFilterChange={(nextFilter) => {
               setSmartFilter(nextFilter);
-              setInspectorDismissed(false);
+
               updateFinanceUrl({ filter: nextFilter }, { native: true });
             }}
             onSortChange={(nextSort) => {
@@ -1060,13 +1081,13 @@ export default function FinanceWorkspace({
             onQueryChange={(nextQuery) => {
               setQuery(nextQuery);
               setCheckedTxnIds(new Set());
-              setInspectorDismissed(false);
+
               updateFinanceUrl({ query: nextQuery }, { native: true });
             }}
             onFilterChange={(nextFilter) => {
               setSmartFilter(nextFilter);
               setCheckedTxnIds(new Set());
-              setInspectorDismissed(false);
+
               updateFinanceUrl({ filter: nextFilter }, { native: true });
             }}
             onSortChange={(nextSort) => {

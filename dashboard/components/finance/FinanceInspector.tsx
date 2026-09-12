@@ -22,6 +22,7 @@ import { createNativeObjectRef, getModuleRoute, getModuleViewRoute } from "../..
 import { Chip, Icon, money } from "./FinancePrimitives";
 import type { FinanceOperation } from "./FinanceMutationDialog";
 import styles from "./FinanceOperational.module.css";
+import { overviewDate, transactionInBudget } from "../../lib/modules/finance/overview-model";
 
 const TRANSACTION_TABS: readonly DetailTab[] = [
   { id: "overview", label: "Overview" },
@@ -245,23 +246,23 @@ export default function FinanceInspector({
     || reviewRow?.item.label
     || "Finance object";
   const objectType = accountRow
-    ? "Selected account"
+    ? "Account"
     : transaction
-      ? "Selected transaction"
+      ? "Transaction"
       : billRow
-        ? "Selected bill / subscription"
+        ? "Bill / subscription"
         : budgetRow
-          ? "Selected budget category"
-          : "Selected close item";
+          ? "Budget"
+          : "Monthly review";
   const subtitle = accountRow
     ? `${accountRow.account.inst} · ••${accountRow.account.mask} · ${accountRow.account.kind}`
     : transaction
-      ? `${transaction.id} · ${transaction.account} · ${transaction.date}`
+      ? `${transaction.account} · ${transaction.date}`
       : billRow
-        ? `${billRow.bill.id} · ${billRow.bill.account} · ${billRow.bill.due}`
+        ? `${billRow.bill.account} · ${billRow.bill.due}`
         : budgetRow
-          ? `${budgetRow.budget.id} · persistent monthly cap`
-          : `${reviewRow?.item.id} · Finance-owned monthly close`;
+          ? `Monthly spending plan`
+          : `${closePeriod?.period || ""} · Month-end checklist`;
   const stateChip = accountRow
     ? <Chip hue={accountRow.account.balance < 0 ? "crimson" : accountRow.account.hue}>{accountRow.account.kind}</Chip>
     : transaction
@@ -282,10 +283,10 @@ export default function FinanceInspector({
           objectType={objectType}
           title={objectTitle}
           subtitle={subtitle}
-          identity={initials(objectTitle)}
-          states={<>{stateChip}<Chip hue="green">Native</Chip></>}
+          identity={<Icon name={accountRow ? "Wallet" : transaction ? "Banknote" : billRow ? "Calendar" : budgetRow ? "PiggyBank" : "Check"} />}
+          states={stateChip}
           metadata={accountRow
-            ? `${money(accountRow.account.balance, { cents: true })} · recorded balance`
+            ? <><strong>{money(accountRow.account.balance, { cents: true })}</strong><small>Recorded balance</small></>
             : transaction
               ? money(transaction.amount, { sign: true, cents: true })
               : billRow
@@ -338,19 +339,16 @@ export default function FinanceInspector({
             <div className={styles.factGrid}>
               <div><span>Amount</span><strong>{money(transaction.amount, { sign: true, cents: true })}</strong></div>
               <div><span>Status</span><strong>{transaction.status}</strong></div>
-              <div><span>IO type</span><strong>{transaction.io}</strong></div>
+              <div><span>Type</span><strong>{transaction.io === "income" ? "Money in" : transaction.io === "transfer" ? "Transfer" : "Money out"}</strong></div>
               <div><span>Account</span><strong>{transaction.account}</strong></div>
               <div><span>Category</span><strong>{transaction.category}</strong></div>
-              <div><span>Receipt</span><strong>{transaction.receipt || "Not attached"}</strong></div>
+              <div><span>Review</span><strong>{transaction.ufInit ? "Reviewed" : "To review"}</strong></div>
             </div>
             <section className={styles.inspectorSection}>
-              <h3>Memo / finance context</h3>
+              <h3>Notes</h3>
               <p>{transaction.memo || "No memo is recorded."}</p>
             </section>
-            <div className={styles.boundary}>
-              <strong>Native ledger identity</strong>
-              <span>The persisted transaction retains its immutable account ID; this display uses the current account label “{transaction.account}”. Balance snapshots remain explicit and are never silently recalculated.</span>
-            </div>
+            <section className={styles.inspectorSection}><h3>Recorded from</h3><p>{({ plaid: "Linked bank account", csv_import: "Imported statement", transfer: "Account transfer", manual: "Manual entry" })[financeState.transactions.find(t => t.id === transaction.id)?.source.kind || "manual"]}</p></section>
           </DetailTabPanel>
 
           <DetailTabPanel tabsId="finance-object-tabs" tabId="properties" active={safeTab === "properties"} className={styles.inspectorPanel}>
@@ -402,7 +400,7 @@ export default function FinanceInspector({
               <span>Transactions and imports do not update this recorded balance. Use Update balance when you have a newer statement or account balance.</span>
             </div>
             <a className={styles.compactRow} href={getModuleViewRoute("finance", "review")}>
-              <span><strong>Finance Monthly Review</strong><small>Finance owns monthly close; this account is not yet durably linked</small></span>
+              <span><strong>Finance Monthly Review</strong><small>Review your balances and finish the monthly checklist</small></span>
               <span>Open</span>
             </a>
           </DetailTabPanel>
@@ -525,10 +523,10 @@ export default function FinanceInspector({
               <div><span>Spent</span><strong>{money(budgetRow.budget.spent, { cents: true })}</strong></div>
               <div><span>Remaining</span><strong>{money(budgetRow.remaining, { cents: true })}</strong></div>
               <div><span>Used</span><strong>{budgetRow.usedPercent === null ? "Unavailable" : `${budgetRow.usedPercent.toFixed(2)}%`}</strong></div>
-              <div><span>Forecast</span><strong>Not calculated</strong></div>
-              <div><span>Review state</span><strong>{budgetRow.remaining < 0 ? "Literal overage" : "No literal overage"}</strong></div>
+              <div><span>Month</span><strong>{financeState.budgets.find(b => b.id === budgetRow.budget.id)?.period || "Monthly"}</strong></div>
+              <div><span>Status</span><strong>{budgetRow.remaining < 0 ? "Over budget" : "Within budget"}</strong></div>
             </div>
-            <section className={styles.inspectorSection}><h3>{budgetRow.budget.evidence ? "Budget basis" : "Spending against your limit"}</h3>{budgetRow.budget.evidence && <p>{budgetRow.budget.evidence.basis}</p>}<p>{budgetRow.budget.category} has {money(budgetRow.remaining, { cents: true })} remaining from its persistent cap. No forecast, confidence, project allocation, or decision is inferred.</p></section>
+            <section className={styles.inspectorSection}><h3>{budgetRow.budget.evidence ? "Budget basis" : "Spending against your limit"}</h3>{budgetRow.budget.evidence && <p>{budgetRow.budget.evidence.basis}</p>}<p>{budgetRow.budget.category} is {money(Math.abs(budgetRow.remaining), { cents: true })} {budgetRow.remaining < 0 ? "over its monthly limit" : "below its monthly limit"}.</p></section>
             <LinkedDecisionsPanel
               source={budgetDecisionSource!}
               decisions={decisions}
@@ -539,10 +537,9 @@ export default function FinanceInspector({
               compact
               title="Budget decisions"
             />
-            <div className={styles.boundary}><strong>Finance owns the cap</strong><span>A Personal Decision may record a choice without changing Finance. A material overage never silently changes the cap.</span></div>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="transactions" active={safeTab === "transactions"} className={styles.inspectorPanel}>
-            <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?query=${encodeURIComponent(budgetRow.budget.category)}`}><span><strong>Search Transactions</strong><small>Transactions owns transaction facts; this is a category search, not a persisted link.</small></span><span>Open</span></a>
+            <section className={styles.inspectorSection}><h3>Spending in this budget</h3><div className={styles.compactList}>{financeState.transactions.filter(t => { const budget = financeState.budgets.find(b => b.id === budgetRow.budget.id); return !t.archivedAt && budget && transactionInBudget(t, budget); }).sort((a, b) => b.occurredOn.localeCompare(a.occurredOn)).map(t => <a key={t.id} className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?selected=${encodeURIComponent(t.id)}`}><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {t.status}</small></span><strong>{money(t.amount, { cents: true })}</strong></a>)}</div>{budgetRow.budget.spent === 0 && <p>No spending is recorded for this budget yet.</p>}</section>
           </DetailTabPanel>
           <DetailTabPanel tabsId="finance-object-tabs" tabId="subscriptions" active={safeTab === "subscriptions"} className={styles.inspectorPanel}>
             <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "bills")}?query=${encodeURIComponent(budgetRow.budget.category)}`}><span><strong>Search Bills & Subscriptions</strong><small>Bills owns recurring-obligation state; category equality is only search evidence.</small></span><span>Open</span></a>

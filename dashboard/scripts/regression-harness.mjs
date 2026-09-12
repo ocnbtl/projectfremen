@@ -1083,7 +1083,7 @@ async function checkNativeFinanceLifecycle(baseUrl, cookieJar) {
 }
 
 async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
-  const { chromium } = await import("@playwright/test");
+  const { chromium, expect } = await import("@playwright/test");
   const browser = await chromium.launch({ headless: true });
   const browserErrors = [];
   const failedResponses = [];
@@ -1111,6 +1111,18 @@ async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
         const url = new URL(response.url());
         if (response.status() >= 400 && !url.pathname.startsWith("/_vercel/")) failedResponses.push(`${viewport.label}: ${response.status()} ${url.pathname}`);
       });
+      await page.goto(`${baseUrl}/admin/finance`, { waitUntil: "networkidle" });
+      await page.getByRole("button", { name: "30 days", exact: true }).click();
+      await expect(page.getByRole("button", { name: "30 days", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await chooseField(page.getByRole("combobox", { name: "Sort spending categories", exact: true }), "name");
+      await expect(page.getByRole("combobox", { name: "Sort spending categories", exact: true })).toHaveText("Category A–Z");
+      await page.goBack({ waitUntil: "networkidle" });
+      await expect(page.getByRole("combobox", { name: "Sort spending categories", exact: true })).toHaveText("Largest amount");
+      await expect(page.getByRole("button", { name: "30 days", exact: true })).toHaveAttribute("aria-pressed", "true");
+      await page.goBack({ waitUntil: "networkidle" });
+      await expect(page.getByRole("button", { name: "90 days", exact: true })).toHaveAttribute("aria-pressed", "true");
+      assert(!new URL(page.url()).searchParams.has("chart-range"), `Finance ${viewport.label} chart did not restore its original range`);
+
       await page.goto(`${baseUrl}/admin/finance/transactions?view=review&sort=amount-desc&probe=keep`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { level: 1, name: "Transactions" }).waitFor();
       const canonical = new URL(page.url());
@@ -1177,7 +1189,7 @@ async function checkNativeFinanceBrowserState(baseUrl, cookieJar) {
           text: document.body.innerText
         };
       });
-      assert(workbenchDiagnostics.railRatio >= (viewport.width <= 390 ? 0.95 : 0.19) && workbenchDiagnostics.railRatio <= (viewport.width <= 390 ? 1 : 421 / viewport.width), `Finance ${viewport.label} inspector is not a bounded detail sheet: ${JSON.stringify(workbenchDiagnostics)}`);
+      assert(workbenchDiagnostics.railRatio >= (viewport.width <= 390 ? 0.95 : 0.19) && workbenchDiagnostics.railRatio <= (viewport.width <= 390 ? 1 : viewport.width <= 1000 ? 521 / viewport.width : .53), `Finance ${viewport.label} inspector is not a responsive detail pane: ${JSON.stringify(workbenchDiagnostics)}`);
       assert(!workbenchDiagnostics.text.includes("Native Finance · persistent and auditable") && !workbenchDiagnostics.text.includes("Manual facts and confirmed CSV imports only"), `Finance ${viewport.label} retained removed technical status copy`);
       if (viewport.width >= 768) {
         assert(workbenchDiagnostics.actionHeight <= 52 && workbenchDiagnostics.actionButtonHeights.every((height) => height >= 40 && height <= 48), `Finance ${viewport.label} action bar is still oversized: ${JSON.stringify(workbenchDiagnostics)}`);
@@ -9192,10 +9204,10 @@ async function checkCrossModuleDecisionConnections(
     const financeBudgetPage = await desktopContext.newPage();
     observe(financeBudgetPage);
     await financeBudgetPage.goto(`${baseUrl}${sources[2].source.route}`, { waitUntil: "networkidle" });
-    await assertPanel(financeBudgetPage, sources[2], "Finance budget decisions");
+    const financeBudgetPanel = await assertPanel(financeBudgetPage, sources[2], "Finance budget decisions");
     assert(
-      await financeBudgetPage.getByText("Finance owns the cap", { exact: true }).count() >= 1,
-      "Finance budget did not preserve its native ownership boundary and owner-aware Decision action"
+      (await financeBudgetPanel.row.getAttribute("href")) === `/admin/personal/decisions?selected=${encodeURIComponent(createdByKey.get("finance-budget").id)}`,
+      "Finance budget did not offer its owner-aware Decision action"
     );
 
     await financeBudgetPage.goto(
@@ -9264,6 +9276,13 @@ async function checkCrossModuleDecisionConnections(
         financeHandoffDecision.sourceRefs[0].objectId === handoffBudget.id &&
         financeHandoffDecision.sourceRefs[0].route === `/admin/finance/budgets?selected=${encodeURIComponent(handoffBudget.id)}`,
       `Finance Decision handoff did not persist its exact native source: ${JSON.stringify(financeHandoffDecision)}`
+    );
+
+    const financeAfterDecision = await requestJson(baseUrl, cookieJar, "/api/finance");
+    assert(
+      financeAfterDecision.response.ok &&
+        JSON.stringify(financeAfterDecision.payload.state.budgets.find((item) => item.id === handoffBudget.id)) === JSON.stringify(handoffBudget),
+      "Filing a Personal Decision changed its source Finance budget"
     );
 
     const financeClosePage = await desktopContext.newPage();

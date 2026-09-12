@@ -1,0 +1,6 @@
+/* Shared navigation and workspaces form one continuous surface. */
+.admin-global-topnav { top: 0; left: 0; transform: none; width: 100%; max-width: none; height: var(--app-content-offset,76px); padding: 10px 20px; border: 0; border-bottom: 1px solid var(--border, #dce3dd); border-radius: 0; background: white; box-shadow: none; backdrop-filter: none; }
+.module-shell { border-top: 0; }
+.people-redesign-shell { border-top: 0; }
+.people-redesign-shell > :is(.people-desktop-sidebar,.people-directory-panel,.people-profile-panel,.people-smart-panel) { border-top: 0; }
+@media(max-width:760px) { .admin-global-topnav { padding: 8px 12px; } }
