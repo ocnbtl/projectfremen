@@ -2,15 +2,18 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
-import { PERSON_AUTOFILL_LABELS, personSeedUrls, personProfileLink, personAutofillHasChanges, type PersonAutofillResult, type PersonAutofillValues } from "../../lib/modules/people/person-autofill";
+import { PERSON_AUTOFILL_LABELS, personNameKey, personSeedUrls, personProfileLink, personAutofillHasChanges, type PersonAutofillResult, type PersonAutofillValues } from "../../lib/modules/people/person-autofill";
 import { extractPastedPersonProfile, MAX_PROFILE_TEXT_LENGTH } from "../../lib/modules/people/profile-text";
+import { enrichPersonOrganizations } from "../../lib/modules/people/person-organization-autofill";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
-export default function PersonAutofill({ name, values, onApply, disabled = false }: {
+export default function PersonAutofill({ name, values, onApply, organizations = [], disabled = false }: {
   name: string; values: PersonAutofillValues; onApply: (result: PersonAutofillResult) => void; disabled?: boolean;
+  organizations?: { id: string; title: string; website: string }[];
 }) {
   const [result, setResult] = useState<PersonAutofillResult | null>(null);
   const [busy, setBusy] = useState(false), [notice, setNotice] = useState("");
+  const [progress, setProgress] = useState("");
   const [pasteOpen, setPasteOpen] = useState(false), [profileText, setProfileText] = useState(""), [pasteError, setPasteError] = useState("");
   const pasteId = useId();
   const controller = useRef<AbortController | null>(null);
@@ -31,17 +34,32 @@ export default function PersonAutofill({ name, values, onApply, disabled = false
     if (changed) latest.current.onApply(next);
     setResult(next);
     setNotice(changed
-      ? "Available details filled. Review, then Save to create or link employers and schools. Existing details were kept."
+      ? `Available details filled.${next.organizations?.length ? ` Organization details found for ${next.organizations.filter(item => item.suggestions.length).length} of ${next.organizations.length}.` : ""} Review, then Save to create or link employers and schools. Existing details were kept.`
       : next.suggestions.length || next.occupations.length || next.education.length ? `No new fields to fill. Existing details were kept. ${next.message}` : next.message);
   }
-  function fillFromText() {
-    setPasteError("");
-    try { applyResult(extractPastedPersonProfile(name, linkedinUrl, profileText)); }
-    catch (error) { setPasteError(error instanceof Error ? error.message : "The profile text could not be read. Your form is unchanged."); }
+  async function completeWithOrganizations(next: PersonAutofillResult, request: AbortController) {
+    const enriched = await enrichPersonOrganizations(latest.current.values, next, async (organizationName, website, organizationId) => {
+      const matches = organizations.filter(item => organizationId ? item.id === organizationId : personNameKey(item.title) === personNameKey(organizationName));
+      const seed = website || (matches.length === 1 ? matches[0].website : "");
+      const response = await fetch("/api/people/transfer/employer", { method: "POST", headers: buildJsonHeadersWithCsrf(), signal: AbortSignal.any([request.signal, AbortSignal.timeout(28000)]), body: JSON.stringify({ name: organizationName, website: seed }) });
+      const payload = await response.json();
+      if (!response.ok || !payload.ok || !Array.isArray(payload.result?.suggestions)) throw new Error("Organization lookup unavailable");
+      return payload.result;
+    }, request.signal, (done, total) => setProgress(total ? `Filling employers and schools… ${done} of ${total}` : ""));
+    if (request.signal.aborted || latest.current.name !== name || JSON.stringify(personSeedUrls(latest.current.values)) !== sourceKey) return;
+    controller.current = null;
+    applyResult(enriched);
+  }
+  async function fillFromText() {
+    const request = new AbortController(); controller.current?.abort(); controller.current = request;
+    setPasteError(""); setBusy(true); setProgress(""); setNotice("");
+    try { await completeWithOrganizations(extractPastedPersonProfile(name, linkedinUrl, profileText), request); }
+    catch (error) { if (!request.signal.aborted) setPasteError(error instanceof Error ? error.message : "The profile text could not be read. Your form is unchanged."); }
+    finally { if (!request.signal.aborted) { controller.current = null; setBusy(false); } }
   }
   async function autofill() {
     const request = new AbortController(); controller.current?.abort(); controller.current = request;
-    setBusy(true); setResult(null); setNotice("");
+    setBusy(true); setResult(null); setNotice(""); setProgress("");
     try {
       const response = await fetch("/api/people/persons/autofill", { method: "POST", headers: buildJsonHeadersWithCsrf(), signal: request.signal, body: JSON.stringify({ name, urls }) });
       const payload = await response.json();
@@ -51,8 +69,7 @@ export default function PersonAutofill({ name, values, onApply, disabled = false
         setNotice("The name or links changed. Run autofill again when ready."); return;
       }
       const next = payload.result as PersonAutofillResult;
-      controller.current = null;
-      applyResult(next);
+      await completeWithOrganizations(next, request);
       if (next.unavailableSources?.some((item) => personProfileLink(item.url)?.field === "linkedin")) setPasteOpen(true);
     } catch (error) { if (!request.signal.aborted) setNotice(error instanceof Error ? error.message : "Autofill could not finish. Your draft is still here."); }
     finally { if (!request.signal.aborted) { controller.current = null; setBusy(false); } }
@@ -62,11 +79,12 @@ export default function PersonAutofill({ name, values, onApply, disabled = false
       title={name.trim() && urls.length ? "Autofill person from links" : "Enter a name and a public profile link to enable autofill"}
       disabled={disabled || busy || !name.trim() || !urls.length} onClick={() => void autofill()}><UnigentamosIcon role="sparkles" size={17} /></button>
     {(busy || notice || result || linkedinUrl) && <div className="people-autofill-feedback">
-      {(busy || notice) && <p role="status" aria-live="polite">{busy ? "Finding public profile details, employers, and schools…" : notice}</p>}
+      {(busy || notice) && <p role="status" aria-live="polite">{busy ? progress || "Finding public profile details, employers, and schools…" : notice}</p>}
       {result && result.sources.length > 0 && <details className="people-autofill-sources"><summary>Autofill sources</summary><p>{result.message}</p>
         <ul>{result.suggestions.map((item) => <li key={item.field}><strong>{PERSON_AUTOFILL_LABELS[item.field]}</strong>: {item.value}<small>{item.evidence}. <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a></small></li>)}
           {result.occupations.map((job, index) => <li key={`job-${index}`}><strong>{job.status === "past" ? "Past occupation" : "Occupation"}</strong>: {[job.title, job.employer].filter(Boolean).join(" · ")}<small>{job.evidence}. <a href={job.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a></small></li>)}
           {result.education.map((school, index) => <li key={`school-${index}`}><strong>Education</strong>: {[school.institution, school.degree, school.fieldOfStudy].filter(Boolean).join(" · ")}<small>{school.evidence}. <a href={school.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a></small></li>)}
+          {result.organizations?.map((organization, index) => <li key={`organization-${index}`}><strong>{organization.name}</strong>: {organization.suggestions.length ? `${organization.suggestions.length} organization fields found` : "No verified public details"}<small>{organization.message}</small>{organization.suggestions.length > 0 && <small>{[...new Set(organization.suggestions.map(item => item.sourceUrl))].map(source => <a key={source} href={source} target="_blank" rel="noopener noreferrer">{new URL(source).hostname} </a>)}</small>}</li>)}
         </ul>
       </details>}
       {result?.sources.length ? result.unavailableSources?.map((item) => <p key={item.url}>{item.message} <a href={item.url} target="_blank" rel="noopener noreferrer">View profile</a></p>) : null}
@@ -76,7 +94,7 @@ export default function PersonAutofill({ name, values, onApply, disabled = false
           <p><a href={linkedinUrl} target="_blank" rel="noopener noreferrer">Open LinkedIn profile</a>, then copy the name, About, Experience, and Education sections. Keep their headings and dates.</p>
           <label htmlFor={`${pasteId}-text`}>Profile text for {name || "this person"}</label>
           <textarea id={`${pasteId}-text`} value={profileText} onChange={(event) => { setProfileText(event.target.value); setPasteError(""); }} maxLength={MAX_PROFILE_TEXT_LENGTH + 1} rows={7} placeholder={`${name || "Full name"}\nAbout\n…\nExperience\n…\nEducation\n…`} spellCheck={false} />
-          <p className="people-profile-text-hint">Text is read in this browser. Review the filled fields, then Save to create or link organizations.</p>
+          <p className="people-profile-text-hint">Profile text is read in this browser. Employers and schools are checked for public details. Review, then Save to create or link organizations.</p>
           {pasteError && <p role="alert">{pasteError}</p>}
           <button type="button" className="people-profile-text-apply" disabled={disabled || busy || !name.trim() || !profileText.trim()} onClick={fillFromText}>Fill from pasted text</button>
         </div>}

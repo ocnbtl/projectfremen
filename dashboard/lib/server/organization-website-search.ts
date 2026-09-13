@@ -29,7 +29,7 @@ export async function findOrganizationFactPages(website: string, name: string, f
   }).slice(0, 2);
 }
 
-async function searchOrganizationPages(query: string, fetchPage: typeof fetchPublicPage, timeoutMs: number): Promise<string[]> {
+export async function searchOrganizationPages(query: string, fetchPage: typeof fetchPublicPage, timeoutMs: number): Promise<string[]> {
   const searchUrl = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=5`;
   const page = await fetchPage(searchUrl, { timeoutMs, maxBytes: 1_000_000 });
   if (/verify you are human|unusual traffic|<title[^>]*>[^<]*(?:sign in|captcha)/i.test(page.html)) return [];

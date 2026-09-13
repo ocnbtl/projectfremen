@@ -29,6 +29,28 @@ function organizationType(value: string): string {
   return "";
 }
 function host(raw: string): string { return new URL(raw).hostname.toLowerCase().replace(/^www\./, ""); }
+/** A search result must identify itself, not merely mention the requested employer.
+ * Directory listings and articles do not establish ownership of a website. */
+export function matchesOrganizationWebsiteIdentity(html: string, sourceUrl: string, name: string): boolean {
+  const page = extractOrganizationPage(html, sourceUrl, name);
+  if (page.blocked || !nameKey(name)) return false;
+  const identity = (value: string) => nameKey(value.replace(/\s*[-|–]\s*(?:official (?:site|website)|home).*$/i, "")) === nameKey(name);
+  const publishedName = page.suggestions.find((item) => item.field === "name");
+  const website = page.suggestions.find((item) => item.field === "website");
+  if (publishedName && website && identity(publishedName.value) && host(website.value) === host(sourceUrl)) return true;
+  // Only a site's root can establish ownership from its branding alone.
+  if (new URL(sourceUrl).pathname.replace(/\/+$/, "")) return false;
+  for (const tag of html.match(/<meta\b[^>]*>/gi) || []) {
+    if ((attribute(tag, "property") || attribute(tag, "name")).toLowerCase() === "og:site_name" && identity(text(attribute(tag, "content")))) return true;
+  }
+  for (const match of html.matchAll(/<(title|h1)\b[^>]*>([\s\S]*?)<\/\1>/gi)) {
+    if (text(match[2]).split(/\s+[|–-]\s+/).some(identity)) return true;
+  }
+  for (const header of html.matchAll(/<header\b[^>]*>([\s\S]*?)<\/header>/gi)) {
+    for (const tag of header[1].match(/<img\b[^>]*>/gi) || []) if (identity(text(attribute(tag, "alt")).replace(/\s+logo$/i, ""))) return true;
+  }
+  return false;
+}
 export type OrganizationPageLink = { url: string; kind: "website" | "detail" | "social"; priority: number };
 export type OrganizationPage = OrganizationAutofillResult & { links: OrganizationPageLink[]; blocked: boolean; linkedInLogo?: string };
 

@@ -1,6 +1,6 @@
 /** Shared suggestion contract. Public metadata is evidence to review, never a record write. */
 export const ORGANIZATION_AUTOFILL_LABELS = {
-  name: "Organization name", organizationType: "Organization type", industry: "Industry or field",
+  name: "Organization name", organizationType: "Organization type", industry: "Industry",
   foundedYear: "Founded year", teamSize: "Team size", headquarters: "Headquarters",
   streetAddress: "Street address", context: "Description", website: "Website", linkedin: "LinkedIn", x: "X",
   instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube"
@@ -45,7 +45,8 @@ export function emptyOrganizationSuggestions(suggestions: OrganizationSuggestion
   const seen = new Set<string>();
   return suggestions.filter((item) => {
     const completesStreet = item.field === "streetAddress" && canCompleteOrganizationAddress(values.streetAddress || "", item.value);
-    if (!(item.field in ORGANIZATION_AUTOFILL_LABELS) || seen.has(item.field) || values[item.field]?.trim() && !completesStreet || organizationSuggestionError(item.field, item.value)) return false;
+    const refinesIndustry = item.field === "industry" && values.industry === "Other" && item.value !== "Other";
+    if (!(item.field in ORGANIZATION_AUTOFILL_LABELS) || seen.has(item.field) || values[item.field]?.trim() && !completesStreet && !refinesIndustry || organizationSuggestionError(item.field, item.value)) return false;
     const otherLocationField = item.field === "streetAddress" ? "headquarters" : item.field === "headquarters" ? "streetAddress" : null;
     if (otherLocationField && values[otherLocationField]?.trim()) {
       const supplied = suggestions.find((suggestion) => suggestion.field === otherLocationField)?.value;

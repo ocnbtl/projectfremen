@@ -11,6 +11,7 @@ const kinds = [
   { id: "organization", label: "Organizations", icon: "organization" },
   { id: "project", label: "Projects", icon: "module-projects" },
   { id: "resource", label: "Resources", icon: "module-resources" },
+  { id: "media", label: "Media", icon: "module-media" },
   { id: "note", label: "Notes", icon: "module-notes" },
   { id: "other", label: "Other", icon: "object" }
 ] as const;
@@ -20,13 +21,16 @@ const kindOf = (target: NativeObjectRef): Kind => {
   if (target.module === "people") return target.objectType === "organization" ? "organization" : "person";
   if (target.module === "projects") return "project";
   if (target.module === "resources") return "resource";
+  if (target.module === "media") return "media";
   if (target.module === "notes") return "note";
   return "other";
 };
 const searchable = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
-const typeLabel = (target: NativeObjectRef) => kindOf(target) === "other"
+export const objectTargetTypeLabel = (target: NativeObjectRef) => kindOf(target) === "other"
   ? target.objectType.replace(/_/g, " ").replace(/^./, letter => letter.toUpperCase())
-  : ({ person: "Person", organization: "Organization", project: "Project", resource: "Resource", note: "Note" } as Record<string, string>)[kindOf(target)];
+  : ({ person: "Person", organization: "Organization", project: "Project", resource: "Resource", note: "Note", media: "Media" } as Record<string, string>)[kindOf(target)];
+
+export const objectTargetIcon = (target: NativeObjectRef) => kinds.find(item => item.id === kindOf(target))!.icon;
 
 /** One search surface for draft links and existing profiles; selection never writes a record. */
 export default function PeopleObjectPicker({ targets, value, onChange, disabled = false }: {
@@ -46,7 +50,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
   const filtered = useMemo(() => {
     const words = searchable(query).trim().split(/\s+/).filter(Boolean);
     return targets.filter(target => (kind === "all" || kindOf(target) === kind)
-      && words.every(word => searchable(`${target.label} ${typeLabel(target)}`).includes(word)));
+      && words.every(word => searchable(`${target.label} ${objectTargetTypeLabel(target)}`).includes(word)));
   }, [targets, kind, query]);
   const currentKind = kinds.find(item => item.id === kind)!;
   const shown = filtered.slice(0, limit);
@@ -55,9 +59,9 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
 
   return <Popover.Root open={open} onOpenChange={next => { setOpen(next); if (next) { setQuery(""); setKind("all"); setLimit(60); } }}>
     <Popover.Trigger asChild>
-      <button type="button" className="people-object-picker-trigger" aria-label="Object to link" aria-description={selected ? `${selected.label} · ${typeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
+      <button type="button" className="people-object-picker-trigger" aria-label="Object to link" aria-description={selected ? `${selected.label} · ${objectTargetTypeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
         <UnigentamosIcon role={kinds.find(item => item.id === (selected ? kindOf(selected) : "all"))!.icon} size={20} />
-        <span><strong>{selected?.label || "Link an Object"}</strong>{selected && <small>{typeLabel(selected)}</small>}</span>
+        <span><strong>{selected?.label || "Link an Object"}</strong>{selected && <small>{objectTargetTypeLabel(selected)}</small>}</span>
         <UnigentamosIcon role="chevron-down" size={16} />
       </button>
     </Popover.Trigger>
@@ -94,7 +98,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
             }}>
             {shown.map(target => <button type="button" role="option" tabIndex={objectTargetKey(target) === tabTarget ? 0 : -1} aria-selected={objectTargetKey(target) === value} data-select-value={objectTargetKey(target)} key={objectTargetKey(target)} onClick={() => select(target)}>
               <span className="people-object-picker-result-icon"><UnigentamosIcon role={kinds.find(item => item.id === kindOf(target))!.icon} size={20} /></span>
-              <span><strong>{target.label}</strong><small>{typeLabel(target)}</small></span>
+              <span><strong>{target.label}</strong><small>{objectTargetTypeLabel(target)}</small></span>
               <UnigentamosIcon role={objectTargetKey(target) === value ? "check" : "plus"} size={16} />
             </button>)}
           </div>

@@ -122,6 +122,16 @@ export async function discoverOrganization(name: string, urls: string[], depende
       }
     } catch { /* An unavailable secondary source never discards official-page results. */ }
   }
+  // A government's published name can identify its function more precisely than
+  // broad source categories such as "Government Administration".
+  const government = candidates.get("organizationType")?.item;
+  const publishedName = candidates.get("name")?.item;
+  const courtName = publishedName?.value || name;
+  const judicial = government?.value === "Government" && /\b(?:court|courts|judiciary|judicial|tribunal)\b/i.test(courtName);
+  if (judicial && !conflicts.has("industry")) {
+    candidates.set("industry", { item: { field: "industry", value: "Judicial / legal", sourceUrl: publishedName?.sourceUrl || government.sourceUrl,
+      evidence: `Court function in organization name: ${courtName}; government type confirmed by public source` }, priority: 0 });
+  }
   const suggestions = [...candidates.values()].map(({ item }) => {
     if (item.field === "industry") {
       const value = normalizeOrganizationIndustry(candidates.get("organizationType")?.item.value || "", item.value);

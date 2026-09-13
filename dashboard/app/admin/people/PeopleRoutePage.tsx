@@ -62,6 +62,12 @@ export default async function PeopleRoutePage({
     (record): record is PersonalRecord => record.className === "interaction" && Boolean(record.interaction)
   );
   const objectTargets = [
+    ...records
+      .filter((record) => !record.archivedAt && record.className === "file")
+      .map((record) => createNativeObjectRef({
+        module: "media", objectType: "media_asset", objectId: record.id,
+        label: record.title, versionId: record.updatedAt
+      })),
     ...people
       .filter((record) => !record.archivedAt)
       .map((record) => createNativeObjectRef({

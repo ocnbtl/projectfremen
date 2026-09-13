@@ -1,6 +1,6 @@
 import type { PersonalEducationEntry, PersonalOccupationEntry } from "../../personal-records-store";
 import { normalizeBirthday } from "./birthday";
-import { normalizeOrganizationUrl, organizationLinkField, organizationProfileLink, ORGANIZATION_LINK_FIELDS } from "./organization-autofill";
+import { normalizeOrganizationUrl, organizationLinkField, organizationProfileLink, organizationSuggestionError, ORGANIZATION_AUTOFILL_LABELS, ORGANIZATION_LINK_FIELDS, type OrganizationSuggestion } from "./organization-autofill";
 
 export const PERSON_AUTOFILL_LABELS = { context: "About", birthday: "Birthday", website: "Website", linkedin: "LinkedIn", x: "X", instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube" } as const;
 export type PersonAutofillField = keyof typeof PERSON_AUTOFILL_LABELS;
@@ -13,8 +13,10 @@ export type PersonAutofillResult = {
   sources: string[]; fetchedAt: string; message: string;
   unavailableSources?: { url: string; message: string }[];
   method?: "public_page" | "pasted_text";
+  organizations?: PersonOrganizationEnrichment[];
 };
-export type PersonOrganizationPlan = { kind: "employer" | "school"; entryId: string; name: string; website?: string; sourceUrl: string };
+export type PersonOrganizationEnrichment = { name: string; website?: string; organizationId?: string; suggestions: OrganizationSuggestion[]; message: string };
+export type PersonOrganizationPlan = { kind: "employer" | "school"; entryId: string; name: string; website?: string; sourceUrl: string; organizationId?: string; suggestions?: OrganizationSuggestion[] };
 export type PersonAutofillPending = { organizations: PersonOrganizationPlan[]; sources: string[] };
 export function validatePersonAutofillPending(input: unknown): PersonAutofillPending | undefined {
   if (input === undefined) return undefined;
@@ -29,7 +31,17 @@ export function validatePersonAutofillPending(input: unknown): PersonAutofillPen
     if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Invalid autofill organization");
     const plan = item as Record<string, unknown>;
     if (!["employer", "school"].includes(String(plan.kind)) || typeof plan.entryId !== "string" || !/^[\w-]{1,80}$/.test(plan.entryId) || typeof plan.name !== "string" || !plan.name.trim() || plan.name.length > 240) throw new Error("Invalid autofill organization");
-    return { kind: plan.kind as PersonOrganizationPlan["kind"], entryId: plan.entryId, name: plan.name.trim(), sourceUrl: url(plan.sourceUrl), ...(plan.website ? { website: url(plan.website) } : {}) };
+    if (plan.organizationId !== undefined && (typeof plan.organizationId !== "string" || !/^[\w-]{1,100}$/.test(plan.organizationId))) throw new Error("Invalid autofill organization reference");
+    if (plan.suggestions !== undefined && (!Array.isArray(plan.suggestions) || plan.suggestions.length > 16)) throw new Error("Too many organization suggestions");
+    const seen = new Set<string>();
+    const suggestions = (plan.suggestions as unknown[] || []).map((value) => {
+      if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid organization suggestion");
+      const suggestion = value as OrganizationSuggestion;
+      if (!Object.hasOwn(ORGANIZATION_AUTOFILL_LABELS, suggestion.field) || seen.has(suggestion.field) || typeof suggestion.value !== "string" || suggestion.value.length > 2048 || typeof suggestion.evidence !== "string" || suggestion.evidence.length > 800 || organizationSuggestionError(suggestion.field, suggestion.value)) throw new Error("Invalid organization suggestion");
+      seen.add(suggestion.field);
+      return { field: suggestion.field, value: suggestion.value.trim(), evidence: suggestion.evidence, sourceUrl: url(suggestion.sourceUrl) };
+    });
+    return { kind: plan.kind as PersonOrganizationPlan["kind"], entryId: plan.entryId, name: plan.name.trim(), sourceUrl: url(plan.sourceUrl), ...(plan.website ? { website: url(plan.website) } : {}), ...(plan.organizationId ? { organizationId: plan.organizationId as string } : {}), ...(suggestions.length ? { suggestions } : {}) };
   }) };
 }
 export type PersonAutofillValues = Partial<Record<PersonAutofillField, string>> & {
@@ -84,7 +96,7 @@ export function applyPersonAutofill<T extends PersonAutofillValues>(current: T, 
       entry = { id: entryId("job", [key, title, job.status]), title, employer, status: job.status };
       next.occupations.push(entry);
     } else { entry.title ||= title; entry.employer ||= employer; }
-    if (employer && !entry.organizationId) plans.push({ kind: "employer", entryId: entry.id, name: employer, website: job.website, sourceUrl: job.sourceUrl });
+    if (employer) plans.push({ kind: "employer", entryId: entry.id, name: employer, website: job.website, sourceUrl: job.sourceUrl, organizationId: entry.organizationId });
   }
   for (const school of result.education) {
     const institution = school.institution.trim();
@@ -99,10 +111,28 @@ export function applyPersonAutofill<T extends PersonAutofillValues>(current: T, 
       entry = { id: entryId("school", [key, school.degree || "", school.fieldOfStudy || ""]), institution, degree: school.degree, fieldOfStudy: school.fieldOfStudy, status: school.status };
       next.education.push(entry);
     } else { entry.degree ||= school.degree; entry.fieldOfStudy ||= school.fieldOfStudy; entry.status ||= school.status; }
-    if (!entry.organizationId) plans.push({ kind: "school", entryId: entry.id, name: institution, website: school.website, sourceUrl: school.sourceUrl });
+    plans.push({ kind: "school", entryId: entry.id, name: institution, website: school.website, sourceUrl: school.sourceUrl, organizationId: entry.organizationId });
+  }
+  // A blocked profile can still have employers/schools saved on the person.
+  // Include those relationships so a retry can enrich their organizations too.
+  const existingSource = personSeedUrls(current)[0] || result.sources[0];
+  if (existingSource) {
+    for (const entry of next.occupations) if (entry.employer?.trim() && !plans.some(plan => plan.kind === "employer" && plan.entryId === entry.id)) {
+      plans.push({ kind: "employer", entryId: entry.id, name: entry.employer, organizationId: entry.organizationId, sourceUrl: existingSource });
+    }
+    for (const entry of next.education) if (entry.institution.trim() && !plans.some(plan => plan.kind === "school" && plan.entryId === entry.id)) {
+      plans.push({ kind: "school", entryId: entry.id, name: entry.institution, organizationId: entry.organizationId, sourceUrl: existingSource });
+    }
   }
   return { ...next, autofill: {
-    organizations: [...new Map(plans.map((plan) => [`${plan.kind}:${plan.entryId}`, plan])).values()],
+    organizations: [...new Map(plans.filter(plan => {
+      const entry = plan.kind === "employer" ? next.occupations.find(item => item.id === plan.entryId) : next.education.find(item => item.id === plan.entryId);
+      return entry && entry.organizationId === plan.organizationId && personNameKey("institution" in entry ? entry.institution : entry.employer || "") === personNameKey(plan.name);
+    }).map((plan) => {
+      const enrichment = result.organizations?.find((item) => personNameKey(item.name) === personNameKey(plan.name) && item.organizationId === plan.organizationId && (!plan.website || !item.website || normalizeOrganizationUrl(plan.website) === normalizeOrganizationUrl(item.website)));
+      const previous = current.autofill?.organizations.find((item) => item.kind === plan.kind && item.entryId === plan.entryId && item.name === plan.name && item.organizationId === plan.organizationId);
+      return [`${plan.kind}:${plan.entryId}`, { ...plan, suggestions: enrichment?.suggestions.length ? enrichment.suggestions : previous?.suggestions }];
+    })).values()],
     sources: [...new Set([...(current.autofill?.sources || []), ...result.sources])].slice(0, 24)
   } };
 }
@@ -112,5 +142,5 @@ export function personAutofillHasChanges(current: PersonAutofillValues, result: 
   const next = applyPersonAutofill(current, result);
   if (Object.keys(PERSON_AUTOFILL_LABELS).some((field) => (current[field as PersonAutofillField] || "") !== (next[field as PersonAutofillField] || ""))) return true;
   if (JSON.stringify(current.occupations) !== JSON.stringify(next.occupations) || JSON.stringify(current.education) !== JSON.stringify(next.education)) return true;
-  return next.autofill.organizations.some((plan) => !(current.autofill?.organizations || []).some((existing) => existing.kind === plan.kind && existing.entryId === plan.entryId && existing.name === plan.name));
+  return next.autofill.organizations.some((plan) => (!plan.organizationId || plan.suggestions?.length) && !(current.autofill?.organizations || []).some((existing) => JSON.stringify(existing) === JSON.stringify(plan)));
 }

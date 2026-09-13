@@ -4,6 +4,7 @@ import { transferNameKey, type ContactDraft } from "./modules/people/transfer";
 import { createPeopleDuplicateIndex } from "./modules/people/duplicates";
 import { normalizeImportedPersonName } from "./modules/people/names";
 import { personNameKey, validatePersonAutofillPending, type PersonAutofillPending } from "./modules/people/person-autofill";
+import { emptyOrganizationSuggestions } from "./modules/people/organization-autofill";
 import { normalizeOrganizationIndustry } from "./modules/people/organization-industries";
 import { normalizeBirthday } from "./modules/people/birthday";
 import {
@@ -2095,12 +2096,13 @@ function createAutofillOrganizationReferences(profile: PersonalContactProfile | 
     const entry = plan.kind === "employer" ? next.occupations.find((item) => item.id === plan.entryId) : next.education.find((item) => item.id === plan.entryId);
     const label = entry && ("institution" in entry ? entry.institution : entry.employer);
     // Removed/renamed entries and explicit choices supersede the autofill plan.
-    if (!entry || entry.organizationId || personNameKey(label || "") !== personNameKey(plan.name)) continue;
+    if (!entry || entry.organizationId !== plan.organizationId || personNameKey(label || "") !== personNameKey(plan.name)) continue;
     const matches = records.filter((record) => record.className === "org" && !record.archivedAt && personNameKey(record.title) === personNameKey(plan.name));
     const urlKey = (value: string) => value.toLowerCase().replace(/^https?:\/\/(?:www\.)?/, "").replace(/\/+$/, "");
     const sameWebsite = plan.website ? matches.filter((record) => [record.profile?.website, record.profile?.linkedin, record.url].some((url) => url && urlKey(url) === urlKey(plan.website!))) : [];
-    if (matches.length > 1 && sameWebsite.length !== 1) throw new Error(`Choose which ${plan.name} organization to link before saving.`);
-    let organization = sameWebsite[0] || matches[0];
+    if (!plan.organizationId && matches.length > 1 && sameWebsite.length !== 1) throw new Error(`Choose which ${plan.name} organization to link before saving.`);
+    let organization = plan.organizationId ? matches.find((record) => record.id === plan.organizationId) : sameWebsite[0] || matches[0];
+    if (plan.organizationId && !organization) continue;
     if (organization && plan.website && !/linkedin\.com\//.test(plan.website) && organization.profile?.website && urlKey(plan.website) !== urlKey(organization.profile.website)) {
       throw new Error(`The existing ${plan.name} organization has a different website. Choose the correct organization before saving.`);
     }
@@ -2110,6 +2112,27 @@ function createAutofillOrganizationReferences(profile: PersonalContactProfile | 
         profile: normalizeContactProfile({ fullName: plan.name, organizationType: plan.kind === "school" ? "University / School" : "", ...(plan.website ? { [/linkedin\.com\/(?:company|school)\//.test(plan.website) ? "linkedin" : "website"]: plan.website } : {}) }, true)
       });
       records.push(organization);
+    }
+    if (plan.suggestions?.length) {
+      const current = organization.profile || normalizeContactProfile({}, true)!;
+      const primary = current.locations.find((location) => location.location || location.address);
+      // CAS retries compare with the latest organization, preserving edits made
+      // after discovery. A generic industry may be refined by specific evidence.
+      const applied = emptyOrganizationSuggestions(plan.suggestions.filter((item) => item.field !== "name"), { ...current, headquarters: primary?.location || current.headquarters, streetAddress: primary?.address });
+      if (applied.length) {
+        const enriched: Record<string, unknown> = { ...current };
+        for (const item of applied) if (item.field !== "streetAddress") enriched[item.field] = item.value;
+        enriched.industry = normalizeOrganizationIndustry(String(enriched.organizationType || ""), String(enriched.industry || ""));
+        const location = applied.find((item) => item.field === "headquarters")?.value;
+        const address = applied.find((item) => item.field === "streetAddress")?.value;
+        if (location || address) {
+          const updated = { ...primary, id: primary?.id || `location-${crypto.randomUUID()}`, label: primary?.label || "Headquarters", location: primary?.location || location, address: address || primary?.address };
+          enriched.locations = primary ? current.locations.map((item) => item.id === primary.id ? updated : item) : [...current.locations, updated];
+        }
+        organization.profile = normalizeContactProfile(enriched, true);
+        organization.externalSources = [...new Set([...organization.externalSources, ...applied.map((item) => item.sourceUrl)])];
+        organization.updatedAt = now;
+      }
     }
     entry.organizationId = organization.id;
     if ("institution" in entry) entry.institution = organization.title;

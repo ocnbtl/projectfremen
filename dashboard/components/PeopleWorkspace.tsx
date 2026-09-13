@@ -65,7 +65,8 @@ import DateField from "./people/DateField";
 import PlaceLabelPicker from "./people/PlaceLabelPicker";
 import InteractionApproach from "./people/InteractionApproach";
 import InteractionCheckbox from "./people/InteractionCheckbox";
-import PeopleObjectPicker from "./people/PeopleObjectPicker";
+import PeopleObjectPicker, { objectTargetKey, objectTargetIcon, objectTargetTypeLabel } from "./people/PeopleObjectPicker";
+import OrganizationObjectsEditor, { type OrganizationObjectRow } from "./people/OrganizationObjectsEditor";
 import PeopleGroupChoice from "./people/PeopleGroupChoice";
 import InlineOrganizationDialog from "./people/InlineOrganizationDialog";
 import { findPeopleDuplicates } from "../lib/modules/people/duplicates";
@@ -661,7 +662,7 @@ const ORGANIZATION_PROFILE_SECTIONS: Array<{ title: string; tone: string; fields
     fields: [
       { key: "fullName", label: "Organization name", placeholder: "Organization name" },
       { key: "organizationType", label: "Organization type" },
-      { key: "industry", label: "Industry or field" },
+      { key: "industry", label: "Industry" },
       { key: "foundedYear", label: "Founded year", placeholder: "1998" },
       { key: "teamSize", label: "Team size", placeholder: "1–10, 50, global network..." },
       { key: "context", label: "Description", type: "textarea", placeholder: "What this organization is and why it is relevant." }
@@ -681,8 +682,7 @@ const ORGANIZATION_PROFILE_SECTIONS: Array<{ title: string; tone: string; fields
       { key: "x", label: "X", type: "url", placeholder: "https://x.com/..." },
       { key: "instagram", label: "Instagram", type: "url", placeholder: "https://instagram.com/..." },
       { key: "tiktok", label: "TikTok", type: "url", placeholder: "https://tiktok.com/@..." },
-      { key: "youtube", label: "YouTube", type: "url", placeholder: "https://youtube.com/@..." },
-      { key: "projects", label: "Projects", placeholder: "Comma-separated project names" }
+      { key: "youtube", label: "YouTube", type: "url", placeholder: "https://youtube.com/@..." }
     ]
   }
 ];
@@ -1204,11 +1204,6 @@ function resolveAssociatedPersonIds(value: string | string[], people: PersonalRe
   })));
 }
 
-function mergeAssociatedPersonIds(value: string, people: PersonalRecord[], selectedIds: string[]) {
-  const unresolvedEntries = splitList(value).filter((entry) => !people.some((person) => associatedPersonMatches(entry, person)));
-  return joinList([...unresolvedEntries, ...selectedIds]);
-}
-
 function getProfile(record?: PersonalRecord): ContactProfileDraft {
   if (!record) {
     return { ...EMPTY_PROFILE_DRAFT };
@@ -1498,7 +1493,7 @@ function getProfileGaps(record: PersonalRecord) {
   if (record.className === "org") {
     return [
       !profile.organizationType ? "Organization type" : "",
-      !profile.industry ? "Industry or field" : "",
+      !profile.industry ? "Industry" : "",
       !profile.headquarters && !profile.livesIn ? "Relevant location" : "",
       !profile.website ? "Website" : "",
       !profile.context ? "Description" : ""
@@ -1794,82 +1789,9 @@ function OrganizationIndustrySelect({
 
   return (
     <SelectField data-organization-industry value={normalizeOrganizationIndustry(organizationType, value)} onChange={(event) => onChange(event.target.value)}>
-      <option value="">Select industry or field</option>
+      <option value="">Select industry</option>
       {options.map((option) => <option value={option} key={option}>{option}</option>)}
     </SelectField>
-  );
-}
-
-function OrganizationPeopleEditor({
-  people,
-  selectedIds,
-  derivedIds = [],
-  relationshipLabels = new Map(),
-  onChange
-}: {
-  people: PersonalRecord[];
-  selectedIds: string[];
-  derivedIds?: string[];
-  relationshipLabels?: ReadonlyMap<string, readonly string[]>;
-  onChange: (selectedIds: string[]) => void;
-}) {
-  const [pendingId, setPendingId] = useState("");
-  const selected = new Set(selectedIds);
-  const derived = new Set(derivedIds);
-  const linkedIds = Array.from(new Set([...selectedIds, ...derivedIds]));
-  const linkedPeople = linkedIds.flatMap((id) => {
-    const person = people.find((candidate) => candidate.id === id);
-    return person ? [person] : [];
-  });
-  const availablePeople = people.filter((person) => !selected.has(person.id) && !derived.has(person.id));
-
-  function addPerson() {
-    if (!pendingId || selected.has(pendingId) || derived.has(pendingId)) return;
-    onChange([...selectedIds, pendingId]);
-    setPendingId("");
-  }
-
-  return (
-    <section className="people-organization-link-editor people-themed-section module-ref-tone-purple" data-organization-people-editor data-profile-section="people">
-      <header className="people-repeatable-heading">
-        <div className="people-repeatable-title">
-          <span><PeopleIcon name="groups" /></span>
-          <h4>People</h4>
-        </div>
-      </header>
-      <div className="people-organization-link-controls">
-        <label>
-          <span className="people-visually-hidden">Person</span>
-          <SelectField aria-label="Person to link" value={pendingId} onChange={(event) => setPendingId(event.target.value)}>
-            <option value="">Select a person</option>
-            {availablePeople.map((person) => <option value={person.id} key={person.id}>{person.title}</option>)}
-          </SelectField>
-        </label>
-        <PeopleAddButton label="Person" onClick={addPerson} disabled={!pendingId} iconOnly />
-      </div>
-      <div className="people-organization-linked-list" aria-label="Linked people">
-        {linkedPeople.length ? linkedPeople.map((person) => {
-          const direct = selected.has(person.id);
-          const backfilled = derived.has(person.id);
-          const source = relationshipLabels.get(person.id)?.join(" · ") || (backfilled ? "Profile link" : "Direct link");
-          return (
-            <article key={person.id} data-linked-person={person.id}>
-              <PeopleProfileAvatar
-                label={person.title}
-                initials={getInitials(person)}
-                photoUrl={person.profile?.photoUrl}
-                photoUpdatedAt={person.profile?.photoUpdatedAt}
-                compact
-              />
-              <span><strong>{person.title}</strong><small>{source}</small></span>
-              {direct && (
-                <RemoveIconButton label={`Remove direct link to ${person.title}`} onClick={() => onChange(selectedIds.filter((id) => id !== person.id))} />
-              )}
-            </article>
-          );
-        }) : <p>No people linked yet.</p>}
-      </div>
-    </section>
   );
 }
 
@@ -1905,7 +1827,7 @@ function QuickObjectsEditor({
             const key = `${target.module}:${target.objectType}:${target.objectId}`;
             return (
               <article key={key} data-object-key={key}>
-                <span><small>{labelize(target.module)}</small><strong>{target.label}</strong></span>
+                <span className="people-object-summary"><UnigentamosIcon role={objectTargetIcon(target)} size={20} /><span><strong>{target.label}</strong><small>{objectTargetTypeLabel(target)}</small></span></span>
                 <RemoveIconButton label={`Remove ${target.label}`} onClick={() => onChange(selectedIds.filter((id) => id !== key))} />
               </article>
             );
@@ -2460,6 +2382,8 @@ export default function PeopleWorkspace({
       .sort((left, right) => left.title.localeCompare(right.title)),
     [activePeople]
   );
+  const organizationAutofillSeeds = useMemo(() => activePeople.filter(record => record.className === "org")
+    .map(record => ({ id: record.id, title: record.title, website: record.profile?.website || record.profile?.linkedin || record.url || "" })), [activePeople]);
   const personOptions = useMemo(
     () => activePeople
       .filter((record) => record.className === "person")
@@ -2582,9 +2506,6 @@ export default function PeopleWorkspace({
 
   const selectedProfile = getProfile(selectedPerson);
   const selectedNotes = selectedProfile.notes.split(/\r?\n/).map((note) => note.trim()).filter(Boolean);
-  const organizationProfileSelectedPersonIds = selectedPerson?.className === "org"
-    ? resolveAssociatedPersonIds(profileDraft.associatedPeople, personOptions)
-    : [];
   const emailContactDetails = selectedProfile.emails.map((entry) => ({
     label: contactEntryLabel(entry),
     value: entry.address,
@@ -2644,7 +2565,7 @@ export default function PeopleWorkspace({
     ? allInteractionItems.filter((item) => item.participantIds.includes(selectedPerson.id))
     : [];
   const selectedChildren = splitList(selectedProfile.children);
-  const associatedPeople = splitList(selectedProfile.associatedPeople);
+  const associatedPeople = splitList(selectedPerson?.className === "org" && detailMode === "edit" ? profileDraft.associatedPeople : selectedProfile.associatedPeople);
   const relationshipConnections = Array.from(new Map([
     ...associatedPeople.map((label) => {
       const name = relationshipName(label);
@@ -2656,7 +2577,8 @@ export default function PeopleWorkspace({
       const target = people.find((record) => record.id === id);
       return [(target?.title || id).toLowerCase(), { label: target?.title || id, target }] as const;
     }),
-    ...selectedOrganizationPeople.map((target) => [target.title.toLowerCase(), { label: target.title, target }] as const)
+    ...selectedOrganizationPeople.filter(target => detailMode !== "edit" || selectedOrganizationDerivedPersonIds.includes(target.id))
+      .map((target) => [target.title.toLowerCase(), { label: target.title, target }] as const)
   ]).values());
   const peopleConnections = relationshipConnections.filter((connection) => connection.target?.className === "person");
   const organizationConnections = relationshipConnections.filter((connection) => connection.target?.className === "org");
@@ -2701,6 +2623,27 @@ export default function PeopleWorkspace({
     !(target.module === selectedPersonRef.module && target.objectType === selectedPersonRef.objectType && target.objectId === selectedPersonRef.objectId)
   ) && !linkedNativeTargetKeys.has(`${target.module}:${target.objectType}:${target.objectId}`));
   const quickObjectTargets = initialObjectTargets;
+  const organizationObjects = Array.from(new Map<string, OrganizationObjectRow>([
+    ...(selectedPerson?.projects || []).map((name) => {
+      const matches = initialObjectTargets.filter((target) => target.module === "projects" && target.label.toLocaleLowerCase() === name.toLocaleLowerCase());
+      const object: NativeObjectRef = matches.length === 1 ? matches[0] : { module: "projects", objectType: "project", objectId: `legacy:${name}`, label: name, route: `${getModuleRoute("projects")}?query=${encodeURIComponent(name)}` };
+      return [objectTargetKey(object), { object, detail: "Saved project reference" }] as [string, OrganizationObjectRow];
+    }),
+    ...selectedNativeObjectLinks.map(({ object, link }) => [objectTargetKey(object), { object, onRemove: () => void removeObjectLink(link) }] as [string, OrganizationObjectRow]),
+    ...relationshipConnections.flatMap(({ target }) => {
+      if (!target) return [];
+      const object = createNativeObjectRef({ module: "people", objectType: target.className === "org" ? "organization" : "person", objectId: target.id, label: target.title });
+      const direct = associatedPeople.some(entry => associatedPersonMatches(entry, target));
+      return [[objectTargetKey(object), { object, detail: selectedOrganizationRelationshipLabels.get(target.id)?.join(" · ") || "Profile connection", onRemove: direct ? () => {
+        setProfileDraft(current => ({ ...current, associatedPeople: joinList(splitList(current.associatedPeople).filter(entry => !associatedPersonMatches(entry, target))) }));
+        setActionNotice("Direct connection removed from the draft. Save to apply; work and education connections are kept.");
+      } : undefined }] as [string, OrganizationObjectRow]];
+    }),
+    ...selectedProjectConnections.map((connection) => {
+      const object = connection.projectRef;
+      return [objectTargetKey(object), { object, detail: "Project connection" }] as [string, OrganizationObjectRow];
+    })
+  ]).values()).sort((a, b) => objectTargetTypeLabel(a.object).localeCompare(objectTargetTypeLabel(b.object)) || a.object.label.localeCompare(b.object.label));
   const timelineItems = selectedInteractionItems.slice(0, 20);
   const selectedTags = Array.from(new Set([
     ...(fallbackPerson?.subjects || []).slice(0, 3),
@@ -3236,7 +3179,7 @@ export default function PeopleWorkspace({
         });
         const results = await Promise.all(selectedTargets.map(async (target) => {
           try {
-            if (className === "person" && target.module === "projects" && target.objectType === "project") {
+            if (target.module === "projects" && target.objectType === "project") {
               const result = await projectsRepository.create("links", {
                 projectId: target.objectId,
                 source,
@@ -3463,8 +3406,12 @@ export default function PeopleWorkspace({
 
   async function saveObjectLink(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await linkObject(objectLinkTargetId);
+  }
+
+  async function linkObject(targetId: string, relationship = objectLinkRelationship) {
     if (!selectedPersonRef || objectLinkSaving) return;
-    const target = availableObjectTargets.find((candidate) => `${candidate.module}:${candidate.objectType}:${candidate.objectId}` === objectLinkTargetId);
+    const target = availableObjectTargets.find((candidate) => objectTargetKey(candidate) === targetId);
     if (!target) {
       setError("Choose an object to link.");
       return;
@@ -3478,22 +3425,22 @@ export default function PeopleWorkspace({
           source: selectedPersonRef,
           relationship: "project_person",
           relationshipStrength: "normal",
-          role: objectLinkRelationship === "related" ? undefined : labelize(objectLinkRelationship),
+          role: relationship === "related" ? undefined : labelize(relationship),
           projectSpecificNote: "Linked from People"
         });
         if (!result.ok) throw new Error(result.error.message);
         await refreshProjects();
-      } else if (target.module === "people" && target.objectType === "organization") {
+      } else if (selectedPerson.className === "person" && target.module === "people" && target.objectType === "organization") {
         const saved = await saveProfileDraft({
           ...selectedProfile,
-          associatedPeople: [...splitList(selectedProfile.associatedPeople), `${target.label} (${labelize(objectLinkRelationship)})`].join(", ")
+          associatedPeople: [...splitList(selectedProfile.associatedPeople), `${target.label} (${labelize(relationship)})`].join(", ")
         });
         if (!saved) throw new Error("The organization relationship could not be saved.");
       } else {
       const response = await fetch("/api/native-links", {
         method: "POST",
         headers: buildJsonHeadersWithCsrf(),
-        body: JSON.stringify({ source: selectedPersonRef, target, relationship: objectLinkRelationship })
+        body: JSON.stringify({ source: selectedPersonRef, target, relationship: relationship })
       });
       const payload = await response.json().catch(() => ({ ok: false, error: "Invalid server response" })) as {
         ok?: boolean;
@@ -3940,7 +3887,7 @@ export default function PeopleWorkspace({
               <header className="people-profile-section-heading people-autofill-heading">
                 <span><PeopleIcon name="communication" /></span>
                 <h4 id="people-create-communication-title">Communication</h4>
-                <PersonAutofill name={name} values={quickPersonAutofillValues} onApply={applyQuickPersonAutofill} disabled={saving} />
+                <PersonAutofill name={name} values={quickPersonAutofillValues} onApply={applyQuickPersonAutofill} organizations={organizationAutofillSeeds} disabled={saving} />
               </header>
               <div className="people-contact-channel-grid">
                 <EmailEntriesEditor
@@ -4029,7 +3976,7 @@ export default function PeopleWorkspace({
                   {ORGANIZATION_TYPE_OPTIONS.map((option) => <option value={option} key={option}>{option}</option>)}
                 </SelectField>
               </label>
-              <label>Industry or field<OrganizationIndustrySelect organizationType={quickOrganizationType} value={quickIndustry} onChange={setQuickIndustry} /></label>
+              <label>Industry<OrganizationIndustrySelect organizationType={quickOrganizationType} value={quickIndustry} onChange={setQuickIndustry} /></label>
               <label className="people-org-founded">Founded year<input inputMode="numeric" pattern="\d{4}" value={quickFoundedYear} onChange={(event) => setQuickFoundedYear(event.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="1998" /></label>
               <label className="people-org-team">Team size<TeamSizeInput value={quickTeamSize} onChange={setQuickTeamSize} placeholder="1–10, 50, global network..." /></label>
               <label className="is-wide">Description<textarea value={quickContext} onChange={(event) => setQuickContext(event.target.value)} rows={3} placeholder="What this organization is and why it is relevant." /></label>
@@ -4603,7 +4550,7 @@ export default function PeopleWorkspace({
                         <h4>{section.title}</h4>
                         {section.title === "About" && selectedPerson.className === "person" && <div className="people-about-additions"><PeopleAddButton label="Life dream" icon="life-dream" iconOnly onClick={()=>setAboutExtras(current=>({...current,dream:true}))}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setAboutExtras(current=>({...current,notes:true}))}/></div>}
                         {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} onPhoto={setProfilePhotoDraft} hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)} disabled={profileSaving} />}
-                        {section.title === "Communication" && selectedPerson.className === "person" && <PersonAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileDraft} onApply={applyProfilePersonAutofill} disabled={profileSaving} />}
+                        {section.title === "Communication" && selectedPerson.className === "person" && <PersonAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileDraft} onApply={applyProfilePersonAutofill} organizations={organizationAutofillSeeds} disabled={profileSaving} />}
                       </header>
                       {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
                         <EmailEntriesEditor
@@ -4753,15 +4700,8 @@ export default function PeopleWorkspace({
                           onRemove={(id) => setProfileDraft((current) => ({ ...current, locations: removeEntry(current.locations, id) }))}
                         />
                         {selectedPerson.className === "org" && (
-                          <OrganizationPeopleEditor
-                            people={personOptions}
-                            selectedIds={organizationProfileSelectedPersonIds}
-                            derivedIds={selectedOrganizationDerivedPersonIds}
-                            relationshipLabels={selectedOrganizationRelationshipLabels}
-                            onChange={(selectedIds) => setProfileDraft((current) => ({
-                              ...current,
-                              associatedPeople: mergeAssociatedPersonIds(current.associatedPeople, personOptions, selectedIds)
-                            }))}
+                          <OrganizationObjectsEditor targets={availableObjectTargets} disabled={objectLinkSaving || profileSaving}
+                            objects={organizationObjects} onAdd={(id) => void linkObject(id, "related")}
                           />
                         )}
                       </>

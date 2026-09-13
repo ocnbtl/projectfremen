@@ -149,6 +149,14 @@
 .people-object-picker-types button { display: flex; flex: 1 0 auto; flex-direction: column; align-items: center; gap: 7px; width: auto; min-width: 0; padding: 10px 8px; min-height: 64px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #55635d; cursor: pointer; font-size: 11px; }
 .people-object-picker-types button[aria-pressed="true"] { background: #edf0e4; border-color: #d1d8bd; color: #485332; }
 .people-object-picker-types button:hover { background: #f3f5ee; }
+.people-object-create-list .people-object-summary { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--text-strong); text-decoration: none; padding: 6px 0; }
+.people-object-summary > svg { flex: 0 0 auto; color: var(--people-section-accent, #596640); }
+.people-object-summary > span { display: grid; gap: 4px; min-width: 0; }
+.people-object-create-list .people-object-summary small { white-space: normal; line-height: 1.45; }
+.people-object-create-list .people-object-unlink { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: 8px; color: var(--text-subtle); background: transparent; cursor: pointer; }
+.people-object-unlink:hover { background: var(--surface-hover, #f3f5ee); }
+.people-object-unlink:focus-visible, .people-object-summary:focus-visible { outline: 2px solid var(--people-section-accent, #596640); outline-offset: 2px; }
+.people-object-link-hint { margin: 0 12px 12px; font-size: 11px; line-height: 1.5; color: var(--text-subtle); }
 .people-object-picker-search { display: flex; align-items: center; gap: 9px; padding: 6px 10px; min-height: 44px; border: 1px solid #ccd6cf; border-radius: 10px; color: #55635d; }
 .people-object-picker-search:focus-within { border-color: #8a9060; }
 .people-object-picker-search > svg { flex: none; }
@@ -174,8 +182,9 @@
 @media (max-width: 760px) {
   .people-redesign-shell .people-cadence-fields :is(.app-select-trigger, .people-date-trigger) { min-height: 44px; height: 44px; }
   .people-object-picker-menu { padding: 12px; }
-  .people-object-picker-types button { flex: 1 0 40px; min-height: 44px; padding: 10px 6px; }
-  .people-object-picker-types button span { display: none; }
+  .people-object-picker-types { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: visible; }
+  .people-object-picker-types button { min-height: 56px; padding: 8px 2px; }
+  .people-object-picker-types button span { display: block; font-size: 10px; }
   .people-object-picker-scroll { max-height: 240px; }
 }
 @media (prefers-reduced-motion: reduce) {
