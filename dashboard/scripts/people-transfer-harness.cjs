@@ -300,8 +300,50 @@ const store = require("../lib/personal-records-store.ts");
   const bulkRetry = await store.importPeopleContacts(largeDrafts, [], "bulk-index-00000001");
   assert.equal(bulkRetry.createdIds.length, 0, "bulk retries do not create more profiles");
   assert.equal(bulkRetry.skipped, 500);
+  const sharedPhoneDrafts = t.vcardContacts([
+    "BEGIN:VCARD", "VERSION:3.0", "FN:Shared phone labels",
+    "TEL;TYPE=HOME:(202) 555-0142", "TEL;TYPE=WORK:+1 202-555-0142",
+    "TEL;TYPE=CELL:+1 202-555-0143", "TEL;TYPE=CELL:+1 202-555-0144",
+    "END:VCARD",
+    "BEGIN:VCARD", "VERSION:3.0", "FN:Household member",
+    "TEL;TYPE=HOME:+1 202-555-0142", "END:VCARD",
+  ].join("\r\n"));
+  const importedPhones = sharedPhoneDrafts[0].profile.phones;
+  assert.deepEqual(importedPhones.map(entry => entry.category), ["personal", "work", "primary", "personal"]);
+  assert.equal(importedPhones[0].number, importedPhones[1].number, "different formats normalize to the same number");
+  const phoneReview = t.reviewContactDrafts(sharedPhoneDrafts, []);
+  assert.deepEqual(phoneReview[1].matches, [{ id: sharedPhoneDrafts[0].key, reasons: ["Same phone"] }]);
+  const selectedPhoneDrafts = sharedPhoneDrafts.map(draft => ({ ...draft, allowDuplicate: true }));
+  const sharedImport = await store.importPeopleContacts(selectedPhoneDrafts, [], "shared-phone-00000001");
+  assert.equal(sharedImport.createdIds.length, 2, "explicitly selected people may share a phone number");
+  let sharedRecords = (await store.readPersonalRecords()).filter(record => sharedImport.createdIds.includes(record.id));
+  const labelledContact = sharedRecords.find(record => record.title === "Shared phone labels");
+  const savedPhones = importedPhones.map(entry => ({ ...entry, customLabel: undefined }));
+  assert.deepEqual(labelledContact.profile.phones, savedPhones, "all numbers and labels survive persistence and reload");
+  assert.equal(labelledContact.profile.phoneNumber, importedPhones[2].number, "legacy display uses the single primary number");
+  assert.deepEqual(findPeopleDuplicates([labelledContact]), [], "repeated fields do not create a self-duplicate");
+  const phoneMatches = findPeopleDuplicates(sharedRecords);
+  assert.equal(phoneMatches.length, 1);
+  assert.deepEqual(phoneMatches[0].reasons, ["Same phone"], "repeated fields yield one duplicate reason between people");
+  const sharedRetry = await store.importPeopleContacts(selectedPhoneDrafts, [], "shared-phone-00000001");
+  assert.equal(sharedRetry.createdIds.length, 0);
+  assert.equal(sharedRetry.skipped, 2, "retry protection still applies to explicitly accepted duplicates");
+  const editedPhones = [...savedPhones, {
+    id: "shared-office", category: "custom", customLabel: "Shared office",
+    number: importedPhones[0].number, countryCode: "+1",
+  }];
+  await store.updatePersonalRecord(labelledContact.id, { profile: { phones: editedPhones } });
+  sharedRecords = await store.readPersonalRecords();
+  assert.deepEqual(sharedRecords.find(record => record.id === labelledContact.id).profile.phones, editedPhones,
+    "editing also preserves repeated numbers with distinct labels");
+  await assert.rejects(() => store.updatePersonalRecord(labelledContact.id, {
+    profile: { phones: [{ ...editedPhones[0], number: "not-a-phone" }] },
+  }), /Phone 1/, "phone format validation remains enforced");
+  await assert.rejects(() => store.updatePersonalRecord(labelledContact.id, {
+    profile: { phones: [editedPhones[0], editedPhones[0]] },
+  }), /unique id/i, "entry identifiers remain unique even when numbers repeat");
   console.log(
-    "PASS: CSV/vCard parsing, private-field exclusion, formula protection, atomic employer linking, indexed 500-contact review/import, retries, duplicates, rollback, and undo.",
+    "PASS: CSV/vCard parsing, shared phone import/edit/reload, primary phone selection, private-field exclusion, formula protection, atomic employer linking, indexed 500-contact review/import, retries, duplicates, rollback, and undo.",
   );
 })().catch((error) => {
   console.error(error);

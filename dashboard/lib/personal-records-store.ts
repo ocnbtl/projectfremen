@@ -842,7 +842,6 @@ function normalizePhoneEntries(value: unknown, strict = false): PersonalPhoneEnt
 
   const entries: PersonalPhoneEntry[] = [];
   const ids = new Set<string>();
-  const numbers = new Set<string>();
   let primaryCount = 0;
   for (const [index, item] of value.slice(0, 16).entries()) {
     if (!item || typeof item !== "object" || Array.isArray(item)) {
@@ -856,11 +855,7 @@ function normalizePhoneEntries(value: unknown, strict = false): PersonalPhoneEnt
       if (strict) throw new Error(`Phone ${index + 1} needs a number`);
       continue;
     }
-    if (numbers.has(number)) {
-      if (strict) throw new Error("Each phone number must be unique");
-      continue;
-    }
-    numbers.add(number);
+    // A shared number may have distinct labels; preserve each entry on write and read.
     let category = normalizeContactEntryCategory(raw.category, index, strict, "phone");
     if (category === "primary") {
       primaryCount += 1;

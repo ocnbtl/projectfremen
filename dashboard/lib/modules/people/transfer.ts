@@ -105,9 +105,14 @@ function phone(
     draft.warnings.push(`Check phone: ${value}`);
     return;
   }
-  draft.profile.phones!.push({
-    id: `phone-${draft.profile.phones!.length}`,
-    category: category(label),
+  const phones = draft.profile.phones!;
+  const importedCategory = category(label);
+  phones.push({
+    id: `phone-${phones.length}`,
+    // Mobile/unlabelled fields can repeat in vCards, but only one is primary.
+    category: importedCategory === "primary" && phones.some(entry => entry.category === "primary")
+      ? "personal"
+      : importedCategory,
     number,
     countryCode: code,
   });
