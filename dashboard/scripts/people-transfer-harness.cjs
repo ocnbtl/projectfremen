@@ -342,8 +342,47 @@ const store = require("../lib/personal-records-store.ts");
   await assert.rejects(() => store.updatePersonalRecord(labelledContact.id, {
     profile: { phones: [editedPhones[0], editedPhones[0]] },
   }), /unique id/i, "entry identifiers remain unique even when numbers repeat");
+  // Simulate retrying an already-edited preview, without rerunning the new parser.
+  const openPreview = Array.from({ length: 87 }, (_, i) => ({
+    key: `old-preview-${i}`, kind: "person", name: `Edited import name ${i}`,
+    employer: "", employerWebsite: "", extra: {}, warnings: [],
+    profile: {
+      nickname: `Edited nickname ${i}`,
+      phones: [
+        { id: "mobile-1", category: "primary", number: `+1202555${1000 + i * 2}`, countryCode: "+1" },
+        { id: "mobile-2", category: "primary", number: `+1202555${1001 + i * 2}`, countryCode: "+1" },
+        { id: "work", category: "work", number: `+1202555${1000 + i * 2}`, countryCode: "+1" },
+        { id: "shared", category: "custom", customLabel: "Shared home", number: `+1202555${1000 + i * 2}`, countryCode: "+1" },
+      ],
+    },
+  }));
+  const previewSnapshot = JSON.stringify(openPreview);
+  const previewImport = await store.importPeopleContacts(openPreview, [], "open-preview-00000001");
+  assert.equal(previewImport.createdIds.length, 87, "old previews import without refreshing or reparsing");
+  const previewRecords = (await store.readPersonalRecords()).filter(record => previewImport.createdIds.includes(record.id));
+  for (const draft of openPreview) {
+    const saved = previewRecords.find(record => record.title === draft.name);
+    assert(saved, "edited name survives import");
+    assert.equal(saved.profile.nickname, draft.profile.nickname, "edited nickname survives import");
+    assert.deepEqual(saved.profile.phones, draft.profile.phones.map((entry, i) => ({
+      ...entry, category: i === 1 ? "personal" : entry.category, customLabel: entry.customLabel,
+    })), "first primary wins and every number, label, and identifier is retained");
+    assert.equal(saved.profile.phoneNumber, draft.profile.phones[0].number);
+  }
+  assert.equal(JSON.stringify(openPreview), previewSnapshot, "server normalization does not mutate the original preview");
+  const previewRetry = await store.importPeopleContacts(openPreview, [], "open-preview-00000001");
+  assert.equal(previewRetry.createdIds.length, 0);
+  assert.equal(previewRetry.skipped, 87, "unchanged preview retries remain idempotent");
+  await assert.rejects(() => store.updatePersonalRecord(previewRecords[0].id, {
+    profile: { phones: openPreview[0].profile.phones },
+  }), /only one primary phone/, "ordinary profile edits still require a single primary selection");
+  await assert.rejects(() => store.importPeopleContacts([{
+    ...openPreview[0], name: "Invalid old preview",
+    profile: { phones: [{ ...openPreview[0].profile.phones[0], number: "not-a-phone" }] },
+  }], [], "open-preview-00000002"), /Phone 1/, "old previews still validate phone syntax");
+  assert(!(await store.readPersonalRecords()).some(record => record.title === "Invalid old preview"));
   console.log(
-    "PASS: CSV/vCard parsing, shared phone import/edit/reload, primary phone selection, private-field exclusion, formula protection, atomic employer linking, indexed 500-contact review/import, retries, duplicates, rollback, and undo.",
+    "PASS: CSV/vCard parsing, shared phone import/edit/reload, 87-contact old-preview retry with preserved edits, primary phone selection, private-field exclusion, formula protection, atomic employer linking, indexed 500-contact review/import, retries, duplicates, rollback, and undo.",
   );
 })().catch((error) => {
   console.error(error);

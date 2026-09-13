@@ -833,7 +833,7 @@ function normalizeEmailEntries(value: unknown, strict = false): PersonalEmailEnt
   return entries;
 }
 
-function normalizePhoneEntries(value: unknown, strict = false): PersonalPhoneEntry[] {
+function normalizePhoneEntries(value: unknown, strict = false, resolvePrimary = false): PersonalPhoneEntry[] {
   if (!Array.isArray(value)) {
     if (strict && value !== undefined) throw new Error("Phone numbers must be a list");
     return [];
@@ -859,8 +859,8 @@ function normalizePhoneEntries(value: unknown, strict = false): PersonalPhoneEnt
     let category = normalizeContactEntryCategory(raw.category, index, strict, "phone");
     if (category === "primary") {
       primaryCount += 1;
-      if (strict && primaryCount > 1) throw new Error("A profile can have only one primary phone number");
-      if (!strict && primaryCount > 1) category = "personal";
+      if (strict && !resolvePrimary && primaryCount > 1) throw new Error("A profile can have only one primary phone number");
+      if (primaryCount > 1) category = "personal";
     }
     const customLabel = profileEntryText(raw.customLabel, 80, strict, `Phone ${index + 1} custom category`);
     if (strict && category === "custom" && !customLabel) {
@@ -1127,7 +1127,7 @@ function reconcileContactProfileCollections(
   };
 }
 
-function normalizeContactProfile(input: unknown, strictEntries = false): PersonalContactProfile | undefined {
+function normalizeContactProfile(input: unknown, strictEntries = false, resolvePrimaryPhone = false): PersonalContactProfile | undefined {
   if (!input || typeof input !== "object") {
     return undefined;
   }
@@ -1142,7 +1142,7 @@ function normalizeContactProfile(input: unknown, strictEntries = false): Persona
     occupations: normalizeOccupationEntries(raw.occupations, strictEntries),
     locations: normalizeLocationEntries(raw.locations, strictEntries),
     emails: normalizeEmailEntries(raw.emails, strictEntries),
-    phones: normalizePhoneEntries(raw.phones, strictEntries)
+    phones: normalizePhoneEntries(raw.phones, strictEntries, resolvePrimaryPhone)
   };
 
   for (const key of CONTACT_PROFILE_TEXT_KEYS) {
@@ -2270,6 +2270,8 @@ export async function importPeopleContacts(
             return school;
           }),
         },
+        true,
+        // Accept previews opened before the parser chose a single primary phone.
         true,
       ),
       importMeta: {
