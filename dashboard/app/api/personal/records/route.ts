@@ -76,7 +76,7 @@ export async function POST(request: Request) {
       profile: typeof body.profile === "object" && body.profile ? body.profile : {},
       resourceProfile: typeof body.resourceProfile === "object" && body.resourceProfile ? body.resourceProfile : undefined,
       interaction: typeof body.interaction === "object" && body.interaction ? body.interaction : undefined
-    }, { initialPhoto: typeof body.initialPhoto === "string" ? body.initialPhoto : undefined });
+    }, { initialPhoto: typeof body.initialPhoto === "string" ? body.initialPhoto : undefined, autofill: body.autofill });
 
     await appendAuditEvent({
       at: new Date().toISOString(),
@@ -147,7 +147,7 @@ export async function PATCH(request: Request) {
         typeof body.resourceProfile === "object" && body.resourceProfile && !Array.isArray(body.resourceProfile)
           ? body.resourceProfile
           : undefined
-    }, expectedUpdatedAt ? { expectedUpdatedAt } : undefined);
+    }, { expectedUpdatedAt: expectedUpdatedAt || undefined, autofill: body.autofill });
 
     const updated = items.find((item) => item.id === id);
     await appendAuditEvent({

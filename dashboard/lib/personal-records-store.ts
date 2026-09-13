@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { transferNameKey, type ContactDraft } from "./modules/people/transfer";
 import { createPeopleDuplicateIndex } from "./modules/people/duplicates";
 import { normalizeImportedPersonName } from "./modules/people/names";
+import { personNameKey, validatePersonAutofillPending, type PersonAutofillPending } from "./modules/people/person-autofill";
 import { normalizeOrganizationIndustry } from "./modules/people/organization-industries";
 import { normalizeBirthday } from "./modules/people/birthday";
 import {
@@ -1874,7 +1875,7 @@ function normalizeTime(
   stage: PersonalRecordStage,
   className: PersonalRecordClass
 ): PersonalRecordTime {
-  const reviewCadence = input?.reviewCadence?.trim().toUpperCase() || undefined;
+  const reviewCadence = input?.reviewCadence?.trim().toUpperCase() || (className === "person" ? "NONE" : undefined);
   const keepsUnknownLastContact = className === "person" || className === "org";
   const lastReview = input?.lastReview?.trim() || (keepsUnknownLastContact ? undefined : meta.createdIso);
   const nextReview = input?.nextReview?.trim() || calculateNextReview(lastReview, reviewCadence);
@@ -1996,6 +1997,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
   const relations = normalizeRelations(raw.relations);
   const body = typeof raw.body === "string" ? raw.body : "";
   const profile = normalizeContactProfile(raw.profile);
+  if (className === "person" && profile) profile.contactCadence ||= raw.time?.reviewCadence?.trim().toUpperCase() || "NONE";
   const resourceProfile = className === "resource"
     ? normalizeResourceProfile(raw.resourceProfile, recordId, createdAt)
     : undefined;
@@ -2030,7 +2032,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
       ? normalizePeopleExternalSources(sanitizeList(raw.externalSources as string[] | undefined))
       : sanitizeList(raw.externalSources as string[] | undefined),
     relations,
-    time: normalizeTime(raw.time, createdMeta, stage, className),
+    time: normalizeTime(className === "person" ? { ...raw.time, reviewCadence: raw.time?.reviewCadence || profile?.contactCadence } : raw.time, createdMeta, stage, className),
     profile,
     resourceProfile,
     interaction: className === "interaction" ? normalizeInteractionDetails(raw.interaction) : undefined,
@@ -2085,6 +2087,37 @@ function resolveOrganizationReferences(
   };
 }
 
+/** Runs inside the same compare-and-swap as the person Save; retries recheck organizations. */
+function createAutofillOrganizationReferences(profile: PersonalContactProfile | undefined, records: PersonalRecord[], pending: PersonAutofillPending | undefined, now: string): PersonalContactProfile | undefined {
+  if (!profile || !pending) return profile;
+  const next = { ...profile, occupations: profile.occupations.map((entry) => ({ ...entry })), education: profile.education.map((entry) => ({ ...entry })) };
+  for (const plan of pending.organizations) {
+    const entry = plan.kind === "employer" ? next.occupations.find((item) => item.id === plan.entryId) : next.education.find((item) => item.id === plan.entryId);
+    const label = entry && ("institution" in entry ? entry.institution : entry.employer);
+    // Removed/renamed entries and explicit choices supersede the autofill plan.
+    if (!entry || entry.organizationId || personNameKey(label || "") !== personNameKey(plan.name)) continue;
+    const matches = records.filter((record) => record.className === "org" && !record.archivedAt && personNameKey(record.title) === personNameKey(plan.name));
+    const urlKey = (value: string) => value.toLowerCase().replace(/^https?:\/\/(?:www\.)?/, "").replace(/\/+$/, "");
+    const sameWebsite = plan.website ? matches.filter((record) => [record.profile?.website, record.profile?.linkedin, record.url].some((url) => url && urlKey(url) === urlKey(plan.website!))) : [];
+    if (matches.length > 1 && sameWebsite.length !== 1) throw new Error(`Choose which ${plan.name} organization to link before saving.`);
+    let organization = sameWebsite[0] || matches[0];
+    if (organization && plan.website && !/linkedin\.com\//.test(plan.website) && organization.profile?.website && urlKey(plan.website) !== urlKey(organization.profile.website)) {
+      throw new Error(`The existing ${plan.name} organization has a different website. Choose the correct organization before saving.`);
+    }
+    if (!organization) {
+      organization = normalizeRecord({ id: `personal-${crypto.randomUUID()}`, domain: "notes-docs", title: plan.name, className: "org", privacy: "private", status: "active", areas: ["Relationships"], createdAt: now, updatedAt: now,
+        externalSources: [plan.sourceUrl, ...(plan.website ? [plan.website] : [])],
+        profile: normalizeContactProfile({ fullName: plan.name, organizationType: plan.kind === "school" ? "University / School" : "", ...(plan.website ? { [/linkedin\.com\/(?:company|school)\//.test(plan.website) ? "linkedin" : "website"]: plan.website } : {}) }, true)
+      });
+      records.push(organization);
+    }
+    entry.organizationId = organization.id;
+    if ("institution" in entry) entry.institution = organization.title;
+    else entry.employer = organization.title;
+  }
+  return next;
+}
+
 export async function readPersonalRecords(): Promise<PersonalRecord[]> {
   const existing = await readJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>>(FILE_NAME, []);
   const records = existing
@@ -2101,7 +2134,7 @@ export function getRecordsForDomain(records: PersonalRecord[], domain: string): 
 
 export async function createPersonalRecord(
   input: PersonalRecordInput,
-  options: { requestedId?: string; initialPhoto?: string } = {}
+  options: { requestedId?: string; initialPhoto?: string; autofill?: unknown } = {}
 ): Promise<PersonalRecord[]> {
   const domain = input.domain.trim();
   if (!isAllowedDomain(domain)) {
@@ -2119,12 +2152,18 @@ export async function createPersonalRecord(
   const meta = buildCreatedMeta(now);
   const stage = pickStage(input.stage);
   const relations = normalizeRelations(input.relations);
-  const profile = normalizeContactProfile(input.profile, true);
+  let profile = normalizeContactProfile(input.profile, true);
   const requestedId = options.requestedId?.trim();
   if (requestedId && !/^personal-[0-9a-f-]{36}$/i.test(requestedId)) {
     throw new Error("Invalid requested personal record id");
   }
   const className = pickClass(input.className || input.kind);
+  const autofill = validatePersonAutofillPending(options.autofill);
+  if (autofill && className !== "person") throw new Error("People autofill applies only to a person");
+  if (className === "person") {
+    profile ||= normalizeContactProfile({}, true);
+    profile!.contactCadence ||= input.time?.reviewCadence?.trim().toUpperCase() || "NONE";
+  }
   if (className === "org" && profile) profile.industry = normalizeOrganizationIndustry(profile.organizationType || "", profile.industry || "");
   const recordId = requestedId || `personal-${crypto.randomUUID()}`;
   const nextRecord: PersonalRecord = {
@@ -2153,6 +2192,7 @@ export async function createPersonalRecord(
     time: normalizeTime(
       {
         ...input.time,
+        reviewCadence: input.time?.reviewCadence || (className === "person" ? profile?.contactCadence : undefined),
         dueDate: input.time?.dueDate || input.happensOn
       },
       meta,
@@ -2181,6 +2221,7 @@ export async function createPersonalRecord(
     const photo = await photos.writePeopleProfilePhoto(recordId, image.mimeType, image.bytes);
     nextRecord.profile = normalizeContactProfile({ ...nextRecord.profile, photoUrl: `/api/people/photos/${recordId}`, photoUpdatedAt: photo.updatedAt }, true);
   }
+  const profileBeforeAutofill = nextRecord.profile;
   try {
   return await mutateJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>, PersonalRecord[]>(FILE_NAME, [], (stored) => {
     const existing = stored.map(normalizeRecord).filter((record) => isAllowedDomain(record.domain));
@@ -2197,6 +2238,8 @@ export async function createPersonalRecord(
         throw new Error("Every interaction participant must link to an active People profile");
       }
     }
+    nextRecord.profile = createAutofillOrganizationReferences(profileBeforeAutofill, existing, autofill, meta.createdIso);
+    nextRecord.externalSources = [...new Set([...nextRecord.externalSources, ...(autofill?.sources || [])])];
     nextRecord.profile = resolveOrganizationReferences(nextRecord.profile, existing, true);
     const next = applyReciprocalRelations([nextRecord, ...existing], nextRecord.id);
     return { value: next, result: next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
@@ -2531,7 +2574,7 @@ export async function undoPeopleImport(batch: string) {
 export async function updatePersonalRecord(
   id: string,
   patch: PersonalRecordPatch,
-  options: { expectedUpdatedAt?: string } = {}
+  options: { expectedUpdatedAt?: string; autofill?: unknown } = {}
 ): Promise<PersonalRecord[]> {
   return mutateJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>, PersonalRecord[]>(FILE_NAME, [], (stored) => {
   const existing = stored.map(normalizeRecord).filter((record) => isAllowedDomain(record.domain));
@@ -2578,7 +2621,11 @@ export async function updatePersonalRecord(
         : current.status;
   const nextStarred = typeof patch.starred === "boolean" ? patch.starred : current.starred === true;
 
-  const nextProfile = resolveOrganizationReferences(mergeContactProfile(current.profile, profilePatch), existing, true);
+  const autofill = validatePersonAutofillPending(options.autofill);
+  if (autofill && (current.className !== "person" || !profilePatch || patch.action || !options.expectedUpdatedAt)) throw new Error("Save autofill with the current person profile and its version");
+  const mergedProfile = createAutofillOrganizationReferences(mergeContactProfile(current.profile, profilePatch), next, autofill, now);
+  const nextProfile = resolveOrganizationReferences(mergedProfile, next, true);
+  if (current.className === "person" && nextProfile) nextProfile.contactCadence ||= time.reviewCadence || "NONE";
   if (current.className === "org" && nextProfile && profilePatch && ("industry" in profilePatch || "organizationType" in profilePatch)) {
     nextProfile.industry = normalizeOrganizationIndustry(nextProfile.organizationType || "", nextProfile.industry || "");
   }
@@ -2651,6 +2698,8 @@ export async function updatePersonalRecord(
           }
         : {})
   };
+
+  if (autofill) next[idx].externalSources = [...new Set([...next[idx].externalSources, ...autofill.sources])];
 
   return { value: next, result: next.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)) };
   });

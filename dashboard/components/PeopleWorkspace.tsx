@@ -56,6 +56,8 @@ import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import PeopleInteractions from "./people/PeopleInteractions";
 import OrganizationAutofill from "./people/OrganizationAutofill";
+import PersonAutofill from "./people/PersonAutofill";
+import { applyPersonAutofill, type PersonAutofillPending, type PersonAutofillResult } from "../lib/modules/people/person-autofill";
 import TeamSizeInput from "./people/TeamSizeInput";
 import SelectField from "./ui/SelectField";
 import TimeField from "./people/TimeField";
@@ -419,6 +421,7 @@ type SidebarItemConfig = {
 };
 
 type ContactProfileDraft = {
+  autofill?: PersonAutofillPending;
   fullName: string;
   firstName: string;
   middleName: string;
@@ -475,7 +478,7 @@ type ContactProfileDraft = {
 
 type ContactProfileTextKey = Exclude<
   keyof ContactProfileDraft,
-  "memories" | "education" | "occupations" | "locations" | "emails" | "phones"
+  "memories" | "education" | "occupations" | "locations" | "emails" | "phones" | "autofill"
 >;
 
 type ProfileField = {
@@ -554,7 +557,6 @@ const COMMON_LOCATIONS = [
 ];
 
 const CADENCE_OPTIONS = [
-  { label: "Not set", value: "" },
   { label: "No cadence", value: "NONE" },
   { label: "Weekly", value: "P1W" },
   { label: "Every 2 weeks", value: "P2W" },
@@ -712,7 +714,7 @@ const EMPTY_PROFILE_DRAFT: ContactProfileDraft = {
   associatedPeople: "",
   lastContact: "",
   nextContact: "",
-  contactCadence: "",
+  contactCadence: "NONE",
   lifeDream: "",
   notes: "",
   linkedin: "",
@@ -1177,7 +1179,7 @@ function getPrimaryGroup(record: PersonalRecord) {
 }
 
 function getCadenceLabel(value?: string) {
-  if (!value) return "Not set";
+  if (!value) return "No cadence";
   return CADENCE_OPTIONS.find((option) => option.value === value)?.label || value;
 }
 
@@ -1268,7 +1270,7 @@ function getProfile(record?: PersonalRecord): ContactProfileDraft {
     associatedPeople: joinList(profile?.associatedPeople),
     lastContact: profile?.lastContact || record.time.lastReview?.slice(0, 10) || "",
     nextContact: profile?.nextContact || record.time.nextReview || "",
-    contactCadence: profile?.contactCadence || record.time.reviewCadence || "",
+    contactCadence: profile?.contactCadence || record.time.reviewCadence || "NONE",
     lifeDream: profile?.lifeDream || "",
     notes: profile?.notes || "",
     linkedin: profile?.linkedin || "",
@@ -1324,7 +1326,7 @@ function lastContactTimestamp(record: PersonalRecord, interactionDate = ""): num
 }
 
 function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile {
-  const { projects: _projects, ...profileDraft } = draft;
+  const { projects: _projects, autofill: _autofill, ...profileDraft } = draft;
   const education = cleanEducationEntries(draft.education);
   const occupations = cleanOccupationEntries(draft.occupations);
   const locations = cleanLocationEntries(draft.locations);
@@ -1367,7 +1369,7 @@ function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile
 
 function countProfileFields(record: PersonalRecord) {
   const profile = getProfile(record);
-  return Object.values(profile).filter((value) => Array.isArray(value) ? value.length > 0 : value.trim()).length;
+  return Object.values(profile).filter((value) => Array.isArray(value) ? value.length > 0 : typeof value === "string" && value.trim()).length;
 }
 
 function profileSummary(record: PersonalRecord) {
@@ -1671,7 +1673,7 @@ function EducationEntriesEditor({
                   onChange(entry.id, { organizationId: organization?.id, institution: organization?.title || entry.institution });
                 }}
               >
-                <option value="">Select university</option>
+                <option value="">{entry.institution || "Select university"}</option>
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.institution || "Unavailable organization"} · unavailable</option>
                 )}
@@ -1724,7 +1726,7 @@ function OccupationEntriesEditor({
                   onChange(entry.id, { organizationId: organization?.id, employer: organization?.title || entry.employer });
                 }}
               >
-                <option value="">Select an organization</option>
+                <option value="">{entry.employer || "Select an organization"}</option>
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.employer || "Unavailable organization"} · unavailable</option>
                 )}
@@ -2083,7 +2085,8 @@ export default function PeopleWorkspace({
   const [quickComesFrom, setQuickComesFrom] = useState("");
   const [lastContact, setLastContact] = useState("");
   const [nextContact, setNextContact] = useState("");
-  const [cadence, setCadence] = useState("P1M");
+  const [cadence, setCadence] = useState("NONE");
+  const [quickPersonAutofill, setQuickPersonAutofill] = useState<PersonAutofillPending>();
   const [referenceUrl, setReferenceUrl] = useState("");
   const [quickInstagram, setQuickInstagram] = useState("");
   const [quickTikTok, setQuickTikTok] = useState("");
@@ -2759,7 +2762,7 @@ export default function PeopleWorkspace({
     || groups.length !== 1
     || groups[0] !== "Collaborator"
     || status !== "active"
-    || cadence !== "P1M";
+    || cadence !== "NONE";
   const profileFormDirty = Boolean(
     selectedPerson && profileDraftOwnerId === selectedPerson.id && (
       profilePhotoDraft ||
@@ -3023,7 +3026,8 @@ export default function PeopleWorkspace({
       },
       subjects: profileGroups,
       projects: splitList(nextDraft.projects),
-      profile
+      profile,
+      autofill: nextDraft.autofill
     });
     if (saved) setProfilePhotoDraft("");
     return saved;
@@ -3197,7 +3201,7 @@ export default function PeopleWorkspace({
       const response = await fetch("/api/personal/records", {
         method: "POST",
         headers: buildJsonHeadersWithCsrf(),
-        body: JSON.stringify({ ...legacyInput, initialPhoto: quickPhoto || undefined })
+        body: JSON.stringify({ ...legacyInput, initialPhoto: quickPhoto || undefined, autofill: className === "person" ? quickPersonAutofill : undefined })
       });
 
       const payload = (await response
@@ -3212,7 +3216,7 @@ export default function PeopleWorkspace({
       const previousIds = new Set(people.map((record) => record.id));
       const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
       const createdPerson =
-        nextPeople.find((record) => !previousIds.has(record.id)) ||
+        nextPeople.find((record) => !previousIds.has(record.id) && record.className === className) ||
         nextPeople.find((record) => record.title.toLowerCase() === name.trim().toLowerCase()) ||
         nextPeople[0];
 
@@ -3299,7 +3303,8 @@ export default function PeopleWorkspace({
       setQuickComesFrom("");
       setLastContact("");
       setNextContact("");
-      setCadence("P1M");
+      setCadence("NONE");
+      setQuickPersonAutofill(undefined);
       setReferenceUrl("");
       setQuickInstagram("");
       setQuickTikTok("");
@@ -3342,6 +3347,7 @@ export default function PeopleWorkspace({
         reviewCadence?: string;
       };
       profile?: PersonalContactProfile;
+      autofill?: PersonAutofillPending;
     }
   ) {
     setError("");
@@ -3366,6 +3372,7 @@ export default function PeopleWorkspace({
           id,
           expectedUpdatedAt: currentRecord?.updatedAt,
           ...legacyPatch,
+          ...(patch.autofill ? { autofill: patch.autofill } : {}),
           ...(patch.action ? { action: patch.action } : {}),
           ...(typeof patch.starred === "boolean" ? { starred: patch.starred } : {}),
           ...(patch.archiveReason ? { archiveReason: patch.archiveReason } : {})
@@ -3842,6 +3849,18 @@ export default function PeopleWorkspace({
     });
   }
 
+  const quickPersonAutofillValues = { context: quickContext, birthday: quickBirthday, website: referenceUrl, linkedin: quickLinkedIn, x: quickX, instagram: quickInstagram, tiktok: quickTikTok, youtube: quickYouTube, occupations: quickOccupations, education: quickEducation, autofill: quickPersonAutofill };
+  function applyQuickPersonAutofill(result: PersonAutofillResult) {
+    const next = applyPersonAutofill(quickPersonAutofillValues, result);
+    setQuickContext(next.context); setQuickBirthday(next.birthday);
+    setReferenceUrl(next.website); setQuickLinkedIn(next.linkedin); setQuickX(next.x);
+    setQuickInstagram(next.instagram); setQuickTikTok(next.tiktok); setQuickYouTube(next.youtube);
+    setQuickOccupations(next.occupations); setQuickEducation(next.education); setQuickPersonAutofill(next.autofill);
+  }
+  function applyProfilePersonAutofill(result: PersonAutofillResult) {
+    setProfileDraft((current) => applyPersonAutofill(current, result));
+  }
+
   function renderAddPersonForm(extraClass = "") {
     return (
       <form data-profile-class={className} className={`people-capture-form people-add-card${extraClass ? ` ${extraClass}` : ""}`} onSubmit={submitPerson}>
@@ -3918,9 +3937,10 @@ export default function PeopleWorkspace({
               </fieldset>
             </section>
             <section className="people-profile-section people-themed-section module-ref-tone-blue people-capture-section" data-profile-section="communication" aria-labelledby="people-create-communication-title">
-              <header className="people-profile-section-heading">
+              <header className="people-profile-section-heading people-autofill-heading">
                 <span><PeopleIcon name="communication" /></span>
                 <h4 id="people-create-communication-title">Communication</h4>
+                <PersonAutofill name={name} values={quickPersonAutofillValues} onApply={applyQuickPersonAutofill} disabled={saving} />
               </header>
               <div className="people-contact-channel-grid">
                 <EmailEntriesEditor
@@ -4578,11 +4598,12 @@ export default function PeopleWorkspace({
                   {(selectedPerson.className === "org" ? ORGANIZATION_PROFILE_SECTIONS : PROFILE_SECTIONS).map((section) => (
                     <Fragment key={section.title}>
                     <section className={`people-profile-section people-themed-section module-ref-tone-${section.tone}`} data-profile-section={section.title.toLowerCase().replace(/\s+/g, "-")}>
-                      <header className={`people-profile-section-heading${section.title === "Links" && selectedPerson.className === "org" ? " people-autofill-heading" : ""}`}>
+                      <header className={`people-profile-section-heading${section.title === "Links" || section.title === "Communication" ? " people-autofill-heading" : ""}`}>
                         <span><PeopleIcon name={profileSectionIcon(section.title)} /></span>
                         <h4>{section.title}</h4>
                         {section.title === "About" && selectedPerson.className === "person" && <div className="people-about-additions"><PeopleAddButton label="Life dream" icon="life-dream" iconOnly onClick={()=>setAboutExtras(current=>({...current,dream:true}))}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setAboutExtras(current=>({...current,notes:true}))}/></div>}
                         {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} onPhoto={setProfilePhotoDraft} hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)} disabled={profileSaving} />}
+                        {section.title === "Communication" && selectedPerson.className === "person" && <PersonAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileDraft} onApply={applyProfilePersonAutofill} disabled={profileSaving} />}
                       </header>
                       {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
                         <EmailEntriesEditor

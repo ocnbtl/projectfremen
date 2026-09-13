@@ -26,7 +26,7 @@ export function derivePeopleCadenceState(person: PeopleRecord, now = new Date())
 
   const next = parseDate(person.profile.nextContact || person.time.nextReview);
   const last = parseDate(person.profile.lastContact || person.time.lastReview);
-  const cadence = (person.profile.contactCadence || person.time.reviewCadence || "").toUpperCase();
+  const cadence = (person.profile.contactCadence || person.time.reviewCadence || "NONE").toUpperCase();
   if (cadence === "NONE" && !next) return "paused";
   if (!next) return last ? "unknown" : "dormant";
 
