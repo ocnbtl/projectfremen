@@ -15,6 +15,9 @@ import {
   transferNameKey,
   CSV_FIELDS,
   PRIVATE_EXPORT_DEFAULTS,
+  CONTACT_FILE_MAX_BYTES,
+  CONTACT_FILE_SIZE_LABEL,
+  IMPORT_LIMIT,
   type ContactDraft,
   type CsvMapping,
   type ExportOptions,
@@ -275,9 +278,9 @@ export default function PeopleTransfer({
     if (!file) return;
     setError("");
     try {
-      if (file.size > 4_000_000)
+      if (file.size > CONTACT_FILE_MAX_BYTES)
         throw new Error(
-          "Choose a contact file under 4 MB, with up to 500 contacts.",
+          `This file exceeds the ${CONTACT_FILE_SIZE_LABEL} size limit. Choose a smaller contact file.`,
         );
       const bytes = new Uint8Array(await file.arrayBuffer());
       const encoding =
@@ -535,7 +538,7 @@ export default function PeopleTransfer({
                   accept=".vcf,.vcard,.csv"
                   onChange={(event) => void upload(event.target.files?.[0])}
                 />
-                <small>vCard or CSV · up to 500 contacts / 4 MB</small>
+                <small>vCard or CSV · up to {IMPORT_LIMIT} contacts / {CONTACT_FILE_SIZE_LABEL}</small>
               </label>
               <label className="people-transfer-country">
                 Default country code

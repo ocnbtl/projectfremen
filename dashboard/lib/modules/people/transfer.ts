@@ -12,6 +12,8 @@ import {
 import { normalizeBirthday } from "./birthday";
 
 export const IMPORT_LIMIT = 500;
+export const CONTACT_FILE_MAX_BYTES = 10 * 1024 * 1024;
+export const CONTACT_FILE_SIZE_LABEL = "10 MiB";
 export type ContactDraft = {
   key: string;
   name: string;

@@ -86,6 +86,19 @@ const store = require("../lib/personal-records-store.ts");
   assert.equal(v[0].profile.birthday, "--02-29");
   assert.equal(v[0].profile.locations[0].location, "Kent, Ohio, USA");
   assert.equal(v[0].profile.linkedin, "https://linkedin.com/in/example");
+  const largePhoto = "A".repeat(40_960);
+  const largeVcard = Array.from({ length: 235 }, (_, i) =>
+    `BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Large Export ${i}\r\nPHOTO;ENCODING=b;TYPE=JPEG:${largePhoto}\r\nEND:VCARD\r\n`,
+  ).join("");
+  assert(Buffer.byteLength(largeVcard) > 9 * 1024 * 1024);
+  assert(Buffer.byteLength(largeVcard) <= t.CONTACT_FILE_MAX_BYTES);
+  const largeDraftsFromVcard = t.vcardContacts(largeVcard);
+  assert.equal(largeDraftsFromVcard.length, 235, "large files preserve every contact in the preview");
+  assert.equal(largeDraftsFromVcard[234].name, "Large Export 234");
+  assert.equal(largeDraftsFromVcard[234].photo, `data:image/jpeg;base64,${largePhoto}`);
+  assert.throws(() => t.vcardContacts(Array.from({ length: 501 }, (_, i) =>
+    `BEGIN:VCARD\nFN:Contact ${i}\nEND:VCARD\n`,
+  ).join("")), /500/, "the contact count cap is independent of file size");
   const qp = t.vcardContacts(
     "BEGIN:VCARD\nVERSION:2.1\nFN;CHARSET=UTF-8;ENCODING=QUOTED-PRINTABLE:Jos=C3=A9=\n Example\nEND:VCARD",
   );
