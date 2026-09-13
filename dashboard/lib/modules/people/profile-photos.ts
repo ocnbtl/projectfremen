@@ -12,6 +12,22 @@ export function decodeProfilePhoto(dataUrl: string) {
   return { mimeType: match[1], bytes };
 }
 
+export const IMPORT_PHOTO_WARNING = "The profile picture could not be imported. Add it separately as a JPEG, PNG, or WebP image.";
+
+/** Imported vCards can mislabel image types. Inspect bytes without fetching remote photos. */
+export function decodeImportedProfilePhoto(dataUrl: unknown) {
+  if (typeof dataUrl !== "string" || dataUrl.length > 1_000_000) return null;
+  const match = dataUrl.match(/^data:image\/[a-z0-9.+-]+;base64,([A-Za-z0-9+/= \t\r\n]+)$/i);
+  if (!match) return null;
+  const encoded = match[1].replace(/[ \t\r\n]/g, "");
+  if (!/^[A-Za-z0-9+/]+={0,2}$/.test(encoded)) return null;
+  const bytes = Buffer.from(encoded, "base64");
+  // Buffer decoding is permissive; reject incomplete or otherwise malformed payloads.
+  if (!bytes.length || bytes.toString("base64").replace(/=+$/, "") !== encoded.replace(/=+$/, "")) return null;
+  const mimeType = [...ALLOWED_PROFILE_PHOTO_TYPES].find(type => hasExpectedSignature(bytes, type));
+  return mimeType ? { mimeType, bytes } : null;
+}
+
 export type StoredPeopleProfilePhoto = {
   personId: string;
   mimeType: "image/jpeg" | "image/png" | "image/webp";

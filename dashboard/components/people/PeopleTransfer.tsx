@@ -101,6 +101,7 @@ export default function PeopleTransfer({
     [notice, setNotice] = useState(""),
     [batch, setBatch] = useState(""),
     [completed, setCompleted] = useState(false);
+  const [photoWarnings, setPhotoWarnings] = useState<{ recordId: string; name: string; message: string }[]>([]);
   const [research, setResearch] = useState<Record<string, Research>>({}),
     [lookupRevision, setLookupRevision] = useState(0),
     [enrich, setEnrich] = useState(true),
@@ -264,6 +265,7 @@ export default function PeopleTransfer({
     );
     setBatch(crypto.randomUUID());
     setCompleted(false);
+    setPhotoWarnings([]);
     setNotice("");
     setError("");
     if (newFile) {
@@ -371,6 +373,7 @@ export default function PeopleTransfer({
       if (!response.ok || !payload.ok) throw new Error(payload.error);
       onChanged(payload.items);
       setCompleted(true);
+      setPhotoWarnings(payload.photoWarnings || []);
       setNotice(
         `${payload.createdIds.length} profiles added, including new employers. ${payload.skipped} already imported or matching contacts skipped.`,
       );
@@ -396,6 +399,7 @@ export default function PeopleTransfer({
       if (!response.ok) throw new Error(payload.error);
       onChanged(payload.items);
       setNotice("Import undone. Those profiles are now in Recently Deleted.");
+      setPhotoWarnings([]);
       setBatch("");
     } catch (reason) {
       setError(errorMessage(reason));
@@ -511,6 +515,16 @@ export default function PeopleTransfer({
         <p role="status" className="people-transfer-notice">
           {notice}
         </p>
+      )}
+      {completed && photoWarnings.length > 0 && (
+        <details className="people-transfer-notice">
+          <summary>{photoWarnings.length} {photoWarnings.length === 1 ? "profile picture needs" : "profile pictures need"} to be added separately</summary>
+          <ul>{photoWarnings.map(warning => (
+            <li key={warning.recordId}>
+              <a href={`/admin/people/${encodeURIComponent(warning.recordId)}`}>{warning.name}</a>: {warning.message}
+            </li>
+          ))}</ul>
+        </details>
       )}
       {mode === "import" ? (
         <>

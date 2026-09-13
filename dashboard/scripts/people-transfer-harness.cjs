@@ -24,6 +24,7 @@ require.extensions[".ts"] = (module, filename) =>
 const t = require("../lib/modules/people/transfer.ts");
 const { findPeopleDuplicates, createPeopleDuplicateIndex } = require("../lib/modules/people/duplicates.ts");
 const store = require("../lib/personal-records-store.ts");
+const photos = require("../lib/modules/people/profile-photos.ts");
 (async () => {
   const fixture = (id, title, profile = {}, extra = {}) => ({ id, title, className: "person", profile, ...extra });
   const directory = [
@@ -217,6 +218,18 @@ const store = require("../lib/personal-records-store.ts");
   assert.equal(undone.filter((r) => r.archivedAt).length, 3);
   const picture =
     "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+aRuAAAAAASUVORK5CYII=";
+  const mislabeledPicture = picture.replace("image/png", "image/jpeg");
+  const recoveredPicture = photos.decodeImportedProfilePhoto(mislabeledPicture);
+  assert.equal(recoveredPicture.mimeType, "image/png", "import trusts image bytes instead of an incorrect vCard type");
+  assert.equal(recoveredPicture.bytes.toString("base64"), picture.split(",")[1]);
+  assert.deepEqual(photos.decodeImportedProfilePhoto(picture.replace(";base64,", ";base64,\r\n ")), recoveredPicture,
+    "folding whitespace in an older preview's base64 is accepted");
+  for (const invalid of [
+    "data:image/png;base64,YmFk", "data:image/jpeg;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==",
+    "data:image/svg+xml;base64,PHN2Zy8+", "data:image/png;base64,AAAA!", "data:image/png;base64,A",
+    "https://example.com/remote-photo.png", "data:image/png;base64," + "A".repeat(1_000_000), {},
+  ]) assert.equal(photos.decodeImportedProfilePhoto(invalid), null, "invalid, unsupported, remote, and oversized images are optional");
+  assert.throws(() => photos.decodeProfilePhoto(mislabeledPicture), /invalid/, "manual photo validation remains strict");
   const photoDraft = {
     key: "photo",
     name: "Photo Contact",
@@ -251,8 +264,7 @@ const store = require("../lib/personal-records-store.ts");
     1,
     "unused staged photos are removed",
   );
-  await assert.rejects(() =>
-    store.importPeopleContacts(
+  const mixedPhotos = await store.importPeopleContacts(
       [
         { ...photoDraft, name: "Valid staged photo" },
         {
@@ -263,19 +275,37 @@ const store = require("../lib/personal-records-store.ts");
       ],
       [],
       "photo-batch-00000003",
-    ),
   );
-  assert(
-    !(await store.readPersonalRecords()).some(
-      (record) => record.title === "Valid staged photo",
-    ),
-  );
+  assert.equal(mixedPhotos.createdIds.length, 2, "one bad optional picture does not block the other contacts");
+  const mixedRecords = await store.readPersonalRecords();
+  const withoutPicture = mixedRecords.find(record => record.title === "Invalid photo");
+  assert(!withoutPicture.profile?.photoUrl, "invalid bytes are not stored or served as a picture");
+  assert.equal(withoutPicture.importMeta.extra["Import warning (profile picture)"], photos.IMPORT_PHOTO_WARNING);
+  assert.deepEqual(mixedPhotos.photoWarnings, [{ recordId: withoutPicture.id, name: withoutPicture.title, message: photos.IMPORT_PHOTO_WARNING }]);
+  assert(mixedRecords.find(record => record.title === "Valid staged photo").profile.photoUrl);
   assert.equal(
     fs
       .readdirSync(process.env.FREMEN_DATA_DIR)
       .filter((name) => name.startsWith("people-profile-photo-")).length,
-    1,
+    2,
   );
+  const originalPhotoWrite = photos.writePeopleProfilePhoto;
+  let photoWrites = 0;
+  try {
+    photos.writePeopleProfilePhoto = async (...args) => {
+      if (++photoWrites === 2) throw new Error("Simulated photo storage outage");
+      return originalPhotoWrite(...args);
+    };
+    await assert.rejects(() => store.importPeopleContacts([
+      { ...photoDraft, name: "Storage failure first contact" },
+      { ...photoDraft, name: "Storage failure second contact" },
+    ], [], "photo-storage-00000001"), /Simulated photo storage outage/, "storage errors still abort the atomic import");
+  } finally {
+    photos.writePeopleProfilePhoto = originalPhotoWrite;
+  }
+  assert(!(await store.readPersonalRecords()).some(record => record.title.startsWith("Storage failure")));
+  assert.equal(fs.readdirSync(process.env.FREMEN_DATA_DIR).filter(name => name.startsWith("people-profile-photo-")).length, 2,
+    "staged pictures are cleaned up after a storage failure");
   await new Promise((resolve) => setTimeout(resolve, 5));
   await store.updatePersonalRecord(photoContact.id, {
     title: "Edited photo contact",
@@ -346,6 +376,7 @@ const store = require("../lib/personal-records-store.ts");
   const openPreview = Array.from({ length: 87 }, (_, i) => ({
     key: `old-preview-${i}`, kind: "person", name: `Edited import name ${i}`,
     employer: "", employerWebsite: "", extra: {}, warnings: [],
+    photo: i === 0 ? mislabeledPicture : i === 1 ? "data:image/png;base64,YmFk" : undefined,
     profile: {
       nickname: `Edited nickname ${i}`,
       phones: [
@@ -359,6 +390,7 @@ const store = require("../lib/personal-records-store.ts");
   const previewSnapshot = JSON.stringify(openPreview);
   const previewImport = await store.importPeopleContacts(openPreview, [], "open-preview-00000001");
   assert.equal(previewImport.createdIds.length, 87, "old previews import without refreshing or reparsing");
+  assert.equal(previewImport.photoWarnings.length, 1, "the older preview returns a specific warning only for the unreadable picture");
   const previewRecords = (await store.readPersonalRecords()).filter(record => previewImport.createdIds.includes(record.id));
   for (const draft of openPreview) {
     const saved = previewRecords.find(record => record.title === draft.name);
@@ -368,11 +400,22 @@ const store = require("../lib/personal-records-store.ts");
       ...entry, category: i === 1 ? "personal" : entry.category, customLabel: entry.customLabel,
     })), "first primary wins and every number, label, and identifier is retained");
     assert.equal(saved.profile.phoneNumber, draft.profile.phones[0].number);
+    if (draft.key === "old-preview-0") {
+      assert(saved.profile.photoUrl, "a mislabeled picture in the old preview is recovered");
+      const storedPicture = await photos.readPeopleProfilePhoto(saved.id);
+      assert.equal(storedPicture.mimeType, "image/png");
+      assert.equal(storedPicture.bytesBase64, picture.split(",")[1]);
+    }
+    if (draft.key === "old-preview-1") {
+      assert(!saved.profile.photoUrl);
+      assert.equal(saved.importMeta.extra["Import warning (profile picture)"], photos.IMPORT_PHOTO_WARNING);
+    }
   }
   assert.equal(JSON.stringify(openPreview), previewSnapshot, "server normalization does not mutate the original preview");
   const previewRetry = await store.importPeopleContacts(openPreview, [], "open-preview-00000001");
   assert.equal(previewRetry.createdIds.length, 0);
   assert.equal(previewRetry.skipped, 87, "unchanged preview retries remain idempotent");
+  assert.deepEqual(previewRetry.photoWarnings, [], "retry warnings are limited to contacts actually created");
   await assert.rejects(() => store.updatePersonalRecord(previewRecords[0].id, {
     profile: { phones: openPreview[0].profile.phones },
   }), /only one primary phone/, "ordinary profile edits still require a single primary selection");
@@ -382,7 +425,7 @@ const store = require("../lib/personal-records-store.ts");
   }], [], "open-preview-00000002"), /Phone 1/, "old previews still validate phone syntax");
   assert(!(await store.readPersonalRecords()).some(record => record.title === "Invalid old preview"));
   console.log(
-    "PASS: CSV/vCard parsing, shared phone import/edit/reload, 87-contact old-preview retry with preserved edits, primary phone selection, private-field exclusion, formula protection, atomic employer linking, indexed 500-contact review/import, retries, duplicates, rollback, and undo.",
+    "PASS: CSV/vCard parsing, mislabeled photo recovery, optional photo warnings, photo storage rollback, shared phone import/edit/reload, 87-contact old-preview retry with preserved edits, primary phone selection, private-field exclusion, formula protection, atomic employer linking, indexed 500-contact review/import, retries, duplicates, rollback, and undo.",
   );
 })().catch((error) => {
   console.error(error);

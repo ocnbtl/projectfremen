@@ -2306,6 +2306,7 @@ export async function importPeopleContacts(
   }));
   const photos = await import("./modules/people/profile-photos");
   const staged: string[] = [];
+  const photoWarnings: { recordId: string; name: string; message: string }[] = [];
   try {
     for (const item of [
       ...prepared.map(({ draft, record }) => ({ photo: draft.photo, record })),
@@ -2315,7 +2316,16 @@ export async function importPeopleContacts(
       })),
     ]) {
       if (!item.photo) continue;
-      const image = photos.decodeProfilePhoto(item.photo);
+      const image = photos.decodeImportedProfilePhoto(item.photo);
+      if (!image) {
+        photoWarnings.push({ recordId: item.record.id, name: item.record.title, message: photos.IMPORT_PHOTO_WARNING });
+        item.record.importMeta!.extra = {
+          ...item.record.importMeta!.extra,
+          "Import warning (profile picture)": photos.IMPORT_PHOTO_WARNING,
+        };
+        continue;
+      }
+      // Storage failures still abort the atomic import; only invalid optional images are omitted.
       const photo = await photos.writePeopleProfilePhoto(
         item.record.id,
         image.mimeType,
@@ -2449,7 +2459,7 @@ export async function importPeopleContacts(
         .filter((id) => !result.createdIds.includes(id))
         .map((id) => photos.removePeopleProfilePhoto(id).catch(() => {})),
     );
-    return result;
+    return { ...result, photoWarnings: photoWarnings.filter(warning => result.createdIds.includes(warning.recordId)) };
   } catch (error) {
     // If a network response was lost after commit, retain pictures that records reference.
     const persisted = await readPersonalRecords().catch(() => null);
