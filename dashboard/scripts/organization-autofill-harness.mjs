@@ -47,6 +47,33 @@ try {
   assert.equal(knowledgeValues([{...entity,claims:{...entity.claims,P7085:[claim('one'),claim('two')]}}]).tiktok,undefined,'Multiple current accounts are ambiguous');
   assert.equal(knowledgeValues([{...entity,claims:{...entity.claims,P7085:[claim('example/video/123')]}}]).tiktok,undefined,'Never turn a post or arbitrary path into a profile');
   const valuesOf = (html) => Object.fromEntries(extractOrganizationMetadata(html,'https://example.com/company','Example').suggestions.map(item=>[item.field,item.value]));
+  const rescueValues = html => Object.fromEntries(extractOrganizationMetadata(html, 'https://www.fortheloveofjanerescue.com/', 'For The Love of Jane').suggestions.map(item => [item.field, item.value]));
+  for (const html of [
+    '<meta name="description" content="For the Love of Jane is a non-profit animal rescue in Columbus, Ohio">',
+    '<p>For the Love of Jane operates as a foster based, 501(c)3 non-profit animal rescue that specializes in neonatal care.</p>',
+    '<p>We are a registered nonprofit cat rescue.</p>'
+  ]) {
+    const values = rescueValues(html);
+    assert.equal(values.organizationType, 'Nonprofit');
+    assert.equal(values.industry, 'Animal welfare');
+    assert.equal(values.teamSize, undefined, 'No inferred workforce from nonprofit status');
+    assert.equal(values.foundedYear, undefined);
+  }
+  for (const html of [
+    '<p>Our partner is a nonprofit animal rescue.</p>',
+    '<p>For the Love of Jane is not a nonprofit animal rescue.</p>',
+    '<p>For the Love of Jane supports a nonprofit animal rescue.</p>',
+    '<p>For the Love of Jane is a veterinary clinic supporting animal rescue.</p>',
+    '<p>I moved to Columbus in 2016 and started rescuing animals.</p><h4>Antonia Tribuzzo</h4><h4>Anna Evans</h4><footer>© 2023 by Animal Shelter</footer>'
+  ]) {
+    const values = rescueValues(html);
+    assert.equal(values.organizationType, undefined, html);
+    assert.equal(values.industry, undefined, html);
+    assert.equal(values.foundedYear, undefined, html);
+    assert.equal(values.teamSize, undefined, html);
+  }
+  assert.equal(normalizeOrganizationIndustry('Nonprofit', 'Animal rescue'), 'Animal welfare');
+  assert.equal(normalizeOrganizationIndustry('Business', 'Animal rescue'), 'Other', 'Respect organization taxonomy');
   assert.equal(valuesOf('<p>Established in 1999, Example’s European Headquarters sits in the Netherlands.</p>').foundedYear,undefined);
   assert.equal(valuesOf('<p>Founded in 2001, Another Company provides shoes.</p>').foundedYear,undefined);
   assert.equal(valuesOf('<p>Example was founded on January 25, 1964.</p>').foundedYear,'1964');

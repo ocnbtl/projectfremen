@@ -2643,7 +2643,10 @@ export default function PeopleWorkspace({
       const object = connection.projectRef;
       return [objectTargetKey(object), { object, detail: "Project connection" }] as [string, OrganizationObjectRow];
     })
-  ]).values()).sort((a, b) => objectTargetTypeLabel(a.object).localeCompare(objectTargetTypeLabel(b.object)) || a.object.label.localeCompare(b.object.label));
+  ]).values()).map(row => {
+    const person = row.object.module === "people" && row.object.objectType === "person" ? people.find(record => record.id === row.object.objectId && record.className === "person") : undefined;
+    return person ? { ...row, object: { ...row.object, label: person.title }, photoUrl: person.profile?.photoUrl, photoUpdatedAt: person.profile?.photoUpdatedAt } : row;
+  }).sort((a, b) => objectTargetTypeLabel(a.object).localeCompare(objectTargetTypeLabel(b.object)) || a.object.label.localeCompare(b.object.label));
   const timelineItems = selectedInteractionItems.slice(0, 20);
   const selectedTags = Array.from(new Set([
     ...(fallbackPerson?.subjects || []).slice(0, 3),
@@ -4877,15 +4880,17 @@ export default function PeopleWorkspace({
                       <strong className="people-section-count" aria-label={`${selectedNativeObjectLinks.length} linked objects`}>{selectedNativeObjectLinks.length}</strong>
                     </header>
                     <div className="people-object-links">
-                      {selectedNativeObjectLinks.length > 0 ? selectedNativeObjectLinks.map(({ link, object }) => (
+                      {selectedNativeObjectLinks.length > 0 ? selectedNativeObjectLinks.map(({ link, object }) => {
+                        const person = object.module === "people" && object.objectType === "person" ? people.find(record => record.id === object.objectId && record.className === "person") : undefined;
+                        return (
                         <div key={link.id}>
                           <a href={object.route}>
-                            <span className="people-object-glyph"><PeopleIcon name="object" /></span>
+                            {person ? <span className="people-linked-person-avatar"><PeopleProfileAvatar label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /></span> : <span className="people-object-glyph"><UnigentamosIcon role={objectTargetIcon(object)} size={20} /></span>}
                             <span><strong>{object.label}</strong><small>{labelize(object.objectType)} · {labelize(link.relationship)}</small></span>
                           </a>
                           <button type="button" onClick={() => void removeObjectLink(link)} disabled={objectLinkSaving} aria-label={`Remove link to ${object.label}`}><PeopleIcon name="close" /></button>
                         </div>
-                      )) : <p>No objects yet.</p>}
+                      ); }) : <p>No objects yet.</p>}
                     </div>
                   </article>
                   <article className="people-links-section is-files">

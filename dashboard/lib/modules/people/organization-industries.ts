@@ -117,6 +117,7 @@ export function normalizeOrganizationIndustry(type: string, value: string): stri
   const exact = options.find((option) => option.toLowerCase() === clean.toLowerCase());
   if (exact) return exact;
   const rules: [RegExp, string[]][] = [
+    [/\b(?:animal (?:welfare|rescue|shelter)|(?:cat|dog|pet|wildlife) rescue)\b/i, ["Animal welfare"]],
     [/\b(?:courts?|judicial|judiciary|legal services|administration of justice|tribunal|prosecutor|public defender)\b/i, ["Judicial / legal"]],
     [/\b(?:public safety|police|fire department|emergency services)\b/i, ["Public safety"]],
     [/\b(?:diploma\w*|embass\w*|foreign affairs)\b/i, ["International / diplomatic"]],

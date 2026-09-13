@@ -241,6 +241,19 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     const biography = social && description?.match(/on Instagram:\s*["“]([\s\S]+)["”]$/i)?.[1];
     add("context", biography || (social && /^\d[\d,.KMB]* Followers,.*(?:Following|Posts)/i.test(description || "") ? "" : description), biography ? "Public profile biography" : "Public page description");
     if (!organizationName.trim()) add("name", social ? pageTitle.split(/\s*[(@|]/)[0] : meta.get("og:site_name"), "Public page: organization name");
+    // Classify explicit self-descriptions, including metadata and qualified
+    // wording such as "operates as a foster based, 501(c)3 non-profit".
+    // Exact subjects keep partner mentions and individual biographies out.
+    for (const statement of [...lines, description || ""].flatMap(line => line.split(/(?<=[.!?])\s+/))) {
+      const self = statement.match(/^(.{1,120}?)\s+(?:is|operates as|are)\s+(.+)$/i);
+      if (!self || !(nameKey(self[1]) === nameKey(organizationName) || /^we$/i.test(self[1]))) continue;
+      const predicate = self[2];
+      const nonprofit = predicate.match(/^(?:a|an)\s+(?:(?:registered|independent|foster[ -]based|501\s*\(c\)\s*\(?3\)?|tax[ -]exempt)[,\s]+)*(?:non[ -]?profit|not[ -]for[ -]profit|charitable|charity)\b/i);
+      if (nonprofit) add("organizationType", "Nonprofit", `Published self-description: ${statement.slice(0, 220)}`);
+      if (nonprofit && /\b(?:animal (?:rescue|welfare|shelter)|(?:cat|dog|pet|wildlife) rescue)\b/i.test(predicate.slice(0, 240))) {
+        add("industry", "Animal welfare", `Published self-description: ${statement.slice(0, 220)}`);
+      }
+    }
     for (const line of lines) {
       const founded = line.match(/^(?:Founded|Established)(?:\s+in)?\s+(\d{4})\b/i) || line.match(/^We were founded in (\d{4})\b/i);
       if (founded) {
