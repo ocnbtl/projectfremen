@@ -11,6 +11,8 @@ export type PersonEducationSuggestion = PersonEvidence & Omit<PersonalEducationE
 export type PersonAutofillResult = {
   suggestions: PersonSuggestion[]; occupations: PersonJobSuggestion[]; education: PersonEducationSuggestion[];
   sources: string[]; fetchedAt: string; message: string;
+  unavailableSources?: { url: string; message: string }[];
+  method?: "public_page" | "pasted_text";
 };
 export type PersonOrganizationPlan = { kind: "employer" | "school"; entryId: string; name: string; website?: string; sourceUrl: string };
 export type PersonAutofillPending = { organizations: PersonOrganizationPlan[]; sources: string[] };
@@ -103,4 +105,12 @@ export function applyPersonAutofill<T extends PersonAutofillValues>(current: T, 
     organizations: [...new Map(plans.map((plan) => [`${plan.kind}:${plan.entryId}`, plan])).values()],
     sources: [...new Set([...(current.autofill?.sources || []), ...result.sources])].slice(0, 24)
   } };
+}
+
+/** Ignore source-only discoveries when reporting whether the form actually changed. */
+export function personAutofillHasChanges(current: PersonAutofillValues, result: PersonAutofillResult): boolean {
+  const next = applyPersonAutofill(current, result);
+  if (Object.keys(PERSON_AUTOFILL_LABELS).some((field) => (current[field as PersonAutofillField] || "") !== (next[field as PersonAutofillField] || ""))) return true;
+  if (JSON.stringify(current.occupations) !== JSON.stringify(next.occupations) || JSON.stringify(current.education) !== JSON.stringify(next.education)) return true;
+  return next.autofill.organizations.some((plan) => !(current.autofill?.organizations || []).some((existing) => existing.kind === plan.kind && existing.entryId === plan.entryId && existing.name === plan.name));
 }

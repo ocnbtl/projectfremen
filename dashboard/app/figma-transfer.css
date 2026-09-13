@@ -14989,12 +14989,23 @@ html[data-admin-preview="mobile"] .people-redesign-shell .people-profile-panel {
 .people-autofill-sources li { overflow-wrap: anywhere; }
 .people-autofill-sources small { display: block; }
 .people-autofill-sources a { color: var(--text-strong); text-decoration: underline; }
+.people-profile-text-import { margin-top: 8px; }
+.people-redesign-shell .people-profile-text-toggle { width: auto; min-height: 36px; padding: 6px 10px; border: 1px solid var(--border-soft); border-radius: 9px; background: var(--surface-panel); color: var(--text-strong); font: inherit; font-weight: 600; }
+.people-profile-text-panel { display: grid; gap: 8px; margin-top: 10px; padding: 12px; border: 1px solid var(--border-soft); border-radius: 12px; background: var(--surface-panel); }
+.people-profile-text-panel a { color: var(--text-strong); text-decoration: underline; }
+.people-redesign-shell .people-profile-text-panel label { display: block; margin: 0; color: var(--text-strong); font: inherit; font-weight: 600; }
+.people-redesign-shell .people-profile-text-panel textarea { display: block; width: 100%; min-width: 0; min-height: 150px; max-height: 360px; box-sizing: border-box; padding: 10px 12px; resize: vertical; font: inherit; line-height: 1.5; }
+.people-redesign-shell .people-profile-text-apply { justify-self: start; width: auto; min-height: 40px; padding: 8px 12px; border: 0; border-radius: 9px; background: var(--people-action, #133c5e); color: #fff; font: inherit; font-weight: 600; }
+.people-redesign-shell .people-profile-text-apply:disabled { opacity: .5; cursor: not-allowed; }
+.people-profile-text-panel [role="alert"] { color: var(--text-strong); border-left: 3px solid var(--people-action, #133c5e); padding-left: 8px; }
+.people-profile-text-panel :is(button, textarea, a):focus-visible, .people-profile-text-toggle:focus-visible { outline: 2px solid var(--people-action, #133c5e); outline-offset: 3px; }
 @media (max-width: 760px) {
   .people-redesign-shell .people-profile-view-bar { gap: 0; }
   .people-redesign-shell .people-profile-view-actions > button,
   .people-redesign-shell [data-people-location-editor] > header .people-add-action { min-height: 44px; }
   .people-redesign-shell .people-organization-autofill-button { width: 44px; height: 44px; min-height: 44px; }
   .people-autofill-sources summary { min-height: 44px; }
+  .people-redesign-shell :is(.people-profile-text-toggle, .people-profile-text-apply) { min-height: 44px; }
 }
 
 @media (max-width: 760px) {
@@ -15023,7 +15034,7 @@ html[data-admin-preview="mobile"] .people-redesign-shell .people-profile-header 
 .people-create-photo .people-avatar { flex: 0 0 72px; width: 72px; min-width: 72px; height: 72px; }
 .people-create-photo > span { color: var(--text-strong); font-size: 13px; }
 .people-create-photo small { display: block; margin-top: 4px; color: var(--text-subtle); }
-.people-redesign-shell .people-capture-form { padding-bottom: 100px; }
+.people-redesign-shell .people-capture-form { padding-bottom: 100px; grid-auto-rows: max-content; align-content: start; }
 .people-redesign-shell .people-capture-form :is(button, input, select, textarea) { scroll-margin-block: 100px; }
 
 @media (max-width: 760px) {

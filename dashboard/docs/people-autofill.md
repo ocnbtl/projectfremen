@@ -12,6 +12,16 @@ New people default to **No cadence** (`NONE`) in the creation form, record API, 
 
 ## Implementation scope and verification
 
+### LinkedIn access and copied profile text
+
+LinkedIn can return HTTP 999 or a sign-in page to the public fetcher even when a signed-in user can view the profile. Autofill now reports the unreadable source explicitly and opens **Paste profile text**. This option is also available whenever the form has a LinkedIn profile link. It does not reuse browser sessions, access the clipboard automatically, or bypass LinkedIn's access controls.
+
+Copy the profile name and the About, Experience, Education, and optional contact information, retaining headings and dates. **Fill from pasted text** parses up to 60,000 characters in the browser and stages the same editable fields and organization plans as public autofill. The pasted header must match the person's name. The parser handles repeated lines, dated work and education entries, grouped jobs, and clearly labeled qualifications without dates. Other-profile recommendations and unrelated sections are excluded. Unclear entries and unknown birthdays stay empty; dates or degrees are not invented. The sources view labels this as user-supplied text rather than independently verified LinkedIn data. The original pasted text is not sent to an extraction API or persisted with the person.
+
+Both methods now compare suggestions with the actual form before claiming new fields were filled. Rediscovering the supplied LinkedIn URL or repeating the same profile no longer produces a misleading success message. Person structured data that uses givenName/familyName without a name property is also supported.
+
+Verified 2026-09-13: the reported LinkedIn URL refused the public fetch, and the browser showed the specific explanation with the paste panel expanded. Synthetic copied text filled About, work, education, and a yearless birthday; wrong-person text was rejected and repeat filling reported no new fields. A local Save created both organization records with working employer/school links. The 390 px check exposed grid row compression in New Person; content-sized rows now keep every section and the expanded paste input usable without horizontal overflow. People autofill and Organization autofill harnesses, TypeScript, and the production build passed. No production profile data was edited.
+
 Primary mode: LOCAL PRODUCT IMPLEMENTATION. Engineering mode: PRODUCT / ADMIN APPLICATION.
 
 AUTHORIZED ACTION CLASSES: LOCAL_CODE_CHANGE for this People feature and its tests in Project Fremen, authorized by the current feature request; DEPLOY_OR_RELEASE to the existing Unigentamos production deployment, under the ongoing release instructions in this conversation. Supporting repository, application, provider, and deployment checks stay within these actions.

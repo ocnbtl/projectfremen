@@ -53,7 +53,7 @@ export function extractPersonPage(html: string, sourceUrl: string, name: string)
   const byId = new Map(nodes.flatMap((node) => typeof node["@id"] === "string" && Object.keys(node).length > 1 ? [[node["@id"], node] as const] : []));
   const resolve = (value: unknown) => { const raw = object(value); return { ...(byId.get(String(raw["@id"])) || {}), ...raw }; };
   const people = nodes.filter((node) => list(node["@type"]).some((type) => /(?:^|[/#])Person$/.test(String(type))));
-  const matches = people.filter((node) => [named(node), ...list(node.alternateName).map(named)].some((label) => matchesName(label, name)));
+  const matches = people.filter((node) => [named(node), [text(node.givenName), text(node.additionalName), text(node.familyName)].filter(Boolean).join(" "), ...list(node.alternateName).map(named)].filter(Boolean).some((label) => matchesName(label, name)));
   const h1 = text(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]);
   const headlineMatches = [h1, title.split(/\s[|–—-]\s/)[0]].some((label) => matchesName(label, name));
   // An unrelated Person node is not authority for the person whose name is in a page title.
@@ -153,6 +153,13 @@ export async function discoverPerson(name: string, urls: string[], dependencies:
   const deadline = Date.now() + (dependencies.timeoutMs ?? 20_000);
   const queue = [...new Set(urls.map(normalizeOrganizationUrl))].slice(0, 6), visited = new Set<string>();
   const suggestions: PersonSuggestion[] = [], occupations: PersonJobSuggestion[] = [], education: PersonEducationSuggestion[] = [], sources: string[] = [];
+  const unavailableSources: NonNullable<PersonAutofillResult["unavailableSources"]> = [];
+  const unavailableSource = (url: string, unmatched = false) => {
+    const linkedin = personProfileLink(url)?.field === "linkedin";
+    unavailableSources.push({ url, message: linkedin
+      ? "LinkedIn did not provide a readable profile to Autofill. Your signed-in browser may show more. Open the profile, copy its name, About, Experience, and Education, then use Paste profile text below."
+      : unmatched ? "This page could not be matched to the person's name." : "This page could not be read. Try another public profile link." });
+  };
   let unavailable = 0, firstError: unknown;
   while (queue.length && visited.size < 8 && Date.now() < deadline) {
     const url = queue.shift()!;
@@ -161,10 +168,10 @@ export async function discoverPerson(name: string, urls: string[], dependencies:
     try {
       const page = await (dependencies.fetchPage || fetchPublicPage)(url, { timeoutMs: Math.min(3500, Math.max(1, deadline - Date.now())), maxBytes: 1_500_000 });
       const parsed = extractPersonPage(page.html, page.sourceUrl, name);
-      if (!parsed.matched) { unavailable++; continue; }
+      if (!parsed.matched) { unavailable++; unavailableSource(url, true); continue; }
       sources.push(page.sourceUrl); suggestions.push(...parsed.suggestions); occupations.push(...parsed.occupations); education.push(...parsed.education);
       for (const link of parsed.links) if (!visited.has(link) && !queue.includes(link) && queue.length < 16) queue.push(link);
-    } catch (error) { firstError ??= error; unavailable++; }
+    } catch (error) { firstError ??= error; unavailable++; unavailableSource(url); }
   }
   if (!sources.length && firstError instanceof Error && /^Use a public/.test(firstError.message)) throw firstError;
   const fields = new Map<PersonSuggestion["field"], PersonSuggestion>(), conflicts = new Set<string>();
@@ -180,6 +187,6 @@ export async function discoverPerson(name: string, urls: string[], dependencies:
     const job = jobs.find((entry) => entry.status === "current" && entry.title);
     if (job) fields.set("context", { field: "context", value: `${name} works as ${job.title}${job.employer ? ` at ${job.employer}` : ""}.`, sourceUrl: job.sourceUrl, evidence: "Summary of the published occupation" });
   }
-  return { suggestions: [...fields.values()].filter((item) => !conflicts.has(item.field)), occupations: jobs, education: schools, sources: [...new Set(sources)], fetchedAt: new Date().toISOString(),
-    message: sources.length ? `${sources.length} public ${sources.length === 1 ? "profile" : "profiles"} checked.${unavailable ? " Some links could not be read or matched to this person." : ""}${conflicts.size ? " Conflicting details were left unchanged." : ""} Unpublished details stay empty.` : "No readable public profile could be matched to this name. Try a personal website or public biography; sign-in-only pages cannot supply details." };
+  return { suggestions: [...fields.values()].filter((item) => !conflicts.has(item.field)), occupations: jobs, education: schools, sources: [...new Set(sources)], unavailableSources, method: "public_page", fetchedAt: new Date().toISOString(),
+    message: sources.length ? `${sources.length} public ${sources.length === 1 ? "profile" : "profiles"} checked.${unavailable ? " Some links could not be read or matched to this person." : ""}${conflicts.size ? " Conflicting details were left unchanged." : ""} Unpublished details stay empty.` : unavailableSources.find((item) => personProfileLink(item.url)?.field === "linkedin")?.message || "No readable public profile could be matched to this name. Try a personal website or public biography; sign-in-only pages cannot supply details." };
 }
