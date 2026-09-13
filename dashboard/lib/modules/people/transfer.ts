@@ -10,6 +10,7 @@ import {
   validateInternationalPhone,
 } from "./phone";
 import { normalizeBirthday } from "./birthday";
+import { normalizeImportedPersonName } from "./names";
 
 export const IMPORT_LIMIT = 500;
 export const CONTACT_FILE_MAX_BYTES = 10 * 1024 * 1024;
@@ -153,6 +154,9 @@ function finish(draft: ContactDraft) {
       .join(" ") ||
     (draft.kind === "org" ? draft.employer : "");
   if (!draft.name) draft.warnings.push("Add a name to include this contact.");
+  const named = normalizeImportedPersonName(draft.name, draft.profile, draft.kind);
+  draft.name = named.name;
+  draft.profile = named.profile;
   draft.profile.fullName = draft.name;
   if (draft.employer || draft.profile.primaryOccupation)
     draft.profile.occupations = [

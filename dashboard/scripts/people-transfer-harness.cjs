@@ -25,7 +25,32 @@ const t = require("../lib/modules/people/transfer.ts");
 const { findPeopleDuplicates, createPeopleDuplicateIndex } = require("../lib/modules/people/duplicates.ts");
 const store = require("../lib/personal-records-store.ts");
 const photos = require("../lib/modules/people/profile-photos.ts");
+const names = require("../lib/modules/people/names.ts");
 (async () => {
+  assert.deepEqual(names.extractQuotedNickname('Dwayne "The Rock" Johnson'), { fullName: "Dwayne Johnson", nickname: "The Rock" });
+  assert.deepEqual(names.extractQuotedNickname('Sean “Shay” O’Connor'), { fullName: "Sean O’Connor", nickname: "Shay" });
+  assert.deepEqual(names.extractQuotedNickname("Robert 'Bob' O'Connor"), { fullName: "Robert O'Connor", nickname: "Bob" });
+  assert.deepEqual(names.extractQuotedNickname("James ‘Jim’ Jones"), { fullName: "James Jones", nickname: "Jim" });
+  assert.equal(names.extractQuotedNickname("Anne O'Connor D’Angelo"), null);
+  assert.equal(names.extractQuotedNickname('John "unfinished'), null);
+  assert.deepEqual(names.extractQuotedNickname('Seunghuk "Patty" "Patrick" Lee'), { fullName: "Seunghuk Lee", nickname: "Patty, Patrick" });
+  const nicknameCsv = t.readCsv('Name,Nickname\n"Robert ""Bob"" Smith",Rob');
+  const nicknameCsvDraft = t.csvContacts(nicknameCsv.rows, t.suggestCsvMapping(nicknameCsv.headers))[0];
+  assert.equal(nicknameCsvDraft.name, "Robert Smith");
+  assert.equal(nicknameCsvDraft.profile.nickname, "Rob, Bob", "explicit nicknames are preserved alongside quoted aliases");
+  assert.equal(nicknameCsvDraft.profile.firstName, "Robert");
+  assert.equal(nicknameCsvDraft.profile.lastName, "Smith");
+  const nicknameCard = t.vcardContacts('BEGIN:VCARD\nVERSION:3.0\nFN:Seunghuk “Patty” "Patrick" Lee\nN:Lee;Seunghuk;"Patty" "Patrick";;\nNICKNAME:Patty\nEND:VCARD')[0];
+  assert.equal(nicknameCard.name, "Seunghuk Lee");
+  assert.equal(nicknameCard.profile.nickname, "Patty, Patrick", "nickname aliases from multiple fields are deduplicated");
+  assert.equal(nicknameCard.profile.middleName, "", "quoted nicknames are removed from structured name fields");
+  assert.equal(t.vcardContacts('BEGIN:VCARD\nVERSION:3.0\nFN:Acme "Studio"\nKIND:org\nEND:VCARD')[0].name, 'Acme "Studio"', "organization names keep their quotation marks");
+  const compoundName = names.normalizeImportedPersonName('Ludwig "Ludo" van Beethoven', { firstName: "Ludwig", lastName: "van Beethoven" }, "person");
+  assert.equal(compoundName.profile.lastName, "van Beethoven", "explicit compound surnames are preserved");
+  assert.equal(compoundName.profile.middleName, "", "a compound surname is not duplicated as a middle name");
+  assert.deepEqual(names.normalizeImportedPersonName('Anthony "Ant"', { firstName: "ant" }, "person").profile,
+    { fullName: "Anthony", firstName: "Anthony", middleName: "", lastName: "", nickname: "Ant" },
+    "a full name edited during import supersedes older name parts from the source file");
   const fixture = (id, title, profile = {}, extra = {}) => ({ id, title, className: "person", profile, ...extra });
   const directory = [
     fixture("saved-name", "José Santos"),
@@ -424,6 +449,25 @@ const photos = require("../lib/modules/people/profile-photos.ts");
     profile: { phones: [{ ...openPreview[0].profile.phones[0], number: "not-a-phone" }] },
   }], [], "open-preview-00000002"), /Phone 1/, "old previews still validate phone syntax");
   assert(!(await store.readPersonalRecords()).some(record => record.title === "Invalid old preview"));
+  const editedNicknameDraft = {
+    key: "edited-nickname", name: 'Alexandra "Alex" Morgan', kind: "person", employer: "", employerWebsite: "", extra: {}, warnings: [],
+    profile: { firstName: "Alexandra", middleName: '"Alex"', lastName: "Morgan", nickname: "Ally", notes: "Preserve these notes" },
+  };
+  const nicknameSnapshot = JSON.stringify(editedNicknameDraft);
+  const nicknameImport = await store.importPeopleContacts([editedNicknameDraft], [], "nickname-batch-00000001");
+  assert.equal(nicknameImport.createdIds.length, 1);
+  const savedNickname = (await store.readPersonalRecords()).find(record => record.id === nicknameImport.createdIds[0]);
+  assert.equal(savedNickname.title, "Alexandra Morgan", "server normalizes names edited in an older import preview");
+  assert.equal(savedNickname.profile.fullName, "Alexandra Morgan");
+  assert.equal(savedNickname.profile.nickname, "Ally, Alex");
+  assert.equal(savedNickname.profile.middleName, "");
+  assert.equal(savedNickname.profile.notes, "Preserve these notes");
+  assert.equal(JSON.stringify(editedNicknameDraft), nicknameSnapshot);
+  const nicknameRetry = await store.importPeopleContacts([editedNicknameDraft], [], "nickname-batch-00000001");
+  assert.equal(nicknameRetry.skipped, 1, "retry keys stay stable for unnormalized preview payloads");
+  const canonicalDuplicate = await store.importPeopleContacts([{ ...editedNicknameDraft, name: 'Alexandra "Lex" Morgan' }], [], "nickname-batch-00000002");
+  assert.equal(canonicalDuplicate.createdIds.length, 0, "duplicate detection uses the normalized name");
+  assert.equal(canonicalDuplicate.skipped, 1);
   console.log(
     "PASS: CSV/vCard parsing, mislabeled photo recovery, optional photo warnings, photo storage rollback, shared phone import/edit/reload, 87-contact old-preview retry with preserved edits, primary phone selection, private-field exclusion, formula protection, atomic employer linking, indexed 500-contact review/import, retries, duplicates, rollback, and undo.",
   );

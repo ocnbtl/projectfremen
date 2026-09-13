@@ -1,7 +1,8 @@
 import { mutateJsonFile, readJsonFile } from "./file-store";
 import { createHash } from "node:crypto";
-import { draftRecord, transferNameKey, type ContactDraft } from "./modules/people/transfer";
+import { transferNameKey, type ContactDraft } from "./modules/people/transfer";
 import { createPeopleDuplicateIndex } from "./modules/people/duplicates";
+import { normalizeImportedPersonName } from "./modules/people/names";
 import { normalizeOrganizationIndustry } from "./modules/people/organization-industries";
 import { normalizeBirthday } from "./modules/people/birthday";
 import {
@@ -2243,15 +2244,15 @@ export async function importPeopleContacts(
       !["person", "org"].includes(draft.kind)
     )
       throw new Error("Every selected contact needs a name.");
-    const { photoUrl, photoUpdatedAt, occupations, education, ...profile } =
-      draft.profile || {};
+    const named = normalizeImportedPersonName(draft.name, draft.profile || {}, draft.kind);
+    const { photoUrl, photoUpdatedAt, occupations, education, ...profile } = named.profile;
     void photoUrl;
     void photoUpdatedAt;
     const record = normalizeRecord({
       id: `personal-${crypto.randomUUID()}`,
       domain: "notes-docs",
       className: draft.kind,
-      title: draft.name.trim(),
+      title: named.name.trim(),
       status: "active",
       privacy: "private",
       areas: ["Relationships"],
@@ -2260,7 +2261,7 @@ export async function importPeopleContacts(
       profile: normalizeContactProfile(
         {
           ...profile,
-          fullName: draft.name,
+          fullName: named.name,
           occupations: occupations?.map(({ organizationId, ...job }) => {
             void organizationId;
             return job;
@@ -2373,7 +2374,7 @@ export async function importPeopleContacts(
               (!item.archivedAt || item.importMeta?.batch === batch),
           ) ||
           (!draft.allowDuplicate &&
-            duplicateIndex.find(draftRecord({ ...draft, key: record.id })).length)
+            duplicateIndex.find(record).length)
         ) {
           skipped++;
           continue;

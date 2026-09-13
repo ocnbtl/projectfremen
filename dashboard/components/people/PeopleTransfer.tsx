@@ -23,6 +23,7 @@ import {
   type ExportOptions,
 } from "../../lib/modules/people/transfer";
 import type { OrganizationAutofillResult } from "../../lib/modules/people/organization-autofill";
+import { normalizeImportedPersonName } from "../../lib/modules/people/names";
 import { normalizeOrganizationIndustry } from "../../lib/modules/people/organization-industries";
 import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -705,6 +706,7 @@ export default function PeopleTransfer({
                           <span>
                             <strong>{draft.name || "Unnamed contact"}</strong>
                             <small>
+                              {draft.kind === "person" && draft.profile.nickname && <>aka {draft.profile.nickname} · </>}
                               {[draft.profile.primaryOccupation, draft.employer]
                                 .filter(Boolean)
                                 .join(" at ") ||
@@ -736,6 +738,11 @@ export default function PeopleTransfer({
                                 <input
                                   aria-label={`${label} for ${draft.key}`}
                                   value={draft[key]}
+                                  onBlur={() => {
+                                    if (key === "name") setDrafts(current => current.map(d => d.key === draft.key
+                                      ? { ...d, ...normalizeImportedPersonName(d.name, d.profile, d.kind) }
+                                      : d));
+                                  }}
                                   onChange={(e) =>
                                     setDrafts((current) =>
                                       current.map((d) =>
@@ -748,6 +755,16 @@ export default function PeopleTransfer({
                                 />
                               </label>
                             ))}
+                            {draft.kind === "person" && <label>
+                              Nickname
+                              <input
+                                aria-label={`Nickname for ${draft.key}`}
+                                value={draft.profile.nickname || ""}
+                                onChange={event => setDrafts(current => current.map(d => d.key === draft.key
+                                  ? { ...d, profile: { ...d.profile, nickname: event.target.value } }
+                                  : d))}
+                              />
+                            </label>}
                             <label>
                               Occupation
                               <input

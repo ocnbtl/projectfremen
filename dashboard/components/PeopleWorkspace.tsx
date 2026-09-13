@@ -15,6 +15,7 @@ import { getSourceProjectConnections } from "../lib/modules/projects/people-link
 import { createProjectsRepository } from "../lib/modules/projects/repository";
 import { peopleCreateInputToLegacy, peopleUpdateInputToLegacy } from "../lib/modules/people/legacy-adapter";
 import { birthdayForStorage, formatBirthday, parseBirthday } from "../lib/modules/people/birthday";
+import { derivePersonNameParts, extractQuotedNickname, mergeNicknames } from "../lib/modules/people/names";
 import {
   PHONE_COUNTRY_CHOICES,
   canonicalCountryCode,
@@ -777,26 +778,6 @@ const CONTACT_CATEGORY_OPTIONS: Array<{ value: PersonalContactEntryCategory; lab
 function contactEntryLabel(entry: Pick<PersonalEmailEntry | PersonalPhoneEntry, "category" | "customLabel">): string {
   if (entry.category === "custom") return entry.customLabel?.trim() || "Custom";
   return CONTACT_CATEGORY_OPTIONS.find((option) => option.value === entry.category)?.label || "Contact";
-}
-
-function derivePersonNameParts(value: string) {
-  const parts = value.trim().replace(/\s+/g, " ").split(" ").filter(Boolean);
-  if (parts.length === 0) return { firstName: "", middleName: "", lastName: "" };
-  if (parts.length === 1) return { firstName: parts[0], middleName: "", lastName: "" };
-  return {
-    firstName: parts[0],
-    middleName: parts.slice(1, -1).join(" "),
-    lastName: parts[parts.length - 1]
-  };
-}
-
-function extractQuotedNickname(value: string): { fullName: string; nickname: string } | null {
-  const match = value.match(/["“]([^"”]{1,80})["”]/);
-  if (!match) return null;
-  return {
-    fullName: value.replace(match[0], " ").replace(/\s+/g, " ").trim(),
-    nickname: match[1].trim()
-  };
 }
 
 function formatFullDate(value?: string) {
@@ -3763,7 +3744,7 @@ export default function PeopleWorkspace({
       return {
         ...current,
         fullName: resolvedValue,
-        nickname: quoted?.nickname || current.nickname,
+        nickname: mergeNicknames(current.nickname, quoted?.nickname),
         firstName: !current.firstName || current.firstName === previous.firstName ? next.firstName : current.firstName,
         middleName: !current.middleName || current.middleName === previous.middleName ? next.middleName : current.middleName,
         lastName: !current.lastName || current.lastName === previous.lastName ? next.lastName : current.lastName
