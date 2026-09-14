@@ -244,6 +244,34 @@ try {
   assert.equal(universityValues.context,'Example University provides higher education and research. It offers undergraduate and graduate programs.');
   assert.ok(conciseOrganizationDescription('A very long description '.repeat(80)).length<=360);
   assert.equal(extractOrganizationPage('<title>Example University | LinkedIn</title><dl><dt>Type</dt><dd>Educational</dd></dl>','https://linkedin.com/school/example-university','Example University').suggestions.find(x=>x.field==='organizationType')?.value,'University / School');
+  const snagProfile = { '@type': 'Organization', name: 'Snag', url: 'https://www.linkedin.com/company/snaginc', sameAs: 'https://snagdelivery.app', numberOfEmployees: {value: 207}, address: {streetAddress: '610 Brazos St', addressLocality: 'Austin', addressRegion: 'Texas', postalCode: '78701', addressCountry: 'US'} };
+  const snagHtml = (nodes, size = true) => `<title>Snag | LinkedIn</title><script type="application/ld+json">${JSON.stringify({'@graph':nodes})}</script><dl><dt>Industry</dt><dd>Consumer Services</dd>${size ? '<dt>Company size</dt><dd>11-50 employees</dd>' : ''}<dt>Type</dt><dd>Privately Held</dd><dt>Founded</dt><dd>2021</dd></dl><a href="/search/results/people">View all 207 employees</a>`;
+  const snagValues = (html, website = 'https://snagdelivery.app') => Object.fromEntries(extractOrganizationPage(html, snagProfile.url, 'Snag Delivery', {website}).suggestions.map(item=>[item.field,item.value]));
+  assert.equal(snagValues(snagHtml([snagProfile])).organizationType, 'Business', 'A verified official website resolves a brand alias');
+  assert.equal(snagValues(snagHtml([snagProfile])).foundedYear, '2021');
+  assert.equal(snagValues(snagHtml([snagProfile])).teamSize, '11-50 employees', 'Use company-declared size, not associated LinkedIn members');
+  assert.equal(snagValues(snagHtml([snagProfile], false)).teamSize, undefined, 'Do not use member counts even without a company-size field');
+  assert.equal(snagValues(snagHtml([snagProfile]), 'https://www.snagdelivery.app/').organizationType, 'Business');
+  for (const website of ['', 'https://snagdelivery.app.evil.example', 'https://other.example', 'https://snagdelivery.app/another-brand']) {
+    assert.equal(snagValues(snagHtml([snagProfile]), website).organizationType, undefined, 'No alias without an exact website match');
+  }
+  assert.equal(snagValues(snagHtml([{...snagProfile, url:'https://www.linkedin.com/company/other'}])).organizationType, undefined, 'Related companies do not establish profile identity');
+  assert.equal(snagValues(snagHtml([snagProfile,{...snagProfile,name:'Another company'}])).organizationType, undefined, 'Ambiguous identity stays empty');
+  assert.equal(snagValues('<title>Sign in | LinkedIn</title>' + snagHtml([snagProfile])).organizationType, undefined, 'Never bypass sign-in pages');
+  const snagRequests = [];
+  const snagResult = await discoverOrganization('Snag Delivery', [snagProfile.url, 'https://snagdelivery.app'], {fetchPage: async url => {
+    snagRequests.push(url);
+    return {sourceUrl:url, html: url === 'https://snagdelivery.app' ? '<meta name="description" content="College essentials delivered.">' : url === snagProfile.url ? snagHtml([snagProfile]) : '{}'};
+  }});
+  const snagFields = Object.fromEntries(snagResult.suggestions.map(item=>[item.field,item.value]));
+  assert.equal(snagRequests[0], 'https://snagdelivery.app', 'Resolve the website before reading social aliases');
+  assert.equal(snagFields.organizationType, 'Business');
+  assert.equal(snagFields.industry, 'Retail & consumer');
+  assert.equal(snagFields.foundedYear, '2021');
+  assert.equal(snagFields.teamSize, '11-50 employees');
+  assert.equal(snagFields.headquarters, 'Austin, Texas, USA');
+  assert.equal(snagFields.streetAddress, '610 Brazos St, Austin, Texas, 78701, USA');
+  assert.equal(emptyOrganizationSuggestions(snagResult.suggestions,{name:'Snag Delivery',context:'My notes'}).some(item=>item.field==='name'||item.field==='context'),false,'Keep the user\'s saved name and description');
   assert.equal(extractOrganizationPage('<p>5,000+ student employees</p><p>25,000 enrolled students</p>','https://university.example').suggestions.some(x=>x.field==='teamSize'),false,'Do not mistake students or a workforce subset for total employees');
   const logoUrl='https://media.licdn.com/dms/image/v2/abc/company-logo_200_200/company-logo/image';
   const logoPage=extractOrganizationPage('<title>Example University | LinkedIn</title><meta property="og:image" content="https://media.licdn.com/company-background/cover"><img class="top-card-layout__entity-image" alt="Example University logo" data-delayed-url="'+logoUrl+'">','https://linkedin.com/school/example-university','Example University');

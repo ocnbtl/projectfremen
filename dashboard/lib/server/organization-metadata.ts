@@ -76,7 +76,7 @@ function postalAddress(address: Record<string, unknown>): string {
 }
 
 /** Read bounded HTML as data. Never execute scripts or load JSON-LD contexts. */
-export function extractOrganizationPage(html: string, sourceUrl: string, organizationName = ""): OrganizationPage {
+export function extractOrganizationPage(html: string, sourceUrl: string, organizationName = "", identity: { website?: string } = {}): OrganizationPage {
   const source = normalizeOrganizationUrl(sourceUrl);
   const social = organizationLinkField(source) !== "website";
   const suggestions: OrganizationSuggestion[] = [];
@@ -168,7 +168,27 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
   const owned = organizations.filter((node) => {
     try { return typeof node.url === "string" && host(normalizeOrganizationUrl(node.url)) === host(source); } catch { return false; }
   });
-  const organization = matches[0] || (!organizationName.trim() ? owned.length === 1 ? owned[0] : !social && organizations.length === 1 && !organizations[0].url ? organizations[0] : undefined : undefined);
+  // Public company profiles often use a shorter brand name than the saved record.
+  // Admit an alias only when this exact profile identifies the supplied official
+  // website, not through fuzzy names, shared hosts, or a related-company mention.
+  const websiteKey = (raw: unknown) => {
+    try {
+      if (typeof raw !== "string" || organizationLinkField(normalizeOrganizationUrl(raw)) !== "website") return "";
+      const url = new URL(normalizeOrganizationUrl(raw));
+      return `${url.hostname.toLowerCase().replace(/^www\./, "")}${url.pathname.replace(/\/+$/, "")}${url.search}`;
+    } catch { return ""; }
+  };
+  const expectedWebsite = websiteKey(identity.website);
+  const verifiedAliases = social && expectedWebsite ? organizations.filter(node => {
+    try {
+      const profile = organizationProfileLink(String(node.url || ""));
+      const current = organizationProfileLink(source);
+      return profile?.field === current?.field && profile?.field !== "website"
+        && new URL(profile!.url).pathname.toLowerCase() === new URL(current!.url).pathname.toLowerCase()
+        && [node.sameAs].flat().some(url => websiteKey(url) === expectedWebsite);
+    } catch { return false; }
+  }) : [];
+  const organization = matches[0] || (verifiedAliases.length === 1 ? verifiedAliases[0] : undefined) || (!organizationName.trim() ? owned.length === 1 ? owned[0] : !social && organizations.length === 1 && !organizations[0].url ? organizations[0] : undefined : undefined);
   const dereference = (value: unknown) => {
     const node = object(value);
     return node["@id"] && Object.keys(node).length === 1 ? nodes.find((item) => item["@id"] === node["@id"] && Object.keys(item).length > 1) || node : node;
@@ -181,8 +201,12 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     if (year) add("foundedYear", year, "Organization structured data: foundingDate");
     const size = object(organization.numberOfEmployees);
     const count = text(size.value ?? organization.numberOfEmployees), min = text(size.minValue), max = text(size.maxValue);
-    if (/^\d+$/.test(count)) add("teamSize", count, "Organization structured data: numberOfEmployees");
-    else if (/^\d+$/.test(min) && /^\d+$/.test(max) && Number(min) <= Number(max)) add("teamSize", `${min}–${max}`, "Organization structured data: numberOfEmployees range");
+    // LinkedIn's JSON-LD count describes associated member profiles, not the
+    // company-declared workforce. Use its visible Company size field instead.
+    if (organizationLinkField(source) !== "linkedin") {
+      if (/^\d+$/.test(count)) add("teamSize", count, "Organization structured data: numberOfEmployees");
+      else if (/^\d+$/.test(min) && /^\d+$/.test(max) && Number(min) <= Number(max)) add("teamSize", `${min}–${max}`, "Organization structured data: numberOfEmployees range");
+    }
     const locations = [organization.location].flat().map(dereference);
     const hq = locations.find((node) => /headquarters|head office/i.test(text(node.name)));
     const publishedAddresses = [hq?.address || organization.address].flat().filter(Boolean);
