@@ -1,5 +1,5 @@
 import { normalizeOrganizationUrl, organizationLinkField, organizationProfileLink, organizationSuggestionError, type OrganizationAutofillResult, type OrganizationAutofillField, type OrganizationSuggestion } from "../modules/people/organization-autofill";
-import { isLinkedInLogoUrl } from "./organization-logo";
+import { isLinkedInLogoUrl, isInstagramLogoUrl, type OrganizationLogo } from "./organization-logo";
 import { classifyOrganizationServices } from "./organization-classification";
 
 function text(value: unknown, limit = 800): string {
@@ -53,7 +53,7 @@ export function matchesOrganizationWebsiteIdentity(html: string, sourceUrl: stri
   return false;
 }
 export type OrganizationPageLink = { url: string; kind: "website" | "detail" | "social"; priority: number };
-export type OrganizationPage = OrganizationAutofillResult & { links: OrganizationPageLink[]; blocked: boolean; linkedInLogo?: string };
+export type OrganizationPage = OrganizationAutofillResult & { links: OrganizationPageLink[]; blocked: boolean; linkedInLogo?: string; logoCandidates?: OrganizationLogo[] };
 
 export function conciseOrganizationDescription(value: string): string {
   const sentences = [...new Intl.Segmenter("en", { granularity: "sentence" }).segment(value)].map((part) => part.segment.trim());
@@ -371,7 +371,38 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
       meta.get("og:image")];
     linkedInLogo = candidates.map((value) => text(value, 2048)).find(isLinkedInLogoUrl);
   }
-  return { suggestions, sourceUrl: source, fetchedAt: new Date().toISOString(), links: links.slice(0, 80), linkedInLogo, blocked, conflicts: [...conflicts], message: "Published details found. Review the filled fields before saving." };
+  const logoCandidates: OrganizationLogo[] = [];
+  const addLogo = (raw: unknown, kind: OrganizationLogo["kind"]) => {
+    try {
+      const url = new URL(text(raw, 4096), source);
+      if (!raw || url.protocol !== "https:" || url.username || url.password || url.port || /\.svg(?:$|\?)/i.test(url.pathname)) return;
+      if (kind === "instagram" && !isInstagramLogoUrl(url.toString())) return;
+      if (!logoCandidates.some((item) => item.url === url.toString())) logoCandidates.push({ url: url.toString(), sourceUrl: source, kind });
+    } catch { /* Only explicit public branding images are candidates. */ }
+  };
+  if (linkedInLogo) addLogo(linkedInLogo, "linkedin");
+  if (!social && !hasOtherOrganization) {
+    const logo = object(organization?.logo);
+    addLogo(typeof organization?.logo === "string" ? organization.logo : logo.url || logo.contentUrl, "website");
+    // Website builders often omit structured branding. Use labelled branding,
+    // not a promotional/social-preview image, partner badge or page hero.
+    const brand = nameKey(organizationName).slice(0, 6);
+    for (const match of html.matchAll(/<img\b[^>]*>/gi)) {
+      const alt = text(attribute(match[0], "alt"));
+      if (!/\blogo\b/i.test(alt) || /partner|sponsor|client|powered by/i.test(alt) || !brand || !nameKey(alt).startsWith(brand)) continue;
+      addLogo(attribute(match[0], "src") || attribute(match[0], "data-src"), "website");
+    }
+    for (const match of html.matchAll(/<link\b[^>]*>/gi)) {
+      if (/^(?:apple-touch-icon(?:-precomposed)?|icon|shortcut icon)$/i.test(attribute(match[0], "rel"))) addLogo(attribute(match[0], "href"), "website");
+    }
+  }
+  if (organizationLinkField(source) === "instagram" && socialIdentity) {
+    for (const profile of matchingProfiles) addLogo(profile.profile_pic_url_hd || profile.profile_pic_url, "instagram");
+    // Instagram's profile preview is considered only on an identified profile,
+    // never a post/reel. The CDN and decoded image are checked separately.
+    if (organizationProfileLink(source)?.field === "instagram") addLogo(meta.get("og:image"), "instagram");
+  }
+  return { suggestions, sourceUrl: source, fetchedAt: new Date().toISOString(), links: links.slice(0, 80), linkedInLogo, logoCandidates: logoCandidates.slice(0, 6), blocked, conflicts: [...conflicts], message: "Published details found. Review the filled fields before saving." };
 }
 
 export function extractOrganizationMetadata(html: string, sourceUrl: string, organizationName = ""): OrganizationAutofillResult {

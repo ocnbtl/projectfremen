@@ -1,11 +1,15 @@
 import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
-import { createRequire } from "node:module";
+import { createRequire, Module } from "node:module";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 const root = process.cwd();
+// Compiled fixtures live in an isolated temp directory; resolve native runtime
+// dependencies from this application's installation, never from a global package.
+process.env.NODE_PATH = path.join(root, "node_modules");
+Module._initPaths();
 const temporary = await mkdtemp(path.join(tmpdir(), "fremen-organization-tests-"));
 try {
   const compile = spawnSync(process.execPath, [path.join(root, "node_modules/typescript/bin/tsc"), "--outDir", temporary, "--module", "commonjs", "--target", "es2022", "--esModuleInterop", "--skipLibCheck", "lib/server/public-page.ts", "lib/server/organization-metadata.ts", "lib/server/organization-discovery.ts", "lib/modules/people/links.ts"], { cwd: root, encoding: "utf8" });
@@ -107,7 +111,7 @@ try {
   assert.equal(supplementedValues.teamSize,'107,000');
   assert.equal(supplementedValues.tiktok,'https://www.tiktok.com/@example');
   assert.ok(supplemented.suggestions.find(item=>item.field==='teamSize').evidence.includes('106523'),'Retain exact count in source explanation');
-  assert.equal(knowledgeRequests.length,3,'One page plus two bounded knowledge requests');
+  assert.equal(knowledgeRequests.length,8,'One page, five platform searches and two bounded knowledge requests');
   assert.ok(!knowledgeRequests.at(-1).includes('Q124'),'Do not download full entities for unrelated products');
   assert.equal(withoutTrailingLinkSlash("https://example.com/path/?q=/"), "https://example.com/path?q=/");
   assert.equal(withoutTrailingLinkSlash("https://example.com/path/#section/"), "https://example.com/path#section/");
@@ -199,7 +203,7 @@ try {
   for (const [field, expected] of Object.entries({ ...socialLinks, website: "https://example.com", name: "Example", industry: "Professional services", organizationType: "Business", foundedYear: "2004", teamSize: "11–50 employees", headquarters: "Columbus, Ohio, USA", streetAddress: "12 Main Street, Suite 4, Columbus, Ohio, 43215, USA", context: "Tools for field research." })) assert.equal(discoveredValues[field], expected, field);
   assert.ok(fetched.includes("https://example.com/about") && fetched.includes("https://example.com/contact"), "Follow relevant company pages from a reverse social seed");
   assert.ok(!fetched.includes("https://wrong.example"), "Ignore unrelated embedded profiles");
-  assert.ok(fetched.length <= 10 && new Set(fetched).size === fetched.length, "Bound and deduplicate discovery");
+  assert.ok(fetched.length <= 25 && new Set(fetched).size === fetched.length, "Bound and deduplicate discovery including five platform searches");
   assert.equal(discovered.suggestions.find((item) => item.field === "streetAddress").sourceUrl, "https://example.com/contact", "Keep exact per-field source");
   const onlyMissing = emptyOrganizationSuggestions(discovered.suggestions, { context: "My own description", teamSize: "20", instagram: socialLinks.instagram });
   assert.ok(!onlyMissing.some((item) => ["context", "teamSize", "instagram"].includes(item.field)), "Keep manually entered values, including changes made while fetching");
@@ -229,7 +233,7 @@ try {
   const searchValues = Object.fromEntries(searchFallback.suggestions.map(item => [item.field, item.value]));
   assert.equal(searchValues.website, 'https://example.com', 'A hidden social website can be recovered through an exact reciprocal profile link');
   assert.equal(searchValues.foundedYear, '2004', 'Search snippets and unverified candidate facts must never enter the draft');
-  assert.ok(!searchFallback.sources.includes('https://unrelated.example') && searchedPages.length <= 10);
+  assert.ok(!searchFallback.sources.includes('https://unrelated.example') && searchedPages.length <= 25);
   assert.ok(searchFallback.message.includes('link back'));
   const { extractOrganizationPage, conciseOrganizationDescription } = require(path.join(temporary, 'server/organization-metadata.js'));
   const mglNode = {'@type':'Organization', name:'MGL 365 Antigua', url:'https://www.mgl365antigua.com', description:'Luxury villa rentals and vacation home management in Antigua.'};

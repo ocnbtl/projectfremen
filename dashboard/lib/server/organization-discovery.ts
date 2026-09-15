@@ -2,23 +2,25 @@ import { normalizeOrganizationUrl, organizationLinkField, organizationProfileLin
 import { extractOrganizationPage, type OrganizationPageLink } from "./organization-metadata";
 import { fetchPublicPage } from "./public-page";
 import { findOrganizationFactPages, findOrganizationWebsiteCandidates, organizationProfileKey } from "./organization-website-search";
-import { fetchLinkedInLogo } from "./organization-logo";
+import { fetchLinkedInLogo, fetchOrganizationLogo, type OrganizationLogo } from "./organization-logo";
+import { findOrganizationSocialProfiles, SOCIAL_DOMAINS } from "./organization-social-search";
 import { findOrganizationKnowledge } from "./organization-knowledge";
 import { approximateTeamSize } from "../modules/people/team-size";
 import { normalizeOrganizationIndustry, organizationIndustryOptions } from "../modules/people/organization-industries";
 
 const MAX_PAGES = 10;
-const TOTAL_TIMEOUT_MS = 22_000;
+const TOTAL_TIMEOUT_MS = 26_000;
 const comparable = (value: string) => value.toLowerCase().replace(/[\s,]+/g, " ").trim().replace(/\/+$/, "");
 
-/** One explicit click inspects at most ten connected public pages, with no background crawl. */
+/** One explicit click: at most ten fact/crawl requests plus fifteen social-search
+ * requests and four logo attempts, all within a shared deadline. No background crawl. */
 export async function discoverOrganization(name: string, urls: string[], dependencies: {
   fetchPage?: typeof fetchPublicPage;
   timeoutMs?: number;
   fetchLogo?: typeof fetchLinkedInLogo;
 } = {}): Promise<OrganizationAutofillResult> {
   const deadline = Date.now() + (dependencies.timeoutMs ?? TOTAL_TIMEOUT_MS);
-  const crawlDeadline = deadline - Math.min(6000, (dependencies.timeoutMs ?? TOTAL_TIMEOUT_MS) * 0.27);
+  const crawlDeadline = deadline - Math.min(12000, (dependencies.timeoutMs ?? TOTAL_TIMEOUT_MS) * 0.46);
   const seeds = [...new Set(urls.map(normalizeOrganizationUrl))].slice(0, 6);
   const queue: (OrganizationPageLink & { verifyProfile?: string; depth?: number })[] = seeds.map((url) => ({ url, kind: organizationLinkField(url) === "website" ? "website" : "social", priority: organizationLinkField(url) === "website" ? 0 : 3 }));
   const visited = new Set<string>();
@@ -32,9 +34,10 @@ export async function discoverOrganization(name: string, urls: string[], depende
   let resolvedName = name;
   let searched = false;
   let searchedFacts = false;
+  let socialPlatformsSearched = 0;
   let verifiedSearch = false;
   let publicProfileName = "";
-  let logo: { url: string; sourceUrl: string } | undefined;
+  const logos: OrganizationLogo[] = [];
   const addCandidate = (item: OrganizationSuggestion, priority: number) => {
     const existing = candidates.get(item.field);
     if (!existing || priority < existing.priority) {
@@ -45,7 +48,7 @@ export async function discoverOrganization(name: string, urls: string[], depende
       if (!["context", "name", "website"].includes(item.field)) conflicts.add(item.field);
     }
   };
-  // Reserve two requests and six seconds for identity-checked missing-fact lookup.
+  // Reserve requests and time for social discovery, missing facts and logo fallbacks.
   while (queue.length && attempted < MAX_PAGES - 2 && Date.now() < crawlDeadline) {
     queue.sort((a, b) => a.priority - b.priority);
     const next = queue.shift()!;
@@ -67,7 +70,7 @@ export async function discoverOrganization(name: string, urls: string[], depende
         verifiedSearch = true;
       }
       sources.push(parsed.sourceUrl);
-      if (parsed.linkedInLogo && !logo) logo = { url: parsed.linkedInLogo, sourceUrl: parsed.sourceUrl };
+      for (const logo of parsed.logoCandidates || []) if (!logos.some((item) => item.url === logo.url)) logos.push(logo);
       visited.add(comparable(parsed.sourceUrl));
       const social = organizationLinkField(parsed.sourceUrl) !== "website";
       if (social && !publicProfileName) publicProfileName = parsed.suggestions.find((item) => item.field === "name")?.value || "";
@@ -113,9 +116,20 @@ export async function discoverOrganization(name: string, urls: string[], depende
   // Preserve the endpoint's private-destination error contract when no page can be read.
   if (!sources.length && firstError instanceof Error && /^Use a public/.test(firstError.message)) throw firstError;
   const website = candidates.get("website")?.item.value;
+  if (website && resolvedName && Date.now() < deadline - 4500) {
+    socialPlatformsSearched = Object.keys(SOCIAL_DOMAINS).filter((field) => !candidates.has(field as OrganizationAutofillField)).length;
+    const socialProfiles = await findOrganizationSocialProfiles(resolvedName, website, [...candidates.values()].map(({ item }) => item), dependencies.fetchPage || fetchPublicPage, Math.min(Date.now() + 5500, deadline - 4500));
+    for (const { suggestion, page } of socialProfiles) {
+      if (conflicts.has(suggestion.field)) continue;
+      addCandidate(suggestion, 4);
+      for (const item of page.suggestions) if (!(item.field in SOCIAL_DOMAINS) && !["name", "website"].includes(item.field)) addCandidate(item, 3);
+      if (!sources.includes(page.sourceUrl)) sources.push(page.sourceUrl);
+      for (const logo of page.logoCandidates || []) if (!logos.some((item) => item.url === logo.url)) logos.push(logo);
+    }
+  }
   if (website && resolvedName && ["foundedYear", "tiktok", "instagram", "x", "youtube", "linkedin"].some((field) => !candidates.has(field as OrganizationAutofillField)) && Date.now() < deadline) {
     try {
-      const knowledge = await findOrganizationKnowledge(resolvedName, website, dependencies.fetchPage || fetchPublicPage, deadline);
+      const knowledge = await findOrganizationKnowledge(resolvedName, website, dependencies.fetchPage || fetchPublicPage, Math.min(Date.now() + 3000, deadline - 2500));
       for (const item of knowledge) if (!candidates.has(item.field) && !conflicts.has(item.field)) {
         addCandidate(item, 4);
         if (!sources.includes(item.sourceUrl)) sources.push(item.sourceUrl);
@@ -143,14 +157,20 @@ export async function discoverOrganization(name: string, urls: string[], depende
   }).filter((item) => !conflicts.has(item.field) && !(item.field === "industry" && item.evidence.startsWith("Inferred classification")
     && (conflicts.has("organizationType") || !organizationIndustryOptions(candidates.get("organizationType")?.item.value || "").includes(candidates.get("industry")!.item.value))));
   let photo: OrganizationAutofillResult["photo"];
-  if (logo && Date.now() < deadline) {
-    try { photo = { dataUrl: await (dependencies.fetchLogo || fetchLinkedInLogo)(logo.url, Math.min(3000, deadline - Date.now())), sourceUrl: logo.sourceUrl }; }
+  const logoPriority = { linkedin: 0, website: 1, instagram: 2 };
+  // Keep a fallback from each source, so several bad website assets cannot crowd
+  // Instagram out of the bounded image budget.
+  const orderedLogos = logos.sort((a, b) => logoPriority[a.kind] - logoPriority[b.kind]);
+  const selectedLogos = orderedLogos.filter((item, index) => orderedLogos.slice(0, index).filter((previous) => previous.kind === item.kind).length < (item.kind === "website" ? 2 : 1));
+  for (const logo of selectedLogos.slice(0, 4)) {
+    if (Date.now() >= deadline || photo) break;
+    try { photo = { dataUrl: await (dependencies.fetchLogo ? dependencies.fetchLogo(logo.url, Math.min(2000, deadline - Date.now())) : fetchOrganizationLogo(logo, Math.min(2000, deadline - Date.now()))), sourceUrl: logo.sourceUrl, sourceKind: logo.kind }; }
     catch { /* A blocked image must not discard available facts. */ }
   }
   return {
     suggestions, photo, sourceUrl: sources[0] || seeds[0], sources, unavailableSources, conflicts: [...conflicts], fetchedAt: new Date().toISOString(),
     message: sources.length
-      ? `${sources.length} public ${sources.length === 1 ? "page" : "pages"} checked.${verifiedSearch ? " The website was matched by its link back to your social profile." : ""}${unavailableSources ? " Some pages could not be read or matched." : ""}${conflicts.size ? " Conflicting details were left empty." : ""} Unpublished details stay empty.`
+      ? `${sources.length} public ${sources.length === 1 ? "page" : "pages"} checked.${socialPlatformsSearched ? ` Searched ${socialPlatformsSearched} social platforms for missing profiles; only matches with a link to the official website were added. Private, unindexed or unverified profiles may remain empty.` : ""}${verifiedSearch ? " The website was matched by its link back to your social profile." : ""}${unavailableSources ? " Some pages could not be read or matched." : ""}${conflicts.size ? " Conflicting details were left empty." : ""} Unpublished details stay empty.`
       : "These links did not provide a readable public profile. Try adding the official website; sign-in-only pages cannot supply details."
   };
 }

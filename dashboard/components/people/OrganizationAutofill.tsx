@@ -59,7 +59,7 @@ export default function OrganizationAutofill({ name, values, onApply, onPhoto, h
       const pictureAdded = Boolean(next.photo && latest.current.onPhoto && !latest.current.hasPhoto && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(next.photo.dataUrl) && next.photo.dataUrl.length <= 1_000_000);
       if (pictureAdded) latest.current.onPhoto!(next.photo!.dataUrl);
       setResult({ ...next, suggestions: chosen });
-      setNotice(chosen.length || pictureAdded ? `${chosen.length} ${chosen.length === 1 ? "field" : "fields"} filled.${pictureAdded ? " LinkedIn picture added." : ""} Review the details, then Save.` : "No additional fields could be filled. Your existing details were kept.");
+      setNotice(chosen.length || pictureAdded ? `${chosen.length} ${chosen.length === 1 ? "field" : "fields"} filled.${pictureAdded ? " Organization picture added." : ""} Review the details, then Save.` : "No additional fields could be filled. Your existing details were kept.");
     } catch (error) {
       if (!request.signal.aborted) setNotice(error instanceof Error ? error.message : "Autofill could not finish. Your draft is still here.");
     } finally {
@@ -77,8 +77,8 @@ export default function OrganizationAutofill({ name, values, onApply, onPhoto, h
       {result && <details className="people-autofill-sources">
         <summary>Autofill sources</summary>
         <p>{result.message}</p>
-        {result.photo && <p>Picture: <a href={result.photo.sourceUrl} target="_blank" rel="noopener noreferrer">LinkedIn organization profile</a></p>}
-        {onPhoto && !hasPhoto && !result.photo && <p>The LinkedIn picture was not publicly available. You can add a picture yourself.</p>}
+        {result.photo && <p>Picture: <a href={result.photo.sourceUrl} target="_blank" rel="noopener noreferrer">{result.photo.sourceKind === "website" ? "Organization website" : result.photo.sourceKind === "instagram" ? "Instagram profile" : "LinkedIn organization profile"}</a>. Fitted to a square with the full artwork visible.</p>}
+        {onPhoto && !hasPhoto && !result.photo && <p>No suitable public logo was available. You can add a picture yourself.</p>}
         {result.suggestions.length > 0 && <ul>{result.suggestions.map((item) => <li key={item.field}>
           <strong>{ORGANIZATION_AUTOFILL_LABELS[item.field]}</strong>: {item.value}
           <small>{item.evidence}. <a href={item.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a></small>

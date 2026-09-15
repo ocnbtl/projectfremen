@@ -29,7 +29,7 @@ export async function findOrganizationFactPages(website: string, name: string, f
   }).slice(0, 2);
 }
 
-export async function searchOrganizationPages(query: string, fetchPage: typeof fetchPublicPage, timeoutMs: number): Promise<string[]> {
+export async function searchOrganizationPages(query: string, fetchPage: typeof fetchPublicPage, timeoutMs: number, socialField?: string): Promise<string[]> {
   const searchUrl = `https://www.bing.com/search?q=${encodeURIComponent(query)}&count=5`;
   const page = await fetchPage(searchUrl, { timeoutMs, maxBytes: 1_000_000 });
   if (/verify you are human|unusual traffic|<title[^>]*>[^<]*(?:sign in|captcha)/i.test(page.html)) return [];
@@ -45,15 +45,15 @@ export async function searchOrganizationPages(query: string, fetchPage: typeof f
           url = new URL(Buffer.from(encoded.slice(2), "base64url").toString("utf8"));
         }
         const link = organizationProfileLink(url.toString());
-        if (!link || organizationLinkField(link.url) !== "website") continue;
-        if (/(?:^|\.)(?:bing|microsoft|google|facebook|wikipedia|wikidata|instagram|youtube|tiktok|linkedin|twitter|x|linktr|linktree)\.(?:com|org|ee)$/.test(url.hostname)) continue;
+        if (!link || organizationLinkField(link.url) !== (socialField || "website")) continue;
+        if (!socialField && /(?:^|\.)(?:bing|microsoft|google|facebook|wikipedia|wikidata|instagram|youtube|tiktok|linkedin|twitter|x|linktr|linktree)\.(?:com|org|ee)$/.test(url.hostname)) continue;
         if (/\.(?:pdf|zip|png|jpg|svg)$/i.test(url.pathname)) continue;
-        const candidate = normalizeOrganizationUrl(url.toString());
+        const candidate = socialField ? link.url : normalizeOrganizationUrl(url.toString());
         if (!candidates.includes(candidate)) candidates.push(candidate);
         break;
       } catch { /* Invalid search links provide no candidate. */ }
     }
-    if (candidates.length >= 5) break;
+    if (candidates.length >= (socialField ? 2 : 5)) break;
   }
   return candidates;
 }

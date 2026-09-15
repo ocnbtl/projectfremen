@@ -21,7 +21,7 @@ export type OrganizationAutofillResult = {
   sources?: string[];
   unavailableSources?: number;
   conflicts?: OrganizationAutofillField[];
-  photo?: { dataUrl: string; sourceUrl: string };
+  photo?: { dataUrl: string; sourceUrl: string; sourceKind?: "linkedin" | "website" | "instagram" };
 };
 export const ORGANIZATION_LINK_FIELDS = ["website", "linkedin", "x", "youtube", "instagram", "tiktok"] as const;
 export type OrganizationLinkField = typeof ORGANIZATION_LINK_FIELDS[number];
