@@ -1,5 +1,6 @@
 import { normalizeOrganizationUrl, organizationLinkField, organizationProfileLink, organizationSuggestionError, type OrganizationAutofillResult, type OrganizationAutofillField, type OrganizationSuggestion } from "../modules/people/organization-autofill";
 import { isLinkedInLogoUrl } from "./organization-logo";
+import { classifyOrganizationServices } from "./organization-classification";
 
 function text(value: unknown, limit = 800): string {
   if (typeof value !== "string" && typeof value !== "number") return "";
@@ -219,7 +220,20 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
       add("streetAddress", address.streetAddress ? postalAddress(address) : typeof addresses[0] === "string" ? addresses[0] : "", "Organization structured data: postal address");
     }
     if (organization.nonprofitStatus) add("organizationType", "Nonprofit", "Organization structured data: nonprofitStatus");
-    for (const type of types(organization)) if (TYPE_LABELS[type]) add("organizationType", TYPE_LABELS[type], `Organization structured data: ${type}`);
+    // A site may describe the same entity as both Organization and LocalBusiness
+    // in separate graph nodes. Do not discard the more specific second node.
+    const sameEntity = organizations.filter(node => {
+      if (node === organization) return true;
+      try { return namesMatch(node) && typeof node.url === "string" && typeof organization.url === "string"
+        && normalizeOrganizationUrl(node.url) === normalizeOrganizationUrl(organization.url); } catch { return false; }
+    });
+    const declaredTypes = [...new Set(sameEntity.flatMap(types).map(type => TYPE_LABELS[type]).filter(Boolean))];
+    if (declaredTypes.length === 1) add("organizationType", declaredTypes[0], "Organization structured data: matching entity types");
+    else if (declaredTypes.length > 1) {
+      const index = suggestions.findIndex(item => item.field === "organizationType");
+      if (index >= 0) suggestions.splice(index, 1);
+      conflicts.add("organizationType");
+    }
     if (types(organization).includes("CollegeOrUniversity")) add("industry", "Higher Education", "Organization structured data: CollegeOrUniversity");
     addLink(organization.url, "Organization structured data: website", true);
     for (const link of [organization.sameAs].flat().slice(0, 24)) addLink(link, "Organization structured data: sameAs link", true);
@@ -313,6 +327,18 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
       const address = Object.fromEntries(addressFields.map((field) => [field, micro(field)]));
       add("streetAddress", postalAddress(address), "Published contact address");
       add("headquarters", addressParts(address).join(", "), "Published contact location");
+    }
+  }
+
+  // Only classify the official homepage's own description. Detail pages may
+  // describe a customer, partner, destination or individual product instead.
+  if (!social && !hasOtherOrganization && !new URL(source).pathname.replace(/\/+$/, "") && !conflicts.has("organizationType")) {
+    const description = suggestions.find(item => item.field === "context");
+    const inferred = description && classifyOrganizationServices(description.value, suggestions.find(item => item.field === "organizationType")?.value);
+    if (inferred) {
+      const evidence = `Inferred classification from published services: ${description!.value}`;
+      add("organizationType", inferred.organizationType, evidence);
+      add("industry", inferred.industry, evidence);
     }
   }
 

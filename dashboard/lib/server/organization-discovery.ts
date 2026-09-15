@@ -5,7 +5,7 @@ import { findOrganizationFactPages, findOrganizationWebsiteCandidates, organizat
 import { fetchLinkedInLogo } from "./organization-logo";
 import { findOrganizationKnowledge } from "./organization-knowledge";
 import { approximateTeamSize } from "../modules/people/team-size";
-import { normalizeOrganizationIndustry } from "../modules/people/organization-industries";
+import { normalizeOrganizationIndustry, organizationIndustryOptions } from "../modules/people/organization-industries";
 
 const MAX_PAGES = 10;
 const TOTAL_TIMEOUT_MS = 22_000;
@@ -73,7 +73,7 @@ export async function discoverOrganization(name: string, urls: string[], depende
       if (social && !publicProfileName) publicProfileName = parsed.suggestions.find((item) => item.field === "name")?.value || "";
       if (!resolvedName && !social) resolvedName = parsed.suggestions.find((item) => item.field === "name")?.value || (next.verifyProfile ? publicProfileName : "");
       for (const item of parsed.suggestions) {
-        const priority = social ? 3 : item.evidence.includes("structured data") ? 0 : item.evidence.includes("Published") ? 1 : 2;
+        const priority = item.evidence.startsWith("Inferred classification") ? 5 : social ? 3 : item.evidence.includes("structured data") ? 0 : item.evidence.includes("Published") ? 1 : 2;
         addCandidate(item, priority);
       }
       for (const field of parsed.conflicts || []) if (!candidates.has(field)) conflicts.add(field);
@@ -140,7 +140,8 @@ export async function discoverOrganization(name: string, urls: string[], depende
     if (item.field !== "teamSize") return item;
     const value = approximateTeamSize(item.value);
     return { ...item, value, evidence: value.replace(/,/g, "") !== item.value.replace(/,/g, "") ? `${item.evidence}; rounded estimate from published count ${item.value}` : item.evidence };
-  }).filter((item) => !conflicts.has(item.field));
+  }).filter((item) => !conflicts.has(item.field) && !(item.field === "industry" && item.evidence.startsWith("Inferred classification")
+    && (conflicts.has("organizationType") || !organizationIndustryOptions(candidates.get("organizationType")?.item.value || "").includes(candidates.get("industry")!.item.value))));
   let photo: OrganizationAutofillResult["photo"];
   if (logo && Date.now() < deadline) {
     try { photo = { dataUrl: await (dependencies.fetchLogo || fetchLinkedInLogo)(logo.url, Math.min(3000, deadline - Date.now())), sourceUrl: logo.sourceUrl }; }

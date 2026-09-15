@@ -17,6 +17,23 @@ try {
   const { normalizeOrganizationUrl, organizationProfileLink, emptyOrganizationSuggestions, organizationSeedUrls } = require(path.join(temporary, "modules/people/organization-autofill.js"));
   const { withoutTrailingLinkSlash } = require(path.join(temporary, "modules/people/links.js"));
   const { normalizeOrganizationIndustry, ORGANIZATION_INDUSTRY_OPTIONS } = require(path.join(temporary, "modules/people/organization-industries.js"));
+  const { classifyOrganizationServices } = require(path.join(temporary, "server/organization-classification.js"));
+  for (const [description, industry] of [
+    ['Discover premium beachfront villa rentals in Antigua with MGL 365. Private pools, beaches, chef services and concierge.', 'Hospitality & travel'],
+    ['Luxury villa rentals and property management.', 'Hospitality & travel'],
+    ['We provide software development and cloud hosting.', 'Technology'],
+    ['An accounting firm providing accounting services.', 'Professional services'],
+    ['A dental clinic offering patient appointments.', 'Healthcare'],
+    ['An online store selling home essentials.', 'Retail & consumer'],
+    ['Courier services and freight forwarding.', 'Transportation & logistics'],
+    ['An insurance brokerage offering tailored coverage.', 'Finance & insurance'],
+    ['A manufacturer of industrial equipment.', 'Manufacturing'],
+    ['Property management and real estate brokerage.', 'Construction & real estate']
+  ]) assert.deepEqual(classifyOrganizationServices(description), {organizationType:'Business',industry});
+  for (const description of ['Discover new possibilities.', 'A guide to villa rentals.', 'Our clients offer villa rentals.', 'Software development and villa rentals.', 'We no longer offer villa rentals.', 'A nonprofit offering free medical clinic appointments.', 'A public medical clinic.', 'A university medical practice.', 'A directory of law firms.', 'Research into property management.']) {
+    assert.equal(classifyOrganizationServices(description), null, description);
+  }
+  assert.equal(classifyOrganizationServices('Villa rentals.', 'Nonprofit'), null, 'Do not override an explicit organization type');
   for (const [type, source, expected] of [
     ['Business', 'Retail', 'Retail & consumer'], ['Business', 'Retail.Current', 'Retail & consumer'],
     ['Business', 'Entertainment Providers', 'Media & entertainment'], ['Business', 'Construction', 'Construction & real estate'],
@@ -215,6 +232,30 @@ try {
   assert.ok(!searchFallback.sources.includes('https://unrelated.example') && searchedPages.length <= 10);
   assert.ok(searchFallback.message.includes('link back'));
   const { extractOrganizationPage, conciseOrganizationDescription } = require(path.join(temporary, 'server/organization-metadata.js'));
+  const mglNode = {'@type':'Organization', name:'MGL 365 Antigua', url:'https://www.mgl365antigua.com', description:'Luxury villa rentals and vacation home management in Antigua.'};
+  const mglHtml = nodes => `<script type="application/ld+json">${JSON.stringify({'@graph':nodes})}</script>`;
+  const mglPage = extractOrganizationPage(mglHtml([mglNode,{...mglNode,'@type':'LocalBusiness'}]),mglNode.url,mglNode.name);
+  assert.equal(mglPage.suggestions.find(item=>item.field==='organizationType')?.value,'Business');
+  assert.ok(mglPage.suggestions.find(item=>item.field==='organizationType').evidence.includes('structured data'), 'Combine specific types from matching entity nodes');
+  assert.equal(mglPage.suggestions.find(item=>item.field==='industry')?.value,'Hospitality & travel');
+  assert.ok(mglPage.suggestions.find(item=>item.field==='industry').evidence.startsWith('Inferred classification'), 'Retain the distinction between published and inferred categories');
+  assert.ok(!mglPage.suggestions.some(item=>['foundedYear','teamSize'].includes(item.field)), 'Never derive exact facts from service language');
+  const partnerPage = extractOrganizationPage(mglHtml([{...mglNode,description:'Our clients offer villa rentals.'},{...mglNode,'@type':'LocalBusiness',url:'https://other.example'}]),mglNode.url,mglNode.name);
+  assert.ok(!partnerPage.suggestions.some(item=>['organizationType','industry'].includes(item.field)), 'A same-name company on a different website cannot contribute its type');
+  const conflictingTypes = extractOrganizationPage(mglHtml([{...mglNode,'@type':'LocalBusiness'},{...mglNode,'@type':'GovernmentOrganization'}]),mglNode.url,mglNode.name);
+  assert.ok(conflictingTypes.conflicts.includes('organizationType'));
+  assert.ok(!conflictingTypes.suggestions.some(item=>['organizationType','industry'].includes(item.field)), 'Contradictory identity types must not be replaced with an inference');
+  const blogPage = extractOrganizationPage('<meta name="description" content="Luxury villa rentals in Antigua.">',mglNode.url+'/blog/travel',mglNode.name);
+  assert.ok(!blogPage.suggestions.some(item=>item.field==='industry'), 'Do not classify the organization from an article');
+  const metadataPage = extractOrganizationPage('<meta name="description" content="Discover premium beachfront villa rentals in Antigua with MGL 365. Private pools, beaches, chef services and concierge.">',mglNode.url,mglNode.name);
+  assert.equal(metadataPage.suggestions.find(item=>item.field==='organizationType')?.value,'Business', 'A clear homepage offering can classify without structured data');
+  for (const [type, industry, expected] of [['Business','Construction & real estate','Construction & real estate'],['Nonprofit','',undefined]]) {
+    const explicit = await discoverOrganization(mglNode.name,[mglNode.url],{fetchPage:async url=>({sourceUrl:url,html:url===mglNode.url
+      ? '<meta name="description" content="Luxury villa rentals in Antigua."><a href="/about">About</a>'
+      : url===mglNode.url+'/about' ? `<dl><dt>Organization type</dt><dd>${type}</dd>${industry ? `<dt>Industry</dt><dd>${industry}</dd>` : ''}</dl>` : '{}'})});
+    assert.equal(explicit.suggestions.find(item=>item.field==='organizationType')?.value,type,'Explicit declarations take priority over inference');
+    assert.equal(explicit.suggestions.find(item=>item.field==='industry')?.value,expected,'Discard inferred categories incompatible with a later explicit type');
+  }
   const navigation=extractOrganizationPage('<a href="https://about.example.com/en">About Example</a><a href="https://example.com.evil.org/company">Company</a>','https://example.com','Example');
   assert.ok(navigation.links.some(link=>link.url==='https://about.example.com/en' && link.kind==='detail'),'Follow linked official corporate subdomains');
   assert.ok(!navigation.links.some(link=>link.url.includes('evil.org')),'Reject lookalike domains');
