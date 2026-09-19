@@ -62,7 +62,8 @@ export async function discoverOrganization(name: string, urls: string[], depende
     if (next.kind === "detail") detailPages++;
     try {
       const page = await (dependencies.fetchPage || fetchPublicPage)(next.url, { timeoutMs: Math.min(4_000, Math.max(1, crawlDeadline - Date.now())), maxBytes: 2_000_000 });
-      const parsed = extractOrganizationPage(page.html, page.sourceUrl, resolvedName, { website: candidates.get("website")?.item.value });
+      const parsed = extractOrganizationPage(page.html, page.sourceUrl, resolvedName, { website: candidates.get("website")?.item.value,
+        organizationType: conflicts.has("organizationType") ? undefined : candidates.get("organizationType")?.item.value });
       if (parsed.blocked) throw new Error("Public profile unavailable");
       if (next.verifyProfile) {
         const key = organizationProfileKey(next.verifyProfile);

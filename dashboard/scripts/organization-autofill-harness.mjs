@@ -23,6 +23,47 @@ try {
   const { normalizeOrganizationIndustry, ORGANIZATION_INDUSTRY_OPTIONS } = require(path.join(temporary, "modules/people/organization-industries.js"));
   const { classifyOrganizationServices } = require(path.join(temporary, "server/organization-classification.js"));
   for (const [description, industry] of [
+    ['Customized Private Boat Charters', 'Hospitality & travel'], ['Luxury yacht charters with free cancellation.', 'Hospitality & travel'],
+    ['Guided snorkelling tours and fishing trips.', 'Hospitality & travel'], ['Not just boat tours. A day to remember.', 'Hospitality & travel'],
+    ['Public boat charters around the coast.', 'Hospitality & travel'], ['Cargo shipping and freight transport.', 'Transportation & logistics'],
+    ['Managed IT services.', 'Technology'], ['An architectural firm.', 'Professional services'], ['Veterinary clinic.', 'Healthcare'],
+    ['A grocery store.', 'Retail & consumer'], ['A credit union.', 'Finance & insurance'], ['Industrial manufacturing.', 'Manufacturing'],
+    ['Snag delivers 1,500+ products to college students in 10 minutes. Order snacks, drinks, and essentials from our app.', 'Retail & consumer'],
+    ['A roofing contractor.', 'Construction & real estate'], ['A film production studio.', 'Media & entertainment'],
+    ['A restaurant.', 'Hospitality & travel'], ['An organic farm.', 'Agriculture & food'], ['Solar panel installation.', 'Energy & utilities'],
+    ['An independent clothing brand.', 'Fashion & apparel']
+  ]) assert.deepEqual(classifyOrganizationServices(description), { organizationType: 'Business', industry }, description);
+  for (const [description, type, industry] of [
+    ['A nonprofit animal rescue.', 'Nonprofit', 'Animal welfare'], ['A nonprofit medical clinic.', 'Nonprofit', 'Health'],
+    ['A primary school.', 'University / School', 'Primary / secondary education'], ['A marketing agency.', 'Agency', 'Marketing / advertising'],
+    ['A judicial court.', 'Government', 'Judicial / legal']
+  ]) assert.deepEqual(classifyOrganizationServices(description, type), { organizationType: type, industry });
+  for (const description of ['We no longer offer boat charters.', 'A guide to private boat charters.', 'Our clients offer yacht charters.', 'Software solutions for boat tours.']) assert.equal(classifyOrganizationServices(description), null);
+  const fieldsFor = (html, url='https://barefoot.example', name='Barefoot Antigua') => Object.fromEntries(extractOrganizationMetadata(html, url, name).suggestions.map(item=>[item.field,item.value]));
+  const barefootHome = '<title>Barefoot Antigua</title><meta property="og:description" content="Charter Options"><h2>Charter Options</h2><h2>Our story</h2><h1>Customized Private Boat Charters</h1><p>Book directly with us.</p><footer>Government sales tax applies. Leave us a review.</footer>';
+  for (const route of ['', '/home', '/index.html', '/en', '/en/home', '/en-US/']) {
+    const fields = fieldsFor(barefootHome,'https://barefoot.example'+route);
+    assert.equal(fields.organizationType,'Business',route); assert.equal(fields.industry,'Hospitality & travel',route);
+    assert.equal(fields.context,'Customized Private Boat Charters','Use the offering instead of a navigation label');
+  }
+  const aboutFields = fieldsFor('<h1>Our story</h1><p>Barefoot Antigua offers private boat charters and guided snorkelling tours.</p>','https://barefoot.example/our-story');
+  assert.equal(aboutFields.industry,'Hospitality & travel','A named about-page self-description is usable evidence');
+  assert.equal(fieldsFor('<h1>Welcome</h1><p>We specialize in customized private tours.</p>').industry,'Hospitality & travel');
+  for (const html of ['<nav><h1>Boat charters</h1></nav>', '<article><h1>Private boat charters</h1></article>', '<blockquote><h2>Private boat charters</h2></blockquote>', '<footer><h2>Boat charters</h2></footer>', '<p>Our partner offers boat charters.</p>']) {
+    assert.equal(fieldsFor(html).industry,undefined,'Do not classify partner, article or navigation content');
+  }
+  assert.equal(fieldsFor('<h1>Private boat charters</h1>','https://barefoot.example/blog/boats').industry,undefined);
+  assert.equal(fieldsFor('<p>Another Company offers private boat charters.</p>','https://barefoot.example/our-story').industry,undefined);
+  assert.equal(fieldsFor('<h1>Private boat charters</h1><h2>Software development</h2>').industry,undefined,'Competing activities require review');
+  assert.equal(fieldsFor('<h1>Private boat charters</h1><h2>Software development</h2>').organizationType,'Business','Ambiguous industry need not hide a supported type');
+  const explicitFields = fieldsFor('<p>Organization type: Business</p><p>Industry: Transportation & logistics</p><h1>Private boat charters</h1>');
+  assert.equal(explicitFields.industry,'Transportation & logistics','Retain an explicitly published classification');
+  const preserved = emptyOrganizationSuggestions(extractOrganizationMetadata(barefootHome,'https://barefoot.example','Barefoot Antigua').suggestions,{ context:'My own notes', organizationType:'Agency', industry:'Consulting' });
+  assert.equal(preserved.some(item=>['context','organizationType','industry'].includes(item.field)),false,'Existing manual fields remain unchanged');
+  const nonprofitService = await discoverOrganization('Example', ['https://nonprofit.example'], { fetchPage: async url => ({ sourceUrl:url, html:url==='https://nonprofit.example'?'<script type="application/ld+json">{"@type":"NGO","name":"Example","url":"https://nonprofit.example"}</script><a href="/about">About</a>':url.endsWith('/about')?'<p>We provide a medical clinic.</p>':'' }) });
+  assert.equal(nonprofitService.suggestions.find(item=>item.field==='organizationType').value,'Nonprofit');
+  assert.equal(nonprofitService.suggestions.find(item=>item.field==='industry').value,'Health','Use the established type to classify services on subsequent pages');
+  for (const [description, industry] of [
     ['Discover premium beachfront villa rentals in Antigua with MGL 365. Private pools, beaches, chef services and concierge.', 'Hospitality & travel'],
     ['Luxury villa rentals and property management.', 'Hospitality & travel'],
     ['We provide software development and cloud hosting.', 'Technology'],

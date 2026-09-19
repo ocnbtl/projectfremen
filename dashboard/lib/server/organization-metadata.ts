@@ -1,6 +1,6 @@
 import { normalizeOrganizationUrl, organizationLinkField, organizationProfileLink, organizationSuggestionError, type OrganizationAutofillResult, type OrganizationAutofillField, type OrganizationSuggestion } from "../modules/people/organization-autofill";
 import { isLinkedInLogoUrl, isInstagramLogoUrl, type OrganizationLogo } from "./organization-logo";
-import { classifyOrganizationServices } from "./organization-classification";
+import { classifyOrganizationEvidence } from "./organization-classification";
 
 function text(value: unknown, limit = 800): string {
   if (typeof value !== "string" && typeof value !== "number") return "";
@@ -77,7 +77,7 @@ function postalAddress(address: Record<string, unknown>): string {
 }
 
 /** Read bounded HTML as data. Never execute scripts or load JSON-LD contexts. */
-export function extractOrganizationPage(html: string, sourceUrl: string, organizationName = "", identity: { website?: string } = {}): OrganizationPage {
+export function extractOrganizationPage(html: string, sourceUrl: string, organizationName = "", identity: { website?: string; organizationType?: string } = {}): OrganizationPage {
   const source = normalizeOrganizationUrl(sourceUrl);
   const social = organizationLinkField(source) !== "website";
   const suggestions: OrganizationSuggestion[] = [];
@@ -330,15 +330,34 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     }
   }
 
-  // Only classify the official homepage's own description. Detail pages may
-  // describe a customer, partner, destination or individual product instead.
-  if (!social && !hasOtherOrganization && !new URL(source).pathname.replace(/\/+$/, "") && !conflicts.has("organizationType")) {
+  // Metadata may be no more than "Home" or "Charter Options". Read the primary
+  // visible offering too, without sweeping navigation, articles or testimonials
+  // into the organization's identity. About pages need an explicit self-subject.
+  const pathname = new URL(source).pathname.replace(/\/+$/, "");
+  const homepage = /^(?:\/[a-z]{2}(?:-[a-z]{2})?)?(?:\/(?:home|index(?:\.html?)?))?$/i.test(pathname);
+  const aboutPage = /(?:^|\/)(?:about(?:-us)?|our-story|our-company|who-we-are)(?:\/|$)/i.test(pathname);
+  if (!social && !hasOtherOrganization && (homepage || aboutPage) && !conflicts.has("organizationType")) {
     const description = suggestions.find(item => item.field === "context");
-    const inferred = description && classifyOrganizationServices(description.value, suggestions.find(item => item.field === "organizationType")?.value);
+    const ownedHtml = visibleHtml.replace(/<(nav|footer|aside|article|blockquote)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+    const selfDescription = (value: string) => {
+      const subject = value.match(/^(.{1,120}?)\s+(?:is|are|offers?|provides?|specializes? in|specialises? in|operates?|delivers?)\b/i)?.[1];
+      return Boolean(subject && (/^we$/i.test(subject) || nameKey(subject) === nameKey(organizationName)));
+    };
+    const statements = [...ownedHtml.matchAll(/<(?:p|h1|h2)\b[^>]*>([\s\S]*?)<\/(?:p|h1|h2)\s*>/gi)]
+      .map((match) => text(match[1], 1200)).flatMap((value) => value.split(/(?<=[.!?])\s+/)).filter(selfDescription).slice(0, 12);
+    const headings = homepage ? [...ownedHtml.matchAll(/<h[12]\b[^>]*>([\s\S]*?)<\/h[12]\s*>/gi)].map((match) => text(match[1], 240)).slice(0, 12) : [];
+    const evidence = [...(description && (homepage || selfDescription(description.value)) ? [description.value] : []), ...headings, ...statements];
+    const inferred = classifyOrganizationEvidence(evidence, suggestions.find(item => item.field === "organizationType")?.value || identity.organizationType);
     if (inferred) {
-      const evidence = `Inferred classification from published services: ${description!.value}`;
-      add("organizationType", inferred.organizationType, evidence);
-      add("industry", inferred.industry, evidence);
+      const provenance = `Inferred classification from published services: ${inferred.evidence}`;
+      add("organizationType", inferred.organizationType, provenance);
+      add("industry", inferred.industry, provenance);
+      // Replace an uninformative metadata label in the draft, never a user's
+      // saved About text. Use the actual source words rather than inventing copy.
+      if (!description || /^(?:home|welcome|about(?: us)?|charter options|services|official (?:site|website))\.?$/i.test(description.value)) {
+        if (description) suggestions.splice(suggestions.indexOf(description), 1);
+        add("context", inferred.evidence, "Published organization service description");
+      }
     }
   }
 
