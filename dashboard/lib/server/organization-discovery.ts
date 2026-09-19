@@ -6,6 +6,7 @@ import { fetchLinkedInLogo, fetchOrganizationLogo, type OrganizationLogo } from 
 import { findOrganizationSocialProfiles, SOCIAL_DOMAINS } from "./organization-social-search";
 import { findOrganizationKnowledge } from "./organization-knowledge";
 import { approximateTeamSize } from "../modules/people/team-size";
+import { writeOrganizationDescription } from "./organization-description";
 import { normalizeOrganizationIndustry, organizationIndustryOptions } from "../modules/people/organization-industries";
 
 const MAX_PAGES = 10;
@@ -38,7 +39,9 @@ export async function discoverOrganization(name: string, urls: string[], depende
   let verifiedSearch = false;
   let publicProfileName = "";
   const logos: OrganizationLogo[] = [];
+  const descriptionSources: { item: OrganizationSuggestion; priority: number }[] = [];
   const addCandidate = (item: OrganizationSuggestion, priority: number) => {
+    if (item.field === "context") descriptionSources.push({ item, priority });
     const existing = candidates.get(item.field);
     if (!existing || priority < existing.priority) {
       candidates.set(item.field, { item, priority });
@@ -148,6 +151,14 @@ export async function discoverOrganization(name: string, urls: string[], depende
       evidence: `Court function in organization name: ${courtName}; government type confirmed by public source` }, priority: 0 });
   }
   const suggestions = [...candidates.values()].map(({ item }) => {
+    if (item.field === "context") {
+      // A home-page slogan must not crowd out a factual about-page description.
+      for (const source of descriptionSources.sort((a, b) => a.priority - b.priority)) {
+        const value = writeOrganizationDescription(source.item.value, resolvedName || publishedName?.value || "");
+        if (value) return { ...source.item, value, evidence: `${source.item.evidence}; editorial summary of source text: ${source.item.value}` };
+      }
+      return { ...item, value: "" };
+    }
     if (item.field === "industry") {
       const value = normalizeOrganizationIndustry(candidates.get("organizationType")?.item.value || "", item.value);
       return { ...item, value, evidence: value !== item.value ? `${item.evidence}; mapped from ${item.value} to the curated category` : item.evidence };
@@ -155,7 +166,7 @@ export async function discoverOrganization(name: string, urls: string[], depende
     if (item.field !== "teamSize") return item;
     const value = approximateTeamSize(item.value);
     return { ...item, value, evidence: value.replace(/,/g, "") !== item.value.replace(/,/g, "") ? `${item.evidence}; rounded estimate from published count ${item.value}` : item.evidence };
-  }).filter((item) => !conflicts.has(item.field) && !(item.field === "industry" && item.evidence.startsWith("Inferred classification")
+  }).filter((item) => item.value && !conflicts.has(item.field) && !(item.field === "industry" && item.evidence.startsWith("Inferred classification")
     && (conflicts.has("organizationType") || !organizationIndustryOptions(candidates.get("organizationType")?.item.value || "").includes(candidates.get("industry")!.item.value))));
   let photo: OrganizationAutofillResult["photo"];
   const logoPriority = { linkedin: 0, website: 1, instagram: 2 };

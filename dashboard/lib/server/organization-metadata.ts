@@ -57,10 +57,15 @@ export type OrganizationPage = OrganizationAutofillResult & { links: Organizatio
 
 export function conciseOrganizationDescription(value: string): string {
   const sentences = [...new Intl.Segmenter("en", { granularity: "sentence" }).segment(value)].map((part) => part.segment.trim());
-  const short = sentences.slice(0, 2).join(" ");
-  if (short.length <= 260) return short;
-  if (sentences[0].length <= 260) return sentences[0];
-  return sentences[0].slice(0, 250).replace(/\s+\S*$/, "").replace(/[,;:]$/, "") + ".";
+  // Keep whole sentences as extraction evidence. Editorial rewriting happens
+  // after discovery; never manufacture a sentence by cutting it mid-clause.
+  const selected: string[] = [];
+  for (const sentence of sentences) {
+    if ([...selected, sentence].join(" ").length > 1500) break;
+    selected.push(sentence);
+    if (selected.length === 6) break;
+  }
+  return selected.join(" ");
 }
 const US_REGIONS: Record<string, string> = Object.fromEntries("AL:Alabama|AK:Alaska|AZ:Arizona|AR:Arkansas|CA:California|CO:Colorado|CT:Connecticut|DE:Delaware|DC:District of Columbia|FL:Florida|GA:Georgia|HI:Hawaii|ID:Idaho|IL:Illinois|IN:Indiana|IA:Iowa|KS:Kansas|KY:Kentucky|LA:Louisiana|ME:Maine|MD:Maryland|MA:Massachusetts|MI:Michigan|MN:Minnesota|MS:Mississippi|MO:Missouri|MT:Montana|NE:Nebraska|NV:Nevada|NH:New Hampshire|NJ:New Jersey|NM:New Mexico|NY:New York|NC:North Carolina|ND:North Dakota|OH:Ohio|OK:Oklahoma|OR:Oregon|PA:Pennsylvania|RI:Rhode Island|SC:South Carolina|SD:South Dakota|TN:Tennessee|TX:Texas|UT:Utah|VT:Vermont|VA:Virginia|WA:Washington|WV:West Virginia|WI:Wisconsin|WY:Wyoming".split("|").map((pair) => pair.split(":")));
 function addressParts(address: Record<string, unknown>) {

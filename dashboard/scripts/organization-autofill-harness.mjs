@@ -18,6 +18,41 @@ try {
   const { isPublicAddress, resolvePublicPage, fetchPublicPage, requestPinnedPage } = require(path.join(temporary, "server/public-page.js"));
   const { extractOrganizationMetadata } = require(path.join(temporary, "server/organization-metadata.js"));
   const { discoverOrganization } = require(path.join(temporary, "server/organization-discovery.js"));
+  const { writeOrganizationDescription: describe } = require(path.join(temporary, "server/organization-description.js"));
+  for (const [name, source, expected] of [
+    ['Barefoot Antigua', 'Customized Private Boat Charters', 'Barefoot Antigua offers customized private boat charters.'],
+    ['MGL 365 Antigua', 'Discover premium beachfront villa rentals in Antigua with MGL 365. Book now!', 'MGL 365 Antigua offers beachfront villa rentals in Antigua.'],
+    ['MGL 365 Antigua', 'Luxury villa rentals in Antigua offering premium Caribbean vacation homes with private beaches, pools, and concierge services in Jolly Harbour and across Antigua.', 'MGL 365 Antigua offers villa rentals in Antigua, including Caribbean vacation homes with private beaches, pools, and concierge services in Jolly Harbour and across Antigua.'],
+    ['Example', 'We provide software development and cloud hosting. Contact us today!', 'Example provides software development and cloud hosting.'],
+    ['Example', 'We are an award-winning design agency. We create digital products.', 'Example is a design agency. It creates digital products.'],
+    ['TopBloc', 'Technology consulting firm specializing in Workday implementation.', 'TopBloc is a technology consulting firm specializing in Workday implementation.'],
+    ['URBN', 'URBN operates Urban Outfitters and Nuuly.', 'URBN operates Urban Outfitters and Nuuly.'],
+    ['URBN', 'URBN operates Free People, Urban Outfitters and Nuuly.', 'URBN operates Free People, Urban Outfitters and Nuuly.'],
+    ['Snag Delivery', 'Snag delivers snacks to college students. Order from our app.', 'Snag Delivery delivers snacks to college students.'],
+    ['Example', 'Charter Options', ''],
+    ['Example', 'Providing IT services in Ohio', 'Example provides IT services in Ohio.'],
+    ['stradajī', 'Technology consulting firm.', 'stradajī is a technology consulting firm.'],
+    ['Example', 'PRIVATE BOAT CHARTERS IN Antigua', 'Example offers private boat charters in Antigua.'],
+    ['Example', 'Example provides care for children. It offers medical training.', 'Example provides care for children. It offers medical training.'],
+    ['Example', 'We no longer offer boat charters.', ''],
+    ['Example', 'Our clients offer boat charters.', ''],
+    ['Example', 'We aspire to create the best outcomes everywhere.', ''],
+    ['Example', 'Example has grown into...', ''],
+    ['Example', 'Example provides software and', ''],
+    ['Example', 'Our story', ''],
+  ]) assert.equal(describe(source, name), expected, source);
+  const editorialPages = {
+    'https://editorial.example': '<meta name="description" content="Our vision is a better tomorrow."><a href="/about">About</a>',
+    'https://editorial.example/about': '<meta name="description" content="We provide software development. Contact us today!">',
+  };
+  const editorial = await discoverOrganization('Example', ['https://editorial.example'], {fetchPage: async url => {
+    if (!editorialPages[url]) throw new Error('Unavailable');
+    return {sourceUrl:url, html:editorialPages[url]};
+  }});
+  const summary = editorial.suggestions.find(item=>item.field==='context');
+  assert.equal(summary.value, 'Example provides software development.');
+  assert.equal(summary.sourceUrl, 'https://editorial.example/about');
+  assert.ok(summary.evidence.includes('We provide software development.'), 'Keep original source evidence separate from editorial prose');
   const { normalizeOrganizationUrl, organizationProfileLink, emptyOrganizationSuggestions, organizationSeedUrls } = require(path.join(temporary, "modules/people/organization-autofill.js"));
   const { withoutTrailingLinkSlash } = require(path.join(temporary, "modules/people/links.js"));
   const { normalizeOrganizationIndustry, ORGANIZATION_INDUSTRY_OPTIONS } = require(path.join(temporary, "modules/people/organization-industries.js"));
@@ -241,7 +276,7 @@ try {
   };
   const discovered = await discoverOrganization("", [socialLinks.instagram], { fetchPage });
   const discoveredValues = Object.fromEntries(discovered.suggestions.map((item) => [item.field, item.value]));
-  for (const [field, expected] of Object.entries({ ...socialLinks, website: "https://example.com", name: "Example", industry: "Professional services", organizationType: "Business", foundedYear: "2004", teamSize: "11–50 employees", headquarters: "Columbus, Ohio, USA", streetAddress: "12 Main Street, Suite 4, Columbus, Ohio, 43215, USA", context: "Tools for field research." })) assert.equal(discoveredValues[field], expected, field);
+  for (const [field, expected] of Object.entries({ ...socialLinks, website: "https://example.com", name: "Example", industry: "Professional services", organizationType: "Business", foundedYear: "2004", teamSize: "11–50 employees", headquarters: "Columbus, Ohio, USA", streetAddress: "12 Main Street, Suite 4, Columbus, Ohio, 43215, USA", context: "Example offers tools for field research." })) assert.equal(discoveredValues[field], expected, field);
   assert.ok(fetched.includes("https://example.com/about") && fetched.includes("https://example.com/contact"), "Follow relevant company pages from a reverse social seed");
   assert.ok(!fetched.includes("https://wrong.example"), "Ignore unrelated embedded profiles");
   assert.ok(fetched.length <= 25 && new Set(fetched).size === fetched.length, "Bound and deduplicate discovery including five platform searches");
