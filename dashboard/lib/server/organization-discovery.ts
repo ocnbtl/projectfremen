@@ -13,8 +13,8 @@ const MAX_PAGES = 10;
 const TOTAL_TIMEOUT_MS = 26_000;
 const comparable = (value: string) => value.toLowerCase().replace(/[\s,]+/g, " ").trim().replace(/\/+$/, "");
 
-/** One explicit click: at most ten fact/crawl requests plus fifteen social-search
- * requests and four logo attempts, all within a shared deadline. No background crawl. */
+/** One explicit click: ten fact/crawl requests, fifteen social-search requests,
+ * two verified profile follow-ups and four logo attempts within a shared deadline. */
 export async function discoverOrganization(name: string, urls: string[], dependencies: {
   fetchPage?: typeof fetchPublicPage;
   timeoutMs?: number;
@@ -38,6 +38,7 @@ export async function discoverOrganization(name: string, urls: string[], depende
   let socialPlatformsSearched = 0;
   let verifiedSearch = false;
   let publicProfileName = "";
+  const sourceIssues: NonNullable<OrganizationAutofillResult["sourceIssues"]> = [];
   const logos: OrganizationLogo[] = [];
   const descriptionSources: { item: OrganizationSuggestion; priority: number }[] = [];
   const addCandidate = (item: OrganizationSuggestion, priority: number) => {
@@ -65,6 +66,8 @@ export async function discoverOrganization(name: string, urls: string[], depende
     if (next.kind === "detail") detailPages++;
     try {
       const page = await (dependencies.fetchPage || fetchPublicPage)(next.url, { timeoutMs: Math.min(4_000, Math.max(1, crawlDeadline - Date.now())), maxBytes: 2_000_000 });
+      const requestedProfile = organizationProfileKey(next.url);
+      if (requestedProfile && organizationProfileKey(page.sourceUrl) !== requestedProfile) throw new Error("Public profile unavailable");
       const parsed = extractOrganizationPage(page.html, page.sourceUrl, resolvedName, { website: candidates.get("website")?.item.value,
         organizationType: conflicts.has("organizationType") ? undefined : candidates.get("organizationType")?.item.value });
       if (parsed.blocked) throw new Error("Public profile unavailable");
@@ -95,6 +98,7 @@ export async function discoverOrganization(name: string, urls: string[], depende
     } catch (error) {
       firstError ??= error;
       unavailableSources++;
+      if (!next.verifyProfile) sourceIssues.push({ sourceUrl: next.url, reason: organizationProfileKey(next.url) ? "The platform did not return a readable public profile. It may require sign-in or restrict automated previews." : "The website could not be read within this lookup. It may restrict automated previews or be temporarily unavailable." });
     }
     // A single optional public search can recover a hidden website, but only reciprocal
     // profile evidence can admit the result. Search + candidates share the six-page budget.
@@ -123,9 +127,9 @@ export async function discoverOrganization(name: string, urls: string[], depende
   // Do not claim to have read it. Every fallback still verifies the exact URL.
   const suppliedWebsites = seeds.filter(url => organizationLinkField(url) === "website");
   const website = candidates.get("website")?.item.value || (suppliedWebsites.length === 1 ? suppliedWebsites[0] : undefined);
-  if (website && resolvedName && Date.now() < deadline - 4500) {
+  if (website && resolvedName && Date.now() < deadline - 8000) {
     socialPlatformsSearched = Object.keys(SOCIAL_DOMAINS).filter((field) => !candidates.has(field as OrganizationAutofillField)).length;
-    const socialProfiles = await findOrganizationSocialProfiles(resolvedName, website, [...candidates.values()].map(({ item }) => item), dependencies.fetchPage || fetchPublicPage, Math.min(Date.now() + 5500, deadline - 4500));
+    const socialProfiles = await findOrganizationSocialProfiles(resolvedName, website, [...candidates.values()].map(({ item }) => item), dependencies.fetchPage || fetchPublicPage, Math.min(Date.now() + 4500, deadline - 8000));
     for (const { suggestion, page } of socialProfiles) {
       if (conflicts.has(suggestion.field)) continue;
       addCandidate(suggestion, 4);
@@ -136,12 +140,34 @@ export async function discoverOrganization(name: string, urls: string[], depende
   }
   if (website && resolvedName && ["foundedYear", "tiktok", "instagram", "x", "youtube", "linkedin"].some((field) => !candidates.has(field as OrganizationAutofillField)) && Date.now() < deadline) {
     try {
-      const knowledge = await findOrganizationKnowledge(resolvedName, website, dependencies.fetchPage || fetchPublicPage, Math.min(Date.now() + 3000, deadline - 2500));
+      const knowledge = await findOrganizationKnowledge(resolvedName, website, dependencies.fetchPage || fetchPublicPage, Math.min(Date.now() + 3000, deadline - 5000));
       for (const item of knowledge) if (!candidates.has(item.field) && !conflicts.has(item.field)) {
         addCandidate(item, 4);
         if (!sources.includes(item.sourceUrl)) sources.push(item.sourceUrl);
       }
     } catch { /* An unavailable secondary source never discards official-page results. */ }
+  }
+  // A verified social URL discovered by the final reference lookup still needs
+  // its profile read. Previously it was returned as a link but never for a logo.
+  // Preserve time for downloading the image rather than spend it all on search.
+  if (!logos.some(logo => logo.kind === "linkedin" || logo.kind === "instagram") && Date.now() < deadline - 2500) {
+    const profiles = ["linkedin", "instagram"].flatMap(field => {
+      const candidate = candidates.get(field as OrganizationAutofillField);
+      return candidate && !conflicts.has(candidate.item.field) && !visited.has(comparable(candidate.item.value)) ? [candidate.item.value] : [];
+    }).slice(0, 2);
+    const followups = await Promise.allSettled(profiles.map(async url => {
+      const page = await (dependencies.fetchPage || fetchPublicPage)(url, { timeoutMs: Math.min(2500, Math.max(1, deadline - 2500 - Date.now())), maxBytes: 2_000_000 });
+      if (organizationProfileKey(url) !== organizationProfileKey(page.sourceUrl)) throw new Error("Profile redirected");
+      const parsed = extractOrganizationPage(page.html, page.sourceUrl, resolvedName, { website });
+      if (parsed.blocked) throw new Error("Profile unavailable");
+      return parsed;
+    }));
+    for (const result of followups) if (result.status === "fulfilled") {
+      const page = result.value;
+      if (!sources.includes(page.sourceUrl)) sources.push(page.sourceUrl);
+      for (const logo of page.logoCandidates || []) if (!logos.some(item => item.url === logo.url)) logos.push(logo);
+      for (const item of page.suggestions) if (!["name", "website"].includes(item.field) && !candidates.has(item.field) && !conflicts.has(item.field)) addCandidate(item, 3);
+    }
   }
   // A government's published name can identify its function more precisely than
   // broad source categories such as "Government Administration".
@@ -183,7 +209,7 @@ export async function discoverOrganization(name: string, urls: string[], depende
     catch { /* A blocked image must not discard available facts. */ }
   }
   return {
-    suggestions, photo, sourceUrl: sources[0] || seeds[0], sources, unavailableSources, conflicts: [...conflicts], fetchedAt: new Date().toISOString(),
+    suggestions, photo, sourceUrl: sources[0] || seeds[0], sources, sourceIssues, unavailableSources, conflicts: [...conflicts], fetchedAt: new Date().toISOString(),
     message: sources.length
       ? `${sources.length} public ${sources.length === 1 ? "page" : "pages"} checked.${socialPlatformsSearched ? ` Searched ${socialPlatformsSearched} social platforms for missing profiles; only matches with a link to the official website were added. Private, unindexed or unverified profiles may remain empty.` : ""}${verifiedSearch ? " The website was matched by its link back to your social profile." : ""}${unavailableSources ? " Some pages could not be read or matched." : ""}${conflicts.size ? " Conflicting details were left empty." : ""} Unpublished details stay empty.`
       : "The supplied pages could not be read, and no verified alternative source was found. A site may block automated previews even when it opens in your browser. Try its official public LinkedIn or Instagram profile."

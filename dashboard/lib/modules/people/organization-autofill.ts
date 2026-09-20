@@ -20,6 +20,7 @@ export type OrganizationAutofillResult = {
   message: string;
   sources?: string[];
   unavailableSources?: number;
+  sourceIssues?: { sourceUrl: string; reason: string }[];
   conflicts?: OrganizationAutofillField[];
   photo?: { dataUrl: string; sourceUrl: string; sourceKind?: "linkedin" | "website" | "instagram" };
 };

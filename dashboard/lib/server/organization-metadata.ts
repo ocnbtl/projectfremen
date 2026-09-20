@@ -153,6 +153,24 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
 
   const nodes: Record<string, unknown>[] = [];
   const profileNodes: Record<string, unknown>[] = [];
+  const requestedHandle = new URL(source).pathname.split("/").filter(Boolean).at(-1)?.replace(/^@/, "").toLowerCase() || "";
+  // Social pages wrap the profile in several Relay/ScheduledServerJS payloads.
+  // Do not let unrelated configuration scripts consume the profile's budget.
+  // Keep only the exact requested account; recommendations/posts are not facts.
+  const collectProfile = (value: unknown) => {
+    let remaining = 6000;
+    const visit = (value: unknown, depth: number) => {
+      if (depth > 32 || --remaining < 0 || profileNodes.length >= 12) return;
+      if (Array.isArray(value)) { for (const item of value.slice(0, 200)) visit(item, depth + 1); return; }
+      const node = object(value);
+      if (requestedHandle && text(node.username || node.uniqueId).toLowerCase() === requestedHandle && node.is_private !== true) profileNodes.push(node);
+      for (const [key, item] of Object.entries(node).slice(0, 100)) {
+        if (/^(?:edge_owner_to_timeline_media|edge_felix_video_timeline|related_profiles|suggested_users|comments)$/i.test(key)) continue;
+        if (item && typeof item === "object") visit(item, depth + 1);
+      }
+    };
+    visit(value, 0);
+  };
   const collect = (value: unknown, depth = 0, profile = false) => {
     if (depth > 9 || (profile ? profileNodes : nodes).length >= 400) return;
     if (Array.isArray(value)) { value.slice(0, 100).forEach((item) => collect(item, depth + 1, profile)); return; }
@@ -165,7 +183,11 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
   for (const match of html.matchAll(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi)) {
     const type = attribute(match[1], "type").toLowerCase();
     if (type !== "application/ld+json" && !(social && type === "application/json")) continue;
-    try { collect(JSON.parse(match[2]), 0, type !== "application/ld+json"); } catch { /* Retain other usable evidence. */ }
+    try {
+      const data = JSON.parse(match[2]);
+      if (type === "application/ld+json") collect(data);
+      else if (match[2].includes('"username"') || match[2].includes('"uniqueId"')) collectProfile(data);
+    } catch { /* Retain other usable evidence. */ }
   }
   const types = (node: Record<string, unknown>) => [node["@type"]].flat().map((value) => text(value).replace(/^https?:\/\/schema.org\//, ""));
   const organizations = nodes.filter((node) => types(node).some((type) => ORG_TYPES.has(type)));
@@ -247,6 +269,9 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
   const handle = new URL(source).pathname.split("/").filter(Boolean).at(-1)?.replace(/^@/, "").toLowerCase() || "";
   const matchingProfiles = profileNodes.filter((profile) => handle && text(profile.username || profile.uniqueId).toLowerCase() === handle);
   const socialIdentity = Boolean(organization || matchingProfiles.length || (handle.length > 1 && pageTitle.toLowerCase().includes(handle)) || (nameKey(organizationName).length > 1 && nameKey(pageTitle).includes(nameKey(organizationName))));
+  // HTTP 200 can be an empty Instagram/login shell. A platform page is not a
+  // checked organization source unless it actually identifies this profile.
+  if (social && (!organizationProfileLink(source) || !socialIdentity)) return { suggestions: [], links: [], blocked: true, sourceUrl: source, fetchedAt: new Date().toISOString(), message: "The platform returned a sign-in page or an empty profile instead of public organization details." };
   for (const profile of matchingProfiles) {
     add("name", profile.full_name || profile.nickname, "Public profile: display name");
     add("context", profile.biography || profile.signature, "Public profile: biography");
@@ -256,9 +281,12 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
 
   // A verified public social biography is first-party service evidence too.
   // Follower counts, posts and recommended accounts cannot establish a business.
+  const socialBiography = [meta.get("description"), meta.get("og:description"), meta.get("twitter:description")]
+    .map(value => value?.match(/on Instagram:\s*["“]([\s\S]+?)["”]\s*$/i)?.[1] || (value && !/^(?:[\d,.KMB]+\s+Followers|See Instagram|Log in|Sign in)/i.test(value) ? value : ""))
+    .find(Boolean);
   if (social && socialIdentity) {
     const biography = suggestions.find(item => item.field === "context")?.value
-      || meta.get("description")?.match(/on Instagram:\s*["“]([\s\S]+)["”]$/i)?.[1];
+      || socialBiography;
     if (biography) {
       const inferred = classifyOrganizationEvidence([biography], suggestions.find(item => item.field === "organizationType")?.value || identity.organizationType);
       if (inferred) {
@@ -295,7 +323,7 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
       if (field === "teamSize" && !/^\d[\d,]*(?:\s*[-–]\s*\d[\d,]*)?\+?(?:\s+employees|\s+people|\s+team members)?$/i.test(value)) continue;
       add(field, value, `Published company detail: ${label}`);
     }
-    const description = social ? meta.get("description") || meta.get("og:description") || meta.get("twitter:description") : meta.get("og:description") || meta.get("description") || meta.get("twitter:description");
+    const description = social ? socialBiography : meta.get("og:description") || meta.get("description") || meta.get("twitter:description");
     const biography = social && description?.match(/on Instagram:\s*["“]([\s\S]+)["”]$/i)?.[1];
     add("context", biography || (social && /^\d[\d,.KMB]* Followers,.*(?:Following|Posts)/i.test(description || "") ? "" : description), biography ? "Public profile biography" : "Public page description");
     if (!organizationName.trim()) add("name", social ? pageTitle.split(/\s*[(@|]/)[0] : meta.get("og:site_name"), "Public page: organization name");
@@ -414,7 +442,7 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
   const addLogo = (raw: unknown, kind: OrganizationLogo["kind"]) => {
     try {
       const url = new URL(text(raw, 4096), source);
-      if (!raw || url.protocol !== "https:" || url.username || url.password || url.port || /\.svg(?:$|\?)/i.test(url.pathname)) return;
+      if (!raw || url.protocol !== "https:" || url.username || url.password || url.port) return;
       if (kind === "instagram" && !isInstagramLogoUrl(url.toString())) return;
       if (!logoCandidates.some((item) => item.url === url.toString())) logoCandidates.push({ url: url.toString(), sourceUrl: source, kind });
     } catch { /* Only explicit public branding images are candidates. */ }

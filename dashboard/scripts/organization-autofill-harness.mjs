@@ -158,7 +158,7 @@ try {
   assert.equal(resortFields.context,'Example is a chain of hotels in the Caribbean based in Jamaica.');
   assert.equal(resortFields.foundedYear,'1981'); assert.equal(resortFields.instagram,'https://www.instagram.com/exampleresorts');
   assert.ok(blockedResort.suggestions.every(item=>item.sourceUrl==='https://www.wikidata.org/wiki/Q999'),'Do not attribute fallback facts to the blocked site');
-  assert.ok(blockedRequests.length<=8,'Recovery remains bounded: site, five searches and two reference requests');
+  assert.ok(blockedRequests.length<=10,'Recovery remains bounded: site, five searches, two reference requests and at most two verified profile follow-ups');
   assert.ok(blockedRequests.every(url=>!url.includes('maxlag=')),'Interactive reads do not use a background maintenance threshold');
   assert.deepEqual(extractOrganizationKnowledge([{...resort,claims:{...resort.claims,P856:[claim('https://another.example')]}}],'Example','https://example.com'),[]);
   assert.deepEqual(extractOrganizationKnowledge([resort,{...resort,id:'Q997'}],'Example','https://example.com'),[],'Ambiguous brand extensions are not automatically resolved');

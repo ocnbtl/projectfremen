@@ -13,9 +13,17 @@ export function isInstagramLogoUrl(raw: string): boolean {
 /** Preserve the complete mark with padding, never crop lettering to fill an avatar. */
 export async function prepareOrganizationLogo(input: Buffer): Promise<string> {
   if (input.length > 2_000_000) throw new Error("Company picture is too large");
+  // Rasterize only self-contained SVG artwork. Reject external resources and
+  // executable XML rather than resolve them through an image decoder.
+  const xml = input.toString("utf8");
+  const raster = input.subarray(0, 3).equals(Buffer.from([0xff, 0xd8, 0xff])) || input.subarray(0, 8).equals(Buffer.from([137,80,78,71,13,10,26,10]))
+    || input.toString("ascii", 0, 4) === "RIFF" && input.toString("ascii", 8, 12) === "WEBP" || input.toString("ascii", 4, 8) === "ftyp";
+  if (!raster && (!/<svg\b/i.test(xml) || /\u0000|encoding\s*=\s*["'](?!utf-8["'])|<!(?:DOCTYPE|ENTITY)|<\?(?!xml\s)|<(?:script|foreignObject|image|feImage|style)\b|\bon\w+\s*=|@import/i.test(xml)
+    || /(?:href|src)\s*=\s*["'](?!#)[^"']+/i.test(xml) || /url\(\s*["']?(?!#)/i.test(xml))) throw new Error("Company logo contains unsupported resources");
   const image = sharp(input, { limitInputPixels: 16_000_000, failOn: "error" });
   const metadata = await image.metadata();
-  if (!["jpeg", "png", "webp"].includes(metadata.format || "") || (metadata.pages || 1) > 1 || !metadata.width || !metadata.height
+  if (metadata.format === "svg" && (!/<svg\b/i.test(xml) || /\u0000|encoding\s*=\s*["'](?!utf-8["'])/i.test(xml))) throw new Error("Company logo must use UTF-8 SVG");
+  if (!["jpeg", "png", "webp", "svg", "heif"].includes(metadata.format || "") || (metadata.pages || 1) > 1 || !metadata.width || !metadata.height
     || Math.min(metadata.width, metadata.height) < 48 || Math.max(metadata.width / metadata.height, metadata.height / metadata.width) > 4) throw new Error("Company picture is not suitable for a square profile");
   // Transparent white artwork needs a dark neutral backing to remain visible.
   const sample = await image.clone().resize(64, 64, { fit: "inside" }).ensureAlpha().raw().toBuffer();
@@ -58,15 +66,15 @@ export async function fetchOrganizationLogo(logo: OrganizationLogo, timeoutMs = 
         const request = httpsRequest(url, {
           agent: false, signal, maxHeaderSize: 16_384, family: address.family,
           lookup: (_host, _options, callback) => callback(null, address.address, address.family),
-          headers: { Accept: "image/jpeg,image/png,image/webp", "Accept-Encoding": "identity" }
+          headers: { Accept: "image/jpeg,image/png,image/webp,image/avif,image/svg+xml", "Accept-Encoding": "identity" }
         }, (response) => {
           response.on("error", reject);
           if ([301, 302, 303, 307, 308].includes(response.statusCode || 0) && response.headers.location) {
             resolve({ redirect: new URL(response.headers.location, url).toString() }); response.destroy(); return;
           }
           const mime = response.headers["content-type"]?.split(";")[0];
-          if (response.statusCode !== 200 || !/^image\/(?:jpeg|png|webp)$/.test(mime || "") || Number(response.headers["content-length"] || 0) > 2_000_000 || response.headers["content-encoding"] && response.headers["content-encoding"] !== "identity") {
-            response.destroy(new Error("LinkedIn company picture unavailable")); return;
+          if (response.statusCode !== 200 || !/^image\/(?:jpeg|png|webp|avif|svg\+xml)$/.test(mime || "") || Number(response.headers["content-length"] || 0) > 2_000_000 || response.headers["content-encoding"] && response.headers["content-encoding"] !== "identity") {
+            response.destroy(new Error("Company picture unavailable")); return;
           }
           let size = 0;
           const chunks: Buffer[] = [];
