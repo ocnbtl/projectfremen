@@ -17,14 +17,14 @@ const proseWords = new Set(("a an the and or in of for to with through across fr
   "fashion brand clothing apparel retail consumer products snacks drinks essentials delivery grocery groceries " +
   "offering providing specializing creating serving operating representing designing manufacturing publishing " +
   "design construction residential commercial industrial engineering architecture accounting insurance finance " +
-  "education training primary secondary medical patient care professional team people community local " +
+  "education training primary secondary medical patient care professional team people community local mobile massage reflexology body scrub exfoliation chain hotels resorts " +
   "international global independent online digital marketing talent modeling entertainment media restaurant hotel " +
   "chef concierge pools beaches transport transportation logistics shipping freight veterinary dental solar energy " +
   "real estate lender law school degree programs graduate undergraduate doctoral sales support strategy " +
   "is are offers provides delivers creates designs builds develops manufactures sells serves supports operates manages " +
   "represents publishes produces connects helps specializes focuses supplies").split(/\s+/));
-const roles = /\b(?:company|firm|agency|organization|organisation|university|school|college|hospital|clinic|rescue|charity|foundation|association|network|manufacturer|retailer|lender|bank|credit union|studio|practice|bakery|country club|brand|health system)\b/i;
-const offerings = /\b(?:charters?|tours?|rentals?|management|services?|software|hosting|tools|counsel|delivery|financing|construction|engineering|training|education|research|care|clothing|apparel|products|snacks|groceries|drinks|essentials|consulting|transport|shipping|manufacturing|installation|catering|pastries|cakes)\b/i;
+const roles = /\b(?:company|firm|agency|organization|organisation|university|school|college|hospital|clinic|rescue|charity|foundation|association|network|manufacturer|retailer|lender|bank|credit union|studio|practice|bakery|country club|brand|health system|chain of (?:hotels|resorts))\b/i;
+const offerings = /\b(?:charters?|tours?|rentals?|management|services?|software|hosting|tools|counsel|delivery|financing|construction|engineering|training|education|research|care|clothing|apparel|products|snacks|groceries|drinks|essentials|consulting|transport|shipping|manufacturing|installation|catering|pastries|cakes|massage|reflexology|body scrub|exfoliation)\b/i;
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const article = (phrase: string) => /^(?:uni(?:vers|que|t)|euro|one\b|US\b)/i.test(phrase) ? "a" : /^(?:[aeiou]|honest|hour|MBA\b)/i.test(phrase) ? "an" : "a";
 function clean(value: string): string {
@@ -95,8 +95,12 @@ export function writeOrganizationDescription(raw: string, organizationName: stri
   const name = clean(organizationName);
   if (!name) return "";
   const result: string[] = [];
-  for (const part of new Intl.Segmenter("en", { granularity: "sentence" }).segment(clean(raw))) {
-    let sentence = neutralSentence(part.segment, name);
+  // Social bios use emoji and bullets instead of sentence boundaries. Keep only
+  // independently meaningful service phrases; experience is not a founding year.
+  const chunks = raw.replace(/[\p{Extended_Pictographic}\p{Regional_Indicator}\uFE0F\u200D]+/gu, "\n").split(/[\n\r•|]+/).map(clean).filter(Boolean);
+  const segments = chunks.flatMap(chunk => [...new Intl.Segmenter("en", { granularity: "sentence" }).segment(chunk)].map(part => part.segment));
+  for (const part of segments) {
+    let sentence = neutralSentence(part, name);
     if (!sentence || result.includes(sentence)) continue;
     if (!result.length && /^(?:It|The (?:company|business|organization))\b/.test(sentence)) sentence = sentence.replace(/^(?:It|The (?:company|business|organization))\b/, name);
     if (result.length && sentence.startsWith(name + " ")) sentence = "It " + sentence.slice(name.length + 1);

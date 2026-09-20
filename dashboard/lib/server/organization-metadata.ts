@@ -254,6 +254,21 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
     for (const link of [profile.bio_links].flat().slice(0, 6)) addLink(object(link).url, "Public profile: biography link", true);
   }
 
+  // A verified public social biography is first-party service evidence too.
+  // Follower counts, posts and recommended accounts cannot establish a business.
+  if (social && socialIdentity) {
+    const biography = suggestions.find(item => item.field === "context")?.value
+      || meta.get("description")?.match(/on Instagram:\s*["“]([\s\S]+)["”]$/i)?.[1];
+    if (biography) {
+      const inferred = classifyOrganizationEvidence([biography], suggestions.find(item => item.field === "organizationType")?.value || identity.organizationType);
+      if (inferred) {
+        const evidence = `Inferred classification from public profile biography: ${inferred.evidence}`;
+        add("organizationType", inferred.organizationType, evidence);
+        add("industry", inferred.industry, evidence);
+      }
+    }
+  }
+
   const safeHtml = html.replace(/<(head|title|script|style|noscript|svg)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
   const visibleHtml = social ? safeHtml.replace(/<article\b[^>]*>[\s\S]*?<\/article\s*>/gi, "") : safeHtml;
   const lines = visibleHtml.replace(/<\/(?:p|div|dt|dd|li|h[1-6]|tr|td|th|section|address)>|<br\s*\/?>/gi, "\n")

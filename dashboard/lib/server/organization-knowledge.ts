@@ -1,9 +1,15 @@
 import { organizationProfileLink, organizationSuggestionError, type OrganizationAutofillField, type OrganizationSuggestion } from "../modules/people/organization-autofill";
 import { fetchPublicPage } from "./public-page";
+import { classifyOrganizationServices } from "./organization-classification";
 
 type Claim = { rank?: string; mainsnak?: { snaktype?: string; datavalue?: { value?: unknown } }; qualifiers?: Record<string, unknown[]> };
-type Entity = { id: string; labels?: Record<string, { value: string }>; aliases?: Record<string, { value: string }[]>; claims?: Record<string, Claim[]> };
+type Entity = { id: string; labels?: Record<string, { value: string }>; descriptions?: Record<string, { value: string }>; aliases?: Record<string, { value: string }[]>; claims?: Record<string, Claim[]> };
 const nameKey = (name: string) => name.toLowerCase().replace(/\b(incorporated|inc|llc|ltd|limited|corporation|corp)\b/g, "").replace(/[^\p{L}\p{N}]/gu, "");
+// A short supplied brand can match its longer public label, but never on its
+// name alone: acceptance below also requires one unique exact website match.
+const relatedName = (label: string, name: string) => nameKey(label) === nameKey(name)
+  || name.trim().length >= 3 && label.toLowerCase().startsWith(name.trim().toLowerCase() + " ")
+    && /^(?:(?:resorts?|hotels?|group|international|company|corporation|inc|ltd|llc|limited|holdings)\.?\s*)+$/i.test(label.slice(name.trim().length).trim());
 const siteKey = (raw: string) => {
   try { const url = new URL(raw); return /^https?:$/.test(url.protocol) ? url.hostname.toLowerCase().replace(/^www\./, "") + url.pathname.replace(/\/+$/, "") : ""; }
   catch { return ""; }
@@ -18,7 +24,7 @@ function values(entity: Entity, property: string): unknown[] {
 export function extractOrganizationKnowledge(entities: Entity[], name: string, website: string): OrganizationSuggestion[] {
   if (!nameKey(name) || !siteKey(website)) return [];
   const matched = entities.filter((entity) => /^Q\d+$/.test(entity.id)
-    && [...Object.values(entity.labels || {}), ...Object.values(entity.aliases || {}).flat()].some((label) => nameKey(label.value) === nameKey(name))
+    && [...Object.values(entity.labels || {}), ...Object.values(entity.aliases || {}).flat()].some((label) => relatedName(label.value, name))
     && values(entity, "P856").some((url) => typeof url === "string" && siteKey(url) === siteKey(website)));
   if (matched.length !== 1) return [];
   const entity = matched[0];
@@ -28,6 +34,13 @@ export function extractOrganizationKnowledge(entities: Entity[], name: string, w
     const unique = [...new Set(candidates)];
     if (unique.length === 1 && !organizationSuggestionError(field, unique[0])) suggestions.push({ field, value: unique[0], sourceUrl, evidence: `Wikidata ${property}; organization name and official website matched. Community-maintained information, review before saving` });
   };
+  const description = entity.descriptions?.en?.value || "";
+  const classification = classifyOrganizationServices(description);
+  if (classification) {
+    add("organizationType", [classification.organizationType], "classification from English description");
+    add("industry", [classification.industry], "classification from English description");
+    add("context", [description], "English description");
+  }
   add("foundedYear", values(entity, "P571").flatMap((value) => {
     const date = value as { time?: string; precision?: number } | undefined;
     const year = date && (date.precision ?? 0) >= 9 && date.time?.match(/^\+(\d{4})-/)?.[1];
@@ -52,17 +65,22 @@ export async function findOrganizationKnowledge(name: string, website: string, f
   if (!name.trim() || Date.now() >= deadline) return [];
   const request = async (params: Record<string, string>) => {
     if (Date.now() >= deadline) throw new Error("Knowledge lookup deadline reached");
-    const url = `https://www.wikidata.org/w/api.php?${new URLSearchParams({ ...params, format: "json", maxlag: "5" })}`;
+    // This is an interactive, user-awaited lookup. MediaWiki explicitly allows
+    // omitting maxlag here; the maintenance-bot threshold was rejecting normal
+    // reads whenever its unrelated query-service replica lagged.
+    const url = `https://www.wikidata.org/w/api.php?${new URLSearchParams({ ...params, format: "json" })}`;
     const page = await fetchPage(url, { timeoutMs: Math.min(3000, Math.max(1, deadline - Date.now())), maxBytes: 1_000_000, format: "json" });
-    return JSON.parse(page.html);
+    const result = JSON.parse(page.html);
+    if (result.error) throw new Error("Public reference source temporarily unavailable");
+    return result;
   };
   const search = await request({ action: "wbsearchentities", search: name.slice(0, 120), language: "en", type: "item", limit: "3" });
   // Avoid downloading large unrelated entities (for example Firefox when looking
   // for Mozilla). Labels or search aliases must match before fetching full claims.
   const ids = (Array.isArray(search.search) ? search.search : []).slice(0, 3)
-    .filter((item: { label?: string; match?: { text?: string } }) => [item.label, item.match?.text].some((label) => typeof label === "string" && nameKey(label) === nameKey(name)))
+    .filter((item: { label?: string; match?: { text?: string } }) => [item.label, item.match?.text].some((label) => typeof label === "string" && relatedName(label, name)))
     .map((item: { id?: string }) => item.id).filter((id: unknown) => typeof id === "string" && /^Q\d+$/.test(id));
   if (!ids.length) return [];
-  const result = await request({ action: "wbgetentities", ids: ids.join("|"), props: "labels|aliases|claims", languages: "en" });
+  const result = await request({ action: "wbgetentities", ids: ids.join("|"), props: "labels|aliases|descriptions|claims", languages: "en" });
   return extractOrganizationKnowledge(Object.values(result.entities || {}), name, website);
 }

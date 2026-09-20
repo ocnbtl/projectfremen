@@ -59,7 +59,7 @@ export default function OrganizationAutofill({ name, values, onApply, onPhoto, h
       const pictureAdded = Boolean(next.photo && latest.current.onPhoto && !latest.current.hasPhoto && /^data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(next.photo.dataUrl) && next.photo.dataUrl.length <= 1_000_000);
       if (pictureAdded) latest.current.onPhoto!(next.photo!.dataUrl);
       setResult({ ...next, suggestions: chosen });
-      setNotice(chosen.length || pictureAdded ? `${chosen.length} ${chosen.length === 1 ? "field" : "fields"} filled.${pictureAdded ? " Organization picture added." : ""} Review the details, then Save.` : "No additional fields could be filled. Your existing details were kept.");
+      setNotice(chosen.length || pictureAdded ? `${chosen.length} ${chosen.length === 1 ? "field" : "fields"} filled.${pictureAdded ? " Organization picture added." : ""} Review the details, then Save.` : next.suggestions.length ? "No additional fields could be filled. Your existing details were kept." : next.message);
     } catch (error) {
       if (!request.signal.aborted) setNotice(error instanceof Error ? error.message : "Autofill could not finish. Your draft is still here.");
     } finally {

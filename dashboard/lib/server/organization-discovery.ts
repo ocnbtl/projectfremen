@@ -119,7 +119,10 @@ export async function discoverOrganization(name: string, urls: string[], depende
   }
   // Preserve the endpoint's private-destination error contract when no page can be read.
   if (!sources.length && firstError instanceof Error && /^Use a public/.test(firstError.message)) throw firstError;
-  const website = candidates.get("website")?.item.value;
+  // The supplied site remains a useful identity anchor if it blocks previews.
+  // Do not claim to have read it. Every fallback still verifies the exact URL.
+  const suppliedWebsites = seeds.filter(url => organizationLinkField(url) === "website");
+  const website = candidates.get("website")?.item.value || (suppliedWebsites.length === 1 ? suppliedWebsites[0] : undefined);
   if (website && resolvedName && Date.now() < deadline - 4500) {
     socialPlatformsSearched = Object.keys(SOCIAL_DOMAINS).filter((field) => !candidates.has(field as OrganizationAutofillField)).length;
     const socialProfiles = await findOrganizationSocialProfiles(resolvedName, website, [...candidates.values()].map(({ item }) => item), dependencies.fetchPage || fetchPublicPage, Math.min(Date.now() + 5500, deadline - 4500));
@@ -183,6 +186,6 @@ export async function discoverOrganization(name: string, urls: string[], depende
     suggestions, photo, sourceUrl: sources[0] || seeds[0], sources, unavailableSources, conflicts: [...conflicts], fetchedAt: new Date().toISOString(),
     message: sources.length
       ? `${sources.length} public ${sources.length === 1 ? "page" : "pages"} checked.${socialPlatformsSearched ? ` Searched ${socialPlatformsSearched} social platforms for missing profiles; only matches with a link to the official website were added. Private, unindexed or unverified profiles may remain empty.` : ""}${verifiedSearch ? " The website was matched by its link back to your social profile." : ""}${unavailableSources ? " Some pages could not be read or matched." : ""}${conflicts.size ? " Conflicting details were left empty." : ""} Unpublished details stay empty.`
-      : "These links did not provide a readable public profile. Try adding the official website; sign-in-only pages cannot supply details."
+      : "The supplied pages could not be read, and no verified alternative source was found. A site may block automated previews even when it opens in your browser. Try its official public LinkedIn or Instagram profile."
   };
 }

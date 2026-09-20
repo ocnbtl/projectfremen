@@ -131,6 +131,37 @@ try {
   assert.equal(formatTeamSize(''),'');
   const { extractOrganizationKnowledge } = require(path.join(temporary, 'server/organization-knowledge.js'));
   const claim = (value, extras={}) => ({rank:'normal',mainsnak:{snaktype:'value',datavalue:{value}},...extras});
+  const massageBio = '🌊Luxury mobile massage•🇦🇬 🌿Swedish•Deep Tissue•Lymphatic ✨Ventosa (cupping)•Reflexology 🌴Body Scrub (Exfoliation) 📜TESDA Licence•12+yrs 🏠I come to you';
+  const massageHtml = `<meta property="og:title" content="The Massage Atelier (@mobile_massage_atelier) • Instagram photos and videos"><meta name="description" content="191 Followers, 594 Following, 68 Posts - The Massage Atelier (@mobile_massage_atelier) on Instagram: &quot;${massageBio}&quot;">`;
+  const massageResult = await discoverOrganization('The Massage Atelier',['https://www.instagram.com/mobile_massage_atelier'],{fetchPage:async url=>{
+    if (!url.startsWith('https://www.instagram.com/')) throw new Error('No verified alternative');
+    return {sourceUrl:url,html:massageHtml};
+  }});
+  const massageFields=Object.fromEntries(massageResult.suggestions.map(item=>[item.field,item.value]));
+  assert.equal(massageFields.organizationType,'Business');
+  assert.equal(massageFields.industry,'Retail & consumer');
+  assert.equal(massageFields.context,'The Massage Atelier offers mobile massage. It offers reflexology.');
+  assert.equal(massageFields.foundedYear,undefined,'Experience years do not establish the business founding year');
+  assert.equal(massageFields.teamSize,undefined,'Followers are not employees');
+  assert.equal(massageFields.headquarters,undefined,'An emoji flag does not establish an office address');
+  assert.equal(massageFields.website,undefined,'Never substitute the unrelated same-name business');
+  const resort = {id:'Q999',labels:{en:{value:'Example Resorts'}},descriptions:{en:{value:'chain of hotels in the Caribbean based in Jamaica'}},claims:{P856:[claim('https://example.com')],P571:[claim({time:'+1981-01-01T00:00:00Z',precision:9})],P2003:[claim('exampleresorts')]}};
+  const blockedRequests=[];
+  const blockedResort=await discoverOrganization('Example',['https://example.com'],{fetchPage:async url=>{
+    blockedRequests.push(url);
+    if(url.includes('wbsearchentities')) return {sourceUrl:url,html:JSON.stringify({search:[{id:'Q999',label:'Example Resorts'},{id:'Q998',label:'Example Browser'}]})};
+    if(url.includes('wbgetentities')) return {sourceUrl:url,html:JSON.stringify({entities:{Q999:resort}})};
+    throw new Error('This website did not allow a public preview.');
+  }});
+  const resortFields=Object.fromEntries(blockedResort.suggestions.map(item=>[item.field,item.value]));
+  assert.equal(resortFields.organizationType,'Business'); assert.equal(resortFields.industry,'Hospitality & travel');
+  assert.equal(resortFields.context,'Example is a chain of hotels in the Caribbean based in Jamaica.');
+  assert.equal(resortFields.foundedYear,'1981'); assert.equal(resortFields.instagram,'https://www.instagram.com/exampleresorts');
+  assert.ok(blockedResort.suggestions.every(item=>item.sourceUrl==='https://www.wikidata.org/wiki/Q999'),'Do not attribute fallback facts to the blocked site');
+  assert.ok(blockedRequests.length<=8,'Recovery remains bounded: site, five searches and two reference requests');
+  assert.ok(blockedRequests.every(url=>!url.includes('maxlag=')),'Interactive reads do not use a background maintenance threshold');
+  assert.deepEqual(extractOrganizationKnowledge([{...resort,claims:{...resort.claims,P856:[claim('https://another.example')]}}],'Example','https://example.com'),[]);
+  assert.deepEqual(extractOrganizationKnowledge([resort,{...resort,id:'Q997'}],'Example','https://example.com'),[],'Ambiguous brand extensions are not automatically resolved');
   const entity = {id:'Q123',labels:{en:{value:'Example Inc.'}},claims:{P856:[claim('https://example.com/')],P571:[claim({time:'+1964-01-25T00:00:00Z',precision:11})],P7085:[claim('example')]}};
   const knowledgeValues = input => Object.fromEntries(extractOrganizationKnowledge(input,'Example','https://www.example.com').map(item=>[item.field,item.value]));
   assert.equal(knowledgeValues([entity]).foundedYear,'1964');
