@@ -3102,6 +3102,9 @@ select {
   border-radius: 50%;
   overflow: hidden;
   border: 0;
+  /* Invert the actual page beneath the orb so letters and icons remain visible. */
+  -webkit-backdrop-filter: invert(1);
+  backdrop-filter: invert(1);
   box-shadow: 0 2px 10px rgba(13, 45, 66, .16);
   transition: width .2s ease, height .2s ease, left .2s ease, top .2s ease;
 }
@@ -3125,6 +3128,11 @@ select {
   background-size: 115% 115%;
   animation-duration: 3600ms, 3200ms;
   filter: saturate(1.2) contrast(1.08);
+  opacity: .22;
+}
+@supports not ((backdrop-filter: invert(1)) or (-webkit-backdrop-filter: invert(1))) {
+  .landing-gradient-cursor { mix-blend-mode: difference; }
+  .landing-cursor-orb { background: white; }
 }
 .landing-cursor-orb::after {
   content: "";
