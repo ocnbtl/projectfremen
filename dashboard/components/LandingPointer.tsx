@@ -2,23 +2,27 @@
 
 import { useEffect, useRef } from "react";
 
-function rippleMask(family: number) {
-  // Different silhouettes survive the soft blur better than tiny changes to
-  // one outline: elongated, lobed, triangular, indented, irregular and squarish.
-  const count = [8, 10, 6, 12, 7 + Math.floor(Math.random() * 5), 8][family];
-  const stretchX = family === 0 ? .42 + Math.random() * .2 : .78 + Math.random() * .22;
-  const stretchY = .82 + Math.random() * .18;
+function rippleMask() {
+  // Irregular, overlapping swells replace repeated silhouettes and evenly
+  // spaced lobes. Every wave is generated afresh rather than chosen from a pool.
+  const count = 32;
+  const stretchX = .62 + Math.random() * .46;
+  const stretchY = .62 + Math.random() * .46;
   const rotation = Math.random() * Math.PI * 2;
+  const baseRadius = 145 + Math.random() * 25;
+  const swells = Array.from({ length: 4 + Math.floor(Math.random() * 5) }, () => ({
+    angle: Math.random() * Math.PI * 2,
+    width: .24 + Math.random() * .8,
+    depth: (Math.random() - .5) * 150
+  }));
   const points = Array.from({ length: count }, (_, index) => {
-    const angle = (index + (Math.random() - .5) * .18) / count * Math.PI * 2;
-    const jitter = Math.random() * 18 - 9;
-    let radius: number;
-    if (family === 0) radius = 195 + jitter;
-    else if (family === 1) radius = (index % 2 ? 105 : 205) + jitter;
-    else if (family === 2) radius = (index % 2 ? 95 : 210) + jitter;
-    else if (family === 3) radius = (index === 0 ? 50 : index === 1 || index === count - 1 ? 105 : 195) + jitter;
-    else if (family === 4) radius = index === 0 ? 215 : 65 + Math.random() * 145;
-    else radius = (index % 2 ? 205 : 150) + jitter;
+    const angle = index / count * Math.PI * 2;
+    const displacement = swells.reduce((sum, swell) => {
+      const distance = Math.atan2(Math.sin(angle - swell.angle), Math.cos(angle - swell.angle));
+      return sum + swell.depth * Math.exp(-.5 * (distance / swell.width) ** 2);
+    }, 0);
+    // Smoothly bound the contour instead of clipping it into flat-sided shapes.
+    const radius = baseRadius + 70 * Math.tanh(displacement / 70);
     const px = Math.cos(angle) * radius * stretchX;
     const py = Math.sin(angle) * radius * stretchY;
     return { x: 352 + px * Math.cos(rotation) - py * Math.sin(rotation), y: 352 + px * Math.sin(rotation) + py * Math.cos(rotation) };
@@ -32,6 +36,27 @@ function rippleMask(family: number) {
   }).join(" ");
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 704 704"><defs><filter id="soft" x="-75%" y="-75%" width="250%" height="250%"><feGaussianBlur stdDeviation="28"/></filter></defs><path d="M${coordinate(points[0].x, points[0].y)} ${path}Z" fill="none" stroke="white" stroke-width="${32 + Math.random() * 20}" filter="url(#soft)"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
+function rippleGradient() {
+  const hue = Math.random() * 360;
+  const count = 4 + Math.floor(Math.random() * 3);
+  const colors = Array.from({ length: count }, (_, index) =>
+    `hsl(${(hue + index * 360 / count + Math.random() * 36) % 360} ${62 + Math.random() * 20}% ${54 + Math.random() * 13}%)`);
+  for (let index = colors.length - 1; index > 0; index--) {
+    const other = Math.floor(Math.random() * (index + 1));
+    [colors[index], colors[other]] = [colors[other], colors[index]];
+  }
+  const widths = colors.map(() => .5 + Math.random());
+  const total = widths.reduce((sum, width) => sum + width, 0);
+  let position = 0;
+  const stops = colors.map((color, index) => {
+    const stop = `${color} ${(position / total * 100).toFixed(2)}%`;
+    position += widths[index];
+    return stop;
+  });
+  stops.push(`${colors[0]} 100%`);
+  return `conic-gradient(from ${Math.random() * 360}deg at ${20 + Math.random() * 60}% ${20 + Math.random() * 60}%, ${stops.join(", ")})`;
 }
 
 export default function LandingPointer({ active }: { active: boolean }) {
@@ -54,19 +79,6 @@ export default function LandingPointer({ active }: { active: boolean }) {
     let lastTrailX = 0;
     let lastTrailY = 0;
     let lastEmission = 0;
-    // Reuse a small bank of unique masks for rendering performance, but never
-    // repeat a silhouette family on consecutive waves, including during holds.
-    const masks = Array.from({ length: 6 }, (_, family) => Array.from({ length: 4 }, () => rippleMask(family)));
-    let previousFamily = -1;
-    const previousVariants = Array<number>(6).fill(-1);
-    const nextMask = () => {
-      const family = previousFamily < 0 ? Math.floor(Math.random() * 6) : (previousFamily + 1 + Math.floor(Math.random() * 5)) % 6;
-      const previous = previousVariants[family];
-      const variant = previous < 0 ? Math.floor(Math.random() * 4) : (previous + 1 + Math.floor(Math.random() * 3)) % 4;
-      previousFamily = family;
-      previousVariants[family] = variant;
-      return masks[family][variant];
-    };
     let pressAnimation: Animation | undefined;
     const orb = cursor.firstElementChild as HTMLElement;
 
@@ -104,7 +116,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       const trail = kind === "trail";
       const heldWave = kind !== "click";
       wave.className = `landing-click-ripple${heldWave ? ` landing-click-ripple--${kind}` : ""}`;
-      wave.style.maskImage = nextMask();
+      wave.style.maskImage = rippleMask();
       wave.style.setProperty("--ripple-duration", trail ? "1200ms" : kind === "pulse" ? "2400ms" : `${3000 + Math.random() * 400}ms`);
       wave.style.setProperty("--ripple-angle", heldWave ? "0deg" : `${Math.random() * 360}deg`);
       wave.style.setProperty("--ripple-stretch", heldWave ? "1" : String(.85 + Math.random() * .25));
@@ -112,6 +124,8 @@ export default function LandingPointer({ active }: { active: boolean }) {
       wave.style.setProperty("--ripple-drift-y", heldWave ? "0px" : `${Math.random() * 50 - 25}px`);
       const gradient = document.createElement("span");
       gradient.className = "landing-ripple-fill";
+      // Choose colors and their placement once; never cycle a visible wave's fill.
+      gradient.style.background = rippleGradient();
       wave.appendChild(gradient);
       const size = trail ? 360 : Math.min(kind === "pulse" ? 840 : 900, Math.max(bounds.width, window.innerHeight) * .85);
       wave.style.width = wave.style.height = `${size}px`;

@@ -3075,8 +3075,7 @@ select {
 .landing-ripple-fill {
   position: absolute;
   inset: 0;
-  /* A colorful but stable field: no independent hue cycling or flashing. */
-  background: conic-gradient(from 35deg, #ee7947, #ce68a6, #726cd6, #329bba, #43b895, #ddbc66, #ee7947);
+  /* Each wave supplies a fresh gradient that stays stable for its lifetime. */
 }
 @keyframes landing-ripple {
   0% { transform: translate(-50%, -50%) rotate(var(--ripple-angle)) scale(.015); opacity: 0; }
@@ -3192,14 +3191,6 @@ select {
   position: absolute;
   inset: 0;
   transform-origin: center;
-}
-.landing-logo-orbit--active {
-  animation: landing-logo-orbit 1.85s linear 220ms;
-}
-@keyframes landing-logo-orbit {
-  0% { transform: rotate(0deg); animation-timing-function: cubic-bezier(.2, .55, .35, 1); }
-  82% { transform: rotate(374deg); animation-timing-function: cubic-bezier(.2, 0, .2, 1); }
-  100% { transform: rotate(360deg); }
 }
 
 .landing-logo-dot {
@@ -3684,9 +3675,7 @@ select {
 @media (prefers-reduced-motion: reduce) {
   .landing-fluid-gradient, .landing-click-ripple, .landing-cursor-orb::after { animation: none; }
   .landing-cursor-orb { transition: none; }
-  .landing-logo-orbit--active { animation: landing-logo-acknowledge 180ms linear; }
   .landing-logo-dot[data-pulsing="true"] { animation: none; }
-  @keyframes landing-logo-acknowledge { from { opacity: .7; } to { opacity: 1; } }
 
   .landing-logo-fallback {
     display: block;

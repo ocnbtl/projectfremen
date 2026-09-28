@@ -172,8 +172,10 @@ export default function AnimatedLandingPage({
         )}
 
         <div className="landing-logo-wrap" role="group" aria-label="Interactive Unigentamos logo" style={{ width: LOGO_SIZE, height: LOGO_SIZE }}>
-          <div className={`landing-logo-orbit${activeLogoDot !== null ? " landing-logo-orbit--active" : ""}`}
-            onAnimationEnd={(event) => { if (event.target === event.currentTarget) setActiveLogoDot(null); }}>
+          <motion.div className="landing-logo-orbit" initial={false}
+            animate={{ rotate: activeLogoDot === null ? 0 : 360 }}
+            transition={activeLogoDot === null || reducedMotion ? { duration: 0 } : { type: "spring", duration: 1.85, bounce: .24, delay: .22 }}
+            onAnimationComplete={() => setActiveLogoDot(null)}>
           {DOT_COLORS.map((color, index) => {
             const start = startPositions[index];
             const swirl = getSwirlPosition(index);
@@ -231,7 +233,7 @@ export default function AnimatedLandingPage({
               />
             );
           })}
-          </div>
+          </motion.div>
         </div>
 
         <motion.h1
