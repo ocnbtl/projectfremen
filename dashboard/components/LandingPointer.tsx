@@ -2,16 +2,26 @@
 
 import { useEffect, useRef } from "react";
 
-function rippleMask() {
-  // Independently placed crests and troughs create genuinely different outlines.
-  // A closed, smooth spline keeps the random contour fluid rather than jagged.
-  const count = 5 + Math.floor(Math.random() * 6);
-  const stretchX = .62 + Math.random() * .38;
-  const stretchY = .62 + Math.random() * .38;
+function rippleMask(family: number) {
+  // Different silhouettes survive the soft blur better than tiny changes to
+  // one outline: elongated, lobed, triangular, indented, irregular and squarish.
+  const count = [8, 10, 6, 12, 7 + Math.floor(Math.random() * 5), 8][family];
+  const stretchX = family === 0 ? .42 + Math.random() * .2 : .78 + Math.random() * .22;
+  const stretchY = .82 + Math.random() * .18;
+  const rotation = Math.random() * Math.PI * 2;
   const points = Array.from({ length: count }, (_, index) => {
-    const angle = (index + (Math.random() - .5) * .45) / count * Math.PI * 2;
-    const radius = index === 0 ? 200 : index === Math.floor(count / 2) ? 85 : 85 + Math.random() * 115;
-    return { x: 320 + Math.cos(angle) * radius * stretchX, y: 320 + Math.sin(angle) * radius * stretchY };
+    const angle = (index + (Math.random() - .5) * .18) / count * Math.PI * 2;
+    const jitter = Math.random() * 18 - 9;
+    let radius: number;
+    if (family === 0) radius = 195 + jitter;
+    else if (family === 1) radius = (index % 2 ? 105 : 205) + jitter;
+    else if (family === 2) radius = (index % 2 ? 95 : 210) + jitter;
+    else if (family === 3) radius = (index === 0 ? 50 : index === 1 || index === count - 1 ? 105 : 195) + jitter;
+    else if (family === 4) radius = index === 0 ? 215 : 65 + Math.random() * 145;
+    else radius = (index % 2 ? 205 : 150) + jitter;
+    const px = Math.cos(angle) * radius * stretchX;
+    const py = Math.sin(angle) * radius * stretchY;
+    return { x: 352 + px * Math.cos(rotation) - py * Math.sin(rotation), y: 352 + px * Math.sin(rotation) + py * Math.cos(rotation) };
   });
   const coordinate = (x: number, y: number) => `${x.toFixed(2)},${y.toFixed(2)}`;
   const path = points.map((point, index) => {
@@ -20,7 +30,7 @@ function rippleMask() {
     const after = points[(index + 2) % count];
     return `C${coordinate(point.x + (next.x - previous.x) / 6, point.y + (next.y - previous.y) / 6)} ${coordinate(next.x - (after.x - point.x) / 6, next.y - (after.y - point.y) / 6)} ${coordinate(next.x, next.y)}`;
   }).join(" ");
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><defs><filter id="soft" x="-75%" y="-75%" width="250%" height="250%"><feGaussianBlur stdDeviation="28"/></filter></defs><path d="M${coordinate(points[0].x, points[0].y)} ${path}Z" fill="none" stroke="white" stroke-width="${32 + Math.random() * 20}" filter="url(#soft)"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 704 704"><defs><filter id="soft" x="-75%" y="-75%" width="250%" height="250%"><feGaussianBlur stdDeviation="28"/></filter></defs><path d="M${coordinate(points[0].x, points[0].y)} ${path}Z" fill="none" stroke="white" stroke-width="${32 + Math.random() * 20}" filter="url(#soft)"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
@@ -44,7 +54,19 @@ export default function LandingPointer({ active }: { active: boolean }) {
     let lastTrailX = 0;
     let lastTrailY = 0;
     let lastEmission = 0;
-    let gestureMask = "";
+    // Reuse a small bank of unique masks for rendering performance, but never
+    // repeat a silhouette family on consecutive waves, including during holds.
+    const masks = Array.from({ length: 6 }, (_, family) => Array.from({ length: 4 }, () => rippleMask(family)));
+    let previousFamily = -1;
+    const previousVariants = Array<number>(6).fill(-1);
+    const nextMask = () => {
+      const family = previousFamily < 0 ? Math.floor(Math.random() * 6) : (previousFamily + 1 + Math.floor(Math.random() * 5)) % 6;
+      const previous = previousVariants[family];
+      const variant = previous < 0 ? Math.floor(Math.random() * 4) : (previous + 1 + Math.floor(Math.random() * 3)) % 4;
+      previousFamily = family;
+      previousVariants[family] = variant;
+      return masks[family][variant];
+    };
     let pressAnimation: Animation | undefined;
     const orb = cursor.firstElementChild as HTMLElement;
 
@@ -74,7 +96,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
         frame = 0;
       });
     };
-    const ripple = (clientX: number, clientY: number, kind: "click" | "trail" | "pulse" = "click", mask = rippleMask()) => {
+    const ripple = (clientX: number, clientY: number, kind: "click" | "trail" | "pulse" = "click") => {
       // Never erase a visible wave to make room: let every wave finish its fade.
       if (reducedMotion.matches || effects.children.length >= 240) return;
       const bounds = root.getBoundingClientRect();
@@ -82,7 +104,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       const trail = kind === "trail";
       const heldWave = kind !== "click";
       wave.className = `landing-click-ripple${heldWave ? ` landing-click-ripple--${kind}` : ""}`;
-      wave.style.maskImage = mask;
+      wave.style.maskImage = nextMask();
       wave.style.setProperty("--ripple-duration", trail ? "1200ms" : kind === "pulse" ? "2400ms" : `${3000 + Math.random() * 400}ms`);
       wave.style.setProperty("--ripple-angle", heldWave ? "0deg" : `${Math.random() * 360}deg`);
       wave.style.setProperty("--ripple-stretch", heldWave ? "1" : String(.85 + Math.random() * .25));
@@ -105,7 +127,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       const count = Math.min(6, Math.max(1, Math.ceil(distance / 18)));
       for (let step = 1; step <= count; step++) {
         const progress = step / count;
-        ripple(lastTrailX + (x - lastTrailX) * progress, lastTrailY + (y - lastTrailY) * progress, "trail", gestureMask);
+        ripple(lastTrailX + (x - lastTrailX) * progress, lastTrailY + (y - lastTrailY) * progress, "trail");
       }
       lastTrailX = x;
       lastTrailY = y;
@@ -120,7 +142,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
         lastEmission = now;
       } else if (elapsed >= 480) {
         // Larger, spaced wavefronts read as radiating rings when held still.
-        ripple(x, y, "pulse", gestureMask);
+        ripple(x, y, "pulse");
         lastTrailX = x;
         lastTrailY = y;
         lastEmission = now;
@@ -142,8 +164,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       x = event.clientX;
       y = event.clientY;
       if (event.pointerType !== "mouse") hide();
-      gestureMask = rippleMask();
-      ripple(event.clientX, event.clientY, "click", gestureMask);
+      ripple(event.clientX, event.clientY, "click");
       if (event.pointerType === "mouse" && !reducedMotion.matches) {
         held = true;
         lastTrailX = x;
