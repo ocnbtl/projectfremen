@@ -243,7 +243,7 @@ export default function AnimatedLandingPage({
         </motion.h1>
 
         {showPortfolio && <>
-          <motion.p className="landing-description" {...entrance(.12)}>A collective of ventures, ideas, and experiences<br />Working towards a better world.</motion.p>
+          <motion.p className="landing-description" {...entrance(.12)}>A collective of ventures, ideas, and experiences<br />working towards a better world.</motion.p>
           <motion.ul layout className={`landing-ventures${viewport.w < 900 || viewport.w / viewport.h < 1.05 ? " landing-ventures--vertical" : ""}`}
             aria-label="Our ventures, ideas, and experiences" inert={!ready} {...entrance(.24)}>
             {VENTURES.map(({ name, url }, index) => <motion.li key={name} layout

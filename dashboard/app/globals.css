@@ -3184,7 +3184,7 @@ select {
   transform-origin: center;
 }
 .landing-logo-orbit--active {
-  animation: landing-logo-orbit 2s cubic-bezier(.45, 0, .2, 1) 1s;
+  animation: landing-logo-orbit 1.25s cubic-bezier(.22, .7, .25, 1) 180ms;
 }
 @keyframes landing-logo-orbit {
   from { transform: rotate(0deg); }
@@ -3206,7 +3206,7 @@ select {
 .landing-logo-dot:hover { background-image: none; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.32); }
 .landing-logo-dot::after { content: ""; position: absolute; inset: -4px; border-radius: inherit; }
 .landing-logo-dot:focus-visible { outline: 2px solid var(--accent-blue); outline-offset: 5px; }
-.landing-logo-dot[data-pulsing="true"] { animation: landing-logo-dot-pulse 1s ease-in-out; }
+.landing-logo-dot[data-pulsing="true"] { animation: landing-logo-dot-pulse 360ms ease-in-out; }
 @keyframes landing-logo-dot-pulse {
   0%, 100% { transform: scale(1); }
   25% { transform: scale(1.4); }

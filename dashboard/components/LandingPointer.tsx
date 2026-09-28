@@ -3,14 +3,23 @@
 import { useEffect, useRef } from "react";
 
 function rippleMask() {
-  const phase = Math.random() * Math.PI * 2;
-  const secondaryPhase = Math.random() * Math.PI * 2;
-  const points = Array.from({ length: 144 }, (_, index) => {
-    const angle = index / 144 * Math.PI * 2;
-    const radius = 150 + Math.sin(angle * 3 + phase) * 15 + Math.sin(angle * 5 + secondaryPhase) * 9 + Math.cos(angle * 2 - phase) * 11;
-    return `${index ? "L" : "M"}${(256 + Math.cos(angle) * radius).toFixed(2)},${(256 + Math.sin(angle) * radius).toFixed(2)}`;
+  // Vary the wave structure, not just the phase of one repeated outline.
+  // Low-frequency harmonics keep every contour smooth and water-like.
+  const waves = Array.from({ length: 3 + Math.floor(Math.random() * 4) }, (_, index) => ({
+    frequency: index + 2,
+    amplitude: (4 + Math.random() * 24) / (1 + index * .4),
+    phase: Math.random() * Math.PI * 2
+  }));
+  const amplitudeTotal = waves.reduce((sum, wave) => sum + wave.amplitude, 0);
+  const irregularity = 32 + Math.random() * 28;
+  const stretchX = .86 + Math.random() * .22;
+  const stretchY = .86 + Math.random() * .22;
+  const points = Array.from({ length: 180 }, (_, index) => {
+    const angle = index / 180 * Math.PI * 2;
+    const radius = 148 + waves.reduce((sum, wave) => sum + Math.sin(angle * wave.frequency + wave.phase) * wave.amplitude, 0) * irregularity / amplitudeTotal;
+    return `${index ? "L" : "M"}${(320 + Math.cos(angle) * radius * stretchX).toFixed(2)},${(320 + Math.sin(angle) * radius * stretchY).toFixed(2)}`;
   });
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="18"/></filter></defs><path d="${points.join(" ")}Z" fill="none" stroke="white" stroke-width="36" filter="url(#soft)"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><defs><filter id="soft" x="-75%" y="-75%" width="250%" height="250%"><feGaussianBlur stdDeviation="28"/></filter></defs><path d="${points.join(" ")}Z" fill="none" stroke="white" stroke-width="44" filter="url(#soft)"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
