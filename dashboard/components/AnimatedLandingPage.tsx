@@ -113,6 +113,7 @@ export default function AnimatedLandingPage({
   const reducedMotion = useReducedMotion();
   const showPortfolio = !showBackLink;
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [activeLogoDot, setActiveLogoDot] = useState<number | null>(null);
   const [loginOpen, setLoginOpen] = useState(hasError);
   const loginToggle = useRef<HTMLButtonElement>(null);
   const passwordInput = useRef<HTMLInputElement>(null);
@@ -168,7 +169,9 @@ export default function AnimatedLandingPage({
           </Link>
         )}
 
-        <div className="landing-logo-wrap" aria-hidden="true" style={{ width: LOGO_SIZE, height: LOGO_SIZE }}>
+        <div className="landing-logo-wrap" role="group" aria-label="Interactive Unigentamos logo" style={{ width: LOGO_SIZE, height: LOGO_SIZE }}>
+          <div className={`landing-logo-orbit${activeLogoDot !== null ? " landing-logo-orbit--active" : ""}`}
+            onAnimationEnd={(event) => { if (event.target === event.currentTarget) setActiveLogoDot(null); }}>
           {DOT_COLORS.map((color, index) => {
             const start = startPositions[index];
             const swirl = getSwirlPosition(index);
@@ -179,9 +182,15 @@ export default function AnimatedLandingPage({
             const swirlY = roundMotionValue(swirl.y - final.y);
 
             return (
-              <motion.span
+              <motion.button
                 key={`${color}-${index}`}
+                type="button"
                 className="landing-logo-dot"
+                aria-label={`Animate logo dot ${index + 1}`}
+                disabled={!ready}
+                aria-disabled={activeLogoDot !== null}
+                data-pulsing={activeLogoDot === index}
+                onClick={() => { if (ready && activeLogoDot === null) setActiveLogoDot(index); }}
                 style={{
                   width: roundMotionValue(DOT_RADIUS * 2),
                   height: roundMotionValue(DOT_RADIUS * 2),
@@ -220,6 +229,7 @@ export default function AnimatedLandingPage({
               />
             );
           })}
+          </div>
         </div>
 
         <motion.h1
@@ -233,7 +243,7 @@ export default function AnimatedLandingPage({
         </motion.h1>
 
         {showPortfolio && <>
-          <motion.p className="landing-description" {...entrance(.12)}>A collective of ventures, ideas, and experiences working towards a better world.</motion.p>
+          <motion.p className="landing-description" {...entrance(.12)}>A collective of ventures, ideas, and experiences<br />Working towards a better world.</motion.p>
           <motion.ul layout className={`landing-ventures${viewport.w < 900 || viewport.w / viewport.h < 1.05 ? " landing-ventures--vertical" : ""}`}
             aria-label="Our ventures, ideas, and experiences" inert={!ready} {...entrance(.24)}>
             {VENTURES.map(({ name, url }, index) => <motion.li key={name} layout

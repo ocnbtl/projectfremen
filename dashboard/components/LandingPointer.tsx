@@ -7,10 +7,10 @@ function rippleMask() {
   const secondaryPhase = Math.random() * Math.PI * 2;
   const points = Array.from({ length: 144 }, (_, index) => {
     const angle = index / 144 * Math.PI * 2;
-    const radius = 174 + Math.sin(angle * 3 + phase) * 15 + Math.sin(angle * 5 + secondaryPhase) * 9 + Math.cos(angle * 2 - phase) * 11;
+    const radius = 150 + Math.sin(angle * 3 + phase) * 15 + Math.sin(angle * 5 + secondaryPhase) * 9 + Math.cos(angle * 2 - phase) * 11;
     return `${index ? "L" : "M"}${(256 + Math.cos(angle) * radius).toFixed(2)},${(256 + Math.sin(angle) * radius).toFixed(2)}`;
   });
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="8"/></filter></defs><path d="${points.join(" ")}Z" fill="none" stroke="white" stroke-width="30" filter="url(#soft)"/></svg>`;
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><filter id="soft" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="18"/></filter></defs><path d="${points.join(" ")}Z" fill="none" stroke="white" stroke-width="36" filter="url(#soft)"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
