@@ -3137,6 +3137,9 @@ select {
   pointer-events: none;
   z-index: 1;
 }
+/* Pseudo artwork is mirrored explicitly with its live animation state. */
+.landing-cursor-foreground *::before,
+.landing-cursor-foreground *::after { content: none !important; }
 .landing-cursor-orb::after {
   content: "";
   position: absolute;

@@ -79,78 +79,110 @@ export default function LandingPointer({ active }: { active: boolean }) {
     let lastPulseEmission = 0;
     let pressAnimation: Animation | undefined;
     const orb = cursor.firstElementChild as HTMLElement;
-    let copiedTarget: Element | null = null;
-    let foregroundCopy: HTMLElement | null = null;
-    let foregroundSources: Element[] = [];
-    let foregroundNodes: (HTMLElement | SVGElement)[] = [];
-
+    type ForegroundCopy = {
+      element: HTMLElement;
+      sources: Element[];
+      nodes: (HTMLElement | SVGElement)[];
+      underline?: HTMLSpanElement;
+    };
+    const foregroundCopies = new Map<Element, ForegroundCopy>();
     const clearForeground = () => {
       foreground.replaceChildren();
-      copiedTarget = null;
-      foregroundCopy = null;
-      foregroundSources = [];
-      foregroundNodes = [];
+      foregroundCopies.clear();
+    };
+    const copyStyle = (source: CSSStyleDeclaration, node: HTMLElement | SVGElement) => {
+      for (const property of Array.from(source)) node.style.setProperty(property, source.getPropertyValue(property));
+      node.style.animation = 'none';
+      node.style.transition = 'none';
+      node.style.pointerEvents = 'none';
+    };
+    const createForeground = (target: Element): ForegroundCopy => {
+      // Mirror only masked character count; never copy the original password.
+      const input = target instanceof HTMLInputElement;
+      const copy = input ? document.createElement('input') : target.cloneNode(true) as HTMLElement;
+      if (input) {
+        (copy as HTMLInputElement).type = 'password';
+        (copy as HTMLInputElement).placeholder = target.placeholder;
+        (copy as HTMLInputElement).autocomplete = 'off';
+      }
+      const sources = [target, ...target.querySelectorAll('*')];
+      const nodes = [copy, ...copy.querySelectorAll('*')] as (HTMLElement | SVGElement)[];
+      nodes.forEach((node, index) => {
+        copyStyle(getComputedStyle(sources[index]), node);
+        node.removeAttribute('id');
+        node.removeAttribute('href');
+        node.removeAttribute('name');
+        node.setAttribute('tabindex', '-1');
+      });
+      Object.assign(copy.style, {
+        position: 'absolute', margin: '0', transform: 'none', zoom: '1',
+        // Percentage constraints otherwise resolve against the zero-width
+        // cursor origin and shift centered text, especially its second line.
+        minWidth: '0', maxWidth: 'none', minHeight: '0', maxHeight: 'none'
+      });
+      if (!target.matches('.landing-logo-dot')) copy.style.background = 'transparent';
+      copy.inert = true;
+      copy.setAttribute('aria-hidden', 'true');
+      let underline: HTMLSpanElement | undefined;
+      if (target.matches('.landing-venture-name, .landing-back-link')) {
+        underline = document.createElement('span');
+        copy.appendChild(underline);
+      }
+      foreground.appendChild(copy);
+      return { element: copy, sources, nodes, underline };
     };
     const drawCursor = () => {
       frame = 0;
       const hit = document.elementFromPoint(x, y);
-      const target = hit?.closest(".landing-title, .landing-description, .landing-venture-name, .landing-logo-dot, .landing-signin-toggle, .landing-submit, .landing-back-link") ?? null;
-      cursor.dataset.interactive = String(Boolean(hit?.closest("a, button, input, .landing-logo-wrap")));
+      cursor.dataset.interactive = String(Boolean(hit?.closest('a, button, input, .landing-logo-wrap, .landing-description, .landing-title')));
       cursor.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-      cursor.style.opacity = "1";
-      root.dataset.customCursor = "true";
-      if (target !== copiedTarget) {
-        clearForeground();
-        if (target && root.contains(target)) {
-          // Copy only foreground artwork, never the page backdrop. This visual
-          // copy is inert and clipped inside the colorful cursor.
-          const copy = target.cloneNode(true) as HTMLElement;
-          const originals = [target, ...target.querySelectorAll("*")];
-          const copies = [copy, ...copy.querySelectorAll("*")];
-          copies.forEach((node, index) => {
-            const styled = node as HTMLElement | SVGElement;
-            const source = getComputedStyle(originals[index]);
-            for (const property of Array.from(source)) styled.style.setProperty(property, source.getPropertyValue(property));
-            styled.style.animation = "none";
-            styled.style.transition = "none";
-            styled.style.pointerEvents = "none";
-            node.removeAttribute("id");
-            node.removeAttribute("href");
-            node.removeAttribute("name");
-            node.setAttribute("tabindex", "-1");
-          });
-          Object.assign(copy.style, {
-            position: "absolute", margin: "0", transform: "none", zoom: "1",
-            boxShadow: "none", outline: "none"
-          });
-          if (!target.matches(".landing-logo-dot")) copy.style.background = "transparent";
-          copy.inert = true;
-          copy.setAttribute("aria-hidden", "true");
-          foreground.appendChild(copy);
-          copiedTarget = target;
-          foregroundCopy = copy;
-          foregroundSources = originals;
-          foregroundNodes = copies as (HTMLElement | SVGElement)[];
-        }
-      }
-      if (copiedTarget && foregroundCopy) {
-        // Keep inverted colors in step with the original hover color transition.
-        foregroundNodes.forEach((node, index) => {
-          const source = getComputedStyle(foregroundSources[index]);
+      cursor.style.opacity = '1';
+      root.dataset.customCursor = 'true';
+      const radius = orb.getBoundingClientRect().width / 2;
+      const candidates = root.querySelectorAll('.landing-center .landing-title, .landing-center .landing-description, .landing-center .landing-venture-name, .landing-center .landing-logo-dot, .landing-center .landing-signin-toggle, .landing-center .landing-submit, .landing-center .landing-back-link, .landing-center .landing-input');
+      const overlaps = new Map<Element, DOMRect>();
+      candidates.forEach((target) => {
+        if (target.closest('[aria-hidden="true"], [inert]')) return;
+        const bounds = target.getBoundingClientRect();
+        // Include outlines and every element touched by the expanded circle,
+        // rather than only the element under its center.
+        const dx = Math.max(bounds.left - 4 - x, 0, x - bounds.right - 4);
+        const dy = Math.max(bounds.top - 4 - y, 0, y - bounds.bottom - 4);
+        if (bounds.width && bounds.height && dx * dx + dy * dy <= radius * radius) overlaps.set(target, bounds);
+      });
+      foregroundCopies.forEach((copy, target) => {
+        if (!overlaps.has(target)) { copy.element.remove(); foregroundCopies.delete(target); }
+      });
+      overlaps.forEach((bounds, target) => {
+        let copy = foregroundCopies.get(target);
+        if (!copy) { copy = createForeground(target); foregroundCopies.set(target, copy); }
+        copy.nodes.forEach((node, index) => {
+          const source = getComputedStyle(copy.sources[index]);
           node.style.color = source.color;
           node.style.fill = source.fill;
           node.style.stroke = source.stroke;
         });
-        const bounds = copiedTarget.getBoundingClientRect();
-        Object.assign(foregroundCopy.style, {
+        const source = getComputedStyle(target);
+        Object.assign(copy.element.style, {
           left: `${bounds.left - x}px`, top: `${bounds.top - y}px`,
-          width: `${bounds.width}px`, height: `${bounds.height}px`
+          width: `${bounds.width}px`, height: `${bounds.height}px`,
+          outline: source.outline, outlineOffset: source.outlineOffset,
+          borderColor: source.borderColor, boxShadow: source.boxShadow
         });
-      }
-      // Keep tracking the gaps too: a spinning dot can move back under a resting mouse.
-      if (copiedTarget || hit?.closest(".landing-logo-wrap")) frame = requestAnimationFrame(drawCursor);
+        if (target instanceof HTMLInputElement) {
+          const inputCopy = copy.element as HTMLInputElement;
+          inputCopy.value = 'x'.repeat(target.value.length);
+          inputCopy.scrollLeft = target.scrollLeft;
+        }
+        if (copy.underline) {
+          const underlineStyle = getComputedStyle(target, '::after');
+          copyStyle(underlineStyle, copy.underline);
+          copy.underline.style.display = underlineStyle.content === 'none' ? 'none' : 'block';
+        }
+      });
+      // Track expansion, focus/hover transitions and moving dots while resting.
+      if (foregroundCopies.size || hit?.closest('.landing-logo-wrap')) frame = requestAnimationFrame(drawCursor);
     };
-
     const release = () => {
       held = false;
       activePointer = null;
