@@ -1,10 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { IconLock, IconX } from "@tabler/icons-react";
+import { IconArrowRight, IconLogin2, IconX } from "@tabler/icons-react";
 import LandingPixels from "./LandingPixels";
 
 type LandingProps = {
@@ -115,6 +115,7 @@ export default function AnimatedLandingPage({
   const [animationComplete, setAnimationComplete] = useState(false);
   const [loginOpen, setLoginOpen] = useState(hasError);
   const loginToggle = useRef<HTMLButtonElement>(null);
+  const passwordInput = useRef<HTMLInputElement>(null);
   const ready = animationComplete || Boolean(reducedMotion);
   // Keep the first client render identical to the server render. The real
   // viewport is applied immediately after hydration so the animation still
@@ -135,6 +136,10 @@ export default function AnimatedLandingPage({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  useEffect(() => {
+    if (showPortfolio && loginOpen && ready) passwordInput.current?.focus({ preventScroll: true });
+  }, [loginOpen, ready, showPortfolio]);
+
   const entrance = (delay = 0) => ({
     initial: { opacity: 0, y: 16 },
     animate: { opacity: ready ? 1 : 0, y: ready ? 0 : 16 },
@@ -145,9 +150,9 @@ export default function AnimatedLandingPage({
     <input type="hidden" name="errorPath" value={errorPath} />
     <input type="hidden" name="successPath" value={successPath} />
     {hasError && <p className="landing-error" role="alert">Invalid password. Try again.</p>}
-    <input id="password" name="password" type="password" aria-label="Password" placeholder="password"
-      className="landing-input" autoComplete="current-password" autoFocus={showPortfolio && loginOpen && ready} required />
-    <button type="submit" className="landing-submit">Enter</button>
+    <input ref={passwordInput} id="password" name="password" type="password" aria-label="Password" placeholder="password"
+      className="landing-input" autoComplete="current-password" required />
+    <button type="submit" className="landing-submit" aria-label="Enter" title="Enter"><IconArrowRight size={20} stroke={1.7} aria-hidden="true" /></button>
   </form>;
 
   return (
@@ -155,16 +160,17 @@ export default function AnimatedLandingPage({
       <LandingPixels active={animationComplete && !reducedMotion} />
       {showPortfolio && <motion.div className="landing-signin" {...entrance(.5)} inert={!ready}
         onKeyDown={(event) => { if (event.key === "Escape") { setLoginOpen(false); loginToggle.current?.focus(); } }}>
-        <AnimatePresence initial={false}>
-          {ready && loginOpen && <motion.div id="landing-signin-panel" className="landing-signin-panel"
-            initial={{ width: 0, opacity: 0 }} animate={{ width: "auto", opacity: 1 }} exit={{ width: 0, opacity: 0 }}
-            transition={{ duration: reducedMotion ? 0 : .4, ease: [.2, .8, .2, 1] }} inert={!loginOpen}>
+        <motion.div id="landing-signin-panel" className="landing-signin-panel"
+          initial={false} animate={{ width: ready && loginOpen ? Math.min(280, viewport.w - 112) + 8 : 0, height: ready && loginOpen ? "auto" : 44 }}
+          transition={{ duration: reducedMotion ? 0 : .7, ease: [.16, 1, .3, 1] }} inert={!ready || !loginOpen} aria-hidden={!ready || !loginOpen}>
+          <motion.div initial={false} animate={{ opacity: ready && loginOpen ? 1 : 0, x: loginOpen ? 0 : 18 }}
+            transition={{ duration: reducedMotion ? 0 : .4, delay: loginOpen && !reducedMotion ? .12 : 0, ease: [.16, 1, .3, 1] }}>
             {loginForm}
-          </motion.div>}
-        </AnimatePresence>
+          </motion.div>
+        </motion.div>
         <button ref={loginToggle} type="button" className="landing-signin-toggle" aria-label={loginOpen ? "Close sign in" : "Sign in"}
           aria-expanded={loginOpen} aria-controls="landing-signin-panel" onClick={() => setLoginOpen(!loginOpen)}>
-          {loginOpen ? <IconX size={20} stroke={1.6} /> : <IconLock size={20} stroke={1.6} />}
+          {loginOpen ? <IconX size={20} stroke={1.6} /> : <IconLogin2 size={21} stroke={1.6} />}
         </button>
       </motion.div>}
 

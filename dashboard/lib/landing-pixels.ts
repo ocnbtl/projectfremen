@@ -1,37 +1,65 @@
-export type PixelPoint = { x: number; y: number };
-export type PixelTrail = { points: PixelPoint[]; occupied: Set<string>; direction: number };
-const directions = [{ x: 2, y: 0 }, { x: 0, y: 2 }, { x: -2, y: 0 }, { x: 0, y: -2 }];
-const key = (point: PixelPoint) => `${point.x},${point.y}`;
+export const PIXEL_SIZE = 4;
+type Cell = { x: number; y: number };
+export type PixelField = {
+  columns: number; rows: number; visibleColumns: number; visibleRows: number;
+  cells: Uint8Array; frontiers: Cell[][]; directions: number[]; cursor: number;
+};
+const directions = [{ x: 1, y: 0 }, { x: 0, y: 1 }, { x: -1, y: 0 }, { x: 0, y: -1 }];
 
-export function createPixelTrail(width: number, height: number, random = Math.random): PixelTrail {
-  const point = { x: Math.floor(random() * Math.max(1, Math.floor(width / 2))) * 2,
-    y: Math.floor(random() * Math.max(1, Math.floor(height / 2))) * 2 };
-  return { points: [point], occupied: new Set([key(point)]), direction: Math.floor(random() * 4) };
+export function createPixelField(width: number, height: number): PixelField {
+  const field: PixelField = { columns: 0, rows: 0, visibleColumns: 0, visibleRows: 0,
+    cells: new Uint8Array(), frontiers: [[], [], [], []], directions: [0, 1, 2, 3], cursor: 0 };
+  resizePixelField(field, width, height);
+  return field;
 }
 
-// Never paint an already occupied cell. If the tip is enclosed, grow from the
-// nearest available part of the trail. Retiring its tail keeps long runs bounded.
-export function advancePixelTrail(trail: PixelTrail, width: number, height: number, random = Math.random) {
-  const limit = Math.max(1, Math.min(1600, Math.floor(width / 2) * Math.floor(height / 2) - 1));
-  while (trail.points.length >= limit) {
-    trail.occupied.delete(key(trail.points.shift()!));
+export function resizePixelField(field: PixelField, width: number, height: number) {
+  field.visibleColumns = Math.max(1, Math.ceil(width / PIXEL_SIZE));
+  field.visibleRows = Math.max(1, Math.ceil(height / PIXEL_SIZE));
+  const columns = Math.max(field.columns, field.visibleColumns);
+  const rows = Math.max(field.rows, field.visibleRows);
+  if (columns !== field.columns || rows !== field.rows) {
+    const cells = new Uint8Array(columns * rows);
+    for (let row = 0; row < field.rows; row++) {
+      cells.set(field.cells.subarray(row * field.columns, (row + 1) * field.columns), row * columns);
+    }
+    field.cells = cells;
+    field.columns = columns;
+    field.rows = rows;
   }
-  const firstDirection = random() < .65 ? trail.direction : Math.floor(random() * 4);
-  for (let index = trail.points.length - 1; index >= 0; index--) {
-    const anchor = trail.points[index];
+  // Existing paint is never removed, including when the viewport shrinks.
+  field.cursor = 0;
+}
+
+export function advancePixelField(field: PixelField, color: number, random = Math.random): Cell | null {
+  const frontier = field.frontiers[color - 1];
+  const available = (cell: Cell) => cell.x >= 0 && cell.y >= 0 && cell.x < field.visibleColumns &&
+    cell.y < field.visibleRows && field.cells[cell.y * field.columns + cell.x] === 0;
+  const paint = (cell: Cell, direction: number) => {
+    field.cells[cell.y * field.columns + cell.x] = color;
+    frontier.push(cell);
+    field.directions[color - 1] = direction;
+    return { x: cell.x * PIXEL_SIZE, y: cell.y * PIXEL_SIZE };
+  };
+  const firstDirection = random() < .65 ? field.directions[color - 1] : Math.floor(random() * 4);
+  while (frontier.length) {
+    const anchor = frontier[frontier.length - 1];
     for (let offset = 0; offset < 4; offset++) {
       const direction = (firstDirection + offset) % 4;
       const delta = directions[direction];
-      const point = { x: anchor.x + delta.x, y: anchor.y + delta.y };
-      if (point.x < 0 || point.y < 0 || point.x + 2 > width || point.y + 2 > height || trail.occupied.has(key(point))) continue;
-      trail.points.push(point);
-      trail.occupied.add(key(point));
-      trail.direction = direction;
-      return;
+      const cell = { x: anchor.x + delta.x, y: anchor.y + delta.y };
+      if (available(cell)) return paint(cell, direction);
     }
+    frontier.pop(); // Retire an enclosed growth tip, never its painted cells.
   }
-  const fresh = createPixelTrail(width, height, random);
-  trail.points = fresh.points;
-  trail.occupied = fresh.occupied;
-  trail.direction = fresh.direction;
+  // Seed another open region if this trail has been enclosed by the others.
+  const seed = { x: Math.floor(random() * field.visibleColumns), y: Math.floor(random() * field.visibleRows) };
+  if (available(seed)) return paint(seed, firstDirection);
+  const capacity = field.visibleColumns * field.visibleRows;
+  while (field.cursor < capacity) {
+    const index = field.cursor++;
+    const cell = { x: index % field.visibleColumns, y: Math.floor(index / field.visibleColumns) };
+    if (available(cell)) return paint(cell, firstDirection);
+  }
+  return null; // A full screen remains painted; it never resets or erases tails.
 }
