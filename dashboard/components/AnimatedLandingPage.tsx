@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useState } from "react";
 
 type Pixel = {
@@ -45,6 +45,15 @@ const LOGO_RADIUS = LOGO_SIZE * 0.38;
 const DOT_RADIUS = LOGO_SIZE * 0.07;
 const CENTER = LOGO_SIZE / 2;
 const LINE_MAX_PIXELS = 3600;
+const VENTURES = [
+  { name: "madagin", url: "https://madagin.com" },
+  { name: "besthellos", url: "https://besthellos.com" },
+  { name: "porchbound", url: "https://porchbound.us" },
+  { name: "isitusa", url: "https://isitusa.com" },
+  { name: "oceanbattelle", url: "https://oceanbattelle.com" },
+  { name: "atlantis", url: "https://joinatlant.is" },
+  { name: "profosi", url: "https://profosi.com" }
+];
 
 function roundMotionValue(value: number) {
   return Number(value.toFixed(5));
@@ -165,6 +174,8 @@ export default function AnimatedLandingPage({
   successPath = "/admin?welcome=1",
   showBackLink = false
 }: LandingProps) {
+  const reducedMotion = useReducedMotion();
+  const showPortfolio = !showBackLink;
   const [animationComplete, setAnimationComplete] = useState(false);
   // Keep the first client render identical to the server render. The real
   // viewport is applied immediately after hydration so the animation still
@@ -191,7 +202,7 @@ export default function AnimatedLandingPage({
   }, []);
 
   useEffect(() => {
-    if (!animationComplete) {
+    if (!animationComplete || reducedMotion) {
       return;
     }
 
@@ -227,10 +238,10 @@ export default function AnimatedLandingPage({
       window.clearInterval(green);
       window.clearInterval(brown);
     };
-  }, [animationComplete, viewport.h, viewport.w]);
+  }, [animationComplete, reducedMotion, viewport.h, viewport.w]);
 
   return (
-    <main className="landing-root">
+    <main className={`landing-root${showPortfolio ? " landing-root--portfolio" : ""}`}>
       <div className="landing-pixel-layer" aria-hidden>
         {orangePixels.map((pixel, index) => (
           <span
@@ -269,7 +280,7 @@ export default function AnimatedLandingPage({
           </Link>
         )}
 
-        <div className="landing-logo-wrap" style={{ width: LOGO_SIZE, height: LOGO_SIZE }}>
+        <div className="landing-logo-wrap" aria-hidden="true" style={{ width: LOGO_SIZE, height: LOGO_SIZE }}>
           {DOT_COLORS.map((color, index) => {
             const start = startPositions[index];
             const swirl = getSwirlPosition(index);
@@ -297,7 +308,7 @@ export default function AnimatedLandingPage({
                   opacity: 0
                 }}
                 animate={
-                  animationComplete
+                  animationComplete || reducedMotion
                     ? { x: 0, y: 0, scale: 1, opacity: 1, rotate: 0 }
                     : {
                         x: [startX, swirlX, 0],
@@ -308,8 +319,8 @@ export default function AnimatedLandingPage({
                       }
                 }
                 transition={{
-                  duration: 2.15,
-                  delay: index * 0.06,
+                  duration: reducedMotion ? 0 : 2.15,
+                  delay: reducedMotion ? 0 : index * 0.06,
                   ease: [0.25, 0.1, 0.25, 1],
                   times: [0, 0.5, 1]
                 }}
@@ -325,7 +336,7 @@ export default function AnimatedLandingPage({
 
         <motion.h1
           className="landing-title"
-          initial={{ opacity: 0, y: 18 }}
+          initial={showPortfolio ? false : { opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 1.8, duration: 0.6 }}
         >
@@ -335,12 +346,19 @@ export default function AnimatedLandingPage({
           <span className="landing-title-mos">mos</span>
         </motion.h1>
 
+        {showPortfolio && <>
+          <p className="landing-description">A collective of ventures, ideas, and experiences working toward a better world.</p>
+          <ul className="landing-ventures" aria-label="Our ventures, ideas, and experiences">
+            {VENTURES.map(({ name, url }) => <li key={name}><a href={url} className="landing-venture-name">{name}</a></li>)}
+          </ul>
+        </>}
+
         <motion.div
           className="landing-login-shell"
-          initial={{ opacity: 0, y: 26 }}
+          initial={showPortfolio ? false : { opacity: 0, y: 26 }}
           animate={{
-            opacity: animationComplete ? 1 : 0,
-            y: animationComplete ? 0 : 26
+            opacity: showPortfolio || animationComplete || reducedMotion ? 1 : 0,
+            y: showPortfolio || animationComplete || reducedMotion ? 0 : 26
           }}
           transition={{ duration: 0.5, delay: 0.15 }}
         >
@@ -361,6 +379,7 @@ export default function AnimatedLandingPage({
               aria-label="Password"
               placeholder="password"
               className="landing-input"
+              autoComplete="current-password"
               required
             />
 
