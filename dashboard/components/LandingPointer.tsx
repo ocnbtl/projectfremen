@@ -74,22 +74,24 @@ export default function LandingPointer({ active }: { active: boolean }) {
         frame = 0;
       });
     };
-    const ripple = (clientX: number, clientY: number, trail = false, mask = rippleMask()) => {
+    const ripple = (clientX: number, clientY: number, kind: "click" | "trail" | "pulse" = "click", mask = rippleMask()) => {
       // Never erase a visible wave to make room: let every wave finish its fade.
       if (reducedMotion.matches || effects.children.length >= 240) return;
       const bounds = root.getBoundingClientRect();
       const wave = document.createElement("span");
-      wave.className = `landing-click-ripple${trail ? " landing-click-ripple--trail" : ""}`;
+      const trail = kind === "trail";
+      const heldWave = kind !== "click";
+      wave.className = `landing-click-ripple${heldWave ? ` landing-click-ripple--${kind}` : ""}`;
       wave.style.maskImage = mask;
-      wave.style.setProperty("--ripple-duration", trail ? "1200ms" : `${3000 + Math.random() * 400}ms`);
-      wave.style.setProperty("--ripple-angle", trail ? "0deg" : `${Math.random() * 360}deg`);
-      wave.style.setProperty("--ripple-stretch", trail ? "1" : String(.85 + Math.random() * .25));
-      wave.style.setProperty("--ripple-drift-x", trail ? "0px" : `${Math.random() * 70 - 35}px`);
-      wave.style.setProperty("--ripple-drift-y", trail ? "0px" : `${Math.random() * 50 - 25}px`);
+      wave.style.setProperty("--ripple-duration", trail ? "1200ms" : kind === "pulse" ? "2400ms" : `${3000 + Math.random() * 400}ms`);
+      wave.style.setProperty("--ripple-angle", heldWave ? "0deg" : `${Math.random() * 360}deg`);
+      wave.style.setProperty("--ripple-stretch", heldWave ? "1" : String(.85 + Math.random() * .25));
+      wave.style.setProperty("--ripple-drift-x", heldWave ? "0px" : `${Math.random() * 70 - 35}px`);
+      wave.style.setProperty("--ripple-drift-y", heldWave ? "0px" : `${Math.random() * 50 - 25}px`);
       const gradient = document.createElement("span");
       gradient.className = "landing-ripple-fill";
       wave.appendChild(gradient);
-      const size = trail ? 360 : Math.min(900, Math.max(bounds.width, window.innerHeight) * .85);
+      const size = trail ? 360 : Math.min(kind === "pulse" ? 840 : 900, Math.max(bounds.width, window.innerHeight) * .85);
       wave.style.width = wave.style.height = `${size}px`;
       wave.style.left = `${clientX - bounds.left}px`;
       wave.style.top = `${clientY - bounds.top}px`;
@@ -103,7 +105,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       const count = Math.min(6, Math.max(1, Math.ceil(distance / 18)));
       for (let step = 1; step <= count; step++) {
         const progress = step / count;
-        ripple(lastTrailX + (x - lastTrailX) * progress, lastTrailY + (y - lastTrailY) * progress, true, gestureMask);
+        ripple(lastTrailX + (x - lastTrailX) * progress, lastTrailY + (y - lastTrailY) * progress, "trail", gestureMask);
       }
       lastTrailX = x;
       lastTrailY = y;
@@ -112,9 +114,15 @@ export default function LandingPointer({ active }: { active: boolean }) {
       if (!held) return;
       const distance = Math.hypot(x - lastTrailX, y - lastTrailY);
       const elapsed = now - lastEmission;
-      if ((distance >= 18 && elapsed >= 32) || elapsed >= 70) {
+      if ((distance >= 18 && elapsed >= 32) || (distance >= 4 && elapsed >= 70)) {
         // Bridge between samples so quick drags do not leave isolated timer dots.
         connectTrail();
+        lastEmission = now;
+      } else if (elapsed >= 480) {
+        // Larger, spaced wavefronts read as radiating rings when held still.
+        ripple(x, y, "pulse", gestureMask);
+        lastTrailX = x;
+        lastTrailY = y;
         lastEmission = now;
       }
       holdFrame = requestAnimationFrame(emitTrail);
@@ -135,7 +143,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       y = event.clientY;
       if (event.pointerType !== "mouse") hide();
       gestureMask = rippleMask();
-      ripple(event.clientX, event.clientY, false, gestureMask);
+      ripple(event.clientX, event.clientY, "click", gestureMask);
       if (event.pointerType === "mouse" && !reducedMotion.matches) {
         held = true;
         lastTrailX = x;

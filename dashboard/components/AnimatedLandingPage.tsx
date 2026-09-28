@@ -149,6 +149,7 @@ export default function AnimatedLandingPage({
     style: { visibility: ready ? "visible" as const : "hidden" as const }
   });
   const signInWidth = Math.min(340, viewport.w - 64);
+  const verticalVentures = viewport.w < 900 || viewport.w / viewport.h < 1.05;
   const loginForm = <form action="/api/admin/login" method="post" className="landing-login-form">
     <input type="hidden" name="errorPath" value={errorPath} />
     <input type="hidden" name="successPath" value={successPath} />
@@ -245,12 +246,20 @@ export default function AnimatedLandingPage({
 
         {showPortfolio && <>
           <motion.p className="landing-description" {...entrance(.12)}>A collective of ventures, ideas, and experiences<br />working towards a better world.</motion.p>
-          <motion.ul layout className={`landing-ventures${viewport.w < 900 || viewport.w / viewport.h < 1.05 ? " landing-ventures--vertical" : ""}`}
+          <motion.ul layout className={`landing-ventures${verticalVentures ? " landing-ventures--vertical" : ""}`}
             aria-label="Our ventures, ideas, and experiences" inert={!ready} {...entrance(.24)}>
             {VENTURES.map(({ name, url }, index) => <motion.li key={name} layout
-              initial={{ opacity: 0, y: 12 }} animate={{ opacity: ready ? 1 : 0, y: ready ? 0 : 12 }}
-              transition={{ duration: reducedMotion ? 0 : .55, delay: ready && !reducedMotion ? .26 + index * .055 : 0, layout: { duration: reducedMotion ? 0 : .5, delay: 0 } }}>
-              <a href={url} className="landing-venture-name">{name}</a>
+              transition={{ layout: { duration: reducedMotion ? 0 : .5 } }}>
+              <motion.span className="landing-venture-fold" initial={{ opacity: 0 }}
+                style={{ transformOrigin: verticalVentures ? (index % 2 ? "right center" : "left center") : (index % 2 ? "center bottom" : "center top") }}
+                animate={{ opacity: ready ? 1 : 0,
+                  x: ready || !verticalVentures ? 0 : (index % 2 ? 24 : -24),
+                  y: ready || verticalVentures ? 0 : (index % 2 ? 24 : -24),
+                  rotateX: ready || verticalVentures ? 0 : (index % 2 ? 85 : -85),
+                  rotateY: ready || !verticalVentures ? 0 : (index % 2 ? -85 : 85) }}
+                transition={{ duration: reducedMotion ? 0 : .8, ease: [.22, .8, .25, 1], delay: ready && !reducedMotion ? .26 + index * .085 : 0 }}>
+                <a href={url} className="landing-venture-name">{name}</a>
+              </motion.span>
             </motion.li>)}
           </motion.ul>
         </>}
