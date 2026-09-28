@@ -3314,7 +3314,7 @@ select {
 .landing-description {
   max-width: 100%;
   margin: 40px 0 0;
-  color: #4b5c60;
+  color: var(--accent-blue);
   font-family: var(--font-body);
   font-size: clamp(16px, 1.4vw, 18px);
   font-weight: 400;
