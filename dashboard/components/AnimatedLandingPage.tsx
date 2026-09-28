@@ -161,12 +161,11 @@ export default function AnimatedLandingPage({
       {showPortfolio && <motion.div className="landing-signin" {...entrance(.5)} inert={!ready}
         onKeyDown={(event) => { if (event.key === "Escape") { setLoginOpen(false); loginToggle.current?.focus(); } }}>
         <motion.div id="landing-signin-panel" className="landing-signin-panel"
-          initial={false} animate={{ width: ready && loginOpen ? Math.min(280, viewport.w - 112) + 8 : 0, height: ready && loginOpen ? "auto" : 60 }}
-          transition={{ duration: reducedMotion ? 0 : .7, ease: [.16, 1, .3, 1] }} inert={!ready || !loginOpen} aria-hidden={!ready || !loginOpen}>
-          <motion.div initial={false} animate={{ opacity: ready && loginOpen ? 1 : 0, x: loginOpen ? 0 : 18 }}
-            transition={{ duration: reducedMotion ? 0 : .4, delay: loginOpen && !reducedMotion ? .12 : 0, ease: [.16, 1, .3, 1] }}>
-            {loginForm}
-          </motion.div>
+          initial={false} animate={{ opacity: ready && loginOpen ? 1 : 0, x: loginOpen ? 0 : 24, scale: loginOpen ? 1 : .94 }}
+          style={{ pointerEvents: ready && loginOpen ? "auto" : "none", transformOrigin: "right center" }}
+          transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 180, damping: 25, mass: .85, opacity: { duration: .25 } }}
+          inert={!ready || !loginOpen} aria-hidden={!ready || !loginOpen}>
+          {loginForm}
         </motion.div>
         <button ref={loginToggle} type="button" className="landing-signin-toggle" aria-label={loginOpen ? "Close sign in" : "Sign in"}
           aria-expanded={loginOpen} aria-controls="landing-signin-panel" onClick={() => setLoginOpen(!loginOpen)}>

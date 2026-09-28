@@ -43,6 +43,10 @@ export default function LandingPointer({ active }: { active: boolean }) {
       const bounds = root.getBoundingClientRect();
       const wave = document.createElement("span");
       wave.className = "landing-click-ripple";
+      const gradient = document.createElement("span");
+      gradient.className = "landing-fluid-gradient";
+      gradient.style.animationDelay = `${-(performance.now() % 1800)}ms, 0ms`;
+      wave.appendChild(gradient);
       const size = Math.min(900, Math.max(bounds.width, window.innerHeight) * .85);
       wave.style.width = wave.style.height = `${size}px`;
       wave.style.left = `${clientX - bounds.left}px`;
@@ -50,7 +54,9 @@ export default function LandingPointer({ active }: { active: boolean }) {
       // Rapid clicking cannot accumulate decorative elements indefinitely.
       while (effects.children.length >= 6) effects.firstElementChild?.remove();
       effects.appendChild(wave);
-      wave.addEventListener("animationend", () => wave.remove(), { once: true });
+      wave.addEventListener("animationend", (event) => {
+        if (event.target === wave) wave.remove();
+      });
     };
     const press = (event: PointerEvent) => {
       if (event.button !== 0 || !event.isPrimary) return;
@@ -101,7 +107,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
   return <>
     <div ref={effectsRef} className="landing-pointer-effects" aria-hidden="true" />
     <div ref={cursorRef} className="landing-gradient-cursor" aria-hidden="true">
-      <span className="landing-cursor-orb"><span className="landing-cursor-gradient" /></span>
+      <span className="landing-cursor-orb"><span className="landing-fluid-gradient" /></span>
     </div>
   </>;
 }

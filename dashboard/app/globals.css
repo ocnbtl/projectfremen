@@ -3061,14 +3061,15 @@ select {
 .landing-click-ripple {
   position: absolute;
   border-radius: 50%;
-  border: 1px solid rgba(23, 77, 54, .22);
-  background: radial-gradient(circle, transparent 30%, rgba(23, 77, 54, .045) 52%, rgba(255, 78, 0, .1) 68%, transparent 72%);
+  overflow: hidden;
+  mask-image: radial-gradient(circle, transparent 28%, rgba(0,0,0,.15) 42%, #000 58%, rgba(0,0,0,.25) 67%, transparent 72%);
   transform: translate(-50%, -50%) scale(.015);
-  animation: landing-ripple 1250ms cubic-bezier(.16, 1, .3, 1) forwards;
+  animation: landing-ripple 1800ms cubic-bezier(.16, 1, .3, 1) forwards;
 }
 @keyframes landing-ripple {
   0% { transform: translate(-50%, -50%) scale(.015); opacity: 0; }
-  12% { opacity: .85; }
+  12% { opacity: .22; }
+  45% { opacity: .14; }
   100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
 }
 .landing-gradient-cursor {
@@ -3094,22 +3095,37 @@ select {
   box-shadow: 0 2px 10px rgba(13, 45, 66, .16);
   transition: width .2s ease, height .2s ease, left .2s ease, top .2s ease;
 }
-.landing-cursor-gradient {
+@property --landing-fluid-a { syntax: "<color>"; inherits: false; initial-value: #ff682e; }
+@property --landing-fluid-b { syntax: "<color>"; inherits: false; initial-value: #ffd29b; }
+@property --landing-fluid-c { syntax: "<color>"; inherits: false; initial-value: #248b79; }
+@property --landing-fluid-d { syntax: "<color>"; inherits: false; initial-value: #285bc8; }
+.landing-fluid-gradient {
   position: absolute;
-  inset: -40%;
-  background: conic-gradient(from 0deg, #ff6e2e, #f4b086, #448d6a, #174d36, #356883, #ff6e2e);
-  animation: landing-cursor-flow 5s linear infinite;
+  inset: -20%;
+  background:
+    radial-gradient(ellipse at 18% 22%, var(--landing-fluid-a) 0%, transparent 58%),
+    radial-gradient(ellipse at 82% 35%, var(--landing-fluid-b) 0%, transparent 55%),
+    radial-gradient(ellipse at 40% 88%, var(--landing-fluid-c) 0%, transparent 62%),
+    var(--landing-fluid-d);
+  background-size: 135% 135%;
+  animation: landing-fluid-colors 4800ms ease-in-out infinite, landing-fluid-drift 7s ease-in-out infinite alternate;
 }
+.landing-click-ripple .landing-fluid-gradient { animation-duration: 1800ms, 2200ms; }
 .landing-gradient-cursor[data-interactive="true"] .landing-cursor-orb {
   width: 20px;
   height: 20px;
   left: -10px;
   top: -10px;
 }
-@keyframes landing-cursor-flow {
-  0% { transform: rotate(0deg) translateX(-8%) scale(1); }
-  50% { transform: rotate(180deg) translateX(8%) scale(1.18); }
-  100% { transform: rotate(360deg) translateX(-8%) scale(1); }
+@keyframes landing-fluid-colors {
+  0%, 100% { --landing-fluid-a: #ff682e; --landing-fluid-b: #ffd29b; --landing-fluid-c: #248b79; --landing-fluid-d: #285bc8; }
+  33% { --landing-fluid-a: #2678cb; --landing-fluid-b: #49d9b1; --landing-fluid-c: #745bd2; --landing-fluid-d: #f59e58; }
+  66% { --landing-fluid-a: #d365a8; --landing-fluid-b: #ff894c; --landing-fluid-c: #f4c685; --landing-fluid-d: #257e65; }
+}
+@keyframes landing-fluid-drift {
+  0% { background-position: 0% 20%, 100% 0%, 30% 100%; transform: rotate(-12deg) scale(1); }
+  50% { background-position: 85% 70%, 20% 80%, 100% 20%; transform: rotate(18deg) scale(1.12); }
+  100% { background-position: 20% 100%, 80% 15%, 0% 60%; transform: rotate(-22deg) scale(1.02); }
 }
 @media (any-hover: hover) and (any-pointer: fine) {
   .landing-root[data-custom-cursor="true"], .landing-root[data-custom-cursor="true"] * { cursor: none !important; }
@@ -3272,13 +3288,18 @@ select {
   display: flex;
   align-items: flex-start;
   padding: 5px;
-  border-radius: 17px;
-  background: rgba(255, 255, 255, .94);
+  background: transparent;
 }
-.landing-signin-panel { overflow: hidden; padding-block: 8px; margin-block: -8px; }
-.landing-root--portfolio .landing-signin .landing-login-form {
+.landing-signin-panel {
+  position: absolute;
+  top: 5px;
+  right: calc(100% + 8px);
   width: min(280px, calc(100vw - 112px));
-  margin-right: 8px;
+  overflow: visible;
+}
+.landing-root--portfolio .landing-signin .landing-login-form {
+  width: 100%;
+  margin: 0;
 }
 .landing-signin-toggle {
   display: grid;
@@ -3596,7 +3617,7 @@ select {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-cursor-gradient, .landing-click-ripple { animation: none; }
+  .landing-fluid-gradient, .landing-click-ripple { animation: none; }
   .landing-cursor-orb { transition: none; }
 
   .landing-logo-fallback {
