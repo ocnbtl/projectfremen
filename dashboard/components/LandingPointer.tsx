@@ -56,13 +56,15 @@ function rippleGradient() {
 export default function LandingPointer({ active }: { active: boolean }) {
   const effectsRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
+  const foregroundRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
     if (!active) return;
     const effects = effectsRef.current;
     const cursor = cursorRef.current;
+    const foreground = foregroundRef.current;
     const root = effects?.parentElement;
-    if (!effects || !cursor || !root) return;
+    if (!effects || !cursor || !foreground || !root) return;
     const finePointer = window.matchMedia("(any-hover: hover) and (any-pointer: fine)");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
@@ -77,6 +79,77 @@ export default function LandingPointer({ active }: { active: boolean }) {
     let lastPulseEmission = 0;
     let pressAnimation: Animation | undefined;
     const orb = cursor.firstElementChild as HTMLElement;
+    let copiedTarget: Element | null = null;
+    let foregroundCopy: HTMLElement | null = null;
+    let foregroundSources: Element[] = [];
+    let foregroundNodes: (HTMLElement | SVGElement)[] = [];
+
+    const clearForeground = () => {
+      foreground.replaceChildren();
+      copiedTarget = null;
+      foregroundCopy = null;
+      foregroundSources = [];
+      foregroundNodes = [];
+    };
+    const drawCursor = () => {
+      frame = 0;
+      const hit = document.elementFromPoint(x, y);
+      const target = hit?.closest(".landing-title, .landing-description, .landing-venture-name, .landing-logo-dot, .landing-signin-toggle, .landing-submit, .landing-back-link") ?? null;
+      cursor.dataset.interactive = String(Boolean(hit?.closest("a, button, input, .landing-logo-wrap")));
+      cursor.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+      cursor.style.opacity = "1";
+      root.dataset.customCursor = "true";
+      if (target !== copiedTarget) {
+        clearForeground();
+        if (target && root.contains(target)) {
+          // Copy only foreground artwork, never the page backdrop. This visual
+          // copy is inert and clipped inside the colorful cursor.
+          const copy = target.cloneNode(true) as HTMLElement;
+          const originals = [target, ...target.querySelectorAll("*")];
+          const copies = [copy, ...copy.querySelectorAll("*")];
+          copies.forEach((node, index) => {
+            const styled = node as HTMLElement | SVGElement;
+            const source = getComputedStyle(originals[index]);
+            for (const property of Array.from(source)) styled.style.setProperty(property, source.getPropertyValue(property));
+            styled.style.animation = "none";
+            styled.style.transition = "none";
+            styled.style.pointerEvents = "none";
+            node.removeAttribute("id");
+            node.removeAttribute("href");
+            node.removeAttribute("name");
+            node.setAttribute("tabindex", "-1");
+          });
+          Object.assign(copy.style, {
+            position: "absolute", margin: "0", transform: "none", zoom: "1",
+            boxShadow: "none", outline: "none"
+          });
+          if (!target.matches(".landing-logo-dot")) copy.style.background = "transparent";
+          copy.inert = true;
+          copy.setAttribute("aria-hidden", "true");
+          foreground.appendChild(copy);
+          copiedTarget = target;
+          foregroundCopy = copy;
+          foregroundSources = originals;
+          foregroundNodes = copies as (HTMLElement | SVGElement)[];
+        }
+      }
+      if (copiedTarget && foregroundCopy) {
+        // Keep inverted colors in step with the original hover color transition.
+        foregroundNodes.forEach((node, index) => {
+          const source = getComputedStyle(foregroundSources[index]);
+          node.style.color = source.color;
+          node.style.fill = source.fill;
+          node.style.stroke = source.stroke;
+        });
+        const bounds = copiedTarget.getBoundingClientRect();
+        Object.assign(foregroundCopy.style, {
+          left: `${bounds.left - x}px`, top: `${bounds.top - y}px`,
+          width: `${bounds.width}px`, height: `${bounds.height}px`
+        });
+      }
+      // Keep tracking the gaps too: a spinning dot can move back under a resting mouse.
+      if (copiedTarget || hit?.closest(".landing-logo-wrap")) frame = requestAnimationFrame(drawCursor);
+    };
 
     const release = () => {
       held = false;
@@ -87,6 +160,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
     const hideCursor = () => {
       cancelAnimationFrame(frame);
       frame = 0;
+      clearForeground();
       delete root.dataset.customCursor;
       cursor.style.opacity = "0";
     };
@@ -99,13 +173,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       if (event.pointerType !== "mouse" || !finePointer.matches) { hideCursor(); return; }
       // Recover if a release happened outside the browser before re-entry.
       if (!(event.buttons & 1)) release();
-      cursor.dataset.interactive = String(event.target instanceof Element && Boolean(event.target.closest("a, button, input")));
-      if (!frame) frame = requestAnimationFrame(() => {
-        cursor.style.transform = `translate3d(${x}px, ${y}px, 0)`;
-        cursor.style.opacity = "1";
-        root.dataset.customCursor = "true";
-        frame = 0;
-      });
+      if (!frame) frame = requestAnimationFrame(drawCursor);
     };
     const ripple = (clientX: number, clientY: number, kind: "click" | "trail" | "pulse" = "click") => {
       // Never erase a visible wave to make room: let every wave finish its fade.
@@ -255,7 +323,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
   return <>
     <div ref={effectsRef} className="landing-pointer-effects" aria-hidden="true" />
     <div ref={cursorRef} className="landing-gradient-cursor" aria-hidden="true">
-      <span className="landing-cursor-orb"><span className="landing-fluid-gradient" /></span>
+      <span className="landing-cursor-orb"><span className="landing-fluid-gradient" /><span ref={foregroundRef} className="landing-cursor-foreground" aria-hidden="true" /></span>
     </div>
   </>;
 }
