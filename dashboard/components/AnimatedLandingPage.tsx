@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { IconArrowRight, IconLogin2, IconX } from "@tabler/icons-react";
+import { IconArrowRight, IconLogin2 } from "@tabler/icons-react";
 import LandingPointer from "./LandingPointer";
 
 type LandingProps = {
@@ -146,6 +146,7 @@ export default function AnimatedLandingPage({
     transition: { duration: reducedMotion ? 0 : .65, delay: ready && !reducedMotion ? delay : 0 },
     style: { visibility: ready ? "visible" as const : "hidden" as const }
   });
+  const signInWidth = Math.min(340, viewport.w - 64);
   const loginForm = <form action="/api/admin/login" method="post" className="landing-login-form">
     <input type="hidden" name="errorPath" value={errorPath} />
     <input type="hidden" name="successPath" value={successPath} />
@@ -158,20 +159,7 @@ export default function AnimatedLandingPage({
   return (
     <main className={`landing-root${showPortfolio ? " landing-root--portfolio" : ""}${hasError ? " landing-root--error" : ""}`}>
       <LandingPointer active={ready} />
-      {showPortfolio && <motion.div className="landing-signin" {...entrance(.5)} inert={!ready}
-        onKeyDown={(event) => { if (event.key === "Escape") { setLoginOpen(false); loginToggle.current?.focus(); } }}>
-        <motion.div id="landing-signin-panel" className="landing-signin-panel"
-          initial={false} animate={{ opacity: ready && loginOpen ? 1 : 0, x: loginOpen ? 0 : 24, scale: loginOpen ? 1 : .94 }}
-          style={{ pointerEvents: ready && loginOpen ? "auto" : "none", transformOrigin: "right center" }}
-          transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 180, damping: 25, mass: .85, opacity: { duration: .25 } }}
-          inert={!ready || !loginOpen} aria-hidden={!ready || !loginOpen}>
-          {loginForm}
-        </motion.div>
-        <button ref={loginToggle} type="button" className="landing-signin-toggle" aria-label={loginOpen ? "Close sign in" : "Sign in"}
-          aria-expanded={loginOpen} aria-controls="landing-signin-panel" onClick={() => setLoginOpen(!loginOpen)}>
-          {loginOpen ? <IconX size={20} stroke={1.6} /> : <IconLogin2 size={21} stroke={1.6} />}
-        </button>
-      </motion.div>}
+
 
       <div className="landing-center">
         {showBackLink && (
@@ -255,6 +243,24 @@ export default function AnimatedLandingPage({
             </motion.li>)}
           </motion.ul>
         </>}
+        {showPortfolio && <motion.div className="landing-signin" {...entrance(.5)} inert={!ready}
+          onKeyDown={(event) => { if (event.key === "Escape") { setLoginOpen(false); loginToggle.current?.focus(); } }}>
+          <motion.div className="landing-signin-controls" initial={false}
+            animate={{ width: loginOpen ? signInWidth : 44, height: loginOpen && hasError ? 96 : 44 }}
+            transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 150, damping: 24, mass: .9 }}>
+            <button ref={loginToggle} type="button" className="landing-signin-toggle" aria-label={loginOpen ? "Close sign in" : "Sign in"}
+              aria-expanded={loginOpen} aria-controls="landing-signin-panel" onClick={() => setLoginOpen(!loginOpen)}>
+              <IconLogin2 size={23} stroke={1.6} />
+            </button>
+            <motion.div id="landing-signin-panel" className="landing-signin-panel"
+              initial={false} animate={{ opacity: ready && loginOpen ? 1 : 0, x: loginOpen ? 0 : -20, scale: loginOpen ? 1 : .95 }}
+              style={{ width: signInWidth - 56, pointerEvents: ready && loginOpen ? "auto" : "none", transformOrigin: "left center" }}
+              transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 150, damping: 24, mass: .9, opacity: { duration: .3, delay: loginOpen ? .1 : 0 } }}
+              inert={!ready || !loginOpen} aria-hidden={!ready || !loginOpen}>
+              {loginForm}
+            </motion.div>
+          </motion.div>
+        </motion.div>}
         {!showPortfolio && <motion.div className="landing-login-shell" {...entrance(.2)} inert={!ready}>{loginForm}</motion.div>}
       </div>
     </main>

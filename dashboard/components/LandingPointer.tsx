@@ -2,6 +2,18 @@
 
 import { useEffect, useRef } from "react";
 
+function rippleMask() {
+  const phase = Math.random() * Math.PI * 2;
+  const secondaryPhase = Math.random() * Math.PI * 2;
+  const points = Array.from({ length: 144 }, (_, index) => {
+    const angle = index / 144 * Math.PI * 2;
+    const radius = 174 + Math.sin(angle * 3 + phase) * 15 + Math.sin(angle * 5 + secondaryPhase) * 9 + Math.cos(angle * 2 - phase) * 11;
+    return `${index ? "L" : "M"}${(256 + Math.cos(angle) * radius).toFixed(2)},${(256 + Math.sin(angle) * radius).toFixed(2)}`;
+  });
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><filter id="soft" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="8"/></filter></defs><path d="${points.join(" ")}Z" fill="none" stroke="white" stroke-width="30" filter="url(#soft)"/></svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
+
 export default function LandingPointer({ active }: { active: boolean }) {
   const effectsRef = useRef<HTMLDivElement>(null);
   const cursorRef = useRef<HTMLDivElement>(null);
@@ -43,6 +55,12 @@ export default function LandingPointer({ active }: { active: boolean }) {
       const bounds = root.getBoundingClientRect();
       const wave = document.createElement("span");
       wave.className = "landing-click-ripple";
+      wave.style.maskImage = rippleMask();
+      wave.style.setProperty("--ripple-duration", `${3000 + Math.random() * 400}ms`);
+      wave.style.setProperty("--ripple-angle", `${Math.random() * 60 - 30}deg`);
+      wave.style.setProperty("--ripple-stretch", String(.85 + Math.random() * .25));
+      wave.style.setProperty("--ripple-drift-x", `${Math.random() * 70 - 35}px`);
+      wave.style.setProperty("--ripple-drift-y", `${Math.random() * 50 - 25}px`);
       const gradient = document.createElement("span");
       gradient.className = "landing-fluid-gradient";
       gradient.style.animationDelay = `${-(performance.now() % 1800)}ms, 0ms`;
