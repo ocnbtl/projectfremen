@@ -48,7 +48,8 @@ const VENTURES = [
   { name: "isitusa", url: "https://isitusa.com" },
   { name: "oceanbattelle", url: "https://oceanbattelle.com" },
   { name: "atlantis", url: "https://joinatlant.is" },
-  { name: "profosi", url: "https://profosi.com" }
+  { name: "profosi", url: "https://profosi.com" },
+  { name: "scantap", url: "https://scantap.us" }
 ];
 
 function roundMotionValue(value: number) {

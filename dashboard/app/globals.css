@@ -3184,7 +3184,7 @@ select {
   transform-origin: center;
 }
 .landing-logo-orbit--active {
-  animation: landing-logo-orbit 1.25s cubic-bezier(.22, .7, .25, 1) 180ms;
+  animation: landing-logo-orbit 1.85s cubic-bezier(.3, .15, .35, 1) 300ms;
 }
 @keyframes landing-logo-orbit {
   from { transform: rotate(0deg); }

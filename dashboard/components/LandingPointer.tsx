@@ -3,23 +3,24 @@
 import { useEffect, useRef } from "react";
 
 function rippleMask() {
-  // Vary the wave structure, not just the phase of one repeated outline.
-  // Low-frequency harmonics keep every contour smooth and water-like.
-  const waves = Array.from({ length: 3 + Math.floor(Math.random() * 4) }, (_, index) => ({
-    frequency: index + 2,
-    amplitude: (4 + Math.random() * 24) / (1 + index * .4),
-    phase: Math.random() * Math.PI * 2
-  }));
-  const amplitudeTotal = waves.reduce((sum, wave) => sum + wave.amplitude, 0);
-  const irregularity = 32 + Math.random() * 28;
-  const stretchX = .86 + Math.random() * .22;
-  const stretchY = .86 + Math.random() * .22;
-  const points = Array.from({ length: 180 }, (_, index) => {
-    const angle = index / 180 * Math.PI * 2;
-    const radius = 148 + waves.reduce((sum, wave) => sum + Math.sin(angle * wave.frequency + wave.phase) * wave.amplitude, 0) * irregularity / amplitudeTotal;
-    return `${index ? "L" : "M"}${(320 + Math.cos(angle) * radius * stretchX).toFixed(2)},${(320 + Math.sin(angle) * radius * stretchY).toFixed(2)}`;
+  // Independently placed crests and troughs create genuinely different outlines.
+  // A closed, smooth spline keeps the random contour fluid rather than jagged.
+  const count = 5 + Math.floor(Math.random() * 6);
+  const stretchX = .62 + Math.random() * .38;
+  const stretchY = .62 + Math.random() * .38;
+  const points = Array.from({ length: count }, (_, index) => {
+    const angle = (index + (Math.random() - .5) * .45) / count * Math.PI * 2;
+    const radius = index === 0 ? 200 : index === Math.floor(count / 2) ? 85 : 85 + Math.random() * 115;
+    return { x: 320 + Math.cos(angle) * radius * stretchX, y: 320 + Math.sin(angle) * radius * stretchY };
   });
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><defs><filter id="soft" x="-75%" y="-75%" width="250%" height="250%"><feGaussianBlur stdDeviation="28"/></filter></defs><path d="${points.join(" ")}Z" fill="none" stroke="white" stroke-width="44" filter="url(#soft)"/></svg>`;
+  const coordinate = (x: number, y: number) => `${x.toFixed(2)},${y.toFixed(2)}`;
+  const path = points.map((point, index) => {
+    const previous = points[(index + count - 1) % count];
+    const next = points[(index + 1) % count];
+    const after = points[(index + 2) % count];
+    return `C${coordinate(point.x + (next.x - previous.x) / 6, point.y + (next.y - previous.y) / 6)} ${coordinate(next.x - (after.x - point.x) / 6, next.y - (after.y - point.y) / 6)} ${coordinate(next.x, next.y)}`;
+  }).join(" ");
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640"><defs><filter id="soft" x="-75%" y="-75%" width="250%" height="250%"><feGaussianBlur stdDeviation="28"/></filter></defs><path d="M${coordinate(points[0].x, points[0].y)} ${path}Z" fill="none" stroke="white" stroke-width="${32 + Math.random() * 20}" filter="url(#soft)"/></svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
 
@@ -66,7 +67,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       wave.className = "landing-click-ripple";
       wave.style.maskImage = rippleMask();
       wave.style.setProperty("--ripple-duration", `${3000 + Math.random() * 400}ms`);
-      wave.style.setProperty("--ripple-angle", `${Math.random() * 60 - 30}deg`);
+      wave.style.setProperty("--ripple-angle", `${Math.random() * 360}deg`);
       wave.style.setProperty("--ripple-stretch", String(.85 + Math.random() * .25));
       wave.style.setProperty("--ripple-drift-x", `${Math.random() * 70 - 35}px`);
       wave.style.setProperty("--ripple-drift-y", `${Math.random() * 50 - 25}px`);
