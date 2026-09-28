@@ -3062,8 +3062,7 @@ select {
   --ripple-peak: .22;
   --ripple-mid: .14;
   position: absolute;
-  border-radius: 50%;
-  overflow: hidden;
+  /* The feathered mask defines the edge; an extra circular clip cuts its haze. */
   mask-size: 100% 100%;
   mask-repeat: no-repeat;
   opacity: 0;

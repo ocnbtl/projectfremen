@@ -41,22 +41,16 @@ function rippleMask() {
 function rippleGradient() {
   const hue = Math.random() * 360;
   const count = 4 + Math.floor(Math.random() * 3);
-  const colors = Array.from({ length: count }, (_, index) =>
-    `hsl(${(hue + index * 360 / count + Math.random() * 36) % 360} ${62 + Math.random() * 20}% ${54 + Math.random() * 13}%)`);
-  for (let index = colors.length - 1; index > 0; index--) {
-    const other = Math.floor(Math.random() * (index + 1));
-    [colors[index], colors[other]] = [colors[other], colors[index]];
-  }
-  const widths = colors.map(() => .5 + Math.random());
-  const total = widths.reduce((sum, width) => sum + width, 0);
-  let position = 0;
-  const stops = colors.map((color, index) => {
-    const stop = `${color} ${(position / total * 100).toFixed(2)}%`;
-    position += widths[index];
-    return stop;
+  const rotation = Math.random() * Math.PI * 2;
+  // Feathered color clouds have no angular seam or pinwheel center. Their
+  // positions, sizes and hues vary per wave, then remain stable as it expands.
+  const clouds = Array.from({ length: count }, (_, index) => {
+    const angle = rotation + index / count * Math.PI * 2 + Math.random() * .6;
+    const reach = 22 + Math.random() * 18;
+    const color = `${(hue + index * 360 / count + Math.random() * 36) % 360} ${70 + Math.random() * 18}% ${54 + Math.random() * 10}%`;
+    return `radial-gradient(ellipse ${42 + Math.random() * 25}% ${42 + Math.random() * 25}% at ${50 + Math.cos(angle) * reach}% ${50 + Math.sin(angle) * reach}%, hsl(${color} / .96) 0%, hsl(${color} / .72) 24%, hsl(${color} / .32) 50%, hsl(${color} / .07) 76%, hsl(${color} / 0) 100%)`;
   });
-  stops.push(`${colors[0]} 100%`);
-  return `conic-gradient(from ${Math.random() * 360}deg at ${20 + Math.random() * 60}% ${20 + Math.random() * 60}%, ${stops.join(", ")})`;
+  return `${clouds.join(", ")}, hsl(${hue} 76% 60%)`;
 }
 
 export default function LandingPointer({ active }: { active: boolean }) {
@@ -79,6 +73,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
     let lastTrailX = 0;
     let lastTrailY = 0;
     let lastEmission = 0;
+    let lastPulseEmission = 0;
     let pressAnimation: Animation | undefined;
     const orb = cursor.firstElementChild as HTMLElement;
 
@@ -154,12 +149,12 @@ export default function LandingPointer({ active }: { active: boolean }) {
         // Bridge between samples so quick drags do not leave isolated timer dots.
         connectTrail();
         lastEmission = now;
-      } else if (elapsed >= 480) {
-        // Larger, spaced wavefronts read as radiating rings when held still.
+      }
+      if (now - lastPulseEmission >= 320) {
+        // A separate clock keeps stationary ripples steady even with small
+        // hand movements. Skip missed beats instead of bursting after a stall.
         ripple(x, y, "pulse");
-        lastTrailX = x;
-        lastTrailY = y;
-        lastEmission = now;
+        lastPulseEmission = now - (now - lastPulseEmission) % 320;
       }
       holdFrame = requestAnimationFrame(emitTrail);
     };
@@ -184,6 +179,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
         lastTrailX = x;
         lastTrailY = y;
         lastEmission = performance.now();
+        lastPulseEmission = lastEmission;
         holdFrame = requestAnimationFrame(emitTrail);
         pressAnimation?.cancel();
         pressAnimation = orb.animate([
