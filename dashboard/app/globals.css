@@ -3059,18 +3059,23 @@ select {
 }
 
 .landing-click-ripple {
+  --ripple-peak: .22;
+  --ripple-mid: .14;
   position: absolute;
   border-radius: 50%;
   overflow: hidden;
   mask-size: 100% 100%;
   mask-repeat: no-repeat;
+  opacity: 0;
   transform: translate(-50%, -50%) scale(.015);
   animation: landing-ripple var(--ripple-duration, 3200ms) linear forwards;
 }
+.landing-click-ripple--trail { --ripple-peak: .065; --ripple-mid: .04; }
+.landing-ripple-fill { position: absolute; inset: 0; background: #426c66; }
 @keyframes landing-ripple {
   0% { transform: translate(-50%, -50%) rotate(var(--ripple-angle)) scale(.015); opacity: 0; }
-  16% { opacity: .25; }
-  48% { opacity: .17; }
+  16% { opacity: var(--ripple-peak); }
+  48% { opacity: var(--ripple-mid); }
   100% { transform: translate(calc(-50% + var(--ripple-drift-x)), calc(-50% + var(--ripple-drift-y))) rotate(calc(var(--ripple-angle) - 6deg)) scale(1, var(--ripple-stretch)); opacity: 0; }
 }
 .landing-gradient-cursor {
@@ -3111,7 +3116,6 @@ select {
   background-size: 135% 135%;
   animation: landing-fluid-colors 4800ms ease-in-out infinite, landing-fluid-drift 7s ease-in-out infinite alternate;
 }
-.landing-click-ripple .landing-fluid-gradient { animation-duration: 1800ms, 2200ms; }
 .landing-cursor-orb .landing-fluid-gradient {
   inset: -35%;
   background-size: 115% 115%;

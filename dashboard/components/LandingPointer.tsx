@@ -39,13 +39,19 @@ export default function LandingPointer({ active }: { active: boolean }) {
     let frame = 0;
     let x = 0;
     let y = 0;
-    let holdTimer: ReturnType<typeof setInterval> | undefined;
+    let holdFrame = 0;
+    let held = false;
+    let lastTrailX = 0;
+    let lastTrailY = 0;
+    let lastEmission = 0;
+    let gestureMask = "";
     let pressAnimation: Animation | undefined;
     const orb = cursor.firstElementChild as HTMLElement;
 
     const release = () => {
-      if (holdTimer !== undefined) clearInterval(holdTimer);
-      holdTimer = undefined;
+      held = false;
+      cancelAnimationFrame(holdFrame);
+      holdFrame = 0;
     };
     const hide = () => {
       release();
@@ -68,31 +74,59 @@ export default function LandingPointer({ active }: { active: boolean }) {
         frame = 0;
       });
     };
-    const ripple = (clientX: number, clientY: number) => {
-      if (reducedMotion.matches) return;
+    const ripple = (clientX: number, clientY: number, trail = false, mask = rippleMask()) => {
+      // Never erase a visible wave to make room: let every wave finish its fade.
+      if (reducedMotion.matches || effects.children.length >= 240) return;
       const bounds = root.getBoundingClientRect();
       const wave = document.createElement("span");
-      wave.className = "landing-click-ripple";
-      wave.style.maskImage = rippleMask();
-      wave.style.setProperty("--ripple-duration", `${3000 + Math.random() * 400}ms`);
-      wave.style.setProperty("--ripple-angle", `${Math.random() * 360}deg`);
-      wave.style.setProperty("--ripple-stretch", String(.85 + Math.random() * .25));
-      wave.style.setProperty("--ripple-drift-x", `${Math.random() * 70 - 35}px`);
-      wave.style.setProperty("--ripple-drift-y", `${Math.random() * 50 - 25}px`);
+      wave.className = `landing-click-ripple${trail ? " landing-click-ripple--trail" : ""}`;
+      wave.style.maskImage = mask;
+      wave.style.setProperty("--ripple-duration", trail ? "1200ms" : `${3000 + Math.random() * 400}ms`);
+      wave.style.setProperty("--ripple-angle", trail ? "0deg" : `${Math.random() * 360}deg`);
+      wave.style.setProperty("--ripple-stretch", trail ? "1" : String(.85 + Math.random() * .25));
+      wave.style.setProperty("--ripple-drift-x", trail ? "0px" : `${Math.random() * 70 - 35}px`);
+      wave.style.setProperty("--ripple-drift-y", trail ? "0px" : `${Math.random() * 50 - 25}px`);
       const gradient = document.createElement("span");
-      gradient.className = "landing-fluid-gradient";
-      gradient.style.animationDelay = `${-(performance.now() % 1800)}ms, 0ms`;
+      gradient.className = "landing-ripple-fill";
       wave.appendChild(gradient);
-      const size = Math.min(900, Math.max(bounds.width, window.innerHeight) * .85);
+      const size = trail ? 360 : Math.min(900, Math.max(bounds.width, window.innerHeight) * .85);
       wave.style.width = wave.style.height = `${size}px`;
       wave.style.left = `${clientX - bounds.left}px`;
       wave.style.top = `${clientY - bounds.top}px`;
-      // Enough room for a held stream to fade naturally, with a hard memory bound.
-      while (effects.children.length >= 20) effects.firstElementChild?.remove();
       effects.appendChild(wave);
       wave.addEventListener("animationend", (event) => {
         if (event.target === wave) wave.remove();
       });
+    };
+    const connectTrail = () => {
+      const distance = Math.hypot(x - lastTrailX, y - lastTrailY);
+      const count = Math.min(6, Math.max(1, Math.ceil(distance / 18)));
+      for (let step = 1; step <= count; step++) {
+        const progress = step / count;
+        ripple(lastTrailX + (x - lastTrailX) * progress, lastTrailY + (y - lastTrailY) * progress, true, gestureMask);
+      }
+      lastTrailX = x;
+      lastTrailY = y;
+    };
+    const emitTrail = (now: number) => {
+      if (!held) return;
+      const distance = Math.hypot(x - lastTrailX, y - lastTrailY);
+      const elapsed = now - lastEmission;
+      if ((distance >= 18 && elapsed >= 32) || elapsed >= 70) {
+        // Bridge between samples so quick drags do not leave isolated timer dots.
+        connectTrail();
+        lastEmission = now;
+      }
+      holdFrame = requestAnimationFrame(emitTrail);
+    };
+    const finish = (event: PointerEvent) => {
+      if (event.button !== 0) return;
+      if (held) {
+        x = event.clientX;
+        y = event.clientY;
+        if (Math.hypot(x - lastTrailX, y - lastTrailY) > 4) connectTrail();
+      }
+      release();
     };
     const press = (event: PointerEvent) => {
       if (event.button !== 0 || !event.isPrimary) return;
@@ -100,10 +134,14 @@ export default function LandingPointer({ active }: { active: boolean }) {
       x = event.clientX;
       y = event.clientY;
       if (event.pointerType !== "mouse") hide();
-      ripple(event.clientX, event.clientY);
+      gestureMask = rippleMask();
+      ripple(event.clientX, event.clientY, false, gestureMask);
       if (event.pointerType === "mouse" && !reducedMotion.matches) {
-        // A clock, rather than pointermove alone, also ripples while held still.
-        holdTimer = setInterval(() => ripple(x, y), 180);
+        held = true;
+        lastTrailX = x;
+        lastTrailY = y;
+        lastEmission = performance.now();
+        holdFrame = requestAnimationFrame(emitTrail);
         pressAnimation?.cancel();
         pressAnimation = orb.animate([
           { transform: "scale(1)", offset: 0 },
@@ -120,7 +158,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
     };
     const keydown = (event: KeyboardEvent) => { if (event.key === "Tab") hide(); };
     const select = (event: Event) => {
-      if (holdTimer !== undefined && !(event.target instanceof Element && event.target.closest("input, textarea, [contenteditable='true']"))) {
+      if (held && !(event.target instanceof Element && event.target.closest("input, textarea, [contenteditable='true']"))) {
         event.preventDefault();
       }
     };
@@ -130,7 +168,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
     root.addEventListener("pointerleave", hide);
     root.addEventListener("click", keyboardClick);
     root.addEventListener("selectstart", select);
-    window.addEventListener("pointerup", release);
+    window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", release);
     window.addEventListener("dragstart", release);
     window.addEventListener("keydown", keydown);
@@ -148,7 +186,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       root.removeEventListener("pointerleave", hide);
       root.removeEventListener("click", keyboardClick);
       root.removeEventListener("selectstart", select);
-      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointerup", finish);
       window.removeEventListener("pointercancel", release);
       window.removeEventListener("dragstart", release);
       window.removeEventListener("keydown", keydown);
