@@ -3054,6 +3054,8 @@ select {
 .landing-pixel-layer {
   position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
 }
 
@@ -3177,7 +3179,7 @@ select {
 }
 
 .landing-root--portfolio .landing-center {
-  width: min(720px, 100%);
+  width: min(1120px, 100%);
   box-sizing: border-box;
   gap: 0;
   padding: clamp(36px, 7svh, 80px) 24px 40px;
@@ -3189,23 +3191,59 @@ select {
   max-width: 470px;
   margin: 24px 0 0;
   color: #4b5c60;
-  font-size: clamp(15px, 1.5vw, 17px);
-  line-height: 1.75;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(19px, 1.8vw, 21px);
+  line-height: 1.35;
   text-align: center;
   text-wrap: balance;
 }
 
 .landing-ventures {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 6px 32px;
+  gap: clamp(18px, 2.5vw, 36px);
   width: 100%;
-  max-width: 570px;
+  max-width: 100%;
   margin: 38px 0 40px;
   padding: 0;
   list-style: none;
 }
+
+.landing-ventures--vertical { flex-direction: column; align-items: center; gap: 5px; }
+.landing-ventures > li { flex-shrink: 0; }
+
+.landing-signin {
+  position: absolute;
+  top: max(18px, env(safe-area-inset-top));
+  right: max(20px, env(safe-area-inset-right));
+  z-index: 3;
+  display: flex;
+  align-items: flex-start;
+  padding: 5px;
+  border-radius: 17px;
+  background: rgba(255, 255, 255, .94);
+}
+.landing-signin-panel { overflow: hidden; }
+.landing-root--portfolio .landing-signin .landing-login-form {
+  width: min(280px, calc(100vw - 112px));
+  margin-right: 8px;
+}
+.landing-signin-toggle {
+  display: grid;
+  place-items: center;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  color: var(--accent-blue);
+  border: 1px solid #d5dfe2;
+  border-radius: 12px;
+  background: #fff;
+  transition: background .2s ease, border-color .2s ease;
+}
+.landing-signin-toggle:hover { background: #f0f4f3; border-color: var(--accent-green); }
+.landing-root--portfolio .landing-signin :is(.landing-input, .landing-submit):focus-visible { outline-offset: -3px; }
 
 .landing-venture-name {
   position: relative;
@@ -3266,7 +3304,7 @@ select {
 }
 .landing-root--portfolio .landing-submit:hover { background: #204d67; }
 .landing-root--portfolio .landing-error { grid-column: 1 / -1; margin: 0 0 4px; }
-.landing-root--portfolio :is(.landing-input, .landing-submit, a.landing-venture-name):focus-visible {
+.landing-root--portfolio :is(.landing-input, .landing-submit, .landing-signin-toggle, a.landing-venture-name):focus-visible {
   outline: 2px solid var(--accent-orange);
   outline-offset: 4px;
 }
@@ -3275,11 +3313,12 @@ select {
 .landing-root--portfolio .landing-logo-fallback { display: none; }
 
 @media (max-width: 480px) {
-  .landing-root--portfolio .landing-center { padding-top: 32px; }
+  .landing-root--portfolio .landing-center { padding-top: 84px; }
+  .landing-root--portfolio.landing-root--error .landing-center { padding-top: 144px; }
   .landing-root--portfolio .landing-logo-wrap { zoom: .76; }
   .landing-root--portfolio .landing-title { font-size: 30px; }
   .landing-description { margin-top: 20px; }
-  .landing-ventures { gap: 2px 26px; margin: 26px 0 30px; }
+  .landing-ventures { gap: 3px; margin: 26px 0 30px; }
   .landing-venture-name { font-size: 18px; }
 }
 

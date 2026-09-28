@@ -1,14 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { motion, useReducedMotion } from "motion/react";
-import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
-type Pixel = {
-  x: number;
-  y: number;
-  color: string;
-};
+import { IconLock, IconX } from "@tabler/icons-react";
+import LandingPixels from "./LandingPixels";
 
 type LandingProps = {
   hasError?: boolean;
@@ -44,7 +41,6 @@ const DOT_COUNT = 12;
 const LOGO_RADIUS = LOGO_SIZE * 0.38;
 const DOT_RADIUS = LOGO_SIZE * 0.07;
 const CENTER = LOGO_SIZE / 2;
-const LINE_MAX_PIXELS = 3600;
 const VENTURES = [
   { name: "madagin", url: "https://madagin.com" },
   { name: "besthellos", url: "https://besthellos.com" },
@@ -108,66 +104,6 @@ function getStartPosition(index: number, width: number, height: number) {
   return { x: -110, y: roundMotionValue(y) };
 }
 
-function isWithinBounds(x: number, y: number, width: number, height: number) {
-  return x >= 0 && x <= width && y >= 0 && y <= height;
-}
-
-function nextPixels(
-  current: Pixel[],
-  color: string,
-  width: number,
-  height: number
-): Pixel[] {
-  if (current.length === 0) {
-    return current;
-  }
-
-  const directions = [
-    { dx: 0, dy: -2 },
-    { dx: 0, dy: 2 },
-    { dx: 2, dy: 0 },
-    { dx: -2, dy: 0 }
-  ];
-
-  const tipSize = Math.min(7, current.length);
-  let anchor = current[current.length - 1 - Math.floor(Math.random() * tipSize)];
-
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const direction = directions[Math.floor(Math.random() * directions.length)];
-    const nx = anchor.x + direction.dx;
-    const ny = anchor.y + direction.dy;
-
-    if (!isWithinBounds(nx, ny, width, height)) {
-      continue;
-    }
-
-    const next: Pixel = { x: nx, y: ny, color };
-    if (current.length >= LINE_MAX_PIXELS) {
-      return [...current.slice(1), next];
-    }
-    return [...current, next];
-  }
-
-  anchor = current[Math.floor(Math.random() * current.length)];
-  for (let attempt = 0; attempt < 10; attempt += 1) {
-    const direction = directions[Math.floor(Math.random() * directions.length)];
-    const nx = anchor.x + direction.dx;
-    const ny = anchor.y + direction.dy;
-
-    if (!isWithinBounds(nx, ny, width, height)) {
-      continue;
-    }
-
-    const next: Pixel = { x: nx, y: ny, color };
-    if (current.length >= LINE_MAX_PIXELS) {
-      return [...current.slice(1), next];
-    }
-    return [...current, next];
-  }
-
-  return current;
-}
-
 export default function AnimatedLandingPage({
   hasError = false,
   errorPath,
@@ -177,15 +113,13 @@ export default function AnimatedLandingPage({
   const reducedMotion = useReducedMotion();
   const showPortfolio = !showBackLink;
   const [animationComplete, setAnimationComplete] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(hasError);
+  const loginToggle = useRef<HTMLButtonElement>(null);
+  const ready = animationComplete || Boolean(reducedMotion);
   // Keep the first client render identical to the server render. The real
   // viewport is applied immediately after hydration so the animation still
   // begins from the current window edges without producing mismatched markup.
   const [viewport, setViewport] = useState({ w: 1366, h: 900 });
-  const [orangePixels, setOrangePixels] = useState<Pixel[]>([]);
-  const [bluePixels, setBluePixels] = useState<Pixel[]>([]);
-  const [greenPixels, setGreenPixels] = useState<Pixel[]>([]);
-  const [brownPixels, setBrownPixels] = useState<Pixel[]>([]);
-
   const startPositions = useMemo(
     () => DOT_COLORS.map((_, index) => getStartPosition(index, viewport.w, viewport.h)),
     [viewport.w, viewport.h]
@@ -201,81 +135,42 @@ export default function AnimatedLandingPage({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  useEffect(() => {
-    if (!animationComplete || reducedMotion) {
-      return;
-    }
-
-    function createSeed(color: string): Pixel {
-      return {
-        x: Math.max(10, Math.floor(Math.random() * (viewport.w - 20))),
-        y: Math.max(10, Math.floor(Math.random() * (viewport.h - 20))),
-        color
-      };
-    }
-
-    setOrangePixels([createSeed(COLORS.orange)]);
-    setBluePixels([createSeed(COLORS.blue)]);
-    setGreenPixels([createSeed(COLORS.green)]);
-    setBrownPixels([createSeed(COLORS.brown)]);
-
-    const orange = window.setInterval(() => {
-      setOrangePixels((current) => nextPixels(current, COLORS.orange, viewport.w, viewport.h));
-    }, 22);
-    const blue = window.setInterval(() => {
-      setBluePixels((current) => nextPixels(current, COLORS.blue, viewport.w, viewport.h));
-    }, 24);
-    const green = window.setInterval(() => {
-      setGreenPixels((current) => nextPixels(current, COLORS.green, viewport.w, viewport.h));
-    }, 20);
-    const brown = window.setInterval(() => {
-      setBrownPixels((current) => nextPixels(current, COLORS.brown, viewport.w, viewport.h));
-    }, 26);
-
-    return () => {
-      window.clearInterval(orange);
-      window.clearInterval(blue);
-      window.clearInterval(green);
-      window.clearInterval(brown);
-    };
-  }, [animationComplete, reducedMotion, viewport.h, viewport.w]);
+  const entrance = (delay = 0) => ({
+    initial: { opacity: 0, y: 16 },
+    animate: { opacity: ready ? 1 : 0, y: ready ? 0 : 16 },
+    transition: { duration: reducedMotion ? 0 : .65, delay: ready && !reducedMotion ? delay : 0 },
+    style: { visibility: ready ? "visible" as const : "hidden" as const }
+  });
+  const loginForm = <form action="/api/admin/login" method="post" className="landing-login-form">
+    <input type="hidden" name="errorPath" value={errorPath} />
+    <input type="hidden" name="successPath" value={successPath} />
+    {hasError && <p className="landing-error" role="alert">Invalid password. Try again.</p>}
+    <input id="password" name="password" type="password" aria-label="Password" placeholder="password"
+      className="landing-input" autoComplete="current-password" autoFocus={showPortfolio && loginOpen && ready} required />
+    <button type="submit" className="landing-submit">Enter</button>
+  </form>;
 
   return (
-    <main className={`landing-root${showPortfolio ? " landing-root--portfolio" : ""}`}>
-      <div className="landing-pixel-layer" aria-hidden>
-        {orangePixels.map((pixel, index) => (
-          <span
-            key={`orange-${index}`}
-            className="landing-pixel"
-            style={{ left: pixel.x, top: pixel.y, backgroundColor: pixel.color }}
-          />
-        ))}
-        {bluePixels.map((pixel, index) => (
-          <span
-            key={`blue-${index}`}
-            className="landing-pixel"
-            style={{ left: pixel.x, top: pixel.y, backgroundColor: pixel.color }}
-          />
-        ))}
-        {greenPixels.map((pixel, index) => (
-          <span
-            key={`green-${index}`}
-            className="landing-pixel"
-            style={{ left: pixel.x, top: pixel.y, backgroundColor: pixel.color }}
-          />
-        ))}
-        {brownPixels.map((pixel, index) => (
-          <span
-            key={`brown-${index}`}
-            className="landing-pixel"
-            style={{ left: pixel.x, top: pixel.y, backgroundColor: pixel.color }}
-          />
-        ))}
-      </div>
+    <main className={`landing-root${showPortfolio ? " landing-root--portfolio" : ""}${hasError ? " landing-root--error" : ""}`}>
+      <LandingPixels active={animationComplete && !reducedMotion} />
+      {showPortfolio && <motion.div className="landing-signin" {...entrance(.5)} inert={!ready}
+        onKeyDown={(event) => { if (event.key === "Escape") { setLoginOpen(false); loginToggle.current?.focus(); } }}>
+        <AnimatePresence initial={false}>
+          {ready && loginOpen && <motion.div id="landing-signin-panel" className="landing-signin-panel"
+            initial={{ width: 0, opacity: 0 }} animate={{ width: "auto", opacity: 1 }} exit={{ width: 0, opacity: 0 }}
+            transition={{ duration: reducedMotion ? 0 : .4, ease: [.2, .8, .2, 1] }} inert={!loginOpen}>
+            {loginForm}
+          </motion.div>}
+        </AnimatePresence>
+        <button ref={loginToggle} type="button" className="landing-signin-toggle" aria-label={loginOpen ? "Close sign in" : "Sign in"}
+          aria-expanded={loginOpen} aria-controls="landing-signin-panel" onClick={() => setLoginOpen(!loginOpen)}>
+          {loginOpen ? <IconX size={20} stroke={1.6} /> : <IconLock size={20} stroke={1.6} />}
+        </button>
+      </motion.div>}
 
       <div className="landing-center">
         {showBackLink && (
-          <Link href="/" className="landing-back-link">
+          <Link href="/" className="landing-back-link" style={{ visibility: ready ? "visible" : "hidden" }}>
             Back Home
           </Link>
         )}
@@ -336,9 +231,7 @@ export default function AnimatedLandingPage({
 
         <motion.h1
           className="landing-title"
-          initial={showPortfolio ? false : { opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.8, duration: 0.6 }}
+          {...entrance()}
         >
           <span className="landing-title-uni">Uni</span>
           <span className="landing-title-gen">gen</span>
@@ -347,52 +240,17 @@ export default function AnimatedLandingPage({
         </motion.h1>
 
         {showPortfolio && <>
-          <p className="landing-description">A collective of ventures, ideas, and experiences working toward a better world.</p>
-          <ul className="landing-ventures" aria-label="Our ventures, ideas, and experiences">
-            {VENTURES.map(({ name, url }) => <li key={name}><a href={url} className="landing-venture-name">{name}</a></li>)}
-          </ul>
+          <motion.p className="landing-description" {...entrance(.12)}>A collective of ventures, ideas, and experiences working towards a better world.</motion.p>
+          <motion.ul layout className={`landing-ventures${viewport.w < 900 || viewport.w / viewport.h < 1.05 ? " landing-ventures--vertical" : ""}`}
+            aria-label="Our ventures, ideas, and experiences" inert={!ready} {...entrance(.24)}>
+            {VENTURES.map(({ name, url }, index) => <motion.li key={name} layout
+              initial={{ opacity: 0, y: 12 }} animate={{ opacity: ready ? 1 : 0, y: ready ? 0 : 12 }}
+              transition={{ duration: reducedMotion ? 0 : .55, delay: ready && !reducedMotion ? .26 + index * .055 : 0, layout: { duration: reducedMotion ? 0 : .5, delay: 0 } }}>
+              <a href={url} className="landing-venture-name">{name}</a>
+            </motion.li>)}
+          </motion.ul>
         </>}
-
-        <motion.div
-          className="landing-login-shell"
-          initial={showPortfolio ? false : { opacity: 0, y: 26 }}
-          animate={{
-            opacity: showPortfolio || animationComplete || reducedMotion ? 1 : 0,
-            y: showPortfolio || animationComplete || reducedMotion ? 0 : 26
-          }}
-          transition={{ duration: 0.5, delay: 0.15 }}
-        >
-          <form action="/api/admin/login" method="post" className="landing-login-form">
-            <input type="hidden" name="errorPath" value={errorPath} />
-            <input type="hidden" name="successPath" value={successPath} />
-
-            {hasError && (
-              <p className="landing-error" role="alert">
-                Invalid password. Try again.
-              </p>
-            )}
-
-            <input
-              id="password"
-              name="password"
-              type="password"
-              aria-label="Password"
-              placeholder="password"
-              className="landing-input"
-              autoComplete="current-password"
-              required
-            />
-
-            <button type="submit" className="landing-submit">
-              Enter
-            </button>
-          </form>
-          <img
-            src="/unigentamos-logo.svg"
-            alt="Unigentamos mark"
-            className="landing-logo-fallback"
-          />
-        </motion.div>
+        {!showPortfolio && <motion.div className="landing-login-shell" {...entrance(.2)} inert={!ready}>{loginForm}</motion.div>}
       </div>
     </main>
   );

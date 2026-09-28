@@ -17,7 +17,7 @@ import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
 export const metadata: Metadata = {
   applicationName: "Unigentamos",
   title: "Unigentamos",
-  description: "A collective of ventures, ideas, and experiences working toward a better world.",
+  description: "A collective of ventures, ideas, and experiences working towards a better world.",
   icons: {
     icon: "/unigentamos-logo.svg",
     shortcut: "/unigentamos-logo.svg",
@@ -25,13 +25,13 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "Unigentamos",
-    description: "A collective of ventures, ideas, and experiences working toward a better world.",
+    description: "A collective of ventures, ideas, and experiences working towards a better world.",
     siteName: "Unigentamos"
   },
   twitter: {
     card: "summary",
     title: "Unigentamos",
-    description: "A collective of ventures, ideas, and experiences working toward a better world."
+    description: "A collective of ventures, ideas, and experiences working towards a better world."
   },
   appleWebApp: {
     capable: true,
