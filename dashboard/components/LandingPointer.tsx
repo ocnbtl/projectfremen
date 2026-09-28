@@ -39,10 +39,16 @@ export default function LandingPointer({ active }: { active: boolean }) {
     let frame = 0;
     let x = 0;
     let y = 0;
+    let holdTimer: ReturnType<typeof setInterval> | undefined;
     let pressAnimation: Animation | undefined;
     const orb = cursor.firstElementChild as HTMLElement;
 
+    const release = () => {
+      if (holdTimer !== undefined) clearInterval(holdTimer);
+      holdTimer = undefined;
+    };
     const hide = () => {
+      release();
       cancelAnimationFrame(frame);
       frame = 0;
       delete root.dataset.customCursor;
@@ -52,6 +58,8 @@ export default function LandingPointer({ active }: { active: boolean }) {
       if (event.pointerType !== "mouse" || !finePointer.matches) { hide(); return; }
       x = event.clientX;
       y = event.clientY;
+      // Recover if a release happened outside the browser before re-entry.
+      if (!(event.buttons & 1)) release();
       cursor.dataset.interactive = String(event.target instanceof Element && Boolean(event.target.closest("a, button, input")));
       if (!frame) frame = requestAnimationFrame(() => {
         cursor.style.transform = `translate3d(${x}px, ${y}px, 0)`;
@@ -79,8 +87,8 @@ export default function LandingPointer({ active }: { active: boolean }) {
       wave.style.width = wave.style.height = `${size}px`;
       wave.style.left = `${clientX - bounds.left}px`;
       wave.style.top = `${clientY - bounds.top}px`;
-      // Rapid clicking cannot accumulate decorative elements indefinitely.
-      while (effects.children.length >= 6) effects.firstElementChild?.remove();
+      // Enough room for a held stream to fade naturally, with a hard memory bound.
+      while (effects.children.length >= 20) effects.firstElementChild?.remove();
       effects.appendChild(wave);
       wave.addEventListener("animationend", (event) => {
         if (event.target === wave) wave.remove();
@@ -88,9 +96,14 @@ export default function LandingPointer({ active }: { active: boolean }) {
     };
     const press = (event: PointerEvent) => {
       if (event.button !== 0 || !event.isPrimary) return;
+      release();
+      x = event.clientX;
+      y = event.clientY;
       if (event.pointerType !== "mouse") hide();
       ripple(event.clientX, event.clientY);
       if (event.pointerType === "mouse" && !reducedMotion.matches) {
+        // A clock, rather than pointermove alone, also ripples while held still.
+        holdTimer = setInterval(() => ripple(x, y), 180);
         pressAnimation?.cancel();
         pressAnimation = orb.animate([
           { transform: "scale(1)", offset: 0 },
@@ -106,16 +119,26 @@ export default function LandingPointer({ active }: { active: boolean }) {
       ripple(bounds.left + bounds.width / 2, bounds.top + bounds.height / 2);
     };
     const keydown = (event: KeyboardEvent) => { if (event.key === "Tab") hide(); };
+    const select = (event: Event) => {
+      if (holdTimer !== undefined && !(event.target instanceof Element && event.target.closest("input, textarea, [contenteditable='true']"))) {
+        event.preventDefault();
+      }
+    };
     const visibility = () => { if (document.hidden) hide(); };
     root.addEventListener("pointermove", move, { passive: true });
     root.addEventListener("pointerdown", press, { passive: true });
     root.addEventListener("pointerleave", hide);
     root.addEventListener("click", keyboardClick);
+    root.addEventListener("selectstart", select);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    window.addEventListener("dragstart", release);
     window.addEventListener("keydown", keydown);
     window.addEventListener("blur", hide);
     window.addEventListener("scroll", hide, { passive: true });
     document.addEventListener("visibilitychange", visibility);
     finePointer.addEventListener("change", hide);
+    reducedMotion.addEventListener("change", hide);
     return () => {
       hide();
       pressAnimation?.cancel();
@@ -124,11 +147,16 @@ export default function LandingPointer({ active }: { active: boolean }) {
       root.removeEventListener("pointerdown", press);
       root.removeEventListener("pointerleave", hide);
       root.removeEventListener("click", keyboardClick);
+      root.removeEventListener("selectstart", select);
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+      window.removeEventListener("dragstart", release);
       window.removeEventListener("keydown", keydown);
       window.removeEventListener("blur", hide);
       window.removeEventListener("scroll", hide);
       document.removeEventListener("visibilitychange", visibility);
       finePointer.removeEventListener("change", hide);
+      reducedMotion.removeEventListener("change", hide);
     };
   }, [active]);
 
