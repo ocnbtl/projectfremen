@@ -3295,7 +3295,12 @@ select {
 .landing-root--portfolio {
   min-height: 100svh;
   align-items: start;
+  /* Single-finger drawing stays with Pointer Events; pinch zoom stays available. */
+  touch-action: pinch-zoom;
+  -webkit-user-select: none;
+  user-select: none;
 }
+.landing-root--portfolio :is(input, textarea) { -webkit-user-select: text; user-select: text; }
 
 .landing-root--portfolio .landing-center {
   width: min(1120px, 100%);

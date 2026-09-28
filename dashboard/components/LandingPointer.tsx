@@ -70,6 +70,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
     let y = 0;
     let holdFrame = 0;
     let held = false;
+    let activePointer: number | null = null;
     let lastTrailX = 0;
     let lastTrailY = 0;
     let lastEmission = 0;
@@ -79,20 +80,23 @@ export default function LandingPointer({ active }: { active: boolean }) {
 
     const release = () => {
       held = false;
+      activePointer = null;
       cancelAnimationFrame(holdFrame);
       holdFrame = 0;
     };
-    const hide = () => {
-      release();
+    const hideCursor = () => {
       cancelAnimationFrame(frame);
       frame = 0;
       delete root.dataset.customCursor;
       cursor.style.opacity = "0";
     };
+    const hide = () => { release(); hideCursor(); };
     const move = (event: PointerEvent) => {
-      if (event.pointerType !== "mouse" || !finePointer.matches) { hide(); return; }
+      if (!event.isPrimary || (held && event.pointerId !== activePointer)) return;
       x = event.clientX;
       y = event.clientY;
+      // Touch and pen still drive the trail; only the custom cursor needs a mouse.
+      if (event.pointerType !== "mouse" || !finePointer.matches) { hideCursor(); return; }
       // Recover if a release happened outside the browser before re-entry.
       if (!(event.buttons & 1)) release();
       cursor.dataset.interactive = String(event.target instanceof Element && Boolean(event.target.closest("a, button, input")));
@@ -159,7 +163,7 @@ export default function LandingPointer({ active }: { active: boolean }) {
       holdFrame = requestAnimationFrame(emitTrail);
     };
     const finish = (event: PointerEvent) => {
-      if (event.button !== 0) return;
+      if (event.pointerId !== activePointer || event.button !== 0) return;
       if (held) {
         x = event.clientX;
         y = event.clientY;
@@ -167,20 +171,29 @@ export default function LandingPointer({ active }: { active: boolean }) {
       }
       release();
     };
+    const cancel = (event: PointerEvent) => {
+      if (event.pointerId === activePointer) release();
+    };
     const press = (event: PointerEvent) => {
-      if (event.button !== 0 || !event.isPrimary) return;
+      // Let a second finger take over for pinch zoom without drawing between fingers.
+      if (!event.isPrimary) { if (event.pointerType === "touch") release(); return; }
+      if (event.button !== 0) return;
       release();
+      if (event.target instanceof Element && event.target.closest("input, textarea, [contenteditable='true']")) return;
       x = event.clientX;
       y = event.clientY;
-      if (event.pointerType !== "mouse") hide();
+      if (event.pointerType !== "mouse") hideCursor();
       ripple(event.clientX, event.clientY, "click");
-      if (event.pointerType === "mouse" && !reducedMotion.matches) {
+      if (!reducedMotion.matches) {
         held = true;
+        activePointer = event.pointerId;
         lastTrailX = x;
         lastTrailY = y;
         lastEmission = performance.now();
         lastPulseEmission = lastEmission;
         holdFrame = requestAnimationFrame(emitTrail);
+      }
+      if (event.pointerType === "mouse" && !reducedMotion.matches) {
         pressAnimation?.cancel();
         pressAnimation = orb.animate([
           { transform: "scale(1)", offset: 0 },
@@ -205,10 +218,11 @@ export default function LandingPointer({ active }: { active: boolean }) {
     root.addEventListener("pointermove", move, { passive: true });
     root.addEventListener("pointerdown", press, { passive: true });
     root.addEventListener("pointerleave", hide);
+    root.addEventListener("lostpointercapture", cancel);
     root.addEventListener("click", keyboardClick);
     root.addEventListener("selectstart", select);
     window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", release);
+    window.addEventListener("pointercancel", cancel);
     window.addEventListener("dragstart", release);
     window.addEventListener("keydown", keydown);
     window.addEventListener("blur", hide);
@@ -223,10 +237,11 @@ export default function LandingPointer({ active }: { active: boolean }) {
       root.removeEventListener("pointermove", move);
       root.removeEventListener("pointerdown", press);
       root.removeEventListener("pointerleave", hide);
+      root.removeEventListener("lostpointercapture", cancel);
       root.removeEventListener("click", keyboardClick);
       root.removeEventListener("selectstart", select);
       window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", release);
+      window.removeEventListener("pointercancel", cancel);
       window.removeEventListener("dragstart", release);
       window.removeEventListener("keydown", keydown);
       window.removeEventListener("blur", hide);

@@ -117,7 +117,6 @@ export default function AnimatedLandingPage({
   const [activeLogoDot, setActiveLogoDot] = useState<number | null>(null);
   const [loginOpen, setLoginOpen] = useState(hasError);
   const loginToggle = useRef<HTMLButtonElement>(null);
-  const passwordInput = useRef<HTMLInputElement>(null);
   const ready = animationComplete || Boolean(reducedMotion);
   // Keep the first client render identical to the server render. The real
   // viewport is applied immediately after hydration so the animation still
@@ -138,10 +137,6 @@ export default function AnimatedLandingPage({
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
-  useEffect(() => {
-    if (showPortfolio && loginOpen && ready) passwordInput.current?.focus({ preventScroll: true });
-  }, [loginOpen, ready, showPortfolio]);
-
   const entrance = (delay = 0) => ({
     initial: { opacity: 0, y: 16 },
     animate: { opacity: ready ? 1 : 0, y: ready ? 0 : 16 },
@@ -155,7 +150,7 @@ export default function AnimatedLandingPage({
     <input type="hidden" name="errorPath" value={errorPath} />
     <input type="hidden" name="successPath" value={successPath} />
     {hasError && <p className="landing-error" role="alert">Invalid password. Try again.</p>}
-    <input ref={passwordInput} id="password" name="password" type="password" aria-label="Password" placeholder="password"
+    <input id="password" name="password" type="password" aria-label="Password" placeholder="password"
       className="landing-input" autoComplete="current-password" required />
     <button type="submit" className="landing-submit" aria-label="Enter" title="Enter"><IconArrowRight size={20} stroke={1.7} aria-hidden="true" /></button>
   </form>;
