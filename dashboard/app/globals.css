@@ -3444,11 +3444,12 @@ select {
 .landing-root--portfolio .landing-logo-fallback { display: none; }
 
 @media (max-width: 899px) {
-  .landing-description { max-width: 520px; white-space: normal; text-wrap: balance; }
+  /* Keep the intentional line break while fitting the longer first line. */
+  .landing-description { font-size: clamp(10px, calc(4.5vw - 4px), 16px); }
 }
 
 @media (max-width: 480px) {
-  .landing-root--portfolio .landing-center { padding-top: 110px; }
+  .landing-root--portfolio .landing-center { padding-top: clamp(64px, 9svh, 84px); }
   .landing-root--portfolio .landing-logo-wrap { zoom: .76; }
   .landing-root--portfolio .landing-title { font-size: 30px; }
   .landing-description { margin-top: 34px; }
