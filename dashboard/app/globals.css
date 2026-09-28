@@ -3495,9 +3495,10 @@ select {
   .landing-description { margin: 0; }
   .landing-ventures {
     display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px 24px;
-    width: min(260px, 100%);
+    /* Center the text bounds, without unused space after the shorter column. */
+    grid-template-columns: repeat(2, max-content);
+    gap: 4px 36px;
+    width: max-content;
     margin: 0;
     justify-items: start;
   }
