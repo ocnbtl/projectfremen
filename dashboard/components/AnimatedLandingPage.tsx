@@ -148,7 +148,8 @@ export default function AnimatedLandingPage({
     transition: { duration: reducedMotion ? 0 : .65, delay: ready && !reducedMotion ? delay : 0 },
     style: { visibility: ready ? "visible" as const : "hidden" as const }
   });
-  const signInWidth = Math.min(340, viewport.w - 64);
+  const compactLandscape = viewport.w < 900 && viewport.h <= 480 && viewport.w > viewport.h;
+  const signInWidth = Math.min(340, compactLandscape ? (viewport.w - 72) / 2 : viewport.w - 64);
   const verticalVentures = viewport.w < 900 || viewport.w / viewport.h < 1.05;
   const loginForm = <form action="/api/admin/login" method="post" className="landing-login-form">
     <input type="hidden" name="errorPath" value={errorPath} />

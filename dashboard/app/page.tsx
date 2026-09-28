@@ -1,4 +1,13 @@
 import AnimatedLandingPage from "../components/AnimatedLandingPage";
+import type { Viewport } from "next";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: "#f5f7f8",
+  colorScheme: "light"
+};
 
 export default async function HomePage({
   searchParams
