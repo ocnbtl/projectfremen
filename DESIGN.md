@@ -34,7 +34,7 @@ Full navigation appears only when it fits; a labeled-for-accessibility icon stri
 
 Shared tokens: press 80ms, quick 120ms, standard 180ms, panel 260ms, context 320ms, explicit map focus up to 450ms. Arrivals use cubic-bezier(.22,1,.36,1); exits are shorter. Pointer dragging tracks directly, with explicit insertion/drop targets. Hover changes surface without moving labels. Focus appears immediately. Small confirmations occur in place. Save and upload states represent real work. Selection updates immediately; large content does not slide across the entire viewport. No perpetual decorative movement, repeated page entrances or staggered row animations.
 
-System and previously saved application reduced-motion settings remove large motion, zoom, spring and smooth scrolling, retaining confirmations, focus and functional parity. The navigation does not expose a Reduce motion button.
+The navigation selection uses a physical spring (stiffness 280, damping 30, mass 1.2), preserving velocity when the target changes. Color blends independently without overshooting. System and previously saved application reduced-motion settings remove large motion, zoom, spring and smooth scrolling, retaining confirmations, focus and functional parity. The navigation does not expose a Reduce motion button.
 
 ## Domain and quality constraints
 

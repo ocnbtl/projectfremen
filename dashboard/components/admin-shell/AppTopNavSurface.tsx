@@ -100,7 +100,11 @@ export default function AppTopNavSurface({ showCommandSearch = true, onCommandSe
         <div className="admin-global-links app-top-nav__links" ref={linksRef}>
           {indicator && <motion.span className="app-top-nav__selection" aria-hidden="true" initial={false}
             animate={{ x: indicator.x, y: indicator.y, width: indicator.width, height: indicator.height, backgroundColor: indicator.color, borderColor: indicator.border }}
-            transition={{ duration: reduceMotion ? 0 : motionTokens.context, ease: motionTokens.arrive }} />}
+            transition={reduceMotion ? { duration: 0 } : {
+              default: motionTokens.navigationSpring,
+              backgroundColor: { duration: 0.4, ease: "easeInOut" },
+              borderColor: { duration: 0.4, ease: "easeInOut" },
+            }} />}
           {ADMIN_NAV_ITEMS.map(item => {
             const href = item.href || "/admin";
             const moduleId = moduleColorIdForPathname(href);

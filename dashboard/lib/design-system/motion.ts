@@ -8,4 +8,13 @@ export const motionTokens = {
   map: 0.45,
   arrive: [0.22, 1, 0.36, 1] as const,
   settle: { type: "spring" as const, stiffness: 420, damping: 38, mass: 0.8 },
+  // Carry velocity through retargeting; a little inertia, then a soft landing.
+  navigationSpring: {
+    type: "spring" as const,
+    stiffness: 280,
+    damping: 30,
+    mass: 1.2,
+    restSpeed: 0.1,
+    restDelta: 0.1,
+  },
 };
