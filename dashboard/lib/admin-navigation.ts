@@ -53,6 +53,8 @@ export const ADMIN_PROJECTS: AdminProjectNavItem[] = [
 ];
 
 export const ADMIN_NAV_ITEMS: AdminNavItem[] = [
+  { label: "Calendar", iconRole: "module-calendar", href: "/admin/calendar", description: "Events and work planning" },
+  { label: "Map", iconRole: "module-map", href: "/admin/map", description: "Places, trips, and regional data" },
   {
     label: "Projects",
     iconRole: "module-projects",

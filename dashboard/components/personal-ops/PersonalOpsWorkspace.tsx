@@ -1,4 +1,6 @@
 "use client";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
+import QuickActionBar from "../operational/QuickActionBar";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -219,7 +221,9 @@ const SOURCE_MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
   personal_ops: "Personal",
   reviews: "Reviews",
   resources: "Resources",
-  finance: "Finance"
+  finance: "Finance",
+  map: "Map",
+  calendar: "Calendar"
 };
 
 const CREATION_SOURCE_OBJECT_TYPES: Readonly<
@@ -1517,7 +1521,7 @@ export default function PersonalOpsWorkspace({
     : "";
 
   return (
-    <div className={styles.shell} data-has-inspector={Boolean(selectedItem)}>
+    <div className={`${styles.shell} work-surface`} data-has-inspector={Boolean(selectedItem)}>
       <PersonalOpsSidebar
         activeView={initialView}
         filter={urlState.filter}
@@ -1530,77 +1534,27 @@ export default function PersonalOpsWorkspace({
       <main className={styles.directory} aria-label={`${VIEW_COPY[initialView].title} ledger`}>
         <div className={styles.mobileToolbar}>
           <button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal</button>
-          <button type="button" onClick={() => openCreate(primaryFamily)}><PersonalOpsIcon name="plus" /> {FAMILY_LABELS[primaryFamily]}</button>
         </div>
         <div className={styles.mainScroll}>
-          <header className={styles.pageHeader}>
-            <div>
-              <h1>{VIEW_COPY[initialView].title}</h1>
-              {VIEW_COPY[initialView].description && <p>{VIEW_COPY[initialView].description}</p>}
-            </div>
-            <div className={styles.headerActions}>
-              <label className={styles.visuallyHidden} htmlFor="personal-ops-search">Search this ledger</label>
-              <span className={styles.searchControl}>
-                <PersonalOpsIcon name="search" />
-                <input
-                  id="personal-ops-search"
-                  type="search"
-                  value={queryDraft}
-                  onChange={(event) => changeQuery(event.target.value)}
-                  placeholder="Search..."
-                />
-              </span>
-              <details className={styles.controlMenu}>
-                <summary className={styles.filterToggle} aria-label={`Sort: ${PERSONAL_OPS_SORT_OPTIONS.find((item) => item.id === urlState.sort)?.label || "Priority"}`} title="Sort">
-                  <PersonalOpsIcon name="sort" />
-                </summary>
-                <div className={styles.controlPopover} role="menu" aria-label="Sort ledger">
-                  <span>Sort by</span>
-                  {PERSONAL_OPS_SORT_OPTIONS.map((item) => <button type="button" role="menuitemradio" aria-checked={urlState.sort === item.id} data-active={urlState.sort === item.id || undefined} key={item.id} onClick={(event) => { updateUrl({ sort: item.id }); event.currentTarget.closest("details")?.removeAttribute("open"); }}>{item.label}{urlState.sort === item.id && <PersonalOpsIcon name="check" />}</button>)}
-                </div>
-              </details>
-              <details className={styles.controlMenu}>
-                <summary className={styles.filterToggle} data-active={urlState.filter !== "all" || undefined} aria-label={`Filter: ${filterItems.find((item) => item.id === urlState.filter)?.label || "All"}`} title="Filter">
-                  <PersonalOpsIcon name="filter" />
-                  {urlState.filter !== "all" && <span>1</span>}
-                </summary>
-                <div className={styles.controlPopover} role="menu" aria-label="Filter ledger">
-                  <span>Filter</span>
-                  {filterItems.map((item) => <button type="button" role="menuitemradio" aria-checked={item.active} data-active={item.active || undefined} key={item.id} onClick={(event) => { item.onSelect(); event.currentTarget.closest("details")?.removeAttribute("open"); }}><span>{item.label}</span><b>{item.count}</b></button>)}
-                </div>
-              </details>
-              {initialView === "command" ? (
-                <div className={styles.commandCreateActions} aria-label="Create Personal object">
-                  <button type="button" className={styles.primaryButton} onClick={() => openCreate("followUps")}><PersonalOpsIcon name="plus" />Follow-up</button>
-                  <button type="button" className={styles.button} onClick={() => openCreate("decisions")}><PersonalOpsIcon name="plus" />Decision</button>
-                  <button type="button" className={styles.button} onClick={() => openCreate("obligations")}><PersonalOpsIcon name="plus" />Obligation</button>
-                  <button type="button" className={styles.button} onClick={() => openCreate("goals")}><PersonalOpsIcon name="plus" />Goal</button>
-                </div>
-              ) : (
-                <button type="button" className={styles.primaryButton} onClick={() => openCreate(primaryFamily)}><PersonalOpsIcon name="plus" />{FAMILY_LABELS[primaryFamily]}</button>
-              )}
-            </div>
-            {!isDecisionView && (
-              <PersonalOpsStatusLine items={[
-                { id: "scope", label: `${scopedItems.length} shown` },
-                { id: "native", label: `${allNative.length} Personal records`, tone: "positive" },
-                { id: "bridge", label: `${legacyGoals.length} Current Goals` }
-              ]} />
-            )}
-          </header>
+          <WorkspaceHeader title={initialView === "command" ? "Personal" : VIEW_COPY[initialView].title} count={scopedItems.length}>
+            <QuickActionBar maxVisible={1} actions={(initialView === "command" ? ["followUps","decisions","obligations","goals"] as const : [primaryFamily]).map((family,index)=>({id:family,label:`Add ${FAMILY_LABELS[family].toLowerCase()}`,onSelect:()=>openCreate(family),intent:index===0?"primary" as const:undefined}))}/>
+          </WorkspaceHeader>
+          <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<>{filterItems.map(item=><WorkspaceButton key={item.id} aria-pressed={item.active} onClick={item.onSelect}>{item.label}</WorkspaceButton>)}</>}>
+            <select className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select>
+          </WorkspaceToolbar>
 
           {initialView === "command" && (
             <nav className={styles.personalSystemsDock} aria-label="Personal systems">
               {PERSONAL_SYSTEM_LINKS.map((item) => (
                 <Link href={item.href} aria-label={item.label} title={item.label} key={item.href}>
                   <PersonalOpsIcon name={item.icon} />
-                  <span className={styles.visuallyHidden}>{item.label}</span>
+                  <span>{item.label}</span>
                 </Link>
               ))}
             </nav>
           )}
 
-          <PersonalOpsMetricRail items={metrics} />
+
 
           {error && <div className={styles.error} role="alert" style={{ margin: "0 16px 10px" }}>{error}</div>}
           {notice && <div className={styles.notice} role="status" style={{ margin: "0 16px 10px" }}>{notice}</div>}
@@ -1673,7 +1627,7 @@ export default function PersonalOpsWorkspace({
                 </table>
               </div>
               <footer className={styles.ledgerFooter}>
-                <span>{scopedItems.length} of {baseItems.length} objects · row selects inspector · checkbox selects batch</span>
+                <span>{selectedIds.size ? `${selectedIds.size} selected` : "Select a record to see its details"}</span>
                 {selectedIds.size > 0 && <button type="button" onClick={() => setSelectedIds(new Set())}>Clear {selectedIds.size} selected</button>}
               </footer>
             </div>

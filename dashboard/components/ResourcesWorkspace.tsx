@@ -304,7 +304,7 @@ export default function ResourcesWorkspace({
   const [activeTab, setActiveTab] = useState<ResourcesTab>(firstUrlState.tab);
   const [collection, setCollection] = useState<ResourceCollection>("all");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(initialMode === "detail");
   const [aiOpen, setAiOpen] = useState(firstUrlState.ai);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [projectAssociationOpen, setProjectAssociationOpen] = useState(false);
@@ -589,7 +589,7 @@ export default function ResourcesWorkspace({
       id="resources-module-sidebar"
       title="Resources"
       description="Saved references and useful source material."
-      sections={sidebarSections}
+      sections={sidebarSections.map(section=>({...section,items:section.items.filter(item=>!item.disabled)})).filter(section=>section.items.length)}
       mobileOpen={mobileSidebarOpen}
       onClose={() => setMobileSidebarOpen(false)}
       className={styles.sidebar}
@@ -608,7 +608,6 @@ export default function ResourcesWorkspace({
     if (!selectedResource) return;
     setAiOpen(false);
     setMobileSidebarOpen(false);
-    setInspectorOpen(false);
     setProjectAssociationOpen(true);
     updateUrl({ ai: false });
   }
@@ -718,7 +717,7 @@ export default function ResourcesWorkspace({
     <ObjectHeader
       objectType=""
       title={selectedResource.title}
-      identity={<ResourceMark gradient={selectedResource.gradient} className={resourceStyles.headerMark} />}
+      identity={<ResourceMark resource={selectedResource} gradient={selectedResource.gradient} imageUrl={selectedResource.metadata.imageUrl} className={resourceStyles.headerMark} />}
       actions={
         <div className={resourceStyles.headerActions}>
           {isInspectorOverlay && (
@@ -901,6 +900,8 @@ export default function ResourcesWorkspace({
       overlay={isInspectorOverlay}
       overlayOpen={isInspectorOverlay ? inspectorOpen : true}
       onRequestClose={() => setInspectorOpen(false)}
+      showCloseButton={false}
+      resolveReturnFocus={() => document.getElementById(`dense-object-row-${selectedId}-title`)?.closest<HTMLElement>(".dense-object-row__body") || document.querySelector<HTMLElement>('[aria-label="Open Resource details"]')}
       className={inspectorOpen ? "is-open" : undefined}
       ariaLabel={selectedResource ? `${selectedResource.title} Resource inspector` : "Resource inspector"}
     >
@@ -930,7 +931,7 @@ export default function ResourcesWorkspace({
       aiDock={aiDock}
       mode={initialMode === "detail" ? "detail" : "directory"}
       ariaLabel="Resources directory"
-      className={`${styles.shell} ${initialMode === "detail" ? styles.detailShell : ""}`}
+      className={styles.shell}
     >
       {editorMode && (
         <ResourceEditorSheet
@@ -1197,13 +1198,12 @@ export default function ResourcesWorkspace({
                   <DenseObjectRow
                     id={resource.id}
                     title={resource.title}
-                    leading={<ResourceMark gradient={resource.gradient} className={resourceStyles.directoryMark} />}
-                    description={resource.body || resource.metadata.description || (resource.source.canonicalUrl ? resource.source.canonicalUrl : "No description")}
+                    leading={<ResourceMark resource={resource} gradient={resource.gradient} imageUrl={resource.metadata.imageUrl} className={resourceStyles.directoryMark} />}
+                    description={(resource.metadata.description || resource.body || "").replace(/!?(?:\[([^\]]*)\]\([^)]*\))/g, "$1").replace(/[#*_>`~]/g, "")}
                     metadata={<span className={resourceStyles.directoryMeta}>
                       {resource.source.canonicalUrl ? <span>{resource.source.displayDomain || resource.source.canonicalUrl}</span> : null}
                       <span>Added {formatDate(resource.createdAt)}</span>
-                      <span>Last review {formatDate(resource.review.lastReviewedAt, "Not yet")}</span>
-                      <span>Next {formatDate(resource.review.nextReviewAt, "Not set")}</span>
+                      {resource.review.nextReviewAt && <span>Review {formatDate(resource.review.nextReviewAt)}</span>}
                     </span>}
                     trailing={
                       view === "needs-review" && queueItem ? (
@@ -1297,14 +1297,7 @@ export default function ResourcesWorkspace({
             />
           )}
 
-          {initialMode === "detail" && selectedResource && (
-            <div className={styles.readOnlyNotice}>
-              <strong>Canonical detail route</strong>
-              <span>
-                Viewing {selectedResource.title} at its native route. <Link className={styles.detailBackLink} href={getModuleRoute("resources")}>Return to the Resources index</Link>.
-              </span>
-            </div>
-          )}
+
         </div>
       </DirectoryPane>
     </ModuleShell>

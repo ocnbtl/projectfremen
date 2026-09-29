@@ -11,6 +11,17 @@ const outputPath = path.join(projectDirectory, "public", "tabler-line-sprite.svg
 
 const registry = JSON.parse(await readFile(registryPath, "utf8"));
 const customIcons = JSON.parse(await readFile(path.join(projectDirectory, "lib", "icons", "custom-icons.json"), "utf8"));
+const roles = new Set();
+for (const entry of registry) {
+  if (roles.has(entry.id)) throw new Error(`Duplicate icon role: ${entry.id}`);
+  roles.add(entry.id);
+  if (entry.candidates.length !== 5 || new Set(entry.candidates).size !== 5) {
+    throw new Error(`${entry.id} must offer five distinct Style Guide options`);
+  }
+  if (!entry.candidates.includes(entry.defaultCandidate)) {
+    throw new Error(`${entry.id} default must be one of its Style Guide options`);
+  }
+}
 const candidates = [...new Set(registry.flatMap((entry) => entry.candidates))].sort();
 const symbols = [];
 

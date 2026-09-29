@@ -56,6 +56,8 @@ export type TripStatus = "been" | "want" | "lived" | "planned";
 export type TravelMode = "car" | "plane" | "train" | "boat" | "bus" | "bike" | "walk" | "other";
 
 export type PersonalTrip = PersonalLifeBase & {
+  stops?: { id: string; placeId?: string; name: string; latitude: number; longitude: number; arrival?: string; notes?: string }[];
+  route?: { type: "FeatureCollection"; features: unknown[]; distance: number; duration: number; calculatedAt: string; mode: string; legs?: {distance:number;duration:number}[] };
   name: string;
   place: string;
   region: string;

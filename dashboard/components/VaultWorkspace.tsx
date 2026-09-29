@@ -29,6 +29,7 @@ import {
 } from "../lib/local-first/vault-record-tools";
 import styles from "./VaultWorkspace.module.css";
 import UnigentamosIcon from "./icons/UnigentamosIcon";
+import QuickActionBar from "./operational/QuickActionBar";
 
 type VaultStatus = Awaited<ReturnType<typeof browserVault.status>>;
 type BootstrapObject = { canonicalId: string; objectKind: VaultObjectKind; fields: Record<string, VaultFieldValue> };
@@ -39,7 +40,6 @@ type MediaPreview = { url: string; mimeType: string; fileName: string };
 
 const COMPANION_HELPER_URL = "http://127.0.0.1:43127/";
 const MAX_RECOVERY_FILE_BYTES = 256 * 1024;
-const VAULT_RELEASE_NOTE = "offline-command-center-v5";
 const RECORD_PAGE_SIZE = 80;
 const RECORD_TABS: Array<{ value: VaultObjectKind | "all"; label: string }> = [
   { value: "all", label: "All" },
@@ -282,7 +282,6 @@ export default function VaultWorkspace({
   const [backups, setBackups] = useState<VaultBackupSummary[]>([]);
   const [restorePreview, setRestorePreview] = useState<VaultBackupRestorePreview | null>(null);
   const [restoreConfirmation, setRestoreConfirmation] = useState("");
-  const [showReleaseNote, setShowReleaseNote] = useState(false);
   const [retireArmedDeviceId, setRetireArmedDeviceId] = useState<string | null>(null);
   const [actionReason, setActionReason] = useState("");
   const [relationshipTargetId, setRelationshipTargetId] = useState("");
@@ -402,16 +401,6 @@ export default function VaultWorkspace({
   useEffect(() => {
     if (status?.unlocked && status.localCompanion.unlocked) void loadBackups();
   }, [status?.localCompanion.unlocked, status?.unlocked]);
-
-  useEffect(() => {
-    if (!status?.configured) return;
-    setShowReleaseNote(window.localStorage.getItem("unigentamos-vault-release-note") !== VAULT_RELEASE_NOTE);
-  }, [status?.configured]);
-
-  function dismissReleaseNote() {
-    window.localStorage.setItem("unigentamos-vault-release-note", VAULT_RELEASE_NOTE);
-    setShowReleaseNote(false);
-  }
 
   async function run(action: () => Promise<void>, options: { clearMessage?: boolean } = {}) {
     setBusy(true);
@@ -929,7 +918,7 @@ export default function VaultWorkspace({
   const selectedObject = objects.find((item) => item.objectId === selectedObjectId) || null;
   const editorKind = selectedObject?.objectKind || activeKind;
   const selectedCanonical = selectedObject ? readCanonicalMetadata(selectedObject.fields) : null;
-  const editorFields = selectedCanonical?.editableFields || [];
+  const editorFields = selectedCanonical?.editableFields.filter(field => !field.hidden) || [];
   const selectedArchived = Boolean(selectedObject?.fields.archivedAt)
     || selectedObject?.fields.lifecycle === "archived"
     || selectedObject?.fields.state === "archived"
@@ -1007,20 +996,19 @@ export default function VaultWorkspace({
   return (
     <main className={styles.page}>
       <header className={styles.header}>
-        <Link href="/admin" className={styles.brand}><span>U</span> Unigentamos</Link>
-        <div><p>Private workspace</p><h1>Your vault</h1></div>
+        <div><h1>Vault</h1></div>
+        {status?.configured && <div className={styles.headerControls}>
+          {status.unlocked ? <a className={styles.headerSync} href={onlineAuthorizationRequired ? "/admin/login?next=%2Fvault" : "#vault-sync-details"} aria-label={`Synchronization: ${networkLabel}`}><span role="status">{networkLabel}</span><UnigentamosIcon role="chevron-down" size={16} /></a> : <span className={styles.headerSync} role="status">Locked</span>}
+          {status.unlocked && <QuickActionBar maxVisible={0} ariaLabel="Vault sections" actions={[
+            { id: "records", label: "Records", href: "#vault-records" },
+            ...(!onlineAuthorizationRequired ? [{ id: "devices", label: "Devices", href: "#vault-devices" }] : []),
+            { id: "recovery", label: "Storage and recovery", href: "#vault-recovery" }
+          ]} />}
+        </div>}
+
       </header>
 
-      {status?.configured && <section className={styles.statusGrid} aria-label="Vault status">
-        {cards.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
-      </section>}
-
       {message && <p className={styles.notice} role="status">{message}</p>}
-
-      {status?.configured && showReleaseNote && <aside className={styles.releaseNote} aria-label="What is new">
-        <div><strong>Your records are easier to work with here.</strong><span>Edit more of each record, search across modules when connecting work, and see what is already connected—all without creating a second copy.</span></div>
-        <button type="button" onClick={dismissReleaseNote}>Got it</button>
-      </aside>}
 
       {!status?.configured ? (
         <section className={styles.setupShell} aria-labelledby="setup-title">
@@ -1184,20 +1172,11 @@ export default function VaultWorkspace({
             <button disabled={busy || !online} onClick={repairSyncIssues}>Try safe repair</button>
           </section>}
 
-          <nav className={styles.workspaceNav} aria-label="Vault sections"><a href="#vault-records">Records</a>{!onlineAuthorizationRequired && <a href="#vault-devices">Devices</a>}<a href="#vault-recovery">Storage &amp; recovery</a></nav>
-
           <section id="vault-records" tabIndex={-1} className={`${styles.panel} ${styles.objectWorkspace}`}>
-            <div className={styles.workspaceHeader}>
-              <div><p className={styles.eyebrow}>Offline command center</p><h2>Your records, in one place</h2><p>These are the same records used by Notes, People, Resources, Projects, Reviews, Personal, and Finance. Safe fields can be changed here offline; specialized actions stay in their full module.</p></div>
-              {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={() => { void newObject(); }}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
-            </div>
-            <div className={styles.workspaceSync} data-attention={onlineAuthorizationRequired || syncIssues.length > 0 || undefined}>
-              <div><strong>{networkLabel}</strong><span>{syncDetail}</span></div>
-              <button className={styles.quietButton} disabled={busy || !online} onClick={refreshDevices}>Sync now</button>
-            </div>
             <div className={styles.searchRow}>
-              <label className={styles.recordSearch}>Search all records<input ref={recordSearchRef} type="search" value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} placeholder="People, notes, projects, files, finance..." /></label>
-              <button className={styles.quietButton} disabled={busy || !recordQuery.trim()} onClick={() => void saveCurrentSearch()}>Save search</button>
+              <label className={styles.recordSearch}><span className={styles.searchLabel}>Search all records</span><input ref={recordSearchRef} type="search" value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} placeholder="Search all records" /></label>
+              {recordQuery.trim() && <button className={styles.quietButton} disabled={busy} onClick={() => void saveCurrentSearch()}>Save search</button>}
+              {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={() => { void newObject(); }}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
             </div>
             {savedSearches.length > 0 && <div className={styles.savedSearches} aria-label="Saved Vault searches">
               <span>Saved searches</span>
@@ -1423,6 +1402,13 @@ export default function VaultWorkspace({
                 </div>}
               </aside>
             </div>
+            <div id="vault-sync-details" className={styles.workspaceSync} data-attention={onlineAuthorizationRequired || syncIssues.length > 0 || undefined}>
+              <div><strong>{networkLabel}</strong><span>{syncDetail}</span></div>
+              <button className={styles.quietButton} disabled={busy || !online} onClick={refreshDevices}>Sync now</button>
+            </div>
+            <details className={styles.statusDisclosure}><summary>Storage and synchronization details</summary><section className={styles.statusGrid} aria-label="Vault status">
+              {cards.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}
+            </section></details>
           </section>
 
           {!onlineAuthorizationRequired && <section id="vault-devices" tabIndex={-1} className={`${styles.panel} ${styles.devicesPanel}`} aria-labelledby="devices-sync-title">

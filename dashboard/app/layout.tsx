@@ -12,6 +12,7 @@ import "./people-profile-controls.css";
 import "./finance-workspace.css";
 import "./finance-split.css";
 import "./module-continuity.css";
+import "./workspace-system.css";
 import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
 
 export const metadata: Metadata = {

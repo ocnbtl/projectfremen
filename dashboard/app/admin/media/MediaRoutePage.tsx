@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import AdminChrome from "../../../components/AdminChrome";
+import MediaLibrary from "../../../components/media/MediaLibrary";
 import MediaWorkspace from "../../../components/MediaWorkspace";
 import MediaDuplicatesWorkspace from "../../../components/media/MediaDuplicatesWorkspace";
 import MediaInUseWorkspace from "../../../components/media/MediaInUseWorkspace";
@@ -115,7 +116,7 @@ export default async function MediaRoutePage({
         sidebarTitle="Media"
         sidebarSummary="Binary assets, provenance, rights, versions, usage, and replacement."
       />
-      {queueMode === "in-use" && inUseEvidence ? (
+      {!queueMode && (mode === "index" || records.some(record=>record.id===assetId&&record.mediaProfile)) ? <MediaLibrary records={records.filter(record=>record.className === "file")} initialError={loadError} initialSelected={assetId}/> : queueMode === "in-use" && inUseEvidence ? (
         <MediaInUseWorkspace
           evidence={inUseEvidence}
           initialLoadError={loadError}

@@ -1,3 +1,4 @@
+import CommandAgenda from "../../components/planning/CommandAgenda";
 import Link from "next/link";
 import AdminChrome from "../../components/AdminChrome";
 import CurrentGoalsPanel, { type HomeGoalItem } from "../../components/CurrentGoalsPanel";
@@ -275,7 +276,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         sidebarChildren={<>
           <CurrentGoalsPanel initialItems={goalItems} />
           <section className="admin-plain-section">
-            <div className="admin-section-heading"><h2>Upcoming Reviews</h2></div>
+            <div className="admin-section-heading"><h2>Review suggestions</h2></div>
             <ul className="admin-plain-list admin-review-list">{reviewRows.map((item) => <li key={item.name}><Link href={item.href}>{item.name}</Link><span className="admin-review-when">{item.when}</span></li>)}</ul>
           </section>
         </>}
@@ -283,19 +284,17 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
       <section className="command-center-grid" aria-label="Command Center">
         <div className="command-center-primary">
-          <section className="command-hero">
-            <div><p className="command-kicker">Command Center</p><h1>What needs attention</h1><p>Decisions, follow-ups, and checks from the records you already use—organized into one clear worklist.</p></div>
-            <div className="command-hero-actions" aria-label="Primary command actions"><Link href="/vault">Open Vault</Link><Link href="/admin/notes">Capture a note</Link></div>
-          </section>
+          <header className="work-header"><div className="work-title"><h1>Command Center</h1></div><Link className="work-button" href="/admin/notes">Add a note</Link></header>
+          <CommandAgenda />
 
           <section className="command-panel command-attention-panel" aria-label="Current attention">
-            <div className="command-section-title"><div><p className="command-kicker-small">Live worklist</p><h2>Current attention</h2></div><span>{attentionTotal} records</span></div>
+            <div className="command-section-title"><div><h2>Next actions</h2></div><span>{attentionTotal} records</span></div>
             {attention.length ? <div className="command-horizon">
               {attentionGroups.map((group) => {
                 const items = attention.filter((item) => item.priority === group.key);
                 return items.length ? <section className="command-horizon-group" key={group.key} aria-labelledby={"attention-" + group.key}>
                   <header><div><span className={"command-priority-dot command-priority-" + group.key} /><h3 id={"attention-" + group.key}>{group.label}</h3></div><p>{group.note}</p><strong>{attentionCounts[group.key]}</strong></header>
-                  <div className="command-attention-list">{items.map((item) => <Link href={item.href} className={"command-attention-row command-priority-" + item.priority + " command-tone-" + item.tone} key={item.id}>
+                  <div className="command-attention-list">{items.slice(0,4).map((item) => <Link href={item.href} className={"command-attention-row command-priority-" + item.priority + " command-tone-" + item.tone} key={item.id}>
                     <div className="command-attention-meta"><span>{item.owner}</span><time>{item.when}</time></div>
                     <strong>{item.title}</strong><p>{item.detail}</p><small>{item.action} →</small>
                   </Link>)}</div>
@@ -305,22 +304,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             </div> : <div className="command-empty-state"><strong>Nothing needs attention right now</strong><p>Connected owner queues are clear. New work will appear here automatically.</p></div>}
           </section>
 
-          <section className="command-lanes" aria-label="Module source state">{modules.map((module) => <article className={`command-lane command-tone-${module.tone}`} key={module.name}><div className="command-section-title"><h2>{module.name}</h2><span>{module.available ? "Connected" : "Unavailable"}</span></div><div className="command-lane-list"><Link href={module.href}><strong>{module.value}</strong><p>{module.available ? "Open the canonical owner module" : "No values inferred while this source is unavailable"}</p></Link></div></article>)}</section>
-
           <section className="command-bottom-grid">
-            <article className="command-panel"><div className="command-section-title"><h2>Recent canonical activity</h2><span>{recentActivity.length}</span></div>{recentActivity.length ? <div className="command-review-list">{recentActivity.map((item) => <Link href={item.href} key={`${item.at}:${item.label}`}><strong>{item.label}</strong><span>{item.detail} · {formatActivityTime(item.at)}</span></Link>)}</div> : <div className="command-empty-state"><strong>No recent activity available</strong><p>Connected sources returned no timestamped owner records.</p></div>}</article>
-            <article className="command-panel"><div className="command-section-title"><h2>Review schedule</h2><Link href="/admin/reviews/weekly">Open Reviews</Link></div><div className="command-review-list">{reviewRows.map((item) => <Link href={item.href} key={item.name}><strong>{item.name}</strong><span>{item.when}</span></Link>)}</div></article>
+            <article className="command-panel"><div className="command-section-title"><h2>Recent activity</h2><span>{recentActivity.length}</span></div>{recentActivity.length ? <div className="command-review-list">{recentActivity.map((item) => <Link href={item.href} key={`${item.at}:${item.label}`}><strong>{item.label}</strong><span>{item.detail} · {formatActivityTime(item.at)}</span></Link>)}</div> : <div className="command-empty-state"><strong>No recent activity available</strong><p>Connected sources returned no timestamped owner records.</p></div>}</article>
+            <article className="command-panel"><div className="command-section-title"><h2>Review suggestions</h2><Link href="/admin/reviews/weekly">Open Reviews</Link></div><div className="command-review-list">{reviewRows.map((item) => <Link href={item.href} key={item.name}><strong>{item.name}</strong><span>{item.when}</span></Link>)}</div></article>
           </section>
         </div>
 
         <aside className="command-center-rail">
-          <section className="command-attention-summary" aria-label="Attention horizon">
-            <div><span>Attention horizon</span><strong>{attentionTotal}</strong><small>from live owner records</small></div>
-            {attentionGroups.map((group) => <div className={"command-priority-" + group.key} key={group.key}><span>{group.label}</span><strong>{attentionCounts[group.key]}</strong><small>{group.note}</small></div>)}
-          </section>
           <section className="command-panel"><div className="command-section-title"><h2>Module sources</h2><span>{modules.length - unavailableCount}/{modules.length}</span></div><div className="command-health-list">{modules.map((module) => <Link className={`command-health command-tone-${module.tone}`} href={module.href} key={module.name}><span /><strong>{module.name}</strong><small>{module.available ? "Connected" : "Unavailable"}</small></Link>)}</div></section>
           <section className="command-panel command-goals-panel"><CurrentGoalsPanel initialItems={goalItems} /></section>
-          <section className="command-rail-note"><strong>One record, every view</strong><p>Nothing is copied here. Opening an item takes you to its owner module, and the Vault stays on the same underlying record.</p></section>
+
         </aside>
       </section>
       {playIntro && <span className="command-intro-flag" aria-hidden="true" />}

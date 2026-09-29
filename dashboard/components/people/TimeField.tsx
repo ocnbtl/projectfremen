@@ -21,6 +21,7 @@ export default function TimeField({ label, value, onChange }: { label: string; v
         event.preventDefault(); wheel.current?.querySelectorAll<HTMLElement>('[aria-pressed="true"]').forEach(el => { el.parentElement!.scrollTop = el.offsetTop - (el.parentElement!.clientHeight - el.offsetHeight) / 2; });
         wheel.current?.querySelector<HTMLElement>('[aria-pressed="true"]')?.focus({ preventScroll: true });
       }}>
+        <label className="work-picker-entry">Enter time<input type="time" value={value} onChange={e=>{if(e.target.value)onChange(e.target.value);}} aria-label={`Type ${label.toLowerCase()}`}/></label>
         <strong>{label} time</strong><div ref={wheel} className="people-time-wheel-columns">{columns.map(column => <div key={column.label}><span>{column.label}</span><div role="group" aria-label={`${label} ${column.label.toLowerCase()}`} onKeyDown={event => {
           if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
           event.preventDefault(); const buttons = Array.from(event.currentTarget.querySelectorAll('button')), index = buttons.indexOf(document.activeElement as HTMLButtonElement);

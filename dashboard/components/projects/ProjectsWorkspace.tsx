@@ -1,10 +1,12 @@
 "use client";
+import RelatedRecords from "../planning/RelatedRecords";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import DirectoryPane from "../admin-shell/DirectoryPane";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 import InspectorRail from "../admin-shell/InspectorRail";
 import ModuleShell from "../admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "../admin-shell/ModuleSidebar";
@@ -151,12 +153,15 @@ type ConfirmationState =
 
 const PROJECT_TABS: readonly DetailTab[] = [
   { id: "overview", label: "Overview" },
-  { id: "timeline", label: "Timeline" },
-  { id: "notes-decisions", label: "Notes & Decisions" },
-  { id: "people", label: "People" },
-  { id: "files-links", label: "Files & Links" },
+  { id: "activity", label: "Activity" },
+  { id: "links", label: "Links" },
   { id: "properties", label: "Properties" }
 ];
+function visibleProjectTab(tab: ProjectTab) {
+  if (tab === "timeline") return "activity";
+  if (["people", "notes-decisions", "files-links"].includes(tab)) return "links";
+  return tab;
+}
 
 const VIEW_LABELS: Readonly<Record<ProjectView, string>> = {
   all: "All Projects",
@@ -304,30 +309,25 @@ function RowActionIcons({
   inspectLabel,
   onInspect,
   openHref,
-  openLabel,
-  openDisabledReason
+  openLabel
 }: {
   inspectLabel: string;
   onInspect?: () => void;
   openHref?: string;
   openLabel: string;
-  openDisabledReason?: string;
 }) {
   return (
     <span className={styles.activityActions}>
-      <button
+      {onInspect && <button
         type="button"
         className={styles.rowActionIcon}
         onClick={onInspect}
-        disabled={!onInspect}
         aria-label={inspectLabel}
-        title={onInspect ? inspectLabel : `${inspectLabel} unavailable`}
-      ><InspectIcon /></button>
+        title={inspectLabel}
+      ><InspectIcon /></button>}
       {openHref ? (
         <Link className={styles.rowActionIcon} href={openHref} aria-label={openLabel} title={openLabel}><OpenIcon /></Link>
-      ) : (
-        <button type="button" className={styles.rowActionIcon} disabled aria-label={`${openLabel} unavailable`} title={openDisabledReason || `${openLabel} unavailable`}><OpenIcon /></button>
-      )}
+      ) : null}
     </span>
   );
 }
@@ -2206,7 +2206,6 @@ export default function ProjectsWorkspace({
               onInspect={() => selectChild(event.id, "timeline")}
               openHref={event.openHref || undefined}
               openLabel={`Open ${event.title}`}
-              openDisabledReason="This activity does not point to a separate object."
             />
             <time className={styles.timelineMeta}>{formatTimestamp(event.occurredAt)}</time>
           </li>
@@ -2325,15 +2324,9 @@ export default function ProjectsWorkspace({
       <>
         <QuickActionBar
           actions={projectQuickActions(item)}
-          label={<strong>Quick actions</strong>}
+          maxVisible={2}
           ariaLabel={`${item.project.name} quick actions`}
         />
-        <div className={styles.signalStrip} aria-label="Project summary">
-          <button type="button" onClick={() => selectTab("timeline")}><strong>{activeMilestones(item).length}</strong><span>Milestones</span></button>
-          <button type="button" onClick={() => selectTab("timeline")} data-alert={blockers.length || undefined}><strong>{blockers.length}</strong><span>Blockers</span></button>
-          <button type="button" onClick={() => selectTab("files-links")}><strong>{item.linkedContext.length}</strong><span>Links</span></button>
-          <button type="button" onClick={() => selectTab("properties")} data-alert={item.attentionReasons.length || undefined}><strong>{item.attentionReasons.length}</strong><span>Checks</span></button>
-        </div>
         <div className={styles.overviewGrid}>
           <section className={`${styles.panel} ${styles.contextPanel}`} data-wide="true">
             <div className={styles.panelHeader}>
@@ -2380,11 +2373,11 @@ export default function ProjectsWorkspace({
         <aside className={styles.timelineSide}>
           <section className={styles.panel}>
             <div className={styles.panelHeader}><h2>Milestones</h2><button type="button" className={styles.button} onClick={() => openEditor("milestone-create", item)} disabled={readOnly}>Add milestone</button></div>
-            {item.milestones.length ? <ul className={styles.objectList}>{item.milestones.map((milestone) => <li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}><span className={styles.itemBody}><strong>{milestone.title}</strong><small>{formatDate(milestone.dueAt)} · {displayLabel(milestone.state)}</small></span><span className={styles.inlineActions}><RowActionIcons inspectLabel={`Inspect ${milestone.title}`} onInspect={() => selectChild(milestone.id, "timeline")} openLabel={`Open ${milestone.title}`} openDisabledReason="The milestone opens in this Project inspection." />{!["complete", "archived"].includes(milestone.state) && <button type="button" className={styles.button} disabled={readOnly || !milestone.completionCriteria.length} onClick={() => { setConfirmationReason(""); setConfirmation({ kind: "milestone-complete", projectId: item.project.id, objectId: milestone.id }); }}>Complete</button>}</span></li>)}</ul> : <p>No milestones yet.</p>}
+            {item.milestones.length ? <ul className={styles.objectList}>{item.milestones.map((milestone) => <li key={milestone.id} aria-current={selectedChildId === milestone.id || undefined}><span className={styles.itemBody}><strong>{milestone.title}</strong><small>{formatDate(milestone.dueAt)} · {displayLabel(milestone.state)}</small></span><span className={styles.inlineActions}><RowActionIcons inspectLabel={`Inspect ${milestone.title}`} onInspect={() => selectChild(milestone.id, "timeline")} openLabel={`Open ${milestone.title}`} />{!["complete", "archived"].includes(milestone.state) && <button type="button" className={styles.button} disabled={readOnly || !milestone.completionCriteria.length} onClick={() => { setConfirmationReason(""); setConfirmation({ kind: "milestone-complete", projectId: item.project.id, objectId: milestone.id }); }}>Complete</button>}</span></li>)}</ul> : <p>No milestones yet.</p>}
           </section>
           <section className={styles.panel}>
             <div className={styles.panelHeader}><h2>Blockers</h2><button type="button" className={styles.button} onClick={() => openEditor("blocker-create", item)} disabled={readOnly}>Add blocker</button></div>
-            {item.blockers.length ? <ul className={styles.objectList}>{item.blockers.map((blocker) => <li key={blocker.id} aria-current={selectedChildId === blocker.id || undefined}><span className={styles.itemBody}><strong>{blocker.title}</strong><small>{displayLabel(blocker.state)} · {displayLabel(blocker.severity)}</small></span><span className={styles.inlineActions}><RowActionIcons inspectLabel={`Inspect ${blocker.title}`} onInspect={() => selectChild(blocker.id, "timeline")} openLabel={`Open ${blocker.title}`} openDisabledReason="The blocker opens in this Project inspection." />{blocker.state === "open" && <button type="button" className={styles.button} disabled={readOnly} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve</button>}</span></li>)}</ul> : <p>No blockers.</p>}
+            {item.blockers.length ? <ul className={styles.objectList}>{item.blockers.map((blocker) => <li key={blocker.id} aria-current={selectedChildId === blocker.id || undefined}><span className={styles.itemBody}><strong>{blocker.title}</strong><small>{displayLabel(blocker.state)} · {displayLabel(blocker.severity)}</small></span><span className={styles.inlineActions}><RowActionIcons inspectLabel={`Inspect ${blocker.title}`} onInspect={() => selectChild(blocker.id, "timeline")} openLabel={`Open ${blocker.title}`} />{blocker.state === "open" && <button type="button" className={styles.button} disabled={readOnly} onClick={() => openEditor("blocker-resolve", item, blocker)}>Resolve</button>}</span></li>)}</ul> : <p>No blockers.</p>}
           </section>
         </aside>
       </div>
@@ -2485,7 +2478,7 @@ export default function ProjectsWorkspace({
                   </span>
                   <span className={styles.rowState} data-tone={stateTone(link.linkState)}>{displayLabel(link.linkState)}</span>
                   <span className={styles.inlineActions}>
-                    <RowActionIcons inspectLabel={`Inspect ${link.source.label} connection`} onInspect={() => selectChild(link.id, "files-links")} openHref={linkSourceIsUnsafe(link) ? undefined : link.source.route} openLabel={`Open ${link.source.label}`} openDisabledReason="Repair this retained association before opening its source." />
+                    <RowActionIcons inspectLabel={`Inspect ${link.source.label} connection`} onInspect={() => selectChild(link.id, "files-links")} openHref={linkSourceIsUnsafe(link) ? undefined : link.source.route} openLabel={`Open ${link.source.label}`} />
                     {linkNeedsRepair(link) ? (
                       <button type="button" className={styles.button} disabled={["complete", "archived"].includes(item.project.lifecycle)} title={["complete", "archived"].includes(item.project.lifecycle) ? "Completed and archived projects are read-only." : undefined} onClick={() => openEditor("link-repair", item, link)}>Repair</button>
                     ) : null}
@@ -2526,22 +2519,6 @@ export default function ProjectsWorkspace({
         </section>
       </div>
     );
-  }
-
-  function tabsFor(item: ProjectDirectoryItem): readonly DetailTab[] {
-    const notesDecisions = item.linkedContext.filter((context) => context.ref.module === "notes" || (context.ref.module === "personal_ops" && context.ref.objectType === "decision")).length;
-    return PROJECT_TABS.map((tab) => ({
-      ...tab,
-      count: tab.id === "timeline"
-        ? item.timelineEvents.length
-        : tab.id === "notes-decisions"
-          ? notesDecisions
-          : tab.id === "people"
-            ? item.linkedContext.filter((context) => context.ref.module === "people").length
-            : tab.id === "files-links"
-              ? item.links.filter((link) => link.linkState !== "removed").length
-              : undefined
-    }));
   }
 
   function renderSelectedChildContext(item: ProjectDirectoryItem) {
@@ -2721,7 +2698,7 @@ export default function ProjectsWorkspace({
               onSave={(patch) => saveConnectionInline(item, link, patch)}
             />
             <div className={styles.inlineActions}>
-              <RowActionIcons inspectLabel={`Inspect ${link.source.label} connection`} openHref={linkSourceIsUnsafe(link) ? undefined : link.source.route} openLabel={`Open ${link.source.label}`} openDisabledReason="Repair this retained association before opening its source." />
+              <RowActionIcons inspectLabel={`Inspect ${link.source.label} connection`} openHref={linkSourceIsUnsafe(link) ? undefined : link.source.route} openLabel={`Open ${link.source.label}`} />
               {linkNeedsRepair(link) ? (
                 <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("link-repair", item, link)}>Repair association</button>
               ) : null}
@@ -2765,7 +2742,7 @@ export default function ProjectsWorkspace({
             </div>
             <div className={styles.inlineActions}>
               {interaction && <button type="button" className={styles.button} disabled={parentReadOnly} title={parentReadOnlyReason} onClick={() => openEditor("interaction-edit", item, interaction)}>Edit update</button>}
-              <RowActionIcons inspectLabel={`Inspect ${timelineEvent.title}`} openHref={timelineEvent.eventType.startsWith("link_") ? timelineEvent.sourceRef?.route : undefined} openLabel={`Open source for ${timelineEvent.title}`} openDisabledReason="This activity does not point to a separate object." />
+              <RowActionIcons inspectLabel={`Inspect ${timelineEvent.title}`} openHref={timelineEvent.eventType.startsWith("link_") ? timelineEvent.sourceRef?.route : undefined} openLabel={`Open source for ${timelineEvent.title}`} />
             </div>
           </div>
         )}
@@ -2793,15 +2770,15 @@ export default function ProjectsWorkspace({
     const tabsId = `project-${item.project.id}`;
     return (
       <>
-        <DetailTabs id={tabsId} tabs={tabsFor(item)} activeTab={activeTab} onTabChange={selectTab} ariaLabel={`${item.project.name} detail sections`} className={styles.tabs} />
+        <DetailTabs id={tabsId} tabs={PROJECT_TABS} activeTab={visibleProjectTab(activeTab)} onTabChange={selectTab} ariaLabel={`${item.project.name} detail sections`} className={styles.tabs} />
         {mutationError && <p className={styles.errorBanner} role="alert">{mutationError}</p>}
         {notice && <p className={styles.successBanner} role="status">{notice}</p>}
         {renderSelectedChildContext(item)}
         <DetailTabPanel tabsId={tabsId} tabId="overview" active={activeTab === "overview"}>{renderOverview(item)}</DetailTabPanel>
-        <DetailTabPanel tabsId={tabsId} tabId="timeline" active={activeTab === "timeline"}>{renderTimeline(item)}</DetailTabPanel>
-        <DetailTabPanel tabsId={tabsId} tabId="notes-decisions" active={activeTab === "notes-decisions"}>{renderNotesDecisions(item)}</DetailTabPanel>
-        <DetailTabPanel tabsId={tabsId} tabId="people" active={activeTab === "people"}>{renderPeople(item)}</DetailTabPanel>
-        <DetailTabPanel tabsId={tabsId} tabId="files-links" active={activeTab === "files-links"}>{renderFilesLinks(item)}</DetailTabPanel>
+        <DetailTabPanel tabsId={tabsId} tabId="activity" active={visibleProjectTab(activeTab) === "activity"}>{renderTimeline(item)}</DetailTabPanel>
+        <DetailTabPanel tabsId={tabsId} tabId="links" active={visibleProjectTab(activeTab) === "links"}>
+          {renderPeople(item)}{renderNotesDecisions(item)}{renderFilesLinks(item)}<RelatedRecords module="projects" type="project" id={item.project.id} />
+        </DetailTabPanel>
         <DetailTabPanel tabsId={tabsId} tabId="properties" active={activeTab === "properties"}>{renderProperties(item)}</DetailTabPanel>
       </>
     );
@@ -3115,84 +3092,31 @@ export default function ProjectsWorkspace({
   const directory = (
     <DirectoryPane className={styles.directory} ariaLabel="Projects directory">
       <div className={styles.mainScroll}>
-        <div className={styles.directoryHeader}>
-          <div>
-            <h1>Projects</h1>
-            <p>{visibleProjects.length} shown · {snapshot.projects.length} projects</p>
-          </div>
-          <div className={styles.headerActions}>
-            <div className={styles.viewSwitch} role="group" aria-label="Project layout">
-              {(["comfortable", "compact", "grid"] as const).map((layout) => {
-                const active = layout === "grid" ? grid : layout === "compact" ? compact && !grid : !compact && !grid;
-                return <button type="button" aria-pressed={active} data-active={active || undefined} onClick={() => {
-                  const nextGrid = layout === "grid";
-                  const nextCompact = layout === "compact";
-                  setGrid(nextGrid);
-                  setCompact(nextCompact);
-                  updateUrl({ grid: nextGrid, compact: nextCompact });
-                }} key={layout}>{displayLabel(layout)}</button>;
-              })}
-            </div>
-            <button type="button" className={styles.button} data-primary="true" onClick={() => openEditor("project-create")}>New project</button>
-          </div>
-        </div>
-
+        <WorkspaceHeader title="Projects" count={visibleProjects.length}>
+          <WorkspaceButton className="work-mobile-only" icon="menu" aria-label="Open Projects navigation" onClick={()=>setMobileSidebarOpen(true)}/>
+          <WorkspaceButton intent="primary" icon="plus" onClick={() => openEditor("project-create")}>Add project</WorkspaceButton>
+        </WorkspaceHeader>
         {initialLoadError && <SystemState variant="error" compact title="Some project sources did not load" description={initialLoadError} />}
-        {sourceErrors.length > 0 && <p className={styles.notice} role="status">Some linked context could not be loaded. Your project is still available.</p>}
-        {mutationError && <p className={styles.errorBanner} role="alert">{mutationError}</p>}
-        {notice && <p className={styles.successBanner} role="status">{notice}</p>}
-
-        <label className={styles.search}>
-          <span aria-hidden="true">/</span>
-          <span className="sr-only">Search projects and linked context</span>
-          <input
-            type="search"
-            value={query}
-            onChange={(event) => {
-              setQuery(event.target.value);
-              updateUrl({ query: event.target.value });
-            }}
-            placeholder="Search projects, milestones, blockers, linked context…"
-          />
-          <kbd aria-hidden="true">SEARCH</kbd>
-        </label>
-
-        <div className={styles.filterRow} role="toolbar" aria-label="Project filters">
-          {(["all", "active", "due", "due-month", "needs-review", "blocked", "linked", "missing-owner"] as const).map((itemFilter) => (
-            <button
-              type="button"
-              className={styles.filterChip}
-              data-active={filter === itemFilter}
-              data-tone={itemFilter === "active" ? "green" : itemFilter === "blocked" || itemFilter === "missing-owner" ? "red" : itemFilter === "due" || itemFilter === "due-month" || itemFilter === "needs-review" ? "amber" : itemFilter === "linked" ? "blue" : undefined}
-              aria-pressed={filter === itemFilter}
-              onClick={() => {
-                setFilter(itemFilter);
-                updateUrl({ filter: itemFilter });
-              }}
-              key={itemFilter}
-            >{FILTER_LABELS[itemFilter]}</button>
-          ))}
-        </div>
-
-        <div className={styles.sortRow}>
-          <div className={styles.sortControl}>
-            <span>Sort</span>
-            <select className={styles.selectControl} value={sort} onChange={(event) => {
-              const nextSort = event.target.value as ProjectSort;
-              setSort(nextSort);
-              updateUrl({ sort: nextSort });
-            }} aria-label="Sort projects">
-              {Object.entries(SORT_LABELS).filter(([value]) => value !== "priority").map(([value, label]) => <option value={value} key={value}>{label}</option>)}
-            </select>
-          </div>
-          <span>{VIEW_LABELS[view]} · {FILTER_LABELS[filter]}</span>
-        </div>
-
+        {sourceErrors.length > 0 && <p className={styles.notice} role="status">Some linked context could not load. Existing projects remain available.</p>}
+        <WorkspaceToolbar query={query} onQuery={(value) => { setQuery(value); updateUrl({ query: value }); }} placeholder="Search projects"
+          activeFilters={filter === "all" ? 0 : 1}
+          filters={<div className={styles.filterRow} aria-label="Project filters">
+            {(["all", "active", "due", "due-month", "needs-review", "blocked", "linked", "missing-owner"] as const).map((value) =>
+              <WorkspaceButton key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); updateUrl({ filter: value }); }}>{FILTER_LABELS[value]}</WorkspaceButton>)}
+          </div>}>
+          <select className={styles.selectControl} value={sort} onChange={(event) => { const value = event.target.value as ProjectSort; setSort(value); updateUrl({ sort: value }); }} aria-label="Sort projects">
+            {Object.entries(SORT_LABELS).filter(([value]) => value !== "priority").map(([value, label]) => <option value={value} key={value}>{label}</option>)}
+          </select>
+          <select className={styles.layoutSelect} value={grid ? "grid" : compact ? "compact" : "comfortable"} aria-label="Project layout" onChange={event => {
+            const nextGrid = event.target.value === "grid", nextCompact = event.target.value === "compact";
+            setGrid(nextGrid); setCompact(nextCompact); updateUrl({ grid: nextGrid, compact: nextCompact });
+          }}><option value="comfortable">List</option><option value="compact">Compact</option><option value="grid">Grid</option></select>
+        </WorkspaceToolbar>
         {visibleProjects.length ? (
           <div className={grid ? styles.projectGrid : styles.list} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">
             {visibleProjects.map((item) => {
               const milestone = nextMilestone(item);
-              const attention = item.attentionReasons[0];
+              const attention = item.attentionReasons.find(reason=>!/objectives.*not defined/i.test(reason));
               const peopleCount = item.linkedContext.filter((context) => context.ref.module === "people").length;
               const objectCount = item.linkedContext.filter((context) => context.ref.module !== "people").length;
               const projectMeta = <span className={styles.projectMeta}>
@@ -3215,12 +3139,12 @@ export default function ProjectsWorkspace({
                 <DenseObjectRow
                   id={item.project.id}
                   title={item.project.name}
-                  description={excerpt(item.project.description || item.project.objective || "No project context recorded.")}
+                  description={item.project.objective || item.project.description ? excerpt(item.project.objective || item.project.description) : undefined}
                   leading={<span className={styles.rowAvatar} aria-label={`${item.project.name} initials`}>{initials(item.project.name)}</span>}
                   metadata={projectMeta}
                   trailing={<>
                     <span className={styles.rowState} data-tone={stateTone(item.project.lifecycle)}>{displayLabel(item.project.lifecycle)}</span>
-                    <span>{attention || (milestone ? `Next ${formatDate(milestone.dueAt)}` : `Updated ${formatDate(item.project.updatedAt)}`)}</span>
+                    {(attention || milestone) && <span>{attention || `Next ${formatDate(milestone!.dueAt)}`}</span>}
                   </>}
                   selected={selectedProjectId === item.project.id}
                   onSelect={() => selectProject(item)}
@@ -3326,8 +3250,8 @@ export default function ProjectsWorkspace({
           }}
         />}
       >
-        <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation"><UnigentamosIcon role="menu" size={18} /></button>
-        {isInspectorOverlay && selectedItem && <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => setInspectorOpen(true)}>{initialDetail ? "Completion" : "Details"}</button>}
+        {initialDetail && <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation"><UnigentamosIcon role="menu" size={18} /></button>}
+        {initialDetail && isInspectorOverlay && selectedItem && <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => setInspectorOpen(true)}>{initialDetail ? "Completion" : "Details"}</button>}
         {initialDetail ? (
           <div className={styles.mainScroll}>
             <div className={styles.mobileToolbar}><Link className={styles.textLink} href={getModuleRoute("projects")}>Back to projects</Link></div>

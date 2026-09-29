@@ -963,6 +963,8 @@ const PROJECT_SORTS = [
   "due"
 ] as const;
 const PROJECT_TABS = [
+  "activity",
+  "links",
   "overview",
   "timeline",
   "notes-decisions",

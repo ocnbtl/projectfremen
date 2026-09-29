@@ -1,4 +1,5 @@
 "use client";
+import { WorkspaceSheet, WorkspaceEmpty } from "./admin-shell/WorkspaceKit";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -199,12 +200,12 @@ function ArchivedFinanceRecords({ state, onRestore }: {
     ...state.closePeriods.filter((item) => item.archivedAt).map((item) => ({ kind: "close_period" as const, id: item.id, label: `${item.period} close` })),
     ...state.rules.filter((item) => item.archivedAt).map((item) => ({ kind: "rule" as const, id: item.id, label: item.name }))
   ];
-  if (!archived.length) return null;
+  if (!archived.length) return <WorkspaceEmpty title="No archived finance records">Archived records can be restored here.</WorkspaceEmpty>;
   return <section className="finance-archived-records" aria-label="Archived Finance records">
     <strong>Archived</strong>
     <span>{archived.length} record{archived.length === 1 ? "" : "s"}</span>
-    {archived.slice(0, 6).map((item) => <button key={`${item.kind}:${item.id}`} type="button" onClick={() => onRestore(item)}>{item.label} · restore</button>)}
-    {archived.length > 6 && <small>{archived.length - 6} more retained in the Finance store.</small>}
+    {archived.map((item) => <button key={`${item.kind}:${item.id}`} type="button" onClick={() => onRestore(item)}>{item.label} · restore</button>)}
+
   </section>;
 }
 
@@ -402,6 +403,7 @@ export default function FinanceWorkspace({
     sync(); media.addEventListener("change", sync);
     return () => media.removeEventListener("change", sync);
   }, []);
+  const [archiveOpen, setArchiveOpen] = useState(false);
   const [utility, setUtility] = useState<FinanceUtility | null>(null);
   useEffect(() => {
     if (new URLSearchParams(window.location.search).has("oauth_state_id")) setUtility("settings");
@@ -939,7 +941,7 @@ export default function FinanceWorkspace({
       <div className="finance-main-workspace">
         <header className="finance-page-header">
           <div className="finance-page-title"><button type="button" className="finance-mobile-menu" onClick={() => setMobileSidebarOpen(true)} aria-label="Open Finance sidebar" aria-expanded={mobileSidebarOpen} aria-controls="finance-module-sidebar"><UnigentamosIcon role="menu" /></button><h1>{activeSmart?.label || activeView.label}</h1></div>
-          <div className="finance-page-actions">{["overview", "budgets", "bills"].includes(view) && <button type="button" aria-label="Plan from history" title="Plan from history" className="finance-action finance-plan-trigger" onClick={() => setPlanning("plan")}><Icon name="Sliders" /><span>Plan from history</span></button>}{view === "transactions" && smartCounts.unreviewed > 0 && <button type="button" aria-label="Approve all transactions" title="Approve all transactions" className="finance-action finance-review-trigger" onClick={() => setPlanning("review")}><Icon name="Check" /><span>Approve all</span></button>}<NativeActionBar
+          <div className="finance-page-actions"><button type="button" className="finance-action" onClick={()=>setArchiveOpen(true)}>Archive</button>{["overview", "budgets", "bills"].includes(view) && <button type="button" aria-label="Plan from history" title="Plan from history" className="finance-action finance-plan-trigger" onClick={() => setPlanning("plan")}><Icon name="Sliders" /><span>Plan from history</span></button>}{view === "transactions" && smartCounts.unreviewed > 0 && <button type="button" aria-label="Approve all transactions" title="Approve all transactions" className="finance-action finance-review-trigger" onClick={() => setPlanning("review")}><Icon name="Check" /><span>Approve all</span></button>}<NativeActionBar
           view={view}
           hasSelection={hasRouteSelection}
           hasAccounts={financeState.accounts.some((item) => !item.archivedAt)}
@@ -951,10 +953,10 @@ export default function FinanceWorkspace({
 
         {planning && <FinancePlanningPanel key={planning} reviewOnly={planning === "review"} onClose={() => setPlanning(null)} onApplied={(state, message) => { setFinanceState(state); setNotice(message); setPlanning(null); setCheckedTxnIds(new Set()); router.refresh(); }} />}
         {financeError && <div className="finance-notice is-error" role="alert"><Swatch hue="crimson" /><span className="finance-notice__message">{financeError}</span></div>}
-        <ArchivedFinanceRecords
+        <WorkspaceSheet open={archiveOpen} onClose={()=>setArchiveOpen(false)} title="Finance archive"><ArchivedFinanceRecords
           state={financeState}
-          onRestore={(selection) => { setOperationTarget(selection); setOperation("restore"); }}
-        />
+          onRestore={(selection) => { setArchiveOpen(false); setOperationTarget(selection); setOperation("restore"); }}
+        /></WorkspaceSheet>
         {notice && <div className="finance-notice" role="status" aria-live="polite"><Swatch hue={activeSmart?.hue || "indigo"} /><span className="finance-notice__message">{notice}</span><button type="button" onClick={() => setNotice("")}>Clear</button></div>}
         {view === "overview" && <FinanceOverviewView state={financeState} model={overviewModel} filters={overviewState.filters} selection={overviewState.selection} onFilters={filters => updateOverview(filters, { kind: "summary", id: "" })} onSelect={selection => updateOverview(overviewState.filters, selection, true)} onAddAccount={() => setOperation("account")} />}
         {view === "accounts" && (

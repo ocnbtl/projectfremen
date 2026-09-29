@@ -7,3 +7,5 @@ data/exports/
 output/
 debug.log
 .vercel
+
+/public/vendor/maplibre/

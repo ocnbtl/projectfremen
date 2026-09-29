@@ -168,7 +168,7 @@ export default function ModuleSidebar({
       <header className="module-sidebar__header">
         <div>
           <p className="module-sidebar__eyebrow">Module</p>
-          <h1>{title}</h1>
+          <p className="module-sidebar__title">{title}</p>
           {description && <p>{description}</p>}
         </div>
         {onClose && (

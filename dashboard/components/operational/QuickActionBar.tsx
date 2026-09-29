@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
+import * as Popover from "@radix-ui/react-popover";
+import { WorkspaceButton } from "../admin-shell/WorkspaceKit";
 
 export type QuickAction = {
   id: string;
@@ -20,6 +22,7 @@ export type QuickActionBarProps = {
   sticky?: boolean;
   ariaLabel?: string;
   className?: string;
+  maxVisible?: number;
 };
 
 export default function QuickActionBar({
@@ -27,8 +30,12 @@ export default function QuickActionBar({
   label,
   sticky = false,
   ariaLabel = "Quick actions",
-  className
+  className,
+  maxVisible = 3
 }: QuickActionBarProps) {
+  const [open,setOpen] = useState(false);
+  const available = actions.filter(action => action.href || action.onSelect);
+  const overflow = available.slice(maxVisible);
   return (
     <div
       className={["quick-action-bar", sticky && "is-sticky", className].filter(Boolean).join(" ")}
@@ -37,7 +44,7 @@ export default function QuickActionBar({
     >
       {label && <div className="quick-action-bar__label">{label}</div>}
       <div className="quick-action-bar__actions">
-        {actions.map((action) => {
+        {available.slice(0,maxVisible).map((action) => {
           const unavailable = action.disabled || (!action.href && !action.onSelect);
           const reason = action.disabledReason ?? (unavailable ? `${action.label} is not available yet.` : undefined);
           const content = (
@@ -84,6 +91,9 @@ export default function QuickActionBar({
             </button>
           );
         })}
+        {overflow.length > 0 && <Popover.Root open={open} onOpenChange={setOpen}><Popover.Trigger asChild><WorkspaceButton aria-label="More actions">More</WorkspaceButton></Popover.Trigger><Popover.Portal><Popover.Content className="work-action-menu" sideOffset={6} collisionPadding={12} aria-label="More actions">
+          {overflow.map(action=>action.href && !action.disabled ? <Link key={action.id} href={action.href} onClick={()=>setOpen(false)}>{action.label}</Link> : <button key={action.id} type="button" disabled={action.disabled} title={action.disabledReason} onClick={()=>{setOpen(false);action.onSelect?.();}}>{action.label}</button>)}
+        </Popover.Content></Popover.Portal></Popover.Root>}
       </div>
     </div>
   );

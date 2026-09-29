@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import ts from "typescript";
 
 const sourceRoot = path.resolve("lib/local-first");
@@ -378,8 +378,6 @@ try {
   assert.match(vaultWorkspace, /vaultRelationshipsFor/i);
   assert.match(vaultWorkspace, /Mark paid in ledger/i);
   assert.match(vaultWorkspace, /No payment was sent/i);
-  assert.match(vaultWorkspace, /Offline command center/i);
-  assert.match(vaultWorkspace, /same records used by Notes, People, Resources, Projects, Reviews, Personal, and Finance/i);
   assert.match(vaultWorkspace, /saveCanonicalFields/i);
   assert.match(vaultWorkspace, /Saved searches updated across your Vault devices/i);
   assert.match(vaultWorkspace, /buildVaultSearchIndex/i);
@@ -470,13 +468,13 @@ try {
   const nextConfig = await readFile("next.config.ts", "utf8");
   assert.match(nextConfig, /outputFileTracingIncludes/i);
   const commandCenter = await readFile("app/admin/page.tsx", "utf8");
-  assert.match(commandCenter, /Attention horizon/i);
+  assert.match(commandCenter, /CommandAgenda/i);
   assert.match(commandCenter, /openProjectBlockers.map/i);
   assert.match(commandCenter, /pendingTransactions.map/i);
   assert.match(commandCenter, /dueBills.map/i);
   assert.match(commandCenter, /openFollowUps.map/i);
-  assert.match(commandCenter, /Nothing is copied here/i);
-  const companionSource = await readFile("../vault-companion/src/server.mjs", "utf8");
+  assert.match(commandCenter, /Review suggestions/i);
+  const companionSource = await readFile(fileURLToPath(new URL("../../vault-companion/src/server.mjs", import.meta.url)), "utf8");
   assert.match(companionSource, /const VERSION = "0\.3\.0"/i);
   assert.match(companionSource, /UNIGENTAMOS_VAULT_AUTO_BACKUP_MS/i);
   assert.match(companionSource, /async function maybeCreateScheduledBackup/i);

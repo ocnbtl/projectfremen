@@ -3,6 +3,8 @@ import customIcons from "./custom-icons.json";
 
 export const ICON_MODULES = [
   "System",
+  "Map",
+  "Calendar",
   "Projects",
   "Notes",
   "People",

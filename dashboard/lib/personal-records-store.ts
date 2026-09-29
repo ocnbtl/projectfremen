@@ -1,3 +1,4 @@
+import { normalizeMediaProfile, type MediaProfile } from "./modules/media/profile";
 import { mutateJsonFile, readJsonFile } from "./file-store";
 import { createHash } from "node:crypto";
 import { transferNameKey, type ContactDraft } from "./modules/people/transfer";
@@ -329,6 +330,7 @@ export type PersonalRecord = {
   time: PersonalRecordTime;
   profile?: PersonalContactProfile;
   resourceProfile?: PersonalResourceProfile;
+  mediaProfile?: MediaProfile;
   interaction?: PersonalInteractionDetails;
   createdMeta: PersonalRecordCreatedMeta;
   createdAt: string;
@@ -361,6 +363,7 @@ export type PersonalRecordInput = {
   time?: PersonalRecordTime;
   profile?: Partial<PersonalContactProfile>;
   resourceProfile?: Partial<PersonalResourceProfile>;
+  mediaProfile?: MediaProfile;
   interaction?: Partial<PersonalInteractionDetails>;
 };
 
@@ -375,6 +378,7 @@ export type PersonalRecordPatch = Partial<
   time?: Partial<PersonalRecordTime>;
   profile?: Partial<PersonalContactProfile>;
   resourceProfile?: Partial<PersonalResourceProfile>;
+  mediaProfile?: MediaProfile;
 };
 
 const FILE_NAME = "personal-records.json";
@@ -2036,6 +2040,7 @@ function normalizeRecord(raw: Partial<PersonalRecord> & Record<string, unknown>)
     time: normalizeTime(className === "person" ? { ...raw.time, reviewCadence: raw.time?.reviewCadence || profile?.contactCadence } : raw.time, createdMeta, stage, className),
     profile,
     resourceProfile,
+    mediaProfile: className === "file" ? normalizeMediaProfile(raw.mediaProfile) : undefined,
     interaction: className === "interaction" ? normalizeInteractionDetails(raw.interaction) : undefined,
     createdMeta,
     createdAt,
@@ -2223,6 +2228,7 @@ export async function createPersonalRecord(
       className
     ),
     profile,
+    mediaProfile: className === "file" ? normalizeMediaProfile(input.mediaProfile) : undefined,
     resourceProfile: className === "resource"
       ? normalizeResourceProfile(input.resourceProfile || { version: 1 }, recordId, meta.createdIso)
       : undefined,
@@ -2705,6 +2711,7 @@ export async function updatePersonalRecord(
     time,
     profile: nextProfile,
     resourceProfile: nextResourceProfile,
+    mediaProfile: current.className === "file" ? normalizeMediaProfile(patch.mediaProfile ?? current.mediaProfile) : undefined,
     updatedAt: now,
     ...(nextStarred ? { starred: true } : { starred: undefined }),
     ...(patch.action === "archive"

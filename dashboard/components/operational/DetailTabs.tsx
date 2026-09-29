@@ -1,5 +1,7 @@
 "use client";
 
+import { motion } from "motion/react";
+import { motionTokens } from "../../lib/design-system/motion";
 import type { KeyboardEvent, ReactNode } from "react";
 import { useEffect, useRef } from "react";
 
@@ -119,6 +121,7 @@ export default function DetailTabs({
             onKeyDown={(event) => handleKeyDown(event, tab.id)}
             key={tab.id}
           >
+            {selected && <motion.span className="work-tab-marker" aria-hidden="true" layoutId={`tab-marker-${safeId(id)}`} initial={false} transition={{ duration:motionTokens.standard, ease:motionTokens.arrive }} />}
             <span>{tab.label}</span>
             {tab.count !== undefined && <span aria-label={`${tab.count} items`}>{tab.count}</span>}
             {tab.disabledReason && (

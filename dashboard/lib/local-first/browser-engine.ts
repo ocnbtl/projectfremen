@@ -19,6 +19,7 @@ import { mergeVaultSnapshots } from "./merge";
 import { deterministicMergeVersionId, meaningfulVaultHistory, snapshotsEquivalent } from "./semantic-history";
 import {
   canonicalMetadata,
+  canonicalVaultFields,
   pendingCanonicalCommands,
   pendingCommandField,
   readCanonicalMetadata,
@@ -422,6 +423,8 @@ export class BrowserVaultEngine {
     this.lastCompactionError = null;
     this.session?.store.close();
     this.session = null;
+    window.dispatchEvent(new Event("unigentamos-vault-locked"));
+    window.dispatchEvent(new Event("unigentamos-vault-data-changed"));
   }
 
   async exportRecoveryPackage(): Promise<VaultRecoveryPackage> {
@@ -571,7 +574,10 @@ export class BrowserVaultEngine {
     const previous = await this.readObject(objectId);
     const fields = { ...(previous?.fields || {}), ...input.fields };
     const tombstone = input.tombstone ?? previous?.tombstone ?? false;
-    const changesOperationalState = Object.keys(input.fields).some((field) => field.startsWith(VAULT_PENDING_COMMAND_PREFIX));
+    // Transfer state must persist even when authored canonical content is unchanged.
+    // It remains excluded from the person-facing history's content comparison.
+    const changesOperationalState = Object.keys(input.fields).some((field) => field.startsWith(VAULT_PENDING_COMMAND_PREFIX))
+      || (input.fields.mediaState !== undefined && JSON.stringify(input.fields.mediaState) !== JSON.stringify(previous?.fields.mediaState));
     if (previous && !changesOperationalState && snapshotsEquivalent(previous, {
       ...previous,
       objectKind: input.objectKind,
@@ -1346,26 +1352,28 @@ export class BrowserVaultEngine {
     }
   }
 
-  private async uploadMediaPacket(packet: EncryptedVaultMediaChunk): Promise<void> {
+  private async uploadMediaPacket(packet: EncryptedVaultMediaChunk, signal?: AbortSignal): Promise<void> {
     const response = await fetch("/api/vault/media", {
       method: "POST",
       headers: buildJsonHeadersWithCsrf(),
-      body: JSON.stringify({ vaultId: packet.vaultId, chunk: packet })
+      body: JSON.stringify({ vaultId: packet.vaultId, chunk: packet }),
+      signal
     });
     const payload = await response.json() as { ok?: boolean; error?: string };
     if (!response.ok || !payload.ok) throw this.vaultRequestError(response, payload.error, "Encrypted media upload failed");
     this.markVaultRequestAuthorized();
   }
 
-  private async syncMediaChunks(manifest: VaultMediaManifest, onProgress?: (completed: number, total: number) => void): Promise<void> {
+  private async syncMediaChunks(manifest: VaultMediaManifest, onProgress?: (completed: number, total: number) => void, signal?: AbortSignal): Promise<void> {
     const session = this.requireSession();
     const cached = await session.store.mediaChunks(manifest.mediaId);
     if (cached.length !== manifest.totalChunks) throw new Error("This device does not have every encrypted media chunk needed to finish the upload");
     let completed = cached.filter((row) => row.uploaded).length;
     onProgress?.(completed, manifest.totalChunks);
     for (const row of cached) {
+      signal?.throwIfAborted();
       if (row.uploaded) continue;
-      await this.uploadMediaPacket(row.packet);
+      await this.uploadMediaPacket(row.packet, signal);
       await session.store.markMediaChunkUploaded(manifest.mediaId, row.chunkIndex);
       completed += 1;
       onProgress?.(completed, manifest.totalChunks);
@@ -1379,7 +1387,7 @@ export class BrowserVaultEngine {
     let uploaded = 0;
     for (const snapshot of media) {
       const manifest = mediaManifestFromSnapshot(snapshot);
-      if (!manifest) continue;
+      if (!manifest || (snapshot.fields.mediaState as Record<string,VaultFieldValue> | undefined)?.uploadPaused === true) continue;
       const chunks = await session.store.mediaChunks(manifest.mediaId);
       for (const row of chunks) {
         if (row.uploaded) continue;
@@ -1389,6 +1397,21 @@ export class BrowserVaultEngine {
         if (uploaded >= limit) return;
       }
     }
+  }
+
+  async mediaTransferState(snapshot:VaultObjectSnapshot) {
+    const manifest=mediaManifestFromSnapshot(snapshot);if(!manifest)return null;
+    const rows=await this.requireSession().store.mediaChunks(manifest.mediaId);
+    return {uploaded:rows.filter(r=>r.uploaded).length,total:manifest.totalChunks,local:rows.length,paused:(snapshot.fields.mediaState as Record<string,VaultFieldValue>|undefined)?.uploadPaused===true};
+  }
+  async pauseMediaUpload(snapshot:VaultObjectSnapshot,paused:boolean){
+    return this.saveObject({objectId:snapshot.objectId,objectKind:"media",fields:{mediaState:{...(snapshot.fields.mediaState as Record<string,VaultFieldValue> || {}),uploadPaused:paused}}});
+  }
+  async retryMediaUpload(snapshot:VaultObjectSnapshot,onProgress?:(completed:number,total:number)=>void,signal?:AbortSignal){
+    const manifest=mediaManifestFromSnapshot(snapshot);if(!manifest)throw new Error("This file has no encrypted media manifest");
+    await this.pauseMediaUpload(snapshot,false);
+    await this.syncMediaChunks(manifest,onProgress,signal);
+    await this.saveObject({objectId:snapshot.objectId,objectKind:"media",fields:{mediaState:{...(snapshot.fields.mediaState as Record<string,VaultFieldValue> || {}),uploadPaused:false,cloudCached:true}}});
   }
 
   private async readMediaCacheHealth(
@@ -1486,7 +1509,7 @@ export class BrowserVaultEngine {
     await this.cleanupMediaCache();
   }
 
-  async addMedia(file: File, onProgress?: (phase: "reading" | "encrypting" | "uploading" | "saving", completed: number, total: number) => void): Promise<{ snapshot: VaultObjectSnapshot; cloudCached: boolean; desktopStored: boolean }> {
+  async addMedia(file: File, onProgress?: (phase: "reading" | "encrypting" | "uploading" | "saving", completed: number, total: number) => void, options: { canonicalRecordId?:string; signal?:AbortSignal; location?:{latitude:number;longitude:number;source:"embedded"|"manual"} } = {}): Promise<{ snapshot: VaultObjectSnapshot; cloudCached: boolean; desktopStored: boolean }> {
     const session = this.requireSession();
     if (!(file instanceof File) || file.size < 1) throw new Error("Choose a file to add");
     if (file.size > MAX_MEDIA_FILE_BYTES) throw new Error("Files larger than 256 MB are not supported yet");
@@ -1495,6 +1518,7 @@ export class BrowserVaultEngine {
     const totalChunks = Math.ceil(file.size / MEDIA_CHUNK_SIZE);
     const plaintextHashes: string[] = [];
     for (let index = 0; index < totalChunks; index += 1) {
+      options.signal?.throwIfAborted();
       const bytes = new Uint8Array(await file.slice(index * MEDIA_CHUNK_SIZE, Math.min(file.size, (index + 1) * MEDIA_CHUNK_SIZE)).arrayBuffer());
       plaintextHashes.push(await sha256Hex(bytes));
       bytes.fill(0);
@@ -1502,7 +1526,7 @@ export class BrowserVaultEngine {
     }
     const contentRoot = await mediaContentRoot({ byteLength: file.size, chunkSize: MEDIA_CHUNK_SIZE, plaintextHashes });
     const mediaId = crypto.randomUUID();
-    const objectId = crypto.randomUUID();
+    const objectId = options.canonicalRecordId ? await deterministicVaultObjectId(`personal-records:file:${options.canonicalRecordId}`) : crypto.randomUUID();
     const manifest: VaultMediaManifest = {
       format: "unigentamos-vault-media-v1",
       mediaId,
@@ -1517,6 +1541,7 @@ export class BrowserVaultEngine {
       createdAt: new Date().toISOString()
     };
     for (let index = 0; index < totalChunks; index += 1) {
+      options.signal?.throwIfAborted();
       const bytes = new Uint8Array(await file.slice(index * MEDIA_CHUNK_SIZE, Math.min(file.size, (index + 1) * MEDIA_CHUNK_SIZE)).arrayBuffer());
       const packet = await encryptVaultMediaChunk({
         vaultId: session.vaultId,
@@ -1544,21 +1569,34 @@ export class BrowserVaultEngine {
             "X-Unigentamos-Digest-Algorithm": "chunk-root-v1",
             "X-Unigentamos-Chunk-Size": String(MEDIA_CHUNK_SIZE)
           },
-          body: file
+          body: file,
+          signal: options.signal
         });
         const payload = await response.json() as { ok?: boolean; error?: string };
         if (!response.ok || !payload.ok) throw new Error(payload.error || "Windows could not store this file");
         desktopStored = true;
       } catch (error) {
+        options.signal?.throwIfAborted();
         this.lastSyncError = error instanceof Error ? error.message : "Windows will retry storing this file";
       }
     }
+    options.signal?.throwIfAborted();
+    const profile = {version:1,manifest,linkedRefs:[],altText:"",...(options.location ? {location:options.location} : {})};
+    const commandId = crypto.randomUUID();
+    const canonicalFields = options.canonicalRecordId ? {
+      ...canonicalVaultFields({module:"personal-records",collection:"file",record:{id:options.canonicalRecordId,title:fileName,body:"",className:"file",createdAt:manifest.createdAt,updatedAt:manifest.createdAt,mediaProfile:profile}}),
+      [pendingCommandField(commandId)]: {
+        format:"unigentamos-canonical-command-v1",commandId,operation:"create",canonicalId:`personal-records:file:${options.canonicalRecordId}`,
+        baseUpdatedAt:null,baseFields:{},patch:{title:fileName,body:"",mediaProfile:profile},queuedAt:manifest.createdAt
+      } as unknown as VaultFieldValue
+    } : {};
     let cloudCached = false;
     onProgress?.("saving", 0, 1);
     let snapshot = await this.saveObject({
       objectId,
       objectKind: "media",
       fields: {
+        ...canonicalFields,
         title: fileName,
         mediaManifest: manifest as unknown as VaultFieldValue,
         mediaState: {
@@ -1571,7 +1609,7 @@ export class BrowserVaultEngine {
     onProgress?.("saving", 1, 1);
     if (navigator.onLine) {
       try {
-        await this.syncMediaChunks(manifest, (completed, total) => onProgress?.("uploading", completed, total));
+        await this.syncMediaChunks(manifest, (completed, total) => onProgress?.("uploading", completed, total), options.signal);
         cloudCached = true;
         snapshot = await this.saveObject({
           objectId,
@@ -1585,6 +1623,7 @@ export class BrowserVaultEngine {
           }
         });
       } catch (error) {
+        options.signal?.throwIfAborted();
         this.lastSyncError = error instanceof Error ? error.message : "Encrypted file sync will retry";
       }
     }

@@ -63,13 +63,13 @@
 .sidebar :global(.module-sidebar__item-count) {
   color: var(--text-muted);
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: .8125rem;
 }
 
 .sidebarFootnote {
   margin: 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
   line-height: 1.45;
 }
 
@@ -145,7 +145,7 @@
 .header p {
   margin-top: 4px;
   color: var(--text-muted);
-  font: 750 12px var(--font-body);
+  font: 550 12px var(--font-body);
 }
 
 .headerActions,
@@ -169,7 +169,7 @@
   border-radius: 7px;
   background: var(--panel-bg);
   color: var(--text-strong);
-  font: 850 12px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .button,
@@ -228,7 +228,7 @@
 }
 
 .search kbd {
-  font: 700 10px var(--font-mono);
+  font: 550 12px var(--font-mono);
 }
 
 .filterRow {
@@ -302,7 +302,7 @@
 
 .rows :global(.dense-object-row__content > strong) {
   overflow: hidden;
-  font: 900 13px/1.3 var(--font-heading);
+  font: 550 13px/1.3 var(--font-heading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -310,7 +310,7 @@
 .rows :global(.dense-object-row__content > span:not(.dense-object-row__metadata)) {
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
   line-height: 1.4;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -325,7 +325,7 @@
   gap: 5px;
   justify-items: end;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: .8125rem;
 }
 
 .rows :global(.dense-object-row__body:focus-visible) {
@@ -344,7 +344,7 @@
   border-radius: 8px;
   background: #eef6f9;
   color: #254d5e;
-  font: 900 11px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .rowMeta {
@@ -370,7 +370,7 @@
   border-radius: 999px;
   background: var(--panel-bg-subtle);
   color: var(--text-muted);
-  font: 800 9px var(--font-heading);
+  font: 550 12px var(--font-heading);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -435,19 +435,19 @@
 
 .projectHandoff h2 {
   overflow-wrap: anywhere;
-  font: 900 16px var(--font-heading);
+  font: 550 16px var(--font-heading);
 }
 
 .projectHandoff p {
   margin-top: 3px;
   color: #355667;
-  font-size: 11px;
+  font-size: .8125rem;
   line-height: 1.45;
 }
 
 .projectHandoff .handoffEvidenceState {
   color: #176145;
-  font-weight: 850;
+  font-weight: 600;
 }
 
 .projectHandoff .handoffEvidenceState[data-attention="true"] {
@@ -469,7 +469,7 @@
 
 .handoffLabel {
   color: #166b95;
-  font: 850 10px var(--font-heading);
+  font: 550 12px var(--font-heading);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
@@ -526,8 +526,8 @@
 .inspectorHead :global(.object-header__heading h1),
 .inspectorHead :global(.object-header__heading h2) {
   overflow-wrap: anywhere;
-  font: 900 clamp(21px, 2.1vw, 29px)/1.13 var(--font-heading);
-  letter-spacing: -0.03em;
+  font: 650 var(--work-size-record, 1.5rem)/1.25 var(--font-heading);
+  letter-spacing: -0.02em;
 }
 
 .detailHead :global(.object-header__subtitle),
@@ -567,7 +567,7 @@
 .reviewTitle h1,
 .reviewTitle h2 {
   overflow-wrap: anywhere;
-  font: 900 21px/1.15 var(--font-heading);
+  font: 550 21px/1.15 var(--font-heading);
   letter-spacing: -0.025em;
 }
 
@@ -593,8 +593,6 @@
   gap: 12px;
 }
 
-.panel,
-.summaryPanel,
 .checklistRow,
 .evidenceRow,
 .sourceRow,
@@ -616,7 +614,53 @@
 
 .panel,
 .summaryPanel {
-  padding: 14px;
+  padding: 16px 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.summaryPanel {
+  grid-column: 1 / -1;
+}
+
+.updatedLine,
+.reviewProgress {
+  color: var(--text-muted);
+  font: 400 var(--work-size-secondary, .8125rem)/1.4 var(--font-body);
+}
+
+.reviewProgress {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+.readOnlySummary {
+  display: grid;
+  gap: 24px;
+  margin: 0;
+  max-width: 72ch;
+}
+
+.readOnlySummary dt {
+  margin-bottom: 8px;
+  font: 500 var(--work-size-secondary, .8125rem)/1.4 var(--font-body);
+  color: var(--text-muted);
+}
+
+.readOnlySummary dd {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: 400 var(--work-size-input, 1rem)/1.5625 var(--font-body);
+  color: var(--text);
+}
+
+.reviewRecordActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 16px;
 }
 
 .panel[data-span="full"] {
@@ -632,13 +676,13 @@
 .panel h3,
 .summaryPanel h2 {
   color: var(--text-strong);
-  font: 900 13px/1.25 var(--font-heading);
+  font: 600 var(--work-size-section, 1.125rem)/1.333 var(--font-heading);
 }
 
 .panel p,
 .summaryPanel p {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: var(--work-size-secondary, .8125rem);
   line-height: 1.55;
 }
 
@@ -668,7 +712,7 @@
 .field label,
 .field > span {
   color: var(--text);
-  font: 850 11px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .field input,
@@ -704,7 +748,7 @@
 
 .field small {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: .8125rem;
   line-height: 1.45;
 }
 
@@ -757,7 +801,7 @@
 .blockerRow strong,
 .readinessRow strong {
   color: var(--text-strong);
-  font: 850 12px/1.35 var(--font-heading);
+  font: 550 12px/1.35 var(--font-heading);
 }
 
 .checklistTop p,
@@ -767,7 +811,7 @@
 .readinessRow p {
   margin: 3px 0 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
   line-height: 1.45;
 }
 
@@ -792,7 +836,7 @@
   border-radius: 7px;
   background: #f4faf7;
   color: var(--text);
-  font-size: 11px;
+  font-size: .8125rem;
   line-height: 1.45;
 }
 
@@ -816,7 +860,7 @@
 
 .evidenceReviewSummary a {
   color: #265e76;
-  font-weight: 850;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 
@@ -832,7 +876,7 @@
   border-radius: 6px;
   background: #fff9f0;
   color: #694019;
-  font-size: 11px;
+  font-size: .8125rem;
   line-height: 1.5;
 }
 
@@ -854,7 +898,7 @@
 
 .definitionList dt {
   color: var(--text-muted);
-  font: 750 10px var(--font-mono);
+  font: 550 12px var(--font-mono);
 }
 
 .definitionList dd {
@@ -876,13 +920,13 @@
 }
 
 .completionHeading h2 {
-  font: 900 15px var(--font-heading);
+  font: 550 15px var(--font-heading);
 }
 
 .completionHeading p {
   margin-top: 3px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
 }
 
 .completionMetrics {
@@ -905,7 +949,7 @@
 }
 
 .emptyInspector h2 {
-  font: 900 18px var(--font-heading);
+  font: 550 18px var(--font-heading);
 }
 
 .emptyInspector p {
@@ -930,7 +974,7 @@
 
 .legacyField dt {
   color: var(--text-muted);
-  font: 750 10px var(--font-mono);
+  font: 550 12px var(--font-mono);
 }
 
 .legacyField dd {
@@ -1214,3 +1258,7 @@
     transition: none;
   }
 }
+
+.scroll :global(.work-header), .scroll :global(.work-toolbar), .scroll :global(.work-filters) { padding-inline:0; }
+.scroll :global(.work-header) { padding-top:0; }
+.scroll :global(.work-toolbar) { flex-wrap:wrap; }

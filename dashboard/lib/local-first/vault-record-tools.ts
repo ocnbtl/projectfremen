@@ -45,6 +45,9 @@ type NativeRefShape = {
 
 const MODULE_LABELS: Record<CanonicalModule, string> = {
   "personal-records": "Library",
+  map: "Map",
+  calendar: "Calendar",
+  "personal-life": "Personal",
   projects: "Projects",
   "personal-ops": "Personal",
   reviews: "Reviews",
@@ -184,6 +187,13 @@ function nativeIdentityFor(snapshot: VaultObjectSnapshot): string | null {
         : metadata.collection;
   } else if (metadata.module === "personal-ops") {
     module = "personal_ops";
+  } else if (metadata.module === "personal-life") {
+    module = "personal_ops";
+    objectType = ({ trips: "trip", lists: "list", buildItems: "build_item", vehicles: "vehicle" } as Record<string, string>)[metadata.collection] || objectType;
+  } else if (metadata.module === "map") {
+    objectType = metadata.collection === "places" ? "place" : "saved_map_view";
+  } else if (metadata.module === "calendar") {
+    objectType = ({ events: "event", calendars: "calendar", connections: "calendar_connection" } as Record<string, string>)[metadata.collection] || objectType;
   } else if (metadata.module === "projects") {
     objectType = ({ projects: "project", milestones: "project_milestone", blockers: "project_blocker", links: "project_link" } as Record<string, string>)[metadata.collection] || objectType;
   } else if (metadata.module === "reviews") {

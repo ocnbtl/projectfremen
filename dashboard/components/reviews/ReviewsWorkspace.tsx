@@ -1,4 +1,5 @@
 "use client";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -837,14 +838,7 @@ export default function ReviewsWorkspace({
         { id: "monthly", label: "Monthly", count: directoryItems.filter((item) => item.run.cadence === "monthly").length, active: urlState.cadence === "monthly", onSelect: () => selectDirectoryScope({ cadence: urlState.cadence === "monthly" ? "all" : "monthly" }) }
       ]
     },
-    {
-      id: "future",
-      label: "Deliberately unavailable",
-      items: [
-        { id: "quarterly", label: "Quarterly templates", disabled: true, disabledReason: "Quarterly template semantics are not approved yet." },
-        { id: "automation", label: "Automatic context pull", disabled: true, disabledReason: "Context stays user-selected until source-selection and risk policy are approved." }
-      ]
-    }
+
   ], [directoryItems, legacyRuns.length, needsEvidence.length, openNative.length, selectDirectoryScope, state.runs, urlState.cadence, urlState.view]);
 
   function openCreate(cadence: ReviewCadence) {
@@ -1298,12 +1292,19 @@ export default function ReviewsWorkspace({
     });
   }
 
-  const renderSummary = (run: ReviewRun) => (
+  const renderSummary = (run: ReviewRun) => reviewIsReadOnly(run) ? (
+    <section id="review-item-summary" className={styles.summaryPanel} tabIndex={-1}>
+      <div className={styles.panelHeader}><h2>Structured summary</h2></div>
+      {SUMMARY_FIELDS.some(field => run.summary[field.id]?.trim()) ? <dl className={styles.readOnlySummary}>
+        {SUMMARY_FIELDS.filter(field => run.summary[field.id]?.trim()).map(field => <div key={field.id}><dt>{field.label}</dt><dd>{run.summary[field.id]}</dd></div>)}
+      </dl> : <p>No summary was recorded.</p>}
+    </section>
+  ) : (
     <form id="review-item-summary" className={styles.summaryPanel} data-selected={urlState.item === "summary" || urlState.item === "nextFocus" || undefined} tabIndex={-1} onSubmit={(event) => void saveSummary(event)}>
       <div className={styles.panelHeader}>
         <div>
           <h2>Structured summary</h2>
-          <p>Saved explicitly; a failed write leaves your draft intact.</p>
+          <p>{reviewIsReadOnly(run) ? "Saved summary from this review." : "Saved explicitly; a failed write leaves your draft intact."}</p>
         </div>
         <span className={styles.chip}>{JSON.stringify(summaryDraft) === summaryInitial ? "Saved" : "Unsaved"}</span>
       </div>
@@ -1359,13 +1360,13 @@ export default function ReviewsWorkspace({
                   type="button"
                   className={styles.button}
                   onClick={() => void toggleChecklist(item)}
-                  disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed" || (item.state !== "complete" && evidenceMissing)}
+                  disabled={busy || reviewIsReadOnly(run) || (item.state !== "complete" && evidenceMissing)}
                   title={evidenceMissing ? "Link or waive the required evidence first." : undefined}
                 >
                   {item.state === "complete" ? "Reopen check" : "Mark complete"}
                 </button>
                 {item.carryForwardAllowed && item.state !== "complete" && item.state !== "carried_forward" && (
-                  <button type="button" className={styles.button} onClick={() => setEditor({ kind: "carry-forward", checklistId: item.id, title: item.label, ownerId: "admin", reason: "", nextAction: "", dueDate: "", destinationModule: item.ownerModule || "personal_ops" })} disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed"}>Carry forward…</button>
+                  <button type="button" className={styles.button} onClick={() => setEditor({ kind: "carry-forward", checklistId: item.id, title: item.label, ownerId: "admin", reason: "", nextAction: "", dueDate: "", destinationModule: item.ownerModule || "personal_ops" })} disabled={busy || reviewIsReadOnly(run)}>Carry forward…</button>
                 )}
                 {evidenceMissing && <button type="button" className={styles.button} onClick={() => updateUrl({ tab: "evidence", item: item.evidenceRequirementIds[0] || "" })}>Open evidence</button>}
               </div>
@@ -1461,7 +1462,7 @@ export default function ReviewsWorkspace({
             <h2>Decision candidates</h2>
             <p>Reviews owns readiness. Durable Decisions are filed in Personal.</p>
           </div>
-          <button type="button" className={styles.button} onClick={() => setEditor({ kind: "decision", title: "", question: "", destinationModule: "personal_ops", dueDate: "", ...defaultSourceDraft("projects") })} disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed"}>Add candidate…</button>
+          <button type="button" className={styles.button} onClick={() => setEditor({ kind: "decision", title: "", question: "", destinationModule: "personal_ops", dueDate: "", ...defaultSourceDraft("projects") })} disabled={busy || reviewIsReadOnly(run)}>Add candidate…</button>
         </div>
         {run.decisions.length === 0 ? <SystemState variant="empty" title="No decision candidates" description="Add a source-backed candidate when this review surfaces a durable choice." compact /> : (
           <ul className={styles.list}>
@@ -1479,21 +1480,23 @@ export default function ReviewsWorkspace({
                   <div className={styles.inlineActions}>
                     {item.destinationRef ? (
                       <Link className={styles.textLink} href={item.destinationRef.route}>Open filed Decision</Link>
+                    ) : reviewIsReadOnly(run) ? (
+                      <span className={styles.sourceLine}>No owner record linked.</span>
                     ) : exactOwner ? (
                       <button
                         type="button"
                         className={styles.button}
                         onClick={() => void linkExactDecision(run, item, exactOwner)}
-                        disabled={busy}
+                        disabled={busy || reviewIsReadOnly(run)}
                       >
                         Link exact Decision
                       </button>
                     ) : linked.length > 1 ? (
-                      <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-decision", decisionId: item.id, rationale: item.rationale, module: "personal_ops", objectType: "decision", objectId: "", containerObjectId: "", label: item.title })}>Choose linked Decision…</button>
+                      <button type="button" className={styles.button} disabled={busy || reviewIsReadOnly(run)} onClick={() => setEditor({ kind: "reconcile-decision", decisionId: item.id, rationale: item.rationale, module: "personal_ops", objectType: "decision", objectId: "", containerObjectId: "", label: item.title })}>Choose linked Decision…</button>
                     ) : (
                       <>
                         <Link className={styles.textLink} href={personalOpsCreateRoute("decision", run, source, item.title, item.dueDate)}>Create once in Personal…</Link>
-                        <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-decision", decisionId: item.id, rationale: item.rationale, module: "personal_ops", objectType: "decision", objectId: "", containerObjectId: "", label: item.title })}>Link filed Decision…</button>
+                        <button type="button" className={styles.button} disabled={busy || reviewIsReadOnly(run)} onClick={() => setEditor({ kind: "reconcile-decision", decisionId: item.id, rationale: item.rationale, module: "personal_ops", objectType: "decision", objectId: "", containerObjectId: "", label: item.title })}>Link filed Decision…</button>
                       </>
                     )}
                   </div>
@@ -1547,7 +1550,7 @@ export default function ReviewsWorkspace({
             >
               {followUpsLoading ? "Refreshing…" : "Refresh owner status"}
             </button>
-            <button type="button" className={styles.button} onClick={() => setEditor({ kind: "follow-up", title: "", ownerId: "admin", dueDate: "", ...defaultSourceDraft("projects") })} disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed"}>Add follow-up…</button>
+            <button type="button" className={styles.button} onClick={() => setEditor({ kind: "follow-up", title: "", ownerId: "admin", dueDate: "", ...defaultSourceDraft("projects") })} disabled={busy || reviewIsReadOnly(run)}>Add follow-up…</button>
           </div>
         </div>
         {followUpsError && <p className={styles.errorBanner} role="alert">{followUpsError}</p>}
@@ -1589,36 +1592,38 @@ export default function ReviewsWorkspace({
                     {item.createdObjectRef ? (
                       <>
                         <Link className={styles.textLink} href={item.createdObjectRef.route}>{linkedOwner?.lifecycle === "archived" ? "Open archived Follow-up" : "Open linked Follow-up"}</Link>
-                        {ownerUnavailable && (
+                        {ownerUnavailable && !reviewIsReadOnly(run) && (
                           <>
                             <Link className={styles.textLink} href={personalOpsCreateRoute("follow-up", run, source, item.title, item.dueDate)}>Create current replacement…</Link>
-                            <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Link current Follow-up…</button>
+                            <button type="button" className={styles.button} disabled={busy || reviewIsReadOnly(run)} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Link current Follow-up…</button>
                           </>
                         )}
                       </>
+                    ) : reviewIsReadOnly(run) ? (
+                      <span className={styles.sourceLine}>No owner record linked.</span>
                     ) : exactOwner ? (
                       <button
                         type="button"
                         className={styles.button}
                         onClick={() => void linkExactFollowUp(run, item, exactOwner)}
-                        disabled={busy}
+                        disabled={busy || reviewIsReadOnly(run)}
                       >
                         Link exact Follow-up
                       </button>
                     ) : availableLinked.length > 1 ? (
-                      <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Choose linked Follow-up…</button>
+                      <button type="button" className={styles.button} disabled={busy || reviewIsReadOnly(run)} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Choose linked Follow-up…</button>
                     ) : (
                       <>
                         <Link className={styles.textLink} href={personalOpsCreateRoute("follow-up", run, source, item.title, item.dueDate)}>Create once in Personal…</Link>
-                        <button type="button" className={styles.button} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Link existing Follow-up…</button>
+                        <button type="button" className={styles.button} disabled={busy || reviewIsReadOnly(run)} onClick={() => setEditor({ kind: "reconcile-follow-up", followUpId: item.id, module: "personal_ops", objectType: "follow_up", objectId: "", containerObjectId: "", label: item.title })}>Link existing Follow-up…</button>
                       </>
                     )}
-                    {item.createdObjectRef && linkedOwner && ownerIsComplete && item.state !== "completed" && (
+                    {!reviewIsReadOnly(run) && item.createdObjectRef && linkedOwner && ownerIsComplete && item.state !== "completed" && (
                       <button
                         type="button"
                         className={styles.button}
                         onClick={() => void linkExactFollowUp(run, item, linkedOwner)}
-                        disabled={busy}
+                        disabled={busy || reviewIsReadOnly(run)}
                       >
                         Record owner completion
                       </button>
@@ -1652,23 +1657,16 @@ export default function ReviewsWorkspace({
   );
 
   const renderOverview = (run: ReviewRun) => {
-    const counts = runCounts(run);
+    const counts = runCounts(run, followUps, followUpsError);
     const activeLinks = run.contextLinks.filter((link) => link.state !== "removed");
     return (
       <div className={styles.panelGrid}>
-        <div className={styles.panel} data-span="full">
-          <MetricStrip items={[
-            { id: "checks", label: "Required checks", value: `${counts.resolved}/${counts.required}`, detail: "literal count" },
-            { id: "evidence", label: "Evidence missing", value: counts.evidenceMissing, tone: counts.evidenceMissing ? "danger" : "positive" },
-            { id: "decisions", label: "Open decisions", value: counts.decisionsOpen, tone: counts.decisionsOpen ? "attention" : "default" },
-            { id: "blockers", label: "Completion blockers", value: counts.blockers.length, tone: counts.blockers.length ? "danger" : "positive" }
-          ]} ariaLabel="Review completion facts" />
-        </div>
+        {initialMode !== "detail" && !reviewIsReadOnly(run) && <p className={styles.reviewProgress}>{counts.resolved} of {counts.required} required checks complete · {counts.blockers.length} completion blocker{counts.blockers.length === 1 ? "" : "s"}</p>}
         {renderSummary(run)}
         <section className={styles.panel} data-span="full">
           <div className={styles.panelHeader}>
             <div><h2>Linked source context</h2><p>Manual selection is the safe boundary: no inferred context is saved without acceptance.</p></div>
-            <button type="button" className={styles.button} onClick={() => setEditor({ kind: "context", relationship: "context", ...defaultSourceDraft() })} disabled={busy || run.lifecycle === "archived" || run.lifecycle === "completed"}>Link source…</button>
+            <button type="button" className={styles.button} onClick={() => setEditor({ kind: "context", relationship: "context", ...defaultSourceDraft() })} disabled={busy || reviewIsReadOnly(run)}>Link source…</button>
           </div>
           {activeLinks.length === 0 ? <SystemState variant="empty" title="No source context linked" description="Link only records you have reviewed. Automatic source selection remains disabled." compact /> : (
             <ul className={styles.list}>{activeLinks.map((link) => (
@@ -1861,12 +1859,12 @@ export default function ReviewsWorkspace({
             objectType={`${displayLabel(run.cadence)} review`}
             title={run.title}
             subtitle={`${formatDate(run.periodStart)} – ${formatDate(run.periodEnd)}`}
-            identity={<span className={styles.monogram}>{monogram(run.cadence)}</span>}
             states={<><span className={styles.stateChip} data-tone={run.lifecycle === "completed" ? "positive" : run.lifecycle === "archived" ? "danger" : "attention"}>{displayLabel(run.lifecycle)}</span>{run.current && <span className={styles.chip}>Current</span>}</>}
-            metadata={<span className={styles.sourceLine}><span>{run.id}</span><span>Updated {formatDate(run.updatedAt)}</span></span>}
+            metadata={<span className={styles.updatedLine}>Updated {formatDate(run.updatedAt)}</span>}
             headingLevel={headingLevel}
           />
         </div>
+        {reviewIsReadOnly(run) && <p className={styles.readOnlyBanner}>{run.lifecycle === "completed" ? "This completed review is read-only." : run.lifecycle === "archived" ? "This archived review is read-only. Restore it to return to its previous state." : "This canceled review is read-only."}</p>}
         {renderSourceHandoff(run)}
         <div className={styles.tabBar}><DetailTabs id={`review-${run.id}`} tabs={tabs} activeTab={activeTab} onTabChange={(tab) => updateUrl({ tab: tab as ReviewsTab, item: "" }, true)} ariaLabel="Review sections" /></div>
         <DetailTabPanel tabsId={`review-${run.id}`} tabId="overview" active={activeTab === "overview"}>{renderOverview(run)}</DetailTabPanel>
@@ -1878,11 +1876,9 @@ export default function ReviewsWorkspace({
         <DetailTabPanel tabsId={`review-${run.id}`} tabId="properties" active={activeTab === "properties"}>{renderProperties(run)}</DetailTabPanel>
         {error && <p className={styles.error} role="alert">{error}</p>}
         {notice && <p className={styles.notice} role="status">{notice}</p>}
-        <QuickActionBar
-          sticky
-          label={`${counts.blockers.length} completion blocker${counts.blockers.length === 1 ? "" : "s"}`}
+        {initialMode !== "detail" && <QuickActionBar
           actions={reviewActions(run, counts.blockers, setConfirmation)}
-        />
+        />}
       </>
     );
   }
@@ -1890,6 +1886,7 @@ export default function ReviewsWorkspace({
   const inspector = (
     <InspectorRail
       className={styles.inspector}
+      showCloseButton={false}
       title={inspectorOverlay ? "Review detail" : undefined}
       actions={inspectorOverlay ? <button type="button" className={styles.button} onClick={() => setMobileInspectorOpen(false)} aria-label="Close review detail">Close</button> : undefined}
       overlay={inspectorOverlay}
@@ -1915,20 +1912,35 @@ export default function ReviewsWorkspace({
   const detailInspector = (
     <InspectorRail
       ariaLabel="Review completion rail"
-      title={inspectorOverlay ? "Completion rail" : undefined}
+      showCloseButton={false}
+      title={inspectorOverlay ? selectedRun && reviewIsReadOnly(selectedRun) ? "Review record" : "Completion requirements" : undefined}
       actions={inspectorOverlay ? <button type="button" className={styles.button} onClick={() => setMobileInspectorOpen(false)} aria-label="Close completion rail">Close</button> : undefined}
-      readOnly={selectedRun?.lifecycle === "completed" || selectedRun?.lifecycle === "archived"}
+      readOnly={Boolean(selectedRun && reviewIsReadOnly(selectedRun))}
       overlay={inspectorOverlay}
       overlayOpen={mobileInspectorOpen}
       onRequestClose={() => setMobileInspectorOpen(false)}
     >
       {selectedRun ? (() => {
         const counts = runCounts(selectedRun, followUps, followUpsError);
+        if (reviewIsReadOnly(selectedRun)) return (
+          <div className={styles.completionBody}>
+            <section className={styles.panel}>
+              <h2>Review record</h2>
+              <p>{displayLabel(selectedRun.lifecycle)} · {formatDate(selectedRun.periodStart)} – {formatDate(selectedRun.periodEnd)}</p>
+              <p>The saved summary, evidence and decisions remain available here.</p>
+              <div className={styles.reviewRecordActions}>
+                <button type="button" className={styles.button} onClick={() => { updateUrl({ tab: "checklist", item: "" }, true); setMobileInspectorOpen(false); }}>View checklist</button>
+                <button type="button" className={styles.button} onClick={() => { updateUrl({ tab: "properties", item: "" }, true); setMobileInspectorOpen(false); }}>View review details</button>
+              </div>
+            </section>
+            <QuickActionBar actions={reviewActions(selectedRun, counts.blockers, setConfirmation)} ariaLabel="Review record actions" />
+          </div>
+        );
         return (
           <>
             <div className={styles.completionHead}>
               <div className={styles.completionHeading}>
-                <div><h2>Completion rail</h2><p>Literal requirements and server-enforced gates</p></div>
+                <div><h2>Completion requirements</h2><p>Resolve these items before completing the review.</p></div>
                 <span className={styles.stateChip} data-tone={counts.blockers.length ? "danger" : "positive"}>{counts.blockers.length ? `${counts.blockers.length} blocked` : "Ready"}</span>
               </div>
               <MetricStrip className={styles.completionMetrics} items={[
@@ -1957,30 +1969,18 @@ export default function ReviewsWorkspace({
     <DirectoryPane className={styles.directory} ariaLabel="Review directory" busy={busy}>
       <div className={styles.mobileToolbar}><button type="button" className={styles.iconButton} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Reviews navigation">Menu</button><span className={styles.chip}>{visibleItems.length} shown</span></div>
       <div className={styles.scroll}>
-        <header className={styles.header}>
-          <div><h1>Reviews</h1><p>Review the source, resolve the work, then complete with evidence.</p></div>
-          <div className={styles.headerActions}><button type="button" className={styles.button} onClick={() => openCreate("weekly")}>Start weekly</button><button type="button" className={styles.button} data-primary="true" onClick={() => openCreate("monthly")}>Start monthly</button></div>
-        </header>
+        <WorkspaceHeader title="Reviews" count={visibleItems.length}>
+          <WorkspaceButton onClick={() => openCreate("weekly")}>Start weekly</WorkspaceButton><WorkspaceButton intent="primary" onClick={() => openCreate("monthly")}>Start monthly</WorkspaceButton>
+        </WorkspaceHeader>
         {!selectedRun && renderSourceHandoff(null)}
         {initialLoadError && <SystemState variant="error" description={initialLoadError} action={{ label: "Retry", onSelect: () => void refreshState() }} />}
-        <MetricStrip className={styles.metrics} items={[
-          { id: "open", label: "Open reviews", value: openNative.length },
-          { id: "evidence", label: "Need evidence", value: needsEvidence.length, tone: needsEvidence.length ? "attention" : "default" },
-          { id: "blocked", label: "Blocked", value: blocked.length, tone: blocked.length ? "danger" : "default" },
-          { id: "legacy", label: "Earlier reviews · read-only", value: legacyRuns.length }
-        ]} ariaLabel="Review directory facts" />
-        <label className={styles.search}>
-          <span aria-hidden="true">⌕</span>
-          <input value={queryDraft} onChange={(event) => { const value = event.target.value; setQueryDraft(value); if (queryTimer.current) clearTimeout(queryTimer.current); queryTimer.current = setTimeout(() => updateUrl({ query: value }), 180); }} placeholder="Search reviews, summaries, blockers…" aria-label="Search reviews" />
-          <kbd>/</kbd>
-        </label>
-        <div className={styles.filterRow} role="toolbar" aria-label="Review filters">
-          {(Object.keys(FILTER_LABELS) as ReviewsFilter[]).map((filter) => <button type="button" className={styles.filterChip} aria-pressed={urlState.filter === filter} onClick={() => updateUrl({ filter })} key={filter}>{FILTER_LABELS[filter]}</button>)}
-          <select className={styles.select} value={urlState.sort} onChange={(event) => updateUrl({ sort: event.target.value as ReviewsSort })} aria-label="Sort reviews">{(Object.keys(SORT_LABELS) as ReviewsSort[]).map((sort) => <option value={sort} key={sort}>{SORT_LABELS[sort]}</option>)}</select>
-        </div>
+        <WorkspaceToolbar query={queryDraft} onQuery={value=>{setQueryDraft(value); if(queryTimer.current)clearTimeout(queryTimer.current);queryTimer.current=setTimeout(()=>updateUrl({query:value}),180);}} placeholder="Search reviews" activeFilters={urlState.filter === "all" ? 0 : 1}
+          filters={<>{(Object.keys(FILTER_LABELS) as ReviewsFilter[]).map(filter=><WorkspaceButton key={filter} aria-pressed={urlState.filter===filter} onClick={()=>updateUrl({filter})}>{FILTER_LABELS[filter]}</WorkspaceButton>)}</>}>
+          <select className="work-compact-select" value={urlState.sort} onChange={event=>updateUrl({sort:event.target.value as ReviewsSort})} aria-label="Sort reviews">{(Object.keys(SORT_LABELS) as ReviewsSort[]).map(sort=><option key={sort} value={sort}>{SORT_LABELS[sort]}</option>)}</select>
+        </WorkspaceToolbar>
         {error && <p className={styles.error} role="alert">{error}</p>}
         {notice && <p className={styles.notice} role="status">{notice}</p>}
-        {visibleItems.length === 0 ? <SystemState variant="empty" title="No reviews match this scope" description="Clear the filter or start a weekly or monthly review." action={{ label: "Clear filters", onSelect: () => updateUrl({ query: "", filter: "all", view: "all", cadence: "all" }) }} /> : (
+        {visibleItems.length === 0 ? <SystemState variant="empty" title={directoryItems.length ? "No reviews match this scope" : "Start your first review"} description={directoryItems.length ? "Clear the filter to see your reviews." : "A weekly review gives you a place to collect evidence, decisions and follow-up work."} action={directoryItems.length ? { label: "Clear filters", onSelect: () => updateUrl({ query: "", filter: "all", view: "all", cadence: "all" }) } : {label:"Start weekly review",onSelect:()=>openCreate("weekly")}} /> : (
           <div className={styles.rows} role="list" aria-label="Reviews">
             {visibleItems.map((item) => {
               if (item.source === "legacy") {
@@ -2044,7 +2044,7 @@ export default function ReviewsWorkspace({
         className={`${styles.shell} ${initialMode === "detail" ? styles.detailShell : ""}`}
         ariaLabel="Reviews workspace"
       >
-        {initialMode === "detail" ? <><div className={styles.mobileToolbar}><button type="button" className={styles.button} onClick={() => proceedWithNavigation(() => router.push("/admin/reviews", { scroll: false }))}>All reviews</button><button type="button" className={styles.iconButton} onClick={() => setMobileSidebarOpen(true)}>Menu</button><button type="button" className={styles.button} onClick={() => setMobileInspectorOpen(true)}>Completion</button></div><div className={styles.detailScroll}>{selectedRun ? <ReviewSurface run={selectedRun} /> : <SystemState variant="error" title="Review not found" description="The requested native ReviewRun could not be loaded. Legacy reviews remain available through their compatibility routes." action={{ label: "Return to Reviews", onSelect: () => router.push("/admin/reviews") }} />}</div></> : directory}
+        {initialMode === "detail" ? <><div className={styles.mobileToolbar}><button type="button" className={styles.button} onClick={() => proceedWithNavigation(() => router.push("/admin/reviews", { scroll: false }))}>All reviews</button><button type="button" className={styles.iconButton} onClick={() => setMobileSidebarOpen(true)}>Menu</button><button type="button" className={styles.button} onClick={() => setMobileInspectorOpen(true)}>{selectedRun && reviewIsReadOnly(selectedRun) ? "Review details" : "Requirements"}</button></div><div className={styles.detailScroll}>{selectedRun ? <ReviewSurface run={selectedRun} /> : <SystemState variant="error" title="Review not found" description="The requested native ReviewRun could not be loaded. Legacy reviews remain available through their compatibility routes." action={{ label: "Return to Reviews", onSelect: () => router.push("/admin/reviews") }} />}</div></> : directory}
       </ModuleShell>
       <button type="button" className={styles.mobileBackdrop} data-open={mobileSidebarOpen || (inspectorOverlay && mobileInspectorOpen) || undefined} aria-label="Close open panel" onClick={() => { setMobileSidebarOpen(false); setMobileInspectorOpen(false); }} />
       <EditorSheet editor={editor} setEditor={setEditor} busy={busy} errorMessage={error} onConfirm={() => void handleEditorConfirm()} />
@@ -2151,8 +2151,7 @@ function ContextLinkRow({
 
 function reviewActions(run: ReviewRun, blockers: ReviewCompletionBlocker[], setConfirmation: (value: ConfirmationState) => void): QuickAction[] {
   if (run.lifecycle === "archived") return [{ id: "restore", label: "Restore", intent: "primary", onSelect: () => setConfirmation({ kind: "restore", reviewId: run.id }) }];
-  if (run.lifecycle === "completed") return [
-    { id: "complete", label: "Completed", disabled: true, disabledReason: "Completed Review reopen semantics are intentionally unresolved." },
+  if (run.lifecycle === "completed" || run.lifecycle === "canceled") return [
     { id: "archive", label: "Archive…", intent: "destructive", onSelect: () => setConfirmation({ kind: "archive", reviewId: run.id, reason: "" }) }
   ];
   return [

@@ -231,7 +231,8 @@ function normalize(value: unknown): StyleGuideState {
   const fallback = defaultStyleGuideState();
   if (!isRecord(value)) return fallback;
   const storedModules = Array.isArray(value.modules) ? value.modules : [];
-  const hasApprovedColorSystem = storedModules.length === 9
+  // New module palettes are additive; a larger registry must not reset saved choices.
+  const hasApprovedColorSystem = storedModules.length > 0
     && storedModules.every((candidate) => isRecord(candidate)
       && candidate.status === "approved"
       && Array.isArray(candidate.primaryScale)

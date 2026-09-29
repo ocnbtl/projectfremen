@@ -1,29 +1,8 @@
-/* A slow horizontal pour; the chip swells past its resting footprint, then settles. */
-.people-redesign-shell .people-group-picker .people-group-choice { transition: transform 160ms ease-out, border-color 220ms ease; }
-.people-redesign-shell .people-group-picker .people-group-choice::before { content: none; }
+.people-redesign-shell .people-group-picker .people-group-choice {transition:background 120ms ease,border-color 120ms ease;}
 .people-redesign-shell .people-group-picker .people-group-choice > .people-group-fill,
-.people-redesign-shell .people-group-picker .people-group-choice > .people-group-crest {
-  position: absolute; pointer-events: none; z-index: 0; inset: -6px -8px;
-  border-radius: 999px; background: #c4e5d4;
-  transform: translateX(-112%) skewX(-12deg); transform-origin: left center;
-  transition: transform 1250ms cubic-bezier(.3, .08, .2, 1);
-}
-.people-redesign-shell .people-group-picker .people-group-choice > .people-group-crest {
-  background: #e0f0d7; opacity: .7; transform: translateX(-125%) skewX(-15deg);
-  transition-duration: 1450ms;
-}
-.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) > .people-group-fill { transform: translateX(0) skewX(0); }
-.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) > .people-group-crest { transform: translateX(125%) skewX(-15deg); }
-.people-redesign-shell .people-group-picker .people-group-choice.is-filling:has(input:checked) { animation: people-group-swell 1450ms cubic-bezier(.2, .65, .3, 1) both; }
-@keyframes people-group-swell {
-  0%, 28% { transform: scale(1); box-shadow: 0 0 0 0 #8fc3a500; }
-  68% { transform: scale(1.045, 1.12); box-shadow: 0 3px 9px #8fc3a52e; }
-  84% { transform: scale(1.012, 1.025); box-shadow: 0 1px 4px #8fc3a512; }
-  100% { transform: scale(1); box-shadow: 0 0 0 0 #8fc3a500; }
-}
-.people-redesign-shell .people-group-picker .people-group-choice > .people-group-label { position: relative; z-index: 1; pointer-events: none; }
-.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) { border-color: #78a58b; }
-.people-redesign-shell .people-group-picker .people-group-choice:active { transform: scale(.96); }
+.people-redesign-shell .people-group-picker .people-group-choice > .people-group-crest {display:none;}
+.people-redesign-shell .people-group-picker .people-group-choice:has(input:checked) {background:#e7f1ec;border-color:#78a58b;}
+.people-redesign-shell .people-group-picker .people-group-choice > .people-group-label {position:relative;}
 
 /* Match the existing identity/social labels and inputs, including their weights. */
 .people-redesign-shell .people-contact-channel-section > .people-repeatable-heading h4 {

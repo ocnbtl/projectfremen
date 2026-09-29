@@ -17,6 +17,7 @@ export type InspectorRailProps = {
   overlay?: boolean;
   overlayOpen?: boolean;
   onRequestClose?: () => void;
+  showCloseButton?: boolean;
   resolveReturnFocus?: () => HTMLElement | null;
 };
 
@@ -34,6 +35,7 @@ export default function InspectorRail({
   overlay = false,
   overlayOpen = false,
   onRequestClose,
+  showCloseButton = true,
   resolveReturnFocus
 }: InspectorRailProps) {
   const railRef = useRef<HTMLElement>(null);
@@ -65,6 +67,11 @@ export default function InspectorRail({
     });
     controls()[0]?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.defaultPrevented) return;
+      // A newly opened modal owns Escape immediately, even before its focus task runs.
+      const otherDialog = Array.from(document.querySelectorAll<HTMLElement>("[role='dialog'][aria-modal='true']"))
+        .some(dialog => dialog !== railRef.current && dialog.getAttribute("aria-hidden") !== "true" && dialog.getClientRects().length > 0);
+      if (otherDialog) return;
       const activeElement = document.activeElement;
       if (activeElement instanceof HTMLElement && !railRef.current?.contains(activeElement)) {
         const activeModal = activeElement.closest<HTMLElement>("[role='dialog'][aria-modal='true']");
@@ -122,6 +129,7 @@ export default function InspectorRail({
           {actions && <div className="inspector-rail__actions">{actions}</div>}
         </header>
       )}
+      {activeOverlay && onRequestClose && showCloseButton && <div className="inspector-rail__dismiss"><button type="button" className="work-button" onClick={onRequestClose} disabled={busy} aria-label="Close details">Close</button></div>}
       <div className="inspector-rail__content">{children}</div>
       {footer && <footer className="inspector-rail__footer">{footer}</footer>}
     </aside>

@@ -3,6 +3,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { createResourcesRepository } from "../../lib/modules/resources/repository";
 import type { ResourceRecord } from "../../lib/modules/resources/types";
+import ResourcePreview from "./ResourcePreview";
 import PersonalOpsIcon from "../personal-ops/PersonalOpsIcon";
 import { ResourceIconButton } from "./ResourceVisual";
 import styles from "./ResourceExperience.module.css";
@@ -60,8 +61,7 @@ export default function ResourceOverviewView({ resource, followUpPanel, onSaved 
       {feedback ? <p className={styles.feedback} data-error="true" role="status">{feedback}</p> : null}
       <div className={styles.overviewHero}>
         <section className={styles.summaryCard}>
-          <h2>{resource.title}</h2>
-          <p>{resource.body || resource.metadata.description || "No description yet."}</p>
+          <ResourcePreview resource={resource}/>
           {resource.source.canonicalUrl ? <a className={styles.urlLink} href={resource.source.canonicalUrl} target="_blank" rel="noreferrer"><PersonalOpsIcon name="open" /><span>{resource.source.canonicalUrl}</span></a> : null}
           <div className={styles.scoreRow}>
             <div className={styles.score}><span>Usefulness</span><strong>{resource.usefulness}<small>/10</small></strong><div className={styles.scoreTrack}><i style={{ width: `${resource.usefulness * 10}%` }} /></div></div>

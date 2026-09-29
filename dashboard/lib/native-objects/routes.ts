@@ -8,7 +8,9 @@ export const MODULE_ROUTES: Readonly<Record<ModuleId, string>> = {
   personal_ops: "/admin/personal",
   reviews: "/admin/reviews",
   resources: "/admin/resources",
-  finance: "/admin/finance"
+  finance: "/admin/finance",
+  map: "/admin/map",
+  calendar: "/admin/calendar"
 };
 
 /** Canonical smart-view paths. Unimplemented paths may still render an explicit boundary page. */
@@ -166,6 +168,7 @@ export function getNativeObjectRoute({
   mode = "view"
 }: NativeObjectRouteInput): string {
   const encodedId = encodeURIComponent(objectId);
+  if (module === "map" || module === "calendar") return selectedObjectRoute(MODULE_ROUTES[module], objectId, mode);
   const encodedContainerId = containerObjectId
     ? encodeURIComponent(containerObjectId)
     : "";

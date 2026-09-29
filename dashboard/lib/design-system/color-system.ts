@@ -57,6 +57,18 @@ export type ModuleColorDefinition = {
 };
 
 export const MODULE_COLOR_SYSTEM: Record<ModuleColorId, ModuleColorDefinition> = {
+  map: {
+    id: "map", label: "Map", primaryName: "Muted moss", hue: "H91°", secondaryName: "Stone",
+    primary: {50:"#F1F4EE",100:"#E3EAD9",200:"#C7D3B9",300:"#ACBC97",400:"#879B6E",500:"#6D8056",600:"#526442",700:"#3E4C32",800:"#2C3624",900:"#1B2117"},
+    secondary: {100:"#ECEAE4",500:"#8A8678",700:"#5E5A4D"},
+    tokens:{action:"#526442",actionHover:"#3E4C32",actionPressed:"#2C3624",selected:"#F1F4EE",quiet:"#F1F4EE",border:"#C7D3B9",icon:"#526442",textOnPrimary:"#FFFFFF",focus:"#526442",accent:"#8A8678"}
+  },
+  calendar: {
+    id: "calendar", label: "Calendar", primaryName: "Smoky indigo", hue: "H234°", secondaryName: "Slate",
+    primary: {50:"#F2F2F8",100:"#E2E3F0",200:"#C6C8E1",300:"#A7ABCD",400:"#898FB5",500:"#6D739D",600:"#565B86",700:"#404567",800:"#2C304B",900:"#191C30"},
+    secondary: {100:"#E5E9EE",500:"#788392",700:"#515D6B"},
+    tokens:{action:"#565B86",actionHover:"#404567",actionPressed:"#2C304B",selected:"#F2F2F8",quiet:"#F2F2F8",border:"#C6C8E1",icon:"#565B86",textOnPrimary:"#FFFFFF",focus:"#565B86",accent:"#788392"}
+  },
   projects: {
     id: "projects", label: "Projects", primaryName: "Chestnut Brown", hue: "H22°", secondaryName: "Warm Slate",
     primary: { 50: "#F8F4F0", 100: "#EFE0CE", 200: "#DFBF9E", 300: "#CE9D6E", 400: "#BC7D48", 500: "#9A5E28", 600: "#754420", 700: "#533012", 800: "#321D08", 900: "#190E04" },
@@ -116,7 +128,7 @@ export const MODULE_COLOR_SYSTEM: Record<ModuleColorId, ModuleColorDefinition> =
 export function moduleColorIdForPathname(pathname: string): ModuleColorId | null {
   if (pathname.startsWith("/vault")) return "vault";
   if (pathname.startsWith("/admin/personal")) return "personal_ops";
-  const match = pathname.match(/^\/admin\/(projects|notes|people|media|reviews|resources|finance)(?:\/|$)/);
+  const match = pathname.match(/^\/admin\/(projects|notes|people|media|reviews|resources|finance|map|calendar)(?:\/|$)/);
   return (match?.[1] as ModuleColorId | undefined) || null;
 }
 

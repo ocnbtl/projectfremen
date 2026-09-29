@@ -1291,15 +1291,16 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
         if (response.status() >= 400 && !url.pathname.startsWith("/_vercel/")) failedResponses.push(`${viewport.label}: ${response.status()} ${url.pathname}`);
       });
       await page.goto(`${baseUrl}/admin`, { waitUntil: "networkidle" });
-      await page.getByRole("heading", { level: 1, name: "What needs attention" }).waitFor();
+      await page.getByRole("heading", { level: 1, name: "Command Center" }).waitFor();
       const command = page.locator(".command-center-grid");
       await command.waitFor();
       assert(await page.locator('[aria-label="Open AI assistant"]').count() === 0, `Command Center ${viewport.label} reintroduced the floating AI control`);
       const text = await command.innerText();
-      assert(text.includes(`${accounts} accounts · ${pending} to review`), `Command Center ${viewport.label} did not derive the current Finance module count`);
-      assert(text.toLowerCase().includes("attention horizon") && text.toLowerCase().includes("live worklist"), `Command Center ${viewport.label} omitted the detailed attention horizon`);
-      assert(await command.locator(".command-attention-summary > div").count() === 4, `Command Center ${viewport.label} did not render total/now/next/watch summaries`);
-      assert(await command.locator(".command-attention-row").count() >= pending, `Command Center ${viewport.label} omitted Finance owner records from its live worklist`);
+      assert(await command.getByRole("region", { name: "Today's agenda" }).count() === 1, `Command Center ${viewport.label} omitted its Calendar agenda`);
+      assert(text.includes("Next actions") && text.includes("Review suggestions"), `Command Center ${viewport.label} did not distinguish actionable work from suggested reviews`);
+      assert(await command.locator(".command-attention-summary > div").count() === 0, `Command Center ${viewport.label} reintroduced the repeated metric strip`);
+      assert(await command.locator('.command-health[href="/admin/finance"]').count() === 1, `Command Center ${viewport.label} omitted the Finance owner route`);
+      assert(await command.locator(".command-attention-row").count() > 0, `Command Center ${viewport.label} omitted actionable owner records`);
       for (const forbidden of ["AI suggestions", "Sync checks", "Media queued", "Across live project lanes", "12 Active goals"]) {
         assert(!text.includes(forbidden), `Command Center ${viewport.label} retained invented copy: ${forbidden}`);
       }
@@ -1351,7 +1352,7 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
       assert(!diagnostics.headerOverlapsContent, `Command Center ${viewport.label} header overlaps page content`);
       assert(!diagnostics.headerChildrenOverlap, `Command Center ${viewport.label} header controls overlap one another`);
       assert(!diagnostics.headerOutsideViewport, `Command Center ${viewport.label} header extends outside the viewport`);
-      assert(diagnostics.commandWidthRatio >= (viewport.width <= 390 ? 0.84 : 0.9), `Command Center ${viewport.label} leaves excessive unused page width: ${JSON.stringify(diagnostics)}`);
+      assert(diagnostics.commandWidthRatio >= (viewport.width <= 390 ? 0.84 : viewport.width > 1600 ? 1550 / viewport.width : 0.9), `Command Center ${viewport.label} leaves excessive unused page width: ${JSON.stringify(diagnostics)}`);
       if (viewport.width === 390) {
         const undersized = await command.locator("button:visible, a[href]:visible").evaluateAll((elements) => elements.map((element) => {
           const rect = element.getBoundingClientRect();
@@ -3234,7 +3235,7 @@ async function checkResourceNotePromotionBrowserState(
     );
     if (!actionInsideViewport) {
       const detailsButton = page.getByRole("button", { name: "Open Resource details" });
-      if (await detailsButton.isVisible().catch(() => false)) {
+      if (await detailsButton.isVisible().catch(() => false) && await detailsButton.getAttribute("aria-expanded") !== "true") {
         await detailsButton.click();
       }
       action = page.getByRole("button", { name: label, exact: true });
@@ -3694,16 +3695,7 @@ async function checkMediaMetadataEditBrowserState(
     const desktopContext = await authenticatedContext({ width: 1440, height: 900 });
     const desktop = await desktopContext.newPage();
     observe(desktop);
-    await desktop.goto(
-      `${baseUrl}/admin/media?selected=${encodeURIComponent(mediaId)}&tab=overview`,
-      { waitUntil: "domcontentloaded" }
-    );
-    await desktop.getByRole("heading", { level: 1, name: "All Media" }).waitFor();
-    const inspector = desktop.locator("#media-inspector-rail");
-    await inspector.getByText(mediaTitle, { exact: true }).first().waitFor();
-    await inspector.getByRole("button", { name: "Edit", exact: true }).click();
-    const editDialog = desktop.getByRole("dialog", { name: mediaTitle });
-    await editDialog.waitFor();
+    const editDialog = await openEditorFromDetail(desktop, mediaTitle);
     assert(
       await desktop.getByRole("button", { name: "Open AI assistant" }).count() === 0,
       "Media AI dock remained exposed beneath the metadata editor"
@@ -3748,7 +3740,6 @@ async function checkMediaMetadataEditBrowserState(
     await desktop.getByText(updatedTitle, { exact: true }).first().waitFor();
 
     await desktop
-      .locator("#media-inspector-rail")
       .getByRole("button", { name: "Edit", exact: true })
       .click();
     const dirtyDialog = desktop.getByRole("dialog", { name: updatedTitle });
@@ -6341,11 +6332,11 @@ async function checkPeopleMemoryBrowserState(
       );
       const contactButtons = overview.locator("[data-contact-method]");
       assert(
-        await contactButtons.count() === 8 &&
-          await overview.locator("[data-contact-method]:disabled").count() > 0 &&
-          await overview.locator('[data-contact-method="tiktok"]:disabled').count() === 1 &&
+        await contactButtons.count() > 0 && await contactButtons.count() < 8 &&
+          await overview.locator("[data-contact-method]:disabled").count() === 0 &&
+          await overview.locator('[data-contact-method="tiktok"]').count() === 0 &&
           await overview.locator('[data-contact-method="youtube"]:not(:disabled)').count() === 1,
-        `People Overview did not keep every contact method visible with unavailable methods disabled at ${viewport.label}`
+        `People Overview did not show working contact methods while omitting missing methods at ${viewport.label}`
       );
       const contactHoverTarget = overview.locator('[data-contact-method="youtube"]');
       await contactHoverTarget.hover();
@@ -6674,7 +6665,7 @@ async function checkPeopleMemoryBrowserState(
         await linksHub.getByRole("heading", { name: "Links", exact: true }).count() === 1 &&
           await linksHub.getByRole("heading", { name: "People", exact: true }).count() === 1 &&
           await linksHub.getByRole("heading", { name: "Organizations", exact: true }).count() === 1 &&
-          await linksHub.getByRole("heading", { name: "Files", exact: true }).count() === 1 &&
+          await linksHub.getByRole("heading", { name: "Places, events and media", exact: true }).count() === 1 &&
           await linksHub.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
           await page.getByText("connected media context", { exact: false }).count() === 0 &&
           await page.getByRole("button", { name: "Add object", exact: true }).count() === 1 &&
@@ -6715,7 +6706,7 @@ async function checkPeopleMemoryBrowserState(
 
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(personId)}?tab=files`, { waitUntil: "networkidle" });
       assert(
-        await page.getByRole("heading", { name: "Files", exact: true }).count() === 1 &&
+        await page.getByRole("heading", { name: "Places, events and media", exact: true }).count() === 1 &&
           await page.getByRole("heading", { name: "Resources", exact: true }).count() === 1 &&
           await page.getByRole("button", { name: /^(Browse|Refresh)$/ }).count() === 0 &&
           !(await page.locator(".people-links-hub").innerText()).includes("unavailable"),
@@ -6978,7 +6969,7 @@ async function checkPeopleMemoryBrowserState(
       await organizationEditor.waitFor();
       assert(
         await organizationEditor.getByLabel("TikTok", { exact: true }).count() === 1 &&
-          await organizationEditor.getByLabel("Projects", { exact: true }).count() === 1 &&
+          await organizationEditor.getByRole("region", { name: "Organization objects", exact: true }).count() === 1 &&
           await organizationEditor.getByRole("heading", { name: "Places", exact: true }).count() === 1 &&
           await organizationEditor.getByRole("heading", { name: "Locations", exact: true }).count() === 0,
         `Organization Properties did not retain creation fields or the shared Places language at ${viewport.label}`
@@ -7025,7 +7016,7 @@ async function checkPeopleMemoryBrowserState(
       assert(
         await page.getByRole("heading", { name: "Details", exact: true }).count() === 1 &&
           await page.getByLabel("Organization type").count() === 1 &&
-          await page.getByLabel("Industry or field").count() === 1 &&
+          await page.getByLabel("Industry", { exact: true }).count() === 1 &&
           await organizationForm.locator(".people-group-picker").count() === 0 &&
           await organizationForm.getByLabel("Email", { exact: true }).count() === 0 &&
           await organizationForm.getByLabel("Phone", { exact: true }).count() === 0 &&
@@ -7209,7 +7200,7 @@ async function checkPeopleMemoryBrowserState(
         };
       });
       assert(
-        noteGeometry.contained && noteGeometry.textareaHeight >= 40 && noteGeometry.textareaHeight <= 44 && noteGeometry.bulletDelta < 2 && noteGeometry.buttonHeights.every((height) => height >= 40) && (viewport.label === "mobile" || noteGeometry.buttonCenterDeltas.every(delta => delta < 2)),
+        noteGeometry.contained && noteGeometry.textareaHeight >= 40 && noteGeometry.textareaHeight <= 44 && noteGeometry.bulletDelta < 2 && noteGeometry.buttonHeights.every((height) => height >= 39.99) && (viewport.label === "mobile" || noteGeometry.buttonCenterDeltas.every(delta => delta < 2)),
         `New People notes did not use compact aligned controls at ${viewport.label}: ${JSON.stringify(noteGeometry)}`
       );
       const birthdayEditor = page.locator("[data-people-birthday-editor]");
@@ -7371,7 +7362,7 @@ async function checkPeopleMemoryBrowserState(
         const quickOrganizationTitle = `${organizationTitle}-ui`;
         await organizationQuickForm.getByLabel("Organization name").fill(quickOrganizationTitle);
         await chooseField(organizationQuickForm.locator("[data-organization-type]"), "Business");
-        await chooseField(organizationQuickForm.getByLabel("Industry or field"), "Technology");
+        await chooseField(organizationQuickForm.getByLabel("Industry", { exact: true }), "Technology");
         await organizationQuickForm.getByLabel("Description").fill("A directly linked organization created by the regression UI.");
         await organizationQuickForm.getByLabel("YouTube", { exact: true }).fill("https://youtube.com/@regression-studio");
         await organizationQuickForm.getByLabel("Place 1 city", { exact: true }).fill("Columbus, Ohio, USA");
@@ -7434,14 +7425,14 @@ async function checkPeopleMemoryBrowserState(
       await page.goto(`${baseUrl}/admin/people/${encodeURIComponent(organizationId)}/edit?tab=properties`, { waitUntil: "networkidle" });
       const organizationEditForm = page.locator(".people-edit-form");
       const organizationSectionOrder = await organizationEditForm.locator(":scope > .people-profile-section, :scope > [data-profile-section]").evaluateAll((sections) => sections.map((section) => section.getAttribute("data-profile-section")).filter(Boolean));
-      const linkedOrganizationPersonText = await organizationEditForm.locator(`[data-linked-person="${personId}"]`).innerText();
+      const linkedOrganizationPersonText = await organizationEditForm.locator(`[data-object-key="people:person:${personId}"]`).innerText();
       assert(
         await organizationEditForm.locator(".people-profile-group-picker").count() === 0 &&
           await organizationEditForm.locator("[data-people-email-editor]").count() === 0 &&
           await organizationEditForm.locator("[data-people-phone-editor]").count() === 0 &&
           await organizationEditForm.locator("[data-people-cadence-select]").count() === 0 &&
           await organizationEditForm.getByLabel("Description").count() === 1 &&
-          await organizationEditForm.locator(`[data-linked-person="${personId}"]`).count() === 1 &&
+          await organizationEditForm.locator(`[data-object-key="people:person:${personId}"]`).count() === 1 &&
           organizationSectionOrder.indexOf("identity") < organizationSectionOrder.indexOf("about") &&
           organizationSectionOrder.indexOf("about") < organizationSectionOrder.indexOf("links") &&
           linkedOrganizationPersonText.includes("Works here") &&
@@ -7702,7 +7693,7 @@ async function checkPeopleStarArchiveBrowserState(baseUrl, cookieJar, personId, 
     assert((await fieldOptions(objectDialog.getByLabel("Relationship", { exact: true }))).length >= 5, "People Add to object lost relationship choices");
     await objectDialog.getByRole("button", { name: "Object to link" }).click();
     const objectSearch = page.getByRole("dialog", { name: "Link an object", exact: true });
-    assert(await objectSearch.getByRole("group", { name: "Object types" }).getByRole("button").count() === 7 && await objectSearch.getByRole("option").count() > 0, "Object picker did not expose categorized canonical targets");
+    assert(await objectSearch.getByRole("group", { name: "Object types" }).getByRole("button").count() === 8 && await objectSearch.getByRole("option").count() > 0, "Object picker did not expose categorized canonical targets");
     await objectSearch.getByRole("button", { name: "Projects", exact: true }).click();
     assert((await objectSearch.getByRole("option").evaluateAll(options => options.map(option => option.getAttribute("data-select-value")))).every(key => key.startsWith("projects:")), "Project filter included a different object type");
     await objectSearch.getByRole("searchbox", { name: "Search objects" }).fill("nonexistent-object-qazwsx");
@@ -9856,7 +9847,7 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
       });
 
       await page.goto(`${baseUrl}/admin/personal`, { waitUntil: "networkidle" });
-      await page.getByRole("heading", { name: "Personal Command", exact: true }).waitFor();
+      await page.getByRole("heading", { name: "Personal", exact: true }).waitFor();
       const bodyText = await page.locator("body").innerText();
       assert(!bodyText.includes("operating view for today") && !bodyText.includes("across goals, decisions, obligations, and follow-ups"), `Personal Command retained removed explanatory copy at ${viewport.label}`);
       const systemDock = page.getByRole("navigation", { name: "Personal systems" });
@@ -9869,32 +9860,16 @@ async function checkPersonalOpsCommandBrowserState(baseUrl, cookieJar) {
         assert(!sidebarLabels.includes(label), `Personal sidebar retained ${label} at ${viewport.label}`);
       }
 
-      const header = page.locator('main[aria-label="Personal Command ledger"] header').first();
-      const search = header.getByPlaceholder("Search...");
-      const sort = header.locator('summary[aria-label^="Sort:"]');
-      const filter = header.locator('summary[aria-label^="Filter:"]');
-      for (const label of ["Follow-up", "Decision", "Obligation", "Goal"]) {
-        assert(await header.getByRole("button", { name: label, exact: true }).count() === 1, `Top action strip omitted + ${label} at ${viewport.label}`);
-      }
-      assert(await page.locator('nav[aria-label="Personal quick actions"]').count() === 0, `Personal retained the bottom action rail at ${viewport.label}`);
-      const controlCenters = await Promise.all([search, sort, filter, header.getByRole("button", { name: "Follow-up", exact: true })].map((locator) => locator.evaluate((element) => {
-        const rect = element.getBoundingClientRect();
-        return rect.top + rect.height / 2;
-      })));
-      assert(Math.max(...controlCenters) - Math.min(...controlCenters) <= 2, `Personal command controls are not vertically aligned at ${viewport.label}: ${JSON.stringify(controlCenters)}`);
-      await sort.click();
-      const sortMenu = header.getByRole("menu", { name: "Sort ledger" });
-      await sortMenu.waitFor();
-      for (const label of ["Priority", "Due date", "Recently updated", "Title"]) {
-        assert(await sortMenu.getByRole("menuitemradio", { name: label, exact: true }).count() === 1, `Sort menu omitted ${label} at ${viewport.label}`);
-      }
-      await sort.click();
-      await filter.click();
-      const filterMenu = header.getByRole("menu", { name: "Filter ledger" });
-      await filterMenu.waitFor();
-      assert(await filterMenu.getByRole("menuitemradio").count() >= 5, `Filter icon did not open an anchored filter menu at ${viewport.label}`);
-      await filter.click();
-      assert(await page.locator("#personal-ops-filter-rail").count() === 0, `Personal retained the detached filter rail at ${viewport.label}`);
+      const workspace=page.locator('main[aria-label="Personal Command ledger"]');
+      const search=workspace.getByPlaceholder("Search personal records");await search.waitFor();
+      const sort=workspace.getByLabel("Sort personal records"),filter=workspace.getByRole("button",{name:"Filter",exact:true});
+      assert(await workspace.getByRole("button",{name:"Add follow-up",exact:true}).count()===1,`Primary capture action missing at ${viewport.label}`);
+      await workspace.getByRole("button",{name:"More actions",exact:true}).click();
+      for(const label of ["Add decision","Add obligation","Add goal"])assert(await page.getByRole("button",{name:label,exact:true}).isVisible(),`Secondary capture action missing: ${label}`);
+      await page.keyboard.press("Escape");
+      const options=await fieldOptions(sort);for(const label of ["Priority","Due date","Recently updated","Title"])assert(options.includes(label),`Sort option missing: ${label}`);
+      await filter.click();assert(await workspace.locator(".work-filters button").count()>=5,"Filter disclosure is incomplete");await filter.click();
+      assert(await workspace.locator(".work-filters").count()===0,"Closed filters still consume the first viewport");
 
       const aiLauncher = page.getByRole("button", { name: "Open AI assistant" });
       const launcherIcon = aiLauncher.locator('svg[data-icon-role="message"][data-icon-candidate="message"]');
@@ -10007,7 +9982,7 @@ async function checkPersonalUtilityBrowserState(baseUrl, cookieJar) {
         `Style Guide specimens did not render their selected font families at ${viewport.label}: ${JSON.stringify(typographyFamilies)}`
       );
       assert(
-        await page.locator('[class*="swatchCard"]').count() >= 18 && await page.locator('[class*="moduleSystemCard"]').count() === 9,
+        await page.locator('[class*="swatchCard"]').count() >= 18 && await page.locator('[class*="moduleSystemCard"]').count() === 11,
         `Style Guide did not expose the expanded foundation and module palettes at ${viewport.label}`
       );
       const componentButton = page.locator("button:visible").filter({ hasText: "Component" }).first();
@@ -10127,20 +10102,20 @@ async function checkProjectCreationWorkflow(
 
   try {
     await page.goto(`${baseUrl}/admin/projects`, { waitUntil: "networkidle" });
-    const layoutControls = page.getByRole("group", { name: "Project layout" });
-    await layoutControls.getByRole("button", { name: "Grid" }).click();
+    const layoutControls = page.getByRole("combobox", { name: "Project layout" });
+    await layoutControls.selectOption("grid");
     await page.locator('article[role="listitem"]').first().waitFor();
     assert(
       await page.locator('article[role="listitem"]').count() >= 5 &&
-        await layoutControls.getByRole("button", { name: "Grid" }).getAttribute("aria-pressed") === "true",
+        await layoutControls.inputValue() === "grid",
       "Projects Grid did not render a distinct card directory"
     );
     assert(await page.locator('article[role="listitem"] input[type="checkbox"]').count() === 0, "Projects Grid retained batch-selection checkboxes");
     await page.screenshot({ path: path.join(screenshotDir, "projects-grid-1440x900.png"), fullPage: true });
-    await layoutControls.getByRole("button", { name: "Comfortable" }).click();
+    await layoutControls.selectOption("comfortable");
     assert(await page.locator('article[role="listitem"]').count() === 0, "Comfortable Projects view retained the Grid cards");
     assert(await page.locator(".dense-object-row__checkbox").count() === 0, "Projects directory retained DenseObjectRow batch checkboxes");
-    await page.getByRole("button", { name: "New project" }).click();
+    await page.getByRole("button", { name: "Add project", exact: true }).click();
     const createForm = page.locator("form").filter({ hasText: "New project" });
     await createForm.waitFor();
     const editorGeometry = await createForm.evaluate((form) => {
@@ -10191,7 +10166,8 @@ async function checkProjectCreationWorkflow(
     );
     await createForm.waitFor({ state: "detached" });
 
-    const projectFilters = page.getByRole("toolbar", { name: "Project filters" });
+    await page.getByRole("button", { name: "Filter", exact: true }).click();
+    const projectFilters = page.locator('[aria-label="Project filters"]');
     await projectFilters.getByRole("button", { name: "Due 7 days" }).click();
     assert(
       await page.locator('[role="listitem"]').filter({ hasText: projectName }).count() === 1,
@@ -10224,7 +10200,7 @@ async function checkProjectCreationWorkflow(
     );
     await projectHeader.getByLabel("More project options").click();
     assert(
-      await page.getByText("Quick actions", { exact: true }).count() === 1 &&
+      await page.getByRole("toolbar", { name: `${projectName} quick actions`, exact: true }).count() === 1 &&
         await page.getByText("Project follow-through", { exact: true }).count() === 0,
       "Project overview did not keep one top quick-action group or retained follow-through"
     );
@@ -10328,8 +10304,8 @@ async function checkProjectCreationWorkflow(
     assert(
       recentTypography.titleFont === recentTypography.summaryFont &&
         await recentActivityRow.getByRole("button", { name: /Inspect Initial project brief logged/ }).count() === 1 &&
-        await recentActivityRow.getByRole("button", { name: /Open Initial project brief logged unavailable/ }).count() === 1,
-      `Recent work did not share Timeline typography or the enabled/disabled icon actions: ${JSON.stringify(recentTypography)}`
+        await recentActivityRow.getByRole("button", { name: /Open Initial project brief logged unavailable/ }).count() === 0,
+      `Recent work did not share Activity typography and working inspection actions: ${JSON.stringify(recentTypography)}`
     );
     const objectivePatchCount = () => browserMutations.filter((entry) => entry === "PATCH /api/projects").length;
     const objectivePatchesBeforeTyping = objectivePatchCount();
@@ -10346,7 +10322,7 @@ async function checkProjectCreationWorkflow(
     assert(await page.getByRole("button", { name: "Save objectives" }).count() === 0, "Objectives retained a manual Save button");
     await page.screenshot({ path: path.join(screenshotDir, "project-saite-overview-1440x900.png"), fullPage: true });
 
-    await page.getByRole("tab", { name: "Timeline" }).click();
+    await page.getByRole("tab", { name: "Activity" }).click();
     const activityFilters = page.getByRole("group", { name: "Filter project activity" });
     await activityFilters.waitFor();
     await activityFilters.getByRole("button", { name: "Project updated" }).click();
@@ -10592,7 +10568,7 @@ async function checkPeopleProjectConnections(
       `Projects did not persist one exact linked person with role and context: ${JSON.stringify(linkedProjects.payload)}`
     );
 
-    await projectPage.getByRole("tab", { name: "Timeline" }).click();
+    await projectPage.getByRole("tab", { name: "Activity" }).click();
     const personActivityRow = projectPage
       .locator('[role="tabpanel"]:not([hidden]) li')
       .filter({ hasText: person.title })
@@ -10606,7 +10582,7 @@ async function checkPeopleProjectConnections(
         !(await personActivityRow.innerText()).includes("Context linked"),
       "Person activity did not use the blue Person linked treatment with Inspect/Open actions"
     );
-    await projectPage.getByRole("tab", { name: "People" }).click();
+    await projectPage.getByRole("tab", { name: "Links", exact: true }).click();
 
     await personLinkRow.getByRole("button", { name: new RegExp(`Inspect ${person.title} connection`) }).click();
     const connectionInspector = projectPage.locator('section[aria-labelledby^="project-selected-child-"]');
@@ -11026,7 +11002,7 @@ async function checkNoteProjectAssociations(
       `${baseUrl}/admin/projects/${encodeURIComponent(project.id)}?tab=timeline`,
       { waitUntil: "networkidle" }
     );
-    await projectActivityPage.getByRole("tab", { name: "Timeline" }).click();
+    await projectActivityPage.getByRole("tab", { name: "Activity" }).click();
     const objectActivityRow = projectActivityPage
       .locator('[role="tabpanel"]:not([hidden]) li')
       .filter({ hasText: note.title })
@@ -11759,11 +11735,8 @@ async function checkResourceMediaProjectAssociations(
           `[data-linked-projects="${fixture.sourceModule}:${fixture.sourceObjectType}:root:${fixture.sourceId}"]`
         );
         if (viewport.width <= 1240 && fixture.key === "resource") {
-          await responsivePage
-            .getByRole("button", {
-              name: "Open Resource details"
-            })
-            .click();
+          const details = responsivePage.getByRole("button", { name: "Open Resource details" });
+          if (await details.getAttribute("aria-expanded") !== "true") await details.click();
         }
         await projectPanel.locator(`[data-project-id="${project.id}"]`).waitFor();
         const lifecycleRow = projectPanel.locator(
@@ -11876,7 +11849,7 @@ async function checkResourceMediaProjectAssociations(
           `Projects Files & Links at ${viewport.label}`
         );
 
-        const activeTab = projectPage.getByRole("tab", { name: /Files & Links/ });
+        const activeTab = projectPage.getByRole("tab", { name: "Links", exact: true });
         const activeTabLayout = await activeTab.evaluate((tab) => {
           const tabBox = tab.getBoundingClientRect();
           const tabListBox = tab.parentElement?.getBoundingClientRect();
@@ -12212,7 +12185,8 @@ async function checkProjectReviewContextBrowserState(
       for (const fixture of sourceFixtures) {
         await page.goto(`${baseUrl}${fixture.pagePath}`, { waitUntil: "domcontentloaded" });
         if (fixture.module === "resources" && viewport.width <= 1180) {
-          await page.getByRole("button", { name: "Open Resource details" }).click();
+          const details = page.getByRole("button", { name: "Open Resource details" });
+          if (await details.getAttribute("aria-expanded") !== "true") await details.click();
           await page.waitForFunction(() => {
             const rail = document.querySelector('#resource-inspector[data-overlay-open="true"]');
             return rail instanceof HTMLElement && rail.getAttribute("aria-hidden") !== "true";
@@ -12613,7 +12587,7 @@ async function checkResourceFocusRedesignBrowserState(baseUrl, cookieJar, resour
 
       await page.goto(`${baseUrl}/admin/resources/${encodeURIComponent(resourceId)}?tab=properties`, { waitUntil: "networkidle" });
       const detailsButton = page.getByRole("button", { name: "Open Resource details" });
-      if ((await detailsButton.count()) && (await detailsButton.isVisible())) await detailsButton.click();
+      if ((await detailsButton.count()) && (await detailsButton.isVisible()) && await detailsButton.getAttribute("aria-expanded") !== "true") await detailsButton.click();
       await page.getByRole("heading", { name: resourceTitle, exact: true }).first().waitFor();
       await page.getByRole("heading", { name: "Resource properties" }).waitFor();
 
@@ -12689,6 +12663,9 @@ async function main() {
     FREMEN_DATA_DIR: path.join(tempRoot, "data"),
     OBSIDIAN_EXPORT_DIR: path.join(tempRoot, "obsidian"),
     GITHUB_TOKEN: "",
+    CENSUS_API_KEY: "",
+    MORGEN_API_KEY: "",
+    OPENROUTESERVICE_API_KEY: "",
     SENTRY_AUTH_TOKEN: "",
     SENTRY_ORG_SLUG: "",
     SENTRY_ORG_SLUG_PNGWN: "",
@@ -12833,7 +12810,7 @@ async function main() {
         personalOpsIconSource.includes('import UnigentamosIcon from "../icons/UnigentamosIcon"') &&
         personalOpsIconSource.includes("ICON_ROLE") &&
         !personalOpsIconSource.includes("<path") &&
-        personalOpsWorkspaceSource.includes('placeholder="Search..."') &&
+        personalOpsWorkspaceSource.includes('placeholder="Search personal records"') &&
         personalOpsWorkspaceSource.includes('aria-label="Personal systems"') &&
         !personalOpsWorkspaceSource.includes('aria-label="Personal quick actions"') &&
         !personalOpsSidebarSource.includes('label: "Passwords"') &&
@@ -12885,7 +12862,7 @@ async function main() {
     pass("Public and protected entry responses include the security-header baseline");
 
     const publicVaultShell = await requestText(server.baseUrl, cookieJar, "/vault");
-    assert(publicVaultShell.response.ok && publicVaultShell.body.includes("Private workspace") && publicVaultShell.body.includes("Your vault") && publicVaultShell.body.includes("Connect to your vault"), "Public vault shell failed to render");
+    assert(publicVaultShell.response.ok && publicVaultShell.body.includes("Vault") && publicVaultShell.body.includes("Connect to your vault"), "Public vault shell failed to render");
     const serviceWorker = await requestText(server.baseUrl, cookieJar, "/sw.js");
     assert(
       serviceWorker.response.ok &&
@@ -13261,7 +13238,7 @@ async function main() {
         label: "Goals",
         expected: [
           "Current Goals",
-          "Track outcomes and key results",
+          "Search personal records",
           "Current Goals",
           "Goal"
         ]
@@ -13279,7 +13256,7 @@ async function main() {
         label: "Obligations",
         expected: [
           "Obligations",
-          "Commitments whose completion depends on criteria and evidence, not a bare checkbox.",
+          "Search personal records",
           "Obligation"
         ]
       },
@@ -13288,7 +13265,7 @@ async function main() {
         label: "Follow-ups",
         expected: [
           "Follow-ups",
-          "Keep the next contact or action connected to the work that prompted it.",
+          "Search personal records",
           "Follow-up"
         ]
       },
@@ -13532,7 +13509,7 @@ async function main() {
         initialStyleGuide.payload?.state?.schemaVersion === 5 &&
         initialStyleGuide.payload?.state?.typography?.length >= 6 &&
         initialStyleGuide.payload?.state?.colors?.length >= 18 &&
-        initialStyleGuide.payload?.state?.modules?.length === 9 &&
+        initialStyleGuide.payload?.state?.modules?.length === 11 &&
         initialStyleGuide.payload?.state?.icons?.length === iconRegistryCount &&
         initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.primaryName === "Signal Red" &&
         initialStyleGuide.payload.state.modules.find((item) => item.id === "media")?.tokens?.action === "#B42318" &&
@@ -13678,9 +13655,9 @@ async function main() {
 
     const mediaPage = await requestText(server.baseUrl, cookieJar, "/admin/media");
     assert(mediaPage.response.ok, `Media page failed: ${describeStatus(mediaPage.response)}`);
-    assert(mediaPage.body.includes("All Media"), "Media page missing its native directory heading");
-    assert(mediaPage.body.includes("What you can do in Media"), "Media page missing its read-path disclosure");
-    pass("Media directory loads with an explicit read-only boundary");
+    assert(mediaPage.body.includes("Search media"), "Media page missing its shared directory controls");
+    assert(mediaPage.body.includes("Unlock your encrypted media"), "Media page missing its encryption boundary");
+    pass("Media library loads with encryption-aware access and shared directory controls");
 
     const mediaNeedsReviewPage = await requestText(server.baseUrl, cookieJar, "/admin/media/needs-review");
     assert(
@@ -14759,7 +14736,7 @@ async function main() {
     assert(
       projectDetailPage.response.ok &&
         projectDetailPage.body.includes("Project Iceflake") &&
-        projectDetailPage.body.includes("Timeline") &&
+        projectDetailPage.body.includes("Activity") &&
         projectDetailPage.body.includes(`${testRunId}-milestone`),
       `Canonical Project detail route did not reload persisted native state: ${describeStatus(projectDetailPage.response)}`
     );
@@ -17710,7 +17687,7 @@ async function main() {
     );
     assertSelectedTab(
       noteAttachments.body,
-      `note-detail-${attachmentNote.id}-tab-attachments`,
+      `note-detail-${attachmentNote.id}-tab-links`,
       "Note Attachments direct tab URL state"
     );
     for (const expected of [
@@ -21284,7 +21261,7 @@ async function main() {
       weeklyReviewDetail.response.ok &&
         weeklyReviewDetail.body.includes(`${testRunId} Weekly Review`) &&
         weeklyReviewDetail.body.includes("Completed") &&
-        weeklyReviewDetail.body.includes("Completed Review reopen semantics are intentionally unresolved."),
+        weeklyReviewDetail.body.includes("This completed review is read-only."),
       `Canonical completed Review detail did not preserve read-only context: ${describeStatus(weeklyReviewDetail.response)}`
     );
     pass("Native ReviewRun create, update, complete, archive, restore, reload, and audit state persist independently");

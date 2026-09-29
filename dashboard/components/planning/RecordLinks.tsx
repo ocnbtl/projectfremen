@@ -1,0 +1,134 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
+import type { NativeObjectRef } from "../../lib/native-objects/types";
+export default function RecordLinks({
+  refs,
+  available = [],
+  onChange,
+}: {
+  refs: NativeObjectRef[];
+  available?: NativeObjectRef[];
+  onChange?: (refs: NativeObjectRef[]) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const key = (ref: NativeObjectRef) =>
+    `${ref.module}:${ref.objectType}:${ref.objectId}`;
+  const options = query.trim()
+    ? available
+        .filter(
+          (ref) =>
+            ref.label.toLowerCase().includes(query.toLowerCase()) &&
+            !refs.some((x) => key(x) === key(ref)),
+        )
+        .slice(0, 12)
+    : [];
+  return (
+    <div>
+      <div className="work-links">
+        {refs.map((ref) => (
+          <span key={key(ref)}>
+            <Link href={ref.route}>
+              <UnigentamosIcon
+                role={`module-${ref.module === "personal_ops" ? "personal" : ref.module}`}
+                size={16}
+              />
+              {ref.label}
+            </Link>
+            {onChange && (
+              <button
+                type="button"
+                className="work-button work-button--quiet"
+                onClick={() =>
+                  onChange(refs.filter((x) => key(x) !== key(ref)))
+                }
+                aria-label={`Unlink ${ref.label}`}
+              >
+                ×
+              </button>
+            )}
+          </span>
+        ))}
+      </div>
+      {onChange && (
+        <label>
+          Link a record
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Find a person, project, note, place…"
+          />
+        </label>
+      )}
+      {options.length > 0 && (
+        <div aria-label="Matching records">
+          {options.map((ref) => (
+            <button
+              type="button"
+              className="work-row"
+              key={key(ref)}
+              onClick={() => {
+                onChange?.([...refs, ref]);
+                setQuery("");
+              }}
+            >
+              <RecordIdentity record={ref} />
+
+              <div>
+                <strong>{ref.label}</strong>
+                <small>
+                  {ref.objectType.replaceAll("_", " ")} ·{" "}
+                  {ref.module.replace("_", " ")}
+                </small>
+                {(ref as PreviewRef).preview?.detail && (
+                  <small>{(ref as PreviewRef).preview?.detail}</small>
+                )}
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+      {query && options.length === 0 && (
+        <p className="work-muted">No matching records.</p>
+      )}
+    </div>
+  );
+}
+
+type PreviewRef = NativeObjectRef & {
+  preview?: { imageUrl?: string; detail?: string };
+};
+function RecordIdentity({ record }: { record: PreviewRef }) {
+  const [failed, setFailed] = useState(false),
+    url = record.preview?.imageUrl || "";
+  const safe =
+    /^\/api\/people\/photos\/personal-[0-9a-f-]+$/i.test(url) ||
+    /^https:\/\//.test(url);
+  return (
+    <span className="work-record-identity">
+      {safe && !failed ? (
+        <img
+          src={url}
+          alt=""
+          referrerPolicy="no-referrer"
+          onError={() => setFailed(true)}
+        />
+      ) : record.module === "people" ? (
+        <span>
+          {record.label
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((x) => x[0])
+            .join("")}
+        </span>
+      ) : (
+        <UnigentamosIcon
+          role={`module-${record.module === "personal_ops" ? "personal" : record.module}`}
+          size={20}
+        />
+      )}
+    </span>
+  );
+}

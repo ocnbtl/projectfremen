@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { motionTokens } from "../../lib/design-system/motion";
+import PlanningNotifications from "../planning/PlanningNotifications";
 import { usePathname, useRouter } from "next/navigation";
 import type { FormEvent, ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -8,6 +10,7 @@ import { ADMIN_NAV_ITEMS } from "../../lib/admin-navigation";
 import { moduleColorIdForPathname, moduleThemeVariables } from "../../lib/design-system/color-system";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import { useMotionPreference } from "./ExperienceProvider";
 
 export type AppTopNavProps = {
   showCommandSearch?: boolean;
@@ -31,7 +34,11 @@ export default function AppTopNav({
   const pathname = usePathname();
   const router = useRouter();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const reduceMotion = useReducedMotion();
+  const { preference, setPreference } = useMotionPreference();
+  const systemReduceMotion = useReducedMotion();
+  const reduceMotion = preference === "reduce" || systemReduceMotion;
+  const [moduleQuery, setModuleQuery] = useState("");
+  const moduleSearchRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     delete document.documentElement.dataset.adminPreview;
     delete document.documentElement.dataset.personalPreview;
@@ -63,7 +70,8 @@ export default function AppTopNav({
         !event.altKey
       ) {
         event.preventDefault();
-        searchInputRef.current?.focus();
+        if (searchInputRef.current?.offsetParent) searchInputRef.current.focus();
+        else router.push("/vault?focus=search");
       }
     }
 
@@ -73,7 +81,7 @@ export default function AppTopNav({
       document.removeEventListener("pointerdown", handlePointerDown);
       document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [mobileNavOpen, searchAvailable]);
+  }, [mobileNavOpen, searchAvailable, router]);
 
   useEffect(() => {
     setMobileNavOpen(false);
@@ -104,6 +112,9 @@ export default function AppTopNav({
   useEffect(() => {
     if (mobileNavOpen) {
       window.dispatchEvent(new Event("app-mobile-navigation-open"));
+      moduleSearchRef.current?.focus();
+    } else {
+      setModuleQuery("");
     }
   }, [mobileNavOpen]);
 
@@ -124,7 +135,7 @@ export default function AppTopNav({
   return (
     <header className={cx("admin-global-topnav", "app-top-nav", className)} data-active-module={moduleColorIdForPathname(pathname) || "home"}>
       <Link href="/admin" className="admin-global-brand app-top-nav__brand" aria-label="Unigentamos home">
-        <span aria-hidden="true">U</span>
+        <img src="/unigentamos-logo.svg" alt="" width="32" height="32" />
         <strong>Unigentamos</strong>
       </Link>
 
@@ -139,7 +150,7 @@ export default function AppTopNav({
             setMobileNavOpen((current) => !current);
           }}
         >
-          {activeNavItem ? <UnigentamosIcon role={activeNavItem.iconRole} size={16} /> : null}
+          {activeNavItem ? <UnigentamosIcon role={activeNavItem.iconRole} size={24} /> : null}
           <strong>{activeNavItem?.label || "Home"}</strong>
           <UnigentamosIcon role="chevron-down" size={12} />
         </button>
@@ -150,10 +161,11 @@ export default function AppTopNav({
           initial={{ opacity: 0, y: reduceMotion ? 0 : -8, scale: reduceMotion ? 1 : 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: reduceMotion ? 0 : -6, scale: reduceMotion ? 1 : 0.98 }}
-          transition={{ duration: reduceMotion ? 0 : 0.18 }}
+          transition={{ duration: reduceMotion ? 0 : motionTokens.standard }}
           style={{ x: "-50%" }}
         >
-          {ADMIN_NAV_ITEMS.map((item) => {
+          <input ref={moduleSearchRef} className="app-top-nav__module-search" type="search" aria-label="Find a workspace" placeholder="Find a workspace" value={moduleQuery} onChange={event => setModuleQuery(event.target.value)} />
+          {ADMIN_NAV_ITEMS.filter(item => item.label.toLowerCase().includes(moduleQuery.toLowerCase())).map((item) => {
             const itemHref = item.href ?? "/admin";
             const itemActive = pathname === itemHref
               || pathname.startsWith(`${itemHref}/`);
@@ -166,7 +178,7 @@ export default function AppTopNav({
                 onClick={() => setMobileNavOpen(false)}
                 key={item.label}
               >
-                <UnigentamosIcon role={item.iconRole} size={18} />
+                <UnigentamosIcon role={item.iconRole} size={24} />
                 <span>{item.label}</span>
               </Link>
             );
@@ -174,6 +186,7 @@ export default function AppTopNav({
           <Link href="/vault?focus=search" data-module="vault" onClick={() => setMobileNavOpen(false)}>
             Search all records
           </Link>
+          <label className="app-top-nav__preference"><input type="checkbox" checked={preference === "reduce"} onChange={event => setPreference(event.target.checked ? "reduce" : "system")} />Reduce motion</label>
         </motion.nav>}</AnimatePresence>
       </div>
 
@@ -192,14 +205,16 @@ export default function AppTopNav({
               aria-current={itemActive ? "page" : undefined}
               key={item.label}
             >
-              <UnigentamosIcon role={item.iconRole} size={16} />
+              <UnigentamosIcon role={item.iconRole} size={24} />
               <span>{item.label}</span>
+              {itemActive && <motion.span aria-hidden="true" className="work-nav-marker" layoutId="workspace-navigation-marker" initial={false} transition={{duration:reduceMotion ? 0 : motionTokens.standard, ease:motionTokens.arrive}} />}
             </Link>
           );
         })}
       </nav>
 
       <div className="app-top-nav__utilities">
+        <button type="button" className="work-button work-button--quiet app-top-nav__motion" aria-pressed={preference === "reduce"} onClick={() => setPreference(preference === "reduce" ? "system" : "reduce")}>Reduce motion</button>
         {showCommandSearch && (
           <form
             className="admin-command-search app-top-nav__search"
@@ -225,6 +240,7 @@ export default function AppTopNav({
             )}
           </form>
         )}
+        <PlanningNotifications />
         {rightSlot}
       </div>
     </header>

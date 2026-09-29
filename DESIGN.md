@@ -1,75 +1,45 @@
-# Unigentamos design system
+# Unigentamos authenticated product design
 
-## Direction
+## Approved direction
 
-The shared direction is a **calm operations desk**. Pages should feel structured, current, and useful at a glance—not like a collection of disconnected dashboards. The signature interaction is the **attention runway**: a compact Now / Next / Watch worklist that makes the current operating horizon immediately legible.
+The product is a composed, precise working environment. Record identity, typography, useful density, and continuity provide its character. People establishes identity-first clarity; Projects proves the shared directory/detail system. The approved public landing page is preserved.
 
-## Hierarchy
+## Information hierarchy
 
-1. The global header provides orientation, module navigation, viewport tools, and search.
-2. Each page names the workspace and exposes no more than one primary action plus a restrained secondary action set.
-3. Current attention or the module's main record workspace is the dominant surface.
-4. Supporting status, activity, ownership, and help remain quieter and smaller.
+Every workspace exposes its identity, current view and one authoritative count, then useful records. One primary action belongs to each task context. Search, filtering, sorting and view selection form one toolbar. Advanced controls reveal on demand. Secondary metadata follows the record rather than competing with it. Notes centers authored reading; Media centers real images; Finance centers the active transaction scope; Map centers geography; Calendar centers time. Actual scheduled commitments and inferred review suggestions remain distinct.
 
-Avoid equal-weight card grids, repeated navigation inside the page, floating controls without a clear owner, or oversized introductions that push real work below the fold.
+No dashboard heroes, obligatory metric rows, equal-weight card grids, gradient placeholders, glass, glow, decorative icon tiles, repeated counts, tiny monospace prose, fake progress or disconnected actions. Missing imagery uses a neutral semantic fallback. Relevant labels remain visible.
 
-## Shared geometry
+## Shared geometry and type
 
-- Base spacing unit: 4px.
-- Common gaps: 8px for controls, 12px within compact groups, 16px within panels, 24px between major sections.
-- Global header: one fixed row; 48px control surface within a 72px reserved page offset.
-- Page gutters: fluid 16–32px. The high-density Command Center may use up to roughly 1920px; record workspaces should use available width up to roughly 1680px rather than subtracting assumed sidebars.
-- Controls: 7–8px radius. Panels: 12px radius. Overlays: 14–16px radius.
-- Base depth is borders and surface contrast. Shadows are reserved for the global header, menus, dialogs, and raised mobile rails.
+- Spacing unit: 4px. Related facts 4–8px; control groups 12px; content groups 16px; sections 24px; major context changes 32px.
+- Header offset: --app-content-offset, 64px desktop and 56px compact. All module and overlay placement derives from it.
+- Gutters: 24px desktop, 20px tablet, 16px phone. Desktop controls 40px, primary touch controls at least 44px. Radius 8px controls, 12px menus, 16px dialogs.
+- Plus Jakarta Sans: workspace 28/34 (phone 24/30), record 24/30 at 650, sections 18/24 at 600. Headings may use -0.02em tracking.
+- Inter: rows and UI 14/20, secondary 13/18, labels 12/16, input 16/22 and prose 16/25. Body tracking normal. Weight primarily 400–600. Reading measure 65–75 characters.
+- Inconsolata only for technical identifiers. Comparable numbers use Inter tabular numerals, right alignment and consistent precision.
+- Content separates through alignment, proximity and whitespace. Shadows belong to floating surfaces, not every section.
 
-## Responsive navigation
+## Palette and recognizable objects
 
-- Full brand, module navigation, search, and utilities appear only when they fit as one row.
-- At tablet and smaller desktop widths, switch to one compact navigation menu and hide inline search; search remains available inside navigation and in Vault.
-- At narrow mobile widths, collapse the wordmark while retaining the recognizable brand mark and accessible label.
-- Page content begins below one canonical header offset. Module sidebars and action rails use the same offset instead of independent hard-coded values.
+Ink #102026, body #23383F, secondary #60747C, canvas #F4F7F5, surface #FFFFFF, inset #FBFCFB, divider #D5E2E7, primary action #133C5E. Existing module palettes identify their module, not operational state. Map moss #526442 with #F1F4EE; Calendar indigo #565B86 with #F2F2F8. Essential text requires 4.5:1 contrast. Status combines meaning with text or an icon, not color alone.
 
-## Color
+UnigentamosIcon is the shared registry: 24-unit drawing grid, rounded joins, 16px inline, 20px controls, 24px navigation. Preserve the hand-selected Projects, Notes, People, Media, Personal, Reviews, Resources, Finance and Vault assignments. Their saved selections take precedence over registry defaults; redesigns and registry additions must not reset them. Every new icon role must be registered with five distinct selectable Style Guide options and included in the generated sprite. New module entries are appended to saved style guides without replacing existing assignments or palettes. Recognizable portraits, logos, source previews, actual thumbnails and chosen project marks take precedence over generic decoration.
 
-- Ink: primary text and high-confidence actions.
-- Eucalyptus green: brand, selected navigation, positive connectivity.
-- Paper white and cool slate: canvas, panels, inset controls, and dividers.
-- Amber: upcoming work or attention.
-- Crimson: only urgent or destructive meaning.
-- Blue: links and informational status where needed, not a competing brand theme.
+## Responsive and accessible behavior
 
-Colors must be expressed through shared semantic tokens wherever practical. Module identity may use restrained accents, but not a separate visual system.
+Full navigation appears only when it fits; a searchable module menu takes over before collision. Reserve selected indicators to prevent layout shifts. Directory/detail persists on wide screens, then becomes a dismissible sheet or page. Preserve filters, directory scroll and return position. Phone useful content should begin near the first 260px at 390x844. No horizontal document overflow. Menus portal out of clipping ancestors; dialogs trap and restore focus, expose Close, and retain visible actions with the keyboard. Icon-only actions have names. Forms preserve drafts and report errors at the operation that failed.
 
-## Typography
+## Motion
 
-- Plus Jakarta Sans: page titles and key section headings.
-- Inter: body text, controls, and record content.
-- Inconsolata: timestamps, IDs, financial figures, and other compact data.
-- Body defaults to 14px in dense workspaces, with 16px supporting copy only when useful.
-- Page headings should normally stay within 28–36px; section headings within 18–22px.
+Shared tokens: press 80ms, quick 120ms, standard 180ms, panel 260ms, context 320ms, explicit map focus up to 450ms. Arrivals use cubic-bezier(.22,1,.36,1); exits are shorter. Pointer dragging tracks directly, with explicit insertion/drop targets. Hover changes surface without moving labels. Focus appears immediately. Small confirmations occur in place. Save and upload states represent real work. Selection updates immediately; large content does not slide across the entire viewport. No perpetual decorative movement, repeated page entrances or staggered row animations.
 
-## Module convergence
+System and application reduced-motion settings remove large motion, zoom, spring and smooth scrolling, retaining confirmations, focus and functional parity.
 
-- Command Center, Finance, and Personal Ops share the same canvas, panel, typography, border, spacing, and responsive-shell rules.
-- Specialized module views keep their domain-specific record layouts and workflows.
-- Command Center does not duplicate module navigation or owner records; it summarizes and links into canonical owners.
-- Finance preserves guarded actions and audit boundaries. Styling must never imply that unavailable execution paths are active.
+## Domain and quality constraints
 
-## Interaction and content
+Private objects retain canonical ownership and stable IDs, with encryption, audit, version history, validation and conflict boundaries. Local saved and synchronized are different states. Calendar imports are inbound only; edits remain overrides, failed refresh never removes events. Trips retain Personal ownership, with Map and Calendar projections. Media retains one asset identity and encrypted chunks. Public provider caches never contain private canonical records.
 
-- Every control needs a clear purpose and visible state.
-- Prefer short labels such as “Open Vault,” “Add note,” and “Review now.”
-- Status copy should describe what the user can do next.
-- Hover may add a subtle surface or border change; movement should be slight and never required to understand state.
-- Focus-visible treatment must remain obvious, and touch targets should be at least 44px where they are primary mobile controls.
+Finance retains established zero-based chart semantics, guarded operations and explicit historical coverage. Missing history is never zero activity. Unavailable provider capabilities receive a precise explanation outside primary working actions.
 
-This system is inferred from Ocean's explicit product direction and the established Unigentamos interface. Revisit it only when a new surface genuinely requires a different mode, not for page-by-page decoration.
-
-## Finance split workspace (September 2026)
-
-- Finance keeps its directory on the left and a persistent detail pane on the right, using the same dividing point as People. Each record view selects a relevant visible record on entry; an empty result keeps a useful empty detail pane. On smaller screens, details open as a dismissible sheet.
-- Overview is centered on a shared, URL-backed transaction scope: date range, account, category, budget, settlement status, direction, and text search. Its graph, spending breakdown and detail totals must agree. Clicking a period, category or transaction reveals its supporting records.
-- The single React-owned SVG uses jade for income and warm bronze for spending, a zero-based dollar scale, responsive labels, keyboard/touch selection, a period table, and reduced-motion support. Transitions update the line geometry without inventing intermediate data. Pending transactions are opt-in; transfers never count as income or spending.
-- History coverage is explicit. Unobserved dates beyond the recorded range are not plotted as zero. Budget filtering respects the budget month, category/group, and personal/business scope.
-- Detail headers use the existing wallet, banknote, calendar, piggy-bank, review and sliders icon roles. Facts use Inter; prominent amounts use Plus Jakarta Sans. Record actions stay at the bottom of the detail pane.
-- Shared navigation is a full-width white surface joined to module content. Modules have no colored top rule; their palette remains in icons, selection, focus, and meaningful content.
+Review uses real dense and incomplete fixtures, all viewport classes, keyboard/focus, reduced motion, save/reopen/sync, screenshots and interaction recordings. Desktop simulation does not establish physical iPhone/iPad Safari behavior. Production activation and deployment require later release authority.

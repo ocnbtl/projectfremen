@@ -1,6 +1,9 @@
 "use client";
+import RelatedRecords from "./planning/RelatedRecords";
 
 import Link from "next/link";
+import NoteProse from "./operational/NoteProse";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "./admin-shell/WorkspaceKit";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ModuleShell from "./admin-shell/ModuleShell";
@@ -166,24 +169,17 @@ const TYPE_LABELS: Readonly<Record<NoteRecord["type"], string>> = {
 };
 
 const HOME_TABS: readonly DetailTab[] = [
-  { id: "overview", label: "Overview" },
-  { id: "body", label: "Body" },
-  { id: "links", label: "Links" },
-  { id: "decisions", label: "Decisions" },
-  { id: "review", label: "Review" },
-  { id: "attachments", label: "Attachments" },
-  { id: "properties", label: "Properties" },
-  { id: "history", label: "History" }
+ {id:"overview", label:"Note"}, {id:"links",label:"Links"}, {id:"properties",label:"Properties"}, {id:"history",label:"History"}
 ];
 
+function visibleNoteTab(tab: NotesTab): NotesTab {
+  if (tab === "attachments") return "links";
+  if (tab === "decisions" || tab === "review") return "properties";
+  return tab;
+}
+
 const DETAIL_TABS: readonly DetailTab[] = [
-  { id: "body", label: "Body" },
-  { id: "links", label: "Links" },
-  { id: "decisions", label: "Decisions" },
-  { id: "review", label: "Review" },
-  { id: "attachments", label: "Attachments" },
-  { id: "properties", label: "Properties" },
-  { id: "history", label: "History" }
+ {id:"body", label:"Note"}, {id:"links",label:"Links"}, {id:"properties",label:"Properties"}, {id:"history",label:"History"}
 ];
 
 const VIEW_LABELS: Readonly<Record<NotesView, string>> = {
@@ -508,6 +504,7 @@ export default function NotesWorkspace({
   const [captureError, setCaptureError] = useState("");
   const [notice, setNotice] = useState("");
   const [draftTitle, setDraftTitle] = useState("");
+  const [noteSource, setNoteSource] = useState(false);
   const [draftBody, setDraftBody] = useState("");
   const [draftLifecycle, setDraftLifecycle] = useState<NoteWritableLifecycleStatus>("draft");
   const [saveState, setSaveState] = useState<SaveState>("saved");
@@ -1544,7 +1541,7 @@ export default function NotesWorkspace({
     });
 
     return (
-      <DetailTabPanel tabsId={tabsId} tabId="attachments" active>
+      <DetailTabPanel tabsId={tabsId} tabId="links" active>
         <NoteAttachmentsView
           evidence={evidence}
           selectedItemId={selectedAttachmentItemId}
@@ -1716,7 +1713,7 @@ export default function NotesWorkspace({
       : [];
 
     return (
-      <DetailTabPanel tabsId={tabsId} tabId="review" active>
+      <DetailTabPanel tabsId={tabsId} tabId="properties" active>
         <div className={styles.overviewGrid}>
           <section className={styles.panel} data-wide="true">
             <MetricStrip
@@ -1847,7 +1844,7 @@ export default function NotesWorkspace({
 
   function renderDetailDecisionsPanel(note: NoteRecord, tabsId: string) {
     return (
-      <DetailTabPanel tabsId={tabsId} tabId="decisions" active>
+      <DetailTabPanel tabsId={tabsId} tabId="properties" active>
         <div className={styles.followUpStack}>
           <NoteDecisionsView
             note={note}
@@ -1890,13 +1887,13 @@ export default function NotesWorkspace({
       states={
         <>
           <span className={styles.stateChip} data-tone={selectedNote.lifecycleStatus === "active" ? "green" : "amber"}>{displayLabel(selectedNote.lifecycleStatus)}</span>
-          <span className={styles.stateChip} data-tone={selectedNote.reviewState === "needs_review" ? "pink" : "blue"}>{displayLabel(selectedNote.reviewState)}</span>
-          {(hasLegacySource(selectedNote) || relationCount(selectedNote) > 0) && <span className={styles.stateChip} data-tone="blue">Legacy context</span>}
+
+
         </>
       }
       actions={
         <>
-          {isInspectorOverlay && <button type="button" className={`${styles.button} ${styles.closeButton}`} onClick={() => setInspectorOpen(false)}>Close</button>}
+
           <Link className={styles.linkButton} href={getNativeObjectRoute({ module: "notes", objectType: "note", objectId: selectedNote.id })}>Edit</Link>
         </>
       }
@@ -1928,6 +1925,11 @@ export default function NotesWorkspace({
       const propertiesAreOpen = initialMode === "detail" && activeTab === "properties";
       return (
         <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="properties" active>
+          <QuickActionBar actions={[
+            {id:"review",label:"Review",href:`${selectedNote.nativeRef.route}?tab=review`},
+            {id:"decisions",label:"Decisions",href:`${selectedNote.nativeRef.route}?tab=decisions`},
+            {id:"attachments",label:"Attachments",href:`${selectedNote.nativeRef.route}?tab=attachments`}
+          ]}/>
           <NotePropertiesSummary
             note={selectedNote}
             readiness={selectedPropertyReadiness}
@@ -1968,7 +1970,7 @@ export default function NotesWorkspace({
       );
       const candidateOpen = selectedNote.type === "decision" && !decision;
       return (
-        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="decisions" active>
+        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="properties" active>
           <div className={styles.overviewGrid}>
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>
@@ -2058,7 +2060,7 @@ export default function NotesWorkspace({
         (mapping) => mapping.field === "review"
       );
       return (
-        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="review" active>
+        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="properties" active>
           <div className={styles.overviewGrid}>
             <section className={styles.panel} data-wide="true">
               <div className={styles.panelHeader}>
@@ -2121,7 +2123,7 @@ export default function NotesWorkspace({
 
     if (inspectorDisplayTab === "attachments" && selectedAttachmentEvidence) {
       return (
-        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="attachments" active>
+        <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId="links" active>
           <NoteAttachmentInspector
             evidence={selectedAttachmentEvidence}
             selectedItem={selectedAttachmentItem}
@@ -2155,29 +2157,19 @@ export default function NotesWorkspace({
       <DetailTabPanel tabsId={`note-home-${selectedNote.id}`} tabId={inspectorDisplayTab} active>
         <div className={styles.overviewGrid}>
           <section className={styles.panel} data-wide="true">
-            <div className={styles.panelHeader}><h2>Note Body</h2><Link href={selectedNote.nativeRef.route}>Open full editor</Link></div>
-            <p>{selectedNote.body || "No body content recorded yet."}</p>
+            <div className={styles.panelHeader}><h2>Note</h2><Link href={selectedNote.nativeRef.route}>Open full editor</Link></div>
+            <NoteProse>{selectedNote.body || "No body content recorded yet."}</NoteProse>
           </section>
-          <section className={styles.panel}>
-            <h2>Review &amp; cleanup</h2>
+          <details className={styles.panel}>
+            <summary>Review details</summary>
             <div className={styles.factGrid}>
               <div className={styles.fact}><span>Next review</span><strong>{formatDate(selectedNote.nextReviewAt)}</strong></div>
               <div className={styles.fact}><span>Updated</span><strong>{formatDate(selectedNote.updatedAt)}</strong></div>
               <div className={styles.fact}><span>Review state</span><strong>{displayLabel(selectedNote.reviewState)}</strong></div>
               <div className={styles.fact}><span>Cadence</span><strong>{selectedNote.nextReviewAt ? formatNoteReviewCadence(selectedNote.reviewCadence) : "Not scheduled"}</strong></div>
             </div>
-          </section>
-          <section className={styles.panel}>
-            <h2>Quick actions</h2>
-            <QuickActionBar
-              actions={[
-                { id: "edit", label: "Open full editor", href: selectedNote.nativeRef.route, intent: "primary" },
-                 { id: "link", label: "Manage links", href: `${selectedNote.nativeRef.route}?tab=links` },
-                { id: "decision", label: "Review decision output", href: noteDecisionsRoute(selectedNote) },
-                { id: "schedule", label: selectedNote.nextReviewAt ? "Edit review schedule" : "Schedule review", onSelect: () => openReviewScheduleEditor(selectedNote) },
-              ]}
-            />
-          </section>
+          </details>
+          <RelatedRecords module="notes" type="note" id={selectedNote.id} />
           {relationValues.length > 0 && <section className={styles.panel} data-wide="true">
             <h2>Related references</h2>
             {relationValues.length ? (
@@ -2195,15 +2187,7 @@ export default function NotesWorkspace({
               </ul>
             ) : <p>No legacy source candidates.</p>}
           </section>}
-          <section className={styles.panel} data-wide="true">
-            <h2>Metadata</h2>
-            <div className={styles.factGrid}>
-              <div className={styles.fact}><span>Type</span><strong>{TYPE_LABELS[selectedNote.type]}</strong></div>
-              <div className={styles.fact}><span>Lifecycle</span><strong>{displayLabel(selectedNote.lifecycleStatus)}</strong></div>
-              <div className={styles.fact}><span>Privacy</span><strong>{displayLabel(selectedNote.privacy)}</strong></div>
-              <div className={styles.fact} data-mono="true"><span>UID</span><strong>{selectedNote.uid}</strong></div>
-            </div>
-          </section>
+
         </div>
       </DetailTabPanel>
     );
@@ -2217,13 +2201,13 @@ export default function NotesWorkspace({
       onRequestClose={() => setInspectorOpen(false)}
       className={inspectorOpen ? "is-open" : undefined}
       ariaLabel={selectedNote ? `${selectedNote.title} Note inspector` : "Note inspector"}
-      readOnly={!selectedNote?.capabilities.nativeLinks}
+
     >
       {selectedNote && (
         <DetailTabs
           id={`note-home-${selectedNote.id}`}
           tabs={HOME_TABS}
-          activeTab={inspectorDisplayTab}
+          activeTab={visibleNoteTab(inspectorDisplayTab)}
           onTabChange={(tab) => {
             const nextTab = tab as NotesTab;
             if (
@@ -2302,46 +2286,25 @@ export default function NotesWorkspace({
               <header className={styles.editorHeader}>
                 <div className={styles.editorHeadingRow}>
                   <div>
-                    <span className={styles.eyebrow}>Personal Note</span>
                     <h1>{currentNote.title}</h1>
-                    <p>Internal knowledge / {currentNote.areas[0] || "Unassigned"} / {displayLabel(currentNote.lifecycleStatus)}</p>
-                    <div className={styles.stateChips}>
-                      <span className={styles.stateChip} data-tone="blue">{TYPE_LABELS[currentNote.type]}</span>
-                      <span className={styles.stateChip} data-tone={currentNote.lifecycleStatus === "active" ? "green" : "amber"}>{displayLabel(currentNote.lifecycleStatus)}</span>
-                      <span className={styles.stateChip} data-tone={currentNote.reviewState === "needs_review" ? "pink" : "blue"}>{displayLabel(currentNote.reviewState)}</span>
-                    </div>
+                    <p>{TYPE_LABELS[currentNote.type]} · Updated {formatDate(currentNote.updatedAt)}</p>
                   </div>
                   <div className={styles.headerActions}>
                     <button type="button" className={styles.button} data-primary="true" onClick={() => void saveNote()} disabled={!editorDirty || saveState === "saving"}>{saveState === "saving" ? "Saving…" : "Save"}</button>
-                    <button type="button" className={styles.button} onClick={() => { setActiveTab("links"); updateUrl({ tab: "links" }); }}>Links</button>
-                    <button type="button" className={styles.button} onClick={() => openReviewScheduleEditor(currentNote)}>{currentNote.nextReviewAt ? "Edit review schedule" : "Schedule review"}</button>
-                    <button
-                      type="button"
-                      className={styles.button}
-                      onClick={() => {
-                        setActiveTab("decisions");
-                        updateUrl({ tab: "decisions" });
-                      }}
-                      aria-label={`Review Decision candidates and outputs for ${currentNote.title}`}
-                    >
-                      Decisions
-                    </button>
+                    <QuickActionBar maxVisible={0} ariaLabel="Note actions" actions={[
+                      { id: "attachments", label: "Attachments", onSelect: () => { setActiveTab("attachments"); updateUrl({ tab: "attachments" }); } },
+                      { id: "review", label: currentNote.nextReviewAt ? "Edit review schedule" : "Schedule review", onSelect: () => openReviewScheduleEditor(currentNote) },
+                      { id: "decisions", label: "Decisions", onSelect: () => { setActiveTab("decisions"); updateUrl({ tab: "decisions" }); } }
+                    ]} />
                   </div>
                 </div>
-                <div className={styles.editorMeta}>
-                  <div className={styles.fact}><span>Updated</span><strong>{formatDate(currentNote.updatedAt)}</strong></div>
-                  <div className={styles.fact}><span>Next review</span><strong>{formatDate(currentNote.nextReviewAt)}</strong></div>
-                  <div className={styles.fact}><span>Persistence</span><strong>Legacy adapter</strong></div>
-                  <div className={styles.fact} data-mono="true"><span>UID</span><strong>{currentNote.uid}</strong></div>
-                </div>
-                <DetailTabs id={detailTabsId} tabs={DETAIL_TABS} activeTab={activeTab === "overview" ? "body" : activeTab} onTabChange={(tab) => { setActiveTab(tab as NotesTab); updateUrl({ tab: tab as NotesTab }); }} className={styles.tabs} ariaLabel="Note detail tabs" />
+                <DetailTabs id={detailTabsId} tabs={DETAIL_TABS} activeTab={activeTab === "overview" ? "body" : visibleNoteTab(activeTab)} onTabChange={(tab) => { setActiveTab(tab as NotesTab); updateUrl({ tab: tab as NotesTab }); }} className={styles.tabs} ariaLabel="Note detail tabs" />
               </header>
 
               {activeTab === "body" || activeTab === "overview" ? (
                 <DetailTabPanel tabsId={detailTabsId} tabId="body" active>
                   <div className={styles.editorToolbar} role="toolbar" aria-label="Note formatting and object actions">
-                    <span className={styles.eyebrow}>Plain text</span>
-                    <span>Write freely. Manage references in Links and Attachments.</span>
+                    <WorkspaceButton aria-pressed={noteSource} onClick={() => setNoteSource(!noteSource)}>{noteSource ? "Read note" : "Edit Markdown"}</WorkspaceButton>
                     <button
                       type="button"
                       className={styles.button}
@@ -2374,10 +2337,10 @@ export default function NotesWorkspace({
                       <span id="note-type-readonly" className={styles.readOnlyNotice}>This note’s type is read-only.</span>
                       {!writableSelectedLifecycle && <span id="note-lifecycle-readonly" className={styles.readOnlyNotice}>This lifecycle is inferred from legacy status {displayLabel(currentNote.provenance.status)}. Saving title or body preserves that source status.</span>}
                     </div>
-                    <label className={`${styles.editorField} ${styles.editorBody}`}>
-                      Body
+                    {noteSource ? <label className={`${styles.editorField} ${styles.editorBody}`}>
+                      Markdown source
                       <textarea value={draftBody} onChange={(event) => setDraftBody(event.target.value)} placeholder="Capture authored internal knowledge." />
-                    </label>
+                    </label> : <NoteProse>{draftBody || "This note is empty. Choose Edit Markdown to begin."}</NoteProse>}
                     <div className={styles.bodyBoundary}><strong>Source-safe editor</strong><span>Downstream objects are never created silently and the body is not rewritten by AI.</span></div>
                     <div className={styles.editorSaveRow}>
                       <Link href={getModuleRoute("notes")}>Back to All Notes</Link>
@@ -2440,47 +2403,22 @@ export default function NotesWorkspace({
     >
       {propertyEditor}
       {reviewScheduleEditor}
-      <button type="button" className={`${styles.button} ${styles.mobileMenuButton}`} onClick={() => { setInspectorOpen(false); setMobileSidebarOpen(true); }} aria-label="Open Notes navigation">Menu</button>
+
       <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(true); }} disabled={!selectedNote}>Preview</button>
       {(mobileSidebarOpen || (isInspectorOverlay && inspectorOpen)) && <button type="button" className={styles.scrim} onClick={() => { setMobileSidebarOpen(false); setInspectorOpen(false); }} aria-label="Close overlay" />}
       <DirectoryPane className={styles.directory} ariaLabel="Notes directory and capture">
         <div className={styles.mainScroll}>
-          <header className={styles.directoryHeader}>
-            <div><h1>{VIEW_LABELS[view]}</h1><p>{unavailableViewReason ? "View unavailable" : `${visibleNotes.length} shown`} · {notes.length} {notes.length === 1 ? "note" : "notes"}</p></div>
-            <div className={styles.headerActions}>
-              <button type="button" className={styles.button} onClick={() => { const next = density === "compact" ? "comfortable" : "compact"; setDensity(next); updateUrl({ density: next }); }}>{density === "compact" ? "Comfortable" : "Compact"}</button>
-              <button type="button" className={styles.button} data-primary="true" onClick={openQuickCapture} aria-expanded={captureOpen && view === "all"} aria-controls="notes-quick-capture"><UnigentamosIcon role="plus" /> New Note</button>
-            </div>
-          </header>
-
-          <label className={styles.search}>
-            <span aria-hidden="true">/</span>
-            <input value={query} onChange={(event) => { setQuery(event.target.value); updateUrl({ query: event.target.value }); }} placeholder="Search notes, people, resources, projects..." aria-label="Search Notes" />
-            <kbd>{visibleNotes.length}</kbd>
-          </label>
-
-          <div className={styles.chipRow} tabIndex={-1} aria-label="Note filters">
-            {FILTERS.filter((item) => !item.disabledReason).map((item) => (
-              <button
-                type="button"
-                className={styles.chip}
-                data-tone={item.tone}
-                data-active={filter === item.id || undefined}
-                aria-disabled={Boolean(item.disabledReason) || undefined}
-                aria-describedby={item.disabledReason ? `note-filter-${item.id}-reason` : undefined}
-                title={item.disabledReason}
-                onClick={() => {
-                  if (item.disabledReason) {
-                    setNotice(item.disabledReason);
-                    return;
-                  }
-                  setFilter(item.id);
-                  updateUrl({ filter: item.id });
-                }}
-                key={item.id}
-              >{item.label}{item.disabledReason && <span id={`note-filter-${item.id}-reason`} className="sr-only">{item.disabledReason}</span>}</button>
-            ))}
-          </div>
+          <WorkspaceHeader title="Notes" count={visibleNotes.length}>
+            <button type="button" className={`${styles.button} ${styles.mobileMenuButton}`} onClick={() => { setInspectorOpen(false); setMobileSidebarOpen(true); }} aria-label="Open Notes navigation">Menu</button>
+            <WorkspaceButton intent="primary" icon="plus" onClick={openQuickCapture} aria-expanded={captureOpen && view === "all"} aria-controls="notes-quick-capture">Add note</WorkspaceButton>
+          </WorkspaceHeader>
+          <WorkspaceToolbar query={query} onQuery={value => { setQuery(value); updateUrl({query:value}); }} placeholder="Search Notes" activeFilters={filter === "all" ? 0 : 1}
+            filters={<div className={styles.chipRow}>{FILTERS.filter(item => !item.disabledReason).map(item => <WorkspaceButton key={item.id} aria-pressed={filter === item.id} onClick={() => { setFilter(item.id); updateUrl({filter:item.id}); }}>{item.label}</WorkspaceButton>)}</div>}>
+            <select className="work-compact-select" aria-label="Sort Notes" value={sort} onChange={event => { setSort(event.target.value as NotesSort); updateUrl({sort:event.target.value as NotesSort}); }}>
+              <option value="updated-desc">Recently updated</option><option value="updated-asc">Oldest update</option><option value="created-desc">Created date</option><option value="title">Title</option><option value="review">Next review</option>
+            </select>
+            <WorkspaceButton onClick={() => { const next = density === "compact" ? "comfortable" : "compact"; setDensity(next); updateUrl({density:next}); }}>{density === "compact" ? "Comfortable" : "Compact"}</WorkspaceButton>
+          </WorkspaceToolbar>
 
           {view === "all" && captureOpen && (
             <form id="notes-quick-capture" className={styles.capture} onSubmit={submitNote}>
@@ -2645,26 +2583,11 @@ export default function NotesWorkspace({
             </section>
           )}
 
-          <div className={styles.sortRow}>
-            <span>Sort</span>
-            <label className={styles.field}>
-              <span className="sr-only">Sort Notes</span>
-              <select value={sort} onChange={(event) => { setSort(event.target.value as NotesSort); updateUrl({ sort: event.target.value as NotesSort }); }}>
-                <option value="updated-desc">Recently updated</option>
-                <option value="updated-asc">Oldest update</option>
-                <option value="created-desc">Created date</option>
-                <option value="title">Title</option>
-                <option value="review">Next review</option>
-              </select>
-            </label>
-            <strong>{unavailableViewReason ? "View unavailable" : `${visibleNotes.length} shown`}</strong>
-          </div>
-
           {batchSelection.size > 0 && (
             <div className={styles.batchBar} role="toolbar" aria-label="Selected Notes actions">
               <strong>{batchSelection.size} selected</strong>
               <button type="button" className={styles.button} onClick={() => setBatchSelection(new Set())}>Clear</button>
-              <button type="button" className={styles.button} aria-disabled="true" onClick={() => setNotice("Batch archive requires native archive and audit support.")}>Archive unavailable</button>
+
             </div>
           )}
 
@@ -2698,14 +2621,13 @@ export default function NotesWorkspace({
                   <DenseObjectRow
                     id={note.id}
                     title={note.title}
-                    description={`${TYPE_LABELS[note.type]} · ${displayLabel(note.lifecycleStatus)} · ${item.area || "Unassigned"}`}
-                    metadata={`${item.bodyExcerpt} · updated ${formatDate(note.updatedAt)}`}
+                    description={item.bodyExcerpt.replace(/!?(?:\[([^\]]*)\]\([^)]*\))/g, "$1").replace(/[#*_>`~]/g, "")}
+                    metadata={`Updated ${formatDate(note.updatedAt)}`}
                     trailing={referenceTrailing || (view === "missing-properties" && propertyItem
                       ? <><strong>{propertyItem.attentionCount} property {propertyItem.attentionCount === 1 ? "item" : "items"}</strong><span>{propertyItem.primaryReason} first</span></>
-                      : <><strong>{displayLabel(note.reviewState)}</strong><span>{note.nextReviewAt ? `Review ${formatDate(note.nextReviewAt)}` : "No review date"}</span></>)}
+                      : view === "needs-review" ? <><strong>{displayLabel(note.reviewState)}</strong></> : null)}
                     selected={selectedNote?.id === note.id}
                     onSelect={() => selectNote(note.id)}
-                    checkbox={{ checked: batchSelection.has(note.id), onCheckedChange: (checked) => setBatch(note.id, checked), label: `Select ${note.title} for batch actions` }}
                     key={note.id}
                   />
                 );

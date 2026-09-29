@@ -32,7 +32,9 @@ const MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
   personal_ops: "Personal",
   reviews: "Reviews",
   resources: "Resources",
-  finance: "Finance"
+  finance: "Finance",
+  map: "Map",
+  calendar: "Calendar"
 };
 
 type DockPoint = { x: number; y: number };

@@ -1,3 +1,5 @@
+import { readPlanningState } from "../../../../lib/modules/planning/store";
+import { readPersonalLifeState } from "../../../../lib/modules/personal-life/store";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import {
@@ -26,6 +28,9 @@ type BootstrapObject = {
 };
 
 const COLLECTIONS = {
+  map: ["places", "savedViews"],
+  calendar: ["calendars", "events", "connections", "reminders"],
+  "personal-life": ["trips"],
   "personal-ops": ["goals", "decisions", "obligations", "followUps", "routines", "captures", "templates"],
   projects: ["projects", "milestones", "blockers", "links"],
   reviews: ["runs"],
@@ -107,13 +112,13 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: "Unauthorized" }, { status: 401 });
   }
   try {
-    const [personalRecords, personalOps, projects, reviews, finance, noteLinks] = await Promise.all([
+    const [personalRecords, personalOps, projects, reviews, finance, noteLinks, planning, life] = await Promise.all([
       readPersonalRecords(),
       readPersonalOpsState(),
       readProjectsState(),
       readReviewsState(),
       readFinanceState(),
-      readNoteLinksState()
+      readNoteLinksState(), readPlanningState(), readPersonalLifeState()
     ]);
     const personalObjects: BootstrapObject[] = personalRecords.map((record) => ({
       canonicalId: `personal-records:${record.className}:${record.id}`,
@@ -126,6 +131,9 @@ export async function GET() {
     }));
     const objects = attachNoteRelationships([
       ...personalObjects,
+      ...collectState("map", "other", planning as unknown as Record<string,unknown>, COLLECTIONS.map),
+      ...collectState("calendar", "other", planning as unknown as Record<string,unknown>, COLLECTIONS.calendar),
+      ...collectState("personal-life", "personal_ops", life as unknown as Record<string,unknown>, COLLECTIONS["personal-life"]),
       ...collectState("personal-ops", "personal_ops", personalOps as unknown as Record<string, unknown>, COLLECTIONS["personal-ops"]),
       ...collectState("projects", "project", projects as unknown as Record<string, unknown>, COLLECTIONS.projects),
       ...collectState("reviews", "review", reviews as unknown as Record<string, unknown>, COLLECTIONS.reviews),

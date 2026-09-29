@@ -1,4 +1,5 @@
 "use client";
+import RelatedRecords from "./planning/RelatedRecords";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
@@ -4893,13 +4894,7 @@ export default function PeopleWorkspace({
                       ); }) : <p>No objects yet.</p>}
                     </div>
                   </article>
-                  <article className="people-links-section is-files">
-                    <header className="people-linked-card-header">
-                      <div><h4>Files</h4></div>
-                      <strong className="people-section-count" aria-label="0 linked files">0</strong>
-                    </header>
-                    <p>No files yet.</p>
-                  </article>
+                  <RelatedRecords module="people" type={selectedPerson.className === "org" ? "organization" : "person"} id={selectedPerson.id} />
                   <article className="people-links-section is-resources">
                     <header className="people-linked-card-header">
                       <div><h4>Resources</h4></div>
@@ -4917,7 +4912,7 @@ export default function PeopleWorkspace({
               <section className="people-overview-grid">
                 <section className="people-overview-contact-strip" data-people-overview-card="contact" aria-label="Contact methods">
                   <div className="people-contact-methods-compact">
-                    {selectedContactMethods.map((method) => (
+                    {selectedContactMethods.filter(method=>method.available).map((method) => (
                       <button
                         type="button"
                         key={method.id}
@@ -4995,7 +4990,7 @@ export default function PeopleWorkspace({
                 <article className="people-overview-facts" data-people-overview-card="quick-info">
                   <h3 className="people-visually-hidden">Profile details</h3>
                   {(["life", "work", "relationships"] as const).map((group) => {
-                    const facts = overviewFacts.filter((fact) => fact.group === group);
+                    const facts = overviewFacts.filter((fact) => fact.group === group && Boolean(fact.value));
                     if (!facts.length) return null;
                     return <section className={`people-fact-cluster is-${group}`} aria-label={labelize(group)} key={group}>
                       {facts.map(({ label, value, icon }) => {
@@ -5019,7 +5014,7 @@ export default function PeopleWorkspace({
                       })}
                     </section>;
                   })}
-                  {selectedPerson.className === "person" && (
+                  {selectedPerson.className === "person" && overviewEducation.length > 0 && (
                     <section className="people-education-overview" aria-label="Education">
                       <span className="people-info-icon"><PeopleIcon name="university" /></span>
                       <div className="people-education-overview-copy">

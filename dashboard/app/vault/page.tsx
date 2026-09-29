@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import ExperienceProvider from "../../components/admin-shell/ExperienceProvider";
 import AppTopNav from "../../components/admin-shell/AppTopNav";
 import IconSystemProvider from "../../components/icons/IconSystemProvider";
 import VaultWorkspace from "../../components/VaultWorkspace";
@@ -23,8 +24,8 @@ export default async function VaultPage({
   const styleGuide = await readStyleGuideState().catch(() => defaultStyleGuideState());
   return (
     <IconSystemProvider selections={selectedIconMap(styleGuide.icons)}>
-      <AppTopNav showCommandSearch={false} />
-      <VaultWorkspace initialSearch={params.search?.slice(0, 500) || ""} initialKind={initialKind} focusSearch={params.focus === "search"} />
+      <ExperienceProvider><AppTopNav showCommandSearch={false} />
+      <VaultWorkspace initialSearch={params.search?.slice(0, 500) || ""} initialKind={initialKind} focusSearch={params.focus === "search"} /></ExperienceProvider>
     </IconSystemProvider>
   );
 }

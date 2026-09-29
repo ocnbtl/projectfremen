@@ -1,0 +1,55 @@
+import type { PlanningCollection } from "./types";
+
+export const planningOwner = (collection: PlanningCollection) =>
+  collection === "places" || collection === "savedViews"
+    ? ("map" as const)
+    : ("calendar" as const);
+export function planningWritableKeys(collection: PlanningCollection): string[] {
+  const keys: Record<PlanningCollection, string[]> = {
+    places: [
+      "name",
+      "address",
+      "latitude",
+      "longitude",
+      "notes",
+      "tags",
+      "linkedRefs",
+    ],
+    events: [
+      "title",
+      "description",
+      "start",
+      "end",
+      "timeZone",
+      "allDay",
+      "calendarId",
+      "placeId",
+      "location",
+      "linkedRefs",
+      "recurrence",
+      "recurrenceDates",
+      "participants",
+      "reminderMinutes",
+      "kind",
+      "exceptions",
+      "overrides",
+    ],
+    calendars: ["name", "color", "visible", "connectionId"],
+    connections: ["name", "kind", "url", "timeZone"],
+    savedViews: [
+      "name",
+      "query",
+      "tag",
+      "layer",
+      "level",
+      "stateCode",
+      "center",
+      "zoom",
+      "sort",
+      "dateFrom",
+      "dateTo",
+    ],
+    reminders: ["occurrenceId", "state", "until"],
+  };
+  return [...keys[collection], "archivedAt"];
+}

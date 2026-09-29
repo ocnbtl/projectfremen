@@ -1,3 +1,4 @@
+import {normalizeTrip} from "./trip-schema";
 import { mutateJsonFile, readJsonFile } from "../../file-store";
 import { createNativeObjectRef } from "../../native-objects/routes";
 import { isModuleId, type NativeObjectRef } from "../../native-objects/types";
@@ -198,21 +199,6 @@ function normalizeList(raw: Record<string, unknown>, now: string): PersonalList 
   };
 }
 
-function normalizeTrip(raw: Record<string, unknown>, now: string): PersonalTrip {
-  return {
-    ...base(raw, now),
-    name: text(raw.name, "Trip name", 240, true),
-    place: text(raw.place, "Place", 240, true),
-    region: text(raw.region, "Region", 160),
-    status: member(raw.status, ["been", "want", "lived", "planned"] as const, "want"),
-    travelMode: member(raw.travelMode, ["car", "plane", "train", "boat", "bus", "bike", "walk", "other"] as const, "plane"),
-    latitude: coordinate(raw.latitude, -90, 90),
-    longitude: coordinate(raw.longitude, -180, 180),
-    startDate: iso(raw.startDate, "Start date"),
-    endDate: iso(raw.endDate, "End date"),
-    notes: text(raw.notes, "Trip notes", 4_000)
-  };
-}
 
 function normalizeBuildItem(raw: Record<string, unknown>, now: string): PersonalBuildItem {
   return {
@@ -259,6 +245,7 @@ function normalizeObject<Collection extends PersonalLifeCollection>(
 
 function normalizeState(value: unknown): PersonalLifeState {
   if (!isRecord(value)) return emptyPersonalLifeState();
+  if(value.schemaVersion !== undefined && value.schemaVersion !== PERSONAL_LIFE_SCHEMA_VERSION)throw new Error("This Personal data needs a newer application version");
   const now = new Date().toISOString();
   return {
     schemaVersion: PERSONAL_LIFE_SCHEMA_VERSION,
@@ -275,12 +262,13 @@ export async function readPersonalLifeState(): Promise<PersonalLifeState> {
 
 export async function createPersonalLifeObject<Collection extends PersonalLifeCollection>(
   collection: Collection,
-  input: PersonalLifeInputByCollection[Collection]
+  input: PersonalLifeInputByCollection[Collection],
+  canonicalId?: string
 ): Promise<PersonalLifeObjectByCollection[Collection]> {
   return mutateJsonFile<unknown, PersonalLifeObjectByCollection[Collection]>(FILE_NAME, emptyPersonalLifeState(), (raw) => {
     const state = normalizeState(raw);
     const now = new Date().toISOString();
-    const item = normalizeObject(collection, { ...input, id: crypto.randomUUID(), createdAt: now, updatedAt: now }, now);
+    const item = normalizeObject(collection, { ...input, id: canonicalId || crypto.randomUUID(), createdAt: now, updatedAt: now }, now);
     return { value: { ...state, [collection]: [item, ...state[collection]] }, result: item };
   });
 }

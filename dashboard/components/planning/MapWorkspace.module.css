@@ -1,0 +1,168 @@
+.shell {
+  height: calc(100dvh - var(--app-content-offset));
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.workspace {
+  display: grid;
+  grid-template-columns: 340px minmax(0, 1fr);
+  flex: 1;
+  min-height: 0;
+  border-top: 1px solid #d5e2e7;
+}
+.directory {
+  overflow: auto;
+  border-right: 1px solid #d5e2e7;
+  padding-bottom: 80px;
+}
+.map {
+  position: relative;
+  min-height: 400px;
+  background: #f1f4ee;
+}
+.mapLoading {
+  padding: 24px;
+  color: #60747c;
+}
+.map :global(.map-provider-error) {
+  position: absolute;
+  top: 12px;
+  left: 16px;
+  right: 64px;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  z-index: 5;
+  font-size: 0.8125rem;
+}
+.placeCard {
+  position: absolute;
+  left: 20px;
+  bottom: 52px;
+  width: min(420px, calc(100% - 80px));
+  max-height: 50%;
+  overflow: auto;
+  background: white;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 8px 28px rgb(16 32 38 / 0.15);
+}
+.placeHeading {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: flex-start;
+}
+.placeHeading h2 {
+  font: 600 1.125rem/1.5 var(--font-heading);
+  margin: 0;
+}
+.placeCard p {
+  margin: 8px 0 16px;
+  line-height: 1.5;
+}
+.savedViews,
+.layers {
+  padding: 16px;
+  border-bottom: 1px solid #d5e2e7;
+}
+.savedViews summary,
+.layers summary {
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 32px;
+}
+.savedViews[open] summary,
+.layers[open] summary {
+  margin-bottom: 16px;
+}
+.searchResults h2,
+.trips h2 {
+  font: 600 1rem/1.5 var(--font-heading);
+  padding: 16px 16px 0;
+  margin: 0;
+}
+.trips {
+  border-top: 1px solid #d5e2e7;
+}
+.hint {
+  padding: 0 24px 12px;
+  margin: 0;
+  color: #526442;
+}
+.listToggle {
+  display: none;
+}
+.stop {
+  padding: 12px 0;
+  border-bottom: 1px solid #d5e2e7;
+  display: grid;
+  gap: 8px;
+}
+.legend {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+}
+.legend i {
+  height: 10px;
+  flex: 1;
+  background: linear-gradient(90deg, #e3ead9, #526442);
+}
+.regionTable {
+  max-height: 360px;
+  overflow: auto;
+}
+.regionTable > div {
+  display: grid;
+  gap: 4px;
+  padding: 12px 0;
+  border-bottom: 1px solid #d5e2e7;
+}
+.regionTable span {
+  font-variant-numeric: tabular-nums;
+}
+.regionTable small {
+  color: #60747c;
+}
+@media (max-width: 1024px) {
+  .workspace {
+    grid-template-columns: 300px minmax(0, 1fr);
+  }
+}
+@media (max-width: 760px) {
+  .workspace {
+    display: block;
+    position: relative;
+  }
+  .map {
+    height: 100%;
+    min-height: 360px;
+  }
+  .directory {
+    display: none;
+    height: 100%;
+    border: 0;
+  }
+  .directory[data-mobile-open="true"] {
+    display: block;
+  }
+  .map[data-mobile-hidden="true"] {
+    display: none;
+  }
+  .listToggle {
+    display: inline-flex;
+  }
+  .placeCard {
+    left: 12px;
+    bottom: 56px;
+    padding: 16px;
+    width: calc(100% - 68px);
+    max-height: 45%;
+  }
+  .hint {
+    padding-inline: 16px;
+  }
+}

@@ -17,7 +17,7 @@ export default function FinanceOverviewInspector({ model, selection, mobileOpen,
   const rows = emptyView ? [] : selectedRows;
   const income = rows.filter(t => t.direction === "income").reduce((s, t) => s + Math.round(t.amount * 100), 0) / 100;
   const spending = rows.filter(t => t.direction === "expense").reduce((s, t) => s + Math.round(t.amount * 100), 0) / 100;
-  const title = emptyView ? `${emptyView} details` : transaction?.merchant || category || (period ? `${overviewDate(period.id)}${period.id !== period.to ? ` – ${overviewDate(period.to)}` : ""}` : "Your money at a glance");
+  const title = emptyView ? `${emptyView} details` : transaction?.merchant || category || (period ? `${overviewDate(period.id)}${period.id !== period.to ? ` – ${overviewDate(period.to)}` : ""}` : "Transactions in this view");
   const merchants = new Map<string, number>();
   rows.filter(t => t.direction === "expense").forEach(t => merchants.set(t.merchant, (merchants.get(t.merchant) || 0) + t.amount));
   const topMerchants = [...merchants].sort((a, b) => b[1] - a[1]).slice(0, 4);
@@ -34,8 +34,8 @@ export default function FinanceOverviewInspector({ model, selection, mobileOpen,
           {transaction.memo && <section><h3>Notes</h3><p className="finance-detail-notes">{transaction.memo}</p></section>}
           <button type="button" className="finance-action is-primary" onClick={() => onOpenTransaction(transaction.id)}>Open transaction <Icon name="Chevron" /></button>
         </> : <>
-          <div className="finance-detail-amount"><span>{category ? "Category spending" : "Net cash flow"}</span><strong>{money(category ? spending : income - spending, { cents: true })}</strong><small>{rows.length} matching transaction{rows.length === 1 ? "" : "s"}</small></div>
-          {!category && <div className="finance-detail-in-out"><div><span>Income</span><strong>{money(income, { cents: true })}</strong></div><div><span>Spending</span><strong>{money(spending, { cents: true })}</strong></div></div>}
+          {(period || category) && <div className="finance-detail-amount"><span>{category ? "Category spending" : "Net cash flow"}</span><strong>{money(category ? spending : income - spending, { cents: true })}</strong><small>{rows.length} matching transaction{rows.length === 1 ? "" : "s"}</small></div>}
+          {period && !category && <div className="finance-detail-in-out"><div><span>Income</span><strong>{money(income, { cents: true })}</strong></div><div><span>Spending</span><strong>{money(spending, { cents: true })}</strong></div></div>}
           {!!topMerchants.length && <section><h3>Largest destinations</h3><dl className="finance-detail-facts">{topMerchants.map(([merchant, amount]) => <div key={merchant}><dt>{merchant}</dt><dd>{money(amount, { cents: true })}</dd></div>)}</dl></section>}
           <section><h3>Behind the numbers</h3><div className="finance-detail-transactions">{rows.slice(0, limit).map(t => <button type="button" key={t.id} onClick={() => onSelect({ kind: "transaction", id: t.id })}><IconTile hue={t.direction === "income" ? "green" : "brown"} icon="Banknote" /><span><strong>{t.merchant}</strong><small>{overviewDate(t.occurredOn)} · {model.accountNames.get(t.accountId)}</small><small>{t.category}{t.status === "pending" ? " · pending" : ""}</small></span><strong>{money(t.direction === "income" ? t.amount : -t.amount, { sign: true, cents: true })}</strong></button>)}</div>{rows.length > limit && <button type="button" className="finance-text-action" onClick={() => setLimit(current => current + 30)}>Show more transactions ({rows.length - limit} remaining)</button>}{!rows.length && <p className="finance-inline-empty">No transactions match the current chart filters.</p>}</section>
         </>}

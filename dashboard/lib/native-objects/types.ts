@@ -6,7 +6,9 @@ export const NATIVE_MODULES = [
   "personal_ops",
   "reviews",
   "resources",
-  "finance"
+  "finance",
+  "map",
+  "calendar"
 ] as const;
 
 export type ModuleId = (typeof NATIVE_MODULES)[number];

@@ -1,3 +1,8 @@
+import { TRIP_WRITABLE_KEYS } from "../modules/personal-life/trip-schema";
+import type {PersonalLifeInputByCollection} from "../modules/personal-life/types";
+import { readPlanningState, savePlanningRecord, isPlanningCollection } from "../modules/planning/store";
+import { readPersonalLifeState, updatePersonalLifeObject, createPersonalLifeObject } from "../modules/personal-life/store";
+import { planningOwner, planningWritableKeys } from "../modules/planning/ownership";
 import { threeWayMergeText } from "./merge";
 import {
   canonicalVaultFields,
@@ -107,6 +112,8 @@ function mutationPatch(
 }
 
 async function readCanonicalRecord(module: CanonicalModule, collection: string, recordId: string): Promise<Record<string, unknown> | null> {
+  if (isPlanningCollection(collection) && planningOwner(collection) === module) return (await readPlanningState())[collection].find(item => item.id === recordId) as unknown as Record<string,unknown> || null;
+  if (module === "personal-life" && collection === "trips") return (await readPersonalLifeState()).trips.find(item => item.id === recordId) as unknown as Record<string,unknown> || null;
   if (module === "personal-records") {
     return (await readPersonalRecords()).find((item) => item.id === recordId) as unknown as Record<string, unknown> || null;
   }
@@ -133,7 +140,7 @@ async function readCanonicalRecord(module: CanonicalModule, collection: string, 
 }
 
 async function createPersonal(command: VaultPendingCanonicalCommand, collection: string, recordId: string): Promise<Record<string, unknown>> {
-  if (!["note", "person", "org", "resource"].includes(collection)) throw new Error("This record type must be created in its full module view");
+  if (!["note", "person", "org", "resource", "file"].includes(collection)) throw new Error("This record type must be created in its full module view");
   const title = typeof command.patch.title === "string" ? command.patch.title.trim() : "";
   if (!title) throw new Error("Title or name is required");
   const profile: Record<string, unknown> = {};
@@ -147,7 +154,8 @@ async function createPersonal(command: VaultPendingCanonicalCommand, collection:
     body: typeof command.patch.body === "string" ? command.patch.body : "",
     url: typeof command.patch.url === "string" ? command.patch.url : "",
     starred: command.patch.starred === true,
-    profile
+    profile,
+    ...(collection === "file" ? {mediaProfile:command.patch.mediaProfile as never} : {})
   }, { requestedId: recordId });
   const created = items.find((item) => item.id === recordId);
   if (!created) throw new Error("The new record could not be confirmed");
@@ -157,7 +165,7 @@ async function createPersonal(command: VaultPendingCanonicalCommand, collection:
 function parseCanonicalIdentity(canonicalId: string): { module: CanonicalModule; collection: string; recordId: string } {
   const [module, collection, ...recordParts] = canonicalId.split(":");
   const recordId = recordParts.join(":");
-  if (!recordId || !["personal-records", "projects", "personal-ops", "reviews", "finance"].includes(module)) {
+  if (!recordId || !["personal-records", "projects", "personal-ops", "reviews", "finance", "map", "calendar", "personal-life"].includes(module)) {
     throw new Error("Canonical record identity is invalid");
   }
   return { module: module as CanonicalModule, collection, recordId };
@@ -200,7 +208,7 @@ async function canonicalNativeRef(canonicalId: string): Promise<NativeObjectRef>
   const record = await readCanonicalRecord(identity.module, identity.collection, identity.recordId);
   if (!record || recordArchived(identity.module, identity.collection, record)) throw new Error("The relationship target is unavailable or archived");
   const module: ModuleId = identity.module === "personal-records" ? personalRefModule(identity.collection)
-    : identity.module === "personal-ops" ? "personal_ops" : identity.module;
+    : identity.module === "personal-ops" || identity.module === "personal-life" ? "personal_ops" : identity.module;
   const objectType = identity.module === "personal-records" ? personalRefObjectType(identity.collection)
     : identity.module === "projects" ? ({ projects: "project", milestones: "project_milestone", blockers: "project_blocker", links: "project_link" }[identity.collection] || "project")
       : identity.module === "reviews" ? "review_run"
@@ -417,6 +425,15 @@ async function applyUpdate(
   if (!Object.keys(patch).length) return current;
   const expectedUpdatedAt = String(current.updatedAt || "");
   if (!expectedUpdatedAt) throw new Error("The record is missing its concurrency version");
+  if (isPlanningCollection(collection) && planningOwner(collection) === module) {
+    const { exceptions, overrides, archivedAt, ...changes } = patch;
+    const input = collection === "events" && current.source ? {
+      id:recordId, overrides:{ ...(current.overrides as object || {}), ...changes, ...(overrides as object || {}) },
+      exceptions:exceptions ?? current.exceptions, archivedAt:archivedAt ?? current.archivedAt
+    } : {id:recordId,...patch};
+    return await savePlanningRecord(collection,input,expectedUpdatedAt) as unknown as Record<string,unknown>;
+  }
+  if (module === "personal-life" && collection === "trips") return await updatePersonalLifeObject("trips",recordId,patch,expectedUpdatedAt) as unknown as Record<string,unknown>;
   if (module === "personal-records") {
     const nested: Record<string, unknown> = {};
     for (const [field, value] of Object.entries(patch)) setNested(nested, field, value);
@@ -467,19 +484,28 @@ export async function reconcileCanonicalRecord(command: VaultPendingCanonicalCom
       objectKind: canonicalModule === "personal-records" ? objectKindForPersonalCollection(collection)
         : canonicalModule === "projects" ? "project"
           : canonicalModule === "personal-ops" ? "personal_ops"
-            : canonicalModule === "reviews" ? "review" : "finance",
+            : canonicalModule === "reviews" ? "review" : canonicalModule === "finance" ? "finance" : canonicalModule === "personal-life" ? "personal_ops" : "other",
       fields: canonicalVaultFields({ module: canonicalModule, collection, record: item }),
       mergedFields: [],
       keptNewerFields: []
     };
   }
-  const allowed = editableFieldsFor(canonicalModule, collection).map((field) => field.key);
+  const planning = isPlanningCollection(collection) && planningOwner(collection) === canonicalModule;
+  const allowed = planning ? planningWritableKeys(collection) : canonicalModule === "personal-life" && collection === "trips" ? TRIP_WRITABLE_KEYS : editableFieldsFor(canonicalModule, collection).map((field) => field.key);
   if (!allowed.length || Object.keys(command.patch).some((field) => !allowed.includes(field))) {
     throw new Error("The offline change contains a field that is not editable here");
   }
   if (!current) {
-    if (command.operation !== "create" || canonicalModule !== "personal-records") throw new Error("Canonical record not found");
-    current = await createPersonal(command, collection, recordId);
+    if (command.operation !== "create") throw new Error("Canonical record not found");
+    if (planning && isPlanningCollection(collection)) current = await savePlanningRecord(collection,{...command.patch,id:recordId}) as unknown as Record<string,unknown>;
+    else if (canonicalModule === "personal-life" && collection === "trips") current = await createPersonalLifeObject("trips",command.patch as unknown as PersonalLifeInputByCollection["trips"],recordId) as unknown as Record<string,unknown>;
+    else if (canonicalModule === "personal-records") current = await createPersonal(command, collection, recordId);
+    else throw new Error("Create this record in its owner workspace");
+  }
+  if ((planning || canonicalModule === "personal-life") && command.operation !== "create" && command.baseUpdatedAt !== current.updatedAt) {
+    // Timing, coordinates, and ordering cannot be resolved with last-writer-wins.
+    const conflicts = Object.keys(command.patch).filter(key => !valueEqual(getNested(current!,key),command.baseFields[key]) && !valueEqual(getNested(current!,key),command.patch[key]));
+    if (conflicts.length) throw Object.assign(new Error(`Saved offline changes conflict in: ${conflicts.join(", ")}. Open the record to review both versions.`),{status:409});
   }
   const merged = mutationPatch(command, current, allowed);
   const item = command.operation === "create"
@@ -490,7 +516,7 @@ export async function reconcileCanonicalRecord(command: VaultPendingCanonicalCom
     objectKind: canonicalModule === "personal-records" ? objectKindForPersonalCollection(collection)
       : canonicalModule === "projects" ? "project"
         : canonicalModule === "personal-ops" ? "personal_ops"
-          : canonicalModule === "reviews" ? "review" : "finance",
+          : canonicalModule === "reviews" ? "review" : canonicalModule === "finance" ? "finance" : canonicalModule === "personal-life" ? "personal_ops" : "other",
     fields: canonicalVaultFields({ module: canonicalModule, collection, record: item }),
     mergedFields: merged.mergedFields,
     keptNewerFields: merged.keptNewerFields

@@ -1,6 +1,6 @@
 .shell {
-  grid-template-columns: clamp(232px, 17.5vw, 304px) minmax(440px, 38vw) minmax(420px, 1fr);
-  height: calc(100dvh - var(--app-content-offset, 76px));
+  grid-template-columns: 208px minmax(320px, 26vw) minmax(420px, 1fr);
+  height: calc(100dvh - var(--app-content-offset, 64px));
   min-height: 0;
   overflow: hidden;
   border-top: 1px solid var(--border);
@@ -8,13 +8,13 @@
 }
 
 .detailShell {
-  grid-template-columns: clamp(232px, 17.5vw, 304px) minmax(560px, 1fr) minmax(390px, 32vw);
+  grid-template-columns: 208px minmax(520px, 1fr) minmax(320px, 26vw);
 }
 
 .loadingShell {
   display: grid;
-  grid-template-columns: clamp(232px, 17.5vw, 304px) minmax(440px, 38vw) minmax(420px, 1fr);
-  min-height: calc(100dvh - var(--app-content-offset, 76px));
+  grid-template-columns: 208px minmax(320px, 26vw) minmax(420px, 1fr);
+  min-height: calc(100dvh - var(--app-content-offset, 64px));
   border-top: 1px solid var(--border);
   background: var(--shell-bg);
 }
@@ -77,8 +77,8 @@
 
 .sidebar :global(.module-sidebar__item-count) {
   color: var(--text-muted);
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-body);
+  font-size: .8125rem;
 }
 
 .sidebar :global(.module-sidebar__footer) {
@@ -89,7 +89,7 @@
 .sidebarFootnote {
   margin: 0;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
   line-height: 1.45;
 }
 
@@ -133,7 +133,7 @@
 }
 
 .directoryHeader h1 {
-  font: 900 clamp(24px, 2.2vw, 32px)/1.05 var(--font-heading);
+  font: 650 1.75rem/1.215 var(--font-heading);
   letter-spacing: -0.035em;
 }
 
@@ -141,7 +141,7 @@
   margin-top: 4px;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .shell :global(.quick-action-bar) {
@@ -179,12 +179,12 @@
 .sortButton,
 .linkButton {
   width: auto;
-  min-height: 36px;
+  min-height: 40px;
   border: 1px solid var(--border-strong);
   border-radius: 7px;
   background: var(--panel-bg);
   color: var(--text-strong);
-  font: 850 12px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .button,
@@ -223,7 +223,7 @@
   border-radius: 999px;
   background: var(--panel-bg);
   color: var(--text-muted);
-  font: 800 11px/1 var(--font-mono);
+  font: 550 12px/1 var(--font-mono);
 }
 
 .resourceToolbar {
@@ -325,7 +325,7 @@
   border-radius: 6px;
   background: transparent;
   color: var(--text-body);
-  font: 700 10px/1.25 var(--font-heading);
+  font: 550 12px/1.25 var(--font-heading);
   text-align: left;
 }
 
@@ -390,7 +390,7 @@
 }
 
 .search kbd {
-  font: 700 10px var(--font-mono);
+  font: 550 12px var(--font-mono);
 }
 
 .chipRow {
@@ -471,14 +471,14 @@
 .eyebrow {
   display: block;
   color: var(--text-muted);
-  font: 900 10px var(--font-heading);
+  font: 550 12px var(--font-heading);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .capture h2 {
   margin: 3px 0 0;
-  font: 900 18px var(--font-heading);
+  font: 550 18px var(--font-heading);
 }
 
 .captureGrid {
@@ -498,7 +498,7 @@
   display: grid;
   gap: 6px;
   color: var(--text-muted);
-  font: 850 11px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .field input,
@@ -560,11 +560,11 @@
 
 .projectAssociationCheckbox strong {
   color: var(--text-strong);
-  font: 850 11px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .projectAssociationCheckbox small {
-  font-size: 10px;
+  font-size: .8125rem;
   line-height: 1.35;
 }
 
@@ -599,7 +599,7 @@
   margin-bottom: 12px;
   padding: 8px 12px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
 }
 
 .sortRow strong {
@@ -674,7 +674,7 @@
 
 .shell :global(.dense-object-row__content > strong) {
   overflow: hidden;
-  font: 900 15px var(--font-heading);
+  font: 550 15px var(--font-heading);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -682,14 +682,14 @@
 .shell :global(.dense-object-row__content > span) {
   overflow: hidden;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .shell :global(.dense-object-row__metadata) {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-body);
+  font-size: .8125rem;
 }
 
 .shell :global(.dense-object-row__trailing) {
@@ -697,7 +697,7 @@
   gap: 4px;
   justify-items: end;
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: .8125rem;
   white-space: nowrap;
 }
 
@@ -708,7 +708,7 @@
   border: 1px solid var(--border-strong);
   border-radius: 8px;
   background: var(--selected-bg);
-  font-size: 11px;
+  font-size: .8125rem;
 }
 
 .batchBar strong {
@@ -755,14 +755,14 @@
 
 .shell :global(.object-header__avatar) {
   display: grid;
-  flex: 0 0 62px;
-  width: 62px;
-  height: 62px;
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
   place-items: center;
   border: 1px solid var(--border);
   border-radius: 8px;
   background: #f2f7f6;
-  font: 900 26px var(--font-heading);
+  font: 550 20px var(--font-heading);
 }
 
 .shell :global(.object-header__heading) {
@@ -771,16 +771,15 @@
 
 .shell :global(.object-header__heading h1) {
   overflow-wrap: anywhere;
-  font-size: clamp(25px, 2.25vw, 36px);
-  line-height: 1.04;
-  letter-spacing: -0.04em;
+  font:650 1.5rem/1.875rem var(--font-heading);
+  letter-spacing: -0.02em;
 }
 
 .shell :global(.object-header__subtitle) {
   margin-top: 4px;
   color: var(--text-muted);
   font-size: 12px;
-  font-weight: 750;
+  font-weight: 600;
 }
 
 .shell :global(.object-header__states) {
@@ -823,7 +822,7 @@
   border-radius: 999px;
   background: #edf3f4;
   color: var(--text);
-  font: 850 10px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .stateChip[data-tone="green"] { background: #dff5e8; color: #216e4a; }
@@ -875,7 +874,7 @@
 
 .panel h2,
 .panel h3 {
-  font: 900 17px var(--font-heading);
+  font: 550 17px var(--font-heading);
 }
 
 .panel p {
@@ -916,19 +915,19 @@
   grid-area: label;
   min-width: 0;
   color: var(--text-muted);
-  font: 850 10px/1.25 var(--font-heading);
+  font: 550 12px/1.25 var(--font-heading);
 }
 
 .metricTile strong {
   grid-area: value;
   color: var(--text-strong);
-  font: 800 14px/1 var(--font-mono);
+  font: 550 14px/1 var(--font-mono);
 }
 
 .metricTile small {
   grid-area: note;
   color: var(--text-faint);
-  font: 750 9px/1.2 var(--font-heading);
+  font: 550 12px/1.2 var(--font-heading);
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
@@ -982,13 +981,13 @@
 .reviewQueueBoundary strong,
 .propertiesBoundary strong {
   color: var(--text-strong);
-  font: 850 12px/1.3 var(--font-heading);
+  font: 550 12px/1.3 var(--font-heading);
 }
 
 .reviewQueueBoundary span,
 .propertiesBoundary span {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
   line-height: 1.45;
 }
 
@@ -1034,12 +1033,12 @@
 
 .propertyRows strong {
   color: var(--text-strong);
-  font: 800 11px/1.3 var(--font-heading);
+  font: 550 12px/1.3 var(--font-heading);
 }
 
 .propertyRows small {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: .8125rem;
   line-height: 1.35;
 }
 
@@ -1080,12 +1079,12 @@
 
 .propertyRuleButton strong {
   color: var(--text-strong);
-  font: 850 11px/1.3 var(--font-heading);
+  font: 550 12px/1.3 var(--font-heading);
 }
 
 .propertyRuleButton span {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: .8125rem;
   line-height: 1.4;
 }
 
@@ -1106,7 +1105,7 @@
 .propertyDisclosure > summary {
   min-height: 24px;
   color: var(--text-strong);
-  font: 850 12px/24px var(--font-heading);
+  font: 550 12px/24px var(--font-heading);
   cursor: pointer;
 }
 
@@ -1131,7 +1130,7 @@
 
 .fact span {
   color: var(--text-muted);
-  font: 850 10px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .fact strong {
@@ -1181,17 +1180,17 @@
 
 .queueGroupHeader h2,
 .readinessHeader h2 {
-  font: 900 18px/1.15 var(--font-heading);
+  font: 550 18px/1.15 var(--font-heading);
 }
 
 .queueGroupHeader p {
   margin-top: 3px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
 }
 
 .queueGroupHeader > strong {
-  font: 800 13px var(--font-mono);
+  font: 550 13px var(--font-mono);
 }
 
 .readinessChecklist {
@@ -1226,12 +1225,12 @@
 
 .readinessChecklist li strong {
   color: var(--text-strong);
-  font: 850 11px/1.25 var(--font-heading);
+  font: 550 12px/1.25 var(--font-heading);
 }
 
 .readinessChecklist li small {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: .8125rem;
   line-height: 1.4;
 }
 
@@ -1243,7 +1242,7 @@
   border-radius: 999px;
   background: #fff0d7;
   color: #8a5a1e;
-  font: 900 11px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .readinessChecklist li[data-supported="true"] .checkMarker {
@@ -1263,7 +1262,7 @@
   border: 1px solid var(--border);
   border-radius: 7px;
   background: var(--panel-bg-subtle);
-  font-size: 11px;
+  font-size: .8125rem;
 }
 
 .objectList li span,
@@ -1282,7 +1281,7 @@
 .sourceList li small,
 .objectList li small {
   color: var(--text-muted);
-  font-size: 10px;
+  font-size: .8125rem;
   line-height: 1.4;
 }
 
@@ -1332,7 +1331,7 @@
   margin: 12px 0;
   padding: 10px 12px;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
 }
 
 .readOnlyNotice strong {
@@ -1393,8 +1392,7 @@
   margin: -20px -20px 0;
   padding: 18px 20px 12px;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--shell-bg-alt) 96%, transparent);
-  backdrop-filter: blur(12px);
+  background: var(--shell-bg-alt);
 }
 
 .editorHeadingRow {
@@ -1405,8 +1403,8 @@
 }
 
 .editorHeader h1 {
-  font: 900 clamp(28px, 3vw, 42px)/1.05 var(--font-heading);
-  letter-spacing: -0.045em;
+  font: 650 1.5rem/1.25 var(--font-heading);
+  letter-spacing: -0.02em;
 }
 
 .editorMeta {
@@ -1416,9 +1414,7 @@
 }
 
 .editorToolbar {
-  position: sticky;
-  top: 148px;
-  z-index: 6;
+  position: static;
   min-height: 50px;
   margin: 0 0 12px;
   padding: 7px 10px;
@@ -1436,7 +1432,7 @@
   border-radius: 999px;
   background: #e7f6ed;
   color: #216e4a;
-  font: 850 10px var(--font-heading);
+  font: 550 12px var(--font-heading);
 }
 
 .saveState[data-state="unsaved"],
@@ -1459,7 +1455,7 @@
 
 .editorTitle input {
   min-height: 52px;
-  font: 900 24px var(--font-heading);
+  font: 550 24px var(--font-heading);
   letter-spacing: -0.025em;
 }
 
@@ -1480,7 +1476,7 @@
   border-radius: 7px;
   background: var(--panel-bg-subtle);
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
 }
 
 .sourceBoundary {
@@ -1490,12 +1486,12 @@
   border-left: 3px solid #2b7ba0;
   background: #f5fafc;
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: .8125rem;
 }
 
 .technicalRow {
-  font-family: var(--font-mono);
-  font-size: 10px;
+  font-family: var(--font-body);
+  font-size: .8125rem;
 }
 
 .previewPlaceholder {
@@ -1515,7 +1511,7 @@
     width: auto;
     padding-right: 6px;
     padding-left: 6px;
-    font-size: 10px;
+    font-size: .8125rem;
   }
 
   .detailShell .editorHeadingRow {
@@ -1527,7 +1523,7 @@
   }
 
   .detailShell .editorHeader h1 {
-    font-size: clamp(30px, 3vw, 38px);
+    font-size: 1.5rem;
   }
 
   .detailShell .editorToolbar {
@@ -1562,7 +1558,7 @@
 
   .shell > :global(.inspector-rail) {
     position: fixed;
-    top: 68px;
+    top: var(--app-content-offset);
     right: 0;
     bottom: 0;
     z-index: 98;
@@ -1595,7 +1591,7 @@
 
   .scrim {
     position: fixed;
-    inset: 68px 0 0;
+    inset: var(--app-content-offset) 0 0;
     z-index: 97;
     display: block;
     border: 0;
@@ -1607,7 +1603,7 @@
   .shell,
   .detailShell {
     display: block;
-    height: calc(100dvh - var(--app-content-offset, 76px));
+    height: calc(100dvh - var(--app-content-offset, 64px));
     overflow: hidden;
   }
 
@@ -1626,7 +1622,7 @@
 
   .shell > :global(.module-sidebar) {
     position: fixed;
-    top: 68px;
+    top: var(--app-content-offset);
     bottom: 0;
     left: 0;
     z-index: 100;
@@ -1764,7 +1760,7 @@
     min-width: 44px;
     min-height: 45px;
     padding-inline: 4px;
-    font-size: 10px;
+    font-size: .8125rem;
   }
 
   .tabs {
@@ -1773,7 +1769,7 @@
   }
 
   .shell > :global(.inspector-rail) {
-    top: 68px;
+    top: var(--app-content-offset);
     width: 100vw;
     max-width: none;
   }
@@ -1918,4 +1914,16 @@
   .shell > :global(.inspector-rail) {
     transition: none;
   }
+}
+
+.mainScroll :global(.work-header), .mainScroll :global(.work-toolbar), .mainScroll :global(.work-filters) { padding-inline: 0; }
+.mainScroll :global(.work-header) { padding-top: 0; }
+.mainScroll :global(.work-toolbar) { flex-wrap: wrap; }
+.editorBody textarea { font: 400 1rem/1.5625 var(--font-body); }
+.overviewGrid > .panel { border: 0; border-top: 1px solid var(--border); border-radius: 0; padding-inline: 0; box-shadow: none; }
+
+@media(max-width:760px){
+ .shell[data-module="notes"]:not(.detailShell) .mainScroll {padding:0 16px 100px;}
+ .shell[data-module="notes"]:not(.detailShell) .mobileInspectorButton {display:none;}
+ .shell[data-module="notes"] :global(.work-header) .mobileMenuButton {position:static;margin:0;width:44px;padding:8px;}
 }

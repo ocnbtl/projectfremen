@@ -1,4 +1,10 @@
+"use client";
+import { useState } from "react";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import type { CSSProperties, ReactNode } from "react";
+import { ICON_REGISTRY_BY_ID } from "../../lib/icons/icon-registry";
+import { PERSONAL_OPS_ICON_LIBRARY } from "../personal-ops/PersonalOpsIcon";
+import type { ResourceRecord } from "../../lib/modules/resources/types";
 import type { ResourceGradient } from "../../lib/modules/resources/types";
 import PersonalOpsIcon, { type PersonalOpsIconName } from "../personal-ops/PersonalOpsIcon";
 import styles from "./ResourceExperience.module.css";
@@ -17,16 +23,15 @@ export function resourceGradientStyle(gradient: ResourceGradient): CSSProperties
   return { background };
 }
 
-export function ResourceMark({ gradient, className = "", label }: { gradient: ResourceGradient; className?: string; label?: string }) {
-  return (
-    <span
-      className={[styles.resourceMark, className].filter(Boolean).join(" ")}
-      style={resourceGradientStyle(gradient)}
-      aria-label={label}
-      role={label ? "img" : undefined}
-      aria-hidden={label ? undefined : true}
-    />
-  );
+export function ResourceMark({ gradient, className = "", label, imageUrl, resource }: { resource?: ResourceRecord; gradient: ResourceGradient; className?: string; label?: string; imageUrl?: string }) {
+  const [failed,setFailed]=useState(false);
+  // The chosen gradient remains editable in Properties. Record identity uses its source image or a semantic fallback.
+  void gradient;
+  const role = resource?.provenance.subjects.find(t=>t.startsWith("Icon role:"))?.slice(10).trim();
+  const icon = resource?.provenance.subjects.find(t=>t.startsWith("Icon:"))?.slice(5).trim();
+  const selectedIcon = role && ICON_REGISTRY_BY_ID.has(role) ? <UnigentamosIcon role={role} size={24}/> : icon && PERSONAL_OPS_ICON_LIBRARY.some(i=>i.name===icon) ? <PersonalOpsIcon name={icon as PersonalOpsIconName}/> : null;
+  let safe="";try{const u=new URL(imageUrl || "");if(u.protocol==="https:"&&!u.username&&!u.password)safe=u.href;}catch{}
+  return <span className={[styles.resourceMark,className].filter(Boolean).join(" ")} aria-label={label} aria-hidden={label?undefined:true}>{selectedIcon || (safe&&!failed?<img src={safe} alt="" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:<UnigentamosIcon role="resource" size={24}/>)}</span>;
 }
 
 export function ResourceIconButton({

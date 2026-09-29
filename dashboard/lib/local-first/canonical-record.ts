@@ -4,7 +4,7 @@ export const VAULT_CANONICAL_RECORD_FIELD = "__unigentamosCanonicalRecordV1";
 export const VAULT_CANONICAL_RELATIONSHIPS_FIELD = "__unigentamosCanonicalRelationshipsV1";
 export const VAULT_PENDING_COMMAND_PREFIX = "__unigentamosPendingCommandV1:";
 
-export type CanonicalModule = "personal-records" | "projects" | "personal-ops" | "reviews" | "finance";
+export type CanonicalModule = "personal-records" | "projects" | "personal-ops" | "reviews" | "finance" | "map" | "calendar" | "personal-life";
 export type VaultEditorControl = "text" | "textarea" | "email" | "tel" | "url" | "date" | "month" | "number" | "select" | "checkbox" | "tags";
 
 export type VaultEditorOption = {
@@ -18,6 +18,7 @@ export type VaultEditableField = {
   control: VaultEditorControl;
   group: "Essentials" | "Details" | "Planning" | "Classification";
   required?: boolean;
+  hidden?: boolean;
   help?: string;
   options?: VaultEditorOption[];
   step?: number;
@@ -84,6 +85,17 @@ const ENTITY_SCOPE_OPTIONS = OPTIONS("personal", "business");
 const PERSONAL_STATUS_OPTIONS = OPTIONS("idea", "draft", "active", "completed", "blocked", "inactive", "next");
 
 export function editableFieldsFor(module: CanonicalModule, collection: string): VaultEditableField[] {
+  if (module === "map" && collection === "places") return [
+    FIELD("name", "Place name", "text", {group:"Essentials",required:true}), FIELD("address", "Address"),
+    FIELD("latitude", "Latitude", "number"), FIELD("longitude", "Longitude", "number"),
+    FIELD("notes", "Notes", "textarea"), FIELD("tags", "Tags", "tags")
+  ];
+  if (module === "calendar" && collection === "events") return [
+    FIELD("title", "Event title", "text", {group:"Essentials",required:true}), FIELD("description", "Description", "textarea"),
+    FIELD("start", "Start (local date and time)"), FIELD("end", "End (local date and time)"), FIELD("timeZone", "Time zone"),
+    FIELD("allDay", "All day", "checkbox"), FIELD("location", "Location"), FIELD("recurrence", "Recurrence rule")
+  ];
+  if (module === "personal-life" && collection === "trips") return [FIELD("name","Trip name"), FIELD("startDate","Start date","date"), FIELD("endDate","End date","date"), FIELD("notes","Notes","textarea")];
   if (module === "personal-records") {
     if (collection === "person" || collection === "org") return [
       FIELD("title", collection === "org" ? "Organization" : "Name", "text", { group: "Essentials", required: true }),
@@ -117,6 +129,7 @@ export function editableFieldsFor(module: CanonicalModule, collection: string): 
       FIELD("projects", "Projects", "tags", { group: "Classification", help: "Project names or IDs; separate with commas." })
     ];
     if (collection === "file") return [
+      FIELD("mediaProfile", "Encrypted media metadata", "text", {group:"Details",hidden:true}),
       FIELD("title", "Title", "text", { group: "Essentials", required: true }),
       FIELD("body", "Description", "textarea", { group: "Details" }),
       FIELD("status", "Status", "select", { group: "Planning", options: PERSONAL_STATUS_OPTIONS }),
@@ -265,6 +278,8 @@ export function editableFieldsFor(module: CanonicalModule, collection: string): 
 }
 
 export function canonicalRoute(module: CanonicalModule, collection: string, recordId: string): string {
+  if (module === "map" || module === "calendar") return `/admin/${module}?selected=${encodeURIComponent(recordId)}`;
+  if (module === "personal-life") return `/admin/personal/travel?selected=${encodeURIComponent(recordId)}`;
   if (module === "personal-records") {
     if (collection === "person" || collection === "org") return `/admin/people/${encodeURIComponent(recordId)}`;
     if (collection === "note") return `/admin/notes/${encodeURIComponent(recordId)}`;
@@ -320,6 +335,7 @@ export function canonicalVaultFields(input: {
     sourceModule: input.module,
     sourceCollection: input.collection,
     ...flattenVaultFields(input.record),
+    ...(input.module === "personal-records" && input.collection === "file" && input.record.mediaProfile ? {mediaManifest:(input.record.mediaProfile as {manifest:VaultFieldValue}).manifest,mediaProfile:input.record.mediaProfile as VaultFieldValue} : {}),
     [VAULT_CANONICAL_RECORD_FIELD]: canonicalMetadata({
       module: input.module,
       collection: input.collection,

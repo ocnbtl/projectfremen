@@ -7187,7 +7187,7 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
   padding: 16px;
 }
 
-.module-sidebar__header h1,
+.module-sidebar__header .module-sidebar__title,
 .directory-pane__heading h1,
 .inspector-rail__header h2,
 .object-header h1,
@@ -7298,7 +7298,7 @@ html[data-admin-preview="mobile"] .finance-filter-panel {
 
 .detail-tabs > button.is-active {
   color: var(--text-strong);
-  box-shadow: inset 0 -2px 0 var(--action-primary);
+  box-shadow: none;
 }
 
 .metric-strip {
@@ -8266,7 +8266,7 @@ html[data-admin-preview="mobile"] .finance-workspace .shared-ai-dock__panel {
   gap: 10px;
 }
 
-.finance-module-sidebar .module-sidebar__header h1 {
+.finance-module-sidebar .module-sidebar__header .module-sidebar__title {
   max-width: 100%;
   overflow-wrap: anywhere;
   font-size: clamp(40px, 3vw, 52px);
@@ -12959,7 +12959,7 @@ html[data-admin-preview="mobile"] .people-record-type-toggle > div {
 
 .module-shell .detail-tabs > button.is-active {
   color: var(--module-icon);
-  box-shadow: inset 0 -2px 0 var(--module-icon);
+  box-shadow: none;
 }
 
 .module-shell :where(input, select, textarea):focus {

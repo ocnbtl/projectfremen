@@ -1,0 +1,251 @@
+.gallery {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 24px;
+  padding: 8px 24px 96px;
+}
+.asset {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  text-align: left;
+  color: #23383f;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.thumbnail {
+  aspect-ratio: 4/3;
+  background: #f4f7f5;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #60747c;
+  font-size: 0.8125rem;
+}
+.thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: opacity 120ms;
+}
+.caption {
+  display: grid;
+  gap: 4px;
+  padding-top: 12px;
+}
+.caption strong {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.caption small {
+  font-size: 0.8125rem;
+  color: #60747c;
+}
+.asset:focus-visible {
+  outline: 2px solid #3482c4;
+  outline-offset: 5px;
+  border-radius: 8px;
+}
+.asset:hover .caption strong {
+  color: #133c5e;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.list {
+  padding: 0 24px 96px;
+}
+.list .asset {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #d5e2e7;
+  width: 100%;
+}
+.list .thumbnail {
+  width: 80px;
+  flex-shrink: 0;
+}
+.list .caption {
+  padding: 0;
+}
+.unlock,
+.upload,
+.pending {
+  margin: 0 24px 20px;
+  padding: 16px 0;
+  border-bottom: 1px solid #d5e2e7;
+}
+.unlock p {
+  color: #60747c;
+  margin: 8px 0 16px;
+}
+.upload,
+.pending {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.upload > div {
+  display: grid;
+  gap: 8px;
+  flex: 1;
+}
+.upload span {
+  font-size: 0.8125rem;
+  color: #60747c;
+}
+.upload progress {
+  width: 100%;
+  accent-color: #133c5e;
+}
+.pending span {
+  flex: 1;
+  font-size: 0.8125rem;
+}
+.viewer {
+  height: 300px;
+  background: #f4f7f5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.viewer :is(img, video) {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.viewer audio {
+  width: 100%;
+}
+@media (max-width: 760px) {
+  .gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px 12px;
+    padding-inline: 16px;
+  }
+  .list {
+    padding-inline: 16px;
+  }
+  .unlock,
+  .upload,
+  .pending {
+    margin-inline: 16px;
+  }
+  .viewer {
+    height: 260px;
+  }
+}
+
+.transfer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid #d5e2e7;
+}
+.transfer > div {
+  flex: 1;
+  min-width: 200px;
+}
+.transfer strong,
+.transfer span {
+  display: block;
+}
+.transfer span {
+  color: #60747c;
+  font-size: 0.8125rem;
+}
+.pending > summary {
+  cursor: pointer;
+  min-height: 40px;
+}
+
+details.pending {
+  display: block;
+}
+
+.assetFrame {
+  position: relative;
+  min-width: 0;
+  border-radius: 8px;
+}
+.assetFrame > .asset {
+  width: 100%;
+}
+.assetFrame[data-selected="true"] .thumbnail {
+  outline: 2px solid #133c5e;
+  outline-offset: 2px;
+}
+.selectionCheck {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  background: white;
+  border-radius: 8px;
+  z-index: 2;
+  cursor: pointer;
+  box-shadow: 0 1px 4px #10202624;
+}
+.selectionCheck input {
+  width: 20px;
+  height: 20px;
+  accent-color: #133c5e;
+}
+.selectionBar {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: white;
+  border: 1px solid #d5e2e7;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px #10202618;
+  z-index: 40;
+  max-width: calc(100vw - 140px);
+  flex-wrap: wrap;
+}
+.selectionBar strong {
+  white-space: nowrap;
+  font-size: 14px;
+}
+.undo {
+  margin: 0 24px 16px;
+}
+.list .selectionCheck {
+  top: 12px;
+  left: 8px;
+}
+@media (max-width: 760px) {
+  .selectionBar {
+    left: 16px;
+    right: 80px;
+    transform: none;
+    max-width: none;
+    gap: 8px;
+    bottom: 16px;
+  }
+  .selectionBar button {
+    min-height: 44px;
+  }
+  .undo {
+    margin-inline: 16px;
+  }
+}

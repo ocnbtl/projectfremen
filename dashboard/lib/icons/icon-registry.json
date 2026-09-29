@@ -1,4 +1,5 @@
 [
+  { "id": "reminder", "label": "Reminder", "defaultCandidate": "bell", "candidates": ["bell", "bell-ringing", "bell-check", "alarm", "calendar-clock"], "usages": [{ "module": "Calendar", "breadcrumb": "Top navigation > Reminders" }] },
   { "id": "module-projects", "label": "Projects", "defaultCandidate": "layout-kanban", "candidates": ["layout-kanban", "folders", "clipboard-list", "road", "stack-2"], "usages": [{ "module": "Projects", "breadcrumb": "Top navigation › Projects" }] },
   { "id": "module-notes", "label": "Notes", "defaultCandidate": "note", "candidates": ["note", "notes", "file-description", "notebook", "writing"], "usages": [{ "module": "Notes", "breadcrumb": "Top navigation › Notes" }] },
   { "id": "module-people", "label": "People", "defaultCandidate": "users", "candidates": ["users", "address-book", "user-circle", "friends", "users-group"], "usages": [{ "module": "People", "breadcrumb": "Top navigation › People" }] },
@@ -123,5 +124,8 @@
   {"id": "object-add", "label": "Add object", "defaultCandidate": "cube-plus", "candidates": ["cube-plus","box","schema","assembly","components"], "usages": [{"module": "People", "breadcrumb": "Add object"}]},
   {"id": "follow-up-add", "label": "Add follow-up", "defaultCandidate": "calendar-plus", "candidates": ["calendar-plus","calendar-event","arrow-forward-up","message-forward","repeat"], "usages": [{"module": "People", "breadcrumb": "Add follow-up"}]},
   {"id": "contact-file", "label": "Contact file", "defaultCandidate": "file-spreadsheet", "candidates": ["file-spreadsheet","file-type-csv","table-import","table","database-import"], "usages": [{"module": "People", "breadcrumb": "Contact file"}]},
-  {"id":"interaction-date","label":"Interaction date","defaultCandidate":"calendar-blank","candidates":["calendar-blank","calendar","calendar-event","calendar-week","calendar-month"],"usages":[{"module":"People","breadcrumb":"Interaction details › Plain calendar outline without a day numeral"}]}
+  {"id":"interaction-date","label":"Interaction date","defaultCandidate":"calendar-blank","candidates":["calendar-blank","calendar","calendar-event","calendar-week","calendar-month"],"usages":[{"module":"People","breadcrumb":"Interaction details › Plain calendar outline without a day numeral"}]},
+  {"id": "module-map", "label": "Map", "defaultCandidate": "map-2", "candidates": ["map-2", "world", "compass", "map-pin", "route"], "usages": [{"module": "Map", "breadcrumb": "Top navigation › Map"}]},
+  {"id": "module-calendar", "label": "Calendar", "defaultCandidate": "calendar-blank", "candidates": ["calendar-blank", "calendar-event", "calendar-week", "calendar-month", "calendar-time"], "usages": [{"module": "Calendar", "breadcrumb": "Top navigation › Calendar"}]},
+  {"id": "warning", "label": "Warning", "defaultCandidate": "alert-triangle", "candidates": ["alert-triangle", "alert-circle", "alert-square-rounded", "exclamation-circle", "info-circle"], "usages": [{"module": "System", "breadcrumb": "Feedback"}]}
 ]

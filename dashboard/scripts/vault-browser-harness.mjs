@@ -432,6 +432,10 @@ try {
   assert.ok(recordLayout.recordTop < recordLayout.devicesTop, "Records must precede device administration");
   assert.ok(recordLayout.textWidth > 200 && recordLayout.separated, "Sync status and action must have separate readable space");
   await page.screenshot({ path: path.join(artifactRoot, "vault-record-workbench-desktop.png"), fullPage: true });
+  await page.evaluate(() => window.scrollTo({ top: 0, behavior: "instant" }));
+  await page.screenshot({ path: path.join(artifactRoot, "vault-record-workbench-viewport.png") });
+  const navigationBounds = await page.locator(".app-top-nav").boundingBox();
+  assert.ok(navigationBounds && Math.abs(navigationBounds.y) <= 1, "Vault navigation stays at the top of the viewport");
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
 
   await page.getByRole("button", { name: "Back up this PC" }).click();
