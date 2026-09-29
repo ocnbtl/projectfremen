@@ -3,9 +3,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useEffect, useState } from "react";
-import type { ModuleId } from "../lib/native-objects/types";
 import AppTopNav from "./admin-shell/AppTopNav";
-import SharedAIDock from "./admin-shell/SharedAIDock";
+import SharedAIDock, { type SharedAIContext } from "./admin-shell/SharedAIDock";
 import OfflineVaultBridge from "./OfflineVaultBridge";
 import UnigentamosIcon from "./icons/UnigentamosIcon";
 
@@ -122,8 +121,12 @@ function AdminPageSidebar({
   );
 }
 
-function moduleFromTitle(title: string): ModuleId {
+function moduleFromTitle(title: string): SharedAIContext["module"] {
   const normalized = title.trim().toLowerCase();
+  if (normalized === "command center") return "home";
+  if (normalized === "vault") return "vault";
+  if (normalized === "map") return "map";
+  if (normalized === "calendar") return "calendar";
   if (normalized === "personal" || normalized === "personal") return "personal_ops";
   if (normalized === "people") return "people";
   if (normalized === "media") return "media";

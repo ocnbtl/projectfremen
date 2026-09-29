@@ -1,4 +1,9 @@
 import CommandAgenda from "../../components/planning/CommandAgenda";
+import type { CSSProperties } from "react";
+import UnigentamosIcon from "../../components/icons/UnigentamosIcon";
+import { MODULE_COLOR_SYSTEM, moduleColorIdForPathname } from "../../lib/design-system/color-system";
+import { ADMIN_NAV_ITEMS } from "../../lib/admin-navigation";
+import { readPlanningState } from "../../lib/modules/planning/store";
 import Link from "next/link";
 import AdminChrome from "../../components/AdminChrome";
 import CurrentGoalsPanel, { type HomeGoalItem } from "../../components/CurrentGoalsPanel";
@@ -77,12 +82,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const playIntro = params.welcome === "1";
   const reviewRows = getReviewRows(new Date());
 
-  const [personalRecordsResult, personalOpsResult, projectsResult, reviewsResult, financeResult] = await Promise.allSettled([
+  const [personalRecordsResult, personalOpsResult, projectsResult, reviewsResult, financeResult, planningResult] = await Promise.allSettled([
     readPersonalRecords(),
     readPersonalOpsState(),
     readProjectsState(),
     readReviewsState(),
-    readFinanceState()
+    readFinanceState(),
+    readPlanningState()
   ] as const);
 
   const personalRecords = personalRecordsResult.status === "fulfilled" ? personalRecordsResult.value : [];
@@ -225,7 +231,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     { key: "watch", label: "Watch", note: "Open, but not urgent yet" }
   ];
 
-  const modules = [
+  const sourceStates = [
     { name: "Projects", href: "/admin/projects", available: Boolean(projects), value: projects ? `${activeProjects.length} active · ${openProjectBlockers.length} blockers` : "Unavailable", tone: "projects" },
     { name: "Personal", href: "/admin/personal", available: Boolean(personalOps), value: personalOps ? `${openDecisions.length} decisions · ${openFollowUps.length} follow-ups` : "Unavailable", tone: "personal" },
     { name: "Notes", href: "/admin/notes", available: personalRecordsResult.status === "fulfilled", value: personalRecordsResult.status === "fulfilled" ? `${personalRecords.filter((item) => item.className === "note").length} records` : "Unavailable", tone: "notes" },
@@ -235,6 +241,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     { name: "Finance", href: "/admin/finance", available: Boolean(finance), value: finance ? `${activeAccounts.length} accounts · ${pendingTransactions.length} to review` : "Unavailable", tone: "finance" },
     { name: "Reviews", href: "/admin/reviews/weekly", available: Boolean(reviews), value: reviews ? `${currentReviews.length} current runs` : "Unavailable", tone: "reviews" }
   ];
+
+  const modules = ADMIN_NAV_ITEMS.map(item => {
+    const id = moduleColorIdForPathname(item.href!)!;
+    const available = id === "vault" ? null
+      : id === "map" || id === "calendar" ? planningResult.status === "fulfilled"
+      : sourceStates.find(source => source.name === item.label)?.available === true;
+    return { ...item, id, available, palette: MODULE_COLOR_SYSTEM[id] };
+  });
 
   const recentActivity: ActivityItem[] = [
     ...(projects?.projects.filter((item) => !item.archivedAt).map((item) => ({ label: item.name, detail: "Project updated", href: `/admin/projects/${encodeURIComponent(item.id)}`, at: item.updatedAt })) || []),
@@ -251,7 +265,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     ...(finance?.auditEvents.slice(-30).map((item) => ({ label: item.action.replaceAll("_", " ").replaceAll(".", " · "), detail: `${item.objectType} audit event`, href: "/admin/finance", at: item.occurredAt })) || [])
   ].filter((item) => !Number.isNaN(Date.parse(item.at))).sort((left, right) => right.at.localeCompare(left.at)).slice(0, 6);
 
-  const unavailableCount = modules.filter((item) => !item.available).length;
+  const unavailableCount = modules.filter((item) => item.available === false).length;
   const attentionCounts = Object.fromEntries(attentionGroups.map((group) => [group.key, attentionCandidates.filter((item) => item.priority === group.key).length])) as Record<AttentionPriority, number>;
 
   return (
@@ -259,7 +273,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       <AdminChrome
         showCommandSearch={false}
         showPageSidebar={false}
-        showLocalAi={false}
         sidebarTitle="Command Center"
         sidebarSummary="A read-through of canonical module state. Changes belong in each owner module."
         sidebarItems={[
@@ -311,7 +324,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         </div>
 
         <aside className="command-center-rail">
-          <section className="command-panel"><div className="command-section-title"><h2>Module sources</h2><span>{modules.length - unavailableCount}/{modules.length}</span></div><div className="command-health-list">{modules.map((module) => <Link className={`command-health command-tone-${module.tone}`} href={module.href} key={module.name}><span /><strong>{module.name}</strong><small>{module.available ? "Connected" : "Unavailable"}</small></Link>)}</div></section>
+          <section className="command-panel"><div className="command-section-title"><h2>Module sources</h2><span>{modules.length} modules</span></div><div className="command-health-list">{modules.map((module) => <Link className="command-health" href={module.href!} key={module.id} data-module={module.id} style={{ "--source-color": module.palette.tokens.icon, "--source-border": module.palette.tokens.border } as CSSProperties}><UnigentamosIcon role={module.iconRole} size={18} /><strong>{module.label}</strong><small>{module.available === null ? "On this device" : module.available ? "Connected" : "Unavailable"}</small></Link>)}</div></section>
           <section className="command-panel command-goals-panel"><CurrentGoalsPanel initialItems={goalItems} /></section>
 
         </aside>

@@ -37,7 +37,6 @@ export default function CommandAgenda() {
     >
       <div className="command-section-title">
         <h2>Today</h2>
-        <Link href="/admin/calendar">Open Calendar</Link>
       </div>
       {error ? (
         <p>Calendar could not load. Open Calendar to retry.</p>
@@ -67,15 +66,7 @@ export default function CommandAgenda() {
           ))}
         </div>
       ) : (
-        <p>
-          No events today.{" "}
-          <Link
-            className="work-button work-button--quiet"
-            href="/admin/calendar"
-          >
-            Plan time in Calendar
-          </Link>
-        </p>
+        <p>No events today.</p>
       )}
     </section>
   );

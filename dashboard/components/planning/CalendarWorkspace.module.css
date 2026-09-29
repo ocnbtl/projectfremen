@@ -74,7 +74,7 @@
   margin-bottom: 8px;
 }
 .dayHeader[data-today="true"] > strong {
-  color: #565b86;
+  color: var(--module-icon, #59518b);
 }
 .hours {
   position: relative;
@@ -109,10 +109,10 @@
   border-top-color: #d5e2e7;
 }
 .slot:hover {
-  background: #f2f2f8;
+  background: var(--module-quiet, #f3f2f9);
 }
 .slot:focus-visible {
-  outline: 2px solid #3482c4;
+  outline: 2px solid var(--module-focus, #746ca5);
   outline-offset: -2px;
 }
 .event {
@@ -176,7 +176,7 @@
   padding: 8px;
 }
 .monthDay[data-today="true"] {
-  background: #f2f2f8;
+  background: var(--module-quiet, #f3f2f9);
 }
 .dayNumber,
 .addDay {
@@ -239,7 +239,7 @@
 .dated {
   display: block;
   padding: 10px 8px;
-  color: #526442;
+  color: var(--module-icon, #59518b);
   text-decoration: none;
   font-size: 0.8125rem;
 }
@@ -308,17 +308,17 @@
   z-index: 5;
   left: 2px;
   right: 2px;
-  background: #e5e6f3;
-  border: 1px solid #565b86;
+  background: var(--module-primary-100, #e5e3f2);
+  border: 1px solid var(--module-icon, #59518b);
   pointer-events: none;
-  color: #34385a;
+  color: var(--module-primary-700, #443d6d);
   font-size: 0.8125rem;
   padding: 4px;
   border-radius: 4px;
 }
 .dropPreview {
   height: 32px;
-  background: #f2f2f8;
+  background: var(--module-quiet, #f3f2f9);
   border-style: dashed;
 }
 
@@ -367,15 +367,15 @@
   width: 24px;
   height: 2px;
   margin: auto;
-  background: #565b86;
+  background: var(--module-icon, #59518b);
   opacity: 0.65;
 }
 .resizeHandle:focus-visible {
-  outline: 2px solid #133c5e;
+  outline: 2px solid var(--module-focus, #746ca5);
   outline-offset: -2px;
 }
 .eventBody:focus-visible {
-  outline: 2px solid #133c5e;
+  outline: 2px solid var(--module-focus, #746ca5);
   outline-offset: -2px;
 }
 
@@ -384,11 +384,11 @@
   z-index: 2;
   left: 3px;
   right: 3px;
-  border: 1px solid #bcc0d5;
-  border-left: 3px solid #565b86;
+  border: 1px solid var(--module-border, #cbc7e4);
+  border-left: 3px solid var(--module-icon, #59518b);
   border-radius: 6px;
   padding: 8px;
-  background: #f2f2f8;
+  background: var(--module-quiet, #f3f2f9);
   color: #23383f;
   cursor: pointer;
   text-align: left;

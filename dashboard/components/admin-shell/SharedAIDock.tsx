@@ -4,10 +4,11 @@ import type { CSSProperties, PointerEvent as ReactPointerEvent, ReactNode } from
 import { createContext, useCallback, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import IconSystemProvider, { useIconSelections } from "../icons/IconSystemProvider";
 import type { ModuleId, NativeObjectRef } from "../../lib/native-objects/types";
 
 export type SharedAIContext = {
-  module: ModuleId;
+  module: ModuleId | "home" | "vault";
   object?: NativeObjectRef | null;
   activeTab?: string;
   visibleScope?: string;
@@ -24,7 +25,9 @@ export type SharedAIDockProps = {
   hidden?: boolean;
 };
 
-const MODULE_LABELS: Readonly<Record<ModuleId, string>> = {
+const MODULE_LABELS: Readonly<Record<SharedAIContext["module"], string>> = {
+  home: "Command Center",
+  vault: "Vault",
   people: "People",
   media: "Media",
   projects: "Projects",
@@ -51,7 +54,7 @@ type DockDrag = {
 const DOCK_VIEWPORT_GAP = 12;
 const AI_DOCK_OPEN_STORAGE_KEY = "unigentamos:assistant:open";
 
-type SharedAIDockRegistration = SharedAIDockProps & { ownerId: string };
+type SharedAIDockRegistration = SharedAIDockProps & { ownerId: string; selections: Readonly<Record<string, string>> };
 type SharedAIDockHost = {
   register: (registration: SharedAIDockRegistration) => void;
   unregister: (ownerId: string, ownerPathname: string) => void;
@@ -410,17 +413,19 @@ export function PersistentSharedAIDockProvider({ children }: { children: ReactNo
     }
   }, [registration]);
 
-  const hideForRoute = pathname === "/admin/login";
+  const hideForRoute = pathname === "/admin/login" || !(pathname === "/admin" || pathname.startsWith("/admin/") || pathname === "/vault");
 
   return (
     <SharedAIDockHostContext.Provider value={host}>
       {children}
       {registration && !hideForRoute && (
-        <SharedAIDockSurface
-          {...registration}
-          open={open}
-          onOpenChange={handleOpenChange}
-        />
+        <IconSystemProvider selections={registration.selections}>
+          <SharedAIDockSurface
+            {...registration}
+            open={open}
+            onOpenChange={handleOpenChange}
+          />
+        </IconSystemProvider>
       )}
     </SharedAIDockHostContext.Provider>
   );
@@ -430,8 +435,10 @@ export default function SharedAIDock(props: SharedAIDockProps) {
   const host = useContext(SharedAIDockHostContext);
   const ownerId = useId();
   const ownerPathname = usePathname();
+  const selections = useIconSelections();
   const allowedActionsKey = props.context.allowedActions?.join("\u0000") || "";
-  const registration = useMemo<SharedAIDockRegistration>(() => ({ ...props, ownerId }), [
+  const registration = useMemo<SharedAIDockRegistration>(() => ({ ...props, ownerId, selections }), [
+    selections,
     ownerId,
     props.className,
     props.context.activeTab,

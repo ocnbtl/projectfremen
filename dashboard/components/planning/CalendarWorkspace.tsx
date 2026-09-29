@@ -50,7 +50,7 @@ import {
   type EventFields,
   type EventOccurrence,
 } from "../../lib/modules/planning/types";
-import { moduleThemeVariables } from "../../lib/design-system/color-system";
+import { MODULE_COLOR_SYSTEM, moduleThemeVariables } from "../../lib/design-system/color-system";
 import styles from "./CalendarWorkspace.module.css";
 
 import { normalizePlanningRecord } from "../../lib/modules/planning/validation";
@@ -146,7 +146,7 @@ export default function CalendarWorkspace() {
   const [connectionName, setConnectionName] = useState(""),
     [feedUrl, setFeedUrl] = useState(""),
     [calendarName, setCalendarName] = useState(""),
-    [calendarColor, setCalendarColor] = useState("#565B86");
+    [calendarColor, setCalendarColor] = useState(MODULE_COLOR_SYSTEM.calendar.tokens.icon);
   const refresh = useCallback(async () => {
     try {
       setSnapshot(await planningRequest<PlanningSnapshot>());
@@ -547,7 +547,7 @@ export default function CalendarWorkspace() {
           key={item.id}
           className={styles.agendaEvent}
           style={
-            { "--event-color": calendar?.color || "#565B86" } as CSSProperties
+            { "--event-color": calendarDisplayColor(calendar?.color) } as CSSProperties
           }
           onClick={() => event && openEvent(event, item)}
           title={title}
@@ -570,7 +570,7 @@ export default function CalendarWorkspace() {
                       (((resizing.end - item.endMs) / 60000) * 64) / 60,
                   )
                 : style.height,
-            "--event-color": calendar?.color || "#565B86",
+            "--event-color": calendarDisplayColor(calendar?.color),
           } as CSSProperties
         }
       >
@@ -652,7 +652,7 @@ export default function CalendarWorkspace() {
       if (kind !== "morgen")
         await savePlanning("calendars", {
           name: connection.name,
-          color: "#565B86",
+          color: MODULE_COLOR_SYSTEM.calendar.tokens.icon,
           visible: true,
           connectionId: connection.id,
         });
@@ -770,7 +770,7 @@ export default function CalendarWorkspace() {
                     )
                   }
                 />
-                <span style={{ background: c.color }} />
+                <span style={{ background: calendarDisplayColor(c.color) }} />
                 {c.name}
               </label>
             ))}
@@ -2005,4 +2005,9 @@ function CalendarSettings({
       </Button>
     </form>
   );
+}
+
+/** Re-tint the former default without changing stored or custom calendar colors. */
+function calendarDisplayColor(color?: string) {
+  return !color || color.toLowerCase() === "#565b86" ? MODULE_COLOR_SYSTEM.calendar.tokens.icon : color;
 }

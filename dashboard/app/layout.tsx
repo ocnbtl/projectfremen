@@ -14,6 +14,8 @@ import "./finance-split.css";
 import "./module-continuity.css";
 import "./workspace-system.css";
 import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
+import NavigationHost from "../components/admin-shell/NavigationHost";
+import { PersistentSharedAIDockProvider } from "../components/admin-shell/SharedAIDock";
 
 export const metadata: Metadata = {
   applicationName: "Unigentamos",
@@ -49,7 +51,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body>
-        {children}
+        <PersistentSharedAIDockProvider><NavigationHost>{children}</NavigationHost></PersistentSharedAIDockProvider>
         <ServiceWorkerRegistration />
         {process.env.VERCEL === "1" ? <Analytics /> : null}
       </body>

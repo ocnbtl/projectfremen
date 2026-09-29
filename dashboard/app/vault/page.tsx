@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import ExperienceProvider from "../../components/admin-shell/ExperienceProvider";
 import AppTopNav from "../../components/admin-shell/AppTopNav";
+import VaultAssistant from "../../components/admin-shell/VaultAssistant";
 import IconSystemProvider from "../../components/icons/IconSystemProvider";
 import VaultWorkspace from "../../components/VaultWorkspace";
 import { selectedIconMap } from "../../lib/icons/icon-registry";
@@ -25,7 +26,7 @@ export default async function VaultPage({
   return (
     <IconSystemProvider selections={selectedIconMap(styleGuide.icons)}>
       <ExperienceProvider><AppTopNav showCommandSearch={false} />
-      <VaultWorkspace initialSearch={params.search?.slice(0, 500) || ""} initialKind={initialKind} focusSearch={params.focus === "search"} /></ExperienceProvider>
+      <VaultWorkspace initialSearch={params.search?.slice(0, 500) || ""} initialKind={initialKind} focusSearch={params.focus === "search"} /><VaultAssistant /></ExperienceProvider>
     </IconSystemProvider>
   );
 }

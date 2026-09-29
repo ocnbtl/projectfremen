@@ -19,7 +19,7 @@
 .map {
   position: relative;
   min-height: 400px;
-  background: #f1f4ee;
+  background: var(--module-quiet, #f3f8ed);
 }
 .mapLoading {
   padding: 24px;
@@ -89,7 +89,7 @@
 .hint {
   padding: 0 24px 12px;
   margin: 0;
-  color: #526442;
+  color: var(--module-icon, #50752f);
 }
 .listToggle {
   display: none;
@@ -109,7 +109,7 @@
 .legend i {
   height: 10px;
   flex: 1;
-  background: linear-gradient(90deg, #e3ead9, #526442);
+  background: linear-gradient(90deg, var(--module-primary-100, #e3f1d5), var(--module-icon, #50752f));
 }
 .regionTable {
   max-height: 360px;

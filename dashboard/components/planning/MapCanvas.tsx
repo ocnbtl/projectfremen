@@ -1,5 +1,6 @@
 "use client";
 import { motionTokens } from "../../lib/design-system/motion";
+import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
@@ -87,7 +88,7 @@ export default function MapCanvas(props: Props) {
         source: "places",
         filter: ["has", "point_count"],
         paint: {
-          "circle-color": "#526442",
+          "circle-color": MODULE_COLOR_SYSTEM.map.primary[500],
           "circle-radius": [
             "step",
             ["get", "point_count"],
@@ -110,7 +111,7 @@ export default function MapCanvas(props: Props) {
           "text-field": ["get", "point_count_abbreviated"],
           "text-size": 13,
         },
-        paint: { "text-color": "white" },
+        paint: { "text-color": MODULE_COLOR_SYSTEM.map.primary[900] },
       });
       instance.addLayer({
         id: "place-points",
@@ -118,7 +119,7 @@ export default function MapCanvas(props: Props) {
         source: "places",
         filter: ["!", ["has", "point_count"]],
         paint: {
-          "circle-color": "#526442",
+          "circle-color": MODULE_COLOR_SYSTEM.map.primary[500],
           "circle-radius": 7,
           "circle-stroke-color": "white",
           "circle-stroke-width": 2,
@@ -147,7 +148,7 @@ export default function MapCanvas(props: Props) {
         type: "circle",
         source: "selected",
         paint: {
-          "circle-color": "#133c5e",
+          "circle-color": MODULE_COLOR_SYSTEM.map.primary[700],
           "circle-radius": 10,
           "circle-stroke-color": "white",
           "circle-stroke-width": 3,
@@ -159,7 +160,7 @@ export default function MapCanvas(props: Props) {
         type: "line",
         source: "route",
         paint: {
-          "line-color": "#133c5e",
+          "line-color": MODULE_COLOR_SYSTEM.map.primary[700],
           "line-width": 4,
           "line-opacity": 0.85,
         },
@@ -171,7 +172,7 @@ export default function MapCanvas(props: Props) {
         type: "circle",
         source: "stops",
         paint: {
-          "circle-color": "#133c5e",
+          "circle-color": MODULE_COLOR_SYSTEM.map.primary[700],
           "circle-radius": 14,
           "circle-stroke-width": 2,
           "circle-stroke-color": "white",
@@ -205,9 +206,9 @@ export default function MapCanvas(props: Props) {
                 ["linear"],
                 ["get", "normalized"],
                 0,
-                "#e3ead9",
+                MODULE_COLOR_SYSTEM.map.primary[100],
                 1,
-                "#526442",
+                MODULE_COLOR_SYSTEM.map.primary[500],
               ],
             ],
             "fill-opacity": 0.5,
@@ -227,9 +228,9 @@ export default function MapCanvas(props: Props) {
               ["linear"],
               ["get", "normalized"],
               0,
-              "#acbc97",
+              MODULE_COLOR_SYSTEM.map.primary[300],
               1,
-              "#3e4c32",
+              MODULE_COLOR_SYSTEM.map.primary[700],
             ],
             "circle-radius": [
               "interpolate",

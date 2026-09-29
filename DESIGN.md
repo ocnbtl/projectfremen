@@ -22,19 +22,19 @@ No dashboard heroes, obligatory metric rows, equal-weight card grids, gradient p
 
 ## Palette and recognizable objects
 
-Ink #102026, body #23383F, secondary #60747C, canvas #F4F7F5, surface #FFFFFF, inset #FBFCFB, divider #D5E2E7, primary action #133C5E. Existing module palettes identify their module, not operational state. Map moss #526442 with #F1F4EE; Calendar indigo #565B86 with #F2F2F8. Essential text requires 4.5:1 contrast. Status combines meaning with text or an icon, not color alone.
+Ink #102026, body #23383F, secondary #60747C, canvas #F4F7F5, surface #FFFFFF, inset #FBFCFB, divider #D5E2E7, primary action #133C5E. Existing module palettes identify their module, not operational state. Map uses light leaf green #B1D68A, dark readable ink #50752F and quiet #F3F8ED; Calendar uses smoky indigo #59518B with #F3F2F9. People utility controls use secondary olive #5A6040 with #E4E8D8. Essential text requires 4.5:1 contrast. Status combines meaning with text or an icon, not color alone. Command Center module sources use white surfaces and canonical module icons and colors. The shared assistant uses the same navy treatment in every workspace.
 
 UnigentamosIcon is the shared registry: 24-unit drawing grid, rounded joins, 16px inline, 20px controls, 24px navigation. Preserve the hand-selected Projects, Notes, People, Media, Personal, Reviews, Resources, Finance and Vault assignments. Their saved selections take precedence over registry defaults; redesigns and registry additions must not reset them. Every new icon role must be registered with five distinct selectable Style Guide options and included in the generated sprite. New module entries are appended to saved style guides without replacing existing assignments or palettes. Recognizable portraits, logos, source previews, actual thumbnails and chosen project marks take precedence over generic decoration.
 
 ## Responsive and accessible behavior
 
-Full navigation appears only when it fits; a searchable module menu takes over before collision. Reserve selected indicators to prevent layout shifts. Directory/detail persists on wide screens, then becomes a dismissible sheet or page. Preserve filters, directory scroll and return position. Phone useful content should begin near the first 260px at 390x844. No horizontal document overflow. Menus portal out of clipping ancestors; dialogs trap and restore focus, expose Close, and retain visible actions with the keyboard. Icon-only actions have names. Forms preserve drafts and report errors at the operation that failed.
+Full navigation appears only when it fits; a labeled-for-accessibility icon strip takes over before collision and scrolls horizontally on narrow phones. A persistent selection box moves between modules and blends to their colors without an underline. Clicking the home logo preserves navigation while playing the landing-page orbit spin. Directory/detail persists on wide screens, then becomes a dismissible sheet or page. Preserve filters, directory scroll and return position. Phone useful content should begin near the first 260px at 390x844. No horizontal document overflow. Menus portal out of clipping ancestors; dialogs trap and restore focus, expose Close, and retain visible actions with the keyboard. Icon-only actions have names. Forms preserve drafts and report errors at the operation that failed.
 
 ## Motion
 
 Shared tokens: press 80ms, quick 120ms, standard 180ms, panel 260ms, context 320ms, explicit map focus up to 450ms. Arrivals use cubic-bezier(.22,1,.36,1); exits are shorter. Pointer dragging tracks directly, with explicit insertion/drop targets. Hover changes surface without moving labels. Focus appears immediately. Small confirmations occur in place. Save and upload states represent real work. Selection updates immediately; large content does not slide across the entire viewport. No perpetual decorative movement, repeated page entrances or staggered row animations.
 
-System and application reduced-motion settings remove large motion, zoom, spring and smooth scrolling, retaining confirmations, focus and functional parity.
+System and previously saved application reduced-motion settings remove large motion, zoom, spring and smooth scrolling, retaining confirmations, focus and functional parity. The navigation does not expose a Reduce motion button.
 
 ## Domain and quality constraints
 

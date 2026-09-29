@@ -45,8 +45,8 @@
     color var(--work-quick);
 }
 .app-top-nav .admin-global-nav-link.is-active {
-  color: var(--work-action);
-  background: #ebf2f9;
+  color: var(--nav-module-accent);
+  background: transparent;
   box-shadow: none;
 }
 .app-top-nav__mobile-menu {
@@ -1004,8 +1004,7 @@ html[data-product-motion="reduce"]
 .app-top-nav .admin-global-nav-link {
   position: relative;
 }
-.work-tab-marker,
-.work-nav-marker {
+.work-tab-marker {
   position: absolute;
   bottom: 0;
   left: 8px;
@@ -1015,6 +1014,139 @@ html[data-product-motion="reduce"]
   border-radius: 2px;
   pointer-events: none;
 }
-.work-nav-marker {
-  bottom: 3px;
+
+/* One continuous navigation strip; the indicator survives route changes. */
+.app-top-nav {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  column-gap: 16px;
+}
+.app-top-nav__scroll {
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+  overscroll-behavior-x: contain;
+}
+.app-top-nav__scroll::-webkit-scrollbar { display: none; }
+.app-top-nav .app-top-nav__links {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  width: max-content;
+  min-width: 100%;
+  gap: 4px;
+  padding: 4px;
+}
+.app-top-nav .admin-global-nav-link {
+  position: relative;
+  z-index: 1;
+  flex-shrink: 0;
+  min-height: 44px;
+  transition: color 320ms var(--work-ease), background 120ms;
+}
+.app-top-nav .admin-global-nav-link.is-active:hover { background: transparent; }
+.app-top-nav__selection {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  pointer-events: none;
+}
+.app-top-nav__brand { min-height: 44px; flex-shrink: 0; }
+.app-top-nav__utilities { display: flex; align-items: center; gap: 8px; }
+@media (max-width: 1699px) {
+  .app-top-nav .app-top-nav__search { display: none; }
+}
+@media (max-width: 1439px) {
+  .app-top-nav .app-top-nav__label { display: none; }
+  .app-top-nav .admin-global-nav-link { width: 44px; padding: 10px; }
+}
+@media (max-width: 900px) {
+  .app-top-nav__brand strong { display: none; }
+}
+@media (max-width: 760px) {
+  .app-top-nav { column-gap: 8px; padding: 0 8px; }
+  .app-top-nav .app-top-nav__links { justify-content: flex-start; }
+}
+
+/* People utility controls use the site's secondary olive palette. */
+.people-redesign-shell :is(.people-control-trigger, .people-view-cycle) {
+  --people-action: #5a6040;
+  --people-action-hover: #454a30;
+  --people-action-soft: #e4e8d8;
+  --people-action-border: #8a9060;
+  border-color: #c5cbb2 !important;
+  color: #5a6040 !important;
+}
+.people-redesign-shell :is(.people-control-trigger, .people-view-cycle):is(:hover, [aria-expanded="true"], :active) {
+  background: #e4e8d8 !important;
+  border-color: #8a9060 !important;
+  color: #454a30 !important;
+}
+.people-redesign-shell :is(.people-control-trigger, .people-view-cycle):focus-visible {
+  outline: 2px solid #5a6040 !important;
+  outline-offset: 3px;
+}
+
+/* Sources retain the canonical module icon and color on a white surface. */
+.command-center-shell .command-health {
+  background: #fff;
+  border: 1px solid #e1e5df;
+  color: var(--source-color);
+  grid-template-columns: 18px minmax(0, 1fr) auto;
+  gap: 10px;
+  min-height: 44px;
+}
+.command-center-shell .command-health:hover {
+  background: #fff;
+  border-color: var(--source-border);
+}
+.command-center-shell .command-health strong { font: 500 13px/1.4 var(--font-body); }
+.command-center-shell .command-health small { font: 400 12px/1.4 var(--font-body); color: #60747c; }
+.command-center-shell .command-health > svg { color: var(--source-color); }
+
+/* The assistant belongs to the whole application, independent of module color. */
+body .shared-ai-dock .shared-ai-dock__launcher {
+  min-height: 48px;
+  padding: 0 16px 0 8px;
+  gap: 8px;
+  border: 1px solid #133c5e !important;
+  background: #133c5e !important;
+  color: #fff !important;
+  border-radius: 24px;
+  font: 500 13px/1.4 var(--font-body);
+  box-shadow: 0 6px 20px rgb(16 32 38 / 0.15);
+}
+body .shared-ai-dock .shared-ai-dock__launcher:hover:not(:disabled) {
+  border-color: #0c2b44 !important;
+  background: #0c2b44 !important;
+}
+body .shared-ai-dock .shared-ai-dock__launcher:focus-visible {
+  outline: 2px solid #5a6040;
+  outline-offset: 3px;
+}
+body .shared-ai-dock .shared-ai-dock__launcher-mark {
+  width: 32px;
+  height: 32px;
+  background: rgb(255 255 255 / 0.12);
+  color: #fff;
+}
+
+/* Planning controls, selections, and focus share their module's scale. */
+html:is([data-active-module="map"], [data-active-module="calendar"]) .work-button--primary {
+  background: var(--module-action);
+  border-color: transparent;
+  color: var(--module-action-contrast);
+}
+html:is([data-active-module="map"], [data-active-module="calendar"]) .work-button--primary:hover:not(:disabled) {
+  background: var(--module-action-hover);
+}
+html:is([data-active-module="map"], [data-active-module="calendar"]) .work-button[aria-pressed="true"] {
+  background: var(--module-primary-100);
+  color: var(--module-primary-700);
+  border-color: var(--module-border);
+}
+html:is([data-active-module="map"], [data-active-module="calendar"]) :is(.work-surface, .work-sheet) :is(input, select, textarea, a, button):focus-visible {
+  outline-color: var(--module-focus);
 }
