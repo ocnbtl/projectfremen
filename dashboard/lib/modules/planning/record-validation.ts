@@ -85,7 +85,8 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       timeZone: string(raw.timeZone, "Time zone", 100, true),
       allDay: raw.allDay === true,
       calendarId: string(raw.calendarId, "Calendar", 300, true),
-      placeId: string(raw.placeId, "Place", 300) || undefined,
+      groupId: string(raw.groupId, "Color group", 100),
+      placeId: string(raw.placeId, "Place", 300),
       location: string(raw.location, "Location"),
       linkedRefs: refs(raw.linkedRefs),
       recurrence: string(raw.recurrence, "Recurrence", 500),
@@ -222,6 +223,9 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       name: string(raw.name, "Calendar name", 120, true),
       color,
       visible: raw.visible !== false,
+      ...(raw.groups !== undefined
+        ? { groups: normalizeGroups(raw.groups) }
+        : {}),
       connectionId: string(raw.connectionId, "Connection", 300) || undefined,
       externalId: string(raw.externalId, "External calendar", 500) || undefined,
       accountId: string(raw.accountId, "Account", 500) || undefined,
@@ -250,10 +254,15 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       query: string(raw.query, "Search"),
       tag: string(raw.tag, "Tag", 80),
       layer: string(raw.layer, "Layer", 80),
-      level: ["state", "county", "tract"].includes(String(raw.level))
+      level: ["country", "state", "county", "place", "tract"].includes(
+        String(raw.level),
+      )
         ? String(raw.level)
         : "state",
       stateCode: string(raw.stateCode, "State FIPS", 2),
+      ...(raw.analysis !== undefined
+        ? { analysis: normalizeAnalysis(raw.analysis) }
+        : {}),
       center: [coordinate(center[0], 180), coordinate(center[1], 90)],
       zoom: Math.max(0, Math.min(20, Number(raw.zoom) || 3)),
       sort: raw.sort === "updated" ? "updated" : "name",
@@ -270,4 +279,72 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
     };
   }
   return { ...base, ...fields } as PlanningCollections[K];
+}
+
+function normalizeGroups(value: unknown) {
+  if (!Array.isArray(value) || value.length > 100)
+    throw new Error("Use no more than 100 color groups");
+  const ids = new Set<string>();
+  return value.map((group) => {
+    if (!group || typeof group !== "object")
+      throw new Error("Invalid color group");
+    const id = string(group.id, "Group id", 100, true);
+    const color = string(group.color, "Group color", 7, true);
+    if (ids.has(id) || !/^#[a-f\d]{6}$/i.test(color))
+      throw new Error("Choose unique groups with six-digit colors");
+    ids.add(id);
+    return {
+      id,
+      name: string(group.name, "Group name", 80, true),
+      color,
+      icon: [
+        "briefcase",
+        "university",
+        "person",
+        "routine",
+        "travel",
+        "star",
+        "goal",
+        "users",
+      ].includes(group.icon)
+        ? group.icon
+        : "star",
+    };
+  });
+}
+
+function normalizeAnalysis(value: unknown) {
+  const raw = value as import("./map-analysis").MapAnalysisSettings;
+  if (!raw || !Array.isArray(raw.metrics) || raw.metrics.length > 3)
+    throw new Error("Choose up to three data layers");
+  const seen = new Set<string>();
+  return {
+    match: raw.match === "any" ? "any" : "all",
+    scale: raw.scale === "linear" ? "linear" : "quantile",
+    metrics: raw.metrics.map((m) => {
+      if (
+        !m ||
+        ![
+          "world-population",
+          "world-density",
+          "population",
+          "age",
+          "income",
+        ].includes(m.metric) ||
+        seen.has(m.metric)
+      )
+        throw new Error("Choose distinct supported map layers");
+      seen.add(m.metric);
+      for (const value of [m.min, m.max])
+        if (value !== undefined && (!Number.isFinite(value) || value < 0))
+          throw new Error("Choose valid map filter values");
+      if (m.min !== undefined && m.max !== undefined && m.min > m.max)
+        throw new Error("Map minimum must be below maximum");
+      return {
+        metric: m.metric,
+        ...(m.min !== undefined ? { min: m.min } : {}),
+        ...(m.max !== undefined ? { max: m.max } : {}),
+      };
+    }),
+  };
 }

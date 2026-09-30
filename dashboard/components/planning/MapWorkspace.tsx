@@ -1,4 +1,9 @@
 "use client";
+import MapDataExplorer, {
+  MapDataLegend,
+  type AnalysisResult,
+} from "./MapDataExplorer";
+import type { MapAnalysisSettings } from "../../lib/modules/planning/map-analysis";
 import RelatedRecords from "./RelatedRecords";
 import { browserVault } from "../../lib/local-first/browser-engine";
 import { smallPreview } from "../../lib/modules/media/thumbnail";
@@ -39,7 +44,6 @@ import type {
 } from "../../lib/modules/personal-life/types";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
-import type { RegionMetric } from "../../lib/modules/planning/map-providers";
 import styles from "./MapWorkspace.module.css";
 const MapCanvas = dynamic(() => import("./MapCanvas"), {
   ssr: false,
@@ -54,16 +58,6 @@ type SearchPlace = {
   address: string;
   latitude: number;
   longitude: number;
-};
-type Demographics = {
-  rows: RegionMetric[];
-  source: string;
-  sourceUrl: string;
-  period: string;
-  unit: string;
-  geography: string;
-  geometry: FeatureCollection | null;
-  geometryNote?: string;
 };
 export default function MapWorkspace() {
   const params = useSearchParams();
@@ -157,11 +151,15 @@ export default function MapWorkspace() {
     [viewName, setViewName] = useState("");
   const [trip, setTrip] = useState<Partial<PersonalTrip>>(),
     [route, setRoute] = useState<FeatureCollection>(),
-    [layer, setLayer] = useState("none"),
-    [level, setLevel] = useState("state"),
-    [stateCode, setStateCode] = useState(""),
-    [data, setData] = useState<Demographics>(),
-    [regionSort, setRegionSort] = useState<"name" | "value">("value");
+    [level, setLevel] = useState("country"),
+    [stateCode, setStateCode] = useState("");
+  const [analysis, setAnalysis] = useState<MapAnalysisSettings>({
+    metrics: [],
+    match: "all",
+    scale: "quantile",
+  });
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult>();
+  const [analysisLoadKey, setAnalysisLoadKey] = useState(0);
   async function refresh() {
     try {
       setSnapshot(await planningRequest<PlanningSnapshot>());
@@ -288,72 +286,6 @@ export default function MapWorkspace() {
     )
       setEditor(undefined);
   }
-  async function loadLayer(
-    metric = layer,
-    geographicLevel = level,
-    fips = stateCode,
-  ) {
-    if (metric === "none") {
-      setData(undefined);
-      return;
-    }
-    await action(
-      async () =>
-        setData(
-          await mapRequest<Demographics>({
-            operation: "demographics",
-            metric,
-            level: geographicLevel,
-            state: fips,
-          }),
-        ),
-      "",
-    );
-  }
-  const regionGeometry = useMemo<FeatureCollection | undefined>(() => {
-    if (!data || layer === "none") return;
-    const values = data.rows.flatMap((x) =>
-        x.value === null ? [] : [x.value],
-      ),
-      max = Math.max(1, ...values),
-      min = Math.min(0, ...values);
-    const properties = (r: RegionMetric) => ({
-      name: r.name,
-      value: r.value,
-      normalized:
-        r.value === null
-          ? 0
-          : Math.log1p(r.value - min) / Math.log1p(max - min),
-      year: r.year,
-    });
-    if (data.geometry) {
-      const rows = new Map(data.rows.map((x) => [x.id, x]));
-      return {
-        ...data.geometry,
-        features: data.geometry.features.map((feature) => {
-          const row = rows.get(String(feature.properties?.GEOID));
-          return {
-            ...feature,
-            properties: row
-              ? properties(row)
-              : { name: feature.properties?.NAME, value: null, normalized: 0 },
-          };
-        }),
-      };
-    }
-    return {
-      type: "FeatureCollection",
-      features: data.rows
-        .filter(
-          (r) => Number.isFinite(r.longitude) && Number.isFinite(r.latitude),
-        )
-        .map((r) => ({
-          type: "Feature",
-          properties: properties(r),
-          geometry: { type: "Point", coordinates: [r.longitude!, r.latitude!] },
-        })),
-    };
-  }, [data, layer]);
   function startTrip(existing?: PersonalTrip) {
     setTrip(
       existing || {
@@ -442,7 +374,7 @@ export default function MapWorkspace() {
       className={`work-surface ${styles.shell}`}
       style={moduleThemeVariables("map") as CSSProperties}
     >
-      <WorkspaceHeader title="Map" count={places.length}>
+      <WorkspaceHeader title="Map">
         <Button onClick={() => startTrip()}>Plan trip</Button>
         <Button intent="primary" icon="plus" onClick={() => newPlace()}>
           Save place
@@ -520,6 +452,26 @@ export default function MapWorkspace() {
       )}
       <div className={styles.workspace}>
         <aside className={styles.directory} data-mobile-open={mobileList}>
+          <MapDataExplorer
+            level={level}
+            state={stateCode}
+            states={STATES}
+            settings={analysis}
+            onLevel={(next) => {
+              setLevel(next);
+              setView(undefined);
+            }}
+            onState={(next) => {
+              setStateCode(next);
+              setView(undefined);
+            }}
+            onSettings={(next) => {
+              setAnalysis(next);
+              setView(undefined);
+            }}
+            onResult={setAnalysisResult}
+            loadKey={analysisLoadKey}
+          />
           <details className={styles.savedViews}>
             <summary>Saved views</summary>
             <div className="work-form">
@@ -532,14 +484,20 @@ export default function MapWorkspace() {
                       setQuery(x.query);
                       setTag(x.tag);
                       setSort(x.sort);
-                      setLayer(x.layer);
-                      setLevel(x.level || "state");
-                      setStateCode(x.stateCode || "");
-                      void loadLayer(
-                        x.layer,
-                        x.level || "state",
-                        x.stateCode || "",
+                      setLevel(
+                        x.level ||
+                          (x.layer.startsWith("world") ? "country" : "state"),
                       );
+                      setStateCode(x.stateCode || "");
+                      setAnalysis(
+                        x.analysis || {
+                          metrics:
+                            x.layer !== "none" ? [{ metric: x.layer }] : [],
+                          match: "all",
+                          scale: "quantile",
+                        },
+                      );
+                      setAnalysisLoadKey((key) => key + 1);
                       setView({ center: x.center, zoom: x.zoom });
                     }}
                   >
@@ -563,7 +521,8 @@ export default function MapWorkspace() {
                         query,
                         tag,
                         sort,
-                        layer,
+                        layer: analysis.metrics[0]?.metric || "none",
+                        analysis,
                         level,
                         stateCode,
                         ...viewport,
@@ -647,141 +606,14 @@ export default function MapWorkspace() {
               ))}
             </section>
           )}
-          <details className={styles.layers}>
-            <summary>Map layers</summary>
-            <label className="work-check">
-              <input
-                type="checkbox"
-                checked={showPhotos}
-                onChange={(e) => setShowPhotos(e.target.checked)}
-              />
-              Photo locations
-            </label>
-            {showPhotos && (
-              <p className="work-muted">
-                Photo previews appear when zoomed in. Overlapping previews are
-                omitted so places remain readable.
-              </p>
-            )}
-            <div className="work-form">
-              <label>
-                Layer
-                <SelectField
-                  value={layer}
-                  onChange={(e) => {
-                    setLayer(e.target.value);
-                    setData(undefined);
-                  }}
-                >
-                  <option value="none">No public layer</option>
-                  <option value="world-population">World population</option>
-                  <option value="world-density">
-                    World population density
-                  </option>
-                  <option value="population">US population</option>
-                  <option value="age">US median age</option>
-                  <option value="income">US median household income</option>
-                </SelectField>
-              </label>
-              {layer !== "none" && !layer.startsWith("world") && (
-                <>
-                  <label>
-                    Geography
-                    <SelectField
-                      value={level}
-                      onChange={(e) => setLevel(e.target.value)}
-                    >
-                      <option value="state">States</option>
-                      <option value="county">Counties</option>
-                      <option value="tract">Census tracts</option>
-                    </SelectField>
-                  </label>
-                  {level !== "state" && (
-                    <label>
-                      State or territory
-                      <SelectField
-                        value={stateCode}
-                        onChange={(e) => setStateCode(e.target.value)}
-                      >
-                        <option value="">Choose a state</option>
-                        {STATES.map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </SelectField>
-                    </label>
-                  )}
-                </>
-              )}
-              {layer !== "none" &&
-                !layer.startsWith("world") &&
-                !snapshot?.capabilities.census && (
-                  <p className="work-muted">
-                    US regional data needs the Census connection configured.
-                    Worldwide layers and your saved places are available.
-                  </p>
-                )}
-              <Button busy={busy} onClick={() => void loadLayer()}>
-                Apply layer
-              </Button>
-              {data && (
-                <>
-                  <p className="work-muted">
-                    {data.geography} · {data.period} · {data.unit}
-                    <br />
-                    <a href={data.sourceUrl} target="_blank" rel="noreferrer">
-                      {data.source}
-                    </a>
-                  </p>
-                  <div className={styles.legend}>
-                    <span>Lower</span>
-                    <i />
-                    <span>Higher</span>
-                  </div>
-                  <small>
-                    Logarithmic color scale. Missing values are gray; boundaries
-                    are generalized for country-level comparison.
-                  </small>
-                  {data.geometryNote && (
-                    <p className="work-muted">{data.geometryNote}</p>
-                  )}
-                  <SelectField
-                    aria-label="Sort regions"
-                    value={regionSort}
-                    onChange={(e) =>
-                      setRegionSort(e.target.value as typeof regionSort)
-                    }
-                  >
-                    <option value="value">Highest value</option>
-                    <option value="name">Name</option>
-                  </SelectField>
-                  <div className={styles.regionTable}>
-                    {[...data.rows]
-                      .sort((a, b) =>
-                        regionSort === "name"
-                          ? a.name.localeCompare(b.name)
-                          : (b.value ?? -1) - (a.value ?? -1),
-                      )
-                      .map((r) => (
-                        <div key={r.id}>
-                          <strong>{r.name}</strong>
-                          <span>
-                            {r.value === null
-                              ? "No data"
-                              : r.value.toLocaleString()}
-                            {r.uncertainty != null
-                              ? ` ± ${r.uncertainty.toLocaleString()}`
-                              : ""}
-                          </span>
-                          <small>{r.year}</small>
-                        </div>
-                      ))}
-                  </div>
-                </>
-              )}
-            </div>
-          </details>
+          <label className={styles.photoToggle}>
+            <input
+              type="checkbox"
+              checked={showPhotos}
+              onChange={(e) => setShowPhotos(e.target.checked)}
+            />
+            Photo locations
+          </label>
         </aside>
         <div className={styles.map} data-mobile-hidden={mobileList}>
           <MapCanvas
@@ -798,8 +630,11 @@ export default function MapWorkspace() {
             view={view}
             route={route}
             stops={trip?.stops}
-            regions={regionGeometry}
+            regions={analysisResult?.geometry}
+            regionExtent={view ? undefined : analysisResult?.data[0].geometry}
+            regionGeography={analysisResult?.data[0].geography}
           />
+          {analysisResult && <MapDataLegend result={analysisResult} />}
           {selected && (
             <section className={styles.placeCard}>
               <div className={styles.placeHeading}>

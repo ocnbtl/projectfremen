@@ -109,7 +109,11 @@
 .legend i {
   height: 10px;
   flex: 1;
-  background: linear-gradient(90deg, var(--module-primary-100, #e3f1d5), var(--module-icon, #50752f));
+  background: linear-gradient(
+    90deg,
+    var(--module-primary-100, #e3f1d5),
+    var(--module-icon, #50752f)
+  );
 }
 .regionTable {
   max-height: 360px;
@@ -165,4 +169,209 @@
   .hint {
     padding-inline: 16px;
   }
+}
+.layers h2 {
+  font: 600 15px var(--font-heading);
+  margin: 0 0 16px;
+}
+.explorerForm {
+  display: grid;
+  gap: 12px;
+  font-size: 12px;
+}
+.explorerForm label {
+  display: grid;
+  gap: 6px;
+}
+.explorerForm label strong {
+  font-weight: 500;
+  color: #50752f;
+}
+.explorerForm input[type="range"] {
+  width: 100%;
+  accent-color: #50752f;
+}
+.levels {
+  display: flex;
+  gap: 3px;
+}
+.levels button {
+  flex: 1;
+  min-width: 0;
+  font-size: 10px;
+  background: transparent;
+  border: 1px solid #e1e8dc;
+  border-radius: 5px;
+  padding: 6px 2px;
+  cursor: pointer;
+}
+.levels button[aria-pressed="true"] {
+  background: #e3f1d5;
+  border-color: #83a667;
+  color: #365421;
+}
+.dataMetrics {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.dataMetrics legend {
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.dataMetrics label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.explorerForm input[type="checkbox"],
+.photoToggle input {
+  accent-color: #50752f;
+}
+.dataHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.rangeFilter {
+  display: grid;
+  grid-template-columns: 1fr 66px 66px;
+  align-items: center;
+  gap: 6px;
+}
+.rangeFilter input {
+  min-width: 0;
+  width: 100%;
+  padding: 7px 5px;
+  border: 1px solid #d3ddcb;
+  border-radius: 5px;
+  font: 400 12px var(--font-body);
+}
+.source {
+  font-size: 11px;
+  color: #697760;
+  margin: 0;
+  line-height: 1.5;
+}
+.source a {
+  color: #50752f;
+}
+.source small {
+  display: block;
+  margin-top: 4px;
+}
+.dataError {
+  color: #a12721;
+  margin: 0;
+  font-size: 12px;
+}
+.onMapLegend {
+  position: absolute;
+  z-index: 3;
+  bottom: 28px;
+  left: 12px;
+  width: min(350px, calc(100% - 68px));
+  background: #ffffffed;
+  padding: 12px 14px;
+  border: 1px solid #e1e8dc;
+  border-radius: 10px;
+  box-shadow: 0 3px 18px #24351f14;
+  display: grid;
+  gap: 6px;
+  pointer-events: none;
+}
+.onMapLegend > strong {
+  font-size: 13px;
+}
+.onMapLegend > span,
+.onMapLegend > small {
+  font-size: 10px;
+  color: #607058;
+}
+.onMapLegend > div:not(.scaleNumbers) {
+  display: flex;
+  height: 10px;
+}
+.onMapLegend i {
+  flex: 1;
+}
+.scaleNumbers {
+  display: flex;
+  justify-content: space-between;
+  font-size: 9px;
+  color: #5c6855;
+}
+.photoToggle {
+  display: flex;
+  gap: 8px;
+  padding: 16px;
+  font-size: 12px;
+}
+.regionTable {
+  max-height: 340px;
+}
+.regionTable span {
+  font-size: 11px;
+}
+.map {
+  min-height: 0;
+}
+.placeCard {
+  bottom: 150px;
+}
+.map :global(.maplibregl-ctrl-attrib) {
+  font-size: 10px;
+}
+.map :global(.maplibregl-popup-content) {
+  font: 400 12px/1.5 var(--font-body);
+  border-radius: 8px;
+  padding: 14px;
+}
+.map :global(.maplibregl-popup-content p) {
+  margin: 6px 0 0;
+}
+.levels button {
+  color: #506440;
+  width: auto;
+  font-weight: 500;
+}
+.dataMetrics input[type="checkbox"],
+.explorerForm input[type="checkbox"],
+.photoToggle input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  min-height: 14px;
+  flex: 0 0 14px;
+  margin: 0;
+  padding: 0;
+}
+.dataMetrics label {
+  justify-content: flex-start;
+}
+.explorerForm input[type="range"] {
+  margin: 0;
+  padding: 0;
+}
+.explorerForm > label:has(input[type="checkbox"]) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.onMapLegend {
+  bottom: 40px;
+}
+.rangeFilter {
+  grid-template-columns: 1fr 80px 80px;
+}
+.map :global(.maplibregl-ctrl-bottom-left) {
+  z-index: 4;
+}
+.levels {
+  gap: 2px;
+}
+.levels button {
+  font-size: 10px;
 }

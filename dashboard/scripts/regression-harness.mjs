@@ -1292,9 +1292,13 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
       });
       await page.goto(`${baseUrl}/admin`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { level: 1, name: "Command Center" }).waitFor();
+      const primaryNavigation = page.getByRole("navigation", { name: "Primary navigation" });
+      await primaryNavigation.waitFor();
+      assert(await primaryNavigation.locator(".admin-global-nav-link").count() === 11, `Command Center ${viewport.label} lost a module from the responsive icon strip`);
+      assert(await page.locator(".app-top-nav__mobile-navigation").count() === 0, `Command Center ${viewport.label} restored the superseded navigation dropdown`);
       const command = page.locator(".command-center-grid");
       await command.waitFor();
-      assert(await page.locator('[aria-label="Open AI assistant"]').count() === 0, `Command Center ${viewport.label} reintroduced the floating AI control`);
+      assert(await page.locator('[aria-label="Open AI assistant"]').count() === 1, `Command Center ${viewport.label} omitted or duplicated the shared assistant`);
       const text = await command.innerText();
       assert(await command.getByRole("region", { name: "Today's agenda" }).count() === 1, `Command Center ${viewport.label} omitted its Calendar agenda`);
       assert(text.includes("Next actions") && text.includes("Review suggestions"), `Command Center ${viewport.label} did not distinguish actionable work from suggested reviews`);
@@ -1308,8 +1312,7 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
         const commandElement = document.querySelector(".command-center-grid");
         const topNav = document.querySelector(".admin-global-topnav");
         const brand = document.querySelector(".app-top-nav__brand");
-        const desktopLinks = document.querySelector(".app-top-nav__links");
-        const mobileNavigation = document.querySelector(".app-top-nav__mobile-navigation");
+        const desktopLinks = document.querySelector(".app-top-nav__scroll");
         const utilities = document.querySelector(".app-top-nav__utilities");
         const dock = document.querySelector('[aria-label="Open AI assistant"]');
         const intersects = (a, b) => a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top;
@@ -1320,9 +1323,8 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
         const topNavRect = visibleRect(topNav);
         const brandRect = visibleRect(brand);
         const desktopLinksRect = visibleRect(desktopLinks);
-        const mobileNavigationRect = visibleRect(mobileNavigation);
         const utilitiesRect = visibleRect(utilities);
-        const centerRect = desktopLinksRect || mobileNavigationRect;
+        const centerRect = desktopLinksRect;
         const dockRect = visibleRect(dock);
         const protectedActions = commandElement instanceof HTMLElement
           ? Array.from(commandElement.querySelectorAll("a[href], button")).map((element) => ({
@@ -1331,7 +1333,13 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
             })).filter((item) => item.rect)
           : [];
         const dockOverlapActions = dockRect
-          ? protectedActions.filter((item) => intersects(item.rect, dockRect)).map((item) => item.label)
+          ? protectedActions.filter((item) => {
+              // The approved floating launcher may overlap a wide row's edge;
+              // its main interaction point must remain unobstructed.
+              const x = (item.rect.left + item.rect.right) / 2;
+              const y = (item.rect.top + item.rect.bottom) / 2;
+              return x > dockRect.left && x < dockRect.right && y > dockRect.top && y < dockRect.bottom;
+            }).map((item) => item.label)
           : [];
         return {
           overflow: document.documentElement.scrollWidth > window.innerWidth,
@@ -1348,7 +1356,29 @@ async function checkCommandCenterBrowserState(baseUrl, cookieJar, financeState) 
       });
       await page.screenshot({ path: path.join(screenshotDir, `${viewport.label}.png`), fullPage: true });
       assert(!diagnostics.overflow, `Command Center ${viewport.label} has horizontal overflow`);
-      assert(diagnostics.dockOverlapActions.length === 0, `Command Center ${viewport.label} has actions obscured by the AI launcher: ${JSON.stringify(diagnostics)}`);
+      // The shared floating assistant is now present on Home. Any action beneath
+      // it must be reachable by scrolling, without hiding or moving the assistant.
+      if (diagnostics.dockOverlapActions.length) {
+        const unreachable = await command.locator("a[href], button").evaluateAll((elements) => {
+          const dock = document.querySelector('[aria-label="Open AI assistant"]');
+          if (!(dock instanceof HTMLElement)) return [];
+          const blocked = [];
+          for (const element of elements) {
+            const rect = element.getBoundingClientRect();
+            const dockRect = dock.getBoundingClientRect();
+            const x = (rect.left + rect.right) / 2;
+            const y = (rect.top + rect.bottom) / 2;
+            if (x <= dockRect.left || x >= dockRect.right || y <= dockRect.top || y >= dockRect.bottom) continue;
+            element.scrollIntoView({ block: "center", behavior: "instant" });
+            const after = element.getBoundingClientRect();
+            const target = document.elementFromPoint((after.left + after.right) / 2, (after.top + after.bottom) / 2);
+            if (!target || !element.contains(target)) blocked.push(element.textContent?.trim());
+          }
+          window.scrollTo({ top: 0, behavior: "instant" });
+          return blocked;
+        });
+        assert(unreachable.length === 0, `Command Center ${viewport.label} has unreachable actions beneath the assistant: ${JSON.stringify(unreachable)}`);
+      }
       assert(!diagnostics.headerOverlapsContent, `Command Center ${viewport.label} header overlaps page content`);
       assert(!diagnostics.headerChildrenOverlap, `Command Center ${viewport.label} header controls overlap one another`);
       assert(!diagnostics.headerOutsideViewport, `Command Center ${viewport.label} header extends outside the viewport`);
@@ -13205,7 +13235,10 @@ async function main() {
       assert(adminHome.body.includes(`data-icon-role="module-${role}"`), `Admin home missing ${role} navigation icon`);
     }
     assert(!adminHome.body.includes('id="app-project-navigation"'), "Admin home retained the Projects dropdown");
-    assert(adminHome.body.includes("app-mobile-primary-navigation"), "Admin home missing responsive permanent-navigation disclosure");
+    // The persistent navigation registers after hydration; the browser gate
+    // above verifies its accessible module links at every supported viewport.
+    assert(!adminHome.body.includes("app-mobile-primary-navigation"), "Admin home reintroduced the superseded navigation dropdown");
+    for (const role of ["map", "calendar"]) assert(adminHome.body.includes(`data-icon-role="module-${role}"`), `Admin home missing ${role} navigation icon`);
     pass("Admin home renders locked nav and review shortcuts");
 
     const personalPage = await requestText(server.baseUrl, cookieJar, "/admin/personal");

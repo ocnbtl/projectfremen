@@ -1,4 +1,12 @@
 "use client";
+import * as Popover from "@radix-ui/react-popover";
+import CalendarTimeGrid from "./CalendarTimeGrid";
+import EventEditorFields from "./EventEditorFields";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
+import {
+  calendarGroups,
+  eventGroup,
+} from "../../lib/modules/planning/calendar-groups";
 import RelatedRecords from "./RelatedRecords";
 import { motionTokens } from "../../lib/design-system/motion";
 import { useMotionPreference } from "../admin-shell/ExperienceProvider";
@@ -23,7 +31,6 @@ import {
 } from "../admin-shell/WorkspaceKit";
 import SharedAIDock from "../admin-shell/SharedAIDock";
 import DateField from "../people/DateField";
-import TimeField from "../people/TimeField";
 import SelectField from "../ui/SelectField";
 import RecordLinks from "./RecordLinks";
 import {
@@ -33,8 +40,6 @@ import {
 } from "../../lib/modules/planning/repository";
 import {
   addDays,
-  calendarLayout,
-  calendarOverlapGroups,
   eventOccurrences,
   instantFor,
   localDate,
@@ -50,7 +55,10 @@ import {
   type EventFields,
   type EventOccurrence,
 } from "../../lib/modules/planning/types";
-import { MODULE_COLOR_SYSTEM, moduleThemeVariables } from "../../lib/design-system/color-system";
+import {
+  MODULE_COLOR_SYSTEM,
+  moduleThemeVariables,
+} from "../../lib/design-system/color-system";
 import styles from "./CalendarWorkspace.module.css";
 
 import { normalizePlanningRecord } from "../../lib/modules/planning/validation";
@@ -93,37 +101,17 @@ export default function CalendarWorkspace() {
   const { preference } = useMotionPreference();
   const contentRef = useRef<HTMLDivElement>(null);
   const previousDate = useRef("");
-  const [overlap, setOverlap] = useState<EventOccurrence[]>();
-  const [overlapQuery, setOverlapQuery] = useState("");
-  const [overlapLimit, setOverlapLimit] = useState(50);
-  const overlapMatches =
-    overlap?.filter((item) =>
-      `${item.title} ${item.location}`
-        .toLowerCase()
-        .includes(overlapQuery.toLowerCase()),
-    ) || [];
-  const timeScroll = useRef<HTMLDivElement>(null);
-  const scrollPositions = useRef<Record<string, number>>({});
   const [draft, setDraft] = useState<EventDraft | undefined>(
     () => retainedDraft,
   );
   const [zoneInput, setZoneInput] = useState("");
-  const [slotFocus, setSlotFocus] = useState({ day: "", half: 18 });
-  const [dragPreview, setDragPreview] = useState<{
-    day: string;
-    half: number;
-  }>();
-  const resizeOrigin = useRef<{ id: string; y: number; end: number } | null>(
-    null,
-  );
-  const [resizing, setResizing] = useState<{ id: string; end: number }>();
-  const dragOrigin = useRef<{ day: string; half: number } | null>(null);
-  const [creationRange, setCreationRange] = useState<{
-    day: string;
-    from: number;
-    to: number;
-  }>();
-
+  const [showWeekends, setShowWeekends] = useState(true),
+    [showCompleted, setShowCompleted] = useState(false),
+    [widenToday, setWidenToday] = useState(false);
+  const [monthPicker, setMonthPicker] = useState(false),
+    [pickerYear, setPickerYear] = useState(new Date().getFullYear());
+  const [dayDetail, setDayDetail] = useState<string>(),
+    [agendaPage, setAgendaPage] = useState(0);
   const [zone, setZone] = useState("America/New_York"),
     [date, setDate] = useState(() => new Date().toISOString().slice(0, 10)),
     [view, setView] = useState<View>("week");
@@ -146,7 +134,9 @@ export default function CalendarWorkspace() {
   const [connectionName, setConnectionName] = useState(""),
     [feedUrl, setFeedUrl] = useState(""),
     [calendarName, setCalendarName] = useState(""),
-    [calendarColor, setCalendarColor] = useState(MODULE_COLOR_SYSTEM.calendar.tokens.icon);
+    [calendarColor, setCalendarColor] = useState(
+      MODULE_COLOR_SYSTEM.calendar.tokens.icon,
+    );
   const refresh = useCallback(async () => {
     try {
       setSnapshot(await planningRequest<PlanningSnapshot>());
@@ -165,7 +155,7 @@ export default function CalendarWorkspace() {
         ? linkedDate
         : localDate(new Date(), z),
     );
-    if (matchMedia("(max-width:760px)").matches) setView("agenda");
+    if (matchMedia("(max-width:760px)").matches) setView("day");
     void refresh();
     const timer = setInterval(() => setNow(Date.now()), 60000);
     window.addEventListener("online", refresh);
@@ -207,11 +197,6 @@ export default function CalendarWorkspace() {
       setDraft(editor);
     }
   }, [editor]);
-  useEffect(() => {
-    if (!snapshot || (view !== "week" && view !== "day")) return;
-    const node = timeScroll.current;
-    if (node) node.scrollTop = scrollPositions.current[view] ?? 8 * 64;
-  }, [view, Boolean(snapshot)]);
   function finishEditing(saved?: EventDraft) {
     if (!saved || retainedDraft === saved) retainedDraft = undefined;
     setDraft((current) => (!saved || current === saved ? undefined : current));
@@ -296,6 +281,11 @@ export default function CalendarWorkspace() {
   const days = Array.from(
     { length: view === "month" ? 42 : view === "week" ? 7 : 1 },
     (_, i) => addDays(range.start, i),
+  ).filter(
+    (day) =>
+      view === "day" ||
+      showWeekends ||
+      ![0, 6].includes(new Date(`${day}T12:00`).getDay()),
   );
   const expanded = useMemo(() => {
     try {
@@ -326,47 +316,16 @@ export default function CalendarWorkspace() {
           .includes(query.toLowerCase()),
     );
   }, [expanded.items, snapshot?.state.calendars, query]);
-  // Zone conversion and interval layout do not depend on open menus or editor
-  // keystrokes. Compute each day's bounds once and reuse its layout.
-  const dayGroups = useMemo(
-    () =>
-      Object.fromEntries(
-        days.map((day) => {
-          const low = instantFor(day, zone),
-            high = instantFor(addDays(day, 1), zone);
-          const groups = calendarOverlapGroups(
-            occurrences.filter(
-              (item) => !item.allDay && item.startMs < high && item.endMs > low,
-            ),
-          );
-          return [
-            day,
-            groups.map((group) => {
-              let endings: number[] = [],
-                dense = false;
-              for (const item of group) {
-                endings = endings.filter((end) => end > item.startMs);
-                endings.push(item.endMs);
-                if (endings.length > 2) {
-                  dense = true;
-                  break;
-                }
-              }
-              return { group, layout: dense ? null : calendarLayout(group) };
-            }),
-          ];
-        }),
-      ),
-    [occurrences, range.start, range.end, view, zone],
-  );
   const dated = showDated
     ? (snapshot?.dated || []).filter(
         (x) =>
+          (showCompleted || !x.completed) &&
           x.start < range.end &&
           x.end > range.start &&
           x.title.toLowerCase().includes(query.toLowerCase()),
       )
     : [];
+  useEffect(() => setAgendaPage(0), [date, query, view, showCompleted]);
   async function action(work: () => Promise<unknown>, message: string) {
     setBusy(true);
     setError("");
@@ -383,7 +342,7 @@ export default function CalendarWorkspace() {
     }
   }
   function create(day = date, hour = 9, duration = 60) {
-    const start = `${day}T${String(Math.floor(hour)).padStart(2, "0")}:${hour % 1 ? "30" : "00"}`;
+    const start = `${day}T${String(Math.floor(hour)).padStart(2, "0")}:${String(Math.round((hour % 1) * 60)).padStart(2, "0")}`;
     setEditor({
       scope: "series",
       fields: {
@@ -466,7 +425,7 @@ export default function CalendarWorkspace() {
   async function move(item: EventOccurrence, day: string, hour: number) {
     const original = snapshot?.state.events.find((x) => x.id === item.eventId);
     if (!original) return;
-    const displayStart = `${day}T${String(Math.floor(hour)).padStart(2, "0")}:${hour % 1 ? "30" : "00"}`,
+    const displayStart = `${day}T${String(Math.floor(hour)).padStart(2, "0")}:${String(Math.round((hour % 1) * 60)).padStart(2, "0")}`,
       ms = instantFor(displayStart, zone),
       start = localFor(ms, item.timeZone),
       end = localFor(ms + item.endMs - item.startMs, item.timeZone);
@@ -496,7 +455,7 @@ export default function CalendarWorkspace() {
     const original = snapshot?.state.events.find((e) => e.id === item.eventId);
     if (!original) return;
     const end = localFor(
-      Math.max(item.startMs + 30 * 60000, endMs),
+      Math.max(item.startMs + 5 * 60000, endMs),
       item.timeZone,
     );
     await action(
@@ -520,122 +479,36 @@ export default function CalendarWorkspace() {
       "Event duration updated",
     );
   }
-  function eventButton(item: EventOccurrence, style?: CSSProperties) {
+  function eventButton(item: EventOccurrence) {
     const event = snapshot?.state.events.find((x) => x.id === item.eventId);
     const calendar = snapshot?.state.calendars.find(
       (x) => x.id === item.calendarId,
     );
-    const content = (
-      <>
-        <strong>{item.title}</strong>
+    const group = eventGroup(calendar, item.groupId);
+    return (
+      <button
+        type="button"
+        key={item.id}
+        className={styles.agendaEvent}
+        style={
+          {
+            "--event-color":
+              group?.color || calendarDisplayColor(calendar?.color),
+          } as CSSProperties
+        }
+        onClick={() => event && openEvent(event, item)}
+        title={item.title}
+      >
+        <strong>
+          {group && <UnigentamosIcon role={group.icon} size={14} />}{" "}
+          {item.title}
+        </strong>
         <span>
           {item.allDay
             ? "All day"
-            : `${timeLabel(item.startMs, zone)}–${timeLabel(resizing?.id === item.id ? resizing.end : item.endMs, zone)}`}
+            : timeLabel(item.startMs, zone) + "–" + timeLabel(item.endMs, zone)}
         </span>
-        {item.location && <small>{item.location}</small>}
-        {item.overridden && <small>Edited here</small>}
-      </>
-    );
-    const title = `${item.title} · ${timeLabel(item.startMs, zone)}–${timeLabel(item.endMs, zone)}`;
-    const drag = (e: React.DragEvent) =>
-      e.dataTransfer.setData("application/x-unigentamos-event", item.id);
-    if (!style)
-      return (
-        <button
-          type="button"
-          key={item.id}
-          className={styles.agendaEvent}
-          style={
-            { "--event-color": calendarDisplayColor(calendar?.color) } as CSSProperties
-          }
-          onClick={() => event && openEvent(event, item)}
-          title={title}
-        >
-          {content}
-        </button>
-      );
-    return (
-      <div
-        key={item.id}
-        className={styles.event}
-        style={
-          {
-            ...style,
-            height:
-              resizing?.id === item.id
-                ? Math.max(
-                    24,
-                    Number(style.height) +
-                      (((resizing.end - item.endMs) / 60000) * 64) / 60,
-                  )
-                : style.height,
-            "--event-color": calendarDisplayColor(calendar?.color),
-          } as CSSProperties
-        }
-      >
-        <button
-          type="button"
-          className={styles.eventBody}
-          draggable={!item.allDay}
-          onDragStart={drag}
-          onClick={() => event && openEvent(event, item)}
-          title={title}
-        >
-          {content}
-        </button>
-        <button
-          type="button"
-          className={styles.resizeHandle}
-          aria-label={`Resize ${item.title}; use up or down arrows to change by 30 minutes`}
-          title="Drag to change duration; arrow keys adjust by 30 minutes"
-          onKeyDown={(e) => {
-            if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-              e.preventDefault();
-              void resizeEvent(
-                item,
-                item.endMs + (e.key === "ArrowUp" ? -1 : 1) * 30 * 60000,
-              );
-            }
-          }}
-          onPointerDown={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            resizeOrigin.current = {
-              id: item.id,
-              y: e.clientY,
-              end: item.endMs,
-            };
-            setResizing({ id: item.id, end: item.endMs });
-            e.currentTarget.setPointerCapture(e.pointerId);
-          }}
-          onPointerMove={(e) => {
-            const origin = resizeOrigin.current;
-            if (origin?.id === item.id)
-              setResizing({
-                id: item.id,
-                end: Math.max(
-                  item.startMs + 30 * 60000,
-                  origin.end +
-                    Math.round((e.clientY - origin.y) / 32) * 30 * 60000,
-                ),
-              });
-          }}
-          onPointerUp={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            if (resizing?.id === item.id) void resizeEvent(item, resizing.end);
-            resizeOrigin.current = null;
-            setResizing(undefined);
-          }}
-          onPointerCancel={() => {
-            resizeOrigin.current = null;
-            setResizing(undefined);
-          }}
-        >
-          <span aria-hidden="true" />
-        </button>
-      </div>
+      </button>
     );
   }
   async function connect(
@@ -712,17 +585,76 @@ export default function CalendarWorkspace() {
           >
             →
           </Button>
-          <h2 aria-live="polite">
-            {view === "month"
-              ? labelDate(date, { month: "long", year: "numeric" })
-              : view === "day"
-                ? labelDate(date, {
-                    weekday: "short",
-                    month: "short",
-                    day: "numeric",
-                  })
-                : `${labelDate(range.start, { month: "short", day: "numeric" })} – ${labelDate(addDays(range.end, -1), { month: "short", day: "numeric", year: "numeric" })}`}
-          </h2>
+          <Popover.Root
+            open={monthPicker}
+            onOpenChange={(open) => {
+              setMonthPicker(open);
+              setPickerYear(Number(date.slice(0, 4)));
+            }}
+          >
+            <Popover.Trigger asChild>
+              <button className={styles.monthTrigger} aria-label="Choose month">
+                {labelDate(date, { month: "long", year: "numeric" })}
+                <UnigentamosIcon role="chevron-down" size={16} />
+              </button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                className={styles.calendarPopover}
+                sideOffset={8}
+                collisionPadding={12}
+              >
+                <div className="work-actions">
+                  <Button
+                    aria-label="Previous year"
+                    onClick={() => setPickerYear(pickerYear - 1)}
+                  >
+                    ←
+                  </Button>
+                  <strong>{pickerYear}</strong>
+                  <Button
+                    aria-label="Next year"
+                    onClick={() => setPickerYear(pickerYear + 1)}
+                  >
+                    →
+                  </Button>
+                </div>
+                <div className={styles.monthChoices}>
+                  {Array.from({ length: 12 }, (_, i) => (
+                    <button
+                      type="button"
+                      key={i}
+                      aria-pressed={
+                        date.slice(0, 7) ===
+                        pickerYear + "-" + String(i + 1).padStart(2, "0")
+                      }
+                      onClick={() => {
+                        setDate(
+                          pickerYear +
+                            "-" +
+                            String(i + 1).padStart(2, "0") +
+                            "-01",
+                        );
+                        setMonthPicker(false);
+                      }}
+                    >
+                      {new Date(2026, i, 1).toLocaleDateString(undefined, {
+                        month: "short",
+                      })}
+                    </button>
+                  ))}
+                </div>
+                <DateField
+                  label="Jump to date"
+                  value={date}
+                  onChange={(value) => {
+                    setDate(value);
+                    setMonthPicker(false);
+                  }}
+                />
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
         </div>
         <div className="work-actions">
           <input
@@ -738,76 +670,94 @@ export default function CalendarWorkspace() {
             value={view}
             onChange={(e) => setView(e.target.value as View)}
           >
-            {["day", "week", "month", "agenda"].map((x) => (
-              <option key={x} value={x}>
-                {x[0].toUpperCase() + x.slice(1)}
+            {["day", "week", "month", "agenda"].map((v) => (
+              <option key={v} value={v}>
+                {v[0].toUpperCase() + v.slice(1)}
               </option>
             ))}
           </SelectField>
-          <Button aria-expanded={filters} onClick={() => setFilters(!filters)}>
-            Filter
-          </Button>
+          <Popover.Root open={filters} onOpenChange={setFilters}>
+            <Popover.Trigger asChild>
+              <Button icon="sliders">View options</Button>
+            </Popover.Trigger>
+            <Popover.Portal>
+              <Popover.Content
+                className={styles.calendarPopover}
+                sideOffset={8}
+                collisionPadding={12}
+              >
+                {[
+                  ["Show weekends", showWeekends, setShowWeekends],
+                  ["Show completed tasks", showCompleted, setShowCompleted],
+                  ["Widen today", widenToday, setWidenToday],
+                  ["Linked work and trips", showDated, setShowDated],
+                ].map(([label, checked, set]) => (
+                  <label className={styles.calendarToggle} key={String(label)}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(checked)}
+                      onChange={(e) =>
+                        (set as (v: boolean) => void)(e.target.checked)
+                      }
+                    />
+                    {String(label)}
+                  </label>
+                ))}
+                <label>
+                  Display time zone
+                  <input
+                    value={zoneInput}
+                    onChange={(e) => setZoneInput(e.target.value)}
+                    onBlur={() => {
+                      try {
+                        new Intl.DateTimeFormat("en", { timeZone: zoneInput });
+                        setZone(zoneInput);
+                        setError("");
+                      } catch {
+                        setError(
+                          "Choose a recognized time zone, such as America/New_York.",
+                        );
+                      }
+                    }}
+                    list="calendar-zones"
+                  />
+                </label>
+                <datalist id="calendar-zones">
+                  {Intl.supportedValuesOf("timeZone").map((z) => (
+                    <option key={z}>{z}</option>
+                  ))}
+                </datalist>
+              </Popover.Content>
+            </Popover.Portal>
+          </Popover.Root>
         </div>
       </div>
-      {filters && (
-        <div className="work-filters">
-          {snapshot?.state.calendars
-            .filter((c) => !c.archivedAt)
-            .map((c) => (
-              <label className={styles.calendarToggle} key={c.id}>
-                <input
-                  type="checkbox"
-                  checked={c.visible}
-                  onChange={() =>
-                    void action(
-                      () =>
-                        savePlanning(
-                          "calendars",
-                          { id: c.id, visible: !c.visible },
-                          c.updatedAt,
-                        ),
-                      "",
-                    )
-                  }
-                />
-                <span style={{ background: calendarDisplayColor(c.color) }} />
-                {c.name}
-              </label>
-            ))}
-          <label className={styles.calendarToggle}>
-            <input
-              type="checkbox"
-              checked={showDated}
-              onChange={(e) => setShowDated(e.target.checked)}
-            />
-            Linked work and trips
-          </label>
-          <label>
-            Display time zone
-            <input
-              value={zoneInput}
-              onChange={(e) => setZoneInput(e.target.value)}
-              onBlur={() => {
-                try {
-                  new Intl.DateTimeFormat("en", { timeZone: zoneInput });
-                  setZone(zoneInput);
-                  setError("");
-                } catch {
-                  setError(
-                    "Choose a recognized time zone, such as America/New_York.",
-                  );
+      <div className={styles.calendarChips}>
+        {snapshot?.state.calendars
+          .filter((c) => !c.archivedAt)
+          .map((c) => (
+            <label className={styles.calendarToggle} key={c.id}>
+              <input
+                type="checkbox"
+                checked={c.visible}
+                disabled={busy}
+                onChange={() =>
+                  void action(
+                    () =>
+                      savePlanning(
+                        "calendars",
+                        { id: c.id, visible: !c.visible },
+                        c.updatedAt,
+                      ),
+                    "",
+                  )
                 }
-              }}
-              list="calendar-zones"
-            />
-          </label>
-          <datalist id="calendar-zones">
-            {Intl.supportedValuesOf("timeZone").map((z) => (
-              <option key={z}>{z}</option>
-            ))}
-          </datalist>
-        </div>
-      )}
+              />
+              <span style={{ background: calendarDisplayColor(c.color) }} />
+              {c.name}
+            </label>
+          ))}
+      </div>
       <WorkspaceFeedback
         error={error || expanded.error}
         message={notice}
@@ -870,7 +820,12 @@ export default function CalendarWorkspace() {
       ) : (
         <div className={styles.content} ref={contentRef}>
           {view === "month" ? (
-            <div className={styles.month}>
+            <div
+              className={styles.month}
+              style={{
+                gridTemplateColumns: `repeat(${showWeekends ? 7 : 5},minmax(0,1fr))`,
+              }}
+            >
               {days.map((day) => (
                 <section
                   key={day}
@@ -892,15 +847,15 @@ export default function CalendarWorkspace() {
                         localFor(x.startMs, zone).slice(0, 10) <= day &&
                         localFor(x.endMs - 1, zone).slice(0, 10) >= day,
                     )
-                    .slice(0, 3)
+                    .slice(0, 2)
                     .map((x) => eventButton(x))}
                   {occurrences.filter(
                     (x) => localFor(x.startMs, zone).slice(0, 10) === day,
-                  ).length > 3 && (
+                  ).length > 2 && (
                     <button
                       onClick={() => {
                         setDate(day);
-                        setView("agenda");
+                        setDayDetail(day);
                       }}
                     >
                       View all events
@@ -918,438 +873,135 @@ export default function CalendarWorkspace() {
             </div>
           ) : view === "agenda" ? (
             <div className={styles.agenda}>
+              {[
+                ...occurrences.map((item) => ({
+                  id: item.id,
+                  start: item.start,
+                  title: item.title,
+                  item,
+                })),
+                ...dated.map((link) => ({
+                  id: link.id,
+                  start: link.start,
+                  title: link.title,
+                  link,
+                })),
+              ]
+                .sort((a, b) => a.start.localeCompare(b.start))
+                .slice(agendaPage * 5, agendaPage * 5 + 5)
+                .map((row) => (
+                  <section className={styles.agendaDay} key={row.id}>
+                    <h2>
+                      {labelDate(row.start.slice(0, 10), {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </h2>
+                    {"item" in row ? (
+                      eventButton(row.item)
+                    ) : (
+                      <Link
+                        className={styles.dated}
+                        href={row.link.ownerRef?.route || "/admin/personal"}
+                      >
+                        {row.title}
+                        {row.link.completed ? " · Completed" : ""}
+                      </Link>
+                    )}
+                  </section>
+                ))}
               {!occurrences.length && !dated.length ? (
                 <WorkspaceEmpty title="Room to plan">
                   Add an event, connect a calendar, or schedule linked work.
                 </WorkspaceEmpty>
               ) : (
-                Array.from({ length: 30 }, (_, i) => addDays(date, i)).map(
-                  (day) => {
-                    const items = occurrences.filter(
-                        (x) =>
-                          localFor(x.startMs, zone).slice(0, 10) <= day &&
-                          localFor(x.endMs - 1, zone).slice(0, 10) >= day,
-                      ),
-                      links = dated.filter(
-                        (x) => x.start <= day && x.end > day,
-                      );
-                    return items.length || links.length ? (
-                      <section className={styles.agendaDay} key={day}>
-                        <h2>
-                          {labelDate(day, {
-                            weekday: "short",
-                            month: "short",
-                            day: "numeric",
-                          })}
-                        </h2>
-                        <div>
-                          {items.map((x) => eventButton(x))}
-                          {links.map((x) => (
-                            <Link
-                              className={styles.dated}
-                              key={x.id}
-                              href={x.ownerRef?.route || "/admin/personal"}
-                            >
-                              {x.title}
-                              <small>Linked record · Open owner</small>
-                            </Link>
-                          ))}
-                        </div>
-                      </section>
-                    ) : null;
-                  },
-                )
+                <div className="work-actions">
+                  <Button
+                    disabled={agendaPage === 0}
+                    onClick={() => setAgendaPage(agendaPage - 1)}
+                  >
+                    Previous
+                  </Button>
+                  <span>
+                    Page {agendaPage + 1} of{" "}
+                    {Math.max(
+                      1,
+                      Math.ceil((occurrences.length + dated.length) / 5),
+                    )}
+                  </span>
+                  <Button
+                    disabled={
+                      (agendaPage + 1) * 5 >= occurrences.length + dated.length
+                    }
+                    onClick={() => setAgendaPage(agendaPage + 1)}
+                  >
+                    Next
+                  </Button>
+                </div>
               )}
             </div>
           ) : (
-            <div
-              className={styles.timeScroll}
-              ref={timeScroll}
-              onScroll={(e) => {
-                scrollPositions.current[view] = e.currentTarget.scrollTop;
+            <CalendarTimeGrid
+              days={days}
+              zone={zone}
+              now={now}
+              events={occurrences}
+              calendars={snapshot.state.calendars}
+              dated={dated}
+              widenToday={widenToday}
+              onCreate={create}
+              onDay={setDayDetail}
+              onOpen={(item) => {
+                const event = snapshot.state.events.find(
+                  (e) => e.id === item.eventId,
+                );
+                if (event) openEvent(event, item);
               }}
-            >
-              <div
-                className={styles.timeGrid}
-                style={{ "--days": days.length } as CSSProperties}
-              >
-                <div className={styles.timeGutter}>
-                  {zone.split("/").pop()?.replaceAll("_", " ")}
-                </div>
-                {days.map((day) => (
-                  <div
-                    className={styles.dayHeader}
-                    key={day}
-                    data-today={day === localDate(new Date(now), zone)}
-                  >
-                    <strong>
-                      {labelDate(day, { weekday: "short", day: "numeric" })}
-                    </strong>
-                    {occurrences
-                      .filter((x) => x.allDay && x.start <= day && x.end > day)
-                      .map((x) => eventButton(x))}
-                    {dated
-                      .filter((x) => x.start <= day && x.end > day)
-                      .map((x) => (
-                        <Link
-                          className={styles.dated}
-                          key={x.id}
-                          href={x.ownerRef?.route || "/admin/personal"}
-                        >
-                          {x.title}
-                        </Link>
-                      ))}
-                  </div>
-                ))}
-                <div className={styles.hours}>
-                  {Array.from({ length: 24 }, (_, h) => (
-                    <span key={h}>
-                      {h === 0
-                        ? "12 AM"
-                        : h < 12
-                          ? `${h} AM`
-                          : h === 12
-                            ? "12 PM"
-                            : `${h - 12} PM`}
-                    </span>
-                  ))}
-                </div>
-                {days.map((day) => (
-                  <div
-                    className={styles.dayColumn}
-                    key={day}
-                    data-calendar-day={day}
-                    onPointerMove={(e) => {
-                      const origin = dragOrigin.current;
-                      if (!origin || origin.day !== day) return;
-                      const half = Math.max(
-                        0,
-                        Math.min(
-                          47,
-                          Math.floor(
-                            (e.clientY -
-                              e.currentTarget.getBoundingClientRect().top) /
-                              32,
-                          ),
-                        ),
-                      );
-                      setCreationRange({
-                        day,
-                        from: Math.min(origin.half, half),
-                        to: Math.max(origin.half, half) + 1,
-                      });
-                    }}
-                    onPointerUp={() => {
-                      const origin = dragOrigin.current;
-                      if (origin && creationRange)
-                        create(
-                          day,
-                          creationRange.from / 2,
-                          (creationRange.to - creationRange.from) * 30,
-                        );
-                      dragOrigin.current = null;
-                      setCreationRange(undefined);
-                    }}
-                    onPointerCancel={() => {
-                      dragOrigin.current = null;
-                      setCreationRange(undefined);
-                    }}
-                    onDragLeave={() => setDragPreview(undefined)}
-                    onDragOver={(e) => {
-                      if (
-                        e.dataTransfer.types.includes(
-                          "application/x-unigentamos-event",
-                        )
-                      ) {
-                        e.preventDefault();
-                        setDragPreview({
-                          day,
-                          half: Math.max(
-                            0,
-                            Math.min(
-                              47,
-                              Math.floor(
-                                (e.clientY -
-                                  e.currentTarget.getBoundingClientRect().top) /
-                                  32,
-                              ),
-                            ),
-                          ),
-                        });
-                      }
-                    }}
-                    onDrop={(e) => {
-                      e.preventDefault();
-                      setDragPreview(undefined);
-                      const item = occurrences.find(
-                        (x) =>
-                          x.id ===
-                          e.dataTransfer.getData(
-                            "application/x-unigentamos-event",
-                          ),
-                      );
-                      if (item) {
-                        const rect = e.currentTarget.getBoundingClientRect();
-                        void move(
-                          item,
-                          day,
-                          Math.max(
-                            0,
-                            Math.min(
-                              23.5,
-                              Math.floor((e.clientY - rect.top) / 32) / 2,
-                            ),
-                          ),
-                        );
-                      }
-                    }}
-                  >
-                    {Array.from({ length: 48 }, (_, half) => (
-                      <button
-                        className={styles.slot}
-                        key={half}
-                        aria-label={`Add event ${day} at ${Math.floor(half / 2)}:${half % 2 ? "30" : "00"}`}
-                        tabIndex={
-                          half === slotFocus.half &&
-                          day === (slotFocus.day || days[0])
-                            ? 0
-                            : -1
-                        }
-                        data-half={half}
-                        onFocus={() => setSlotFocus({ day, half })}
-                        onKeyDown={(e) => {
-                          if (
-                            [
-                              "ArrowUp",
-                              "ArrowDown",
-                              "ArrowLeft",
-                              "ArrowRight",
-                              "Home",
-                              "End",
-                            ].includes(e.key)
-                          ) {
-                            e.preventDefault();
-                            const nextHalf =
-                              e.key === "Home"
-                                ? 0
-                                : e.key === "End"
-                                  ? 47
-                                  : Math.max(
-                                      0,
-                                      Math.min(
-                                        47,
-                                        half +
-                                          (e.key === "ArrowDown"
-                                            ? 1
-                                            : e.key === "ArrowUp"
-                                              ? -1
-                                              : 0),
-                                      ),
-                                    );
-                            const nextDay =
-                              days[
-                                Math.max(
-                                  0,
-                                  Math.min(
-                                    days.length - 1,
-                                    days.indexOf(day) +
-                                      (e.key === "ArrowRight"
-                                        ? 1
-                                        : e.key === "ArrowLeft"
-                                          ? -1
-                                          : 0),
-                                  ),
-                                )
-                              ];
-                            setSlotFocus({ day: nextDay, half: nextHalf });
-                            timeScroll.current
-                              ?.querySelector<HTMLButtonElement>(
-                                `[data-calendar-day="${nextDay}"] [data-half="${nextHalf}"]`,
-                              )
-                              ?.focus();
-                          }
-                        }}
-                        onPointerDown={(e) => {
-                          if (e.pointerType === "mouse" && e.button === 0) {
-                            dragOrigin.current = { day, half };
-                            setCreationRange({ day, from: half, to: half + 2 });
-                            e.currentTarget.parentElement?.setPointerCapture(
-                              e.pointerId,
-                            );
-                          }
-                        }}
-                        onClick={(e) => {
-                          if (e.detail === 0 || !creationRange)
-                            create(day, half / 2);
-                        }}
-                      />
-                    ))}
-                    {creationRange?.day === day && (
-                      <div
-                        className={styles.dragPreview}
-                        style={{
-                          top: creationRange.from * 32,
-                          height: (creationRange.to - creationRange.from) * 32,
-                        }}
-                        aria-hidden="true"
-                      >
-                        {Math.floor(creationRange.from / 2)}:
-                        {creationRange.from % 2 ? "30" : "00"}
-                      </div>
-                    )}
-                    {dragPreview?.day === day && (
-                      <div
-                        className={styles.dropPreview}
-                        style={{ top: dragPreview.half * 32 }}
-                        aria-hidden="true"
-                      >
-                        {Math.floor(dragPreview.half / 2)}:
-                        {dragPreview.half % 2 ? "30" : "00"}
-                      </div>
-                    )}
-                    {dayGroups[day].flatMap(({ group, layout }) => {
-                      if (!layout) {
-                        const start = Math.max(
-                          group[0].startMs,
-                          instantFor(day, zone),
-                        );
-                        const end = Math.min(
-                          Math.max(...group.map((e) => e.endMs)),
-                          instantFor(addDays(day, 1), zone),
-                        );
-                        const local = localFor(start, zone),
-                          top =
-                            (Number(local.slice(11, 13)) +
-                              Number(local.slice(14, 16)) / 60) *
-                            64;
-                        return [
-                          <button
-                            key={`overlap-${group[0].id}`}
-                            className={styles.overlap}
-                            style={{
-                              top,
-                              height: Math.max(
-                                48,
-                                ((end - start) / 3600000) * 64 - 2,
-                              ),
-                            }}
-                            onClick={() => {
-                              setOverlapQuery("");
-                              setOverlapLimit(50);
-                              setOverlap(group);
-                            }}
-                            aria-label={`${group.length} overlapping events on ${labelDate(day)}: ${group
-                              .slice(0, 3)
-                              .map((e) => e.title)
-                              .join(
-                                ", ",
-                              )}${group.length > 3 ? ` and ${group.length - 3} others` : ""}`}
-                          >
-                            <strong>{group.length} overlapping events</strong>
-                            <span>
-                              {timeLabel(start, zone)}–{timeLabel(end, zone)}
-                            </span>
-                            <small>View events</small>
-                          </button>,
-                        ];
-                      }
-                      return layout.map((item) => {
-                        const localStart = localFor(
-                            Math.max(item.startMs, instantFor(day, zone)),
-                            zone,
-                          ),
-                          localEnd = localFor(
-                            Math.min(
-                              item.endMs,
-                              instantFor(addDays(day, 1), zone),
-                            ),
-                            zone,
-                          );
-                        const minute = (value: string) =>
-                          Number(value.slice(11, 13)) * 60 +
-                          Number(value.slice(14, 16));
-                        const top = (minute(localStart) / 60) * 64,
-                          end =
-                            localEnd.slice(0, 10) > day
-                              ? 1536
-                              : (minute(localEnd) / 60) * 64;
-                        return eventButton(item, {
-                          top,
-                          left: `calc(${(item.column / item.columns) * 100}% + 3px)`,
-                          width: `calc(${100 / item.columns}% - 6px)`,
-                          height: Math.max(24, end - top - 2),
-                        });
-                      });
-                    })}
-                    {day === localDate(new Date(now), zone) && (
-                      <div
-                        className={styles.now}
-                        style={{
-                          top:
-                            (Number(localFor(now, zone).slice(11, 13)) +
-                              Number(localFor(now, zone).slice(14, 16)) / 60) *
-                            64,
-                        }}
-                      />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
+              onMove={(...args) => void move(...args)}
+              onResize={(...args) => void resizeEvent(...args)}
+            />
           )}
         </div>
       )}
       <WorkspaceSheet
-        open={Boolean(overlap)}
-        onClose={() => setOverlap(undefined)}
-        title="Overlapping events"
+        open={Boolean(dayDetail)}
+        onClose={() => setDayDetail(undefined)}
+        title={
+          dayDetail
+            ? labelDate(dayDetail, {
+                weekday: "long",
+                month: "long",
+                day: "numeric",
+              })
+            : "Day"
+        }
       >
-        {(overlap?.length || 0) > 50 && (
-          <label className="work-form">
-            Find an overlapping event
-            <input
-              type="search"
-              value={overlapQuery}
-              onChange={(e) => {
-                setOverlapQuery(e.target.value);
-                setOverlapLimit(50);
-              }}
-            />
-          </label>
-        )}
-        {overlapMatches.length > overlapLimit && (
-          <p className="work-muted">
-            Showing {overlapLimit} of {overlapMatches.length} events.
-          </p>
-        )}
-        {overlapMatches.slice(0, overlapLimit).map((item) => (
-          <button
-            className="work-row"
-            key={item.id}
-            onClick={() => {
-              setOverlap(undefined);
-              const event = snapshot?.state.events.find(
-                (e) => e.id === item.eventId,
-              );
-              if (event) openEvent(event, item);
-            }}
-          >
-            <div>
-              <strong>{item.title}</strong>
-              <span>
-                {timeLabel(item.startMs, zone)}–{timeLabel(item.endMs, zone)}
-              </span>
-              {item.location && <small>{item.location}</small>}
-            </div>
-          </button>
-        ))}
-        {overlapMatches.length > overlapLimit && (
-          <Button onClick={() => setOverlapLimit((limit) => limit + 50)}>
-            Show next 50 events
-          </Button>
-        )}
-        {overlapQuery && !overlapMatches.length && (
-          <p>No overlapping events match this search.</p>
+        {dayDetail && (
+          <>
+            <Button icon="plus" onClick={() => create(dayDetail)}>
+              Add event
+            </Button>
+            {occurrences
+              .filter(
+                (x) =>
+                  localFor(x.startMs, zone).slice(0, 10) <= dayDetail &&
+                  localFor(x.endMs - 1, zone).slice(0, 10) >= dayDetail,
+              )
+              .map(eventButton)}
+            {dated
+              .filter((x) => x.start <= dayDetail && x.end > dayDetail)
+              .map((x) => (
+                <Link
+                  className={styles.dated}
+                  href={x.ownerRef?.route || "/admin/personal"}
+                  key={x.id}
+                >
+                  {x.title}
+                  {x.completed ? " · Completed" : ""}
+                </Link>
+              ))}
+          </>
         )}
       </WorkspaceSheet>
       <WorkspaceSheet
@@ -1408,272 +1060,34 @@ export default function CalendarWorkspace() {
                   </SelectField>
                 </label>
               )}
-            <label className="work-check">
-              <input
-                type="checkbox"
-                checked={editor.fields.allDay}
-                onChange={(e) => {
-                  const allDay = e.target.checked;
-                  setEditor({
-                    ...editor,
-                    fields: {
-                      ...editor.fields,
-                      allDay,
-                      start: allDay
-                        ? editor.fields.start.slice(0, 10)
-                        : `${editor.fields.start.slice(0, 10)}T09:00`,
-                      end: allDay
-                        ? addDays(editor.fields.start.slice(0, 10), 1)
-                        : `${editor.fields.start.slice(0, 10)}T10:00`,
-                    },
-                  });
-                }}
+            <EventEditorFields
+              key={editor.original?.id || "new"}
+              fields={editor.fields}
+              update={update}
+              snapshot={snapshot}
+              busy={busy}
+              onCreateGroup={(calendar, group) =>
+                action(
+                  () =>
+                    savePlanning(
+                      "calendars",
+                      {
+                        id: calendar.id,
+                        groups: [...calendarGroups(calendar), group],
+                      },
+                      calendar.updatedAt,
+                    ),
+                  "Color group saved",
+                )
+              }
+            />
+            {editor.original && (
+              <RelatedRecords
+                module="calendar"
+                type="event"
+                id={editor.original.id}
               />
-              All day
-            </label>
-            <div className="work-form-pair">
-              <DateField
-                label="Starts"
-                value={editor.fields.start.slice(0, 10)}
-                onChange={(value) =>
-                  update(
-                    "start",
-                    editor.fields.allDay
-                      ? value
-                      : `${value}T${editor.fields.start.slice(11, 16)}`,
-                  )
-                }
-              />
-              <DateField
-                label={editor.fields.allDay ? "Through" : "Ends"}
-                value={
-                  editor.fields.allDay
-                    ? addDays(editor.fields.end, -1)
-                    : editor.fields.end.slice(0, 10)
-                }
-                onChange={(value) =>
-                  update(
-                    "end",
-                    editor.fields.allDay
-                      ? addDays(value, 1)
-                      : `${value}T${editor.fields.end.slice(11, 16)}`,
-                  )
-                }
-              />
-            </div>
-            {!editor.fields.allDay && (
-              <div className="work-form-pair">
-                <TimeField
-                  label="Start time"
-                  value={editor.fields.start.slice(11, 16)}
-                  onChange={(value) =>
-                    update(
-                      "start",
-                      `${editor.fields.start.slice(0, 10)}T${value}`,
-                    )
-                  }
-                />
-                <TimeField
-                  label="End time"
-                  value={editor.fields.end.slice(11, 16)}
-                  onChange={(value) =>
-                    update("end", `${editor.fields.end.slice(0, 10)}T${value}`)
-                  }
-                />
-              </div>
             )}
-            <details className="work-form-options">
-              <summary>Calendar, repeat, people and location</summary>
-              <label>
-                Time zone
-                <input
-                  required
-                  value={editor.fields.timeZone}
-                  onChange={(e) => update("timeZone", e.target.value)}
-                  list="event-time-zones"
-                />
-              </label>
-              <datalist id="event-time-zones">
-                {Intl.supportedValuesOf("timeZone").map((z) => (
-                  <option key={z}>{z}</option>
-                ))}
-              </datalist>
-              <div className="work-form-pair">
-                <label>
-                  Calendar
-                  <SelectField
-                    value={editor.fields.calendarId}
-                    onChange={(e) => update("calendarId", e.target.value)}
-                  >
-                    {snapshot?.state.calendars
-                      .filter((c) => !c.archivedAt)
-                      .map((c) => (
-                        <option value={c.id} key={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                  </SelectField>
-                </label>
-                <label>
-                  Type
-                  <SelectField
-                    value={editor.fields.kind}
-                    onChange={(e) =>
-                      update("kind", e.target.value as EventFields["kind"])
-                    }
-                  >
-                    <option value="event">Event</option>
-                    <option value="time_block">Work block</option>
-                  </SelectField>
-                </label>
-              </div>
-              <label>
-                Repeat
-                <SelectField
-                  value={
-                    [
-                      "",
-                      "FREQ=DAILY",
-                      "FREQ=WEEKLY",
-                      "FREQ=MONTHLY",
-                      "FREQ=YEARLY",
-                    ].includes(editor.fields.recurrence)
-                      ? editor.fields.recurrence
-                      : "custom"
-                  }
-                  onChange={(e) => {
-                    if (e.target.value !== "custom")
-                      update("recurrence", e.target.value);
-                  }}
-                >
-                  <option value="">Does not repeat</option>
-                  <option value="FREQ=DAILY">Daily</option>
-                  <option value="FREQ=WEEKLY">Weekly</option>
-                  <option value="FREQ=MONTHLY">Monthly</option>
-                  <option value="FREQ=YEARLY">Yearly</option>
-                  {editor.fields.recurrence && (
-                    <option value="custom">Custom imported recurrence</option>
-                  )}
-                </SelectField>
-              </label>
-              {editor.fields.recurrence && (
-                <details>
-                  <summary>Recurrence details</summary>
-                  <label>
-                    Recurrence rule
-                    <input
-                      value={editor.fields.recurrence}
-                      onChange={(e) => update("recurrence", e.target.value)}
-                      placeholder="FREQ=WEEKLY;COUNT=12"
-                    />
-                  </label>
-                  <small>
-                    COUNT limits occurrences; UNTIL sets the last recurrence
-                    date.
-                  </small>
-                </details>
-              )}
-              <label>
-                Reminder
-                <SelectField
-                  value={String(editor.fields.reminderMinutes ?? "none")}
-                  onChange={(e) =>
-                    update(
-                      "reminderMinutes",
-                      e.target.value === "none" ? null : Number(e.target.value),
-                    )
-                  }
-                >
-                  {[
-                    ["none", "None"],
-                    ["0", "At start"],
-                    ["5", "5 minutes before"],
-                    ["15", "15 minutes before"],
-                    ["60", "1 hour before"],
-                    ["1440", "1 day before"],
-                  ].map(([v, l]) => (
-                    <option key={v} value={v}>
-                      {l}
-                    </option>
-                  ))}
-                </SelectField>
-                <small>
-                  Shown inside Unigentamos, including missed reminders when you
-                  return.
-                </small>
-              </label>
-              <label>
-                Saved place
-                <SelectField
-                  value={editor.fields.placeId || ""}
-                  onChange={(e) => {
-                    update("placeId", e.target.value || undefined);
-                    const p = snapshot?.state.places.find(
-                      (x) => x.id === e.target.value,
-                    );
-                    if (p) update("location", p.name);
-                  }}
-                >
-                  <option value="">No saved place</option>
-                  {snapshot?.state.places
-                    .filter((p) => !p.archivedAt)
-                    .map((p) => (
-                      <option value={p.id} key={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                </SelectField>
-              </label>
-              <label>
-                Location
-                <input
-                  value={editor.fields.location}
-                  onChange={(e) => update("location", e.target.value)}
-                />
-              </label>
-              <label>
-                Description
-                <textarea
-                  value={editor.fields.description}
-                  onChange={(e) => update("description", e.target.value)}
-                />
-              </label>
-              <label>
-                Participants (one name or email per line)
-                <textarea
-                  value={(editor.fields.participants || [])
-                    .map((p) => p.email || p.name)
-                    .join("\n")}
-                  onChange={(e) =>
-                    update(
-                      "participants",
-                      e.target.value
-                        .split("\n")
-                        .filter(Boolean)
-                        .map((value) => ({
-                          name: value,
-                          ...(value.includes("@") ? { email: value } : {}),
-                        })),
-                    )
-                  }
-                />
-              </label>
-              <p className="work-muted">
-                Participants are saved here. No invitations are sent.
-              </p>
-              <RecordLinks
-                refs={editor.fields.linkedRefs}
-                available={snapshot?.refs}
-                onChange={(refs) => update("linkedRefs", refs)}
-              />
-              {editor.original && (
-                <RelatedRecords
-                  module="calendar"
-                  type="event"
-                  id={editor.original.id}
-                />
-              )}
-            </details>
             <div className="work-form-footer">
               <Button type="submit" intent="primary" busy={busy}>
                 Save event
@@ -2009,5 +1423,7 @@ function CalendarSettings({
 
 /** Re-tint the former default without changing stored or custom calendar colors. */
 function calendarDisplayColor(color?: string) {
-  return !color || color.toLowerCase() === "#565b86" ? MODULE_COLOR_SYSTEM.calendar.tokens.icon : color;
+  return !color || color.toLowerCase() === "#565b86"
+    ? MODULE_COLOR_SYSTEM.calendar.tokens.icon
+    : color;
 }

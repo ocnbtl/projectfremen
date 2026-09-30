@@ -27,6 +27,8 @@ type Props = {
   route?: FeatureCollection;
   stops?: { id: string; name: string; latitude: number; longitude: number }[];
   regions?: FeatureCollection;
+  regionExtent?: FeatureCollection | null;
+  regionGeography?: string;
 };
 const empty: FeatureCollection = { type: "FeatureCollection", features: [] };
 export default function MapCanvas(props: Props) {
@@ -62,8 +64,12 @@ export default function MapCanvas(props: Props) {
     }
     map.current = instance;
     instance.addControl(
-      new maplibregl.AttributionControl({ compact: false }),
-      "bottom-left",
+      new maplibregl.AttributionControl({ compact: true }),
+      "top-right",
+    );
+    instance.addControl(
+      new maplibregl.ScaleControl({ unit: "metric" }),
+      "bottom-right",
     );
     instance.addControl(
       new maplibregl.NavigationControl({ showCompass: false }),
@@ -109,6 +115,7 @@ export default function MapCanvas(props: Props) {
         filter: ["has", "point_count"],
         layout: {
           "text-field": ["get", "point_count_abbreviated"],
+          "text-font": ["Noto Sans Regular"],
           "text-size": 13,
         },
         paint: { "text-color": MODULE_COLOR_SYSTEM.map.primary[900] },
@@ -133,6 +140,7 @@ export default function MapCanvas(props: Props) {
         filter: ["!", ["has", "point_count"]],
         layout: {
           "text-field": ["get", "name"],
+          "text-font": ["Noto Sans Regular"],
           "text-size": 12,
           "text-offset": [0, 1.5],
         },
@@ -184,6 +192,7 @@ export default function MapCanvas(props: Props) {
         source: "stops",
         layout: {
           "text-field": ["get", "number"],
+          "text-font": ["Noto Sans Regular"],
           "text-size": 13,
           "text-allow-overlap": true,
         },
@@ -197,21 +206,26 @@ export default function MapCanvas(props: Props) {
           source: "regions",
           filter: ["==", ["geometry-type"], "Polygon"],
           paint: {
-            "fill-color": [
+            "fill-color": ["coalesce", ["get", "color"], "#c4c9c0"],
+            "fill-opacity": [
               "case",
-              ["==", ["get", "value"], null],
-              "#bfc9c4",
-              [
-                "interpolate",
-                ["linear"],
-                ["get", "normalized"],
-                0,
-                MODULE_COLOR_SYSTEM.map.primary[100],
-                1,
-                MODULE_COLOR_SYSTEM.map.primary[500],
-              ],
+              ["==", ["get", "matches"], true],
+              0.78,
+              0.12,
             ],
-            "fill-opacity": 0.5,
+          },
+        },
+        "place-clusters",
+      );
+      instance.addLayer(
+        {
+          id: "region-outlines",
+          type: "line",
+          source: "regions",
+          paint: {
+            "line-color": "#486139",
+            "line-width": 0.6,
+            "line-opacity": 0.45,
           },
         },
         "place-clusters",
@@ -250,6 +264,12 @@ export default function MapCanvas(props: Props) {
       );
       setReady(true);
       setError("");
+      // MapLibre 6 opens compact attribution initially. Start with the same
+      // accessible information button in its collapsed state.
+      const attribution = container.current?.querySelector<HTMLElement>(
+        ".maplibregl-ctrl-attrib.maplibregl-compact-show summary",
+      );
+      attribution?.click();
     });
     instance.on("click", (event) => {
       if (current.current.pinning) {
@@ -261,7 +281,36 @@ export default function MapCanvas(props: Props) {
           layers: ["place-clusters", "place-points"],
         }),
         feature = features[0];
-      if (!feature) return;
+      if (!feature) {
+        const region = instance.queryRenderedFeatures(event.point, {
+          layers: ["region-fill"],
+        })[0];
+        if (region) {
+          const content = document.createElement("div"),
+            title = document.createElement("strong");
+          title.textContent = String(region.properties.name || "Region");
+          content.append(title);
+          try {
+            const details = JSON.parse(region.properties.details || "[]") as {
+              label: string;
+              value: number | null;
+              unit: string;
+              year?: string;
+              uncertainty?: number;
+            }[];
+            for (const d of details) {
+              const line = document.createElement("p");
+              line.textContent = `${d.label}: ${d.value === null ? "No data" : d.value.toLocaleString()} ${d.unit}${d.uncertainty != null ? ` ± ${d.uncertainty.toLocaleString()}` : ""}${d.year ? ` · ${d.year}` : ""}`;
+              content.append(line);
+            }
+          } catch {}
+          new maplibregl.Popup({ maxWidth: "300px" })
+            .setLngLat(event.lngLat)
+            .setDOMContent(content)
+            .addTo(instance);
+        }
+        return;
+      }
       if (feature.properties.cluster_id !== undefined) {
         void (instance.getSource("places") as GeoJSONSource)
           .getClusterExpansionZoom(feature.properties.cluster_id)
@@ -418,6 +467,35 @@ export default function MapCanvas(props: Props) {
         props.regions || empty,
       );
   }, [ready, props.regions]);
+  useEffect(() => {
+    if (!ready || !map.current || !props.regionExtent) return;
+    if (props.regionGeography === "Country") {
+      map.current.jumpTo({ center: [-10, 25], zoom: 1.6 });
+      return;
+    }
+    if (props.regionGeography === "state") {
+      map.current.jumpTo({ center: [-98, 38], zoom: 3 });
+      return;
+    }
+    const bounds = new maplibregl.LngLatBounds();
+    const visit = (coordinates: unknown) => {
+      if (!Array.isArray(coordinates)) return;
+      if (
+        typeof coordinates[0] === "number" &&
+        typeof coordinates[1] === "number"
+      )
+        bounds.extend([
+          coordinates[0] > 0 ? coordinates[0] - 360 : coordinates[0],
+          coordinates[1],
+        ]);
+      else coordinates.forEach(visit);
+    };
+    props.regionExtent.features.forEach((f) => {
+      if ("coordinates" in f.geometry) visit(f.geometry.coordinates);
+    });
+    if (!bounds.isEmpty())
+      map.current.fitBounds(bounds, { padding: 60, maxZoom: 10, duration: 0 });
+  }, [ready, props.regionExtent, props.regionGeography]);
   useEffect(() => {
     if (map.current)
       map.current.getCanvas().style.cursor = props.pinning ? "crosshair" : "";

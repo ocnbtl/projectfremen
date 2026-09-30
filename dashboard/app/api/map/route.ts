@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
 import { isCsrfRequestValid } from "../../../lib/csrf";
+import { privateJsonStream } from "../../../lib/modules/planning/json-stream";
 import {
   demographics,
   routeStops,
@@ -25,7 +26,7 @@ export async function GET(request: Request) {
             params.get("state") || "",
           )
         : await searchPlaces(params.get("q") || "");
-    return json({ ok: true, data });
+    return privateJsonStream({ ok: true, data });
   } catch (e) {
     return json(
       {

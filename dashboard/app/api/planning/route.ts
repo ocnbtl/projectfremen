@@ -142,12 +142,13 @@ export async function GET() {
         }),
       );
     const dated = [...(ops?.obligations || []), ...(ops?.followUps || [])]
-      .filter((x) => x.dueAt)
+      .filter((x) => x.dueAt && !x.archivedAt)
       .map((item) => ({
         id: `work-${item.id}`,
         title: item.title,
         start: item.dueAt!.slice(0, 10),
         end: addDays(item.dueAt!.slice(0, 10), 1),
+        completed: (item.objectType === "obligation" ? item.obligationState : item.followUpState) === "complete",
         ownerRef: refs.find((x) => x.objectId === item.id),
       }));
     for (const trip of life?.trips || [])
@@ -157,16 +158,18 @@ export async function GET() {
           title: trip.name,
           start: trip.startDate.slice(0, 10),
           end: addDays((trip.endDate || trip.startDate).slice(0, 10), 1),
+          completed: trip.status === "been" || trip.status === "lived",
           ownerRef: refs.find((x) => x.objectId === trip.id),
         });
     for (const milestone of projects?.milestones || []) {
-      if (!milestone.dueAt || milestone.archivedAt || milestone.completedAt)
+      if (!milestone.dueAt || milestone.archivedAt)
         continue;
       dated.push({
         id: `milestone-${milestone.id}`,
         title: milestone.title,
         start: milestone.dueAt.slice(0, 10),
         end: addDays(milestone.dueAt.slice(0, 10), 1),
+        completed: Boolean(milestone.completedAt),
         ownerRef: createNativeObjectRef({
           module: "projects",
           objectType: "milestone",

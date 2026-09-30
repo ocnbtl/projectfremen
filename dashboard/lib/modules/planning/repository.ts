@@ -37,6 +37,7 @@ export type PlanningSnapshot = {
     title: string;
     start: string;
     end: string;
+    completed?: boolean;
     ownerRef?: NativeObjectRef;
   }[];
   sourceErrors: string[];

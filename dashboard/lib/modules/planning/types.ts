@@ -15,10 +15,12 @@ export type Place = PlanningBase & {
   tags: string[];
   linkedRefs: NativeObjectRef[];
 };
+export type EventGroup = { id: string; name: string; color: string; icon: string };
 export type Calendar = PlanningBase & {
   name: string;
   color: string;
   visible: boolean;
+  groups?: EventGroup[];
   connectionId?: string;
   externalId?: string;
   accountId?: string;
@@ -31,6 +33,7 @@ export type EventFields = {
   timeZone: string;
   allDay: boolean;
   calendarId: string;
+  groupId?: string;
   placeId?: string;
   location: string;
   linkedRefs: NativeObjectRef[];
@@ -73,6 +76,7 @@ export type SavedMapView = PlanningBase & {
   layer: string;
   level?: string;
   stateCode?: string;
+  analysis?: import("./map-analysis").MapAnalysisSettings;
   center: [number, number];
   zoom: number;
   sort: "name" | "updated";

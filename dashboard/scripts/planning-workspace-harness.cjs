@@ -779,6 +779,255 @@ async function check(label, run) {
       );
     },
   );
+  await check(
+    "calendar groups and five-minute event times persist through canonical reconciliation",
+    async () => {
+      const before = (await readPlanningState()).calendars.find(
+        (c) => c.id === "native",
+      );
+      const groups = [
+        { id: "study", name: "Study", color: "#59518B", icon: "university" },
+      ];
+      const calendar = await savePlanningRecord(
+        "calendars",
+        { id: "native", groups },
+        before.updatedAt,
+      );
+      assert.deepEqual(calendar.groups, groups);
+      await reconcileCanonicalRecord({
+        format: "unigentamos-canonical-command-v1",
+        operation: "update",
+        commandId: "group-sync",
+        canonicalId: "calendar:calendars:native",
+        baseUpdatedAt: calendar.updatedAt,
+        baseFields: { groups },
+        patch: {
+          groups: [
+            ...groups,
+            { id: "work", name: "Work", color: "#50752F", icon: "briefcase" },
+          ],
+        },
+        queuedAt: new Date().toISOString(),
+      });
+      assert.equal(
+        (await readPlanningState()).calendars.find((c) => c.id === "native")
+          .groups.length,
+        2,
+      );
+      const saved = await savePlanningRecord(
+        "events",
+        event({
+          id: "five-minute",
+          start: "2026-03-01T08:05",
+          end: "2026-03-01T08:10",
+          recurrence: "",
+          groupId: "study",
+        }),
+      );
+      assert.equal(saved.groupId, "study");
+      assert.equal(saved.end, "2026-03-01T08:10");
+      await reconcileCanonicalRecord({
+        format: "unigentamos-canonical-command-v1",
+        operation: "update",
+        commandId: "event-group-sync",
+        canonicalId: "calendar:events:five-minute",
+        baseUpdatedAt: saved.updatedAt,
+        baseFields: { groupId: "study" },
+        patch: { groupId: "work" },
+        queuedAt: new Date().toISOString(),
+      });
+      assert.equal(
+        (await readPlanningState()).events.find((e) => e.id === "five-minute")
+          .groupId,
+        "work",
+      );
+      assert.equal(
+        eventOccurrences(
+          [saved],
+          "2026-03-01",
+          "2026-03-02",
+          "America/New_York",
+        )[0].groupId,
+        "study",
+      );
+      assert.throws(
+        () =>
+          normalizePlanningRecord("calendars", {
+            ...calendar,
+            groups: [...groups, ...groups],
+          }),
+        /unique groups/,
+      );
+      const {
+        planningWritableKeys,
+      } = require("../lib/modules/planning/ownership.ts");
+      assert(planningWritableKeys("calendars").includes("groups"));
+      assert(planningWritableKeys("events").includes("groupId"));
+    },
+  );
+  await check(
+    "clearing an occurrence group or place survives JSON persistence",
+    () => {
+      const raw = event({
+        groupId: "work",
+        placeId: "studio",
+        exceptions: { "2026-03-01T09:00:00": { groupId: "", placeId: "" } },
+      });
+      const normalized = JSON.parse(
+        JSON.stringify(normalizePlanningRecord("events", raw)),
+      );
+      const occurrences = eventOccurrences(
+        [normalized],
+        "2026-03-01",
+        "2026-03-09",
+        "America/New_York",
+      );
+      assert.equal(occurrences[0].groupId, "");
+      assert.equal(occurrences[0].placeId, "");
+      assert.equal(occurrences[1].groupId, "work");
+    },
+  );
+  await check(
+    "map filters join by region, distinguish missing data, and reject mismatched releases",
+    () => {
+      const {
+        mapAnalysis,
+      } = require("../lib/modules/planning/map-analysis.ts");
+      const data = (values) => ({
+        rows: values.map((v, i) => ({
+          id: String(i),
+          name: String(i),
+          value: v,
+          year: "2020-2024",
+        })),
+        source: "fixture",
+        sourceUrl: "https://example.test",
+        period: "2020-2024",
+        unit: "people",
+        geography: "state",
+        geometry: { type: "FeatureCollection", features: [] },
+      });
+      const settings = {
+        metrics: [
+          { metric: "population", min: 20 },
+          { metric: "income", min: 40 },
+        ],
+        match: "all",
+        scale: "quantile",
+      };
+      const result = mapAnalysis(
+        [data([10, 20, 30, null]), data([100, 35, 50, 500])],
+        settings,
+      );
+      assert.equal(result.matched, 1);
+      assert.equal(result.rows[2].matches, true);
+      assert.equal(result.rows[3].matches, false);
+      assert.equal(
+        mapAnalysis([data([10, 20, 30, null]), data([100, 35, 50, null])], {
+          ...settings,
+          match: "any",
+        }).matched,
+        3,
+      );
+      assert.throws(
+        () =>
+          mapAnalysis(
+            [data([1]), { ...data([2]), period: "2019-2023" }],
+            settings,
+          ),
+        /releases cannot be combined/,
+      );
+      assert.throws(
+        () =>
+          normalizePlanningRecord("savedViews", {
+            id: "bad",
+            createdAt: stamp,
+            updatedAt: stamp,
+            name: "Bad",
+            center: [0, 0],
+            analysis: {
+              ...settings,
+              metrics: [{ metric: "population", min: 50, max: 1 }],
+            },
+          }),
+        /minimum/,
+      );
+    },
+  );
+  await check("world boundaries are clipped at the antimeridian", () => {
+    const { clipCountry } = require("../lib/modules/planning/map-providers.ts");
+    const { feature } = require("topojson-client"),
+      world = require("world-atlas/countries-110m.json");
+    for (const name of ["Russia", "Canada", "Fiji"]) {
+      const source = feature(world, world.objects.countries).features.find(
+        (f) => f.properties.name === name,
+      );
+      const clipped = clipCountry(source.geometry);
+      assert(clipped.coordinates.length);
+      for (const polygon of clipped.coordinates)
+        for (const ring of polygon) {
+          assert.deepEqual(ring[0], ring.at(-1));
+          for (let i = 1; i < ring.length; i++)
+            assert(
+              Math.abs(ring[i][0] - ring[i - 1][0]) <= 180.00001,
+              name + " crosses the whole map",
+            );
+        }
+    }
+  });
+  await check(
+    "bundled city estimates preserve official GEOIDs, missing values and margins of error",
+    () => {
+      const data = require("../data/map/census-places-2024.json");
+      assert.equal(data.period, "2020–2024");
+      assert.equal(data.rows.length, 32330);
+      assert.equal(
+        new Set(data.rows.map((row) => row[0])).size,
+        data.rows.length,
+      );
+      assert.equal(
+        data.rows.filter((row) => row[0].startsWith("39")).length,
+        1265,
+      );
+      assert(
+        data.sources.every(
+          (source) =>
+            source.url.startsWith("https://www2.census.gov/") &&
+            /^[a-f0-9]{64}$/.test(source.sha256),
+        ),
+      );
+      for (const row of data.rows) {
+        assert(/^\d{7}$/.test(row[0]));
+        assert.equal(row.length, 7);
+        assert(
+          row
+            .slice(1)
+            .every(
+              (value) =>
+                value === null || (Number.isFinite(value) && value >= 0),
+            ),
+        );
+      }
+      assert(data.rows.some((row) => row[5] === null));
+      assert.deepEqual(
+        data.rows.find((row) => row[0] === "3915000"),
+        ["3915000", 311224, 60, 33.2, 0.4, 52909, 1946],
+      );
+    },
+  );
+  await check(
+    "large map responses stream complete JSON while remaining private",
+    async () => {
+      const {
+        privateJsonStream,
+      } = require("../lib/modules/planning/json-stream.ts");
+      const body = { ok: true, data: "Place 📍 Québec – ".repeat(350000) };
+      const response = privateJsonStream(body);
+      assert.equal(response.headers.get("Cache-Control"), "private, no-store");
+      assert.equal(response.headers.get("Content-Length"), null);
+      assert.deepEqual(await response.json(), body);
+    },
+  );
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );
