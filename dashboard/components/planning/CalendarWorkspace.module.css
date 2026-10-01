@@ -1,4 +1,7 @@
 .shell {
+  --calendar-day-line: color-mix(in srgb, var(--module-icon, #59518b) 20%, white);
+  --calendar-hour-line: color-mix(in srgb, var(--module-icon, #59518b) 11%, white);
+  --calendar-muted: #716b80;
   display: flex;
   flex-direction: column;
   height: calc(100dvh - var(--app-content-offset));
@@ -445,6 +448,7 @@
   height: 15px;
 }
 .calendarPopover {
+  --calendar-muted: #716b80;
   z-index: 120;
   width: 300px;
   max-width: calc(100vw - 24px);
@@ -455,7 +459,9 @@
   box-shadow: 0 12px 40px #23383f22;
   display: grid;
   gap: 10px;
-  font-size: 13px;
+  font: 400 13px/1.4 var(--font-body);
+  transform-origin: var(--radix-popover-content-transform-origin);
+  animation: calendarPopoverIn 160ms cubic-bezier(.22, 1, .36, 1);
 }
 .calendarPopover label {
   display: flex;
@@ -475,7 +481,9 @@
   border: 0;
   background: transparent;
   color: #23383f;
-  font: 600 17px var(--font-heading);
+  font: 600 18px/1.4 var(--font-heading);
+  letter-spacing: -0.025em;
+  border-radius: 8px;
   padding: 8px;
   cursor: pointer;
 }
@@ -488,7 +496,9 @@
   border: 0;
   border-radius: 6px;
   padding: 12px;
-  background: #f3f2f9;
+  background: transparent;
+  font: 500 12px/1.4 var(--font-body);
+  min-height: 44px;
   cursor: pointer;
 }
 .monthChoices button[aria-pressed="true"] {
@@ -543,7 +553,8 @@
 }
 .fittedDayHeader {
   min-width: 0;
-  border-left: 1px solid #e6e4ed;
+  border-left: 1px solid var(--calendar-day-line);
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -552,37 +563,48 @@
   gap: 2px;
 }
 .fittedDayHeader > button:first-child {
+  width: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 6px;
+  gap: 2px;
   justify-content: center;
   border: 0;
   background: transparent;
   color: #666174;
-  font-size: 12px;
+  font: 500 12px/1.3 var(--font-body);
+  min-height: 48px;
+  padding: 3px 6px;
+  border-radius: 8px;
   cursor: pointer;
 }
 .fittedDayHeader strong {
   display: inline-flex;
-  width: 28px;
-  height: 28px;
+  min-width: 32px;
+  height: 32px;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
-  border-radius: 50%;
+  font: 600 24px/1 var(--font-heading);
+  letter-spacing: -0.045em;
+  font-variant-numeric: tabular-nums;
+  color: #23383f;
+  border-radius: 8px;
 }
 .fittedDayHeader small {
-  font-size: 9px;
+  position: absolute;
+  left: calc(100% + 4px);
+  font: 500 10px/1 var(--font-body);
+  color: var(--module-icon, #59518b);
 }
 .fittedDayHeader[data-today="true"] {
-  background: #f3f2f9;
+  background: var(--module-quiet, #f3f2f9);
 }
 .fittedDayHeader[data-today="true"] strong {
   background: #59518b;
   color: white;
 }
 .daySummary {
-  font-size: 10px;
+  font: 500 10px/1.2 var(--font-body);
   border: 0;
   color: #59518b;
   background: transparent;
@@ -596,19 +618,20 @@
 .fittedHours {
   min-height: 0;
 }
-.fittedHours span {
+.fittedHours > span {
   height: var(--hour-height);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  color: #7d7988;
+  font: 400 10px/1 var(--font-body);
+  color: var(--calendar-muted);
   font-variant-numeric: tabular-nums;
 }
 .fittedColumn {
   position: relative;
   min-height: 0;
-  border-left: 1px solid #e6e4ed;
+  border-left: 1px solid var(--calendar-day-line);
+  border-top: 1px solid var(--calendar-day-line);
 }
 .fittedColumn[data-today="true"] {
   background: #faf9fd;
@@ -619,7 +642,7 @@
   min-height: 0;
   display: block;
   border: 0;
-  border-top: 1px solid #e6e4ed;
+  border-top: 1px dashed var(--calendar-hour-line);
   border-radius: 0;
   background: transparent;
   cursor: crosshair;
@@ -629,6 +652,7 @@
 .hourSlot:hover {
   background: #e5e3f255;
 }
+.hourSlot:first-child { border-top-color: transparent; }
 .hourSlot:focus-visible {
   outline: 2px solid #746ca5;
   outline-offset: -2px;
@@ -714,9 +738,12 @@
   overflow: hidden;
 }
 .monthDay .dayNumber {
-  min-height: 22px;
-  font-size: 11px;
-  padding: 0;
+  min-height: 36px;
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font: 600 18px/1.4 var(--font-heading);
+  padding: 2px 4px;
 }
 .monthDay .agendaEvent {
   margin: 2px 0;
@@ -866,9 +893,8 @@
     padding: 5px 8px;
   }
   .fittedDayHeader > button:first-child {
-    flex-wrap: wrap;
     gap: 2px;
-    font-size: 10px;
+    padding-inline: 0;
   }
   .fittedDayHeader small {
     display: none;
@@ -887,6 +913,60 @@
     margin: 0;
   }
 }
+.calendarStage {
+  position: relative;
+  height: 100%;
+  min-height: 0;
+  isolation: isolate;
+}
+.calendarScene { height: 100%; min-height: 0; }
+.weekdayName { font: 500 12px/1.4 var(--font-body); color: var(--calendar-muted); }
+.weekdayCompact { display: none; font: 500 10px/1.4 var(--font-body); color: var(--calendar-muted); }
+.dateLine { position: relative; display: flex; align-items: center; justify-content: center; }
+.headingYear { margin-left: 6px; color: var(--calendar-muted); font-weight: 400; }
+.monthWeekday { font: 500 11px/1.4 var(--font-body); color: var(--calendar-muted); }
+.monthDay[data-today="true"] .monthWeekday { color: inherit; }
+.monthDay { border-right: 1px solid var(--calendar-day-line); border-top: 1px dashed var(--calendar-hour-line); }
+.monthTrigger:hover, .fittedDayHeader > button:first-child:hover { background: var(--module-quiet, #f3f2f9); }
+.monthTrigger:focus-visible, .fittedDayHeader button:focus-visible, .datePopover button:focus-visible, .hoursEdge button:focus-visible {
+  outline: 2px solid var(--module-focus, #746ca5); outline-offset: -2px;
+}
+.datePopover { width: 332px; padding: 12px; gap: 12px; }
+.datePopover .calendarStage { height: 280px; }
+.datePopover .monthChoices { height: 100%; }
+.datePopover button { width: auto; color: var(--module-icon, #59518b); cursor: pointer; box-shadow: none; }
+.datePopover button:hover { box-shadow: none; }
+.pickerHeading { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pickerHeading strong { font: 600 14px/1.4 var(--font-heading); color: #23383f; }
+.pickerArrow { display: grid; place-items: center; width: 40px !important; height: 40px; padding: 0; border: 0; border-radius: 8px; background: transparent; }
+.datePopover button:hover { background: var(--module-quiet, #f3f2f9); }
+.datePopover .monthChoices button[aria-pressed="true"], .pickerDays [aria-selected="true"] button {
+  background: var(--module-icon, #59518b); color: white;
+}
+.pickerFooter { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--module-border, #cbc7e4); padding-top: 8px; }
+.pickerFooter button { display: inline-flex; align-items: center; gap: 8px; padding: 8px; min-height: 40px; border: 0; border-radius: 8px; background: transparent; font: 500 12px/1.4 var(--font-body); }
+.pickerWeekdays, .pickerDays [role="row"] { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.pickerWeekdays span { padding: 4px 0 8px; text-align: center; font: 500 11px var(--font-body); color: var(--calendar-muted); }
+.pickerDays button { width: 100%; min-height: 40px; border: 0; border-radius: 8px; background: transparent; font: 500 12px/1 var(--font-body); font-variant-numeric: tabular-nums; }
+.pickerDays button[data-outside="true"] { color: var(--calendar-muted); }
+.pickerDays button[aria-current="date"] { box-shadow: inset 0 0 0 1px var(--module-icon, #59518b); }
+.datePopover button, .monthTrigger { transition: background-color 120ms, color 120ms; }
+@container (max-width: 110px) {
+  .weekdayName { font-size: 10px; letter-spacing: -0.025em; }
+  .fittedDayHeader small { display: none; }
+}
+@container (max-width: 68px) {
+  .weekdayName { display: none; }
+  .weekdayCompact { display: inline; }
+  .fittedDayHeader strong { min-width: 24px; font-size: 20px; }
+}
+@media (max-width: 760px) {
+  .monthWeekday { display: none; }
+  .monthDay .dayNumber { font-size: 16px; min-height: 28px; }
+}
+@keyframes calendarPopoverIn { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .calendarPopover { animation: none; } }
+:global([data-product-motion="reduce"]) .calendarPopover, .calendarPopover[data-reduced-motion="true"] { animation: none; }
 .monthTrigger,
 .hoursEdge button,
 .groupChoices button,

@@ -2,14 +2,15 @@
 import * as Popover from "@radix-ui/react-popover";
 import CalendarTimeGrid from "./CalendarTimeGrid";
 import EventEditorFields from "./EventEditorFields";
+import CalendarDatePicker from "./CalendarDatePicker";
+import { CalendarScene, useCalendarMotion } from "./CalendarMotion";
+import { motion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import {
   calendarGroups,
   eventGroup,
 } from "../../lib/modules/planning/calendar-groups";
 import RelatedRecords from "./RelatedRecords";
-import { motionTokens } from "../../lib/design-system/motion";
-import { useMotionPreference } from "../admin-shell/ExperienceProvider";
 import {
   useCallback,
   useEffect,
@@ -30,7 +31,6 @@ import {
   WorkspaceEmpty,
 } from "../admin-shell/WorkspaceKit";
 import SharedAIDock from "../admin-shell/SharedAIDock";
-import DateField from "../people/DateField";
 import SelectField from "../ui/SelectField";
 import RecordLinks from "./RecordLinks";
 import {
@@ -98,9 +98,9 @@ const timeLabel = (ms: number, zone: string) =>
   }).format(ms);
 export default function CalendarWorkspace() {
   const params = useSearchParams();
-  const { preference } = useMotionPreference();
-  const contentRef = useRef<HTMLDivElement>(null);
+  const { layoutTransition } = useCalendarMotion();
   const previousDate = useRef("");
+  const [early, setEarly] = useState(false), [late, setLate] = useState(false);
   const [draft, setDraft] = useState<EventDraft | undefined>(
     () => retainedDraft,
   );
@@ -108,8 +108,6 @@ export default function CalendarWorkspace() {
   const [showWeekends, setShowWeekends] = useState(true),
     [showCompleted, setShowCompleted] = useState(false),
     [widenToday, setWidenToday] = useState(false);
-  const [monthPicker, setMonthPicker] = useState(false),
-    [pickerYear, setPickerYear] = useState(new Date().getFullYear());
   const [dayDetail, setDayDetail] = useState<string>(),
     [agendaPage, setAgendaPage] = useState(0);
   const [zone, setZone] = useState("America/New_York"),
@@ -167,30 +165,8 @@ export default function CalendarWorkspace() {
     };
   }, [refresh, params]);
   useEffect(() => {
-    const previous = previousDate.current;
     previousDate.current = date;
-    if (
-      !previous ||
-      previous === date ||
-      preference === "reduce" ||
-      matchMedia("(prefers-reduced-motion:reduce)").matches
-    )
-      return;
-    const animation = contentRef.current?.animate(
-      [
-        {
-          opacity: 0.55,
-          transform: `translateX(${date > previous ? 8 : -8}px)`,
-        },
-        { opacity: 1, transform: "translateX(0)" },
-      ],
-      {
-        duration: motionTokens.standard * 1000,
-        easing: `cubic-bezier(${motionTokens.arrive.join(",")})`,
-      },
-    );
-    return () => animation?.cancel();
-  }, [date, preference]);
+  }, [date]);
   useEffect(() => {
     if (editor) {
       retainedDraft = editor;
@@ -568,7 +544,7 @@ export default function CalendarWorkspace() {
               )
             }
           >
-            ←
+            <UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} />
           </Button>
           <Button
             aria-label="Next period"
@@ -583,78 +559,9 @@ export default function CalendarWorkspace() {
               )
             }
           >
-            →
+            <UnigentamosIcon role="chevron-right" size={18} />
           </Button>
-          <Popover.Root
-            open={monthPicker}
-            onOpenChange={(open) => {
-              setMonthPicker(open);
-              setPickerYear(Number(date.slice(0, 4)));
-            }}
-          >
-            <Popover.Trigger asChild>
-              <button className={styles.monthTrigger} aria-label="Choose month">
-                {labelDate(date, { month: "long", year: "numeric" })}
-                <UnigentamosIcon role="chevron-down" size={16} />
-              </button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
-                className={styles.calendarPopover}
-                sideOffset={8}
-                collisionPadding={12}
-              >
-                <div className="work-actions">
-                  <Button
-                    aria-label="Previous year"
-                    onClick={() => setPickerYear(pickerYear - 1)}
-                  >
-                    ←
-                  </Button>
-                  <strong>{pickerYear}</strong>
-                  <Button
-                    aria-label="Next year"
-                    onClick={() => setPickerYear(pickerYear + 1)}
-                  >
-                    →
-                  </Button>
-                </div>
-                <div className={styles.monthChoices}>
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <button
-                      type="button"
-                      key={i}
-                      aria-pressed={
-                        date.slice(0, 7) ===
-                        pickerYear + "-" + String(i + 1).padStart(2, "0")
-                      }
-                      onClick={() => {
-                        setDate(
-                          pickerYear +
-                            "-" +
-                            String(i + 1).padStart(2, "0") +
-                            "-01",
-                        );
-                        setMonthPicker(false);
-                      }}
-                    >
-                      {new Date(2026, i, 1).toLocaleDateString(undefined, {
-                        month: "short",
-                      })}
-                    </button>
-                  ))}
-                </div>
-                <DateField
-                  label="Jump to date"
-                  value={date}
-                  onChange={(value) => {
-                    setDate(value);
-                    setMonthPicker(false);
-                  }}
-                />
-              </Popover.Content>
-            </Popover.Portal>
-          </Popover.Root>
+          <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} onChange={setDate} />
         </div>
         <div className="work-actions">
           <input
@@ -818,7 +725,8 @@ export default function CalendarWorkspace() {
           Your records will appear here when loading completes.
         </WorkspaceEmpty>
       ) : (
-        <div className={styles.content} ref={contentRef}>
+        <div className={styles.content}>
+          <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
           {view === "month" ? (
             <div
               className={styles.month}
@@ -827,20 +735,26 @@ export default function CalendarWorkspace() {
               }}
             >
               {days.map((day) => (
-                <section
+                <motion.section
                   key={day}
+                  layout
+                  transition={{ layout: layoutTransition }}
                   className={styles.monthDay}
                   data-today={day === localDate(new Date(now), zone)}
                 >
-                  <button
+                  <motion.button
+                    layout="position"
+                    transition={{ layout: layoutTransition }}
                     className={styles.dayNumber}
+                    aria-label={labelDate(day, { weekday: "long", month: "long", day: "numeric" })}
                     onClick={() => {
                       setDate(day);
                       setView("day");
                     }}
                   >
-                    {labelDate(day, { weekday: "short", day: "numeric" })}
-                  </button>
+                    <span className={styles.monthWeekday}>{labelDate(day, { weekday: "long" })}</span>
+                    <span>{Number(day.slice(-2))}</span>
+                  </motion.button>
                   {occurrences
                     .filter(
                       (x) =>
@@ -868,7 +782,7 @@ export default function CalendarWorkspace() {
                   >
                     +
                   </button>
-                </section>
+                </motion.section>
               ))}
             </div>
           ) : view === "agenda" ? (
@@ -950,6 +864,10 @@ export default function CalendarWorkspace() {
               calendars={snapshot.state.calendars}
               dated={dated}
               widenToday={widenToday}
+              early={early}
+              late={late}
+              setEarly={setEarly}
+              setLate={setLate}
               onCreate={create}
               onDay={setDayDetail}
               onOpen={(item) => {
@@ -962,6 +880,7 @@ export default function CalendarWorkspace() {
               onResize={(...args) => void resizeEvent(...args)}
             />
           )}
+          </CalendarScene>
         </div>
       )}
       <WorkspaceSheet
