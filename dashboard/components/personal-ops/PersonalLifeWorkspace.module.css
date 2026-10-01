@@ -30,6 +30,11 @@
 .keyringHeader { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 9px; min-height: 44px; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--border); background: var(--panel-bg-subtle); }
 .keyringHeader strong { color: var(--text-strong); font: 780 12px var(--font-heading); }
 .keyringCount { display: grid; min-width: 28px; height: 26px; place-items: center; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--text-muted); background: var(--panel-bg); font: 700 10px var(--font-mono); }
+.credentialSearchToolbar { padding: 10px 12px; border-bottom: 1px solid var(--border); }
+.credentialSearch { width: min(100%, 400px); min-width: 0; grid-template-columns: 16px minmax(0, 1fr) auto; }
+.credentialSearch input::-webkit-search-cancel-button { display: none; }
+.credentialSearch button { display: grid; width: 26px; height: 26px; min-height: 0; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--text-muted); cursor: pointer; }
+.credentialSearch button:hover { background: var(--panel-bg-subtle); color: var(--text-strong); }
 .credentialLedger { overflow-x: auto; overscroll-behavior-inline: contain; scrollbar-width: thin; }
 .credentialGridHeader,
 .credentialRow { display: grid; grid-template-columns: minmax(220px, 1.35fr) minmax(96px, .7fr) minmax(130px, 1fr) minmax(112px, .8fr) minmax(104px, .72fr) minmax(54px, .38fr) 96px; gap: 8px; align-items: center; min-width: 900px; }
@@ -64,6 +69,7 @@
 .iconActions { display: flex; gap: 3px; }
 .iconActions button, .squareAction { display: inline-grid; width: 30px; height: 30px; min-height: 30px; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 5px; background: transparent; color: var(--text-muted); cursor: pointer; }
 .iconActions button:hover, .squareAction:hover { border-color: var(--border); background: var(--panel-bg-subtle); color: var(--text-strong); }
+.iconActions button:disabled { opacity: .4; cursor: default; border-color: transparent; background: transparent; }
 .iconActions svg, .squareAction svg { width: 15px; height: 15px; }
 .iconActions .dangerAction { border-color: transparent; background: transparent; color: var(--accent-crimson, #b73343); }
 .iconActions .dangerAction:hover { border-color: color-mix(in srgb, var(--accent-crimson, #b73343) 24%, var(--border)); background: color-mix(in srgb, var(--accent-crimson, #b73343) 7%, transparent); color: color-mix(in srgb, var(--accent-crimson, #b73343) 86%, black); }

@@ -53,6 +53,7 @@ export type CredentialInput = {
 
 export type CredentialSummary = Omit<CredentialInput, "secret" | "pin"> & {
   id: string;
+  hasSecret: boolean;
   hasPin: boolean;
   createdAt: string;
   updatedAt: string;

@@ -59,9 +59,9 @@ function cleanText(value: unknown, field: string, maximum: number, required = fa
 }
 
 function cleanSecret(value: unknown): string {
-  if (typeof value !== "string") throw new PersonalPasswordsStoreError("Password is required");
+  if (value === undefined || value === null) return "";
+  if (typeof value !== "string") throw new PersonalPasswordsStoreError("Password must be text");
   const clean = value.replace(/\u0000/g, "");
-  if (!clean) throw new PersonalPasswordsStoreError("Password is required");
   if (clean.length > 20_000) throw new PersonalPasswordsStoreError("Password is too long");
   return clean;
 }
@@ -212,6 +212,7 @@ function detail(item: EncryptedCredentialRecord): CredentialDetail {
   return {
     id: item.id,
     ...decrypted,
+    hasSecret: Boolean(decrypted.secret),
     hasPin: Boolean(decrypted.pin),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt

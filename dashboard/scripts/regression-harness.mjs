@@ -9678,7 +9678,22 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
           await keyring.locator('[role="columnheader"][title="Website"]').count() === 0,
         "Credential ledger did not expose the five aligned icon-only field headings"
       );
-      const row = keyring.locator("article").filter({ hasText: credentialTitle }).first();
+      const search = page.getByRole("searchbox", { name: "Search credentials" });
+      assert(!await page.evaluate((term) => window.find(term), credentialTitle), "Browser Find matched a blurred account");
+      assert(!await keyring.evaluate((element, term) => element.outerHTML.includes(term), credentialTitle), "Blurred account leaked into credential markup or accessible labels");
+      for (const shortcut of ["Control+f", "Meta+f"]) {
+        await page.getByRole("heading", { name: "Passwords", exact: true }).click();
+        await page.keyboard.press(shortcut);
+        assert(await search.evaluate((element) => document.activeElement === element), `${shortcut} did not focus credential search`);
+      }
+      await search.fill("no-such-synthetic-credential");
+      await page.getByText("No matching credentials", { exact: true }).waitFor();
+      await search.fill(credentialTitle.toUpperCase());
+      assert(await keyring.locator("article").count() === 1 && await keyring.getAttribute("data-masked") !== null, "Credential search failed or unmasked its result");
+      await page.getByRole("button", { name: "Clear credential search" }).click();
+      await page.getByRole("button", { name: "Unblur password page" }).click();
+      const credentialId = await keyring.locator("article").filter({ hasText: credentialTitle }).first().getAttribute("data-credential-id");
+      const row = keyring.locator(`article[data-credential-id="${credentialId}"]`);
       await row.waitFor();
       const websiteTrigger = row.getByRole("button", { name: `Copy and reveal website for ${credentialTitle}` });
       assert(
@@ -9705,7 +9720,6 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
         });
         assert(columnAlignment.every((offset) => offset <= 1), `Credential ledger columns are not vertically aligned: ${JSON.stringify(columnAlignment)}`);
       }
-      await page.getByRole("button", { name: "Unblur password page" }).click();
       await websiteTrigger.click();
       const websiteNotice = page.getByRole("status").filter({ hasText: "Website copied." });
       await websiteNotice.waitFor();
@@ -9731,7 +9745,10 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       await editEditor.getByRole("button", { name: "Close password editor" }).click();
       await editEditor.waitFor({ state: "detached" });
       await page.getByRole("button", { name: "Blur password page" }).click();
-      await row.getByRole("button", { name: `Copy password for ${credentialTitle}` }).click();
+      assert(!await page.evaluate((term) => window.find(term), credentialTitle), "Browser Find matched an account after reblurring");
+      assert(!await row.evaluate((element, term) => element.outerHTML.includes(term), credentialTitle), "Reblurred account retained private markup");
+      assert(await row.getAttribute("data-website-expanded") === null && await row.locator("a[href]").count() === 0, "Reblurred account retained a website link");
+      await row.locator('button[title="Copy password"]').click();
       const notice = page.getByRole("status").filter({ hasText: "Password copied." });
       await notice.waitFor();
       await notice.getByRole("button", { name: "Dismiss notification" }).click();
@@ -9793,6 +9810,7 @@ async function checkPersonalPasswordsBrowserState(baseUrl, cookieJar, credential
       assert(await editor.getByLabel("Phone", { exact: true }).inputValue() === "+51 987-654-321", "Credential phone did not apply Peru-aware formatting");
 
       const passwordInput = editor.getByLabel("Password", { exact: true });
+      assert(!await passwordInput.evaluate((element) => element.required), "Credential editor still requires a password");
       await passwordInput.fill("synthetic-visible-password");
       assert(await passwordInput.getAttribute("type") === "password", "Credential password was not masked by default");
       await editor.getByRole("button", { name: "Show password" }).click();
@@ -13449,6 +13467,35 @@ async function main() {
     });
     assert(deletedCredential.response.ok && deletedCredential.payload?.ok, "Encrypted password delete failed");
     pass("Encrypted passwords require admin auth and CSRF, preserve exact passwords/PINs plus formatted phone metadata, persist only AES-GCM ciphertext, and enforce stale-write protection");
+
+    const pinOnlyInput = { title: `${testRunId} PIN only`, pin: "001927", notes: "Door access" };
+    const pinOnlyCreate = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
+      body: JSON.stringify({ input: pinOnlyInput })
+    });
+    assert(pinOnlyCreate.response.ok && pinOnlyCreate.payload?.item?.hasSecret === false && pinOnlyCreate.payload?.item?.hasPin === true, "PIN-only create rejected an omitted password");
+    let pinOnlySummary = pinOnlyCreate.payload.item;
+    for (const secret of ["  temporary password  ", ""]) {
+      const updated = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
+        method: "PATCH",
+        headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
+        body: JSON.stringify({ id: pinOnlySummary.id, expectedUpdatedAt: pinOnlySummary.updatedAt, input: { ...pinOnlyInput, secret } })
+      });
+      assert(updated.response.ok && updated.payload?.item?.hasSecret === Boolean(secret), "Credential did not accept adding or clearing its password");
+      pinOnlySummary = updated.payload.item;
+      const detail = await requestJson(server.baseUrl, cookieJar, `/api/personal/passwords?id=${pinOnlySummary.id}`);
+      assert(detail.payload?.item?.secret === secret && detail.payload?.item?.pin === pinOnlyInput.pin, "PIN-only roundtrip changed the password or leading-zero PIN");
+    }
+    const pinOnlyFile = await readFile(path.join(serverEnv.FREMEN_DATA_DIR, "personal-passwords.json"), "utf8");
+    assert(!pinOnlyFile.includes(pinOnlyInput.title) && !pinOnlyFile.includes(pinOnlyInput.pin), "PIN-only persistence exposed plaintext");
+    const pinOnlyDelete = await requestJson(server.baseUrl, cookieJar, "/api/personal/passwords", {
+      method: "DELETE",
+      headers: { "content-type": "application/json", "x-csrf-token": passwordCsrfToken },
+      body: JSON.stringify({ id: pinOnlySummary.id, expectedUpdatedAt: pinOnlySummary.updatedAt })
+    });
+    assert(pinOnlyDelete.response.ok, "PIN-only fixture cleanup failed");
+    pass("PIN-only credentials accept omitted or cleared passwords, preserve leading zeros, and remain encrypted at rest");
 
     const personalLifeWithoutCsrf = await requestJson(server.baseUrl, cookieJar, "/api/personal/life", {
       method: "POST",
