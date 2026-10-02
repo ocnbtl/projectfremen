@@ -127,5 +127,6 @@
   {"id":"interaction-date","label":"Interaction date","defaultCandidate":"calendar-blank","candidates":["calendar-blank","calendar","calendar-event","calendar-week","calendar-month"],"usages":[{"module":"People","breadcrumb":"Interaction details › Plain calendar outline without a day numeral"}]},
   {"id": "module-map", "label": "Map", "defaultCandidate": "map-2", "candidates": ["map-2", "world", "compass", "map-pin", "route"], "usages": [{"module": "Map", "breadcrumb": "Top navigation › Map"}]},
   {"id": "module-calendar", "label": "Calendar", "defaultCandidate": "calendar-blank", "candidates": ["calendar-blank", "calendar-event", "calendar-week", "calendar-month", "calendar-time"], "usages": [{"module": "Calendar", "breadcrumb": "Top navigation › Calendar"}]},
-  {"id": "warning", "label": "Warning", "defaultCandidate": "alert-triangle", "candidates": ["alert-triangle", "alert-circle", "alert-square-rounded", "exclamation-circle", "info-circle"], "usages": [{"module": "System", "breadcrumb": "Feedback"}]}
+  {"id": "warning", "label": "Warning", "defaultCandidate": "alert-triangle", "candidates": ["alert-triangle", "alert-circle", "alert-square-rounded", "exclamation-circle", "info-circle"], "usages": [{"module": "System", "breadcrumb": "Feedback"}]},
+  {"id":"calendar-month-view","label":"Month view","defaultCandidate":"calendar-month","candidates":["calendar-month","calendar-stats","calendar-week","calendar-event","calendar"],"usages":[{"module":"Calendar","breadcrumb":"View selector and date navigator > Month"}]}
 ]

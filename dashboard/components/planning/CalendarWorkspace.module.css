@@ -153,7 +153,7 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: var(--module-secondary-700);
+  background: color-mix(in srgb, var(--module-secondary-700) 72%, transparent);
   pointer-events: none;
   z-index: 3;
 }
@@ -165,7 +165,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--module-secondary-700);
+  background: color-mix(in srgb, var(--module-secondary-700) 72%, transparent);
 }
 .month {
   display: grid;
@@ -713,11 +713,11 @@
   background: var(--event-color);
 }
 .now {
-  background: var(--module-secondary-700);
+  background: color-mix(in srgb, var(--module-secondary-700) 72%, transparent);
   height: 2px;
 }
 .now::before {
-  background: var(--module-secondary-700);
+  background: color-mix(in srgb, var(--module-secondary-700) 72%, transparent);
 }
 .now time {
   position: absolute;
@@ -725,9 +725,10 @@
   bottom: 5px;
   padding: 4px 7px;
   border-radius: 6px;
-  background: var(--module-secondary-700);
-  color: white;
-  box-shadow: 0 0 0 2px white;
+  background: color-mix(in srgb, var(--module-secondary-100) 78%, transparent);
+  color: var(--text-strong);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--panel-bg) 70%, transparent);
   font: 600 12px/1.2 var(--font-body);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
@@ -1239,11 +1240,11 @@
 .draftNotice :global(.work-button) { height: 28px; min-height: 28px; padding: 4px 6px; font-size: 11px; }
 .draftNotice :global(.work-button):last-child { width: 25px; padding: 2px; }
 .hoursEdge { gap: 7px; padding-block: 5px; min-height: 36px; }
-.hoursEdge > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 5px 10px; border: 1px solid var(--module-secondary-100); border-radius: 7px; color: var(--module-secondary-700); background: color-mix(in srgb, var(--module-secondary-100) 45%, var(--panel-bg)); font-size: 11px; }
-.hoursEdge > button + button { margin: 0; background: var(--module-secondary-100); }
+.hoursEdge > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 5px 10px; border: 1px solid var(--module-secondary-100); border-radius: 7px; color: var(--module-secondary-700); background: var(--module-secondary-100); font-size: 11px; }
+.hoursEdge > button + button { margin: 0; color: var(--module-primary-700); border-color: var(--module-border); background: var(--module-primary-100); }
 .hoursEdge > button + button::before { content: none; }
-.hoursEdge > button:hover { background: var(--module-secondary-100); border-color: var(--module-accent); }
-.hoursEdge > button + button:hover { background: color-mix(in srgb, var(--module-secondary-100) 80%, var(--module-accent)); }
+.hoursEdge > button:hover { background: color-mix(in srgb, var(--module-secondary-100) 80%, var(--module-accent)); border-color: var(--module-accent); }
+.hoursEdge > button + button:hover { background: var(--module-primary-200); border-color: var(--module-focus); }
 .hoursEdge svg, .allDayItem > svg, .timedEventTitle > svg { display: block; flex: none; margin: 0; align-self: center; }
 .allDayItem { flex-wrap: nowrap; }
 
@@ -1374,8 +1375,8 @@
 .holidayCountry[open] summary > svg:last-child { transform: rotate(180deg); }
 .holidayList { gap: 2px; padding: 8px; max-height: 360px; scrollbar-width: thin; scrollbar-color: #aaa2c4 #f3f2f9; scrollbar-gutter: stable; }
 .holidayList .holidayChoice { display: flex !important; min-height: 62px; padding: 7px; gap: 12px !important; border-radius: 7px; }
-.holidayList .holidayChoice:hover { background: #f6f4fa; }
-.holidayDate { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 40px; min-height: 44px; background: #f3f2f9; color: #59518b; border-radius: 7px; flex: none; }
+.holidayList .holidayChoice:hover { background: var(--module-quiet); }
+.holidayDate { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 40px; min-height: 44px; background: var(--module-primary-100); color: var(--module-primary-700); border-radius: 7px; flex: none; }
 .holidayDate > span { font: 500 9px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: .4px; }
 .holidayDate > strong { font: 500 19px/1.2 var(--font-heading); }
 .holidayName { min-width: 0; }
@@ -1448,3 +1449,21 @@
   .navigatorMonths { gap: 14px 8px; }
   .navigatorMonths .miniDays button { font-size: 10px; }
 }
+
+/* Center rich option labels without the inline baseline gap. */
+.toolbarTools > :global(.app-select-trigger) { display: flex; align-items: center; line-height: 1; padding-block: 0; }
+.toolbarTools > :global(.app-select-trigger) > span, .viewChoice { display: flex; align-items: center; line-height: 1; }
+.viewChoice svg { display: block; flex: none; }
+.viewOptions .zoneControl > .viewChoice { min-height: 34px; }
+/* Transparent tracks and rounded thumbs avoid squared native scrollbar gutters. */
+.calendarChoiceMenu :global(.app-choice-options), .holidayList, .navigatorBody { scrollbar-width: auto; scrollbar-color: auto; border-radius: 9px; }
+.calendarChoiceMenu :global(.app-choice-options)::-webkit-scrollbar-track, .holidayList::-webkit-scrollbar-track, .navigatorBody::-webkit-scrollbar-track { background: transparent; border-radius: 999px; margin-block: 5px; }
+.calendarChoiceMenu :global(.app-choice-options)::-webkit-scrollbar-thumb, .holidayList::-webkit-scrollbar-thumb, .navigatorBody::-webkit-scrollbar-thumb { background: var(--module-primary-300, #aea8d2); border: 2px solid transparent; background-clip: padding-box; border-radius: 999px; }
+.calendarVisibility .calendarToggle { transition: background 180ms ease, box-shadow 180ms ease; }
+.calendarVisibility .calendarToggle:has(input:checked) { background: var(--module-quiet); box-shadow: inset 0 0 0 1px var(--module-border); }
+.calendarVisibility .calendarToggle:not(:has(input:checked)) { background: var(--paper); }
+.calendarToggle input, .holidayChoice input, .customDateRow input { transition: background 180ms ease, border-color 180ms ease; }
+.calendarToggle input::before, .holidayChoice input::before, .customDateRow input::before { transition: opacity 140ms ease, transform 220ms cubic-bezier(.2,.8,.2,1); transform: rotate(-45deg) translateY(-1px) scale(.55); }
+.calendarToggle input:checked::before, .holidayChoice input:checked::before, .customDateRow input:checked::before { transform: rotate(-45deg) translateY(-1px) scale(1); }
+@media (prefers-reduced-motion: reduce) { .calendarVisibility .calendarToggle, .calendarToggle input, .holidayChoice input, .customDateRow input, .calendarToggle input::before, .holidayChoice input::before, .customDateRow input::before { transition: none; } }
+:global([data-product-motion="reduce"]) :is(.calendarToggle, .holidayChoice, .customDateRow) input, :global([data-product-motion="reduce"]) :is(.calendarToggle, .holidayChoice, .customDateRow) input::before, :global([data-product-motion="reduce"]) .calendarVisibility .calendarToggle { transition: none; }

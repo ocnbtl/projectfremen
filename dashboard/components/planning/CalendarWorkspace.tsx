@@ -112,10 +112,10 @@ export default function CalendarWorkspace() {
   const [zone, setZone] = useState("America/New_York"),
     [date, setDate] = useState(() => new Date().toISOString().slice(0, 10)),
     [view, setView] = useState<View>("week");
-  const [snapshot, setSnapshot] = useState<PlanningSnapshot>(),
+  const [confirmedSnapshot, setSnapshot] = useState<PlanningSnapshot>(),
     [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
-    [busy, setBusy] = useState(false),
+    [actionBusy, setBusy] = useState(false),
     [query, setQuery] = useState("");
   const [editor, setEditor] = useState<{
       fields: EventFields;
@@ -138,11 +138,60 @@ export default function CalendarWorkspace() {
   const [calendarTab, setCalendarTab] = useState<"calendars" | "holidays">("calendars");
   const [holidayData, setHolidayData] = useState<HolidayCatalog>(), [holidayError, setHolidayError] = useState(""), [holidayLoading, setHolidayLoading] = useState(false);
   const [holidayRetry, setHolidayRetry] = useState(0);
+  // Keep the UI responsive while ordered writes preserve record-version checks.
+  const confirmed = useRef<PlanningSnapshot | undefined>(undefined);
+  const writes = useRef(Promise.resolve());
+  const writeCount = useRef(0), revision = useRef(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [calendarPatches, setCalendarPatches] = useState<Record<string, { revision: number; input: Partial<Calendar> }>>({});
+  const busy = actionBusy || pendingCount > 0;
+  const snapshot = useMemo(() => confirmedSnapshot && ({ ...confirmedSnapshot, state: {
+    ...confirmedSnapshot.state,
+    calendars: confirmedSnapshot.state.calendars.map(calendar => ({ ...calendar, ...calendarPatches[calendar.id]?.input })),
+  } }), [confirmedSnapshot, calendarPatches]);
+  function saveCalendarPreference(id: string, input: Partial<Calendar>): Promise<boolean> {
+    const version = ++revision.current;
+    writeCount.current += 1;
+    setPendingCount(writeCount.current);
+    setError("");
+    setCalendarPatches(current => ({ ...current, [id]: { revision: version, input: { ...current[id]?.input, ...input } } }));
+    const job = writes.current.then(async () => {
+      try {
+        const current = confirmed.current?.state.calendars.find(calendar => calendar.id === id);
+        const saved = await savePlanning("calendars", { id, ...input }, current?.updatedAt);
+        if (confirmed.current) {
+          confirmed.current = { ...confirmed.current, state: { ...confirmed.current.state, calendars: confirmed.current.state.calendars.map(calendar => calendar.id === id ? saved : calendar) } };
+          setSnapshot(confirmed.current);
+        }
+        return true;
+      } catch (e) {
+        setError((e as Error).message || "Calendar preference could not be saved");
+        // A conflict may have a newer server value. Restore it before the next queued write.
+        try { confirmed.current = await planningRequest<PlanningSnapshot>(); setSnapshot(confirmed.current); } catch { /* Retain the last confirmed value. */ }
+        return false;
+      } finally {
+        setCalendarPatches(current => {
+          if (current[id]?.revision !== version) return current;
+          const next = { ...current }; delete next[id]; return next;
+        });
+        writeCount.current -= 1;
+        revision.current += 1;
+        setPendingCount(writeCount.current);
+      }
+    });
+    writes.current = job.then(() => undefined);
+    return job;
+  }
   const nativeCalendar = snapshot?.state.calendars.find(c => c.id === "native");
   const observanceSettings = useMemo(() => nativeCalendar?.observances || defaultObservances(), [nativeCalendar?.observances]);
   const refresh = useCallback(async () => {
+    if (writeCount.current) return;
+    const startedAt = revision.current;
     try {
-      setSnapshot(await planningRequest<PlanningSnapshot>());
+      const next = await planningRequest<PlanningSnapshot>();
+      if (writeCount.current || startedAt !== revision.current) return;
+      confirmed.current = next;
+      setSnapshot(next);
       setError("");
     } catch (e) {
       setError((e as Error).message);
@@ -529,7 +578,7 @@ export default function CalendarWorkspace() {
         </div>
         <div className={styles.toolbarTools}>
           <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" placeholder="Search events" value={query} onChange={e => setQuery(e.target.value)} /></label>
-          <SelectField aria-label="Calendar view" value={view} onChange={e => setView(e.target.value as View)}>
+          <SelectField aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => setView(e.target.value as View)}>
             {(["day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
@@ -903,15 +952,15 @@ export default function CalendarWorkspace() {
             <button type="button" aria-pressed={calendarTab === "calendars"} onClick={() => setCalendarTab("calendars")}><UnigentamosIcon role="calendar" size={16} />Calendars</button>
             <button type="button" aria-pressed={calendarTab === "holidays"} onClick={() => setCalendarTab("holidays")}><UnigentamosIcon role="star" size={16} />Holidays & dates</button>
           </div>
-          {calendarTab === "holidays" ? <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => action(() => savePlanning("calendars", { id: "native", observances: settings }, nativeCalendar?.updatedAt), "")} /> : <>
+          {calendarTab === "holidays" ? <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} /> : <>
           <section className={styles.calendarVisibility} aria-label="Visible calendars">
             {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <label className={styles.calendarToggle} key={c.id}>
               <span className={styles.visibilityIcon} style={{ color: calendarDisplayColor(c.color), background: "color-mix(in srgb, " + calendarDisplayColor(c.color) + " 10%, white)" }}><UnigentamosIcon role="calendar" size={18} /></span><span className={styles.visibilityName}>{c.name}</span>
-              <input type="checkbox" aria-label={c.name} checked={c.visible} disabled={busy} onChange={() => void action(() => savePlanning("calendars", { id: c.id, visible: !c.visible }, c.updatedAt), "")} />
+              <input type="checkbox" aria-label={c.name} checked={c.visible} disabled={actionBusy} onChange={e => void saveCalendarPreference(c.id, { visible: e.target.checked })} />
             </label>)}
             <label className={styles.calendarToggle}>
               <span className={styles.visibilityIcon} style={{ color: observanceAppearance(observanceSettings, "birthdays").color }}><UnigentamosIcon role="birthday" size={18} /></span><span className={styles.visibilityName}>{observanceAppearance(observanceSettings, "birthdays").name}</span>
-              <input type="checkbox" aria-label={observanceAppearance(observanceSettings, "birthdays").name} checked={observanceSettings.birthdays} disabled={busy} onChange={e => void action(() => savePlanning("calendars", { id: "native", observances: { ...observanceSettings, birthdays: e.target.checked } }, nativeCalendar?.updatedAt), "")} />
+              <input type="checkbox" aria-label={observanceAppearance(observanceSettings, "birthdays").name} checked={observanceSettings.birthdays} disabled={actionBusy} onChange={e => void saveCalendarPreference("native", { observances: { ...observanceSettings, birthdays: e.target.checked } })} />
             </label>
           </section>
           <details className={styles.settingsDisclosure}><summary><UnigentamosIcon role="plus" size={18} /><span>Add a calendar</span><UnigentamosIcon role="chevron-down" size={16} /></summary>

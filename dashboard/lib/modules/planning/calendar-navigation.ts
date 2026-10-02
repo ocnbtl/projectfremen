@@ -7,7 +7,7 @@ export const navigationYear = (value: string, view: CalendarView) => {
   const date = Temporal.PlainDate.from(value);
   return view === "week" ? date.yearOfWeek! : date.year;
 };
-export const viewIcons: Record<CalendarView, string> = { day: "today", week: "week", month: "calendar", year: "view-grid", agenda: "list" };
+export const viewIcons: Record<CalendarView, string> = { day: "today", week: "week", month: "calendar-month-view", year: "view-grid", agenda: "list" };
 export function calendarRange(value: string, view: CalendarView) {
   const day = Temporal.PlainDate.from(value);
   const first = view === "year" ? day.with({ month: 1, day: 1 }) : view === "month" ? day.with({ day: 1 }) : day;
