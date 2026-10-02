@@ -866,6 +866,19 @@ async function check(label, run) {
     },
   );
   await check(
+    "bulk group recoloring retains group identities and rejects stale calendar edits",
+    async () => {
+      const before = (await readPlanningState()).calendars.find((c) => c.id === "native");
+      const groups = before.groups.map((group, index) => ({ ...group, color: index ? "#AA7833" : "#665399" }));
+      const saved = await savePlanningRecord("calendars", { id: before.id, groups }, before.updatedAt);
+      assert.deepEqual(saved.groups, groups);
+      const reloaded = await readPlanningState();
+      assert.deepEqual(reloaded.calendars.find((c) => c.id === before.id).groups, groups);
+      assert.equal(reloaded.events.find((e) => e.id === "five-minute").groupId, "work");
+      await assert.rejects(() => savePlanningRecord("calendars", { id: before.id, groups: before.groups }, before.updatedAt), /changed|updated|refresh/i);
+    },
+  );
+  await check(
     "clearing an occurrence group or place survives JSON persistence",
     () => {
       const raw = event({

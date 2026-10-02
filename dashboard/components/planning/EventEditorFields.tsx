@@ -22,17 +22,22 @@ export default function EventEditorFields({
   snapshot,
   busy,
   onCreateGroup,
+  onSaveGroups,
 }: {
   fields: EventFields;
   update: <K extends keyof EventFields>(key: K, value: EventFields[K]) => void;
   snapshot?: PlanningSnapshot;
   busy: boolean;
   onCreateGroup: (calendar: Calendar, group: EventGroup) => Promise<boolean>;
+  onSaveGroups: (calendar: Calendar, groups: EventGroup[]) => Promise<boolean>;
 }) {
   const [newGroup, setNewGroup] = useState(false),
     [groupName, setGroupName] = useState("");
   const [groupColor, setGroupColor] = useState("#59518B"),
     [groupIcon, setGroupIcon] = useState("star");
+  const [groupEditor, setGroupEditor] = useState<{ calendar: Calendar; groups: EventGroup[] } | null>(null);
+  const [recurrenceDraft, setRecurrenceDraft] = useState(fields.recurrence || "FREQ=WEEKLY;INTERVAL=1");
+  const [reminderDraft, setReminderDraft] = useState(fields.reminderMinutes ?? 15);
   const [reminderUnit, setReminderUnit] = useState(() =>
     fields.reminderMinutes && fields.reminderMinutes % 1440 === 0
       ? 1440
@@ -44,7 +49,7 @@ export default function EventEditorFields({
     (c) => c.id === fields.calendarId,
   );
   const rule = Object.fromEntries(
-    fields.recurrence
+    recurrenceDraft
       .split(";")
       .filter(Boolean)
       .map((x) => x.split("=")),
@@ -52,6 +57,14 @@ export default function EventEditorFields({
   const simpleRule = Object.keys(rule).every((k) =>
     ["FREQ", "INTERVAL"].includes(k),
   );
+  function changeRecurrence(value: string) {
+    setRecurrenceDraft(value);
+    if (fields.recurrence) update("recurrence", value);
+  }
+  function changeReminder(value: number) {
+    setReminderDraft(value);
+    if (fields.reminderMinutes !== null) update("reminderMinutes", value);
+  }
   const placeRef = snapshot?.refs.find(
     (r) =>
       r.module === "map" &&
@@ -67,7 +80,7 @@ export default function EventEditorFields({
       : fields.linkedRefs;
   return (
     <>
-      <label>
+      <label className={styles.eventDescription}>
         Description
         <textarea
           rows={2}
@@ -76,32 +89,34 @@ export default function EventEditorFields({
           onChange={(e) => update("description", e.target.value)}
         />
       </label>
+      <label className={styles.locationField}>
+        <UnigentamosIcon role="location" size={18} />
+        <input
+          aria-label="Address or meeting link"
+          placeholder="Address or meeting link"
+          value={fields.location}
+          onChange={(e) => update("location", e.target.value)}
+        />
+      </label>
       <section className={styles.editorSection} aria-label="Event schedule">
         <div className={styles.editorSectionTitle}>
           <UnigentamosIcon role="clock" size={18} />
           <strong>Date & time</strong>
-          <label className={styles.quietToggle}>
-            <input
-              type="checkbox"
-              checked={fields.allDay}
-              onChange={(e) => {
-                update("allDay", e.target.checked);
+          <EventCheckbox label="All day" checked={fields.allDay} onChange={(checked) => {
+                update("allDay", checked);
                 update(
                   "start",
-                  e.target.checked
+                  checked
                     ? fields.start.slice(0, 10)
                     : `${fields.start.slice(0, 10)}T09:00`,
                 );
                 update(
                   "end",
-                  e.target.checked
+                  checked
                     ? addDays(fields.start.slice(0, 10), 1)
                     : `${fields.start.slice(0, 10)}T10:00`,
                 );
-              }}
-            />
-            All day
-          </label>
+              }} />
         </div>
         <div className="work-form-pair">
           {(["start", "end"] as const).map((key) => (
@@ -145,6 +160,8 @@ export default function EventEditorFields({
               onChange={(e) => {
                 update("calendarId", e.target.value);
                 update("groupId", "");
+                setGroupEditor(null);
+                setNewGroup(false);
               }}
             >
               {snapshot?.state.calendars
@@ -180,32 +197,20 @@ export default function EventEditorFields({
           <UnigentamosIcon role="routine" size={18} />
           <strong>Repeat & remind</strong>
         </div>
-        <div className={styles.inlineFields}>
-          <label className={styles.quietToggle}>
-            <input
-              type="checkbox"
-              checked={Boolean(fields.recurrence)}
-              onChange={(e) =>
-                update(
-                  "recurrence",
-                  e.target.checked ? "FREQ=WEEKLY;INTERVAL=1" : "",
-                )
-              }
-            />
-            Repeat
-          </label>
-          {fields.recurrence && simpleRule && (
-            <>
-              <span>Every</span>
+        <div className={styles.scheduleOption} data-enabled={Boolean(fields.recurrence)}>
+          <EventCheckbox label="Repeat" checked={Boolean(fields.recurrence)} onChange={(checked) => update("recurrence", checked ? recurrenceDraft : "")} />
+          {simpleRule ? (
+            <div className={styles.scheduleOptionFields}>
+              <span className={styles.everyLabel}>Every</span>
               <input
                 aria-label="Repeat interval"
                 type="number"
-                min={1}
-                max={365}
-                value={rule.INTERVAL || 1}
+                min={fields.recurrence ? 1 : undefined}
+                max={fields.recurrence ? 365 : undefined}
+                required={Boolean(fields.recurrence)}
+                value={rule.INTERVAL ?? 1}
                 onChange={(e) =>
-                  update(
-                    "recurrence",
+                  changeRecurrence(
                     `FREQ=${rule.FREQ || "WEEKLY"};INTERVAL=${e.target.value}`,
                   )
                 }
@@ -214,8 +219,7 @@ export default function EventEditorFields({
                 aria-label="Repeat unit"
                 value={rule.FREQ}
                 onChange={(e) =>
-                  update(
-                    "recurrence",
+                  changeRecurrence(
                     `FREQ=${e.target.value};INTERVAL=${rule.INTERVAL || 1}`,
                   )
                 }
@@ -231,48 +235,34 @@ export default function EventEditorFields({
                   </option>
                 ))}
               </SelectField>
-            </>
-          )}
-        </div>
-        {fields.recurrence && !simpleRule && (
-          <label>
+            </div>
+          ) : (
+          <label className={styles.customRecurrence}>
             Custom recurrence
             <input
-              value={fields.recurrence}
-              onChange={(e) => update("recurrence", e.target.value)}
+              value={recurrenceDraft}
+              onChange={(e) => changeRecurrence(e.target.value)}
             />
             <small>
               Imported recurrence is preserved, including its end date and
               exceptions.
             </small>
-          </label>
-        )}
-        <div className={styles.inlineFields}>
-          <UnigentamosIcon role="reminder" size={18} />
-          <label className={styles.quietToggle}>
-            <input
-              type="checkbox"
-              checked={fields.reminderMinutes !== null}
-              onChange={(e) =>
-                update("reminderMinutes", e.target.checked ? 15 : null)
-              }
-            />
-            Reminder
-          </label>
-          {fields.reminderMinutes !== null && (
-            <>
+          </label>)}
+        </div>
+        <div className={styles.scheduleOption} data-enabled={fields.reminderMinutes !== null}>
+          <EventCheckbox label="Reminder" checked={fields.reminderMinutes !== null} onChange={(checked) => update("reminderMinutes", checked ? reminderDraft : null)} />
+          <div className={styles.scheduleOptionFields}>
               <input
                 aria-label="Reminder amount"
                 type="number"
-                min={0}
-                max={43200 / reminderUnit}
+                min={fields.reminderMinutes !== null ? 0 : undefined}
+                max={fields.reminderMinutes !== null ? 43200 / reminderUnit : undefined}
                 step="any"
                 value={Number(
-                  (fields.reminderMinutes / reminderUnit).toFixed(5),
+                  (reminderDraft / reminderUnit).toFixed(5),
                 )}
                 onChange={(e) =>
-                  update(
-                    "reminderMinutes",
+                  changeReminder(
                     Math.round(Number(e.target.value) * reminderUnit),
                   )
                 }
@@ -282,12 +272,11 @@ export default function EventEditorFields({
                 value={String(reminderUnit)}
                 onChange={(e) => {
                   const next = Number(e.target.value);
-                  update(
-                    "reminderMinutes",
+                  changeReminder(
                     Math.min(
                       43200,
                       Math.round(
-                        ((fields.reminderMinutes || 0) / reminderUnit) * next,
+                        (reminderDraft / reminderUnit) * next,
                       ),
                     ),
                   );
@@ -298,18 +287,33 @@ export default function EventEditorFields({
                 <option value="60">hours before</option>
                 <option value="1440">days before</option>
               </SelectField>
-            </>
-          )}
+          </div>
         </div>
-        <small className="work-muted">
-          Reminders appear inside Unigentamos.
-        </small>
       </section>
       <section className={styles.editorSection} aria-label="Color groups">
         <div className={styles.editorSectionTitle}>
           <UnigentamosIcon role="palette" size={18} />
           <strong>Color group</strong>
+          <button type="button" className={styles.editorIconButton} aria-label="Edit group colors" title="Edit group colors" aria-expanded={Boolean(groupEditor)} disabled={busy || !calendar} onClick={() => {
+            setGroupEditor(groupEditor || !calendar ? null : { calendar, groups: calendarGroups(calendar).map((group) => ({ ...group })) });
+            setNewGroup(false);
+          }}><UnigentamosIcon role="sliders" size={18} /></button>
         </div>
+        {groupEditor && <div className={styles.groupColorEditor} role="group" aria-label="Edit all group colors">
+          <div className={styles.groupColorRows}>
+            {groupEditor.groups.map((group) => <label key={group.id}>
+              <UnigentamosIcon role={group.icon} size={18} />
+              <span>{group.name}</span>
+              <input type="color" aria-label={`${group.name} color`} value={group.color} disabled={busy} onChange={(event) => setGroupEditor((current) => current ? { ...current, groups: current.groups.map((item) => item.id === group.id ? { ...item, color: event.target.value } : item) } : null)} />
+            </label>)}
+          </div>
+          <div className={styles.groupColorActions}>
+            <button type="button" className="work-button work-button--quiet" disabled={busy} onClick={() => setGroupEditor(null)}>Cancel</button>
+            <button type="button" className="work-button" disabled={busy} onClick={async () => {
+              if (await onSaveGroups(groupEditor.calendar, groupEditor.groups)) setGroupEditor(null);
+            }}>Save colors</button>
+          </div>
+        </div>}
         <div className={styles.groupChoices}>
           <button
             type="button"
@@ -333,7 +337,7 @@ export default function EventEditorFields({
           <button
             type="button"
             aria-expanded={newGroup}
-            onClick={() => setNewGroup(!newGroup)}
+            onClick={() => { setNewGroup(!newGroup); setGroupEditor(null); }}
           >
             <UnigentamosIcon role="plus" size={16} />
             Create group
@@ -399,11 +403,8 @@ export default function EventEditorFields({
         )}
       </section>
       <section className={styles.editorSection} aria-label="Linked objects">
-        <div className={styles.editorSectionTitle}>
-          <UnigentamosIcon role="link" size={18} />
-          <strong>Linked objects</strong>
-        </div>
         <RecordLinks
+          objectPicker
           refs={linked}
           available={snapshot?.refs}
           onChange={(refs) => {
@@ -420,14 +421,6 @@ export default function EventEditorFields({
               );
           }}
         />
-        <label>
-          Address or meeting link
-          <input
-            placeholder="Optional location details"
-            value={fields.location}
-            onChange={(e) => update("location", e.target.value)}
-          />
-        </label>
         {!!fields.participants?.length && (
           <div>
             <small className="work-muted">Imported participants</small>
@@ -436,17 +429,15 @@ export default function EventEditorFields({
             </p>
           </div>
         )}
-        <label className={styles.quietToggle}>
-          <input
-            type="checkbox"
-            checked={fields.kind === "time_block"}
-            onChange={(e) =>
-              update("kind", e.target.checked ? "time_block" : "event")
-            }
-          />
-          Reserve as a work block
-        </label>
       </section>
     </>
   );
+}
+
+function EventCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return <label className={`${styles.quietToggle} ${styles.eventCheckbox}`}>
+    <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
+    <span className={styles.checkboxMark} aria-hidden="true"><UnigentamosIcon role="check" size={13} /></span>
+    <span>{label}</span>
+  </label>;
 }

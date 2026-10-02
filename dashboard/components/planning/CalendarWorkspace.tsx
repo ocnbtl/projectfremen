@@ -929,7 +929,7 @@ export default function CalendarWorkspace() {
         title={editor?.original ? "Edit event" : "New event"}
       >
         {editor && (
-          <form className="work-form" onSubmit={save}>
+          <form className={`work-form ${styles.eventForm}`} onSubmit={save}>
             <WorkspaceFeedback error={error} />
             {editor.original?.source && (
               <p className="work-muted">
@@ -980,11 +980,17 @@ export default function CalendarWorkspace() {
                 </label>
               )}
             <EventEditorFields
-              key={editor.original?.id || "new"}
+              key={`${editor.original?.id || "new"}:${editor.scope}`}
               fields={editor.fields}
               update={update}
               snapshot={snapshot}
               busy={busy}
+              onSaveGroups={(calendar, groups) =>
+                action(
+                  () => savePlanning("calendars", { id: calendar.id, groups }, calendar.updatedAt),
+                  "Group colors saved",
+                )
+              }
               onCreateGroup={(calendar, group) =>
                 action(
                   () =>

@@ -798,8 +798,6 @@
   font-size: 11px;
 }
 .editorSection {
-  border-top: 1px solid #e6e4ed;
-  padding-top: 14px;
   display: grid;
   gap: 12px;
 }
@@ -866,6 +864,47 @@
 .newGroup .groupChoices {
   grid-column: 1 / -1;
 }
+.eventForm { gap: 16px; }
+.eventForm :global(.work-form-footer) { border-top: 0; }
+.eventDescription textarea { min-height: 64px; }
+.editorSection :global(.work-form-pair) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.editorSection :global(.work-form-pair) input { min-width: 0; }
+.locationField { display: flex !important; align-items: center; gap: 10px !important; color: #716b80; }
+.locationField > svg { flex: none; }
+.locationField input { min-width: 0; }
+.eventCheckbox { position: relative; cursor: pointer; min-height: 36px; flex-shrink: 0; }
+.eventCheckbox input { position: absolute; width: 18px !important; height: 18px; min-height: 18px !important; opacity: 0; }
+.checkboxMark { display: inline-grid; place-items: center; width: 18px; height: 18px; flex: none; border: 1px solid #a8a2ba; border-radius: 5px; background: white; color: white; pointer-events: none; transition: background-color 140ms, border-color 140ms; }
+.checkboxMark svg { opacity: 0; }
+.eventCheckbox input:checked + .checkboxMark { background: #59518b; border-color: #59518b; }
+.eventCheckbox input:checked + .checkboxMark svg { opacity: 1; }
+.eventCheckbox input:focus-visible + .checkboxMark { outline: 2px solid #59518b; outline-offset: 3px; }
+.scheduleOption { display: grid; grid-template-columns: 112px minmax(0, 1fr); gap: 12px; align-items: center; }
+.scheduleOptionFields { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.scheduleOptionFields > input[type="number"] { width: 68px; flex: none; margin: 0; }
+.scheduleOptionFields :global(.app-select) { min-width: 0; flex: 1; }
+.scheduleOptionFields :global(.app-select-trigger) { min-width: 0; width: 100%; }
+.everyLabel { color: #716b80; font-size: 12px; }
+.scheduleOption[data-enabled="false"] { color: #716b80; }
+.customRecurrence { min-width: 0; }
+.editorIconButton { display: inline-grid; place-items: center; width: 32px; height: 32px; min-height: 32px; margin-left: auto; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #59518b; cursor: pointer; }
+.editorIconButton:hover, .editorIconButton[aria-expanded="true"] { background: #f3f2f9; }
+.groupColorEditor { display: grid; gap: 12px; padding: 12px; border-radius: 10px; background: #f8f7fb; }
+.groupColorRows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
+.groupColorRows label { display: flex !important; align-items: center; gap: 8px !important; min-width: 0; font-size: 12px; color: #59518b; }
+.groupColorRows label span { flex: 1; overflow-wrap: anywhere; }
+.groupColorRows label > svg { flex: none; }
+.groupColorRows input[type="color"] { width: 36px; min-height: 32px; height: 32px; padding: 3px; border-color: #cbc7e4; cursor: pointer; flex: none; }
+.groupColorActions { display: flex; justify-content: flex-end; gap: 8px; }
+.groupColorActions button { width: auto; }
+@media (max-width: 480px) {
+  .editorSection :global(.work-form-pair) { grid-template-columns: minmax(0, 1fr); }
+  .scheduleOption { grid-template-columns: 1fr; gap: 4px; }
+  .scheduleOptionFields { padding-left: 26px; }
+  .customRecurrence { margin-left: 26px; }
+  .groupColorRows { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { .checkboxMark { transition: none; } }
 @media (max-width: 760px) {
   .content {
     padding-inline: 8px;

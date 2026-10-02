@@ -13,6 +13,7 @@ const kinds = [
   { id: "resource", label: "Resources", icon: "module-resources" },
   { id: "media", label: "Media", icon: "module-media" },
   { id: "note", label: "Notes", icon: "module-notes" },
+  { id: "place", label: "Places", icon: "location" },
   { id: "other", label: "Other", icon: "object" }
 ] as const;
 type Kind = typeof kinds[number]["id"];
@@ -23,21 +24,23 @@ const kindOf = (target: NativeObjectRef): Kind => {
   if (target.module === "resources") return "resource";
   if (target.module === "media") return "media";
   if (target.module === "notes") return "note";
+  if (target.module === "map" && target.objectType === "place") return "place";
   return "other";
 };
 const searchable = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase();
 export const objectTargetTypeLabel = (target: NativeObjectRef) => kindOf(target) === "other"
   ? target.objectType.replace(/_/g, " ").replace(/^./, letter => letter.toUpperCase())
-  : ({ person: "Person", organization: "Organization", project: "Project", resource: "Resource", note: "Note", media: "Media" } as Record<string, string>)[kindOf(target)];
+  : ({ person: "Person", organization: "Organization", project: "Project", resource: "Resource", note: "Note", media: "Media", place: "Place" } as Record<string, string>)[kindOf(target)];
 
 export const objectTargetIcon = (target: NativeObjectRef) => kinds.find(item => item.id === kindOf(target))!.icon;
 
 /** One search surface for draft links and existing profiles; selection never writes a record. */
-export default function PeopleObjectPicker({ targets, value, onChange, disabled = false }: {
+export default function PeopleObjectPicker({ targets, value, onChange, disabled = false, iconOnly = false }: {
   targets: NativeObjectRef[];
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  iconOnly?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>("all");
@@ -59,19 +62,19 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
 
   return <Popover.Root open={open} onOpenChange={next => { setOpen(next); if (next) { setQuery(""); setKind("all"); setLimit(60); } }}>
     <Popover.Trigger asChild>
-      <button type="button" className="people-object-picker-trigger" aria-label="Object to link" aria-description={selected ? `${selected.label} · ${objectTargetTypeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
-        <UnigentamosIcon role={kinds.find(item => item.id === (selected ? kindOf(selected) : "all"))!.icon} size={20} />
-        <span><strong>{selected?.label || "Link an Object"}</strong>{selected && <small>{objectTargetTypeLabel(selected)}</small>}</span>
-        <UnigentamosIcon role="chevron-down" size={16} />
+      <button type="button" className="people-object-picker-trigger" data-icon-only={iconOnly || undefined} aria-label={iconOnly ? "Link a record" : "Object to link"} title={iconOnly ? "Link a record" : undefined} aria-description={selected ? `${selected.label} · ${objectTargetTypeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
+        <UnigentamosIcon role={iconOnly ? "link" : kinds.find(item => item.id === (selected ? kindOf(selected) : "all"))!.icon} size={20} />
+        {!iconOnly && <><span><strong>{selected?.label || "Link an Object"}</strong>{selected && <small>{objectTargetTypeLabel(selected)}</small>}</span>
+        <UnigentamosIcon role="chevron-down" size={16} /></>}
       </button>
     </Popover.Trigger>
     <Popover.Portal>
-      <Popover.Content className="people-object-picker-menu" sideOffset={8} collisionPadding={12} aria-label="Link an object"
+      <Popover.Content className={`people-object-picker-menu${iconOnly ? " people-object-picker-menu--sheet" : ""}`} sideOffset={8} collisionPadding={12} aria-label="Link an object"
         onEscapeKeyDown={event => event.stopImmediatePropagation()}
         onOpenAutoFocus={event => { event.preventDefault(); search.current?.focus(); }}>
         <header><strong>Link an Object</strong><Popover.Close aria-label="Close object search"><UnigentamosIcon role="close" size={18} /></Popover.Close></header>
         <div className="people-object-picker-types" role="group" aria-label="Object types">
-          {kinds.map(item => <button type="button" key={item.id} aria-label={item.label} title={item.label} aria-pressed={kind === item.id} onClick={() => { setKind(item.id); setLimit(60); }}>
+          {kinds.filter(item => item.id !== "place" || targets.some(target => kindOf(target) === "place")).map(item => <button type="button" key={item.id} aria-label={item.label} title={item.label} aria-pressed={kind === item.id} onClick={() => { setKind(item.id); setLimit(60); }}>
             <UnigentamosIcon role={item.icon} size={20} /><span>{item.label}</span>
           </button>)}
         </div>

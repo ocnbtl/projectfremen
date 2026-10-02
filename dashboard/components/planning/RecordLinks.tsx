@@ -2,15 +2,18 @@
 import { useState } from "react";
 import Link from "next/link";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import PeopleObjectPicker, { objectTargetKey } from "../people/PeopleObjectPicker";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 export default function RecordLinks({
   refs,
   available = [],
   onChange,
+  objectPicker = false,
 }: {
   refs: NativeObjectRef[];
   available?: NativeObjectRef[];
   onChange?: (refs: NativeObjectRef[]) => void;
+  objectPicker?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const key = (ref: NativeObjectRef) =>
@@ -25,7 +28,11 @@ export default function RecordLinks({
         .slice(0, 12)
     : [];
   return (
-    <div>
+    <div className={objectPicker ? "work-object-links" : undefined}>
+      {onChange && objectPicker && <PeopleObjectPicker iconOnly targets={available.filter((ref) => !refs.some((linked) => key(linked) === key(ref)))} value="" onChange={(value) => {
+        const ref = available.find((candidate) => objectTargetKey(candidate) === value);
+        if (ref && !refs.some((linked) => key(linked) === key(ref))) onChange([...refs, ref]);
+      }} />}
       <div className="work-links">
         {refs.map((ref) => (
           <span key={key(ref)}>
@@ -51,7 +58,7 @@ export default function RecordLinks({
           </span>
         ))}
       </div>
-      {onChange && (
+      {onChange && !objectPicker && (
         <label>
           Link a record
           <input
