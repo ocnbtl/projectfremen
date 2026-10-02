@@ -153,7 +153,7 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: var(--module-icon, #59518b);
+  background: var(--module-secondary-700);
   pointer-events: none;
   z-index: 3;
 }
@@ -165,7 +165,7 @@
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--module-icon, #59518b);
+  background: var(--module-secondary-700);
 }
 .month {
   display: grid;
@@ -529,7 +529,8 @@
   align-items: center;
 }
 .hoursEdge b {
-  background: #e5e3f2;
+  background: var(--module-secondary-100);
+  color: var(--text-strong);
   border-radius: 4px;
   padding: 2px 6px;
   font-weight: 500;
@@ -712,11 +713,11 @@
   background: var(--event-color);
 }
 .now {
-  background: var(--module-icon, #59518b);
+  background: var(--module-secondary-700);
   height: 2px;
 }
 .now::before {
-  background: var(--module-icon, #59518b);
+  background: var(--module-secondary-700);
 }
 .now time {
   position: absolute;
@@ -724,7 +725,7 @@
   bottom: 5px;
   padding: 4px 7px;
   border-radius: 6px;
-  background: var(--module-icon, #59518b);
+  background: var(--module-secondary-700);
   color: white;
   box-shadow: 0 0 0 2px white;
   font: 600 12px/1.2 var(--font-body);
@@ -1134,12 +1135,12 @@
 }
 
 /* People belong to the event, with the same quiet identity treatment in every view. */
-.personAvatar { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--avatar-size, 22px); width: var(--avatar-size, 22px); height: var(--avatar-size, 22px); min-width: var(--avatar-size, 22px); border-radius: 50%; overflow: hidden; background: var(--module-primary-100, #e5e3f2); color: var(--module-primary-700, #443d6d); box-shadow: 0 0 0 1.5px white; font: 600 9px/1 var(--font-body); vertical-align: middle; }
+.personAvatar { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--avatar-size, 22px); width: var(--avatar-size, 22px); height: var(--avatar-size, 22px); min-width: var(--avatar-size, 22px); border-radius: 50%; overflow: hidden; background: var(--module-secondary-100); color: var(--text-strong); box-shadow: 0 0 0 1.5px white; font: 600 9px/1 var(--font-body); vertical-align: middle; }
 .personAvatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
 .personAvatar > span { font: inherit; margin: 0; }
 .eventPeople { display: inline-flex; flex: none; align-items: center; max-width: 100%; margin: 0 0 0 auto; padding-left: 3px; }
 .eventPeople > span + span { margin-left: -5px; }
-.morePeople { display: inline-grid; place-items: center; height: var(--avatar-size, 22px); min-width: var(--avatar-size, 22px); border-radius: 50%; background: #f3f2f9; color: #59518b; font: 600 9px/1 var(--font-body); box-shadow: 0 0 0 1.5px white; }
+.morePeople { display: inline-grid; place-items: center; height: var(--avatar-size, 22px); min-width: var(--avatar-size, 22px); border-radius: 50%; background: var(--module-secondary-100); color: var(--text-strong); font: 600 9px/1 var(--font-body); box-shadow: 0 0 0 1.5px white; }
 .allDayItem { align-items: center; flex-wrap: wrap; }
 .allDayItem .eventTitle { flex: 1; min-width: 30px; }
 .allDayItem .eventPeople { --avatar-size: 20px; }
@@ -1171,7 +1172,7 @@
 .hoursEdge { gap: 4px; padding-right: 0; }
 .hoursEdge > button { border-radius: 6px; }
 .hoursEdge > button:hover { background: #f3f2f9; }
-.hoursEdge > button + button { color: var(--module-icon, #59518b); margin-left: 4px; }
+.hoursEdge > button + button { color: var(--module-secondary-700); margin-left: 4px; }
 .hoursEdge > button + button::before { content: ""; width: 1px; height: 12px; background: #ddd9e8; margin-right: 6px; }
 .settingsTabs { display: flex; padding: 4px; gap: 4px; border-radius: 9px; background: #f3f2f9; }
 .settingsTabs button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 6px 10px; border: 0; border-radius: 6px; color: #716b80; background: transparent; font: 500 12px/1.4 var(--font-body); cursor: pointer; }
@@ -1238,11 +1239,11 @@
 .draftNotice :global(.work-button) { height: 28px; min-height: 28px; padding: 4px 6px; font-size: 11px; }
 .draftNotice :global(.work-button):last-child { width: 25px; padding: 2px; }
 .hoursEdge { gap: 7px; padding-block: 5px; min-height: 36px; }
-.hoursEdge > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 5px 10px; border: 1px solid var(--module-border, #cbc7e4); border-radius: 7px; color: var(--module-icon, #59518b); background: var(--module-quiet, #f3f2f9); font-size: 11px; }
-.hoursEdge > button + button { margin: 0; background: var(--module-primary-100, #e5e3f2); }
+.hoursEdge > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 5px 10px; border: 1px solid var(--module-secondary-100); border-radius: 7px; color: var(--module-secondary-700); background: color-mix(in srgb, var(--module-secondary-100) 45%, var(--panel-bg)); font-size: 11px; }
+.hoursEdge > button + button { margin: 0; background: var(--module-secondary-100); }
 .hoursEdge > button + button::before { content: none; }
-.hoursEdge > button:hover { background: var(--module-primary-100, #e5e3f2); }
-.hoursEdge > button + button:hover { background: var(--module-primary-200, #cbc7e4); }
+.hoursEdge > button:hover { background: var(--module-secondary-100); border-color: var(--module-accent); }
+.hoursEdge > button + button:hover { background: color-mix(in srgb, var(--module-secondary-100) 80%, var(--module-accent)); }
 .hoursEdge svg, .allDayItem > svg, .timedEventTitle > svg { display: block; flex: none; margin: 0; align-self: center; }
 .allDayItem { flex-wrap: nowrap; }
 
@@ -1304,7 +1305,7 @@
 .agendaEvent .eventPeople { display: inline-flex; margin: 0 0 0 auto; }
 .agendaEvent .personAvatar { display: inline-flex; margin-top: 0; }
 .agendaEvent .personAvatar > span { font: inherit; margin: 0; }
-.agendaLinked { display: flex; gap: 10px; align-items: center; min-height: 48px; padding: 10px; background: var(--module-quiet, #f3f2f9); border-radius: 8px; color: var(--module-icon, #59518b); text-decoration: none; }
+.agendaLinked { display: flex; gap: 10px; align-items: center; min-height: 48px; padding: 10px; background: var(--module-secondary-100); border-radius: 8px; color: var(--text-strong); text-decoration: none; }
 .agendaLinked > span { width: 70px; flex: none; font-size: 11px; }
 .agendaLinked > strong { flex: 1; font-size: 13px; font-weight: 500; }
 .agendaLinked > small { font-size: 10px; }
@@ -1344,7 +1345,7 @@
 .calendarChoiceMenu :global(.app-select-item)[aria-selected="true"] { color: #59518b; background: #f3f2f9; }
 .calendarVisibility { display: grid; gap: 8px; }
 .calendarVisibility .calendarToggle { padding: 8px 10px; border-radius: 9px; min-height: 52px; background: #f9f8fc; }
-.calendarToggle > .visibilityIcon { width: 32px; height: 32px; border-radius: 8px; background: var(--module-quiet, #f3f2f9); display: grid; place-items: center; flex: none; }
+.calendarToggle > .visibilityIcon { width: 32px; height: 32px; border-radius: 8px; background: var(--module-secondary-100); display: grid; place-items: center; flex: none; }
 .visibilityIcon svg { display: block; }
 .calendarToggle > .visibilityName { min-width: 0; flex: 1; font-size: 13px; font-weight: 500; }
 .settingsDisclosure { padding: 0; background: #faf9fc; border-radius: 10px; overflow: hidden; }
