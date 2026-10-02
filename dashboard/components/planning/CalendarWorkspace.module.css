@@ -538,29 +538,32 @@
   display: grid;
   flex: 1;
   min-height: 0;
-  grid-template-rows: 70px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
   border: 1px solid #e3e0ed;
   border-radius: 10px;
   overflow: hidden;
 }
 .fittedZone {
-  align-self: center;
+  align-self: start;
   font-size: 10px;
-  padding: 4px;
+  padding: 18px 4px 4px;
   color: #727080;
   overflow-wrap: anywhere;
   text-align: center;
 }
 .fittedDayHeader {
   min-width: 0;
+  min-height: 70px;
+  padding: 7px 0;
+  box-sizing: border-box;
   border-left: 1px solid var(--calendar-day-line);
   container-type: inline-size;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
   overflow: hidden;
-  gap: 2px;
+  gap: 6px;
 }
 .fittedDayHeader > button:first-child {
   width: 100%;
@@ -603,20 +606,22 @@
   background: #59518b;
   color: white;
 }
-.daySummary {
-  font: 500 10px/1.2 var(--font-body);
-  border: 0;
-  color: #59518b;
-  background: transparent;
-  padding: 2px;
-  cursor: pointer;
-  max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+.allDayItems { display: flex; flex-direction: column; gap: 4px; width: 100%; min-width: 0; padding: 0 5px; box-sizing: border-box; max-height: min(24dvh, 200px); overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #cbc7e4 transparent; }
+.allDayItem { display: flex; flex-shrink: 0; align-items: flex-start; gap: 6px; width: 100%; min-width: 0; min-height: 30px; box-sizing: border-box; padding: 7px 8px; border: 0; border-left: 3px solid var(--event-color); border-radius: 6px; background: color-mix(in srgb, var(--event-color) 12%, white); color: #23383f; font: 500 11px/1.4 var(--font-body); text-align: left; text-decoration: none; cursor: pointer; transition: background-color 140ms; }
+.allDayItem > svg { flex: none; margin-top: 1px; color: var(--event-color); }
+.allDayItem > span { min-width: 0; overflow-wrap: anywhere; }
+.allDayItem:hover { background: color-mix(in srgb, var(--event-color) 20%, white); box-shadow: none; }
+.allDayItem:focus-visible { outline: 2px solid var(--event-color); outline-offset: -2px; }
+.allDayItem[data-completed="true"] > span { text-decoration: line-through; color: #60747c; }
+@media (max-width: 760px) { .allDayItems { max-height: min(16dvh, 132px); } }
+@container (max-width: 100px) {
+  .allDayItems { padding-inline: 3px; }
+  .allDayItem { padding: 5px 4px; gap: 3px; font-size: 10px; }
+  .allDayItem > svg { display: none; }
 }
 .fittedHours {
   min-height: 0;
+  border-top: 1px solid var(--calendar-day-line);
 }
 .fittedHours > span {
   height: var(--hour-height);

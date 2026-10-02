@@ -1,5 +1,6 @@
 "use client";
 import { motion } from "motion/react";
+import Link from "next/link";
 import { useCalendarMotion } from "./CalendarMotion";
 import {
   useLayoutEffect,
@@ -21,6 +22,7 @@ import {
   localFor,
 } from "../../lib/modules/planning/calendar-model";
 import { eventGroup } from "../../lib/modules/planning/calendar-groups";
+import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./CalendarWorkspace.module.css";
 
@@ -68,7 +70,7 @@ export default function CalendarTimeGrid({
 }) {
   const { reduced, layoutTransition } = useCalendarMotion();
   const [height, setHeight] = useState(400),
-    grid = useRef<HTMLDivElement>(null);
+    hours = useRef<HTMLDivElement>(null);
   const [cursor, setCursor] = useState({ day: "", minute: 540 });
   const [selection, setSelection] = useState<{
     day: string;
@@ -85,14 +87,15 @@ export default function CalendarTimeGrid({
     minutes = (endHour - startHour) * 60;
   const today = localDate(new Date(now), zone);
   useLayoutEffect(() => {
-    const element = grid.current;
+    const element = hours.current;
     if (!element) return;
     const observer = new ResizeObserver(() => setHeight(element.clientHeight));
     observer.observe(element);
     setHeight(element.clientHeight);
     return () => observer.disconnect();
   }, []);
-  const px = Math.max(1, height - 70) / minutes;
+  // The header grows with visible all-day cards; measure the remaining time area.
+  const px = Math.max(1, height) / minutes;
   const position = (m: number) => (m - startHour * 60) * px;
   const atPointer = (
     e: PointerEvent<HTMLElement> | React.DragEvent<HTMLElement>,
@@ -157,7 +160,6 @@ export default function CalendarTimeGrid({
       </div>
       <div
         className={styles.fittedGrid}
-        ref={grid}
         style={
           {
             gridTemplateColumns: columns,
@@ -203,18 +205,32 @@ export default function CalendarTimeGrid({
                 </span>
               </motion.button>
               {!!(allDay.length + links.length) && (
-                <button
-                  type="button"
-                  className={styles.daySummary}
-                  onClick={() => onDay(day)}
-                >
-                  {allDay.length + links.length} all-day / linked
-                </button>
+                <div className={styles.allDayItems} role="group" aria-label={`All-day and linked events on ${day}`} data-all-day-date={day}>
+                  {allDay.map(item => {
+                    const calendar = calendars.find(c => c.id === item.calendarId),
+                      group = eventGroup(calendar, item.groupId),
+                      color = group?.color || (calendar?.color?.toLowerCase() === "#565b86" ? "#59518B" : calendar?.color) || "#59518B";
+                    return <motion.button type="button" key={item.id} layout="position" transition={{ layout: layoutTransition }}
+                      className={styles.allDayItem} style={{ "--event-color": color } as CSSProperties}
+                      aria-label={`${item.title} · All day${group ? ` · ${group.name}` : ""}`} title={`${item.title} · All day`}
+                      onClick={() => onOpen(item)}>
+                      <UnigentamosIcon role={group?.icon || "interaction-date"} size={13} />
+                      <span>{item.title}</span>
+                    </motion.button>;
+                  })}
+                  {links.map(link => <Link key={link.id} className={styles.allDayItem}
+                    style={{ "--event-color": MODULE_COLOR_SYSTEM[link.ownerRef?.module || "personal_ops"].tokens.icon } as CSSProperties}
+                    href={link.ownerRef?.route || "/admin/personal"} data-completed={link.completed || undefined}
+                    aria-label={`${link.title} · Linked${link.completed ? " · Completed" : ""}`} title={link.title}>
+                    <UnigentamosIcon role={link.completed ? "check" : "link"} size={13} />
+                    <span>{link.title}</span>
+                  </Link>)}
+                </div>
               )}
             </motion.div>
           );
         })}
-        <div className={styles.fittedHours}>
+        <div className={styles.fittedHours} ref={hours}>
           {Array.from({ length: endHour - startHour }, (_, i) => (
             <motion.span layout key={startHour + i} transition={{ layout: layoutTransition }}>
               <motion.span layout="position" transition={{ layout: layoutTransition }}>{hourName(startHour + i)}</motion.span>
