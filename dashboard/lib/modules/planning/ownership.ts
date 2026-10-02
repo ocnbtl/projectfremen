@@ -35,7 +35,7 @@ export function planningWritableKeys(collection: PlanningCollection): string[] {
       "exceptions",
       "overrides",
     ],
-    calendars: ["name", "color", "visible", "connectionId", "groups"],
+    calendars: ["name", "color", "visible", "connectionId", "groups", "observances"],
     connections: ["name", "kind", "url", "timeZone"],
     savedViews: [
       "name",

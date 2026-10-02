@@ -31,6 +31,7 @@ import {
 export type PlanningSnapshot = {
   state: PlanningState;
   refs: NativeObjectRef[];
+  birthdays?: import("./observances").BirthdaySource[];
   trips: PersonalTrip[];
   dated: {
     id: string;

@@ -1,6 +1,9 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
 import CalendarTimeGrid from "./CalendarTimeGrid";
+import EventPeople from "./EventPeople";
+import CalendarObservanceSettings from "./CalendarObservanceSettings";
+import { calendarObservances, defaultObservances, type HolidayCatalog } from "../../lib/modules/planning/observances";
 import EventEditorFields from "./EventEditorFields";
 import CalendarDatePicker from "./CalendarDatePicker";
 import { CalendarScene, useCalendarMotion } from "./CalendarMotion";
@@ -135,6 +138,12 @@ export default function CalendarWorkspace() {
     [calendarColor, setCalendarColor] = useState(
       MODULE_COLOR_SYSTEM.calendar.tokens.icon,
     );
+  const [observance, setObservance] = useState<EventOccurrence>();
+  const [calendarTab, setCalendarTab] = useState<"calendars" | "holidays">("calendars");
+  const [holidayData, setHolidayData] = useState<HolidayCatalog>(), [holidayError, setHolidayError] = useState(""), [holidayLoading, setHolidayLoading] = useState(false);
+  const [holidayRetry, setHolidayRetry] = useState(0);
+  const nativeCalendar = snapshot?.state.calendars.find(c => c.id === "native");
+  const observanceSettings = useMemo(() => nativeCalendar?.observances || defaultObservances(), [nativeCalendar?.observances]);
   const refresh = useCallback(async () => {
     try {
       setSnapshot(await planningRequest<PlanningSnapshot>());
@@ -254,6 +263,20 @@ export default function CalendarWorkspace() {
       ),
     };
   }, [date, view]);
+  const holidayCountries = observanceSettings.countries.join(",");
+  const holidayYears = [...new Set([range.start.slice(0, 4), addDays(range.end, -1).slice(0, 4), date.slice(0, 4)])].join(",");
+  useEffect(() => {
+    if (!snapshot) return;
+    const controller = new AbortController();
+    setHolidayLoading(true);
+    setHolidayError("");
+    fetch(`/api/planning/holidays?${new URLSearchParams({ countries: holidayCountries, years: holidayYears })}`, { signal: controller.signal, cache: "no-store" })
+      .then(async response => { const data = await response.json(); if (!response.ok || !data.ok) throw new Error(data.error || "Holiday dates could not be loaded"); return data as HolidayCatalog; })
+      .then(data => { if (!controller.signal.aborted) setHolidayData(data); })
+      .catch(e => { if (!controller.signal.aborted) setHolidayError((e as Error).message); })
+      .finally(() => { if (!controller.signal.aborted) setHolidayLoading(false); });
+    return () => controller.abort();
+  }, [Boolean(snapshot), holidayCountries, holidayYears, holidayRetry]);
   const days = Array.from(
     { length: view === "month" ? 42 : view === "week" ? 7 : 1 },
     (_, i) => addDays(range.start, i),
@@ -284,14 +307,14 @@ export default function CalendarWorkspace() {
         .filter((calendar) => calendar.visible && !calendar.archivedAt)
         .map((calendar) => calendar.id),
     );
-    return expanded.items.filter(
+    return [...expanded.items.filter(
       (item) =>
         visibleCalendars.has(item.calendarId) &&
         `${item.title} ${item.description} ${item.location}`
           .toLowerCase()
           .includes(query.toLowerCase()),
-    );
-  }, [expanded.items, snapshot?.state.calendars, query]);
+    ), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.toLowerCase()))];
+  }, [expanded.items, snapshot?.state.calendars, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
   const dated = showDated
     ? (snapshot?.dated || []).filter(
         (x) =>
@@ -469,16 +492,17 @@ export default function CalendarWorkspace() {
         style={
           {
             "--event-color":
-              group?.color || calendarDisplayColor(calendar?.color),
+              item.system ? (item.system.kind === "birthday" ? "#5A6040" : "#716B80") : group?.color || calendarDisplayColor(calendar?.color),
           } as CSSProperties
         }
-        onClick={() => event && openEvent(event, item)}
+        onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
         title={item.title}
       >
         <strong>
-          {group && <UnigentamosIcon role={group.icon} size={14} />}{" "}
+          {(group || item.system) && <UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group!.icon} size={14} />}{" "}
           {item.title}
         </strong>
+        <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
         <span>
           {item.allDay
             ? "All day"
@@ -521,18 +545,19 @@ export default function CalendarWorkspace() {
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
       <WorkspaceHeader title="Calendar">
-        <Button onClick={() => setConnections(true)}>Calendars</Button>
+        <Button icon="calendar" onClick={() => setConnections(true)}>Calendars</Button>
         <Button intent="primary" icon="plus" onClick={() => create()}>
           Add event
         </Button>
       </WorkspaceHeader>
       <div className={styles.toolbar}>
-        <div className="work-actions">
+        <div className={`work-actions ${styles.dateNavigation}`}>
           <Button onClick={() => setDate(localDate(new Date(), zone))}>
             Today
           </Button>
           <Button
             aria-label="Previous period"
+            className={styles.periodButton}
             onClick={() =>
               setDate(
                 view === "month"
@@ -548,6 +573,7 @@ export default function CalendarWorkspace() {
           </Button>
           <Button
             aria-label="Next period"
+            className={styles.periodButton}
             onClick={() =>
               setDate(
                 view === "month"
@@ -562,6 +588,13 @@ export default function CalendarWorkspace() {
             <UnigentamosIcon role="chevron-right" size={18} />
           </Button>
           <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} onChange={setDate} />
+        </div>
+        <div className={styles.draftSlot}>
+          {draft && !editor && <div className={styles.draftNotice}>
+            <UnigentamosIcon role="edit" size={14} /><span>Unsaved draft</span>
+            <Button onClick={() => setEditor(draft)} aria-label="Resume draft">Resume</Button>
+            <Button onClick={() => finishEditing()} aria-label="Discard draft" title="Discard draft" icon="close" />
+          </div>}
         </div>
         <div className="work-actions">
           <input
@@ -579,7 +612,7 @@ export default function CalendarWorkspace() {
           >
             {["day", "week", "month", "agenda"].map((v) => (
               <option key={v} value={v}>
-                {v[0].toUpperCase() + v.slice(1)}
+                <span className={styles.viewChoice}><UnigentamosIcon role={({ day: "today", week: "week", month: "calendar", agenda: "list" } as Record<string, string>)[v]} size={16} />{v[0].toUpperCase() + v.slice(1)}</span>
               </option>
             ))}
           </SelectField>
@@ -594,11 +627,11 @@ export default function CalendarWorkspace() {
                 collisionPadding={12}
               >
                 {[
-                  ["Show weekends", showWeekends, setShowWeekends],
-                  ["Show completed tasks", showCompleted, setShowCompleted],
-                  ["Widen today", widenToday, setWidenToday],
-                  ["Linked work and trips", showDated, setShowDated],
-                ].map(([label, checked, set]) => (
+                  ["Show weekends", showWeekends, setShowWeekends, "week"],
+                  ["Show completed tasks", showCompleted, setShowCompleted, "check"],
+                  ["Widen today", widenToday, setWidenToday, "today"],
+                  ["Linked work and trips", showDated, setShowDated, "link"],
+                ].map(([label, checked, set, icon]) => (
                   <label className={styles.calendarToggle} key={String(label)}>
                     <input
                       type="checkbox"
@@ -607,11 +640,11 @@ export default function CalendarWorkspace() {
                         (set as (v: boolean) => void)(e.target.checked)
                       }
                     />
-                    {String(label)}
+                    <UnigentamosIcon role={String(icon)} size={16} />{String(label)}
                   </label>
                 ))}
                 <label>
-                  Display time zone
+                  <span className={styles.viewChoice}><UnigentamosIcon role="clock" size={16} />Display time zone</span>
                   <input
                     value={zoneInput}
                     onChange={(e) => setZoneInput(e.target.value)}
@@ -639,49 +672,16 @@ export default function CalendarWorkspace() {
           </Popover.Root>
         </div>
       </div>
-      <div className={styles.calendarChips}>
-        {snapshot?.state.calendars
-          .filter((c) => !c.archivedAt)
-          .map((c) => (
-            <label className={styles.calendarToggle} key={c.id}>
-              <input
-                type="checkbox"
-                checked={c.visible}
-                disabled={busy}
-                onChange={() =>
-                  void action(
-                    () =>
-                      savePlanning(
-                        "calendars",
-                        { id: c.id, visible: !c.visible },
-                        c.updatedAt,
-                      ),
-                    "",
-                  )
-                }
-              />
-              <span style={{ background: calendarDisplayColor(c.color) }} />
-              {c.name}
-            </label>
-          ))}
-      </div>
       <WorkspaceFeedback
-        error={error || expanded.error}
+        error={error || expanded.error || holidayError}
         message={notice}
-        onRetry={error ? () => void refresh() : undefined}
+        onRetry={error || holidayError ? () => { void refresh(); setHolidayRetry(value => value + 1); } : undefined}
       />
       {snapshot?.persistence === "device" && (
         <p className={styles.contextNotice} role="status">
           Saved on this device. Pending changes will sync when your Vault
           reconnects.
         </p>
-      )}
-      {draft && !editor && (
-        <div className={styles.draftNotice}>
-          <span>Unsaved event draft</span>
-          <Button onClick={() => setEditor(draft)}>Resume draft</Button>
-          <Button onClick={() => finishEditing()}>Discard</Button>
-        </div>
       )}
       {snapshot?.state.events.some(
         (e) =>
@@ -862,6 +862,7 @@ export default function CalendarWorkspace() {
               now={now}
               events={occurrences}
               calendars={snapshot.state.calendars}
+              refs={snapshot.refs}
               dated={dated}
               widenToday={widenToday}
               early={early}
@@ -871,6 +872,7 @@ export default function CalendarWorkspace() {
               onCreate={create}
               onDay={setDayDetail}
               onOpen={(item) => {
+                if (item.system) { setObservance(item); return; }
                 const event = snapshot.state.events.find(
                   (e) => e.id === item.eventId,
                 );
@@ -1072,12 +1074,36 @@ export default function CalendarWorkspace() {
         )}
       </WorkspaceSheet>
       <WorkspaceSheet
+        open={Boolean(observance)} onClose={() => setObservance(undefined)} title={observance?.title || "Calendar date"}
+      >
+        {observance && <div className={styles.observanceDetail}>
+          <EventPeople refs={observance.linkedRefs} available={snapshot?.refs} limit={100} />
+          <p><UnigentamosIcon role={observance.system?.kind === "birthday" ? "birthday" : "star"} size={18} />{labelDate(observance.start, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
+          <p>{observance.system?.detail}</p>
+          {observance.ownerRef && <Link className="work-button" href={observance.ownerRef.route}>Open {observance.ownerRef.label}’s profile</Link>}
+          <Button icon="sliders" onClick={() => { setObservance(undefined); setCalendarTab(observance.system?.kind === "birthday" ? "calendars" : "holidays"); setConnections(true); }}>Manage {observance.system?.kind === "birthday" ? "birthdays" : "holidays & dates"}</Button>
+        </div>}
+      </WorkspaceSheet>
+      <WorkspaceSheet
         open={connections}
         onClose={() => setConnections(false)}
         title="Calendars and connections"
       >
-        <div className="work-form">
+        <div className={`work-form ${styles.calendarSettingsForm}`}>
           <WorkspaceFeedback error={error} message={notice} />
+          <div className={styles.settingsTabs} role="group" aria-label="Calendar settings sections">
+            <button type="button" aria-pressed={calendarTab === "calendars"} onClick={() => setCalendarTab("calendars")}><UnigentamosIcon role="calendar" size={16} />Calendars</button>
+            <button type="button" aria-pressed={calendarTab === "holidays"} onClick={() => setCalendarTab("holidays")}><UnigentamosIcon role="star" size={16} />Holidays & dates</button>
+          </div>
+          {calendarTab === "holidays" ? <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => action(() => savePlanning("calendars", { id: "native", observances: settings }, nativeCalendar?.updatedAt), "")} /> : <>
+          <section className={styles.calendarVisibility} aria-label="Visible calendars">
+            {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <label className={styles.calendarToggle} key={c.id}>
+              <input type="checkbox" checked={c.visible} disabled={busy} onChange={() => void action(() => savePlanning("calendars", { id: c.id, visible: !c.visible }, c.updatedAt), "")} />
+              <span className={styles.calendarDot} style={{ background: calendarDisplayColor(c.color) }} />{c.name}
+            </label>)}
+            <label className={styles.calendarToggle}><input type="checkbox" checked={observanceSettings.birthdays} disabled={busy} onChange={e => void action(() => savePlanning("calendars", { id: "native", observances: { ...observanceSettings, birthdays: e.target.checked } }, nativeCalendar?.updatedAt), "")} /><UnigentamosIcon role="birthday" size={16} />People’s birthdays</label>
+          </section>
+          <details className={styles.settingsDisclosure}><summary>Add a calendar</summary>
           <form
             className="work-form"
             onSubmit={(e) => {
@@ -1115,8 +1141,9 @@ export default function CalendarWorkspace() {
               Add calendar
             </Button>
           </form>
-          <section className="work-section">
-            <h2>Your calendars</h2>
+          </details>
+          <details className={styles.settingsDisclosure}>
+            <summary>Calendar names & colors</summary>
             {snapshot?.state.calendars
               .filter((calendar) => !calendar.archivedAt)
               .map((calendar) => (
@@ -1137,9 +1164,9 @@ export default function CalendarWorkspace() {
                   }
                 />
               ))}
-          </section>
-          <section className="work-section">
-            <h2>Import or subscribe</h2>
+          </details>
+          <details className={styles.settingsDisclosure}>
+            <summary>Import or subscribe</summary>
             <label>
               Name
               <input
@@ -1188,8 +1215,9 @@ export default function CalendarWorkspace() {
                 and feeds are available now.
               </p>
             )}
-          </section>
-          <section className="work-section">
+          </details>
+          </>}
+          {calendarTab === "calendars" && Boolean(snapshot?.state.connections.length) && <section className="work-section">
             <h2>Connections</h2>
             {snapshot?.state.connections.map((c) => (
               <div className={styles.connection} key={c.id}>
@@ -1281,7 +1309,7 @@ export default function CalendarWorkspace() {
                 )}
               </div>
             ))}
-          </section>
+          </section>}
         </div>
       </WorkspaceSheet>
       <SharedAIDock

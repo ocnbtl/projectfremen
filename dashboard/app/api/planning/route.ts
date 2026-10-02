@@ -82,6 +82,7 @@ export async function GET() {
             record.profile?.photoUrl ||
             record.resourceProfile?.metadata?.imageUrl ||
             "",
+          imageUpdatedAt: record.profile?.photoUpdatedAt,
           detail:
             [record.profile?.primaryOccupation, record.profile?.primaryEmployer]
               .filter(Boolean)
@@ -183,6 +184,7 @@ export async function GET() {
       ok: true,
       state,
       refs,
+      birthdays: records.filter(record => record.className === "person" && !record.archivedAt && record.profile?.birthday).map(record => ({ ref: refs.find(ref => ref.module === "people" && ref.objectId === record.id)!, birthday: record.profile!.birthday! })),
       trips: life?.trips || [],
       dated,
       sourceErrors: sources.flatMap((x, i) =>

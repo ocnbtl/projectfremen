@@ -3,6 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import PeopleObjectPicker, { objectTargetKey } from "../people/PeopleObjectPicker";
+import { PersonAvatar } from "./EventPeople";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 export default function RecordLinks({
   refs,
@@ -37,10 +38,10 @@ export default function RecordLinks({
         {refs.map((ref) => (
           <span key={key(ref)}>
             <Link href={ref.route}>
-              <UnigentamosIcon
+              {ref.module === "people" && ref.objectType === "person" ? <PersonAvatar person={available.find(x => x.module === "people" && x.objectId === ref.objectId) || ref} /> : <UnigentamosIcon
                 role={`module-${ref.module === "personal_ops" ? "personal" : ref.module}`}
                 size={16}
-              />
+              />}
               {ref.label}
             </Link>
             {onChange && (

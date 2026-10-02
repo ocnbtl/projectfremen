@@ -24,6 +24,7 @@ import {
 import { eventGroup } from "../../lib/modules/planning/calendar-groups";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import EventPeople from "./EventPeople";
 import styles from "./CalendarWorkspace.module.css";
 
 const minuteOf = (ms: number, zone: string) => {
@@ -39,6 +40,7 @@ export default function CalendarTimeGrid({
   now,
   events,
   calendars,
+  refs,
   dated,
   widenToday,
   early,
@@ -56,6 +58,7 @@ export default function CalendarTimeGrid({
   now: number;
   events: EventOccurrence[];
   calendars: Calendar[];
+  refs: PlanningSnapshot["refs"];
   dated: PlanningSnapshot["dated"];
   widenToday: boolean;
   early: boolean;
@@ -142,6 +145,7 @@ export default function CalendarTimeGrid({
           aria-expanded={early}
           onClick={() => setEarly(!early)}
         >
+          <UnigentamosIcon role="chevron-down" size={14} style={{ transform: early ? undefined : "rotate(180deg)" }} />
           {early ? "Hide" : "Show"} before 8 am
           {earlyEvents.length > 0 && (
             <b>
@@ -155,7 +159,7 @@ export default function CalendarTimeGrid({
           aria-label="Add an early event"
           onClick={() => onCreate(days.includes(today) ? today : days[0], 7)}
         >
-          + Early event
+          <UnigentamosIcon role="plus" size={13} />Early event
         </button>
       </div>
       <div
@@ -209,13 +213,14 @@ export default function CalendarTimeGrid({
                   {allDay.map(item => {
                     const calendar = calendars.find(c => c.id === item.calendarId),
                       group = eventGroup(calendar, item.groupId),
-                      color = group?.color || (calendar?.color?.toLowerCase() === "#565b86" ? "#59518B" : calendar?.color) || "#59518B";
+                      color = item.system ? (item.system.kind === "birthday" ? "#5A6040" : "#716B80") : group?.color || (calendar?.color?.toLowerCase() === "#565b86" ? "#59518B" : calendar?.color) || "#59518B";
                     return <motion.button type="button" key={item.id} layout="position" transition={{ layout: layoutTransition }}
                       className={styles.allDayItem} style={{ "--event-color": color } as CSSProperties}
                       aria-label={`${item.title} · All day${group ? ` · ${group.name}` : ""}`} title={`${item.title} · All day`}
                       onClick={() => onOpen(item)}>
-                      <UnigentamosIcon role={group?.icon || "interaction-date"} size={13} />
-                      <span>{item.title}</span>
+                      <UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={13} />
+                      <span className={styles.eventTitle}>{item.title}</span>
+                      <EventPeople refs={item.linkedRefs} available={refs} />
                     </motion.button>;
                   })}
                   {links.map(link => <Link key={link.id} className={styles.allDayItem}
@@ -399,6 +404,7 @@ export default function CalendarTimeGrid({
                             : bottom - top - 1,
                         ),
                         "--event-color": color,
+                        "--event-avatar-size": `${Math.max(8, Math.min(18, bottom - top - 7))}px`,
                       } as CSSProperties
                     }
                   >
@@ -416,8 +422,7 @@ export default function CalendarTimeGrid({
                       onClick={() => onOpen(item)}
                       aria-label={title}
                     >
-                      {group && <UnigentamosIcon role={group.icon} size={12} />}
-                      <strong>{item.title}</strong>
+                      <span className={styles.timedEventTitle}>{group && <UnigentamosIcon role={group.icon} size={12} />}<strong>{item.title}</strong><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
                       {bottom - top > 30 && (
                         <span>
                           {clock(from)}–{clock(until)}
@@ -516,6 +521,7 @@ export default function CalendarTimeGrid({
           aria-expanded={late}
           onClick={() => setLate(!late)}
         >
+          <UnigentamosIcon role="chevron-down" size={14} style={{ transform: late ? "rotate(180deg)" : undefined }} />
           {late ? "Hide" : "Show"} after 10 pm
           {lateEvents.length > 0 && (
             <b>
@@ -528,7 +534,7 @@ export default function CalendarTimeGrid({
           aria-label="Add a late event"
           onClick={() => onCreate(days.includes(today) ? today : days[0], 23)}
         >
-          + Late event
+          <UnigentamosIcon role="plus" size={13} />Late event
         </button>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { createNativeObjectRef } from "../../native-objects/routes";
+import { normalizeObservances } from "./observance-settings";
 import { isModuleId, type NativeObjectRef } from "../../native-objects/types";
 import type {
   PlanningCollection,
@@ -223,6 +224,7 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       name: string(raw.name, "Calendar name", 120, true),
       color,
       visible: raw.visible !== false,
+      ...(raw.observances !== undefined ? { observances: normalizeObservances(raw.observances) } : {}),
       ...(raw.groups !== undefined
         ? { groups: normalizeGroups(raw.groups) }
         : {}),

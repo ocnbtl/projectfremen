@@ -1041,6 +1041,48 @@ async function check(label, run) {
       assert.deepEqual(await response.json(), body);
     },
   );
+  await check("birthday projections include unknown years and cross-year ranges without moving leap days", () => {
+    const { calendarObservances, defaultObservances } = require("../lib/modules/planning/observances.ts");
+    const person = { module: "people", objectType: "person", objectId: "person-1", label: "Alex", route: "/admin/people/person-1" };
+    const birthdays = [{ ref: person, birthday: "--01-01" }, { ref: { ...person, objectId: "leap" }, birthday: "2000-02-29" }, { ref: { ...person, objectId: "bad" }, birthday: "--02-31" }];
+    const found = calendarObservances(birthdays, [], defaultObservances(), "2026-12-28", "2027-01-04", "America/Los_Angeles");
+    assert.equal(found.length, 1); assert.equal(found[0].start, "2027-01-01"); assert.equal(found[0].end, "2027-01-02"); assert.equal(found[0].ownerRef.route, person.route); assert.equal(found[0].linkedRefs[0].objectId, person.objectId);
+    assert.equal(calendarObservances(birthdays.slice(1), [], defaultObservances(), "2027-02-01", "2027-03-02", "UTC").length, 0);
+    assert.equal(calendarObservances(birthdays.slice(1), [], defaultObservances(), "2028-02-01", "2028-03-02", "UTC")[0].start, "2028-02-29");
+    assert.equal(calendarObservances(birthdays, [], { ...defaultObservances(), birthdays: false }, "2026-12-28", "2027-01-04", "UTC").length, 0);
+  });
+  await check("country holidays retain calendar dates, observed dates and individual visibility", () => {
+    const { holidayCatalog } = require("../lib/modules/planning/holiday-catalog.ts");
+    const { calendarObservances, defaultObservances } = require("../lib/modules/planning/observances.ts");
+    const catalog = holidayCatalog(["US", "CA"], [2026]); assert(catalog.countries.length >= 200);
+    const independence = catalog.holidays.filter(x => x.country === "US" && x.name.startsWith("Independence Day"));
+    assert.deepEqual(independence.map(x => x.date), ["2026-07-03", "2026-07-04"]);
+    const tax = catalog.holidays.find(x => x.country === "US" && x.name === "Tax Day");
+    const defaults = calendarObservances([], catalog.holidays, defaultObservances(), "2026-01-01", "2027-01-01", "Pacific/Auckland");
+    assert(!defaults.some(x => x.title === "Tax Day")); assert(!defaults.some(x => x.system.country === "CA"));
+    const enabled = calendarObservances([], catalog.holidays, { ...defaultObservances(), countries: ["US", "CA"], hiddenHolidays: [independence[0].key], extraHolidays: [tax.key] }, "2026-01-01", "2027-01-01", "Pacific/Auckland");
+    assert(enabled.some(x => x.title === "Tax Day")); assert(enabled.some(x => x.system.country === "CA")); assert(!enabled.some(x => x.title.startsWith("Independence Day")));
+    assert.equal(enabled.find(x => x.title === "Halloween").start, "2026-10-31");
+  });
+  await check("custom dates preserve annual versus one-time behavior and exclusion boundaries", () => {
+    const { calendarObservances, defaultObservances } = require("../lib/modules/planning/observances.ts");
+    const settings = { ...defaultObservances(), custom: [{ id: "annual", title: "Annual deadline", date: "2025-10-02", annual: true, visible: true }, { id: "once", title: "One time", date: "2025-10-02", annual: false, visible: true }, { id: "hidden", title: "Hidden", date: "2026-10-02", annual: true, visible: false }] };
+    const found = calendarObservances([], [], settings, "2026-10-02", "2026-10-03", "America/New_York"); assert.deepEqual(found.map(x => x.title), ["Annual deadline"]);
+    assert.equal(calendarObservances([], [], settings, "2026-10-03", "2026-10-04", "UTC").length, 0);
+  });
+  await check("observance settings reject malformed dates and retain canonical conflict protection", async () => {
+    const { defaultObservances } = require("../lib/modules/planning/observances.ts");
+    const { normalizeObservances } = require("../lib/modules/planning/observance-settings.ts");
+    const settings = { ...defaultObservances(), countries: ["US", "CA"], custom: [{ id: "tax", title: "My deadline", date: "2026-04-15", annual: true, visible: true }] };
+    assert.throws(() => normalizeObservances({ ...settings, countries: ["bad"] }));
+    assert.throws(() => normalizeObservances({ ...settings, custom: [{ ...settings.custom[0], date: "2026-02-31" }] }));
+    assert.throws(() => normalizeObservances({ ...settings, custom: [settings.custom[0], settings.custom[0]] }));
+    const state = await readPlanningState(), native = state.calendars.find(x => x.id === "native");
+    const saved = await savePlanningRecord("calendars", { id: "native", observances: settings }, native.updatedAt);
+    assert.deepEqual(saved.observances, settings); assert.deepEqual((await readPlanningState()).calendars.find(x => x.id === "native").observances, settings);
+    await assert.rejects(() => savePlanningRecord("calendars", { id: "native", observances: defaultObservances() }, native.updatedAt), /changed elsewhere/);
+    const { planningWritableKeys } = require("../lib/modules/planning/ownership.ts"); assert(planningWritableKeys("calendars").includes("observances"));
+  });
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );

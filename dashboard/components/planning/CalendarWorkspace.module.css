@@ -293,7 +293,7 @@
   display: flex;
   align-items: center;
   gap: 8px;
-  margin: 0 24px 12px;
+  margin: 0;
   font-size: 0.8125rem;
 }
 .sourceChanges {
@@ -513,7 +513,7 @@
 }
 .hoursEdge {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   flex: 0 0 30px;
   gap: 6px;
 }
@@ -688,11 +688,12 @@
   font-weight: 500;
   white-space: nowrap;
 }
-.fittedEvent span {
+.fittedEvent > button:first-child > span:not(.timedEventTitle) {
   display: block;
   font-size: 10px;
   margin-top: 3px;
 }
+
 .fittedResize {
   position: absolute;
   bottom: 0;
@@ -1129,4 +1130,90 @@
     font-size: 10px;
     padding-inline: 2px;
   }
+}
+
+/* People belong to the event, with the same quiet identity treatment in every view. */
+.personAvatar { display: inline-flex; align-items: center; justify-content: center; flex: 0 0 var(--avatar-size, 22px); width: var(--avatar-size, 22px); height: var(--avatar-size, 22px); min-width: var(--avatar-size, 22px); border-radius: 50%; overflow: hidden; background: #e4e8d8; color: #4b5236; box-shadow: 0 0 0 1.5px white; font: 600 9px/1 var(--font-body); vertical-align: middle; }
+.personAvatar img { width: 100%; height: 100%; object-fit: cover; border-radius: inherit; }
+.personAvatar > span { font: inherit; margin: 0; }
+.eventPeople { display: inline-flex; flex: none; align-items: center; max-width: 100%; margin: 0 0 0 auto; padding-left: 3px; }
+.eventPeople > span + span { margin-left: -5px; }
+.morePeople { display: inline-grid; place-items: center; height: var(--avatar-size, 22px); min-width: var(--avatar-size, 22px); border-radius: 50%; background: #f3f2f9; color: #59518b; font: 600 9px/1 var(--font-body); box-shadow: 0 0 0 1.5px white; }
+.allDayItem { align-items: center; flex-wrap: wrap; }
+.allDayItem .eventTitle { flex: 1; min-width: 30px; }
+.allDayItem .eventPeople { --avatar-size: 20px; }
+.fittedEvent > button:first-child { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; }
+.fittedEvent .timedEventTitle { display: flex; align-items: center; gap: 4px; min-width: 0; margin: 0; font: inherit; line-height: 1; }
+.timedEventTitle > strong { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; }
+.timedEventTitle .eventPeople { --avatar-size: var(--event-avatar-size, 16px); }
+.timedEventTitle .personAvatar { font-size: 7px; }
+.agendaEvent .eventPeople { margin: 4px 0; }
+.observanceDetail { display: grid; gap: 16px; font: 400 13px/1.6 var(--font-body); }
+.observanceDetail > .eventPeople { --avatar-size: 40px; margin: 0; }
+.observanceDetail p { margin: 0; display: flex; gap: 8px; align-items: center; }
+.observanceDetail .personAvatar { font-size: 14px; }
+
+/* A stable toolbar reserves a draft slot at every breakpoint. */
+.toolbar { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; }
+.draftSlot { min-width: 0; min-height: 40px; }
+.draftNotice { height: 40px; padding: 0 10px; font-size: 11px; color: #716b80; gap: 6px; white-space: nowrap; }
+.draftNotice :global(.work-button) { min-height: 30px; height: 30px; padding: 4px 7px; font-size: 11px; border: 0; background: transparent; }
+.dateNavigation .periodButton { display: grid; place-items: center; width: 40px; min-width: 40px; height: 40px; padding: 0; line-height: 1; }
+.dateNavigation .periodButton svg { display: block; margin: 0; }
+.viewChoice { display: inline-flex; align-items: center; gap: 8px; }
+.search { font-size: 13px; }
+.calendarPopover input:not([type="checkbox"]) { font: 400 12px/1.5 var(--font-body); }
+.eventForm input:not([type="checkbox"]):not([type="color"]), .eventForm textarea, .eventForm :global(.app-select-trigger), .calendarSettingsForm input:not([type="checkbox"]):not([type="color"]), .calendarSettingsForm :global(.app-select-trigger) { font: 400 13px/1.5 var(--font-body); }
+.eventForm label, .calendarSettingsForm label { font-size: 12px; }
+.eventForm textarea::placeholder, .eventForm input::placeholder, .search::placeholder { font-size: 12px; }
+.eventForm .inlineFields input[type="number"] { font-size: 13px; }
+.hoursEdge { gap: 4px; padding-right: 0; }
+.hoursEdge > button { border-radius: 6px; }
+.hoursEdge > button:hover { background: #f3f2f9; }
+.hoursEdge > button + button { color: #716b80; margin-left: 4px; }
+.hoursEdge > button + button::before { content: ""; width: 1px; height: 12px; background: #ddd9e8; margin-right: 6px; }
+.settingsTabs { display: flex; padding: 4px; gap: 4px; border-radius: 9px; background: #f3f2f9; }
+.settingsTabs button { flex: 1; display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 38px; padding: 6px 10px; border: 0; border-radius: 6px; color: #716b80; background: transparent; font: 500 12px/1.4 var(--font-body); cursor: pointer; }
+.settingsTabs button[aria-pressed="true"] { background: white; color: #59518b; box-shadow: 0 1px 4px #23383f0d; }
+.calendarVisibility { display: grid; gap: 4px; }
+.calendarVisibility .calendarToggle { flex-direction: row; justify-content: flex-start; min-height: 40px; font-size: 13px; }
+.calendarDot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.settingsDisclosure { padding-block: 8px; }
+.settingsDisclosure > summary { cursor: pointer; font: 500 13px/1.5 var(--font-body); padding-block: 8px; color: #59518b; }
+.settingsDisclosure > form { padding-top: 12px; }
+.observanceSettings { display: grid; gap: 28px; }
+.observanceSettings section { display: grid; gap: 12px; }
+.observanceSettings h3 { display: flex; align-items: center; gap: 8px; margin: 0; font: 600 14px/1.5 var(--font-body); }
+.observanceSettings p { margin: 0; color: #716b80; font: 400 12px/1.6 var(--font-body); }
+.countryPicker { display: flex; gap: 8px; align-items: center; }
+.countryPicker > :global(.app-select-trigger) { flex: 1; min-width: 0; }
+.holidayCountry { background: #fbfafc; border-radius: 8px; padding: 8px 12px; }
+.holidayCountry summary { cursor: pointer; display: flex; gap: 8px; align-items: center; min-height: 36px; font: 500 13px/1.4 var(--font-body); }
+.holidayCountry summary > span { margin-left: auto; font-size: 11px; color: #716b80; }
+.holidayCountry[open] summary > svg { transform: rotate(90deg); }
+.holidayList { display: grid; gap: 2px; max-height: 340px; overflow-y: auto; overscroll-behavior: contain; padding: 4px 0 12px; }
+.holidayChoice, .customDateRow > label { display: flex !important; flex-direction: row !important; align-items: center; justify-content: flex-start; gap: 10px; min-height: 40px; font: 400 12px/1.5 var(--font-body); cursor: pointer; }
+.holidayChoice input, .customDateRow input, .calendarVisibility input { width: 16px !important; min-height: 16px !important; height: 16px; margin: 0; flex: none; accent-color: #59518b; }
+.holidayChoice small, .customDateRow small { display: block; color: #716b80; font-size: 11px; }
+.holidaySource a { color: #59518b; }
+.observanceHeading, .customDateRow { display: flex; align-items: center; gap: 8px; }
+.observanceHeading { justify-content: space-between; }
+.customDateRow > label { flex: 1; min-width: 0; }
+.customDateRow :global(.work-button) { padding: 6px; width: 34px; min-width: 34px; }
+.customDateForm { padding: 16px; background: #f3f2f9; border-radius: 10px; }
+@media (max-width: 1250px) {
+  .toolbar { grid-template-columns: 1fr auto; }
+  .draftSlot { grid-column: 1 / -1; grid-row: 2; min-height: 32px; }
+  .draftNotice { height: 32px; padding-inline: 0; }
+}
+@media (max-width: 760px) {
+  .toolbar { grid-template-columns: minmax(0, 1fr); gap: 4px; }
+  .draftSlot { grid-row: 3; }
+  .toolbar .dateNavigation { justify-content: flex-start; }
+  .dateNavigation .periodButton { width: 36px; min-width: 36px; height: 36px; }
+  .toolbar :global(.work-actions) { justify-content: flex-start; }
+  .hoursEdge { padding-right: 0; }
+  .hoursEdge > button { gap: 4px; font-size: 10px; }
+  .hoursEdge > button + button { margin-left: 0; }
+  .eventForm input:not([type="checkbox"]):not([type="color"]), .eventForm textarea, .calendarSettingsForm input:not([type="checkbox"]):not([type="color"]) { font-size: 16px; } /* Avoid Safari focus zoom. */
 }

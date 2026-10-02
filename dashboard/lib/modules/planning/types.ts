@@ -16,11 +16,19 @@ export type Place = PlanningBase & {
   linkedRefs: NativeObjectRef[];
 };
 export type EventGroup = { id: string; name: string; color: string; icon: string };
+export type CalendarObservanceSettings = {
+  birthdays: boolean;
+  countries: string[];
+  hiddenHolidays: string[];
+  extraHolidays: string[];
+  custom: { id: string; title: string; date: string; annual: boolean; visible: boolean }[];
+};
 export type Calendar = PlanningBase & {
   name: string;
   color: string;
   visible: boolean;
   groups?: EventGroup[];
+  observances?: CalendarObservanceSettings;
   connectionId?: string;
   externalId?: string;
   accountId?: string;
@@ -109,6 +117,7 @@ export type EventOccurrence = EventFields & {
   source?: CalendarEvent["source"];
   overridden: boolean;
   ownerRef?: NativeObjectRef;
+  system?: { kind: "birthday" | "holiday" | "custom"; key: string; detail: string; country?: string };
 };
 export const PLANNING_COLLECTIONS = [
   "places",
