@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
 import { isCsrfRequestValid } from "../../../lib/csrf";
 import { privateJsonStream } from "../../../lib/modules/planning/json-stream";
+import { worldRegions } from "../../../lib/modules/planning/world-regions";
 import {
   demographics,
   routeStops,
@@ -20,7 +21,9 @@ export async function GET(request: Request) {
     const params = new URL(request.url).searchParams;
     const data =
       params.get("operation") === "demographics"
-        ? await demographics(
+        ? params.get("metric")?.startsWith("regional-")
+          ? await worldRegions(params.get("metric")!, params.get("level") || "state", params.get("country") || "")
+          : await demographics(
             params.get("metric") || "world-population",
             params.get("level") || "state",
             params.get("state") || "",

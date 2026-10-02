@@ -10,16 +10,17 @@ import {
   type MapData,
 } from "../../lib/modules/planning/map-analysis";
 import styles from "./MapWorkspace.module.css";
+import countryCatalog from "../../data/map/world-regions-catalog.json";
+import { STATE_FLAGS } from "../../lib/modules/planning/map-flags";
 export type AnalysisResult = NonNullable<ReturnType<typeof mapAnalysis>> & {
   label: string;
   data: MapData[];
   scale: string;
 };
-const levels = ["country", "state", "county", "place", "tract"],
-  labels = ["Country", "State", "County", "City / town", "Tract"];
+const usLevels = ["country", "state", "county", "place", "tract"];
 const format = (value: number) =>
   new Intl.NumberFormat(undefined, {
-    notation: value >= 1000000 ? "compact" : "standard",
+    notation: value >= 10000 ? "compact" : "standard",
     maximumFractionDigits: 1,
   }).format(value);
 
@@ -50,9 +51,16 @@ export default function MapDataExplorer({
   const [sort, setSort] = useState("value"),
     [onlyMatches, setOnlyMatches] = useState(false),
     [page, setPage] = useState(0);
+  const countryCode = settings.countryCode || "USA";
+  const international = countryCode !== "USA";
+  const levels = international ? usLevels.slice(0, 3) : usLevels;
+  const labels = international ? ["Country", "Province / state", "District / county"] : ["Country", "State", "County", "City / town", "Tract"];
+  const territory = countryCatalog.find((c) => c.code === countryCode);
+  const coverage = territory?.levels[level === "state" ? "1" : "2"];
   const key = JSON.stringify([
       level,
       state,
+      countryCode,
       settings.metrics.map((m) => m.metric),
     ]),
     currentKey = useRef(key),
@@ -62,6 +70,7 @@ export default function MapDataExplorer({
   const country = level === "country",
     available = country
       ? ["world-population", "world-density"]
+      : international ? ["regional-population", "regional-density"]
       : ["population", "age", "income"];
   const invalidRange = settings.metrics.some(
     (m) => m.min !== undefined && m.max !== undefined && m.min > m.max,
@@ -92,7 +101,7 @@ export default function MapDataExplorer({
     if (nextCountry !== country)
       onSettings({
         ...settings,
-        metrics: [{ metric: nextCountry ? "world-population" : "population" }],
+        metrics: [{ metric: nextCountry ? "world-population" : international ? "regional-population" : "population" }],
       });
     setError("");
   }
@@ -105,7 +114,7 @@ export default function MapDataExplorer({
       const loaded = await Promise.all(
         settings.metrics.map(async ({ metric }) => {
           const response = await fetch(
-            `/api/map?${new URLSearchParams({ operation: "demographics", metric, level, state })}`,
+            `/api/map?${new URLSearchParams({ operation: "demographics", metric, level, state, country: countryCode })}`,
           );
           const body = await response.json();
           if (!response.ok || !body.ok)
@@ -142,12 +151,32 @@ export default function MapDataExplorer({
       <h2>Explore data</h2>
       <div className={styles.explorerForm}>
         <label>
+          Country or territory
+          <SelectField aria-label="Data country" searchable value={country ? "WORLD" : countryCode}
+            onChange={(e) => {
+              const next = e.target.value;
+              onLevel(next === "WORLD" ? "country" : "state");
+              onState("");
+              onSettings({ ...settings, countryCode: next === "WORLD" ? countryCode : next,
+                metrics: [{ metric: next === "WORLD" ? "world-population" : next === "USA" ? "population" : "regional-population" }] });
+              setError("");
+            }}>
+            <option value="WORLD">All countries · World overview</option>
+            {countryCatalog.map((c) => <option key={c.code} value={c.code}>
+              <span className={styles.flagOption}>
+                {/^[A-Z]{2}$/.test(c.iso2 || "") && <svg width="24" height="16" viewBox="0 0 513 342" aria-hidden="true"><use href={`/country-flags.svg#flag-${c.iso2}`} /></svg>}
+                <span>{c.name}{c.code !== "USA" && !c.levels["2"]?.available ? " · boundaries only" : ""}</span>
+              </span>
+            </option>)}
+          </SelectField>
+        </label>
+        <label>
           Detail <strong>{labels[levels.indexOf(level)]}</strong>
           <input
             aria-label="Geographic detail"
             type="range"
             min={0}
-            max={4}
+            max={levels.length - 1}
             step={1}
             value={Math.max(0, levels.indexOf(level))}
             aria-valuetext={labels[levels.indexOf(level)]}
@@ -169,20 +198,31 @@ export default function MapDataExplorer({
         <small className="work-muted">
           {country
             ? "World countries · World Bank"
+            : international ? `${territory?.name} · WorldPop estimates, 2020`
             : "United States · Census ACS five-year estimates"}
         </small>
-        {!country && level !== "state" && (
+        {!country && international && <small className={styles.coverageNote}>
+          {coverage?.available || 0} of {coverage?.regions || 0} regions have population estimates.
+          {" "}State/province and district/county equivalents follow each country’s administrative system. City and tract data are currently U.S. only.
+        </small>}
+        {!country && !international && level !== "state" && (
           <label>
             State or territory
             <SelectField
               aria-label="Data state"
+              searchable
               value={state}
               onChange={(e) => onState(e.target.value)}
             >
               <option value="">Choose a state</option>
               {states.map(([value, label]) => (
                 <option key={value} value={value}>
-                  {label}
+                  <span className={styles.flagOption}>
+                    {/* Static local flags avoid third-party image requests. */}
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={`/map-flags/${STATE_FLAGS[value]}.${value === "11" ? "svg" : "png"}`} width="24" height="16" alt="" />
+                    <span>{label}</span>
+                  </span>
                 </option>
               ))}
             </SelectField>
@@ -238,7 +278,7 @@ export default function MapDataExplorer({
           disabled={
             invalidRange ||
             !settings.metrics.length ||
-            (!country && level !== "state" && !state)
+            (!country && !international && level !== "state" && !state)
           }
           onClick={() => void load()}
         >
@@ -319,6 +359,7 @@ export default function MapDataExplorer({
                 <option value="linear">Equal numeric ranges</option>
               </SelectField>
             </label>
+            <small className="work-muted">Balanced bands make regional differences easier to see. Use density to compare population concentration across differently sized regions.</small>
           </>
         )}
         {result && (
@@ -407,6 +448,7 @@ export function MapDataLegend({ result }: { result: AnalysisResult }) {
       <span>
         {result.data[0].geography} · {result.unit}
       </span>
+      <span>{result.data[0].period}</span>
       <div>
         {MAP_COLORS.map((color, i) => (
           <i
@@ -423,7 +465,7 @@ export function MapDataLegend({ result }: { result: AnalysisResult }) {
       </div>
       <small>
         {result.scale === "quantile" ? "Balanced bands" : "Equal ranges"} ·{" "}
-        {result.matched} matching regions
+        {result.matched} matching regions · Gray: no data
       </small>
     </aside>
   );

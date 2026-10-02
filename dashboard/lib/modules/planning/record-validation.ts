@@ -321,6 +321,7 @@ function normalizeAnalysis(value: unknown) {
     throw new Error("Choose up to three data layers");
   const seen = new Set<string>();
   return {
+    ...(raw.countryCode && /^[A-Z]{3}$/.test(raw.countryCode) ? { countryCode: raw.countryCode } : {}),
     match: raw.match === "any" ? "any" : "all",
     scale: raw.scale === "linear" ? "linear" : "quantile",
     metrics: raw.metrics.map((m) => {
@@ -329,6 +330,8 @@ function normalizeAnalysis(value: unknown) {
         ![
           "world-population",
           "world-density",
+          "regional-population",
+          "regional-density",
           "population",
           "age",
           "income",

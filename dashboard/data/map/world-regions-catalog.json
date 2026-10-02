@@ -1,0 +1,3677 @@
+[
+  {
+    "code": "AFG",
+    "iso2": "AF",
+    "name": "Afghanistan",
+    "levels": {
+      "2": {
+        "regions": 398,
+        "available": 398
+      },
+      "1": {
+        "regions": 34,
+        "available": 34
+      }
+    }
+  },
+  {
+    "code": "ALB",
+    "iso2": "AL",
+    "name": "Albania",
+    "levels": {
+      "2": {
+        "regions": 61,
+        "available": 58
+      },
+      "1": {
+        "regions": 12,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "DZA",
+    "iso2": "DZ",
+    "name": "Algeria",
+    "levels": {
+      "2": {
+        "regions": 1541,
+        "available": 1541
+      },
+      "1": {
+        "regions": 48,
+        "available": 48
+      }
+    }
+  },
+  {
+    "code": "ASM",
+    "iso2": "AS",
+    "name": "American Samoa (U.S.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "AND",
+    "iso2": "AD",
+    "name": "Andorra",
+    "levels": {
+      "2": {
+        "regions": 7,
+        "available": 7
+      },
+      "1": {
+        "regions": 7,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "AGO",
+    "iso2": "AO",
+    "name": "Angola",
+    "levels": {
+      "2": {
+        "regions": 326,
+        "available": 147
+      },
+      "1": {
+        "regions": 21,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "AIA",
+    "iso2": "AI",
+    "name": "Anguilla (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 14,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "ATG",
+    "iso2": "AG",
+    "name": "Antigua and Barbuda",
+    "levels": {
+      "2": {
+        "regions": 8,
+        "available": 0
+      },
+      "1": {
+        "regions": 8,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "EGY",
+    "iso2": "EG",
+    "name": "Arab Republic of Egypt",
+    "levels": {
+      "2": {
+        "regions": 342,
+        "available": 342
+      },
+      "1": {
+        "regions": 27,
+        "available": 27
+      }
+    }
+  },
+  {
+    "code": "ARG",
+    "iso2": "AR",
+    "name": "Argentina",
+    "levels": {
+      "2": {
+        "regions": 525,
+        "available": 525
+      },
+      "1": {
+        "regions": 24,
+        "available": 24
+      }
+    }
+  },
+  {
+    "code": "ARM",
+    "iso2": "AM",
+    "name": "Armenia",
+    "levels": {
+      "2": {
+        "regions": 40,
+        "available": 40
+      },
+      "1": {
+        "regions": 11,
+        "available": 11
+      }
+    }
+  },
+  {
+    "code": "ABW",
+    "iso2": "AW",
+    "name": "Aruba (Neth.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "AUS",
+    "iso2": "AU",
+    "name": "Australia",
+    "levels": {
+      "2": {
+        "regions": 566,
+        "available": 565
+      },
+      "1": {
+        "regions": 11,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "AUT",
+    "iso2": "AT",
+    "name": "Austria",
+    "levels": {
+      "2": {
+        "regions": 100,
+        "available": 100
+      },
+      "1": {
+        "regions": 9,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "AZE",
+    "iso2": "AZ",
+    "name": "Azerbaijan",
+    "levels": {
+      "2": {
+        "regions": 74,
+        "available": 14
+      },
+      "1": {
+        "regions": 14,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "BHR",
+    "iso2": "BH",
+    "name": "Bahrain",
+    "levels": {
+      "2": {
+        "regions": 12,
+        "available": 12
+      },
+      "1": {
+        "regions": 12,
+        "available": 12
+      }
+    }
+  },
+  {
+    "code": "BGD",
+    "iso2": "BD",
+    "name": "Bangladesh",
+    "levels": {
+      "2": {
+        "regions": 64,
+        "available": 64
+      },
+      "1": {
+        "regions": 8,
+        "available": 8
+      }
+    }
+  },
+  {
+    "code": "BRB",
+    "iso2": "BB",
+    "name": "Barbados",
+    "levels": {
+      "2": {
+        "regions": 11,
+        "available": 11
+      },
+      "1": {
+        "regions": 11,
+        "available": 11
+      }
+    }
+  },
+  {
+    "code": "BLR",
+    "iso2": "BY",
+    "name": "Belarus",
+    "levels": {
+      "2": {
+        "regions": 119,
+        "available": 119
+      },
+      "1": {
+        "regions": 7,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "BEL",
+    "iso2": "BE",
+    "name": "Belgium",
+    "levels": {
+      "2": {
+        "regions": 11,
+        "available": 11
+      },
+      "1": {
+        "regions": 3,
+        "available": 3
+      }
+    }
+  },
+  {
+    "code": "BLZ",
+    "iso2": "BZ",
+    "name": "Belize",
+    "levels": {
+      "2": {
+        "regions": 6,
+        "available": 6
+      },
+      "1": {
+        "regions": 6,
+        "available": 6
+      }
+    }
+  },
+  {
+    "code": "BEN",
+    "iso2": "BJ",
+    "name": "Benin",
+    "levels": {
+      "2": {
+        "regions": 77,
+        "available": 77
+      },
+      "1": {
+        "regions": 12,
+        "available": 12
+      }
+    }
+  },
+  {
+    "code": "BMU",
+    "iso2": "BM",
+    "name": "Bermuda (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "BTN",
+    "iso2": "BT",
+    "name": "Bhutan",
+    "levels": {
+      "2": {
+        "regions": 205,
+        "available": 205
+      },
+      "1": {
+        "regions": 20,
+        "available": 20
+      }
+    }
+  },
+  {
+    "code": "BOL",
+    "iso2": "BO",
+    "name": "Bolivia",
+    "levels": {
+      "2": {
+        "regions": 113,
+        "available": 113
+      },
+      "1": {
+        "regions": 9,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "BES",
+    "iso2": "BQ",
+    "name": "Bonaire (Neth.)",
+    "levels": {
+      "2": {
+        "regions": 3,
+        "available": 0
+      },
+      "1": {
+        "regions": 3,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "BIH",
+    "iso2": "BA",
+    "name": "Bosnia and Herzegovina",
+    "levels": {
+      "2": {
+        "regions": 81,
+        "available": 80
+      },
+      "1": {
+        "regions": 3,
+        "available": 2
+      }
+    }
+  },
+  {
+    "code": "BWA",
+    "iso2": "BW",
+    "name": "Botswana",
+    "levels": {
+      "2": {
+        "regions": 10,
+        "available": 10
+      },
+      "1": {
+        "regions": 10,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "BVT",
+    "iso2": "BV",
+    "name": "Bouvet Island (Nor.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "BRA",
+    "iso2": "BR",
+    "name": "Brazil",
+    "levels": {
+      "2": {
+        "regions": 5506,
+        "available": 5506
+      },
+      "1": {
+        "regions": 27,
+        "available": 27
+      }
+    }
+  },
+  {
+    "code": "VGB",
+    "iso2": "VG",
+    "name": "British Virgin Islands (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 5,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "BRN",
+    "iso2": "BN",
+    "name": "Brunei Darussalam",
+    "levels": {
+      "2": {
+        "regions": 38,
+        "available": 38
+      },
+      "1": {
+        "regions": 4,
+        "available": 4
+      }
+    }
+  },
+  {
+    "code": "BGR",
+    "iso2": "BG",
+    "name": "Bulgaria",
+    "levels": {
+      "2": {
+        "regions": 262,
+        "available": 262
+      },
+      "1": {
+        "regions": 28,
+        "available": 28
+      }
+    }
+  },
+  {
+    "code": "BFA",
+    "iso2": "BF",
+    "name": "Burkina Faso",
+    "levels": {
+      "2": {
+        "regions": 45,
+        "available": 45
+      },
+      "1": {
+        "regions": 13,
+        "available": 13
+      }
+    }
+  },
+  {
+    "code": "BDI",
+    "iso2": "BI",
+    "name": "Burundi",
+    "levels": {
+      "2": {
+        "regions": 42,
+        "available": 10
+      },
+      "1": {
+        "regions": 5,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "CPV",
+    "iso2": "CV",
+    "name": "Cabo Verde",
+    "levels": {
+      "2": {
+        "regions": 32,
+        "available": 32
+      },
+      "1": {
+        "regions": 22,
+        "available": 22
+      }
+    }
+  },
+  {
+    "code": "KHM",
+    "iso2": "KH",
+    "name": "Cambodia",
+    "levels": {
+      "2": {
+        "regions": 198,
+        "available": 198
+      },
+      "1": {
+        "regions": 26,
+        "available": 26
+      }
+    }
+  },
+  {
+    "code": "CMR",
+    "iso2": "CM",
+    "name": "Cameroon",
+    "levels": {
+      "2": {
+        "regions": 58,
+        "available": 58
+      },
+      "1": {
+        "regions": 10,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "CAN",
+    "iso2": "CA",
+    "name": "Canada",
+    "levels": {
+      "2": {
+        "regions": 295,
+        "available": 292
+      },
+      "1": {
+        "regions": 13,
+        "available": 11
+      }
+    }
+  },
+  {
+    "code": "CYM",
+    "iso2": "KY",
+    "name": "Cayman Islands (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 3,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "CAF",
+    "iso2": "CF",
+    "name": "Central African Republic",
+    "levels": {
+      "2": {
+        "regions": 72,
+        "available": 14
+      },
+      "1": {
+        "regions": 17,
+        "available": 2
+      }
+    }
+  },
+  {
+    "code": "TCD",
+    "iso2": "TD",
+    "name": "Chad",
+    "levels": {
+      "2": {
+        "regions": 70,
+        "available": 70
+      },
+      "1": {
+        "regions": 23,
+        "available": 23
+      }
+    }
+  },
+  {
+    "code": "CHL",
+    "iso2": "CL",
+    "name": "Chile",
+    "levels": {
+      "2": {
+        "regions": 54,
+        "available": 51
+      },
+      "1": {
+        "regions": 16,
+        "available": 15
+      }
+    }
+  },
+  {
+    "code": "CHN",
+    "iso2": "CN",
+    "name": "China",
+    "levels": {
+      "2": {
+        "regions": 340,
+        "available": 339
+      },
+      "1": {
+        "regions": 32,
+        "available": 31
+      }
+    }
+  },
+  {
+    "code": "CXR",
+    "iso2": "CX",
+    "name": "Christmas Island (Aus.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "CPT",
+    "iso2": "CP",
+    "name": "Clipperton Island (Fr.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "CCK",
+    "iso2": "CC",
+    "name": "Cocos (Keeling) Islands (Aus.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "COL",
+    "iso2": "CO",
+    "name": "Colombia",
+    "levels": {
+      "2": {
+        "regions": 1122,
+        "available": 1122
+      },
+      "1": {
+        "regions": 33,
+        "available": 33
+      }
+    }
+  },
+  {
+    "code": "COM",
+    "iso2": "KM",
+    "name": "Comoros",
+    "levels": {
+      "2": {
+        "regions": 3,
+        "available": 3
+      },
+      "1": {
+        "regions": 3,
+        "available": 3
+      }
+    }
+  },
+  {
+    "code": "COG",
+    "iso2": "CG",
+    "name": "Congo",
+    "levels": {
+      "2": {
+        "regions": 89,
+        "available": 89
+      },
+      "1": {
+        "regions": 12,
+        "available": 12
+      }
+    }
+  },
+  {
+    "code": "COK",
+    "iso2": "CK",
+    "name": "Cook Islands (N.Z.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "CRI",
+    "iso2": "CR",
+    "name": "Costa Rica",
+    "levels": {
+      "2": {
+        "regions": 82,
+        "available": 82
+      },
+      "1": {
+        "regions": 7,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "HRV",
+    "iso2": "HR",
+    "name": "Croatia",
+    "levels": {
+      "2": {
+        "regions": 21,
+        "available": 21
+      },
+      "1": {
+        "regions": 21,
+        "available": 21
+      }
+    }
+  },
+  {
+    "code": "CUB",
+    "iso2": "CU",
+    "name": "Cuba",
+    "levels": {
+      "2": {
+        "regions": 169,
+        "available": 168
+      },
+      "1": {
+        "regions": 16,
+        "available": 15
+      }
+    }
+  },
+  {
+    "code": "CUW",
+    "iso2": "CW",
+    "name": "Curaçao (Neth.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "CYP",
+    "iso2": "CY",
+    "name": "Cyprus",
+    "levels": {
+      "2": {
+        "regions": 6,
+        "available": 6
+      },
+      "1": {
+        "regions": 6,
+        "available": 6
+      }
+    }
+  },
+  {
+    "code": "CZE",
+    "iso2": "CZ",
+    "name": "Czech Republic",
+    "levels": {
+      "2": {
+        "regions": 77,
+        "available": 33
+      },
+      "1": {
+        "regions": 14,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "CIV",
+    "iso2": "CI",
+    "name": "Côte d'Ivoire",
+    "levels": {
+      "2": {
+        "regions": 33,
+        "available": 33
+      },
+      "1": {
+        "regions": 14,
+        "available": 14
+      }
+    }
+  },
+  {
+    "code": "PRK",
+    "iso2": "KP",
+    "name": "D. P. R. of Korea",
+    "levels": {
+      "2": {
+        "regions": 183,
+        "available": 183
+      },
+      "1": {
+        "regions": 11,
+        "available": 11
+      }
+    }
+  },
+  {
+    "code": "COD",
+    "iso2": "ZR",
+    "name": "Democratic Republic of Congo",
+    "levels": {
+      "2": {
+        "regions": 219,
+        "available": 219
+      },
+      "1": {
+        "regions": 26,
+        "available": 26
+      }
+    }
+  },
+  {
+    "code": "DNK",
+    "iso2": "DK",
+    "name": "Denmark",
+    "levels": {
+      "2": {
+        "regions": 99,
+        "available": 99
+      },
+      "1": {
+        "regions": 5,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "DJI",
+    "iso2": "DJ",
+    "name": "Djibouti",
+    "levels": {
+      "2": {
+        "regions": 12,
+        "available": 12
+      },
+      "1": {
+        "regions": 6,
+        "available": 6
+      }
+    }
+  },
+  {
+    "code": "DMA",
+    "iso2": "DM",
+    "name": "Dominica",
+    "levels": {
+      "2": {
+        "regions": 10,
+        "available": 10
+      },
+      "1": {
+        "regions": 10,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "DOM",
+    "iso2": "DO",
+    "name": "Dominican Republic",
+    "levels": {
+      "2": {
+        "regions": 162,
+        "available": 162
+      },
+      "1": {
+        "regions": 32,
+        "available": 32
+      }
+    }
+  },
+  {
+    "code": "ECU",
+    "iso2": "EC",
+    "name": "Ecuador",
+    "levels": {
+      "2": {
+        "regions": 221,
+        "available": 221
+      },
+      "1": {
+        "regions": 24,
+        "available": 24
+      }
+    }
+  },
+  {
+    "code": "SLV",
+    "iso2": "SV",
+    "name": "El Salvador",
+    "levels": {
+      "2": {
+        "regions": 262,
+        "available": 262
+      },
+      "1": {
+        "regions": 14,
+        "available": 14
+      }
+    }
+  },
+  {
+    "code": "GNQ",
+    "iso2": "GQ",
+    "name": "Equatorial Guinea",
+    "levels": {
+      "2": {
+        "regions": 7,
+        "available": 7
+      },
+      "1": {
+        "regions": 7,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "ERI",
+    "iso2": "ER",
+    "name": "Eritrea",
+    "levels": {
+      "2": {
+        "regions": 58,
+        "available": 58
+      },
+      "1": {
+        "regions": 7,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "EST",
+    "iso2": "EE",
+    "name": "Estonia",
+    "levels": {
+      "2": {
+        "regions": 228,
+        "available": 228
+      },
+      "1": {
+        "regions": 15,
+        "available": 15
+      }
+    }
+  },
+  {
+    "code": "SWZ",
+    "iso2": "SZ",
+    "name": "Eswatini",
+    "levels": {
+      "2": {
+        "regions": 59,
+        "available": 59
+      },
+      "1": {
+        "regions": 4,
+        "available": 4
+      }
+    }
+  },
+  {
+    "code": "ETH",
+    "iso2": "ET",
+    "name": "Ethiopia",
+    "levels": {
+      "2": {
+        "regions": 92,
+        "available": 86
+      },
+      "1": {
+        "regions": 14,
+        "available": 13
+      }
+    }
+  },
+  {
+    "code": "FRO",
+    "iso2": "FO",
+    "name": "Faroe Islands (Den.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "SOM",
+    "iso2": "SO",
+    "name": "Federal Republic of Somalia",
+    "levels": {
+      "2": {
+        "regions": 74,
+        "available": 74
+      },
+      "1": {
+        "regions": 18,
+        "available": 18
+      }
+    }
+  },
+  {
+    "code": "FSM",
+    "iso2": "FM",
+    "name": "Federated States of Micronesia",
+    "levels": {
+      "2": {
+        "regions": 4,
+        "available": 0
+      },
+      "1": {
+        "regions": 4,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "FJI",
+    "iso2": "FJ",
+    "name": "Fiji",
+    "levels": {
+      "2": {
+        "regions": 15,
+        "available": 0
+      },
+      "1": {
+        "regions": 4,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "FIN",
+    "iso2": "FI",
+    "name": "Finland",
+    "levels": {
+      "2": {
+        "regions": 19,
+        "available": 19
+      },
+      "1": {
+        "regions": 5,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "FRA",
+    "iso2": "FR",
+    "name": "France",
+    "levels": {
+      "2": {
+        "regions": 96,
+        "available": 56
+      },
+      "1": {
+        "regions": 13,
+        "available": 6
+      }
+    }
+  },
+  {
+    "code": "REU",
+    "iso2": "RE",
+    "name": "France",
+    "levels": {
+      "2": {
+        "regions": 2,
+        "available": 2
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "MYT",
+    "iso2": "YT",
+    "name": "France",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "GUF",
+    "iso2": "GF",
+    "name": "France",
+    "levels": {
+      "2": {
+        "regions": 2,
+        "available": 2
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "MTQ",
+    "iso2": "MQ",
+    "name": "France",
+    "levels": {
+      "2": {
+        "regions": 4,
+        "available": 4
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "GLP",
+    "iso2": "GP",
+    "name": "France",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "PYF",
+    "iso2": "PF",
+    "name": "French Polynesia (Fr.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "ATF",
+    "iso2": "TF",
+    "name": "French Southern and Antarctic Lands (Fr.)",
+    "levels": {
+      "2": {
+        "regions": 4,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "GAB",
+    "iso2": "GA",
+    "name": "Gabon",
+    "levels": {
+      "2": {
+        "regions": 48,
+        "available": 48
+      },
+      "1": {
+        "regions": 9,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "GEO",
+    "iso2": "GE",
+    "name": "Georgia",
+    "levels": {
+      "2": {
+        "regions": 74,
+        "available": 74
+      },
+      "1": {
+        "regions": 12,
+        "available": 12
+      }
+    }
+  },
+  {
+    "code": "DEU",
+    "iso2": "DE",
+    "name": "Germany",
+    "levels": {
+      "2": {
+        "regions": 33,
+        "available": 33
+      },
+      "1": {
+        "regions": 16,
+        "available": 16
+      }
+    }
+  },
+  {
+    "code": "GHA",
+    "iso2": "GH",
+    "name": "Ghana",
+    "levels": {
+      "2": {
+        "regions": 260,
+        "available": 259
+      },
+      "1": {
+        "regions": 16,
+        "available": 15
+      }
+    }
+  },
+  {
+    "code": "GIB",
+    "iso2": "GI",
+    "name": "Gibraltar (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "GRC",
+    "iso2": "GR",
+    "name": "Greece",
+    "levels": {
+      "2": {
+        "regions": 14,
+        "available": 13
+      },
+      "1": {
+        "regions": 8,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "GRL",
+    "iso2": "GL",
+    "name": "Greenland (Den.)",
+    "levels": {
+      "2": {
+        "regions": 3,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "GRD",
+    "iso2": "GD",
+    "name": "Grenada",
+    "levels": {
+      "2": {
+        "regions": 7,
+        "available": 0
+      },
+      "1": {
+        "regions": 7,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "GUM",
+    "iso2": "GU",
+    "name": "Guam (U.S.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "GTM",
+    "iso2": "GT",
+    "name": "Guatemala",
+    "levels": {
+      "2": {
+        "regions": 336,
+        "available": 336
+      },
+      "1": {
+        "regions": 22,
+        "available": 22
+      }
+    }
+  },
+  {
+    "code": "GGY",
+    "iso2": "GG",
+    "name": "Guernsey (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 13,
+        "available": 0
+      },
+      "1": {
+        "regions": 13,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "GIN",
+    "iso2": "GN",
+    "name": "Guinea",
+    "levels": {
+      "2": {
+        "regions": 38,
+        "available": 38
+      },
+      "1": {
+        "regions": 8,
+        "available": 8
+      }
+    }
+  },
+  {
+    "code": "GNB",
+    "iso2": "GW",
+    "name": "Guinea-Bissau",
+    "levels": {
+      "2": {
+        "regions": 39,
+        "available": 39
+      },
+      "1": {
+        "regions": 9,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "GUY",
+    "iso2": "GY",
+    "name": "Guyana",
+    "levels": {
+      "2": {
+        "regions": 26,
+        "available": 26
+      },
+      "1": {
+        "regions": 10,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "HTI",
+    "iso2": "HT",
+    "name": "Haiti",
+    "levels": {
+      "2": {
+        "regions": 41,
+        "available": 0
+      },
+      "1": {
+        "regions": 10,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "HMD",
+    "iso2": "HM",
+    "name": "Heard Island and McDonald Islands (Aus.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "HND",
+    "iso2": "HN",
+    "name": "Honduras",
+    "levels": {
+      "2": {
+        "regions": 290,
+        "available": 290
+      },
+      "1": {
+        "regions": 18,
+        "available": 18
+      }
+    }
+  },
+  {
+    "code": "HKG",
+    "iso2": "HK",
+    "name": "Hong Kong SAR, China",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "HUN",
+    "iso2": "HU",
+    "name": "Hungary",
+    "levels": {
+      "2": {
+        "regions": 20,
+        "available": 8
+      },
+      "1": {
+        "regions": 8,
+        "available": 2
+      }
+    }
+  },
+  {
+    "code": "ISL",
+    "iso2": "IS",
+    "name": "Iceland",
+    "levels": {
+      "2": {
+        "regions": 62,
+        "available": 8
+      },
+      "1": {
+        "regions": 8,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "IND",
+    "iso2": "IN",
+    "name": "India",
+    "levels": {
+      "2": {
+        "regions": 683,
+        "available": 681
+      },
+      "1": {
+        "regions": 34,
+        "available": 33
+      }
+    }
+  },
+  {
+    "code": "IDN",
+    "iso2": "ID",
+    "name": "Indonesia",
+    "levels": {
+      "2": {
+        "regions": 518,
+        "available": 518
+      },
+      "1": {
+        "regions": 38,
+        "available": 38
+      }
+    }
+  },
+  {
+    "code": "IRQ",
+    "iso2": "IQ",
+    "name": "Iraq",
+    "levels": {
+      "2": {
+        "regions": 101,
+        "available": 0
+      },
+      "1": {
+        "regions": 18,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "IRL",
+    "iso2": "IE",
+    "name": "Ireland",
+    "levels": {
+      "2": {
+        "regions": 26,
+        "available": 26
+      },
+      "1": {
+        "regions": 26,
+        "available": 26
+      }
+    }
+  },
+  {
+    "code": "IRN",
+    "iso2": "IR",
+    "name": "Islamic Republic of Iran",
+    "levels": {
+      "2": {
+        "regions": 429,
+        "available": 225
+      },
+      "1": {
+        "regions": 31,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "IMN",
+    "iso2": "IM",
+    "name": "Isle of Man (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 24,
+        "available": 24
+      },
+      "1": {
+        "regions": 24,
+        "available": 24
+      }
+    }
+  },
+  {
+    "code": "ISR",
+    "iso2": "IL",
+    "name": "Israel",
+    "levels": {
+      "2": {
+        "regions": 6,
+        "available": 6
+      },
+      "1": {
+        "regions": 6,
+        "available": 6
+      }
+    }
+  },
+  {
+    "code": "ITA",
+    "iso2": "IT",
+    "name": "Italy",
+    "levels": {
+      "2": {
+        "regions": 103,
+        "available": 103
+      },
+      "1": {
+        "regions": 20,
+        "available": 20
+      }
+    }
+  },
+  {
+    "code": "JAM",
+    "iso2": "JM",
+    "name": "Jamaica",
+    "levels": {
+      "2": {
+        "regions": 14,
+        "available": 14
+      },
+      "1": {
+        "regions": 14,
+        "available": 14
+      }
+    }
+  },
+  {
+    "code": "JPN",
+    "iso2": "JP",
+    "name": "Japan",
+    "levels": {
+      "2": {
+        "regions": 1742,
+        "available": 1623
+      },
+      "1": {
+        "regions": 47,
+        "available": 41
+      }
+    }
+  },
+  {
+    "code": "JEY",
+    "iso2": "JE",
+    "name": "Jersey (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 12,
+        "available": 0
+      },
+      "1": {
+        "regions": 12,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "JOR",
+    "iso2": "JO",
+    "name": "Jordan",
+    "levels": {
+      "2": {
+        "regions": 58,
+        "available": 58
+      },
+      "1": {
+        "regions": 12,
+        "available": 12
+      }
+    }
+  },
+  {
+    "code": "KAZ",
+    "iso2": "KZ",
+    "name": "Kazakhstan",
+    "levels": {
+      "2": {
+        "regions": 218,
+        "available": 136
+      },
+      "1": {
+        "regions": 21,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "KEN",
+    "iso2": "KE",
+    "name": "Kenya",
+    "levels": {
+      "2": {
+        "regions": 290,
+        "available": 290
+      },
+      "1": {
+        "regions": 47,
+        "available": 47
+      }
+    }
+  },
+  {
+    "code": "KIR",
+    "iso2": "KI",
+    "name": "Kiribati",
+    "levels": {
+      "2": {
+        "regions": 34,
+        "available": 1
+      },
+      "1": {
+        "regions": 6,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "XKX",
+    "iso2": "XK",
+    "name": "Kosovo",
+    "levels": {
+      "2": {
+        "regions": 38,
+        "available": 38
+      },
+      "1": {
+        "regions": 7,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "KWT",
+    "iso2": "KW",
+    "name": "Kuwait",
+    "levels": {
+      "2": {
+        "regions": 140,
+        "available": 5
+      },
+      "1": {
+        "regions": 6,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "KGZ",
+    "iso2": "KG",
+    "name": "Kyrgyz Republic",
+    "levels": {
+      "2": {
+        "regions": 40,
+        "available": 40
+      },
+      "1": {
+        "regions": 7,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "LAO",
+    "iso2": "LA",
+    "name": "Lao People's Democratic Republic",
+    "levels": {
+      "2": {
+        "regions": 148,
+        "available": 148
+      },
+      "1": {
+        "regions": 18,
+        "available": 18
+      }
+    }
+  },
+  {
+    "code": "LVA",
+    "iso2": "LV",
+    "name": "Latvia",
+    "levels": {
+      "2": {
+        "regions": 589,
+        "available": 157
+      },
+      "1": {
+        "regions": 43,
+        "available": 13
+      }
+    }
+  },
+  {
+    "code": "LBN",
+    "iso2": "LB",
+    "name": "Lebanon",
+    "levels": {
+      "2": {
+        "regions": 26,
+        "available": 26
+      },
+      "1": {
+        "regions": 8,
+        "available": 8
+      }
+    }
+  },
+  {
+    "code": "LSO",
+    "iso2": "LS",
+    "name": "Lesotho",
+    "levels": {
+      "2": {
+        "regions": 10,
+        "available": 0
+      },
+      "1": {
+        "regions": 10,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "LBR",
+    "iso2": "LR",
+    "name": "Liberia",
+    "levels": {
+      "2": {
+        "regions": 136,
+        "available": 136
+      },
+      "1": {
+        "regions": 15,
+        "available": 15
+      }
+    }
+  },
+  {
+    "code": "LBY",
+    "iso2": "LY",
+    "name": "Libya",
+    "levels": {
+      "2": {
+        "regions": 25,
+        "available": 25
+      },
+      "1": {
+        "regions": 25,
+        "available": 25
+      }
+    }
+  },
+  {
+    "code": "LIE",
+    "iso2": "LI",
+    "name": "Liechtenstein",
+    "levels": {
+      "2": {
+        "regions": 11,
+        "available": 11
+      },
+      "1": {
+        "regions": 11,
+        "available": 11
+      }
+    }
+  },
+  {
+    "code": "LTU",
+    "iso2": "LT",
+    "name": "Lithuania",
+    "levels": {
+      "2": {
+        "regions": 55,
+        "available": 55
+      },
+      "1": {
+        "regions": 10,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "LUX",
+    "iso2": "LU",
+    "name": "Luxembourg",
+    "levels": {
+      "2": {
+        "regions": 12,
+        "available": 12
+      },
+      "1": {
+        "regions": 3,
+        "available": 3
+      }
+    }
+  },
+  {
+    "code": "MAC",
+    "iso2": "MO",
+    "name": "Macau SAR, China",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "MDG",
+    "iso2": "MG",
+    "name": "Madagascar",
+    "levels": {
+      "2": {
+        "regions": 119,
+        "available": 0
+      },
+      "1": {
+        "regions": 24,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "MWI",
+    "iso2": "MW",
+    "name": "Malawi",
+    "levels": {
+      "2": {
+        "regions": 28,
+        "available": 28
+      },
+      "1": {
+        "regions": 3,
+        "available": 3
+      }
+    }
+  },
+  {
+    "code": "MYS",
+    "iso2": "MY",
+    "name": "Malaysia",
+    "levels": {
+      "2": {
+        "regions": 133,
+        "available": 132
+      },
+      "1": {
+        "regions": 15,
+        "available": 14
+      }
+    }
+  },
+  {
+    "code": "MDV",
+    "iso2": "MV",
+    "name": "Maldives",
+    "levels": {
+      "2": {
+        "regions": 20,
+        "available": 20
+      },
+      "1": {
+        "regions": 20,
+        "available": 20
+      }
+    }
+  },
+  {
+    "code": "MLI",
+    "iso2": "ML",
+    "name": "Mali",
+    "levels": {
+      "2": {
+        "regions": 50,
+        "available": 50
+      },
+      "1": {
+        "regions": 9,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "MLT",
+    "iso2": "MT",
+    "name": "Malta",
+    "levels": {
+      "2": {
+        "regions": 69,
+        "available": 0
+      },
+      "1": {
+        "regions": 6,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "MHL",
+    "iso2": "MH",
+    "name": "Marshall Islands",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "MRT",
+    "iso2": "MR",
+    "name": "Mauritania",
+    "levels": {
+      "2": {
+        "regions": 63,
+        "available": 63
+      },
+      "1": {
+        "regions": 15,
+        "available": 15
+      }
+    }
+  },
+  {
+    "code": "MUS",
+    "iso2": "MU",
+    "name": "Mauritius",
+    "levels": {
+      "2": {
+        "regions": 13,
+        "available": 1
+      },
+      "1": {
+        "regions": 5,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "MEX",
+    "iso2": "MX",
+    "name": "Mexico",
+    "levels": {
+      "2": {
+        "regions": 2463,
+        "available": 2463
+      },
+      "1": {
+        "regions": 32,
+        "available": 32
+      }
+    }
+  },
+  {
+    "code": "MDA",
+    "iso2": "MD",
+    "name": "Moldova",
+    "levels": {
+      "2": {
+        "regions": 37,
+        "available": 0
+      },
+      "1": {
+        "regions": 37,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "MCO",
+    "iso2": "MC",
+    "name": "Monaco",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "MNG",
+    "iso2": "MN",
+    "name": "Mongolia",
+    "levels": {
+      "2": {
+        "regions": 337,
+        "available": 336
+      },
+      "1": {
+        "regions": 22,
+        "available": 21
+      }
+    }
+  },
+  {
+    "code": "MNE",
+    "iso2": "ME",
+    "name": "Montenegro",
+    "levels": {
+      "2": {
+        "regions": 21,
+        "available": 21
+      },
+      "1": {
+        "regions": 21,
+        "available": 21
+      }
+    }
+  },
+  {
+    "code": "MSR",
+    "iso2": "MS",
+    "name": "Montserrat (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 3,
+        "available": 0
+      },
+      "1": {
+        "regions": 3,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "MAR",
+    "iso2": "MA",
+    "name": "Morocco",
+    "levels": {
+      "2": {
+        "regions": 71,
+        "available": 71
+      },
+      "1": {
+        "regions": 11,
+        "available": 11
+      }
+    }
+  },
+  {
+    "code": "MOZ",
+    "iso2": "MZ",
+    "name": "Mozambique",
+    "levels": {
+      "2": {
+        "regions": 155,
+        "available": 155
+      },
+      "1": {
+        "regions": 11,
+        "available": 11
+      }
+    }
+  },
+  {
+    "code": "MMR",
+    "iso2": "MM",
+    "name": "Myanmar",
+    "levels": {
+      "2": {
+        "regions": 70,
+        "available": 70
+      },
+      "1": {
+        "regions": 15,
+        "available": 15
+      }
+    }
+  },
+  {
+    "code": "NAM",
+    "iso2": "NA",
+    "name": "Namibia",
+    "levels": {
+      "2": {
+        "regions": 121,
+        "available": 96
+      },
+      "1": {
+        "regions": 14,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "NRU",
+    "iso2": "NR",
+    "name": "Naoero",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "NPL",
+    "iso2": "NP",
+    "name": "Nepal",
+    "levels": {
+      "2": {
+        "regions": 77,
+        "available": 77
+      },
+      "1": {
+        "regions": 7,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "NLD",
+    "iso2": "NL",
+    "name": "Netherlands",
+    "levels": {
+      "2": {
+        "regions": 12,
+        "available": 11
+      },
+      "1": {
+        "regions": 12,
+        "available": 11
+      }
+    }
+  },
+  {
+    "code": "NCL",
+    "iso2": "NC",
+    "name": "New Caledonia (Fr.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "NZL",
+    "iso2": "NZ",
+    "name": "New Zealand",
+    "levels": {
+      "2": {
+        "regions": 77,
+        "available": 77
+      },
+      "1": {
+        "regions": 17,
+        "available": 17
+      }
+    }
+  },
+  {
+    "code": "NIC",
+    "iso2": "NI",
+    "name": "Nicaragua",
+    "levels": {
+      "2": {
+        "regions": 153,
+        "available": 153
+      },
+      "1": {
+        "regions": 17,
+        "available": 17
+      }
+    }
+  },
+  {
+    "code": "NER",
+    "iso2": "NE",
+    "name": "Niger",
+    "levels": {
+      "2": {
+        "regions": 64,
+        "available": 64
+      },
+      "1": {
+        "regions": 8,
+        "available": 8
+      }
+    }
+  },
+  {
+    "code": "NGA",
+    "iso2": "NG",
+    "name": "Nigeria",
+    "levels": {
+      "2": {
+        "regions": 774,
+        "available": 774
+      },
+      "1": {
+        "regions": 37,
+        "available": 37
+      }
+    }
+  },
+  {
+    "code": "NIU",
+    "iso2": "NU",
+    "name": "Niue (N.Z.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "NFK",
+    "iso2": "NF",
+    "name": "Norfolk Island (Aus.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "MKD",
+    "iso2": "MK",
+    "name": "North Macedonia",
+    "levels": {
+      "2": {
+        "regions": 84,
+        "available": 84
+      },
+      "1": {
+        "regions": 8,
+        "available": 8
+      }
+    }
+  },
+  {
+    "code": "MNP",
+    "iso2": "MP",
+    "name": "Northern Mariana Islands (U.S.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "NOR",
+    "iso2": "NO",
+    "name": "Norway",
+    "levels": {
+      "2": {
+        "regions": 357,
+        "available": 266
+      },
+      "1": {
+        "regions": 15,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "OMN",
+    "iso2": "OM",
+    "name": "Oman",
+    "levels": {
+      "2": {
+        "regions": 63,
+        "available": 33
+      },
+      "1": {
+        "regions": 11,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "PAK",
+    "iso2": "PK",
+    "name": "Pakistan",
+    "levels": {
+      "2": {
+        "regions": 138,
+        "available": 138
+      },
+      "1": {
+        "regions": 5,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "PLW",
+    "iso2": "PW",
+    "name": "Palau",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "PAN",
+    "iso2": "PA",
+    "name": "Panama",
+    "levels": {
+      "2": {
+        "regions": 76,
+        "available": 76
+      },
+      "1": {
+        "regions": 13,
+        "available": 13
+      }
+    }
+  },
+  {
+    "code": "PNG",
+    "iso2": "PG",
+    "name": "Papua New Guinea",
+    "levels": {
+      "2": {
+        "regions": 87,
+        "available": 87
+      },
+      "1": {
+        "regions": 22,
+        "available": 22
+      }
+    }
+  },
+  {
+    "code": "PRY",
+    "iso2": "PY",
+    "name": "Paraguay",
+    "levels": {
+      "2": {
+        "regions": 219,
+        "available": 217
+      },
+      "1": {
+        "regions": 18,
+        "available": 16
+      }
+    }
+  },
+  {
+    "code": "PER",
+    "iso2": "PE",
+    "name": "Peru",
+    "levels": {
+      "2": {
+        "regions": 195,
+        "available": 195
+      },
+      "1": {
+        "regions": 25,
+        "available": 25
+      }
+    }
+  },
+  {
+    "code": "PHL",
+    "iso2": "PH",
+    "name": "Philippines",
+    "levels": {
+      "2": {
+        "regions": 85,
+        "available": 85
+      },
+      "1": {
+        "regions": 17,
+        "available": 17
+      }
+    }
+  },
+  {
+    "code": "PCN",
+    "iso2": "PN",
+    "name": "Pitcairn Islands (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "POL",
+    "iso2": "PL",
+    "name": "Poland",
+    "levels": {
+      "2": {
+        "regions": 377,
+        "available": 377
+      },
+      "1": {
+        "regions": 16,
+        "available": 16
+      }
+    }
+  },
+  {
+    "code": "PRT",
+    "iso2": "PT",
+    "name": "Portugal",
+    "levels": {
+      "2": {
+        "regions": 308,
+        "available": 308
+      },
+      "1": {
+        "regions": 20,
+        "available": 20
+      }
+    }
+  },
+  {
+    "code": "PRI",
+    "iso2": "PR",
+    "name": "Puerto Rico (U.S.)",
+    "levels": {
+      "2": {
+        "regions": 78,
+        "available": 78
+      },
+      "1": {
+        "regions": 8,
+        "available": 8
+      }
+    }
+  },
+  {
+    "code": "QAT",
+    "iso2": "QA",
+    "name": "Qatar",
+    "levels": {
+      "2": {
+        "regions": 9,
+        "available": 9
+      },
+      "1": {
+        "regions": 9,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "KOR",
+    "iso2": "KR",
+    "name": "Republic of Korea",
+    "levels": {
+      "2": {
+        "regions": 15,
+        "available": 15
+      },
+      "1": {
+        "regions": 15,
+        "available": 15
+      }
+    }
+  },
+  {
+    "code": "YEM",
+    "iso2": "RY",
+    "name": "Republic of Yemen",
+    "levels": {
+      "2": {
+        "regions": 333,
+        "available": 333
+      },
+      "1": {
+        "regions": 22,
+        "available": 22
+      }
+    }
+  },
+  {
+    "code": "VEN",
+    "iso2": "VE",
+    "name": "Republica Bolivariana de Venezuela",
+    "levels": {
+      "2": {
+        "regions": 304,
+        "available": 0
+      },
+      "1": {
+        "regions": 25,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "ROU",
+    "iso2": "RO",
+    "name": "Romania",
+    "levels": {
+      "2": {
+        "regions": 42,
+        "available": 0
+      },
+      "1": {
+        "regions": 42,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "RUS",
+    "iso2": "RU",
+    "name": "Russian Federation",
+    "levels": {
+      "2": {
+        "regions": 90,
+        "available": 0
+      },
+      "1": {
+        "regions": 90,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "RWA",
+    "iso2": "RW",
+    "name": "Rwanda",
+    "levels": {
+      "2": {
+        "regions": 30,
+        "available": 30
+      },
+      "1": {
+        "regions": 5,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "SHN",
+    "iso2": "SH",
+    "name": "Saint Helena, Ascension and Tristan da Cunha (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 6,
+        "available": 6
+      },
+      "1": {
+        "regions": 3,
+        "available": 3
+      }
+    }
+  },
+  {
+    "code": "KNA",
+    "iso2": "KN",
+    "name": "Saint Kitts and Nevis",
+    "levels": {
+      "2": {
+        "regions": 14,
+        "available": 14
+      },
+      "1": {
+        "regions": 14,
+        "available": 14
+      }
+    }
+  },
+  {
+    "code": "LCA",
+    "iso2": "LC",
+    "name": "Saint Lucia",
+    "levels": {
+      "2": {
+        "regions": 10,
+        "available": 0
+      },
+      "1": {
+        "regions": 10,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "VCT",
+    "iso2": "VC",
+    "name": "Saint Vincent and the Grenadines",
+    "levels": {
+      "2": {
+        "regions": 6,
+        "available": 6
+      },
+      "1": {
+        "regions": 6,
+        "available": 6
+      }
+    }
+  },
+  {
+    "code": "BLM",
+    "iso2": "BL",
+    "name": "Saint-Barthélemy (Fr.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "MAF",
+    "iso2": "MF",
+    "name": "Saint-Martin (Fr.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "SPM",
+    "iso2": "PM",
+    "name": "Saint-Pierre-et-Miquelon (Fr.)",
+    "levels": {
+      "2": {
+        "regions": 2,
+        "available": 2
+      },
+      "1": {
+        "regions": 2,
+        "available": 2
+      }
+    }
+  },
+  {
+    "code": "WSM",
+    "iso2": "WS",
+    "name": "Samoa",
+    "levels": {
+      "2": {
+        "regions": 52,
+        "available": 1
+      },
+      "1": {
+        "regions": 11,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "SMR",
+    "iso2": "SM",
+    "name": "San Marino",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "SAU",
+    "iso2": "SA",
+    "name": "Saudi Arabia",
+    "levels": {
+      "2": {
+        "regions": 13,
+        "available": 13
+      },
+      "1": {
+        "regions": 13,
+        "available": 13
+      }
+    }
+  },
+  {
+    "code": "SEN",
+    "iso2": "SN",
+    "name": "Senegal",
+    "levels": {
+      "2": {
+        "regions": 46,
+        "available": 46
+      },
+      "1": {
+        "regions": 14,
+        "available": 14
+      }
+    }
+  },
+  {
+    "code": "SRB",
+    "iso2": "YF",
+    "name": "Serbia",
+    "levels": {
+      "2": {
+        "regions": 25,
+        "available": 25
+      },
+      "1": {
+        "regions": 25,
+        "available": 25
+      }
+    }
+  },
+  {
+    "code": "SYC",
+    "iso2": "SC",
+    "name": "Seychelles",
+    "levels": {
+      "2": {
+        "regions": 29,
+        "available": 7
+      },
+      "1": {
+        "regions": 7,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "SLE",
+    "iso2": "SL",
+    "name": "Sierra Leone",
+    "levels": {
+      "2": {
+        "regions": 16,
+        "available": 16
+      },
+      "1": {
+        "regions": 5,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "SGP",
+    "iso2": "SG",
+    "name": "Singapore",
+    "levels": {
+      "2": {
+        "regions": 9,
+        "available": 9
+      },
+      "1": {
+        "regions": 9,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "SXM",
+    "iso2": "SX",
+    "name": "Sint Maarten (Neth.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "SVK",
+    "iso2": "SK",
+    "name": "Slovak Republic",
+    "levels": {
+      "2": {
+        "regions": 79,
+        "available": 79
+      },
+      "1": {
+        "regions": 8,
+        "available": 8
+      }
+    }
+  },
+  {
+    "code": "SVN",
+    "iso2": "SI",
+    "name": "Slovenia",
+    "levels": {
+      "2": {
+        "regions": 145,
+        "available": 145
+      },
+      "1": {
+        "regions": 12,
+        "available": 12
+      }
+    }
+  },
+  {
+    "code": "SLB",
+    "iso2": "SB",
+    "name": "Solomon Islands",
+    "levels": {
+      "2": {
+        "regions": 50,
+        "available": 1
+      },
+      "1": {
+        "regions": 10,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "ZAF",
+    "iso2": "ZA",
+    "name": "South Africa",
+    "levels": {
+      "2": {
+        "regions": 52,
+        "available": 52
+      },
+      "1": {
+        "regions": 9,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "SSD",
+    "iso2": "SS",
+    "name": "South Sudan",
+    "levels": {
+      "2": {
+        "regions": 78,
+        "available": 78
+      },
+      "1": {
+        "regions": 12,
+        "available": 12
+      }
+    }
+  },
+  {
+    "code": "ESP",
+    "iso2": "ES",
+    "name": "Spain",
+    "levels": {
+      "2": {
+        "regions": 52,
+        "available": 50
+      },
+      "1": {
+        "regions": 19,
+        "available": 17
+      }
+    }
+  },
+  {
+    "code": "LKA",
+    "iso2": "LK",
+    "name": "Sri Lanka",
+    "levels": {
+      "2": {
+        "regions": 25,
+        "available": 25
+      },
+      "1": {
+        "regions": 9,
+        "available": 9
+      }
+    }
+  },
+  {
+    "code": "SDN",
+    "iso2": "SD",
+    "name": "Sudan",
+    "levels": {
+      "2": {
+        "regions": 188,
+        "available": 84
+      },
+      "1": {
+        "regions": 18,
+        "available": 2
+      }
+    }
+  },
+  {
+    "code": "SUR",
+    "iso2": "SR",
+    "name": "Suriname",
+    "levels": {
+      "2": {
+        "regions": 62,
+        "available": 62
+      },
+      "1": {
+        "regions": 10,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "SJM",
+    "iso2": "SJ",
+    "name": "Svalbard and Jan Mayen (Nor.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "SWE",
+    "iso2": "SE",
+    "name": "Sweden",
+    "levels": {
+      "2": {
+        "regions": 289,
+        "available": 289
+      },
+      "1": {
+        "regions": 21,
+        "available": 21
+      }
+    }
+  },
+  {
+    "code": "CHE",
+    "iso2": "CH",
+    "name": "Switzerland",
+    "levels": {
+      "2": {
+        "regions": 144,
+        "available": 17
+      },
+      "1": {
+        "regions": 26,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "SYR",
+    "iso2": "SY",
+    "name": "Syrian Arab Republic",
+    "levels": {
+      "2": {
+        "regions": 61,
+        "available": 61
+      },
+      "1": {
+        "regions": 14,
+        "available": 14
+      }
+    }
+  },
+  {
+    "code": "STP",
+    "iso2": "ST",
+    "name": "São Tomé and Príncipe",
+    "levels": {
+      "2": {
+        "regions": 2,
+        "available": 0
+      },
+      "1": {
+        "regions": 2,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "TJK",
+    "iso2": "TJ",
+    "name": "Tajikistan",
+    "levels": {
+      "2": {
+        "regions": 65,
+        "available": 65
+      },
+      "1": {
+        "regions": 5,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "TZA",
+    "iso2": "TZ",
+    "name": "Tanzania",
+    "levels": {
+      "2": {
+        "regions": 174,
+        "available": 169
+      },
+      "1": {
+        "regions": 31,
+        "available": 30
+      }
+    }
+  },
+  {
+    "code": "THA",
+    "iso2": "TH",
+    "name": "Thailand",
+    "levels": {
+      "2": {
+        "regions": 813,
+        "available": 804
+      },
+      "1": {
+        "regions": 77,
+        "available": 75
+      }
+    }
+  },
+  {
+    "code": "BHS",
+    "iso2": "BS",
+    "name": "The Bahamas",
+    "levels": {
+      "2": {
+        "regions": 32,
+        "available": 0
+      },
+      "1": {
+        "regions": 32,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "GMB",
+    "iso2": "GM",
+    "name": "The Gambia",
+    "levels": {
+      "2": {
+        "regions": 49,
+        "available": 49
+      },
+      "1": {
+        "regions": 8,
+        "available": 8
+      }
+    }
+  },
+  {
+    "code": "TLS",
+    "iso2": "TP",
+    "name": "Timor-Leste",
+    "levels": {
+      "2": {
+        "regions": 65,
+        "available": 65
+      },
+      "1": {
+        "regions": 13,
+        "available": 13
+      }
+    }
+  },
+  {
+    "code": "TGO",
+    "iso2": "TG",
+    "name": "Togo",
+    "levels": {
+      "2": {
+        "regions": 39,
+        "available": 39
+      },
+      "1": {
+        "regions": 5,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "TKL",
+    "iso2": "TK",
+    "name": "Tokelau (N.Z.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "TON",
+    "iso2": "TO",
+    "name": "Tonga",
+    "levels": {
+      "2": {
+        "regions": 5,
+        "available": 0
+      },
+      "1": {
+        "regions": 5,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "TTO",
+    "iso2": "TT",
+    "name": "Trinidad and Tobago",
+    "levels": {
+      "2": {
+        "regions": 15,
+        "available": 15
+      },
+      "1": {
+        "regions": 15,
+        "available": 15
+      }
+    }
+  },
+  {
+    "code": "TUN",
+    "iso2": "TN",
+    "name": "Tunisia",
+    "levels": {
+      "2": {
+        "regions": 279,
+        "available": 279
+      },
+      "1": {
+        "regions": 24,
+        "available": 24
+      }
+    }
+  },
+  {
+    "code": "TKM",
+    "iso2": "TM",
+    "name": "Turkmenistan",
+    "levels": {
+      "2": {
+        "regions": 5,
+        "available": 5
+      },
+      "1": {
+        "regions": 5,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "TCA",
+    "iso2": "TC",
+    "name": "Turks and Caicos Islands (U.K.)",
+    "levels": {
+      "2": {
+        "regions": 6,
+        "available": 6
+      },
+      "1": {
+        "regions": 6,
+        "available": 6
+      }
+    }
+  },
+  {
+    "code": "TUV",
+    "iso2": "TV",
+    "name": "Tuvalu",
+    "levels": {
+      "2": {
+        "regions": 9,
+        "available": 0
+      },
+      "1": {
+        "regions": 9,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "TUR",
+    "iso2": "TR",
+    "name": "Türkiye",
+    "levels": {
+      "2": {
+        "regions": 927,
+        "available": 919
+      },
+      "1": {
+        "regions": 81,
+        "available": 80
+      }
+    }
+  },
+  {
+    "code": "UMI",
+    "iso2": "UM",
+    "name": "U.S. Minor Outlying Islands",
+    "levels": {
+      "2": {
+        "regions": 7,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "UGA",
+    "iso2": "UG",
+    "name": "Uganda",
+    "levels": {
+      "2": {
+        "regions": 135,
+        "available": 4
+      },
+      "1": {
+        "regions": 4,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "UKR",
+    "iso2": "UA",
+    "name": "Ukraine",
+    "levels": {
+      "2": {
+        "regions": 139,
+        "available": 25
+      },
+      "1": {
+        "regions": 27,
+        "available": 2
+      }
+    }
+  },
+  {
+    "code": "ARE",
+    "iso2": "AE",
+    "name": "United Arab Emirates",
+    "levels": {
+      "2": {
+        "regions": 7,
+        "available": 7
+      },
+      "1": {
+        "regions": 7,
+        "available": 7
+      }
+    }
+  },
+  {
+    "code": "GBR",
+    "iso2": "GB",
+    "name": "United Kingdom",
+    "levels": {
+      "2": {
+        "regions": 94,
+        "available": 94
+      },
+      "1": {
+        "regions": 5,
+        "available": 5
+      }
+    }
+  },
+  {
+    "code": "VIR",
+    "iso2": "VI",
+    "name": "United States Virgin Islands (U.S.)",
+    "levels": {
+      "2": {
+        "regions": 3,
+        "available": 3
+      },
+      "1": {
+        "regions": 3,
+        "available": 3
+      }
+    }
+  },
+  {
+    "code": "USA",
+    "iso2": "US",
+    "name": "United States of America",
+    "levels": {
+      "2": {
+        "regions": 3144,
+        "available": 3142
+      },
+      "1": {
+        "regions": 51,
+        "available": 49
+      }
+    }
+  },
+  {
+    "code": "URY",
+    "iso2": "UY",
+    "name": "Uruguay",
+    "levels": {
+      "2": {
+        "regions": 19,
+        "available": 0
+      },
+      "1": {
+        "regions": 19,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "UZB",
+    "iso2": "UZ",
+    "name": "Uzbekistan",
+    "levels": {
+      "2": {
+        "regions": 199,
+        "available": 199
+      },
+      "1": {
+        "regions": 14,
+        "available": 14
+      }
+    }
+  },
+  {
+    "code": "VUT",
+    "iso2": "VU",
+    "name": "Vanuatu",
+    "levels": {
+      "2": {
+        "regions": 6,
+        "available": 6
+      },
+      "1": {
+        "regions": 6,
+        "available": 6
+      }
+    }
+  },
+  {
+    "code": "VAT",
+    "iso2": "VA",
+    "name": "Vatican City",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "VNM",
+    "iso2": "VN",
+    "name": "Viet Nam",
+    "levels": {
+      "2": {
+        "regions": 3319,
+        "available": 369
+      },
+      "1": {
+        "regions": 34,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "WLF",
+    "iso2": "WF",
+    "name": "Wallis and Futuna (Fr.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 1
+      },
+      "1": {
+        "regions": 1,
+        "available": 1
+      }
+    }
+  },
+  {
+    "code": "PSE",
+    "iso2": "PS",
+    "name": "West Bank and Gaza",
+    "levels": {
+      "2": {
+        "regions": 16,
+        "available": 2
+      },
+      "1": {
+        "regions": 2,
+        "available": 0
+      }
+    }
+  },
+  {
+    "code": "ZMB",
+    "iso2": "ZM",
+    "name": "Zambia",
+    "levels": {
+      "2": {
+        "regions": 116,
+        "available": 116
+      },
+      "1": {
+        "regions": 10,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "ZWE",
+    "iso2": "ZW",
+    "name": "Zimbabwe",
+    "levels": {
+      "2": {
+        "regions": 62,
+        "available": 62
+      },
+      "1": {
+        "regions": 10,
+        "available": 10
+      }
+    }
+  },
+  {
+    "code": "ALA",
+    "iso2": "AX",
+    "name": "Åland (Fin.)",
+    "levels": {
+      "2": {
+        "regions": 1,
+        "available": 0
+      },
+      "1": {
+        "regions": 1,
+        "available": 0
+      }
+    }
+  }
+]

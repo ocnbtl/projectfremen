@@ -1110,6 +1110,53 @@ async function check(label, run) {
     assert.throws(() => normalizeObservances({ ...settings, custom: [{ ...custom, startTime: "25:00" }] }), /valid start/);
     assert.throws(() => normalizeObservances({ ...settings, appearances: { birthdays: { name: "Birthday", color: "url(example)" } } }), /name and color/);
   });
+  await check("international regions join stable IDs, retain missing data and support cross-filters", async () => {
+    const { worldRegions } = require("../lib/modules/planning/world-regions.ts");
+    const { mapAnalysis } = require("../lib/modules/planning/map-analysis.ts");
+    const population = await worldRegions("regional-population", "county", "CAN");
+    const density = await worldRegions("regional-density", "county", "CAN");
+    assert.equal(population.rows.length, 295);
+    assert.equal(population.rows.filter(r => r.value === null).length, 3);
+    const settings = { countryCode: "CAN", scale: "quantile", match: "all", metrics: [{ metric: "regional-population", min: 100000 }, { metric: "regional-density", min: 100 }] };
+    const result = mapAnalysis([population, density], settings);
+    assert(result.matched > 0 && result.matched < population.rows.length);
+    assert.equal(new Set(result.geometry.features.filter(f => f.properties.value !== null).map(f => f.properties.color)).size, 5);
+    assert(result.geometry.features.every(f => Number.isFinite(f.properties.normalized)));
+    for (const country of ["BRA", "GBR", "IND", "KEN", "AUS"]) {
+      const data = await worldRegions("regional-population", "state", country);
+      assert(data.rows.some(r => r.value > 0));
+      assert.equal(new Set(data.rows.map(r => r.id)).size, data.rows.length);
+    }
+    await assert.rejects(worldRegions("regional-population", "county", "../../bad"), /supported/);
+    await assert.rejects(worldRegions("income", "county", "CAN"), /supported/);
+    await assert.rejects(worldRegions("regional-population", "tract", "CAN"), /supported/);
+    const saved = normalizePlanningRecord("savedViews", { id: "canada", createdAt: stamp, updatedAt: stamp, name: "Canada density", query: "", tag: "", layer: "regional-population", analysis: settings, level: "county", center: [-100, 55], zoom: 4 });
+    assert.equal(saved.analysis.countryCode, "CAN");
+    assert.deepEqual(saved.analysis.metrics, settings.metrics);
+  });
+  await check("international geometry is complete and does not cross the map seam", () => {
+    const { gunzipSync } = require("node:zlib");
+    const catalog = require("../data/map/world-regions-catalog.json");
+    for (const country of catalog) for (const level of ["1", "2"]) {
+      const data = JSON.parse(gunzipSync(fs.readFileSync(path.join(process.cwd(), "data/map/world", `${country.code}-${level}.json.gz`))));
+      assert.equal(data.features.length, country.levels[level].regions);
+      assert.equal(data.features.filter(f => f.properties.population !== null).length, country.levels[level].available);
+      for (const f of data.features) {
+        const visit = c => { if (typeof c[0]?.[0] === "number") {
+          assert(c.length >= 4); assert.deepEqual(c[0], c.at(-1));
+          c.forEach(([x,y], i) => { assert(Number.isFinite(x) && Math.abs(x) <= 180); assert(Number.isFinite(y) && Math.abs(y) <= 90); if (i) assert(Math.abs(x - c[i-1][0]) <= 180); });
+        } else c.forEach(visit); };
+        visit(f.geometry.coordinates);
+      }
+    }
+  });
+  await check("map focus keeps date-line regions together and preserves Greenwich crossings", () => {
+    const { regionBounds } = require("../lib/modules/planning/map-bounds.ts");
+    const points = coordinates => ({ type: "FeatureCollection", features: coordinates.map(coordinates => ({ type: "Feature", properties: {}, geometry: { type: "Point", coordinates } })) });
+    assert.deepEqual(regionBounds(points([[179, 50], [-179, 55]])), [[179, 50], [181, 55]]);
+    assert.deepEqual(regionBounds(points([[-5, 50], [5, 55]])), [[-5, 50], [5, 55]]);
+    assert.equal(regionBounds(points([])), undefined);
+  });
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );

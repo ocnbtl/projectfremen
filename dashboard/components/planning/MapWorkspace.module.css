@@ -288,7 +288,7 @@
 }
 .onMapLegend > span,
 .onMapLegend > small {
-  font-size: 10px;
+  font-size: 11px;
   color: #607058;
 }
 .onMapLegend > div:not(.scaleNumbers) {
@@ -301,7 +301,7 @@
 .scaleNumbers {
   display: flex;
   justify-content: space-between;
-  font-size: 9px;
+  font-size: 11px;
   color: #5c6855;
 }
 .photoToggle {
@@ -370,6 +370,27 @@
   z-index: 4;
 }
 .levels {
+  gap: 2px;
+}
+.flagOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.flagOption img, .flagOption svg {
+  flex: 0 0 24px;
+  object-fit: contain;
+  border-radius: 3px;
+  box-shadow: 0 0 0 1px rgb(16 32 38 / 10%);
+}
+.coverageNote {
+  color: var(--text-secondary, #60747c);
+  font: 400 12px/1.5 var(--font-body);
+}
+.onMapLegend > div:not(.scaleNumbers) {
+  border-radius: 4px;
+  overflow: hidden;
   gap: 2px;
 }
 .levels button {

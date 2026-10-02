@@ -1,6 +1,7 @@
 "use client";
 import { motionTokens } from "../../lib/design-system/motion";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
+import { regionBounds } from "../../lib/modules/planning/map-bounds";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import * as maplibregl from "maplibre-gl";
@@ -81,6 +82,12 @@ export default function MapCanvas(props: Props) {
       ),
     );
     instance.on("load", () => {
+      // Thematic land sits above landcover, beneath water, roads and labels.
+      // Using the app's place layer here would put fills ABOVE the entire basemap.
+      const thematicBefore = instance.getStyle().layers.find((layer) =>
+        layer.type === "line" || layer.type === "symbol" ||
+        /building|aeroway|transport/i.test(layer.id),
+      )?.id;
       instance.addSource("places", {
         type: "geojson",
         data: empty,
@@ -209,13 +216,15 @@ export default function MapCanvas(props: Props) {
             "fill-color": ["coalesce", ["get", "color"], "#c4c9c0"],
             "fill-opacity": [
               "case",
+              ["==", ["get", "value"], null],
+              0.5,
               ["==", ["get", "matches"], true],
-              0.78,
-              0.12,
+              0.82,
+              0.14,
             ],
           },
         },
-        "place-clusters",
+        thematicBefore,
       );
       instance.addLayer(
         {
@@ -223,12 +232,12 @@ export default function MapCanvas(props: Props) {
           type: "line",
           source: "regions",
           paint: {
-            "line-color": "#486139",
-            "line-width": 0.6,
-            "line-opacity": 0.45,
+            "line-color": "#515d6b",
+            "line-width": ["interpolate", ["linear"], ["zoom"], 2, 0.4, 9, 1],
+            "line-opacity": 0.5,
           },
         },
-        "place-clusters",
+        thematicBefore,
       );
       instance.addLayer(
         {
@@ -237,15 +246,7 @@ export default function MapCanvas(props: Props) {
           source: "regions",
           filter: ["==", ["geometry-type"], "Point"],
           paint: {
-            "circle-color": [
-              "interpolate",
-              ["linear"],
-              ["get", "normalized"],
-              0,
-              MODULE_COLOR_SYSTEM.map.primary[300],
-              1,
-              MODULE_COLOR_SYSTEM.map.primary[700],
-            ],
+            "circle-color": ["coalesce", ["get", "color"], "#c4c9c0"],
             "circle-radius": [
               "interpolate",
               ["linear"],
@@ -262,6 +263,11 @@ export default function MapCanvas(props: Props) {
         },
         "place-clusters",
       );
+      // Positron places water below some landcover fills; keep water above the
+      // thematic land without covering roads or changing its own styling.
+      for (const layer of instance.getStyle().layers.filter((layer) =>
+        layer.type === "fill" && /water/i.test(layer.id),
+      )) instance.moveLayer(layer.id, thematicBefore);
       setReady(true);
       setError("");
       // MapLibre 6 opens compact attribution initially. Start with the same
@@ -477,23 +483,8 @@ export default function MapCanvas(props: Props) {
       map.current.jumpTo({ center: [-98, 38], zoom: 3 });
       return;
     }
-    const bounds = new maplibregl.LngLatBounds();
-    const visit = (coordinates: unknown) => {
-      if (!Array.isArray(coordinates)) return;
-      if (
-        typeof coordinates[0] === "number" &&
-        typeof coordinates[1] === "number"
-      )
-        bounds.extend([
-          coordinates[0] > 0 ? coordinates[0] - 360 : coordinates[0],
-          coordinates[1],
-        ]);
-      else coordinates.forEach(visit);
-    };
-    props.regionExtent.features.forEach((f) => {
-      if ("coordinates" in f.geometry) visit(f.geometry.coordinates);
-    });
-    if (!bounds.isEmpty())
+    const bounds = regionBounds(props.regionExtent);
+    if (bounds)
       map.current.fitBounds(bounds, { padding: 60, maxZoom: 10, duration: 0 });
   }, [ready, props.regionExtent, props.regionGeography]);
   useEffect(() => {

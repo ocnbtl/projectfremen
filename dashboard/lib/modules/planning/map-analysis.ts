@@ -12,6 +12,7 @@ export type MapData = {
   geometryNote?: string;
 };
 export type MapAnalysisSettings = {
+  countryCode?: string;
   metrics: { metric: string; min?: number; max?: number }[];
   match: "all" | "any";
   scale: "quantile" | "linear";
@@ -19,16 +20,18 @@ export type MapAnalysisSettings = {
 export const MAP_METRICS: Record<string, string> = {
   "world-population": "Population",
   "world-density": "Population density",
+  "regional-population": "Population estimate",
+  "regional-density": "Population density",
   population: "Population",
   age: "Median age",
   income: "Household income",
 };
 export const MAP_COLORS = [
-  "#edf5df",
-  "#c7df9e",
-  "#91bb63",
-  "#598d3d",
-  "#285725",
+  "#edf8b1",
+  "#addd8e",
+  "#41b6c4",
+  "#2c7fb8",
+  "#253494",
 ];
 export function mapAnalysis(data: MapData[], settings: MapAnalysisSettings) {
   const primary = data[0];
@@ -98,6 +101,7 @@ export function mapAnalysis(data: MapData[], settings: MapAnalysisSettings) {
         properties: {
           name: row?.name || feature.properties?.NAME,
           value,
+          normalized: value === null || max === min ? 0 : (value - min) / (max - min),
           year: row?.year,
           matches: row?.matches ?? false,
           color:
