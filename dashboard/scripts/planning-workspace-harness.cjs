@@ -1083,6 +1083,33 @@ async function check(label, run) {
     await assert.rejects(() => savePlanningRecord("calendars", { id: "native", observances: defaultObservances() }, native.updatedAt), /changed elsewhere/);
     const { planningWritableKeys } = require("../lib/modules/planning/ownership.ts"); assert(planningWritableKeys("calendars").includes("observances"));
   });
+  await check("calendar navigation retains complete years, leap days and ISO week boundaries", () => {
+    const { calendarRange, shiftCalendar, weeksOfYear, navigationYear } = require("../lib/modules/planning/calendar-navigation.ts");
+    assert.deepEqual(calendarRange("2028-02-29", "year"), { start: "2028-01-01", end: "2029-01-01" });
+    assert.equal(shiftCalendar("2028-02-29", "year", 1), "2029-02-28");
+    assert.equal(shiftCalendar("2026-01-31", "month", 1), "2026-02-28");
+    assert.equal(weeksOfYear(2026).length, 53);
+    assert.deepEqual(weeksOfYear(2026)[0], { number: 1, start: "2025-12-29", end: "2026-01-04" });
+    assert.equal(weeksOfYear(2027)[0].start, "2027-01-04");
+    assert.equal(navigationYear("2025-12-29", "week"), 2026);
+    assert.equal(weeksOfYear(2026).at(-1).end, "2027-01-03");
+    assert.deepEqual(calendarRange("2025-12-29", "week"), { start: "2025-12-29", end: "2026-01-05" });
+  });
+  await check("timed custom dates retain their owning zone, annual duration and display-zone boundaries", () => {
+    const { calendarObservances, defaultObservances } = require("../lib/modules/planning/observances.ts");
+    const { normalizeObservances } = require("../lib/modules/planning/observance-settings.ts");
+    const custom = { id: "night", title: "Annual reflection", date: "2025-12-31", endDate: "2026-01-01", startTime: "23:30", endTime: "00:30", timeZone: "America/New_York", allDay: false, annual: true, visible: true };
+    const settings = normalizeObservances({ ...defaultObservances(), custom: [custom], appearances: { custom: { name: "Milestones", color: "#335577" } } });
+    const items = calendarObservances([], [], settings, "2027-01-01", "2027-01-02", "Europe/London");
+    assert.equal(items.length, 1); assert.equal(items[0].allDay, false); assert.equal(items[0].start, "2026-12-31T23:30");
+    assert.equal(items[0].end, "2027-01-01T00:30"); assert.equal(items[0].endMs - items[0].startMs, 3600000);
+    assert.equal(items[0].system.color, "#335577"); assert.equal(items[0].system.calendarName, "Milestones");
+    assert.equal(calendarObservances([], [], settings, "2026-12-31", "2027-01-01", "Europe/London").length, 0);
+    assert.throws(() => normalizeObservances({ ...settings, custom: [{ ...custom, endDate: custom.date, endTime: "22:30" }] }), /after the start/);
+    assert.throws(() => normalizeObservances({ ...settings, custom: [{ ...custom, timeZone: "Invalid/Zone" }] }), /time zone/);
+    assert.throws(() => normalizeObservances({ ...settings, custom: [{ ...custom, startTime: "25:00" }] }), /valid start/);
+    assert.throws(() => normalizeObservances({ ...settings, appearances: { birthdays: { name: "Birthday", color: "url(example)" } } }), /name and color/);
+  });
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );

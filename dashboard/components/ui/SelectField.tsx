@@ -24,7 +24,7 @@ export default function SelectField({ value, defaultValue, onChange, children, c
       onKeyDown={event => {if (["ArrowDown","ArrowUp"].includes(event.key)) {event.preventDefault(); setOpen(true);}}}>
       <span>{triggerContent ?? options.find(option => option.value === chosen)?.label ?? options.find(option => !option.value)?.label ?? "Select…"}</span>{!triggerContent && <UnigentamosIcon role="chevron-down" size={16} />}
     </button></Popover.Trigger>
-    <Popover.Portal><Popover.Content ref={menu} className={`app-select-menu app-choice-menu${columns > 1 ? " is-grid" : ""} ${menuClassName}`} sideOffset={6} collisionPadding={12}
+    <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content ref={menu} className={`app-select-menu app-choice-menu${columns > 1 ? " is-grid" : ""} ${menuClassName}`} sideOffset={6} collisionPadding={12}
       onEscapeKeyDown={event => event.stopImmediatePropagation()}
       onOpenAutoFocus={event => {event.preventDefault(); if (searchable) search.current?.focus(); else (menu.current?.querySelector<HTMLElement>('[aria-selected="true"]:not([disabled])') || menu.current?.querySelector<HTMLElement>('[role="option"]:not([disabled])'))?.focus();}}
       onKeyDown={event => {

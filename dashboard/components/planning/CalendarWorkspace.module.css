@@ -762,9 +762,6 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
-.monthDay .agendaEvent span {
-  display: none;
-}
 .monthDay .addDay {
   position: absolute;
   right: 2px;
@@ -965,6 +962,7 @@
   isolation: isolate;
 }
 .calendarScene { height: 100%; min-height: 0; }
+.content { overflow-x: hidden; }
 .weekdayName { font: 500 12px/1.4 var(--font-body); color: var(--calendar-muted); }
 .weekdayCompact { display: none; font: 500 10px/1.4 var(--font-body); color: var(--calendar-muted); }
 .dateLine { position: relative; display: flex; align-items: center; justify-content: center; }
@@ -1216,4 +1214,233 @@
   .hoursEdge > button { gap: 4px; font-size: 10px; }
   .hoursEdge > button + button { margin-left: 0; }
   .eventForm input:not([type="checkbox"]):not([type="color"]), .eventForm textarea, .calendarSettingsForm input:not([type="checkbox"]):not([type="color"]) { font-size: 16px; } /* Avoid Safari focus zoom. */
+}
+
+/* Calendar command row, date navigation and source settings share the indigo rhythm. */
+.toolbar { display: grid; grid-template-columns: auto auto minmax(110px, 1fr) auto; align-items: center; gap: 12px; padding: 18px 24px 14px; flex: none; }
+.toolbar h1 { margin: 0 8px 0 0; font: 600 22px/1.3 var(--font-heading); letter-spacing: -.5px; }
+.dateNavigation, .toolbarTools { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.toolbar :global(.work-button) { height: 38px; min-height: 38px; padding: 7px 11px; font-size: 12px; white-space: nowrap; }
+.toolbar .periodButton { width: 34px; min-width: 34px; height: 38px; padding: 0; display: grid; place-items: center; }
+.toolbar .periodButton > span { display: grid; place-items: center; }
+.toolbar .monthTrigger { min-height: 38px; font-size: 15px; padding: 6px; white-space: nowrap; }
+.toolbarTools { justify-self: end; }
+.toolbarTools > :global(.app-select-trigger) { width: 124px; flex: none; height: 38px; min-height: 38px; padding: 7px 10px; font-size: 12px; }
+.toolbarTools > :global(.work-button) { flex: none; }
+.calendarSearch { display: flex; align-items: center; gap: 6px; border: 1px solid #e3e0ec; border-radius: 8px; padding-left: 10px; height: 38px; width: 180px; flex: none; color: #716b80; }
+.toolbar .search { width: 100%; min-width: 0; flex: 1; height: 36px; min-height: 36px; border: 0; background: transparent; padding: 6px 8px 6px 0; font-size: 12px; outline-offset: 0; }
+.draftSlot { grid-column: auto; grid-row: auto; min-height: 38px; }
+.draftNotice { min-height: 38px; height: 38px; padding: 0; gap: 4px; }
+.draftNotice > span { font-size: 10px; }
+.draftNotice :global(.work-button) { height: 28px; min-height: 28px; padding: 4px 6px; font-size: 11px; }
+.draftNotice :global(.work-button):last-child { width: 25px; padding: 2px; }
+.hoursEdge { gap: 7px; padding-block: 5px; min-height: 36px; }
+.hoursEdge > button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 28px; padding: 5px 10px; border: 1px solid #e1ddef; border-radius: 7px; color: #59518b; background: #f3f2f9; font-size: 11px; }
+.hoursEdge > button + button { margin: 0; color: #5a6040; border-color: #e0e4d3; background: #f1f3e9; }
+.hoursEdge > button + button::before { content: none; }
+.hoursEdge > button:hover { background: #e9e6f5; }
+.hoursEdge > button + button:hover { background: #e4e8d8; }
+.hoursEdge svg, .allDayItem > svg, .timedEventTitle > svg { display: block; flex: none; margin: 0; align-self: center; }
+.allDayItem { flex-wrap: nowrap; }
+
+/* A single date navigator drills into matching Day, Week, Month and Year views. */
+.dateNavigator { width: min(440px, calc(100vw - 24px)); padding: 12px; display: flex; flex-direction: column; gap: 12px; max-height: min(660px, var(--radix-popover-content-available-height)); }
+.navigatorScales { display: flex; gap: 3px; padding: 3px; background: #f3f2f9; border-radius: 9px; flex: none; }
+.navigatorScales button { display: flex; align-items: center; justify-content: center; gap: 6px; flex: 1; min-height: 34px; border: 0; border-radius: 6px; background: transparent; color: #716b80; font: 500 12px/1.4 var(--font-body); cursor: pointer; }
+.navigatorScales button[aria-selected="true"] { color: #59518b; background: white; box-shadow: 0 1px 4px #23383f12; }
+.dateNavigator .pickerHeading { flex: none; margin: 0; }
+.navigatorBody { overflow-y: auto; overscroll-behavior: contain; min-height: 0; height: 340px; scrollbar-gutter: stable; }
+.navigatorBody[data-mode="month"], .navigatorBody[data-mode="year"] { height: 210px; }
+.navigatorBody .calendarStage, .navigatorBody .calendarScene { height: auto; min-height: 100%; overflow: visible; }
+.navigatorBody .monthChoices { padding: 4px; gap: 8px; }
+.navigatorBody .monthChoices button { min-height: 42px; font-size: 12px; }
+.navigatorMonths { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 12px; padding: 4px 6px 8px; }
+.weekChoices { display: grid; gap: 4px; padding: 2px 4px; }
+.weekChoices button { display: grid; grid-template-columns: 70px 1fr auto; align-items: center; min-height: 42px; gap: 8px; padding: 8px 10px; border: 0; border-radius: 7px; color: #23383f; background: white; text-align: left; font: 400 12px/1.4 var(--font-body); cursor: pointer; }
+.weekChoices button > span:first-child { color: #716b80; }
+.weekChoices button:hover, .weekChoices button[aria-pressed="true"] { background: #f3f2f9; color: #59518b; }
+.weekChoices small { color: #928ba3; }
+.dateNavigator .pickerFooter { padding: 8px 0 0; flex: none; align-items: center; margin: 0; }
+.dateNavigator .pickerFooter > span { color: #716b80; font-size: 10px; }
+.dateNavigator .pickerFooter button { display: inline-flex; align-items: center; gap: 6px; border-radius: 6px; padding: 6px 8px; background: #f3f2f9; font-size: 12px; }
+
+/* Twelve native mini calendars make the year both legible and navigable. */
+.yearView { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px 24px; height: 100%; padding: 4px 16px 16px; align-content: stretch; }
+.miniMonth { min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 8px; background: white; border-radius: 10px; }
+.miniMonth h3, .miniMonthHeading { margin: 0; min-height: 24px; text-align: left; border: 0; padding: 0 4px; background: transparent; color: #59518b; font: 600 13px/1.5 var(--font-body); }
+.miniMonthHeading { cursor: pointer; }
+.miniMonthHeading:hover { text-decoration: underline; text-underline-offset: 4px; }
+.miniDays { display: grid; flex: 1; grid-template-rows: 20px repeat(6, minmax(20px, 1fr)); gap: 2px; }
+.miniWeekday { text-align: center; color: #827b90; font: 400 10px/20px var(--font-body); }
+.miniDays button { position: relative; display: grid; place-items: center; min-height: 24px; padding: 2px 0 5px; border: 0; border-radius: 5px; color: #34404a; background: transparent; font: 400 12px/1 var(--font-body); cursor: pointer; }
+.miniDays button:hover, .miniDays button[aria-pressed="true"] { background: #e9e6f5; color: #59518b; }
+.miniDays button[aria-current="date"] { background: #59518b; color: white; font-weight: 600; }
+.miniDays button i { position: absolute; bottom: 2px; left: calc(50% - 1.5px); width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+.navigatorMonths .miniMonth { padding: 0; gap: 4px; }
+.navigatorMonths .miniDays button { font-size: 11px; min-height: 25px; }
+
+/* Timed rows have a distinct time rail; month cards remain compact. */
+.agenda { width: min(100%, 1120px); max-width: none; height: auto; min-height: 100%; display: block; padding: 4px 24px 24px; }
+.agendaHeading { display: flex; justify-content: space-between; padding: 12px 0 18px; font: 400 12px/1.4 var(--font-body); color: #716b80; }
+.agendaHeading strong { color: #23383f; font-weight: 500; margin-left: 4px; }
+.agendaDay { display: grid; grid-template-columns: 136px minmax(0, 1fr); gap: 20px; padding: 18px 0; border-top: 1px solid #edeaf3; flex: none; align-items: start; }
+.agendaDate { display: flex; align-items: flex-start; gap: 10px; align-self: start; padding: 8px 0; border: 0; background: transparent; color: #59518b; cursor: pointer; text-align: left; }
+.agendaDate > strong { font: 500 30px/1.1 var(--font-heading); }
+.agendaDate > span { font: 500 12px/1.4 var(--font-body); padding-top: 2px; }
+.agendaDate small { display: block; margin-top: 3px; font: 400 11px/1.4 var(--font-body); color: #716b80; }
+.agendaDay[data-today="true"] .agendaDate > strong { border-radius: 8px; background: #f3f2f9; padding: 3px 6px; }
+.agendaRows { display: grid; gap: 7px; align-content: start; }
+.agendaEvent { display: flex; align-items: center; gap: 8px; margin: 0; min-width: 0; padding: 10px; border-left: 2px solid var(--event-color); }
+.agendaEvent .eventIcon { display: grid; place-items: center; flex: none; width: 24px; height: 24px; color: var(--event-color); margin: 0; }
+.agendaEvent .eventIcon > svg { display: block; margin: 0; flex: none; }
+.agendaEvent .eventCopy { flex: 1; min-width: 0; margin: 0; }
+.agendaEvent .eventCopy > strong { font: 500 13px/1.45 var(--font-body); overflow-wrap: anywhere; }
+.agendaEvent .eventCopy > small { color: #716b80; margin: 3px 0 0; font-size: 11px; }
+.agendaEvent .agendaTime { display: flex; flex-direction: column; flex: 0 0 70px; color: #716b80; font: 500 11px/1.4 var(--font-body); margin: 0; }
+.agendaEvent .agendaTime small { font: 400 10px/1.4 var(--font-body); color: #827b90; margin: 2px 0 0; }
+.agendaEvent .eventPeople { display: inline-flex; margin: 0 0 0 auto; }
+.agendaEvent .personAvatar { display: inline-flex; margin-top: 0; }
+.agendaEvent .personAvatar > span { font: inherit; margin: 0; }
+.agendaLinked { display: flex; gap: 10px; align-items: center; min-height: 48px; padding: 10px; background: #f7f8f4; border-radius: 8px; color: #5a6040; text-decoration: none; }
+.agendaLinked > span { width: 70px; flex: none; font-size: 11px; }
+.agendaLinked > strong { flex: 1; font-size: 13px; font-weight: 500; }
+.agendaLinked > small { font-size: 10px; }
+.agendaPagination { display: flex; align-items: center; justify-content: center; gap: 14px; padding: 16px 0; font-size: 12px; color: #716b80; }
+.agendaPagination :global(.work-button) { width: 34px; height: 34px; min-height: 34px; padding: 0; }
+.agendaPagination :global(.work-button) > span { display: grid; place-items: center; }
+.monthDay .agendaEvent { flex-wrap: wrap; gap: 3px 5px; padding: 5px; margin: 4px 0; }
+.monthDay .agendaEvent .agendaTime { order: 4; flex: 1 0 100%; display: block; font-size: 10px; padding-left: 22px; }
+.monthDay .agendaTime small { display: inline; margin: 0 0 0 4px; }
+.monthDay .eventCopy > small { display: none; }
+.monthDay .eventCopy > strong { font-size: 11px; }
+.monthDay .eventIcon { width: 17px; height: 20px; }
+.monthDay .eventPeople { --avatar-size: 17px; }
+
+/* Custom native checkboxes retain standard focus and keyboard behavior. */
+.calendarToggle { display: flex !important; flex-direction: row !important; align-items: center; gap: 10px !important; min-width: 0; cursor: pointer; }
+.calendarToggle > span { width: auto; height: auto; border-radius: 0; }
+.calendarToggle > svg { flex: none; display: block; color: #716b80; }
+.calendarToggle > input { margin-left: auto !important; }
+.calendarToggle input, .holidayChoice input, .customDateRow input { appearance: none; display: inline-grid; place-items: center; width: 18px !important; min-width: 18px; min-height: 18px !important; height: 18px; margin: 0; padding: 0 !important; border: 1px solid #bcb6cf !important; border-radius: 5px !important; background: white; flex: none; cursor: pointer; }
+.calendarToggle input:checked, .holidayChoice input:checked, .customDateRow input:checked { background: #59518b; border-color: #59518b !important; }
+.calendarToggle input::before, .holidayChoice input::before, .customDateRow input::before { content: ""; width: 8px; height: 4px; border: solid white; border-width: 0 0 2px 2px; transform: rotate(-45deg) translateY(-1px); opacity: 0; }
+.calendarToggle input:checked::before, .holidayChoice input:checked::before, .customDateRow input:checked::before { opacity: 1; }
+.calendarToggle input:focus-visible, .holidayChoice input:focus-visible, .customDateRow input:focus-visible { outline: 2px solid #59518b; outline-offset: 3px; }
+.calendarToggle input:disabled, .holidayChoice input:disabled, .customDateRow input:disabled { opacity: .5; cursor: wait; }
+.viewOptions { display: grid; gap: 16px; width: 304px; padding: 16px; }
+.viewOptionSection { display: grid; gap: 8px; }
+.viewOptions .calendarToggle { font: 400 12px/1.4 var(--font-body); min-height: 34px; }
+.viewOptions .calendarToggle > span { flex: 1; }
+.zoneControl { display: grid; gap: 9px; color: #716b80; font: 400 12px/1.4 var(--font-body); }
+.zoneControl :global(.app-select-trigger) { font-size: 12px; }
+.calendarChoiceMenu { width: min(350px, calc(100vw - 24px)); --module-quiet: #f3f2f9; --border-soft: #e2deef; }
+.calendarChoiceMenu :global(.app-choice-options) { scrollbar-width: thin; scrollbar-color: #aaa2c4 #f3f2f9; scrollbar-gutter: stable; }
+.calendarChoiceMenu :global(.app-choice-options)::-webkit-scrollbar, .holidayList::-webkit-scrollbar, .navigatorBody::-webkit-scrollbar { width: 7px; }
+.calendarChoiceMenu :global(.app-choice-options)::-webkit-scrollbar-thumb, .holidayList::-webkit-scrollbar-thumb, .navigatorBody::-webkit-scrollbar-thumb { background: #aaa2c4; border-radius: 8px; border: 2px solid #f3f2f9; }
+.calendarChoiceMenu :global(.app-select-item) { font: 400 12px/1.5 var(--font-body); }
+.calendarChoiceMenu :global(.app-select-item)[aria-selected="true"] { color: #59518b; background: #f3f2f9; }
+.calendarVisibility { display: grid; gap: 8px; }
+.calendarVisibility .calendarToggle { padding: 8px 10px; border-radius: 9px; min-height: 52px; background: #f9f8fc; }
+.calendarToggle > .visibilityIcon { width: 32px; height: 32px; border-radius: 8px; background: #f0f1e8; display: grid; place-items: center; flex: none; }
+.visibilityIcon svg { display: block; }
+.calendarToggle > .visibilityName { min-width: 0; flex: 1; font-size: 13px; font-weight: 500; }
+.settingsDisclosure { padding: 0; background: #faf9fc; border-radius: 10px; overflow: hidden; }
+.settingsDisclosure > summary { display: flex; align-items: center; gap: 10px; padding: 14px; list-style: none; min-height: 48px; font-size: 13px; }
+.settingsDisclosure > summary::-webkit-details-marker, .holidayCountry > summary::-webkit-details-marker { display: none; }
+.settingsDisclosure > summary > span { flex: 1; }
+.settingsDisclosure > summary > svg { display: block; flex: none; }
+.settingsDisclosure[open] > summary > svg:last-child { transform: rotate(180deg); }
+.settingsDisclosure > :not(summary) { margin: 0 14px 14px; }
+.settingsDisclosure > label { display: grid; gap: 6px; }
+.calendarNameRow { display: grid; grid-template-columns: 24px minmax(0, 1fr) 38px 32px; gap: 10px; align-items: end; padding-top: 8px; }
+.calendarNameIcon { display: grid; place-items: center; height: 38px; align-self: end; }
+.calendarNameRow label { display: grid; gap: 4px; min-width: 0; }
+.calendarNameRow label > span { color: #827b90; font: 400 10px/1.4 var(--font-body); }
+.calendarNameRow input { height: 38px; min-height: 38px; }
+.calendarNameRow input[type="color"] { padding: 4px; width: 38px; cursor: pointer; }
+.calendarNameRow :global(.work-button) { min-width: 32px; width: 32px; height: 38px; min-height: 38px; padding: 0; }
+.calendarNameRow :global(.work-button) > span:empty { display: none; }
+.countryFlag { flex: 0 0 24px; width: 24px; height: 16px; overflow: hidden; border-radius: 3px; box-shadow: 0 0 0 1px #23383f10; }
+.countryOption { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.holidayCountry { padding: 0; border: 1px solid #eeebf4; border-radius: 10px; background: white; }
+.holidayCountry > summary { padding: 12px; gap: 10px; background: #faf9fc; border-radius: 9px; list-style: none; }
+.holidayCountry > summary > strong { min-width: 0; flex: 1; font-weight: 500; }
+.holidayCountry > summary > span { margin-left: 0; flex: none; }
+.holidayCountry[open] summary > svg { transform: none; }
+.holidayCountry[open] summary > svg:last-child { transform: rotate(180deg); }
+.holidayList { gap: 2px; padding: 8px; max-height: 360px; scrollbar-width: thin; scrollbar-color: #aaa2c4 #f3f2f9; scrollbar-gutter: stable; }
+.holidayList .holidayChoice { display: flex !important; min-height: 62px; padding: 7px; gap: 12px !important; border-radius: 7px; }
+.holidayList .holidayChoice:hover { background: #f6f4fa; }
+.holidayDate { display: flex; flex-direction: column; align-items: center; justify-content: center; width: 40px; min-height: 44px; background: #f3f2f9; color: #59518b; border-radius: 7px; flex: none; }
+.holidayDate > span { font: 500 9px/1.3 var(--font-body); text-transform: uppercase; letter-spacing: .4px; }
+.holidayDate > strong { font: 500 19px/1.2 var(--font-heading); }
+.holidayName { min-width: 0; }
+.holidayName > strong { font: 500 12px/1.4 var(--font-body); color: #23383f; }
+.holidayName > small { font: 400 10px/1.5 var(--font-body); color: #827b90; margin-top: 3px; }
+.holidayCountry > :global(.work-button) { margin: 4px 12px 10px; font-size: 11px; min-height: 30px; }
+.holidaySource { font-size: 10px !important; }
+.customDateRow { padding: 8px 10px; border-radius: 8px; background: #faf9fc; }
+.customDateRow label strong { font-size: 12px; font-weight: 500; }
+.customDateRow label small { margin-top: 3px; font-size: 10px; }
+.customDateToggles { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.customDateToggles .calendarToggle { flex-direction: row-reverse !important; font-weight: 400; }
+.customDateToggles .calendarToggle input { margin-left: 0 !important; }
+.customDateSchedule { display: grid; gap: 10px; }
+
+@media (max-width: 1600px) {
+  .toolbar { gap: 9px; padding-inline: 18px; }
+  .toolbar .toolbarUtility { width: 38px; padding: 0; }
+  .toolbarUtility > span { display: none; }
+  .calendarSearch { width: 140px; }
+  .draftNotice > span { display: none; }
+}
+@media (max-width: 1180px) {
+  .toolbar { grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px; }
+  .toolbar h1 { display: none; }
+  .calendarSearch { width: 120px; }
+  .toolbar .dateNavigation { gap: 3px; }
+  .toolbar .monthTrigger { font-size: 14px; }
+  .toolbar .addEventButton { width: 38px; padding: 0; }
+  .addEventButton > span { display: none; }
+  .yearView { gap: 10px; padding-inline: 8px; }
+}
+@media (max-width: 900px) {
+  .toolbar { grid-template-columns: minmax(0, 1fr) auto; padding-inline: 12px; }
+  .draftSlot { grid-row: 2; grid-column: 1 / -1; min-height: 30px; }
+  .draftNotice { min-height: 30px; height: 30px; }
+  .draftNotice > span { display: inline; }
+  .calendarSearch { width: 100px; }
+  .toolbarTools { gap: 4px; }
+  .yearView { grid-template-columns: repeat(3, minmax(0, 1fr)); height: auto; }
+}
+@media (max-width: 760px) {
+  .toolbar { grid-template-columns: minmax(0, 1fr); padding: 10px 12px 6px; gap: 5px; }
+  .dateNavigation { justify-content: flex-start; }
+  .toolbarTools { justify-content: flex-end; justify-self: stretch; }
+  .toolbarTools .calendarSearch { width: auto; margin-right: auto; min-width: 0; flex: 1; }
+  .toolbar .search { width: 100%; min-width: 0; font-size: 16px; }
+  .toolbar .monthTrigger { font-size: 16px; }
+  .draftSlot { grid-row: 3; min-height: 28px; }
+  .toolbar :global(.work-button), .toolbarTools > :global(.app-select-trigger) { height: 34px; min-height: 34px; }
+  .toolbarTools > :global(.app-select-trigger) { width: 120px; }
+  .toolbar .periodButton { height: 34px; min-height: 34px; width: 32px; min-width: 32px; }
+  .hoursEdge > button { font-size: 10px; min-height: 28px; padding: 5px 8px; }
+  .yearView { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 4px; padding: 0; }
+  .miniMonth { padding: 5px; }
+  .miniDays { gap: 1px; }
+  .miniDays button { font-size: 10px; }
+  .agenda { padding: 0 8px 20px; }
+  .agendaDay { grid-template-columns: 1fr; gap: 7px; padding: 10px 0 16px; }
+  .agendaDate { align-items: center; gap: 8px; padding: 3px 0; }
+  .agendaDate > strong { font-size: 23px; }
+  .agendaDate > span { display: flex; align-items: baseline; gap: 6px; padding: 0; }
+  .agendaDate small { margin: 0; }
+  .agendaEvent .agendaTime { flex-basis: 54px; font-size: 10px; }
+  .agendaEvent .eventCopy > strong { font-size: 12px; }
+  .agendaEvent .eventIcon { width: 20px; }
+  .calendarNameRow { grid-template-columns: 20px minmax(0, 1fr) 32px 30px; gap: 6px; }
+  .calendarNameRow input[type="color"] { width: 32px; }
+  .navigatorScales button { gap: 4px; font-size: 11px; }
+  .navigatorMonths { gap: 14px 8px; }
+  .navigatorMonths .miniDays button { font-size: 10px; }
 }

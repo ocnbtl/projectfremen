@@ -21,7 +21,8 @@ export type CalendarObservanceSettings = {
   countries: string[];
   hiddenHolidays: string[];
   extraHolidays: string[];
-  custom: { id: string; title: string; date: string; annual: boolean; visible: boolean }[];
+  appearances?: Record<string, { name: string; color: string }>;
+  custom: { id: string; title: string; date: string; annual: boolean; visible: boolean; allDay?: boolean; startTime?: string; endTime?: string; endDate?: string; timeZone?: string }[];
 };
 export type Calendar = PlanningBase & {
   name: string;
@@ -117,7 +118,7 @@ export type EventOccurrence = EventFields & {
   source?: CalendarEvent["source"];
   overridden: boolean;
   ownerRef?: NativeObjectRef;
-  system?: { kind: "birthday" | "holiday" | "custom"; key: string; detail: string; country?: string };
+  system?: { kind: "birthday" | "holiday" | "custom"; key: string; detail: string; country?: string; color?: string; calendarName?: string };
 };
 export const PLANNING_COLLECTIONS = [
   "places",

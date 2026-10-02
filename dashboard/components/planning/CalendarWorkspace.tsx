@@ -1,9 +1,12 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
 import CalendarTimeGrid from "./CalendarTimeGrid";
+import CalendarYearView from "./CalendarYearView";
+import CalendarAgenda from "./CalendarAgenda";
+import { calendarRange, shiftCalendar, viewIcons, type CalendarView as View } from "../../lib/modules/planning/calendar-navigation";
 import EventPeople from "./EventPeople";
-import CalendarObservanceSettings from "./CalendarObservanceSettings";
-import { calendarObservances, defaultObservances, type HolidayCatalog } from "../../lib/modules/planning/observances";
+import CalendarObservanceSettings, { CalendarCountryFlag } from "./CalendarObservanceSettings";
+import { calendarObservances, defaultObservances, observanceAppearance, type HolidayCatalog } from "../../lib/modules/planning/observances";
 import EventEditorFields from "./EventEditorFields";
 import CalendarDatePicker from "./CalendarDatePicker";
 import { CalendarScene, useCalendarMotion } from "./CalendarMotion";
@@ -28,7 +31,6 @@ import { useSearchParams } from "next/navigation";
 import { Temporal } from "@js-temporal/polyfill";
 import {
   WorkspaceButton as Button,
-  WorkspaceHeader,
   WorkspaceFeedback,
   WorkspaceSheet,
   WorkspaceEmpty,
@@ -47,9 +49,6 @@ import {
   instantFor,
   localDate,
   localFor,
-  monthStart,
-  shiftMonth,
-  weekStart,
 } from "../../lib/modules/planning/calendar-model";
 import {
   effectiveEvent,
@@ -88,7 +87,6 @@ type EventDraft = {
 };
 // Session memory only: private drafts are never written to unencrypted browser storage.
 let retainedDraft: EventDraft | undefined;
-type View = "day" | "week" | "month" | "agenda";
 const labelDate = (
   date: string,
   options: Intl.DateTimeFormatOptions = { month: "long", day: "numeric" },
@@ -107,12 +105,10 @@ export default function CalendarWorkspace() {
   const [draft, setDraft] = useState<EventDraft | undefined>(
     () => retainedDraft,
   );
-  const [zoneInput, setZoneInput] = useState("");
   const [showWeekends, setShowWeekends] = useState(true),
     [showCompleted, setShowCompleted] = useState(false),
     [widenToday, setWidenToday] = useState(false);
-  const [dayDetail, setDayDetail] = useState<string>(),
-    [agendaPage, setAgendaPage] = useState(0);
+  const [dayDetail, setDayDetail] = useState<string>();
   const [zone, setZone] = useState("America/New_York"),
     [date, setDate] = useState(() => new Date().toISOString().slice(0, 10)),
     [view, setView] = useState<View>("week");
@@ -155,7 +151,6 @@ export default function CalendarWorkspace() {
   useEffect(() => {
     const z = Intl.DateTimeFormat().resolvedOptions().timeZone;
     setZone(z);
-    setZoneInput(z);
     const linkedDate = params.get("date");
     setDate(
       linkedDate && /^\d{4}-\d{2}-\d{2}$/.test(linkedDate)
@@ -242,27 +237,7 @@ export default function CalendarWorkspace() {
       setError("This event link has an invalid date.");
     }
   }, [params, snapshot, zone, openEvent]);
-  const range = useMemo(() => {
-    const start =
-      view === "month"
-        ? weekStart(monthStart(date))
-        : view === "week"
-          ? weekStart(date)
-          : date;
-    return {
-      start,
-      end: addDays(
-        start,
-        view === "month"
-          ? 42
-          : view === "week"
-            ? 7
-            : view === "agenda"
-              ? 30
-              : 1,
-      ),
-    };
-  }, [date, view]);
+  const range = useMemo(() => calendarRange(date, view), [date, view]);
   const holidayCountries = observanceSettings.countries.join(",");
   const holidayYears = [...new Set([range.start.slice(0, 4), addDays(range.end, -1).slice(0, 4), date.slice(0, 4)])].join(",");
   useEffect(() => {
@@ -324,7 +299,6 @@ export default function CalendarWorkspace() {
           x.title.toLowerCase().includes(query.toLowerCase()),
       )
     : [];
-  useEffect(() => setAgendaPage(0), [date, query, view, showCompleted]);
   async function action(work: () => Promise<unknown>, message: string) {
     setBusy(true);
     setError("");
@@ -492,22 +466,16 @@ export default function CalendarWorkspace() {
         style={
           {
             "--event-color":
-              item.system ? (item.system.kind === "birthday" ? "#5A6040" : "#716B80") : group?.color || calendarDisplayColor(calendar?.color),
+              item.system ? item.system.color || "#716B80" : group?.color || calendarDisplayColor(calendar?.color),
           } as CSSProperties
         }
         onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
         title={item.title}
       >
-        <strong>
-          {(group || item.system) && <UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group!.icon} size={14} />}{" "}
-          {item.title}
-        </strong>
+        <span className={styles.agendaTime}>{item.allDay ? "All day" : <>{timeLabel(item.startMs, zone)}<small>{timeLabel(item.endMs, zone)}</small></>}</span>
+        <span className={styles.eventIcon}><UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={16} /></span>
+        <span className={styles.eventCopy}><strong>{item.title}</strong>{item.location && <small>{item.location}</small>}</span>
         <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
-        <span>
-          {item.allDay
-            ? "All day"
-            : timeLabel(item.startMs, zone) + "–" + timeLabel(item.endMs, zone)}
-        </span>
       </button>
     );
   }
@@ -544,50 +512,13 @@ export default function CalendarWorkspace() {
       className={`work-surface ${styles.shell}`}
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
-      <WorkspaceHeader title="Calendar">
-        <Button icon="calendar" onClick={() => setConnections(true)}>Calendars</Button>
-        <Button intent="primary" icon="plus" onClick={() => create()}>
-          Add event
-        </Button>
-      </WorkspaceHeader>
-      <div className={styles.toolbar}>
-        <div className={`work-actions ${styles.dateNavigation}`}>
-          <Button onClick={() => setDate(localDate(new Date(), zone))}>
-            Today
-          </Button>
-          <Button
-            aria-label="Previous period"
-            className={styles.periodButton}
-            onClick={() =>
-              setDate(
-                view === "month"
-                  ? shiftMonth(date, -1)
-                  : addDays(
-                      date,
-                      view === "week" ? -7 : view === "agenda" ? -30 : -1,
-                    ),
-              )
-            }
-          >
-            <UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} />
-          </Button>
-          <Button
-            aria-label="Next period"
-            className={styles.periodButton}
-            onClick={() =>
-              setDate(
-                view === "month"
-                  ? shiftMonth(date, 1)
-                  : addDays(
-                      date,
-                      view === "week" ? 7 : view === "agenda" ? 30 : 1,
-                    ),
-              )
-            }
-          >
-            <UnigentamosIcon role="chevron-right" size={18} />
-          </Button>
-          <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} onChange={setDate} />
+      <header className={styles.toolbar} aria-label="Calendar controls">
+        <h1>Calendar</h1>
+        <div className={styles.dateNavigation}>
+          <Button onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
+          <Button aria-label="Previous period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, -1))}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></Button>
+          <Button aria-label="Next period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, 1))}><UnigentamosIcon role="chevron-right" size={18} /></Button>
+          <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => { setDate(day); setView(next); }} />
         </div>
         <div className={styles.draftSlot}>
           {draft && !editor && <div className={styles.draftNotice}>
@@ -596,82 +527,33 @@ export default function CalendarWorkspace() {
             <Button onClick={() => finishEditing()} aria-label="Discard draft" title="Discard draft" icon="close" />
           </div>}
         </div>
-        <div className="work-actions">
-          <input
-            className={styles.search}
-            type="search"
-            aria-label="Search events"
-            placeholder="Search events"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <SelectField
-            aria-label="Calendar view"
-            value={view}
-            onChange={(e) => setView(e.target.value as View)}
-          >
-            {["day", "week", "month", "agenda"].map((v) => (
-              <option key={v} value={v}>
-                <span className={styles.viewChoice}><UnigentamosIcon role={({ day: "today", week: "week", month: "calendar", agenda: "list" } as Record<string, string>)[v]} size={16} />{v[0].toUpperCase() + v.slice(1)}</span>
-              </option>
-            ))}
+        <div className={styles.toolbarTools}>
+          <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" placeholder="Search events" value={query} onChange={e => setQuery(e.target.value)} /></label>
+          <SelectField aria-label="Calendar view" value={view} onChange={e => setView(e.target.value as View)}>
+            {(["day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
-            <Popover.Trigger asChild>
-              <Button icon="sliders">View options</Button>
-            </Popover.Trigger>
-            <Popover.Portal>
-              <Popover.Content
-                className={styles.calendarPopover}
-                sideOffset={8}
-                collisionPadding={12}
-              >
-                {[
-                  ["Show weekends", showWeekends, setShowWeekends, "week"],
-                  ["Show completed tasks", showCompleted, setShowCompleted, "check"],
-                  ["Widen today", widenToday, setWidenToday, "today"],
-                  ["Linked work and trips", showDated, setShowDated, "link"],
-                ].map(([label, checked, set, icon]) => (
-                  <label className={styles.calendarToggle} key={String(label)}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(checked)}
-                      onChange={(e) =>
-                        (set as (v: boolean) => void)(e.target.checked)
-                      }
-                    />
-                    <UnigentamosIcon role={String(icon)} size={16} />{String(label)}
-                  </label>
-                ))}
-                <label>
-                  <span className={styles.viewChoice}><UnigentamosIcon role="clock" size={16} />Display time zone</span>
-                  <input
-                    value={zoneInput}
-                    onChange={(e) => setZoneInput(e.target.value)}
-                    onBlur={() => {
-                      try {
-                        new Intl.DateTimeFormat("en", { timeZone: zoneInput });
-                        setZone(zoneInput);
-                        setError("");
-                      } catch {
-                        setError(
-                          "Choose a recognized time zone, such as America/New_York.",
-                        );
-                      }
-                    }}
-                    list="calendar-zones"
-                  />
-                </label>
-                <datalist id="calendar-zones">
-                  {Intl.supportedValuesOf("timeZone").map((z) => (
-                    <option key={z}>{z}</option>
-                  ))}
-                </datalist>
-              </Popover.Content>
-            </Popover.Portal>
+            <Popover.Trigger asChild><Button icon="sliders" aria-label="View options" className={styles.toolbarUtility}>View options</Button></Popover.Trigger>
+            <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar view options">
+              <div className={styles.viewOptionSection}>
+                <ViewToggle label="Widen today" icon="today" checked={widenToday} onChange={setWidenToday} />
+                <ViewToggle label="Show weekends" icon="week" checked={showWeekends} onChange={setShowWeekends} />
+              </div>
+              <div className={styles.viewOptionSection}>
+                <ViewToggle label="Display completed tasks" icon="check" checked={showCompleted} onChange={setShowCompleted} />
+                <ViewToggle label="Linked work and trips" icon="link" checked={showDated} onChange={setShowDated} />
+              </div>
+              <label className={styles.zoneControl}><span className={styles.viewChoice}><UnigentamosIcon role="clock" size={16} />Display time zone</span>
+                <SelectField searchable aria-label="Display time zone" value={zone} menuClassName={styles.calendarChoiceMenu} onChange={e => setZone(e.target.value)}>
+                  {[...new Set([zone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(z => <option key={z} value={z}>{z.replaceAll("_", " ").replaceAll("/", " / ")}</option>)}
+                </SelectField>
+              </label>
+            </Popover.Content></Popover.Portal>
           </Popover.Root>
+          <Button icon="calendar" aria-label="Calendars" className={styles.toolbarUtility} onClick={() => setConnections(true)}>Calendars</Button>
+          <Button intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>Add event</Button>
         </div>
-      </div>
+      </header>
       <WorkspaceFeedback
         error={error || expanded.error || holidayError}
         message={notice}
@@ -727,7 +609,7 @@ export default function CalendarWorkspace() {
       ) : (
         <div className={styles.content}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
-          {view === "month" ? (
+          {view === "year" ? <CalendarYearView date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => { setDate(day); setView("day"); }} onMonth={day => { setDate(day); setView("month"); }} /> : view === "month" ? (
             <div
               className={styles.month}
               style={{
@@ -775,86 +657,11 @@ export default function CalendarWorkspace() {
                       View all events
                     </button>
                   )}
-                  <button
-                    className={styles.addDay}
-                    aria-label={`Add event on ${day}`}
-                    onClick={() => create(day)}
-                  >
-                    +
-                  </button>
                 </motion.section>
               ))}
             </div>
           ) : view === "agenda" ? (
-            <div className={styles.agenda}>
-              {[
-                ...occurrences.map((item) => ({
-                  id: item.id,
-                  start: item.start,
-                  title: item.title,
-                  item,
-                })),
-                ...dated.map((link) => ({
-                  id: link.id,
-                  start: link.start,
-                  title: link.title,
-                  link,
-                })),
-              ]
-                .sort((a, b) => a.start.localeCompare(b.start))
-                .slice(agendaPage * 5, agendaPage * 5 + 5)
-                .map((row) => (
-                  <section className={styles.agendaDay} key={row.id}>
-                    <h2>
-                      {labelDate(row.start.slice(0, 10), {
-                        weekday: "short",
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </h2>
-                    {"item" in row ? (
-                      eventButton(row.item)
-                    ) : (
-                      <Link
-                        className={styles.dated}
-                        href={row.link.ownerRef?.route || "/admin/personal"}
-                      >
-                        {row.title}
-                        {row.link.completed ? " · Completed" : ""}
-                      </Link>
-                    )}
-                  </section>
-                ))}
-              {!occurrences.length && !dated.length ? (
-                <WorkspaceEmpty title="Room to plan">
-                  Add an event, connect a calendar, or schedule linked work.
-                </WorkspaceEmpty>
-              ) : (
-                <div className="work-actions">
-                  <Button
-                    disabled={agendaPage === 0}
-                    onClick={() => setAgendaPage(agendaPage - 1)}
-                  >
-                    Previous
-                  </Button>
-                  <span>
-                    Page {agendaPage + 1} of{" "}
-                    {Math.max(
-                      1,
-                      Math.ceil((occurrences.length + dated.length) / 5),
-                    )}
-                  </span>
-                  <Button
-                    disabled={
-                      (agendaPage + 1) * 5 >= occurrences.length + dated.length
-                    }
-                    onClick={() => setAgendaPage(agendaPage + 1)}
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
-            </div>
+            <CalendarAgenda key={[range.start, query, showCompleted, showDated].join(":")} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={eventButton} onDay={day => { setDate(day); setView("day"); }} />
           ) : (
             <CalendarTimeGrid
               days={days}
@@ -1078,7 +885,8 @@ export default function CalendarWorkspace() {
       >
         {observance && <div className={styles.observanceDetail}>
           <EventPeople refs={observance.linkedRefs} available={snapshot?.refs} limit={100} />
-          <p><UnigentamosIcon role={observance.system?.kind === "birthday" ? "birthday" : "star"} size={18} />{labelDate(observance.start, { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
+          <p><UnigentamosIcon role={observance.system?.kind === "birthday" ? "birthday" : "star"} size={18} />{labelDate(localFor(observance.startMs, zone).slice(0, 10), { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
+          {!observance.allDay && <p><UnigentamosIcon role="clock" size={18} />{timeLabel(observance.startMs, zone)}–{timeLabel(observance.endMs, zone)} · {zone.replaceAll("_", " ")}</p>}
           <p>{observance.system?.detail}</p>
           {observance.ownerRef && <Link className="work-button" href={observance.ownerRef.route}>Open {observance.ownerRef.label}’s profile</Link>}
           <Button icon="sliders" onClick={() => { setObservance(undefined); setCalendarTab(observance.system?.kind === "birthday" ? "calendars" : "holidays"); setConnections(true); }}>Manage {observance.system?.kind === "birthday" ? "birthdays" : "holidays & dates"}</Button>
@@ -1098,12 +906,15 @@ export default function CalendarWorkspace() {
           {calendarTab === "holidays" ? <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => action(() => savePlanning("calendars", { id: "native", observances: settings }, nativeCalendar?.updatedAt), "")} /> : <>
           <section className={styles.calendarVisibility} aria-label="Visible calendars">
             {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <label className={styles.calendarToggle} key={c.id}>
-              <input type="checkbox" checked={c.visible} disabled={busy} onChange={() => void action(() => savePlanning("calendars", { id: c.id, visible: !c.visible }, c.updatedAt), "")} />
-              <span className={styles.calendarDot} style={{ background: calendarDisplayColor(c.color) }} />{c.name}
+              <span className={styles.visibilityIcon} style={{ color: calendarDisplayColor(c.color), background: "color-mix(in srgb, " + calendarDisplayColor(c.color) + " 10%, white)" }}><UnigentamosIcon role="calendar" size={18} /></span><span className={styles.visibilityName}>{c.name}</span>
+              <input type="checkbox" aria-label={c.name} checked={c.visible} disabled={busy} onChange={() => void action(() => savePlanning("calendars", { id: c.id, visible: !c.visible }, c.updatedAt), "")} />
             </label>)}
-            <label className={styles.calendarToggle}><input type="checkbox" checked={observanceSettings.birthdays} disabled={busy} onChange={e => void action(() => savePlanning("calendars", { id: "native", observances: { ...observanceSettings, birthdays: e.target.checked } }, nativeCalendar?.updatedAt), "")} /><UnigentamosIcon role="birthday" size={16} />People’s birthdays</label>
+            <label className={styles.calendarToggle}>
+              <span className={styles.visibilityIcon} style={{ color: observanceAppearance(observanceSettings, "birthdays").color }}><UnigentamosIcon role="birthday" size={18} /></span><span className={styles.visibilityName}>{observanceAppearance(observanceSettings, "birthdays").name}</span>
+              <input type="checkbox" aria-label={observanceAppearance(observanceSettings, "birthdays").name} checked={observanceSettings.birthdays} disabled={busy} onChange={e => void action(() => savePlanning("calendars", { id: "native", observances: { ...observanceSettings, birthdays: e.target.checked } }, nativeCalendar?.updatedAt), "")} />
+            </label>
           </section>
-          <details className={styles.settingsDisclosure}><summary>Add a calendar</summary>
+          <details className={styles.settingsDisclosure}><summary><UnigentamosIcon role="plus" size={18} /><span>Add a calendar</span><UnigentamosIcon role="chevron-down" size={16} /></summary>
           <form
             className="work-form"
             onSubmit={(e) => {
@@ -1143,7 +954,7 @@ export default function CalendarWorkspace() {
           </form>
           </details>
           <details className={styles.settingsDisclosure}>
-            <summary>Calendar names & colors</summary>
+            <summary><UnigentamosIcon role="palette" size={18} /><span>Calendar names & colors</span><UnigentamosIcon role="chevron-down" size={16} /></summary>
             {snapshot?.state.calendars
               .filter((calendar) => !calendar.archivedAt)
               .map((calendar) => (
@@ -1164,9 +975,14 @@ export default function CalendarWorkspace() {
                   }
                 />
               ))}
+            {[{ key: "birthdays", name: "People’s birthdays" }, ...observanceSettings.countries.map(code => ({ key: "holidays:" + code, name: holidayData?.countries.find(country => country.code === code)?.name || code })), { key: "custom", name: "Custom dates" }].map(entry => <CalendarSettings
+              key={entry.key + ":" + nativeCalendar?.updatedAt} calendar={observanceAppearance(observanceSettings, entry.key, entry.name)} busy={busy}
+              icon={entry.key === "birthdays" ? "birthday" : "star"} country={entry.key.startsWith("holidays:") ? entry.key.slice(9) : undefined}
+              onSave={(name, color) => action(() => savePlanning("calendars", { id: "native", observances: { ...observanceSettings, appearances: { ...observanceSettings.appearances, [entry.key]: { name, color } } } }, nativeCalendar?.updatedAt), "Calendar updated")}
+            />)}
           </details>
           <details className={styles.settingsDisclosure}>
-            <summary>Import or subscribe</summary>
+            <summary><UnigentamosIcon role="link" size={18} /><span>Import or subscribe</span><UnigentamosIcon role="chevron-down" size={16} /></summary>
             <label>
               Name
               <input
@@ -1332,46 +1148,59 @@ function CalendarSettings({
   calendar,
   busy,
   onSave,
+  icon = "calendar",
+  country,
 }: {
-  calendar: Calendar;
+  calendar: Pick<Calendar, "name" | "color">;
   busy: boolean;
   onSave: (name: string, color: string) => Promise<boolean>;
+  icon?: string;
+  country?: string;
 }) {
   const [name, setName] = useState(calendar.name),
     [color, setColor] = useState(calendar.color);
   return (
     <form
-      className="work-form work-section"
+      className={styles.calendarNameRow}
       onSubmit={(event) => {
         event.preventDefault();
         void onSave(name, color);
       }}
     >
-      <label>
-        Calendar name
+      <span className={styles.calendarNameIcon} style={{ color }}>{country ? <CalendarCountryFlag code={country} /> : <UnigentamosIcon role={icon} size={18} />}</span>
+      <label className={styles.calendarNameInput}>
+        <span>Calendar name</span>
         <input
           required
+          maxLength={120}
+          aria-label={`Name for ${calendar.name}`}
           value={name}
           onChange={(event) => setName(event.target.value)}
         />
       </label>
-      <label>
-        Color for {calendar.name}
+      <label className={styles.calendarColorInput}>
+        <span>Color</span>
         <input
           type="color"
+          aria-label={`Color for ${calendar.name}`}
           value={color}
           onChange={(event) => setColor(event.target.value)}
         />
       </label>
       <Button
         type="submit"
+        aria-label={`Save ${calendar.name}`}
+        icon="check"
         busy={busy}
         disabled={name === calendar.name && color === calendar.color}
       >
-        Save calendar
       </Button>
     </form>
   );
+}
+
+function ViewToggle({ label, icon, checked, onChange }: { label: string; icon: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return <label className={styles.calendarToggle}><UnigentamosIcon role={icon} size={17} /><span>{label}</span><input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} /></label>;
 }
 
 /** Re-tint the former default without changing stored or custom calendar colors. */

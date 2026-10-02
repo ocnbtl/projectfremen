@@ -213,7 +213,7 @@ export default function CalendarTimeGrid({
                   {allDay.map(item => {
                     const calendar = calendars.find(c => c.id === item.calendarId),
                       group = eventGroup(calendar, item.groupId),
-                      color = item.system ? (item.system.kind === "birthday" ? "#5A6040" : "#716B80") : group?.color || (calendar?.color?.toLowerCase() === "#565b86" ? "#59518B" : calendar?.color) || "#59518B";
+                      color = item.system?.color || group?.color || (calendar?.color?.toLowerCase() === "#565b86" ? "#59518B" : calendar?.color) || "#59518B";
                     return <motion.button type="button" key={item.id} layout="position" transition={{ layout: layoutTransition }}
                       className={styles.allDayItem} style={{ "--event-color": color } as CSSProperties}
                       aria-label={`${item.title} · All day${group ? ` · ${group.name}` : ""}`} title={`${item.title} · All day`}
@@ -377,7 +377,7 @@ export default function CalendarTimeGrid({
                 const c = calendars.find((c) => c.id === item.calendarId),
                   group = eventGroup(c, item.groupId),
                   color =
-                    group?.color ||
+                    item.system?.color || group?.color ||
                     (c?.color?.toLowerCase() === "#565b86"
                       ? "#59518B"
                       : c?.color) ||
@@ -412,7 +412,7 @@ export default function CalendarTimeGrid({
                       layout="position"
                       transition={{ layout: layoutTransition }}
                       type="button"
-                      draggable
+                      draggable={!item.system}
                       onDragStartCapture={(e) =>
                         e.dataTransfer.setData(
                           "application/x-unigentamos-event",
@@ -422,14 +422,14 @@ export default function CalendarTimeGrid({
                       onClick={() => onOpen(item)}
                       aria-label={title}
                     >
-                      <span className={styles.timedEventTitle}>{group && <UnigentamosIcon role={group.icon} size={12} />}<strong>{item.title}</strong><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
+                      <span className={styles.timedEventTitle}>{(group || item.system) && <UnigentamosIcon role={item.system ? "star" : group!.icon} size={12} />}<strong>{item.title}</strong><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
                       {bottom - top > 30 && (
                         <span>
                           {clock(from)}–{clock(until)}
                         </span>
                       )}
                     </motion.button>
-                    <button
+                    {!item.system && <button
                       type="button"
                       className={styles.fittedResize}
                       aria-label={`Resize ${item.title}; arrow keys adjust by 5 minutes`}
@@ -481,7 +481,7 @@ export default function CalendarTimeGrid({
                         resize.current = undefined;
                         setResizing(undefined);
                       }}
-                    />
+                    />}
                   </motion.div>
                 );
               })}
