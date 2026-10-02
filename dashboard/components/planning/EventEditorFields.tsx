@@ -5,14 +5,11 @@ import SelectField from "../ui/SelectField";
 import RecordLinks from "./RecordLinks";
 import EventDateTimePicker from "./EventDateTimePicker";
 import type {
-  Calendar,
   EventFields,
-  EventGroup,
 } from "../../lib/modules/planning/types";
 import type { PlanningSnapshot } from "../../lib/modules/planning/repository";
 import {
   calendarGroups,
-  GROUP_ICONS,
 } from "../../lib/modules/planning/calendar-groups";
 import { addDays } from "../../lib/modules/planning/calendar-model";
 import styles from "./CalendarWorkspace.module.css";
@@ -21,22 +18,11 @@ export default function EventEditorFields({
   fields,
   update,
   snapshot,
-  busy,
-  onCreateGroup,
-  onSaveGroups,
 }: {
   fields: EventFields;
   update: <K extends keyof EventFields>(key: K, value: EventFields[K]) => void;
   snapshot?: PlanningSnapshot;
-  busy: boolean;
-  onCreateGroup: (calendar: Calendar, group: EventGroup) => Promise<boolean>;
-  onSaveGroups: (calendar: Calendar, groups: EventGroup[]) => Promise<boolean>;
 }) {
-  const [newGroup, setNewGroup] = useState(false),
-    [groupName, setGroupName] = useState("");
-  const [groupColor, setGroupColor] = useState("#59518B"),
-    [groupIcon, setGroupIcon] = useState("star");
-  const [groupEditor, setGroupEditor] = useState<{ calendar: Calendar; groups: EventGroup[] } | null>(null);
   const [recurrenceDraft, setRecurrenceDraft] = useState(fields.recurrence || "FREQ=WEEKLY;INTERVAL=1");
   const [reminderDraft, setReminderDraft] = useState(fields.reminderMinutes ?? 15);
   const [reminderUnit, setReminderUnit] = useState(() =>
@@ -148,8 +134,6 @@ export default function EventEditorFields({
               onChange={(e) => {
                 update("calendarId", e.target.value);
                 update("groupId", "");
-                setGroupEditor(null);
-                setNewGroup(false);
               }}
             >
               {snapshot?.state.calendars
@@ -282,26 +266,7 @@ export default function EventEditorFields({
         <div className={styles.editorSectionTitle}>
           <UnigentamosIcon role="palette" size={18} />
           <strong>Color group</strong>
-          <button type="button" className={styles.editorIconButton} aria-label="Edit group colors" title="Edit group colors" aria-expanded={Boolean(groupEditor)} disabled={busy || !calendar} onClick={() => {
-            setGroupEditor(groupEditor || !calendar ? null : { calendar, groups: calendarGroups(calendar).map((group) => ({ ...group })) });
-            setNewGroup(false);
-          }}><UnigentamosIcon role="sliders" size={18} /></button>
         </div>
-        {groupEditor && <div className={styles.groupColorEditor} role="group" aria-label="Edit all group colors">
-          <div className={styles.groupColorRows}>
-            {groupEditor.groups.map((group) => <label key={group.id}>
-              <UnigentamosIcon role={group.icon} size={18} />
-              <span>{group.name}</span>
-              <input type="color" aria-label={`${group.name} color`} value={group.color} disabled={busy} onChange={(event) => setGroupEditor((current) => current ? { ...current, groups: current.groups.map((item) => item.id === group.id ? { ...item, color: event.target.value } : item) } : null)} />
-            </label>)}
-          </div>
-          <div className={styles.groupColorActions}>
-            <button type="button" className="work-button work-button--quiet" disabled={busy} onClick={() => setGroupEditor(null)}>Cancel</button>
-            <button type="button" className="work-button" disabled={busy} onClick={async () => {
-              if (await onSaveGroups(groupEditor.calendar, groupEditor.groups)) setGroupEditor(null);
-            }}>Save colors</button>
-          </div>
-        </div>}
         <div className={styles.groupChoices}>
           <button
             type="button"
@@ -322,73 +287,7 @@ export default function EventEditorFields({
               {g.name}
             </button>
           ))}
-          <button
-            type="button"
-            aria-expanded={newGroup}
-            onClick={() => { setNewGroup(!newGroup); setGroupEditor(null); }}
-          >
-            <UnigentamosIcon role="plus" size={16} />
-            Create group
-          </button>
         </div>
-        {newGroup && (
-          <div className={styles.newGroup}>
-            <label>
-              Group name
-              <input
-                maxLength={80}
-                value={groupName}
-                onChange={(e) => setGroupName(e.target.value)}
-              />
-            </label>
-            <label>
-              Color
-              <input
-                type="color"
-                value={groupColor}
-                onChange={(e) => setGroupColor(e.target.value)}
-              />
-            </label>
-            <div
-              className={styles.groupChoices}
-              role="group"
-              aria-label="Group icon"
-            >
-              {GROUP_ICONS.map((icon) => (
-                <button
-                  type="button"
-                  aria-label={icon}
-                  aria-pressed={icon === groupIcon}
-                  key={icon}
-                  onClick={() => setGroupIcon(icon)}
-                >
-                  <UnigentamosIcon role={icon} size={18} />
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              className="work-button"
-              disabled={busy || !groupName.trim() || !calendar}
-              onClick={async () => {
-                if (!calendar) return;
-                const group = {
-                  id: crypto.randomUUID(),
-                  name: groupName.trim(),
-                  color: groupColor,
-                  icon: groupIcon,
-                };
-                if (await onCreateGroup(calendar, group)) {
-                  update("groupId", group.id);
-                  setNewGroup(false);
-                  setGroupName("");
-                }
-              }}
-            >
-              Save group
-            </button>
-          </div>
-        )}
       </section>
       <section className={styles.editorSection} aria-label="Linked objects">
         <RecordLinks

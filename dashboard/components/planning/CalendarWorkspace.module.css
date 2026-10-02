@@ -861,17 +861,6 @@
   border-color: var(--group-color, #59518b);
   background: color-mix(in srgb, var(--group-color, #59518b) 12%, white);
 }
-.newGroup {
-  display: grid;
-  grid-template-columns: 1fr 64px;
-  gap: 10px;
-  background: #f8f7fb;
-  padding: 12px;
-  border-radius: 8px;
-}
-.newGroup .groupChoices {
-  grid-column: 1 / -1;
-}
 .eventForm { gap: 16px; }
 .eventForm :global(.work-form-footer) { border-top: 0; }
 .eventDescription textarea { min-height: 64px; }
@@ -895,14 +884,6 @@
 .everyLabel { color: #716b80; font-size: 12px; }
 .scheduleOption[data-enabled="false"] { color: #716b80; }
 .customRecurrence { min-width: 0; }
-.editorIconButton { display: inline-grid; place-items: center; width: 32px; height: 32px; min-height: 32px; margin-left: auto; padding: 0; border: 0; border-radius: 7px; background: transparent; color: #59518b; cursor: pointer; }
-.editorIconButton:hover, .editorIconButton[aria-expanded="true"] { background: #f3f2f9; }
-.groupColorEditor { display: grid; gap: 12px; padding: 12px; border-radius: 10px; background: #f8f7fb; }
-.groupColorRows { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 16px; }
-.groupColorRows label { display: flex !important; align-items: center; gap: 8px !important; min-width: 0; font-size: 12px; color: #59518b; }
-.groupColorRows label span { flex: 1; overflow-wrap: anywhere; }
-.groupColorRows label > svg { flex: none; }
-.groupColorRows input[type="color"] { width: 36px; min-height: 32px; height: 32px; padding: 3px; border-color: #cbc7e4; cursor: pointer; flex: none; }
 .groupColorActions { display: flex; justify-content: flex-end; gap: 8px; }
 .groupColorActions button { width: auto; }
 @media (max-width: 480px) {
@@ -910,7 +891,6 @@
   .scheduleOption { grid-template-columns: 1fr; gap: 4px; }
   .scheduleOptionFields { padding-left: 26px; }
   .customRecurrence { margin-left: 26px; }
-  .groupColorRows { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .checkboxMark { transition: none; } }
 @media (max-width: 760px) {
@@ -1064,9 +1044,6 @@
 }
 .editorSectionTitle .quietToggle {
   margin-left: auto;
-}
-.newGroup input[type="color"] {
-  padding: 3px;
 }
 .hoursEdge {
   padding-right: 130px;
@@ -1467,3 +1444,22 @@
 .calendarToggle input:checked::before, .holidayChoice input:checked::before, .customDateRow input:checked::before { transform: rotate(-45deg) translateY(-1px) scale(1); }
 @media (prefers-reduced-motion: reduce) { .calendarVisibility .calendarToggle, .calendarToggle input, .holidayChoice input, .customDateRow input, .calendarToggle input::before, .holidayChoice input::before, .customDateRow input::before { transition: none; } }
 :global([data-product-motion="reduce"]) :is(.calendarToggle, .holidayChoice, .customDateRow) input, :global([data-product-motion="reduce"]) :is(.calendarToggle, .holidayChoice, .customDateRow) input::before, :global([data-product-motion="reduce"]) .calendarVisibility .calendarToggle { transition: none; }
+
+/* Event entry uses whitespace to separate purpose, schedule and linked context. */
+.eventForm { gap: 28px; }
+.eventForm > label { gap: 10px; }
+.eventForm .editorSection { gap: 18px; }
+.eventForm .editorSectionTitle { min-height: 28px; }
+.eventForm .editorSection :global(.work-form-pair) { gap: 18px; }
+.eventForm .scheduleOption { padding-block: 4px; }
+.eventForm .groupChoices { gap: 8px; }
+.eventForm :global(.work-form-footer) { margin-top: 4px; padding-top: 8px; }
+.groupSettings { display: grid; gap: 20px; }
+.groupSettings > p { margin: 0; font: 400 12px/1.6 var(--font-body); }
+.groupSettingsRows { display: grid; gap: 20px; }
+.groupSettingsRow { display: grid; grid-template-columns: minmax(0, 1fr) 130px 48px; align-items: end; gap: 12px; }
+.groupSettingsRow label { min-width: 0; color: var(--text-muted); font-size: 11px; }
+.groupSettingsRow input, .groupSettingsRow :global(.app-select-trigger) { min-width: 0; height: 40px; }
+.groupSettingsRow input[type="color"] { width: 48px; padding: 4px; cursor: pointer; }
+.groupSettings > button { justify-self: start; }
+@media (max-width: 480px) { .groupSettingsRow { grid-template-columns: minmax(0, 1fr) 136px 40px; gap: 8px; } .groupSettingsRow input[type="color"] { width: 40px; } .settingsTabs button { gap: 5px; padding-inline: 6px; font-size: 11px; } }

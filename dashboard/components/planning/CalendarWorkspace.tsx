@@ -8,12 +8,12 @@ import EventPeople from "./EventPeople";
 import CalendarObservanceSettings, { CalendarCountryFlag } from "./CalendarObservanceSettings";
 import { calendarObservances, defaultObservances, observanceAppearance, type HolidayCatalog } from "../../lib/modules/planning/observances";
 import EventEditorFields from "./EventEditorFields";
+import CalendarGroupSettings from "./CalendarGroupSettings";
 import CalendarDatePicker from "./CalendarDatePicker";
 import { CalendarScene, useCalendarMotion } from "./CalendarMotion";
 import { motion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import {
-  calendarGroups,
   eventGroup,
 } from "../../lib/modules/planning/calendar-groups";
 import RelatedRecords from "./RelatedRecords";
@@ -135,7 +135,7 @@ export default function CalendarWorkspace() {
       MODULE_COLOR_SYSTEM.calendar.tokens.icon,
     );
   const [observance, setObservance] = useState<EventOccurrence>();
-  const [calendarTab, setCalendarTab] = useState<"calendars" | "holidays">("calendars");
+  const [calendarTab, setCalendarTab] = useState<"calendars" | "groups" | "holidays">("calendars");
   const [holidayData, setHolidayData] = useState<HolidayCatalog>(), [holidayError, setHolidayError] = useState(""), [holidayLoading, setHolidayLoading] = useState(false);
   const [holidayRetry, setHolidayRetry] = useState(0);
   // Keep the UI responsive while ordered writes preserve record-version checks.
@@ -842,27 +842,6 @@ export default function CalendarWorkspace() {
               fields={editor.fields}
               update={update}
               snapshot={snapshot}
-              busy={busy}
-              onSaveGroups={(calendar, groups) =>
-                action(
-                  () => savePlanning("calendars", { id: calendar.id, groups }, calendar.updatedAt),
-                  "Group colors saved",
-                )
-              }
-              onCreateGroup={(calendar, group) =>
-                action(
-                  () =>
-                    savePlanning(
-                      "calendars",
-                      {
-                        id: calendar.id,
-                        groups: [...calendarGroups(calendar), group],
-                      },
-                      calendar.updatedAt,
-                    ),
-                  "Color group saved",
-                )
-              }
             />
             {editor.original && (
               <RelatedRecords
@@ -950,9 +929,10 @@ export default function CalendarWorkspace() {
           <WorkspaceFeedback error={error} message={notice} />
           <div className={styles.settingsTabs} role="group" aria-label="Calendar settings sections">
             <button type="button" aria-pressed={calendarTab === "calendars"} onClick={() => setCalendarTab("calendars")}><UnigentamosIcon role="calendar" size={16} />Calendars</button>
+            <button type="button" aria-pressed={calendarTab === "groups"} onClick={() => setCalendarTab("groups")}><UnigentamosIcon role="palette" size={16} />Color groups</button>
             <button type="button" aria-pressed={calendarTab === "holidays"} onClick={() => setCalendarTab("holidays")}><UnigentamosIcon role="star" size={16} />Holidays & dates</button>
           </div>
-          {calendarTab === "holidays" ? <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} /> : <>
+          {calendarTab === "groups" ? <CalendarGroupSettings calendars={snapshot?.state.calendars.filter(calendar => !calendar.archivedAt) || []} busy={busy} onSave={(calendar, groups) => action(() => savePlanning("calendars", { id: calendar.id, groups }, calendar.updatedAt), "Color groups saved")} /> : calendarTab === "holidays" ? <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} /> : <>
           <section className={styles.calendarVisibility} aria-label="Visible calendars">
             {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <label className={styles.calendarToggle} key={c.id}>
               <span className={styles.visibilityIcon} style={{ color: calendarDisplayColor(c.color), background: "color-mix(in srgb, " + calendarDisplayColor(c.color) + " 10%, white)" }}><UnigentamosIcon role="calendar" size={18} /></span><span className={styles.visibilityName}>{c.name}</span>
