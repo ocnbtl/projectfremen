@@ -21,13 +21,15 @@
 .tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; margin-bottom: 8px; background: #f3f2f9; border-radius: 11px; }
 .tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 6px 8px; background: transparent; border-radius: 8px; color: #716b80; }
 .tabs button > span:not(.tabSelection) { display: inline-flex; align-items: center; gap: 6px; position: relative; font-size: 12px; }
-.tabs button .tabName { font-size: 10px; }
 .tabs button[aria-selected="true"] { color: #59518b; }
 .tabSelection { position: absolute; inset: 0; background: white; border-radius: 8px; box-shadow: 0 1px 4px #23383f0d; }
 .tabs, .footer { flex: none; }
-.pane { height: 264px; min-height: 220px; flex: 1 1 264px; }
-.datePanel { height: 100%; }
-.dateArea { height: calc(100% - 40px); }
+.popover { height: 396px; max-height: min(396px, var(--radix-popover-content-available-height, calc(100dvh - 24px))); overflow: hidden; }
+.pane { min-height: 0; flex: 1 1 264px; overflow: hidden; isolation: isolate; }
+.datePanel { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+.heading { flex: none; }
+.dateArea { min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: #d1ccdf transparent; }
+.dateArea > div { min-height: 224px; }
 .days { display: grid; height: 100%; grid-template-rows: 20px repeat(6, minmax(0, 1fr)); }
 .days [role="row"] { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .weekdays { height: 20px; align-items: center; text-align: center; color: #716b80; font-size: 11px; }
@@ -49,13 +51,13 @@
 .timeColumns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; min-height: 0; flex: 1; }
 .timeColumns > div { display: flex; flex-direction: column; min-height: 0; }
 .columnLabel { display: block; margin-bottom: 4px; text-align: center; font-size: 10px; color: #716b80; }
-.timeOptions { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #d1ccdf transparent; border-radius: 8px; }
+.timeOptions { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; touch-action: pan-y; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: #d1ccdf transparent; border-radius: 8px; }
 .timeOptions button { display: grid; place-items: center; width: 100%; height: 40px; background: transparent; border-radius: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
 .timeOptions button:hover { background: #ebe8f3; }
 .timeOptions button[aria-pressed="true"] { color: #59518b; font-weight: 600; }
 .timeSelection { background: #e5e0f0; border-radius: 7px; }
 .timeOptions button:focus-visible { outline-offset: -2px; }
-.footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.footer { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; margin-top: 12px; background: white; }
 .footer button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 12px; border-radius: 9px; background: transparent; color: #59518b; font-size: 12px; font-weight: 500; }
 .footer button:hover { background: var(--module-quiet); }
 .footer .done { background: var(--module-icon); color: white; }

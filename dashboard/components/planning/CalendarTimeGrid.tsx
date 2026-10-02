@@ -31,9 +31,8 @@ const minuteOf = (ms: number, zone: string) => {
   const s = localFor(ms, zone);
   return Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
 };
-const clock = (minute: number) =>
-  `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 const hourName = (h: number) => `${h % 12 || 12} ${h < 12 ? "am" : "pm"}`;
+const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 export default function CalendarTimeGrid({
   days,
   zone,
@@ -47,7 +46,6 @@ export default function CalendarTimeGrid({
   late,
   setEarly,
   setLate,
-  onCreate,
   onOpen,
   onDay,
   onMove,
@@ -65,7 +63,6 @@ export default function CalendarTimeGrid({
   late: boolean;
   setEarly: (value: boolean) => void;
   setLate: (value: boolean) => void;
-  onCreate: (day: string, hour?: number, duration?: number) => void;
   onOpen: (event: EventOccurrence) => void;
   onDay: (day: string) => void;
   onMove: (event: EventOccurrence, day: string, hour: number) => void;
@@ -74,13 +71,6 @@ export default function CalendarTimeGrid({
   const { reduced, layoutTransition } = useCalendarMotion();
   const [height, setHeight] = useState(400),
     hours = useRef<HTMLDivElement>(null);
-  const [cursor, setCursor] = useState({ day: "", minute: 540 });
-  const [selection, setSelection] = useState<{
-    day: string;
-    start: number;
-    end: number;
-  }>();
-  const origin = useRef<{ day: string; minute: number } | undefined>(undefined);
   const resize = useRef<
     { item: EventOccurrence; y: number; end: number } | undefined
   >(undefined);
@@ -154,13 +144,6 @@ export default function CalendarTimeGrid({
               {earlyEvents.length === 1 ? "event" : "events"}
             </b>
           )}
-        </button>
-        <button
-          type="button"
-          aria-label="Add an early event"
-          onClick={() => onCreate(days.includes(today) ? today : days[0], 7)}
-        >
-          <UnigentamosIcon role="plus" size={13} />Early event
         </button>
       </div>
       <div
@@ -259,33 +242,6 @@ export default function CalendarTimeGrid({
               key={day}
               data-today={day === today}
               data-calendar-day={day}
-              onPointerMove={(e) => {
-                if (origin.current?.day === day) {
-                  const m = atPointer(e);
-                  setSelection({
-                    day,
-                    start: Math.min(origin.current.minute, m),
-                    end: Math.max(origin.current.minute, m) + 5,
-                  });
-                }
-              }}
-              onPointerUp={(e) => {
-                if (origin.current?.day === day) {
-                  const m = atPointer(e),
-                    first = origin.current.minute;
-                  onCreate(
-                    day,
-                    Math.min(first, m) / 60,
-                    first === m ? 60 : Math.abs(first - m) + 5,
-                  );
-                }
-                origin.current = undefined;
-                setSelection(undefined);
-              }}
-              onPointerCancel={() => {
-                origin.current = undefined;
-                setSelection(undefined);
-              }}
               onDragOver={(e) => {
                 if (
                   e.dataTransfer.types.includes(
@@ -293,7 +249,6 @@ export default function CalendarTimeGrid({
                   )
                 ) {
                   e.preventDefault();
-                  setCursor({ day, minute: atPointer(e) });
                 }
               }}
               onDrop={(e) => {
@@ -307,64 +262,9 @@ export default function CalendarTimeGrid({
               }}
             >
               {Array.from({ length: endHour - startHour }, (_, i) => {
-                const h = startHour + i,
-                  focused =
-                    cursor.day === day && Math.floor(cursor.minute / 60) === h,
-                  minute = focused ? cursor.minute : h * 60;
-                return (
-                  <motion.button
-                    layout
-                    transition={{ layout: layoutTransition }}
-                    initial={false}
-                    type="button"
-                    className={styles.hourSlot}
-                    key={h}
-                    aria-label={`Add event ${day} at ${clock(minute)}`}
-                    data-hour={h}
-                    onPointerDown={(e) => {
-                      if (e.button !== 0) return;
-                      const parent = e.currentTarget.parentElement!;
-                      const m = Math.max(
-                        startHour * 60,
-                        Math.min(
-                          endHour * 60 - 5,
-                          startHour * 60 +
-                            Math.floor(
-                              (e.clientY - parent.getBoundingClientRect().top) /
-                                px /
-                                5,
-                            ) *
-                              5,
-                        ),
-                      );
-                      origin.current = { day, minute: m };
-                      setSelection({ day, start: m, end: m + 5 });
-                      parent.setPointerCapture(e.pointerId);
-                    }}
-                    onClick={(e) => {
-                      if (e.detail === 0) onCreate(day, minute / 60);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                        e.preventDefault();
-                        const next = Math.max(
-                          startHour * 60,
-                          Math.min(
-                            endHour * 60 - 5,
-                            minute + (e.key === "ArrowUp" ? -5 : 5),
-                          ),
-                        );
-                        setCursor({ day, minute: next });
-                        if (Math.floor(next / 60) !== h)
-                          (
-                            e.currentTarget.parentElement?.querySelector(
-                              `[data-hour="${Math.floor(next / 60)}"]`,
-                            ) as HTMLElement
-                          )?.focus();
-                      }
-                    }}
-                  />
-                );
+                const h = startHour + i;
+                return <motion.div layout transition={{ layout: layoutTransition }} initial={false}
+                  className={styles.hourSlot} key={h} data-hour={h} aria-hidden="true" />;
               })}
               {laid.map((item) => {
                 const from =
@@ -448,6 +348,7 @@ export default function CalendarTimeGrid({
                         }
                       }}
                       onPointerDown={(e) => {
+                        if (e.pointerType !== "mouse") return;
                         e.stopPropagation();
                         resize.current = {
                           item,
@@ -486,20 +387,6 @@ export default function CalendarTimeGrid({
                   </motion.div>
                 );
               })}
-              {selection?.day === day && (
-                <div
-                  className={styles.dragPreview}
-                  style={{
-                    top: position(selection.start),
-                    height: Math.max(
-                      18,
-                      (selection.end - selection.start) * px,
-                    ),
-                  }}
-                >
-                  {clock(selection.start)}–{clock(selection.end)}
-                </div>
-              )}
               {day === today &&
                 minuteOf(now, zone) >= startHour * 60 &&
                 minuteOf(now, zone) < endHour * 60 && (
@@ -531,13 +418,6 @@ export default function CalendarTimeGrid({
               {lateEvents.length} {lateEvents.length === 1 ? "event" : "events"}
             </b>
           )}
-        </button>
-        <button
-          type="button"
-          aria-label="Add a late event"
-          onClick={() => onCreate(days.includes(today) ? today : days[0], 23)}
-        >
-          <UnigentamosIcon role="plus" size={13} />Late event
         </button>
       </div>
     </div>

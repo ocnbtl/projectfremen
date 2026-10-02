@@ -101,6 +101,7 @@ export default function CalendarWorkspace() {
   const params = useSearchParams();
   const { layoutTransition } = useCalendarMotion();
   const previousDate = useRef("");
+  const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
   const [early, setEarly] = useState(false), [late, setLate] = useState(false);
   const [draft, setDraft] = useState<EventDraft | undefined>(
     () => retainedDraft,
@@ -573,7 +574,7 @@ export default function CalendarWorkspace() {
           {draft && !editor && <div className={styles.draftNotice}>
             <UnigentamosIcon role="edit" size={14} /><span>Unsaved draft</span>
             <Button onClick={() => setEditor(draft)} aria-label="Resume draft">Resume</Button>
-            <Button onClick={() => finishEditing()} aria-label="Discard draft" title="Discard draft" icon="close" />
+            <Button onClick={() => finishEditing()} aria-label="Discard draft" title="Discard draft">Discard</Button>
           </div>}
         </div>
         <div className={styles.toolbarTools}>
@@ -656,7 +657,21 @@ export default function CalendarWorkspace() {
           Your records will appear here when loading completes.
         </WorkspaceEmpty>
       ) : (
-        <div className={styles.content}>
+        <div className={styles.content}
+          onTouchStart={event => {
+            const touch = event.touches.length === 1 ? event.touches[0] : undefined;
+            swipe.current = touch ? { x: touch.clientX, y: touch.clientY } : undefined;
+          }}
+          onTouchCancel={() => { swipe.current = undefined; }}
+          onTouchEnd={event => {
+            const start = swipe.current, touch = event.changedTouches[0];
+            swipe.current = undefined;
+            if (!start || !touch || event.touches.length) return;
+            const dx = touch.clientX - start.x, dy = touch.clientY - start.y;
+            if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+            if (event.cancelable) event.preventDefault();
+            setDate(current => shiftCalendar(current, view, dx < 0 ? 1 : -1));
+          }}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
           {view === "year" ? <CalendarYearView date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => { setDate(day); setView("day"); }} onMonth={day => { setDate(day); setView("month"); }} /> : view === "month" ? (
             <div
@@ -725,7 +740,6 @@ export default function CalendarWorkspace() {
               late={late}
               setEarly={setEarly}
               setLate={setLate}
-              onCreate={create}
               onDay={setDayDetail}
               onOpen={(item) => {
                 if (item.system) { setObservance(item); return; }
@@ -756,9 +770,6 @@ export default function CalendarWorkspace() {
       >
         {dayDetail && (
           <>
-            <Button icon="plus" onClick={() => create(dayDetail)}>
-              Add event
-            </Button>
             {occurrences
               .filter(
                 (x) =>
@@ -845,6 +856,7 @@ export default function CalendarWorkspace() {
             />
             {editor.original && (
               <RelatedRecords
+                hideEmpty
                 module="calendar"
                 type="event"
                 id={editor.original.id}

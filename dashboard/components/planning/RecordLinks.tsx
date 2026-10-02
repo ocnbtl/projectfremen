@@ -53,7 +53,7 @@ export default function RecordLinks({
                 }
                 aria-label={`Unlink ${ref.label}`}
               >
-                ×
+                <UnigentamosIcon role="close" size={14} />
               </button>
             )}
           </span>

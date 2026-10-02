@@ -27,6 +27,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
   const [open, setOpen] = useState(false), [mode, setMode] = useState<"days" | "months">("days");
   const [pane, setPane] = useState<"date" | "time">("date");
   const [page, setPage] = useState(day), [focused, setFocused] = useState(day), [direction, setDirection] = useState(1);
+  const trigger = useRef<HTMLButtonElement>(null);
   const grid = useRef<HTMLDivElement>(null), timeControls = useRef<HTMLDivElement>(null), pendingFocus = useRef(false);
   const id = useId(), { reduced, layoutTransition } = useCalendarMotion();
   let today = day;
@@ -75,7 +76,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
       if (next) { setPage(day); setFocused(day); setMode("days"); setPane("date"); }
       setOpen(next);
     }}>
-      <Popover.Trigger asChild><button type="button" className={styles.trigger} aria-label={label}
+      <Popover.Trigger asChild><button ref={trigger} type="button" className={styles.trigger} aria-label={label}
         aria-description={`${dateLabel(day, { dateStyle: "full" })}${allDay ? ", all day" : `, ${clockHour}:${pad(minute)} ${period}, ${timeZone}`}`}
         data-value={value}>
         <UnigentamosIcon role="interaction-date" size={18} />
@@ -83,7 +84,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
           <small>{allDay ? "All day" : `${clockHour}:${pad(minute)} ${period}`}</small></span>
         <UnigentamosIcon role="chevron-down" size={14} />
       </button></Popover.Trigger>
-      <Popover.Portal><Popover.Content className={styles.popover} style={moduleThemeVariables("calendar") as CSSProperties}
+      <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={styles.popover} style={moduleThemeVariables("calendar") as CSSProperties}
         data-reduced-motion={reduced} sideOffset={8} collisionPadding={12} align="start" aria-label={`${label} date${allDay ? "" : " and time"}`}
         onEscapeKeyDown={event => event.stopImmediatePropagation()}
         onOpenAutoFocus={event => {
@@ -93,7 +94,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
         <LayoutGroup id={id}>
           {!allDay && <div className={styles.tabs} role="tablist" aria-label={`${label} date or time`}>
             {(["date", "time"] as const).map(tab => <button type="button" role="tab" key={tab} id={`${id}-${tab}-tab`}
-              aria-selected={pane === tab} aria-controls={`${id}-${tab}-panel`} tabIndex={pane === tab ? 0 : -1}
+              aria-label={tab === "date" ? "Date" : "Time"} aria-selected={pane === tab} aria-controls={`${id}-${tab}-panel`} tabIndex={pane === tab ? 0 : -1}
               onClick={() => setPane(tab)} onKeyDown={event => {
                 if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
                 event.preventDefault();
@@ -103,7 +104,6 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
               {pane === tab && <motion.span className={styles.tabSelection} layoutId="active-pane" transition={layoutTransition} />}
               <span><UnigentamosIcon role={tab === "date" ? "interaction-date" : "clock"} size={15} />
                 {tab === "date" ? dateLabel(day, { month: "short", day: "numeric" }) : `${clockHour}:${pad(minute)} ${period}`}</span>
-              <span className={styles.tabName}>{tab === "date" ? "Date" : "Time"}</span>
             </button>)}
           </div>}
           <div className={styles.pane}>

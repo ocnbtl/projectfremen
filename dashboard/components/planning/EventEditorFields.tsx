@@ -76,6 +76,33 @@ export default function EventEditorFields({
           onChange={(e) => update("description", e.target.value)}
         />
       </label>
+      <section className={styles.editorSection} aria-label="Color groups">
+        <div className={styles.editorSectionTitle}>
+          <UnigentamosIcon role="palette" size={18} />
+          <strong>Color group</strong>
+        </div>
+        <div className={styles.groupChoices}>
+          <button
+            type="button"
+            aria-pressed={!fields.groupId}
+            onClick={() => update("groupId", "")}
+          >
+            None
+          </button>
+          {calendarGroups(calendar).map((g) => (
+            <button
+              type="button"
+              key={g.id}
+              aria-pressed={g.id === fields.groupId}
+              style={{ "--group-color": g.color } as React.CSSProperties}
+              onClick={() => update("groupId", g.id)}
+            >
+              <UnigentamosIcon role={g.icon} size={16} />
+              {g.name}
+            </button>
+          ))}
+        </div>
+      </section>
       <label className={styles.locationField}>
         <UnigentamosIcon role="location" size={18} />
         <input
@@ -165,15 +192,10 @@ export default function EventEditorFields({
         className={styles.editorSection}
         aria-label="Repeat and reminder"
       >
-        <div className={styles.editorSectionTitle}>
-          <UnigentamosIcon role="routine" size={18} />
-          <strong>Repeat & remind</strong>
-        </div>
         <div className={styles.scheduleOption} data-enabled={Boolean(fields.recurrence)}>
-          <EventCheckbox label="Repeat" checked={Boolean(fields.recurrence)} onChange={(checked) => update("recurrence", checked ? recurrenceDraft : "")} />
+          <EventCheckbox icon="routine" label="Repeat" checked={Boolean(fields.recurrence)} onChange={(checked) => update("recurrence", checked ? recurrenceDraft : "")} />
           {simpleRule ? (
             <div className={styles.scheduleOptionFields}>
-              <span className={styles.everyLabel}>Every</span>
               <input
                 aria-label="Repeat interval"
                 type="number"
@@ -222,7 +244,7 @@ export default function EventEditorFields({
           </label>)}
         </div>
         <div className={styles.scheduleOption} data-enabled={fields.reminderMinutes !== null}>
-          <EventCheckbox label="Reminder" checked={fields.reminderMinutes !== null} onChange={(checked) => update("reminderMinutes", checked ? reminderDraft : null)} />
+          <EventCheckbox icon="clock" label="Reminder" checked={fields.reminderMinutes !== null} onChange={(checked) => update("reminderMinutes", checked ? reminderDraft : null)} />
           <div className={styles.scheduleOptionFields}>
               <input
                 aria-label="Reminder amount"
@@ -262,33 +284,6 @@ export default function EventEditorFields({
           </div>
         </div>
       </section>
-      <section className={styles.editorSection} aria-label="Color groups">
-        <div className={styles.editorSectionTitle}>
-          <UnigentamosIcon role="palette" size={18} />
-          <strong>Color group</strong>
-        </div>
-        <div className={styles.groupChoices}>
-          <button
-            type="button"
-            aria-pressed={!fields.groupId}
-            onClick={() => update("groupId", "")}
-          >
-            None
-          </button>
-          {calendarGroups(calendar).map((g) => (
-            <button
-              type="button"
-              key={g.id}
-              aria-pressed={g.id === fields.groupId}
-              style={{ "--group-color": g.color } as React.CSSProperties}
-              onClick={() => update("groupId", g.id)}
-            >
-              <UnigentamosIcon role={g.icon} size={16} />
-              {g.name}
-            </button>
-          ))}
-        </div>
-      </section>
       <section className={styles.editorSection} aria-label="Linked objects">
         <RecordLinks
           objectPicker
@@ -321,10 +316,11 @@ export default function EventEditorFields({
   );
 }
 
-function EventCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+function EventCheckbox({ label, checked, onChange, icon }: { label: string; checked: boolean; onChange: (checked: boolean) => void; icon?: string }) {
   return <label className={`${styles.quietToggle} ${styles.eventCheckbox}`}>
     <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
     <span className={styles.checkboxMark} aria-hidden="true"><UnigentamosIcon role="check" size={13} /></span>
+    {icon && <UnigentamosIcon role={icon} size={16} />}
     <span>{label}</span>
   </label>;
 }

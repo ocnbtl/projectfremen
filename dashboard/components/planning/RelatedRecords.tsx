@@ -7,10 +7,12 @@ export default function RelatedRecords({
   module,
   type,
   id,
+  hideEmpty = false,
 }: {
   module: ModuleId;
   type: string;
   id: string;
+  hideEmpty?: boolean;
 }) {
   const [items, setItems] = useState<
       { ref: NativeObjectRef; detail: string }[]
@@ -38,6 +40,7 @@ export default function RelatedRecords({
       });
     return () => controller.abort();
   }, [module, type, id]);
+  if (hideEmpty && !error && (!loaded || !items.length)) return null;
   return (
     <section className="work-related">
       <h3>Places, events and media</h3>
