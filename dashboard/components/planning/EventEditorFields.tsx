@@ -3,6 +3,7 @@ import { useState } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 import RecordLinks from "./RecordLinks";
+import EventDateTimePicker from "./EventDateTimePicker";
 import type {
   Calendar,
   EventFields,
@@ -120,36 +121,23 @@ export default function EventEditorFields({
         </div>
         <div className="work-form-pair">
           {(["start", "end"] as const).map((key) => (
-            <label key={key}>
-              {key === "start" ? "Start" : "End"}
-              <input
-                required
-                type={fields.allDay ? "date" : "datetime-local"}
-                step={
-                  fields.allDay
-                    ? 1
-                    : Number(fields[key].slice(14, 16)) % 5 === 0
-                      ? 300
-                      : 60
-                }
-                value={
-                  fields.allDay
-                    ? key === "end"
-                      ? addDays(fields.end, -1)
-                      : fields.start
-                    : fields[key].slice(0, 16)
-                }
-                onChange={(e) => {
-                  if (e.target.value)
-                    update(
-                      key,
-                      fields.allDay && key === "end"
-                        ? addDays(e.target.value, 1)
-                        : e.target.value,
-                    );
-                }}
-              />
-            </label>
+            <EventDateTimePicker
+              key={`${key}:${fields.allDay}`}
+              label={key === "start" ? "Start" : "End"}
+              allDay={fields.allDay}
+              timeZone={fields.timeZone}
+              value={
+                fields.allDay
+                  ? key === "end"
+                    ? addDays(fields.end, -1)
+                    : fields.start
+                  : fields[key].slice(0, 16)
+              }
+              onChange={(value) => update(
+                key,
+                fields.allDay && key === "end" ? addDays(value, 1) : value,
+              )}
+            />
           ))}
         </div>
         <div className="work-form-pair">

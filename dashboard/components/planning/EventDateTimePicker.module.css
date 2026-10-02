@@ -1,0 +1,67 @@
+.field { display: grid; gap: 6px; min-width: 0; }
+.label { font: 500 13px/1.4 var(--font-body); color: #23383f; }
+.trigger { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid #dedce8; border-radius: 10px; background: #fbfafd; color: #59518b; cursor: pointer; text-align: left; transition: background-color 150ms, border-color 150ms; }
+.trigger:hover, .trigger[data-state="open"] { border-color: #a49cbe; background: #f3f2f9; }
+.trigger > svg { flex: none; }
+.trigger > svg:last-child { margin-left: auto; transition: transform 180ms cubic-bezier(.23, 1, .32, 1); }
+.trigger[data-state="open"] > svg:last-child { transform: rotate(180deg); }
+.value { display: grid; gap: 3px; font: 500 13px/1.4 var(--font-body); color: #23383f; font-variant-numeric: tabular-nums; }
+.value small { font: 500 12px/1.4 var(--font-body); color: #716b80; }
+.trigger:focus-visible, .popover button:focus-visible { outline: 2px solid var(--module-focus, #746ca5); outline-offset: 2px; }
+.popover { z-index: 1602; width: 340px; max-width: calc(100vw - 24px); max-height: var(--radix-popover-content-available-height); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 12px; border: 1px solid #e5e2ed; border-radius: 16px; background: white; color: #23383f; box-shadow: 0 0 0 1px #59518b04, 0 4px 12px #23383f08, 0 16px 48px #23383f1a; font: 400 13px/1.4 var(--font-body); transform-origin: var(--radix-popover-content-transform-origin); animation: arrive 200ms cubic-bezier(.23, 1, .32, 1); }
+.popover[data-state="closed"] { animation: leave 120ms ease-out; pointer-events: none; }
+.popover { display: flex; flex-direction: column; }
+.popover button { position: relative; color: inherit; border: 0; cursor: pointer; box-shadow: none; font-family: var(--font-body); transition: background-color 120ms, color 120ms; }
+.popover button:hover { box-shadow: none; }
+.heading { display: flex; align-items: center; justify-content: space-between; gap: 4px; }
+.arrow { display: grid; place-items: center; width: 40px; height: 40px; flex: none; background: transparent; border-radius: 10px; }
+.month { display: inline-flex; gap: 8px; align-items: center; justify-content: center; padding: 8px; min-height: 40px; border-radius: 10px; background: transparent; font: 600 14px/1.4 var(--font-heading) !important; }
+.month svg { color: #716b80; transition: transform 180ms cubic-bezier(.23, 1, .32, 1); }
+.arrow:hover, .month:hover { background: var(--module-quiet); }
+.tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; margin-bottom: 8px; background: #f3f2f9; border-radius: 11px; }
+.tabs button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 6px 8px; background: transparent; border-radius: 8px; color: #716b80; }
+.tabs button > span:not(.tabSelection) { display: inline-flex; align-items: center; gap: 6px; position: relative; font-size: 12px; }
+.tabs button .tabName { font-size: 10px; }
+.tabs button[aria-selected="true"] { color: #59518b; }
+.tabSelection { position: absolute; inset: 0; background: white; border-radius: 8px; box-shadow: 0 1px 4px #23383f0d; }
+.tabs, .footer { flex: none; }
+.pane { height: 264px; min-height: 220px; flex: 1 1 264px; }
+.datePanel { height: 100%; }
+.dateArea { height: calc(100% - 40px); }
+.days { display: grid; height: 100%; grid-template-rows: 20px repeat(6, minmax(0, 1fr)); }
+.days [role="row"] { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.weekdays { height: 20px; align-items: center; text-align: center; color: #716b80; font-size: 11px; }
+.days button { display: grid; place-items: center; width: 100%; height: 100%; min-height: 26px; padding: 0; background: transparent; border-radius: 10px; font-size: 12px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.days button[data-outside="true"] { color: #847c94; }
+.days button:hover { background: var(--module-quiet); }
+.days [aria-selected="true"] button { color: white; }
+.selection, .timeSelection { position: absolute; inset: 2px; background: var(--module-icon); border-radius: 9px; pointer-events: none; }
+.dayNumber, .timeOptions button > span:last-child { position: relative; z-index: 1; }
+.days button[aria-current="date"]::after { content: ""; position: absolute; width: 3px; height: 3px; bottom: 5px; left: calc(50% - 1.5px); border-radius: 50%; background: currentColor; }
+.months { display: grid; height: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding-block: 4px; box-sizing: border-box; }
+.months button { border-radius: 10px; background: transparent; font-size: 13px; }
+.months button:hover { background: var(--module-quiet); }
+.months button[aria-pressed="true"] { background: var(--module-icon); color: white; }
+.timeArea { display: flex; flex-direction: column; height: 100%; box-sizing: border-box; padding: 12px; background: #f8f7fb; border-radius: 12px; }
+.timeHeading { display: flex; gap: 8px; align-items: center; justify-content: space-between; color: #59518b; margin-bottom: 8px; }
+.timeHeading > span { display: inline-flex; gap: 6px; align-items: center; font-weight: 500; }
+.timeHeading small { min-width: 0; text-overflow: ellipsis; overflow: hidden; white-space: nowrap; font-size: 10px; color: #716b80; }
+.timeColumns { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; min-height: 0; flex: 1; }
+.timeColumns > div { display: flex; flex-direction: column; min-height: 0; }
+.columnLabel { display: block; margin-bottom: 4px; text-align: center; font-size: 10px; color: #716b80; }
+.timeOptions { position: relative; flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: #d1ccdf transparent; border-radius: 8px; }
+.timeOptions button { display: grid; place-items: center; width: 100%; height: 40px; background: transparent; border-radius: 8px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.timeOptions button:hover { background: #ebe8f3; }
+.timeOptions button[aria-pressed="true"] { color: #59518b; font-weight: 600; }
+.timeSelection { background: #e5e0f0; border-radius: 7px; }
+.timeOptions button:focus-visible { outline-offset: -2px; }
+.footer { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.footer button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 40px; padding: 8px 12px; border-radius: 9px; background: transparent; color: #59518b; font-size: 12px; font-weight: 500; }
+.footer button:hover { background: var(--module-quiet); }
+.footer .done { background: var(--module-icon); color: white; }
+.footer .done:hover { background: #4d457c; }
+@keyframes arrive { from { opacity: 0; transform: translateY(-4px) scale(.97); } to { opacity: 1; transform: none; } }
+@keyframes leave { from { opacity: 1; transform: none; } to { opacity: 0; transform: translateY(-2px) scale(.985); } }
+.popover[data-reduced-motion="true"] { animation: none; }
+@media (prefers-reduced-motion: reduce) { .popover { animation: none; } .trigger > svg:last-child, .month svg { transition: none; } }
+:global([data-product-motion="reduce"]) .trigger > svg:last-child { transition: none; }
