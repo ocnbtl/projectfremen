@@ -89,6 +89,7 @@ export default function CalendarTimeGrid({
     endHour = late ? 24 : 22,
     minutes = (endHour - startHour) * 60;
   const today = localDate(new Date(now), zone);
+  const currentTime = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit", hour12: true }).format(now);
   useLayoutEffect(() => {
     const element = hours.current;
     if (!element) return;
@@ -504,11 +505,13 @@ export default function CalendarTimeGrid({
                 minuteOf(now, zone) < endHour * 60 && (
                   <motion.div
                     className={styles.now}
+                    role="img"
+                    aria-label={`Current time: ${currentTime} (${zone})`}
                     layout="position"
                     transition={{ layout: reduced ? { duration: 0 } : layoutTransition }}
                     style={{ top: position(minuteOf(now, zone)) }}
                   >
-                    <span>{clock(minuteOf(now, zone))}</span>
+                    <time dateTime={new Date(now).toISOString()}>{currentTime}</time>
                   </motion.div>
                 )}
             </motion.div>
