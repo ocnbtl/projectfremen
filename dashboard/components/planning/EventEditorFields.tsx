@@ -1,4 +1,5 @@
 "use client";
+import { calendarDisplayColor } from "./calendar-presentation";
 import { useState } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
@@ -76,11 +77,8 @@ export default function EventEditorFields({
           onChange={(e) => update("description", e.target.value)}
         />
       </label>
-      <section className={styles.editorSection} aria-label="Color groups">
-        <div className={styles.editorSectionTitle}>
-          <UnigentamosIcon role="palette" size={18} />
-          <strong>Color group</strong>
-        </div>
+      <section className={styles.groupField} aria-label="Color groups">
+        <UnigentamosIcon role="palette" size={18} />
         <div className={styles.groupChoices}>
           <button
             type="button"
@@ -154,7 +152,7 @@ export default function EventEditorFields({
           ))}
         </div>
         <div className="work-form-pair">
-          <label>
+          <label className={styles.editorCalendar} style={{ "--selected-calendar": calendarDisplayColor(calendar?.color) } as React.CSSProperties}>
             Calendar
             <SelectField
               value={fields.calendarId}

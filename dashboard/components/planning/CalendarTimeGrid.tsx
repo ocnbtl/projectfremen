@@ -1,5 +1,6 @@
 "use client";
 import { animate, motion } from "motion/react";
+import { eventColors, eventPreviewTitle } from "./calendar-presentation";
 import Link from "next/link";
 import { useCalendarMotion } from "./CalendarMotion";
 import {
@@ -164,14 +165,13 @@ export default function CalendarTimeGrid({
                 <div className={styles.allDayItems} role="group" aria-label={`All-day and linked events on ${day}`} data-all-day-date={day}>
                   {allDay.map(item => {
                     const calendar = calendars.find(c => c.id === item.calendarId),
-                      group = eventGroup(calendar, item.groupId),
-                      color = item.system?.color || group?.color || (calendar?.color?.toLowerCase() === "#565b86" ? "#59518B" : calendar?.color) || "#59518B";
+                      group = eventGroup(calendar, item.groupId);
                     return <motion.button type="button" key={item.id} layout="position" transition={{ layout: layoutTransition }}
-                      data-morph-event={item.id} className={styles.allDayItem} style={{ "--event-color": color } as CSSProperties}
+                      data-morph-event={item.id} className={styles.allDayItem} data-birthday={item.system?.kind === "birthday" || undefined} style={eventColors(item, calendar) as CSSProperties}
                       aria-label={`${item.title} · All day${group ? ` · ${group.name}` : ""}`} title={`${item.title} · All day`}
                       onClick={() => onOpen(item)}>
                       <UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={13} />
-                      <span className={styles.eventTitle}>{item.title}</span>
+                      <span className={styles.eventTitle}>{eventPreviewTitle(item)}</span>
                       <EventPeople refs={item.linkedRefs} available={refs} />
                     </motion.button>;
                   })}
@@ -239,13 +239,7 @@ export default function CalendarTimeGrid({
                 const top = position(Math.max(startHour * 60, from)),
                   bottom = position(Math.min(endHour * 60, until));
                 const c = calendars.find((c) => c.id === item.calendarId),
-                  group = eventGroup(c, item.groupId),
-                  color =
-                    item.system?.color || group?.color ||
-                    (c?.color?.toLowerCase() === "#565b86"
-                      ? "#59518B"
-                      : c?.color) ||
-                    "#59518B";
+                  group = eventGroup(c, item.groupId);
                 const title = `${item.title} · ${clock(from)}–${clock(until)}${group ? ` · ${group.name}` : ""}`;
                 return (
                   <motion.div
@@ -263,7 +257,7 @@ export default function CalendarTimeGrid({
                         left: `calc(${(item.column / item.columns) * 100}% + 2px)`,
                         width: `calc(${100 / item.columns}% - 4px)`,
                         height: `max(14px, calc(${resizing?.id === item.id ? (resizing.end - item.startMs) / 60000 : until - from} * 100% / var(--calendar-span) - 1px))`,
-                        "--event-color": color,
+                        ...eventColors(item, c),
                         "--event-avatar-size": `${Math.max(8, Math.min(18, bottom - top - 7))}px`,
                       } as CSSProperties
                     }
@@ -282,7 +276,7 @@ export default function CalendarTimeGrid({
                       onClick={() => onOpen(item)}
                       aria-label={title}
                     >
-                      <span className={styles.timedEventTitle}>{(group || item.system) && <UnigentamosIcon role={item.system ? "star" : group!.icon} size={12} />}<strong>{item.title}</strong><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
+                      <span className={styles.timedEventTitle}>{(group || item.system) && <UnigentamosIcon role={item.system ? "star" : group!.icon} size={12} />}<strong>{eventPreviewTitle(item)}</strong><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
                       {bottom - top > 30 && (
                         <span>
                           {clock(from)}–{clock(until)}

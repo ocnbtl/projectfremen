@@ -1,5 +1,6 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
+import { calendarDisplayColor, eventColors, eventPreviewTitle } from "./calendar-presentation";
 import CalendarMobileView from "./CalendarMobileView";
 import CalendarHourControls from "./CalendarHourControls";
 import CalendarTimeGrid from "./CalendarTimeGrid";
@@ -145,7 +146,7 @@ export default function CalendarWorkspace() {
       MODULE_COLOR_SYSTEM.calendar.tokens.icon,
     );
   const [observance, setObservance] = useState<EventOccurrence>();
-  const [calendarTab, setCalendarTab] = useState<"calendars" | "groups" | "holidays">("calendars");
+  const [calendarTab, setCalendarTab] = useState<"calendars" | "holidays">("calendars");
   const [holidayData, setHolidayData] = useState<HolidayCatalog>(), [holidayError, setHolidayError] = useState(""), [holidayLoading, setHolidayLoading] = useState(false);
   const [holidayRetry, setHolidayRetry] = useState(0);
   // Keep the UI responsive while ordered writes preserve record-version checks.
@@ -525,18 +526,14 @@ export default function CalendarWorkspace() {
         key={item.id}
         className={styles.agendaEvent}
         data-morph-event={item.id}
-        style={
-          {
-            "--event-color":
-              item.system ? item.system.color || "#716B80" : group?.color || calendarDisplayColor(calendar?.color),
-          } as CSSProperties
-        }
+        data-birthday={item.system?.kind === "birthday" || undefined}
+        style={eventColors(item, calendar) as CSSProperties}
         onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
         title={item.title}
       >
         <span className={styles.agendaTime}>{item.allDay ? "All day" : <>{timeLabel(item.startMs, zone)}<small>{timeLabel(item.endMs, zone)}</small></>}</span>
         <span className={styles.eventIcon}><UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={16} /></span>
-        <span className={styles.eventCopy}><strong>{item.title}</strong>{item.location && <small>{item.location}</small>}</span>
+        <span className={styles.eventCopy}><strong>{eventPreviewTitle(item)}</strong>{item.location && <small>{item.location}</small>}</span>
         <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
       </button>
     );
@@ -580,7 +577,7 @@ export default function CalendarWorkspace() {
           <Button className={styles.todayButton} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
           <Button aria-label="Previous period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, -1))}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></Button>
           <Button aria-label="Next period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, 1))}><UnigentamosIcon role="chevron-right" size={18} /></Button>
-          <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day) => { setDate(day); }} />
+          <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => changeView(next, day)} />
         </div>
         <div className={styles.draftSlot} data-active={Boolean(draft && !editor)}>
           {draft && !editor && <div className={styles.draftNotice}>
@@ -620,7 +617,7 @@ export default function CalendarWorkspace() {
               </label>
             </Popover.Content></Popover.Portal>
           </Popover.Root>
-          <Button icon="calendar" aria-label="Calendars" className={`${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}>Calendars</Button>
+          <button type="button" aria-label="Calendars" title="Calendar settings" className={`work-button work-button--secondary ${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}><UnigentamosIcon role="sliders" candidate="settings" size={20} /><span>Calendars</span></button>
           <Button intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>Add event</Button>
         </div>
       </header>
@@ -958,10 +955,9 @@ export default function CalendarWorkspace() {
           <WorkspaceFeedback error={error} message={notice} />
           <div className={styles.settingsTabs} role="group" aria-label="Calendar settings sections">
             <button type="button" aria-pressed={calendarTab === "calendars"} onClick={() => setCalendarTab("calendars")}><UnigentamosIcon role="calendar" size={16} />Calendars</button>
-            <button type="button" aria-pressed={calendarTab === "groups"} onClick={() => setCalendarTab("groups")}><UnigentamosIcon role="palette" size={16} />Color groups</button>
-            <button type="button" aria-pressed={calendarTab === "holidays"} onClick={() => setCalendarTab("holidays")}><UnigentamosIcon role="star" size={16} />Holidays & dates</button>
+            <button type="button" aria-pressed={calendarTab === "holidays"} onClick={() => setCalendarTab("holidays")}><UnigentamosIcon role="star" size={16} />Holidays</button>
           </div>
-          {calendarTab === "groups" ? <CalendarGroupSettings calendars={snapshot?.state.calendars.filter(calendar => !calendar.archivedAt) || []} busy={busy} onSave={(calendar, groups) => action(() => savePlanning("calendars", { id: calendar.id, groups }, calendar.updatedAt), "Color groups saved")} /> : calendarTab === "holidays" ? <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} /> : <>
+          {calendarTab === "holidays" ? <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} /> : <>
           <section className={styles.calendarVisibility} aria-label="Visible calendars">
             {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <label className={styles.calendarToggle} key={c.id}>
               <span className={styles.visibilityIcon} style={{ color: calendarDisplayColor(c.color), background: "color-mix(in srgb, " + calendarDisplayColor(c.color) + " 10%, white)" }}><UnigentamosIcon role="calendar" size={18} /></span><span className={styles.visibilityName}>{c.name}</span>
@@ -1038,6 +1034,10 @@ export default function CalendarWorkspace() {
               icon={entry.key === "birthdays" ? "birthday" : "star"} country={entry.key.startsWith("holidays:") ? entry.key.slice(9) : undefined}
               onSave={(name, color) => action(() => savePlanning("calendars", { id: "native", observances: { ...observanceSettings, appearances: { ...observanceSettings.appearances, [entry.key]: { name, color } } } }, nativeCalendar?.updatedAt), "Calendar updated")}
             />)}
+          </details>
+          <details className={styles.settingsDisclosure}>
+            <summary><UnigentamosIcon role="palette" size={18} /><span>Event groups & colors</span><UnigentamosIcon role="chevron-down" size={16} /></summary>
+            <CalendarGroupSettings calendars={snapshot?.state.calendars.filter(calendar => !calendar.archivedAt) || []} busy={busy} onSave={(calendar, groups) => action(() => savePlanning("calendars", { id: calendar.id, groups }, calendar.updatedAt), "Color groups saved")} />
           </details>
           <details className={styles.settingsDisclosure}>
             <summary><UnigentamosIcon role="link" size={18} /><span>Import or subscribe</span><UnigentamosIcon role="chevron-down" size={16} /></summary>
@@ -1260,11 +1260,4 @@ function CalendarSettings({
 
 function ViewToggle({ label, icon, checked, onChange }: { label: string; icon: string; checked: boolean; onChange: (value: boolean) => void }) {
   return <label className={styles.calendarToggle}><UnigentamosIcon role={icon} size={17} /><span>{label}</span><input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} /></label>;
-}
-
-/** Re-tint the former default without changing stored or custom calendar colors. */
-function calendarDisplayColor(color?: string) {
-  return !color || color.toLowerCase() === "#565b86"
-    ? MODULE_COLOR_SYSTEM.calendar.tokens.icon
-    : color;
 }

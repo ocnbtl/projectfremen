@@ -1669,3 +1669,79 @@
 .fittedGrid { --calendar-start: 480; --calendar-span: 840; }
 
 :global(html[data-product-motion="reduce"]) .toolbarHours svg { transition: none; }
+/* Calendar identity and category remain distinct across every event projection. */
+.allDayItem, .fittedEvent, .agendaEvent {
+  border: 1px solid color-mix(in srgb, var(--event-outline, var(--event-color)) 76%, white);
+}
+.allDayItem { align-items: center; }
+.allDayItem .eventTitle { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.agendaEvent[data-birthday] .eventCopy > strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.now time { box-shadow: none; border: 1px solid color-mix(in srgb, var(--module-secondary-700) 72%, transparent); }
+.fittedDayHeader strong { font-size: 20px; }
+
+/* Drafts overlay the toolbar without reserving an empty calendar row. */
+.toolbar { position: relative; grid-template-columns: auto minmax(0, 1fr) auto; }
+.toolbar .draftSlot { display: none; min-height: 0; }
+.toolbar .draftSlot[data-active="true"] { display: block; position: absolute; top: calc(100% - 4px); right: 20px; z-index: 12; }
+.draftNotice { background: var(--panel-bg, white); border: 1px solid var(--module-border); border-radius: 8px; padding: 4px 8px; box-shadow: 0 4px 16px #10202612; }
+.toolbarTools > :global(.app-select-trigger) { order: 0; }
+.toolbarHours { order: 1; }
+.calendarSearch { order: 2; }
+.optionsButton { order: 3; }
+.calendarsButton { order: 4; }
+.addEventButton { order: 5; }
+@media (min-width: 761px) {
+  .toolbarTools .calendarSearch { width: 156px; min-width: 156px; }
+  .toolbar .search { font-size: 12px; }
+}
+@media (min-width: 1181px) and (max-width: 1300px) {
+  .toolbar { grid-template-columns: minmax(0, 1fr) auto; }
+}
+@media (min-width: 761px) and (max-width: 1180px) {
+  .toolbar { grid-template-columns: 124px auto minmax(160px, 1fr) 38px 38px auto; gap: 8px; padding-block: 10px; }
+  .toolbarTools { display: contents; }
+  .dateNavigation { grid-row: 1; grid-column: 1 / 5; }
+  .toolbar .calendarsButton { grid-row: 1; grid-column: 5; }
+  .toolbar .addEventButton { grid-row: 1; grid-column: 6; }
+  .toolbarTools > :global(.app-select-trigger) { grid-row: 2; grid-column: 1; }
+  .toolbarHours { grid-row: 2; grid-column: 2; }
+  .toolbarTools .calendarSearch { grid-row: 2; grid-column: 3 / 6; width: auto; }
+  .toolbar .optionsButton { grid-row: 2; grid-column: 6; justify-self: end; }
+  .toolbar[data-timeline="false"] .calendarSearch { grid-column: 2 / 6; }
+}
+@media (max-width: 760px) {
+  .toolbar .draftSlot[data-active="true"] { display: none; }
+  .fittedDayHeader strong { font-size: 17px; }
+}
+.dateNavigator { gap: 8px; }
+.dateNavigator .pickerFooter { border-top: 0; padding-top: 0; justify-content: flex-end; }
+.dateNavigator .pickerHeading { min-height: 32px; }
+
+/* Compact inputs retain clear section rhythm and comfortable control heights. */
+.eventForm { gap: 16px; }
+.eventForm > label { gap: 6px; }
+.eventForm .editorSection { gap: 12px; }
+.eventForm .editorSectionTitle { min-height: 24px; }
+.eventForm .editorSection :global(.work-form-pair) { gap: 12px; }
+.eventForm .scheduleOption { padding-block: 0; }
+.groupField { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+.groupField > svg { flex: none; margin-top: 7px; color: var(--module-icon); }
+.eventForm .groupChoices { gap: 5px; margin: 0; }
+.groupField .groupChoices button { min-height: 30px; padding: 5px 7px; font-size: 11px; }
+.editorCalendar :global(.app-select-trigger) { border-color: color-mix(in srgb, var(--selected-calendar) 65%, white); background: color-mix(in srgb, var(--selected-calendar) 15%, white); transition: background-color 280ms ease, border-color 280ms ease; }
+@media (prefers-reduced-motion: reduce) { .editorCalendar :global(.app-select-trigger) { transition: none; } }
+/* Keep scrolled fields fully behind the sticky action surface, including the sheet gutter. */
+.eventForm :global(.work-form-footer) {
+  bottom: calc(-1 * max(24px, env(safe-area-inset-bottom)));
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+  margin-bottom: calc(-1 * max(24px, env(safe-area-inset-bottom)));
+}
+@media (min-width: 761px) {
+  .yearView { grid-template-rows: repeat(3, minmax(0, 1fr)); height: 100%; min-height: 0; box-sizing: border-box; gap: 10px 18px; }
+  .yearView .miniMonth { min-height: 0; gap: 4px; padding: 4px; }
+  .yearView .miniDays { min-height: 0; grid-template-rows: 16px repeat(6, minmax(0, 1fr)); gap: 1px; }
+  .yearView .miniDays button { min-height: 0; padding-block: 1px 3px; font-size: 11px; }
+}
+@media (min-width: 761px) and (max-width: 900px) {
+  .yearView { grid-template-rows: repeat(4, minmax(0, 1fr)); }
+}

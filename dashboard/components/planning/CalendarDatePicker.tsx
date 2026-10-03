@@ -20,7 +20,7 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
   }, [focused, year]);
   const { reduced } = useCalendarMotion();
   const firstYear = Math.max(1900, Math.min(2189, year - 4));
-  const choose = (day: string) => { onChange(day, view); setOpen(false); };
+  const choose = (day: string) => { onChange(day, mode); setOpen(false); };
   const changeMode = (next: DateScale) => { setMode(next); setFocused(value); };
   const move = (amount: number) => { setDirection(amount); setYear(current => Math.max(1900, Math.min(2200, current + amount * (mode === "year" ? 12 : 1)))); };
   return <Popover.Root open={open} onOpenChange={next => {
@@ -60,7 +60,7 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
 
         </CalendarScene>
       </div>
-      <footer className={styles.pickerFooter}><span>Jump to a date · keep {view} view</span><button type="button" onClick={() => choose(today)}><UnigentamosIcon role="today" size={15} />Today</button></footer>
+      <footer className={styles.pickerFooter}><button type="button" onClick={() => choose(today)}><UnigentamosIcon role="today" size={15} />Jump to today</button></footer>
     </Popover.Content></Popover.Portal>
   </Popover.Root>;
 }
