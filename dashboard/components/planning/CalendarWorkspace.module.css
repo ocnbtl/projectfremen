@@ -1507,3 +1507,115 @@
   .toolbarTools > :global(.app-select-trigger) { width: 124px; }
   .toolbar .monthTrigger { font-size: 17px; }
 }
+/* A two-row phone command bar and readable calendar projections. */
+.mobileToday { display: none; }
+.mobileCalendar { height: 100%; min-height: 0; display: flex; flex-direction: column; gap: 10px; }
+.mobileMonthGrid, .mobileWeekStrip { display: grid; gap: 2px; flex: none; padding: 6px; border: 1px solid var(--module-border); border-radius: 12px; background: #fff; }
+.mobileWeekday { text-align: center; font-size: 10px; color: var(--calendar-muted); line-height: 20px; }
+.mobileMonthGrid button, .mobileWeekStrip button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-width: 0; height: 34px; padding: 2px; border: 0; border-radius: 8px; background: transparent; color: var(--text-strong); font: 500 12px/1 var(--font-body); }
+.mobileWeekStrip button { height: 60px; }
+.mobileWeekStrip button > small { font-size: 10px; color: var(--calendar-muted); }
+.mobileWeekStrip button > strong { font: 600 20px/1.2 var(--font-heading); }
+.mobileMonthGrid button[data-outside="true"] { color: #a7a2b3; }
+.mobileMonthGrid button[aria-current="date"], .mobileWeekStrip button[aria-current="date"] { box-shadow: inset 0 0 0 1px var(--module-icon); }
+.mobileMonthGrid button[aria-pressed="true"], .mobileWeekStrip button[aria-pressed="true"] { background: var(--module-icon); color: white; }
+.mobileWeekStrip button[aria-pressed="true"] > small { color: inherit; }
+.mobileDateMarks { height: 4px; display: flex; gap: 2px; }
+.mobileDateMarks i { width: 3px; height: 3px; border-radius: 50%; background: currentColor; }
+.mobileSchedule { position: relative; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; scrollbar-width: thin; scrollbar-color: #cbc7e4 transparent; padding-bottom: 64px; }
+.mobileScheduleDay { padding: 0 2px 14px; }
+.mobileScheduleDay > header { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 2px; }
+.mobileScheduleDay h2 { display: flex; align-items: baseline; gap: 8px; margin: 0; font: 600 14px/1.4 var(--font-heading); }
+.mobileScheduleDay h2 > span, .mobileScheduleDay header > small { font: 400 11px/1.4 var(--font-body); color: var(--calendar-muted); }
+.mobileScheduleDay .agendaEvent { width: 100%; display: grid; grid-template-columns: 58px 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; margin: 0 0 6px; padding: 10px 8px; min-height: 54px; }
+.mobileScheduleDay .agendaTime { font-size: 11px; min-width: 0; }
+.mobileScheduleDay .eventIcon { width: 20px; }
+.mobileScheduleDay .eventCopy { min-width: 0; }
+.mobileScheduleDay .eventCopy strong { white-space: normal; overflow: visible; font-size: 13px; line-height: 1.4; overflow-wrap: anywhere; }
+.mobileScheduleDay .eventCopy small { font-size: 11px; }
+.mobileEmpty { margin: 0; padding: 6px 2px; font-size: 12px; color: var(--calendar-muted); }
+.mobileLinked { display: flex; gap: 8px; align-items: center; padding: 10px; margin-bottom: 6px; background: var(--module-secondary-100); border-radius: 8px; color: var(--text-strong); font-size: 13px; text-decoration: none; }
+.navigatorBody[data-mode] { height: auto; max-height: 390px; overflow-y: auto; }
+.dateNavigator .weekChoices { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px; padding: 2px; }
+.dateNavigator .weekChoices button { display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 2px; min-height: 34px; padding: 2px 0; font-size: 11px; text-align: center; }
+.dateNavigator .weekChoices button small { font-size: 8px; white-space: nowrap; }
+.navigatorDayChoices { display: grid; gap: 8px; }
+.navigatorMonthStrip { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 3px; }
+.navigatorMonthStrip button { border: 0; border-radius: 6px; padding: 7px 0; background: var(--module-quiet); color: var(--module-icon); font: 500 11px var(--font-body); }
+.navigatorMonthStrip button[aria-pressed="true"] { background: var(--module-icon); color: white; }
+.navigatorDayChoices .miniMonth { min-height: 240px; }
+.navigatorDayChoices .miniDays { grid-template-rows: 18px repeat(6, minmax(28px, 1fr)); }
+.dateNavigator .pickerFooter button { background: var(--module-icon); color: white; }
+@media (max-width: 760px) {
+  .shell { height: calc(100dvh - var(--app-content-offset)); min-height: 0; position: relative; }
+  .shell > .toolbar { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); grid-template-rows: 36px 36px; gap: 6px 4px; padding: 10px 10px 8px; }
+  .toolbar .dateNavigation, .toolbar .toolbarTools { display: contents; }
+  .toolbar .todayButton, .toolbar h1 { display: none; }
+  .toolbar .monthTrigger { grid-area: 1 / 1 / 2 / 7; justify-content: flex-start; width: 100%; min-width: 0; padding: 0; font-size: 16px; }
+  .toolbar .monthTrigger > span { overflow: hidden; text-overflow: ellipsis; }
+  .toolbar .periodButton { width: 100%; min-width: 0; height: 36px; min-height: 36px; }
+  .toolbar .periodButton:nth-of-type(2) { grid-area: 1 / 7 / 2 / 8; }
+  .toolbar .periodButton:nth-of-type(3) { grid-area: 1 / 8 / 2 / 9; }
+  .toolbar .addEventButton { grid-area: 1 / 9 / 2 / 13; width: 100%; padding: 0 5px; gap: 5px; height: 36px; min-height: 36px; font-size: 12px; }
+  .toolbar .calendarSearch { grid-area: 2 / 1 / 3 / 6; width: 100%; height: 36px; min-width: 0; margin: 0; padding-inline: 8px; gap: 6px; }
+  .toolbar .search::placeholder { font-size: 11px; }
+  .toolbarTools > :global(.app-select-trigger) { grid-area: 2 / 6 / 3 / 9; width: 100%; min-width: 0; height: 36px; min-height: 36px; padding-inline: 6px; font-size: 11px; }
+  .toolbarTools > :global(.app-select-trigger) > span > span { gap: 4px; }
+  .toolbar .toolbarUtility { width: 100%; min-width: 0; height: 36px; padding: 0; }
+  .toolbar .optionsButton { grid-area: 2 / 9 / 3 / 10; }
+  .toolbar .calendarsButton { grid-area: 2 / 10 / 3 / 11; }
+  .toolbar .mobileToday { display: inline-flex; grid-area: 2 / 11 / 3 / 13; height: 36px; min-height: 36px; padding: 0 3px; font-size: 11px; }
+  .toolbar .draftSlot { display: none; min-height: 0; }
+  .toolbar .draftSlot[data-active="true"] { display: block; position: absolute; z-index: 10; right: 72px; bottom: 12px; }
+  .draftNotice { box-shadow: 0 4px 16px #23383f14; }
+  .shell > :global(.work-feedback):not(:global(.is-error)) { position: absolute; z-index: 11; bottom: 14px; left: 12px; margin: 0; padding: 8px 12px; max-width: calc(100% - 90px); border: 1px solid var(--module-border); border-radius: 9px; background: white; box-shadow: 0 4px 16px #23383f14; font-size: 12px; pointer-events: none; }
+  .shell > :global(.work-feedback.is-error) { margin: 0 12px 8px; padding: 4px 0; font-size: 12px; }
+  .content { padding: 0 10px 8px; flex: 1; min-height: 0; overflow: hidden; }
+  .content[data-view="agenda"] { overflow-y: auto; }
+  .yearView { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: repeat(4, minmax(0, 1fr)); gap: 8px 6px; padding: 0 0 4px; height: 100%; min-height: 0; box-sizing: border-box; }
+  .yearView .miniMonth { position: relative; min-height: 0; gap: 2px; padding: 3px; border-radius: 8px; background: #faf9fc; }
+  .yearView .miniMonthHeading { min-height: 18px; padding: 0 2px; font-size: 11px; }
+  .yearView .miniMonthHeading::after { content: ""; position: absolute; inset: 0; border-radius: 8px; }
+  .yearView .miniMonthHeading:focus-visible::after { outline: 2px solid var(--module-icon); }
+  .yearView .miniDays { min-height: 0; gap: 0; grid-template-rows: 12px repeat(6, minmax(0, 1fr)); }
+  .yearView .miniWeekday { font-size: 7px; }
+  .overviewDate { position: relative; display: grid; place-items: center; min-height: 0; font: 400 9px/1 var(--font-body); color: var(--text-strong); }
+  .overviewDate[data-current="true"] { border-radius: 4px; background: var(--module-icon); color: white; }
+  .overviewDate[data-has-events="true"] { font-weight: 700; color: var(--module-icon); background: var(--module-primary-100); border-radius: 3px; }
+  .dateNavigator { max-height: min(570px, var(--radix-popover-content-available-height)); gap: 8px; padding: 10px; }
+  .navigatorScales button { min-height: 32px; font-size: 11px; gap: 4px; }
+  .dateNavigator .pickerHeading { min-height: 30px; }
+  .dateNavigator .pickerArrow { height: 30px; }
+  .dateNavigator .pickerFooter { gap: 8px; }
+  .dateNavigator .pickerFooter > span { font-size: 9px; }
+}
+@media (max-width: 360px) { .toolbar .monthTrigger { font-size: 14px; } .toolbar .addEventButton { font-size: 11px; } .toolbar .search::placeholder { font-size: 10px; } }
+@media (max-width: 760px) {
+  .toolbar .calendarsButton, .calendarAssistant > :global(.shared-ai-dock__launcher) { display: none; }
+  .toolbar .optionsButton { grid-area: 2 / 9 / 3 / 11; position: relative; }
+  .toolbar .optionsButton[data-has-draft="true"]::after { content: ""; position: absolute; width: 5px; height: 5px; border-radius: 50%; background: var(--module-icon); top: 5px; right: 8px; }
+  .toolbar .draftSlot[data-active="true"] { display: none; }
+  .mobileToolActions { display: flex; flex-wrap: wrap; gap: 8px; padding-bottom: 12px; }
+  .mobileToolActions > :global(.work-button) { flex: 1; width: auto; }
+  .mobileToolActions .draftNotice { width: 100%; flex-basis: 100%; box-shadow: none; justify-content: space-between; }
+  .mobileSchedule { padding-bottom: 12px; }
+  .yearView .miniWeekday { line-height: 12px; }
+}
+
+@media (min-width: 761px) and (max-width: 900px) {
+  .content[data-view="year"] { overflow-y: auto; }
+}
+
+@media (max-width: 760px) {
+  .dateNavigator .weekChoices button { min-height: 32px; }
+  .navigatorDayChoices .miniMonth { min-height: 190px; }
+  .navigatorDayChoices .miniDays { grid-template-rows: 18px repeat(6, minmax(24px, 1fr)); }
+}
+@media (max-width: 360px) {
+  .toolbar .calendarSearch { grid-column: 1 / 5; }
+  .toolbarTools > :global(.app-select-trigger) { grid-column: 5 / 9; }
+}
+
+@media (max-width: 760px) {
+  .calendarAssistant > :global(.shared-ai-dock__panel) { position: fixed; inset: auto 12px 12px; width: auto; height: min(600px, calc(100dvh - var(--app-content-offset) - 24px)); max-height: calc(100dvh - var(--app-content-offset) - 24px); min-height: 0; }
+}

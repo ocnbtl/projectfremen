@@ -5,8 +5,8 @@ import { addDays, localFor } from "../../lib/modules/planning/calendar-model";
 import CalendarMiniMonth from "./CalendarMiniMonth";
 import styles from "./CalendarWorkspace.module.css";
 
-export default function CalendarYearView({ date, today, zone, events, linked, showWeekends, onDay, onMonth }: {
-  date: string; today: string; zone: string; events: EventOccurrence[]; linked: { start: string; end: string }[]; showWeekends: boolean; onDay: (day: string) => void; onMonth: (day: string) => void;
+export default function CalendarYearView({ date, today, zone, events, linked, showWeekends, onDay, onMonth, compact = false }: {
+  compact?: boolean; date: string; today: string; zone: string; events: EventOccurrence[]; linked: { start: string; end: string }[]; showWeekends: boolean; onDay: (day: string) => void; onMonth: (day: string) => void;
 }) {
   const year = date.slice(0, 4);
   const counts = useMemo(() => {
@@ -16,6 +16,6 @@ export default function CalendarYearView({ date, today, zone, events, linked, sh
     return result;
   }, [events, linked, year, zone]);
   return <div className={styles.yearView} data-month-collection aria-label={`${year} year calendar`}>
-    {Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}-01`).map(month => <CalendarMiniMonth key={month} month={month} value={date} today={today} showWeekends={showWeekends} counts={counts} onSelect={onDay} onMonth={onMonth} />)}
+    {Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}-01`).map(month => <CalendarMiniMonth key={month} overview={compact} month={month} value={date} today={today} showWeekends={showWeekends} counts={counts} onSelect={onDay} onMonth={onMonth} />)}
   </div>;
 }

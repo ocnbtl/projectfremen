@@ -1,5 +1,6 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
+import CalendarMobileView from "./CalendarMobileView";
 import CalendarTimeGrid from "./CalendarTimeGrid";
 import CalendarYearView from "./CalendarYearView";
 import CalendarAgenda from "./CalendarAgenda";
@@ -23,6 +24,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type CSSProperties,
   type FormEvent,
 } from "react";
@@ -97,7 +99,10 @@ const timeLabel = (ms: number, zone: string) =>
     minute: "2-digit",
     timeZone: zone,
   }).format(ms);
+const subscribeCompact = (notify: () => void) => { const query = matchMedia("(max-width: 760px)"); query.addEventListener("change", notify); return () => query.removeEventListener("change", notify); };
+const readCompact = () => matchMedia("(max-width: 760px)").matches;
 export default function CalendarWorkspace() {
+  const compact = useSyncExternalStore(subscribeCompact, readCompact, () => false);
   const params = useSearchParams();
   const { layoutTransition } = useCalendarMotion();
   const previousDate = useRef("");
@@ -118,6 +123,7 @@ export default function CalendarWorkspace() {
     [notice, setNotice] = useState(""),
     [actionBusy, setBusy] = useState(false),
     [query, setQuery] = useState("");
+  useEffect(() => { if (!notice) return; const timer = setTimeout(() => setNotice(""), 3500); return () => clearTimeout(timer); }, [notice]);
   const [editor, setEditor] = useState<{
       fields: EventFields;
       original?: CalendarEvent;
@@ -565,12 +571,12 @@ export default function CalendarWorkspace() {
       <header className={styles.toolbar} aria-label="Calendar controls">
         <h1>Calendar</h1>
         <div className={styles.dateNavigation}>
-          <Button onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
+          <Button className={styles.todayButton} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
           <Button aria-label="Previous period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, -1))}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></Button>
           <Button aria-label="Next period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, 1))}><UnigentamosIcon role="chevron-right" size={18} /></Button>
-          <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => { setDate(day); setView(next); }} />
+          <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day) => { setDate(day); }} />
         </div>
-        <div className={styles.draftSlot}>
+        <div className={styles.draftSlot} data-active={Boolean(draft && !editor)}>
           {draft && !editor && <div className={styles.draftNotice}>
             <UnigentamosIcon role="edit" size={14} /><span>Unsaved draft</span>
             <Button onClick={() => setEditor(draft)} aria-label="Resume draft">Resume</Button>
@@ -578,13 +584,19 @@ export default function CalendarWorkspace() {
           </div>}
         </div>
         <div className={styles.toolbarTools}>
+          <Button className={styles.mobileToday} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
           <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" placeholder="Search events" value={query} onChange={e => setQuery(e.target.value)} /></label>
           <SelectField aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => setView(e.target.value as View)}>
             {(["day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
-            <Popover.Trigger asChild><Button icon="sliders" aria-label="View options" className={styles.toolbarUtility}>View options</Button></Popover.Trigger>
+            <Popover.Trigger asChild><Button icon={compact ? "more" : "sliders"} aria-label={compact ? "Calendar tools" : "View options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? "Tools" : "View options"}</Button></Popover.Trigger>
             <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar view options">
+              {compact && <div className={styles.mobileToolActions}>
+                <Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button>
+                <Button icon="message" onClick={() => { setFilters(false); setAi(true); }}>Assistant</Button>
+                {draft && !editor && <div className={styles.draftNotice}><span>Unsaved draft</span><Button aria-label="Resume draft" onClick={() => { setFilters(false); setEditor(draft); }}>Resume</Button><Button aria-label="Discard draft" onClick={() => finishEditing()}>Discard</Button></div>}
+              </div>}
               <div className={styles.viewOptionSection}>
                 <ViewToggle label="Widen today" icon="today" checked={widenToday} onChange={setWidenToday} />
                 <ViewToggle label="Show weekends" icon="week" checked={showWeekends} onChange={setShowWeekends} />
@@ -600,7 +612,7 @@ export default function CalendarWorkspace() {
               </label>
             </Popover.Content></Popover.Portal>
           </Popover.Root>
-          <Button icon="calendar" aria-label="Calendars" className={styles.toolbarUtility} onClick={() => setConnections(true)}>Calendars</Button>
+          <Button icon="calendar" aria-label="Calendars" className={`${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}>Calendars</Button>
           <Button intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>Add event</Button>
         </div>
       </header>
@@ -657,7 +669,7 @@ export default function CalendarWorkspace() {
           Your records will appear here when loading completes.
         </WorkspaceEmpty>
       ) : (
-        <div className={styles.content}
+        <div className={styles.content} data-view={view}
           onTouchStart={event => {
             const touch = event.touches.length === 1 ? event.touches[0] : undefined;
             swipe.current = touch ? { x: touch.clientX, y: touch.clientY } : undefined;
@@ -673,7 +685,7 @@ export default function CalendarWorkspace() {
             setDate(current => shiftCalendar(current, view, dx < 0 ? 1 : -1));
           }}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
-          {view === "year" ? <CalendarYearView date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => { setDate(day); setView("day"); }} onMonth={day => { setDate(day); setView("month"); }} /> : view === "month" ? (
+          {compact && (view === "day" || view === "week" || view === "month") ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={eventButton} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => { setDate(day); setView("day"); }} onMonth={day => { setDate(day); setView("month"); }} /> : view === "month" ? (
             <div
               className={styles.month}
               style={{
@@ -1170,6 +1182,7 @@ export default function CalendarWorkspace() {
         </div>
       </WorkspaceSheet>
       <SharedAIDock
+        className={styles.calendarAssistant}
         open={ai}
         onOpenChange={setAi}
         context={{
