@@ -309,11 +309,11 @@ export default function CalendarWorkspace() {
     return () => controller.abort();
   }, [Boolean(snapshot), holidayCountries, holidayYears, holidayRetry]);
   const days = Array.from(
-    { length: view === "month" ? 42 : view === "week" ? 7 : 1 },
+    { length: view === "month" ? 42 : view === "week" ? 7 : view === "3-day" ? 3 : 1 },
     (_, i) => addDays(range.start, i),
   ).filter(
     (day) =>
-      view === "day" ||
+      view === "day" || view === "3-day" ||
       showWeekends ||
       ![0, 6].includes(new Date(`${day}T12:00`).getDay()),
   );
@@ -586,8 +586,8 @@ export default function CalendarWorkspace() {
         <div className={styles.toolbarTools}>
           <Button className={styles.mobileToday} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
           <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" placeholder="Search events" value={query} onChange={e => setQuery(e.target.value)} /></label>
-          <SelectField aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => setView(e.target.value as View)}>
-            {(["day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v[0].toUpperCase() + v.slice(1)}</span></option>)}
+          <SelectField aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; setView(next); if (next === "3-day") setDate(localDate(new Date(), zone)); }}>
+            {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
             <Popover.Trigger asChild><Button icon={compact ? "more" : "sliders"} aria-label={compact ? "Calendar tools" : "View options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? "Tools" : "View options"}</Button></Popover.Trigger>
@@ -685,7 +685,7 @@ export default function CalendarWorkspace() {
             setDate(current => shiftCalendar(current, view, dx < 0 ? 1 : -1));
           }}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
-          {compact && (view === "day" || view === "week" || view === "month") ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={eventButton} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => { setDate(day); setView("day"); }} onMonth={day => { setDate(day); setView("month"); }} /> : view === "month" ? (
+          {compact && (view === "week" || view === "month") ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={eventButton} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => { setDate(day); setView("day"); }} onMonth={day => { setDate(day); setView("month"); }} /> : view === "month" ? (
             <div
               className={styles.month}
               style={{

@@ -1619,3 +1619,16 @@
 @media (max-width: 760px) {
   .calendarAssistant > :global(.shared-ai-dock__panel) { position: fixed; inset: auto 12px 12px; width: auto; height: min(600px, calc(100dvh - var(--app-content-offset) - 24px)); max-height: calc(100dvh - var(--app-content-offset) - 24px); min-height: 0; }
 }
+
+/* Phone timelines retain the complete visible hour range. */
+@media (max-width: 760px) {
+  .fittedDayHeader { min-height: 54px; padding-block: 4px; gap: 4px; }
+  .fittedDayHeader > button:first-child { min-height: 44px; }
+  .fittedDayHeader strong { height: 26px; font-size: 20px; }
+  .fittedZone { padding-top: 12px; font-size: 9px; }
+  .allDayItems { max-height: 64px; }
+  .fittedHours > span { font-size: clamp(8px, calc(var(--hour-height) * .55), 10px); }
+  .hoursEdge { padding-right: 0; }
+  .content[data-view="day"] .weekdayName { display: inline; }
+  .content[data-view="day"] .weekdayCompact { display: none; }
+}

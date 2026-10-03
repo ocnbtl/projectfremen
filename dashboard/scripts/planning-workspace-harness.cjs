@@ -1085,6 +1085,9 @@ async function check(label, run) {
   });
   await check("calendar navigation retains complete years, leap days and ISO week boundaries", () => {
     const { calendarRange, shiftCalendar, weeksOfYear, navigationYear } = require("../lib/modules/planning/calendar-navigation.ts");
+    assert.deepEqual(calendarRange("2026-12-31", "3-day"), { start: "2026-12-31", end: "2027-01-03" });
+    assert.equal(shiftCalendar("2028-02-28", "3-day", 1), "2028-03-02");
+    assert.equal(shiftCalendar("2027-01-02", "3-day", -1), "2026-12-30");
     assert.deepEqual(calendarRange("2028-02-29", "year"), { start: "2028-01-01", end: "2029-01-01" });
     assert.equal(shiftCalendar("2028-02-29", "year", 1), "2029-02-28");
     assert.equal(shiftCalendar("2026-01-31", "month", 1), "2026-02-28");
