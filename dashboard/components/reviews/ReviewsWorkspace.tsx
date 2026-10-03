@@ -1,5 +1,6 @@
 "use client";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
+import { weekStart } from "../../lib/calendar-week";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -231,9 +232,7 @@ function defaultPeriod(cadence: ReviewCadence) {
     const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
     return { start: dateInputValue(start), end: dateInputValue(end) };
   }
-  const start = new Date(now);
-  const day = (start.getDay() + 6) % 7;
-  start.setDate(start.getDate() - day);
+  const start = new Date(`${weekStart(dateInputValue(now))}T12:00:00`);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   return { start: dateInputValue(start), end: dateInputValue(end) };

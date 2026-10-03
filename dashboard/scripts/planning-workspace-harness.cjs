@@ -1083,7 +1083,7 @@ async function check(label, run) {
     await assert.rejects(() => savePlanningRecord("calendars", { id: "native", observances: defaultObservances() }, native.updatedAt), /changed elsewhere/);
     const { planningWritableKeys } = require("../lib/modules/planning/ownership.ts"); assert(planningWritableKeys("calendars").includes("observances"));
   });
-  await check("calendar navigation retains complete years, leap days and ISO week boundaries", () => {
+  await check("calendar navigation retains complete years, leap days and Sunday-first week boundaries", () => {
     const { calendarRange, shiftCalendar, weeksOfYear, navigationYear } = require("../lib/modules/planning/calendar-navigation.ts");
     assert.deepEqual(calendarRange("2026-12-31", "3-day"), { start: "2026-12-31", end: "2027-01-03" });
     assert.equal(shiftCalendar("2028-02-28", "3-day", 1), "2028-03-02");
@@ -1091,12 +1091,37 @@ async function check(label, run) {
     assert.deepEqual(calendarRange("2028-02-29", "year"), { start: "2028-01-01", end: "2029-01-01" });
     assert.equal(shiftCalendar("2028-02-29", "year", 1), "2029-02-28");
     assert.equal(shiftCalendar("2026-01-31", "month", 1), "2026-02-28");
-    assert.equal(weeksOfYear(2026).length, 53);
-    assert.deepEqual(weeksOfYear(2026)[0], { number: 1, start: "2025-12-29", end: "2026-01-04" });
-    assert.equal(weeksOfYear(2027)[0].start, "2027-01-04");
+    assert.equal(weeksOfYear(2026).length, 52);
+    assert.deepEqual(weeksOfYear(2026)[0], { number: 1, start: "2025-12-28", end: "2026-01-03" });
+    assert.equal(weeksOfYear(2027)[0].start, "2026-12-27");
     assert.equal(navigationYear("2025-12-29", "week"), 2026);
-    assert.equal(weeksOfYear(2026).at(-1).end, "2027-01-03");
-    assert.deepEqual(calendarRange("2025-12-29", "week"), { start: "2025-12-29", end: "2026-01-05" });
+    assert.equal(weeksOfYear(2026).at(-1).end, "2026-12-26");
+    assert.deepEqual(calendarRange("2025-12-29", "week"), { start: "2025-12-28", end: "2026-01-04" });
+    assert.deepEqual(calendarRange("2026-11-04", "month"), { start: "2026-11-01", end: "2026-12-13" });
+    assert.deepEqual(calendarRange("2026-10-03", "week"), { start: "2026-09-27", end: "2026-10-04" });
+    assert.deepEqual(calendarRange("2026-10-04", "week"), { start: "2026-10-04", end: "2026-10-11" });
+  });
+  await check("shared Sunday-first weeks cover every date and remain contiguous across years", () => {
+    const { Temporal } = require("@js-temporal/polyfill");
+    const { weekStart, visibleWeekdays } = require("../lib/calendar-week.ts");
+    const { weeksOfYear, navigationYear } = require("../lib/modules/planning/calendar-navigation.ts");
+    assert.deepEqual(visibleWeekdays(), ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]);
+    assert.deepEqual(visibleWeekdays(false), ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]);
+    // Includes all weekday/leap-year combinations in the Gregorian cycle.
+    for (let year = 2000; year < 2400; year++) {
+      const weeks = weeksOfYear(year);
+      assert([52, 53].includes(weeks.length));
+      assert(weeks[0].start <= `${year}-01-01` && weeks[0].end >= `${year}-01-01`);
+      for (const [index, week] of weeks.entries()) {
+        const start = Temporal.PlainDate.from(week.start), end = Temporal.PlainDate.from(week.end);
+        assert.equal(start.dayOfWeek, 7); assert.equal(end.dayOfWeek, 6);
+        assert.equal(start.until(end).days, 6);
+        assert.equal(navigationYear(week.start, "week"), year);
+        assert.equal(navigationYear(week.end, "week"), year);
+        assert.equal(weekStart(week.end), week.start);
+        assert.equal(end.add({ days: 1 }).toString(), (weeks[index + 1] || weeksOfYear(year + 1)[0]).start);
+      }
+    }
   });
   await check("timed custom dates retain their owning zone, annual duration and display-zone boundaries", () => {
     const { calendarObservances, defaultObservances } = require("../lib/modules/planning/observances.ts");

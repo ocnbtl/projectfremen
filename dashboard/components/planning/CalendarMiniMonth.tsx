@@ -1,8 +1,8 @@
 "use client";
 import { addDays, monthStart, weekStart } from "../../lib/modules/planning/calendar-model";
+import { visibleWeekdays } from "../../lib/calendar-week";
 import styles from "./CalendarWorkspace.module.css";
 
-const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 export const calendarDateLabel = (date: string, options: Intl.DateTimeFormatOptions) => new Date(`${date}T12:00`).toLocaleDateString(undefined, options);
 
 export default function CalendarMiniMonth({ month, value, today, showWeekends = true, counts, onSelect, onMonth, onFocusDate, overview = false }: {
@@ -14,9 +14,9 @@ export default function CalendarMiniMonth({ month, value, today, showWeekends = 
   return <section className={styles.miniMonth} data-overview={overview || undefined} data-mini-month={month.slice(0, 7)} aria-label={calendarDateLabel(month, { month: "long", year: "numeric" })}>
     {onMonth ? <button type="button" className={styles.miniMonthHeading} onClick={() => onMonth(month)} aria-label={`View ${calendarDateLabel(month, { month: "long", year: "numeric" })}`}>{title}</button> : <h3>{title}</h3>}
     <div className={styles.miniDays} style={{ gridTemplateColumns: `repeat(${showWeekends ? 7 : 5}, minmax(0, 1fr))` }}>
-      {weekdays.slice(0, showWeekends ? 7 : 5).map(day => <span className={styles.miniWeekday} key={day} title={day}>{day.slice(0, 2)}</span>)}
+      {visibleWeekdays(showWeekends).map(day => <span className={styles.miniWeekday} key={day} title={day}>{day.slice(0, 2)}</span>)}
       {Array.from({ length: 42 }, (_, index) => {
-        if (!showWeekends && index % 7 > 4) return null;
+        if (!showWeekends && [0, 6].includes(index % 7)) return null;
         const day = addDays(start, index), outside = day.slice(0, 7) !== month.slice(0, 7), count = counts?.get(day) || 0;
         if (outside) return <span key={day} aria-hidden="true" />;
         if (overview) return <span className={styles.overviewDate} key={day} data-morph-date={counts ? day : undefined} data-current={day === today} data-has-events={count > 0 || undefined}>{Number(day.slice(-2))}</span>;
@@ -25,7 +25,7 @@ export default function CalendarMiniMonth({ month, value, today, showWeekends = 
           aria-pressed={day === value} aria-current={day === today ? "date" : undefined}
           tabIndex={day === value || (value.slice(0, 7) !== month.slice(0, 7) && day.endsWith("-01")) ? 0 : -1}
           onClick={() => onSelect(day)} onKeyDown={event => {
-            const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7, Home: -(index % 7), End: (showWeekends ? 6 : 4) - index % 7 };
+            const offsets: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7, Home: (showWeekends ? 0 : 1) - index % 7, End: (showWeekends ? 6 : 5) - index % 7 };
             if (!(event.key in offsets)) return;
             event.preventDefault();
             let next = addDays(day, offsets[event.key]);

@@ -31,10 +31,7 @@ export function addDays(date: string, days: number): string {
 export function monthStart(date: string): string {
   return `${date.slice(0, 7)}-01`;
 }
-export function weekStart(date: string): string {
-  const d = Temporal.PlainDate.from(date);
-  return d.subtract({ days: d.dayOfWeek - 1 }).toString();
-}
+export { weekStart } from "../../calendar-week";
 export function shiftMonth(date: string, months: number): string {
   return Temporal.PlainDate.from(date).add({ months }).toString();
 }

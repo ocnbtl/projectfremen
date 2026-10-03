@@ -5,11 +5,11 @@ import { LayoutGroup, motion } from "motion/react";
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import { addDays, localDate, monthStart, shiftMonth, weekStart } from "../../lib/modules/planning/calendar-model";
+import { calendarWeekdays as weekdays } from "../../lib/calendar-week";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { CalendarScene, useCalendarMotion } from "./CalendarMotion";
 import styles from "./EventDateTimePicker.module.css";
 
-const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const dateLabel = (day: string, options: Intl.DateTimeFormatOptions) => new Date(`${day}T12:00`).toLocaleDateString("en-US", options);
 const pad = (number: number) => String(number).padStart(2, "0");
 

@@ -4,6 +4,7 @@ import Link from "next/link";
 import type { EventOccurrence } from "../../lib/modules/planning/types";
 import type { PlanningSnapshot } from "../../lib/modules/planning/repository";
 import { localFor } from "../../lib/modules/planning/calendar-model";
+import { visibleWeekdays } from "../../lib/calendar-week";
 import { calendarDateLabel as label } from "./CalendarMiniMonth";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { useCalendarMotion } from "./CalendarMotion";
@@ -29,7 +30,7 @@ export default function CalendarMobileView({ view, date, today, days, events, li
   const shown = view === "week" ? days : [date];
   return <div className={styles.mobileCalendar} data-mobile-view={view}>
     {view !== "day" && <div className={view === "month" ? styles.mobileMonthGrid : styles.mobileWeekStrip} style={{ gridTemplateColumns: `repeat(${days.length === 30 || days.length === 5 ? 5 : 7}, minmax(0, 1fr))` }} aria-label={view === "month" ? "Month dates" : "Week dates"}>
-      {view === "month" && ["Mo", "Tu", "We", "Th", "Fr", ...(days.length === 30 ? [] : ["Sa", "Su"])].map(name => <span key={name} className={styles.mobileWeekday}>{name}</span>)}
+      {view === "month" && visibleWeekdays(days.length !== 30).map(name => <span key={name} className={styles.mobileWeekday}>{name.slice(0, 2)}</span>)}
       {days.map(day => {
         const count = eventsOn(day).length + linksOn(day).length;
         return <button type="button" key={day} data-mobile-date={day} data-outside={view === "month" && day.slice(0, 7) !== date.slice(0, 7)} aria-pressed={day === date} aria-current={day === today ? "date" : undefined}
