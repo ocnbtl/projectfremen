@@ -1671,7 +1671,7 @@
 :global(html[data-product-motion="reduce"]) .toolbarHours svg { transition: none; }
 /* Calendar identity and category remain distinct across every event projection. */
 .allDayItem, .fittedEvent, .agendaEvent {
-  border: 1px solid color-mix(in srgb, var(--event-outline, var(--event-color)) 76%, white);
+  border: 2px solid color-mix(in srgb, var(--event-outline, var(--event-color)) 76%, white);
 }
 .allDayItem { align-items: center; }
 .allDayItem .eventTitle { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
