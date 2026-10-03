@@ -34,7 +34,7 @@ export default function CalendarMobileView({ view, date, today, days, events, li
         const count = eventsOn(day).length + linksOn(day).length;
         return <button type="button" key={day} data-mobile-date={day} data-outside={view === "month" && day.slice(0, 7) !== date.slice(0, 7)} aria-pressed={day === date} aria-current={day === today ? "date" : undefined}
           aria-label={`${label(day, { dateStyle: "full" })}${count ? ` · ${count} events` : ""}`} onClick={() => choose(day)}>
-          {view === "week" && <small>{label(day, { weekday: "short" }).slice(0, 2)}</small>}<strong>{Number(day.slice(-2))}</strong>
+          {view === "week" && <small>{label(day, { weekday: "short" }).slice(0, 2)}</small>}<strong data-morph-date={day}>{Number(day.slice(-2))}</strong>
           <span className={styles.mobileDateMarks} aria-hidden="true">{count > 0 && <><i />{count > 1 && <i />}{count > 2 && <i />}</>}</span>
         </button>;
       })}

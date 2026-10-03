@@ -27,7 +27,7 @@ export default function CalendarAgenda({ events, linked, zone, start, today, ren
     <div className={styles.agendaHeading}><span>Upcoming <strong>30 days</strong></span><span>{events.length + linked.length} {events.length + linked.length === 1 ? "event" : "events"}</span></div>
     {groups.slice(current * 4, current * 4 + 4).map(([day, rows]) => <section className={styles.agendaDay} key={day} data-today={day === today}>
       <button type="button" className={styles.agendaDate} onClick={() => onDay(day)} aria-label={`View ${label(day, { dateStyle: "full" })}`}>
-        <strong>{Number(day.slice(-2))}</strong><span>{label(day, { month: "short" })}<small>{day === today ? "Today" : label(day, { weekday: "long" })}</small></span>
+        <strong data-morph-date={day}>{Number(day.slice(-2))}</strong><span>{label(day, { month: "short" })}<small>{day === today ? "Today" : label(day, { weekday: "long" })}</small></span>
       </button>
       <div className={styles.agendaRows}>{rows.map(row => "event" in row ? renderEvent(row.event) : <Link key={row.id} className={styles.agendaLinked} href={row.link.ownerRef?.route || "/admin/personal"}>
         <span>Linked</span><UnigentamosIcon role={row.link.completed ? "check" : "link"} size={17} /><strong>{row.link.title}</strong>{row.link.completed && <small>Completed</small>}

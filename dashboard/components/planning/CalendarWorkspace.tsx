@@ -1,6 +1,7 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
 import CalendarMobileView from "./CalendarMobileView";
+import CalendarHourControls from "./CalendarHourControls";
 import CalendarTimeGrid from "./CalendarTimeGrid";
 import CalendarYearView from "./CalendarYearView";
 import CalendarAgenda from "./CalendarAgenda";
@@ -11,7 +12,7 @@ import { calendarObservances, defaultObservances, observanceAppearance, type Hol
 import EventEditorFields from "./EventEditorFields";
 import CalendarGroupSettings from "./CalendarGroupSettings";
 import CalendarDatePicker from "./CalendarDatePicker";
-import { CalendarScene, useCalendarMotion } from "./CalendarMotion";
+import { CalendarScene, useCalendarMotion, useCalendarMorph } from "./CalendarMotion";
 import { motion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import {
@@ -105,6 +106,8 @@ export default function CalendarWorkspace() {
   const compact = useSyncExternalStore(subscribeCompact, readCompact, () => false);
   const params = useSearchParams();
   const { layoutTransition } = useCalendarMotion();
+  const calendarSurface = useRef<HTMLDivElement>(null);
+  const morph = useCalendarMorph(calendarSurface);
   const previousDate = useRef("");
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
   const [early, setEarly] = useState(false), [late, setLate] = useState(false);
@@ -508,6 +511,8 @@ export default function CalendarWorkspace() {
       "Event duration updated",
     );
   }
+  const timeline = view === "day" || view === "3-day" || (!compact && view === "week");
+  const changeView = (next: View, day?: string) => morph(() => { setView(next); if (day) setDate(day); });
   function eventButton(item: EventOccurrence) {
     const event = snapshot?.state.events.find((x) => x.id === item.eventId);
     const calendar = snapshot?.state.calendars.find(
@@ -519,6 +524,7 @@ export default function CalendarWorkspace() {
         type="button"
         key={item.id}
         className={styles.agendaEvent}
+        data-morph-event={item.id}
         style={
           {
             "--event-color":
@@ -568,7 +574,7 @@ export default function CalendarWorkspace() {
       className={`work-surface ${styles.shell}`}
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
-      <header className={styles.toolbar} aria-label="Calendar controls">
+      <header className={styles.toolbar} data-timeline={timeline} aria-label="Calendar controls">
         <h1>Calendar</h1>
         <div className={styles.dateNavigation}>
           <Button className={styles.todayButton} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
@@ -584,15 +590,17 @@ export default function CalendarWorkspace() {
           </div>}
         </div>
         <div className={styles.toolbarTools}>
+          {timeline && <CalendarHourControls days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />}
           <Button className={styles.mobileToday} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
           <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" placeholder="Search events" value={query} onChange={e => setQuery(e.target.value)} /></label>
-          <SelectField aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; setView(next); if (next === "3-day") setDate(localDate(new Date(), zone)); }}>
+          <SelectField aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
             {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
             <Popover.Trigger asChild><Button icon={compact ? "more" : "sliders"} aria-label={compact ? "Calendar tools" : "View options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? "Tools" : "View options"}</Button></Popover.Trigger>
             <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar view options">
               {compact && <div className={styles.mobileToolActions}>
+                {timeline && <label className={styles.toolsSearch}><UnigentamosIcon role="search" size={16} /><input type="search" aria-label="Search events" placeholder="Search events" value={query} onChange={e => setQuery(e.target.value)} /></label>}
                 <Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button>
                 <Button icon="message" onClick={() => { setFilters(false); setAi(true); }}>Assistant</Button>
                 {draft && !editor && <div className={styles.draftNotice}><span>Unsaved draft</span><Button aria-label="Resume draft" onClick={() => { setFilters(false); setEditor(draft); }}>Resume</Button><Button aria-label="Discard draft" onClick={() => finishEditing()}>Discard</Button></div>}
@@ -669,7 +677,7 @@ export default function CalendarWorkspace() {
           Your records will appear here when loading completes.
         </WorkspaceEmpty>
       ) : (
-        <div className={styles.content} data-view={view}
+        <div ref={calendarSurface} className={styles.content} data-view={view} data-morph-focus={date}
           onTouchStart={event => {
             const touch = event.touches.length === 1 ? event.touches[0] : undefined;
             swipe.current = touch ? { x: touch.clientX, y: touch.clientY } : undefined;
@@ -685,7 +693,7 @@ export default function CalendarWorkspace() {
             setDate(current => shiftCalendar(current, view, dx < 0 ? 1 : -1));
           }}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
-          {compact && (view === "week" || view === "month") ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={eventButton} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => { setDate(day); setView("day"); }} onMonth={day => { setDate(day); setView("month"); }} /> : view === "month" ? (
+          {compact && (view === "week" || view === "month") ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={eventButton} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
             <div
               className={styles.month}
               style={{
@@ -706,12 +714,11 @@ export default function CalendarWorkspace() {
                     className={styles.dayNumber}
                     aria-label={labelDate(day, { weekday: "long", month: "long", day: "numeric" })}
                     onClick={() => {
-                      setDate(day);
-                      setView("day");
+                      changeView("day", day);
                     }}
                   >
                     <span className={styles.monthWeekday}>{labelDate(day, { weekday: "long" })}</span>
-                    <span>{Number(day.slice(-2))}</span>
+                    <span data-morph-date={day}>{Number(day.slice(-2))}</span>
                   </motion.button>
                   {occurrences
                     .filter(
@@ -737,7 +744,7 @@ export default function CalendarWorkspace() {
               ))}
             </div>
           ) : view === "agenda" ? (
-            <CalendarAgenda key={[range.start, query, showCompleted, showDated].join(":")} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={eventButton} onDay={day => { setDate(day); setView("day"); }} />
+            <CalendarAgenda key={[range.start, query, showCompleted, showDated].join(":")} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={eventButton} onDay={day => changeView("day", day)} />
           ) : (
             <CalendarTimeGrid
               days={days}
@@ -750,8 +757,6 @@ export default function CalendarWorkspace() {
               widenToday={widenToday}
               early={early}
               late={late}
-              setEarly={setEarly}
-              setLate={setLate}
               onDay={setDayDetail}
               onOpen={(item) => {
                 if (item.system) { setObservance(item); return; }

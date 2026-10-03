@@ -1,8 +1,9 @@
 "use client";
 
 import { animate, motion, useMotionValue, type AnimationPlaybackControls } from "motion/react";
-import { useLayoutEffect, useRef, useSyncExternalStore, type ReactNode } from "react";
+import { useLayoutEffect, useRef, useSyncExternalStore, type RefObject, type ReactNode } from "react";
 import { useMotionPreference } from "../admin-shell/ExperienceProvider";
+import { flushSync } from "react-dom";
 import styles from "./CalendarWorkspace.module.css";
 
 export const calendarSpring = { type: "spring" as const, stiffness: 340, damping: 36, mass: 0.9 };
@@ -27,7 +28,7 @@ export function CalendarScene({ id, direction = 1, children }: { id: string; dir
   const previous = useRef(id), running = useRef<AnimationPlaybackControls[]>([]);
   const x = useMotionValue(0), opacity = useMotionValue(1);
   useLayoutEffect(() => {
-    if (reduced) {
+    if (reduced || document.documentElement.dataset.calendarMorph) {
       running.current.forEach(animation => animation.stop());
       x.set(0); opacity.set(1); previous.current = id;
       return;
@@ -45,4 +46,39 @@ export function CalendarScene({ id, direction = 1, children }: { id: string; dir
   return <div className={styles.calendarStage}>
     <motion.div className={styles.calendarScene} style={{ x, opacity }}>{children}</motion.div>
   </div>;
+}
+
+/** Match visible dates and events across projections without retaining duplicate live controls. */
+export function useCalendarMorph(root: RefObject<HTMLElement | null>) {
+  const { reduced } = useCalendarMotion();
+  const active = useRef<ViewTransition | null>(null), revision = useRef(0);
+  const cleanup = useRef<() => void>(() => {});
+  useLayoutEffect(() => () => { revision.current++; active.current?.skipTransition(); cleanup.current(); }, []);
+  return (update: () => void) => {
+    const version = ++revision.current;
+    active.current?.skipTransition(); cleanup.current();
+    if (reduced || !document.startViewTransition || !root.current) { update(); return; }
+    const names = new Map<string, string>(), touched = new Map<HTMLElement, string>();
+    const capture = () => {
+      const surface = root.current; if (!surface) return;
+      const rect = surface.getBoundingClientRect(), used = new Set<string>();
+      if (!touched.has(surface)) touched.set(surface, surface.style.viewTransitionName); surface.style.viewTransitionName = "calendar-surface";
+      const focus = Date.parse(surface.dataset.morphFocus || "");
+      const nodes = [...surface.querySelectorAll<HTMLElement>("[data-morph-date], [data-morph-event]")].sort((a, b) => (a.dataset.morphDate ? Math.abs(Date.parse(a.dataset.morphDate) - focus) : -1) - (b.dataset.morphDate ? Math.abs(Date.parse(b.dataset.morphDate) - focus) : -1));
+      for (const node of nodes) {
+        const box = node.getBoundingClientRect(), key = node.dataset.morphDate ? "date:" + node.dataset.morphDate : "event:" + node.dataset.morphEvent;
+        if (node.inert || used.has(key) || !box.width || box.bottom < rect.top || box.top > Math.min(rect.bottom, innerHeight) || names.size > 120 && !names.has(key)) continue;
+        used.add(key); if (!names.has(key)) names.set(key, "calendar-item-" + names.size);
+        if (!touched.has(node)) touched.set(node, node.style.viewTransitionName);
+        node.style.viewTransitionName = names.get(key)!;
+      }
+    };
+    document.documentElement.dataset.calendarMorph = "true";
+    cleanup.current = () => { for (const [node, name] of touched) node.style.viewTransitionName = name; delete document.documentElement.dataset.calendarMorph; };
+    capture();
+    const transition = document.startViewTransition(() => { if (version !== revision.current) return; flushSync(update); capture(); });
+    active.current = transition;
+    void transition.ready.catch(() => {}); // Unsupported/hidden documents still apply the update.
+    void transition.finished.finally(() => { if (version === revision.current) { cleanup.current(); active.current = null; } }).catch(() => {});
+  };
 }

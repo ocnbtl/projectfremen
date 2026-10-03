@@ -3767,3 +3767,13 @@ select {
     display: block;
   }
 }
+
+/* Only the calendar opts into these snapshot morphs; application chrome stays still. */
+html[data-calendar-morph]::view-transition { pointer-events: none; }
+html[data-calendar-morph]::view-transition-group(*) { animation-duration: 480ms; animation-timing-function: cubic-bezier(.22,.78,.18,1); }
+html[data-calendar-morph]::view-transition-old(root) { display: none; }
+html[data-calendar-morph]::view-transition-new(root) { animation: none; }
+html[data-calendar-morph]::view-transition-old(*), html[data-calendar-morph]::view-transition-new(*) { height: 100%; width: 100%; object-fit: fill; animation-duration: 360ms; mix-blend-mode: normal; }
+@media (prefers-reduced-motion: reduce) {
+  html[data-calendar-morph]::view-transition-group(*), html[data-calendar-morph]::view-transition-old(*), html[data-calendar-morph]::view-transition-new(*) { animation-duration: 1ms; }
+}

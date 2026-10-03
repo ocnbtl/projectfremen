@@ -1632,3 +1632,40 @@
   .content[data-view="day"] .weekdayName { display: inline; }
   .content[data-view="day"] .weekdayCompact { display: none; }
 }
+
+/* Calendar motion and responsive hour controls share the module's indigo/slate system. */
+.fittedHours { position: relative; overflow: hidden; }
+.fittedColumn { overflow: hidden; }
+.fittedDayHeader strong { font-size: 22px; }
+.mobileWeekStrip button > strong { font-size: 18px; }
+.toolbarHours { display: flex; flex: none; align-items: center; gap: 5px; }
+.toolbarHours button { display: inline-flex; align-items: center; justify-content: center; gap: 3px; white-space: nowrap; height: 36px; padding: 0 8px; border: 1px solid transparent; border-radius: 8px; background: var(--module-secondary-100); color: var(--text-strong); font: 500 11px/1 var(--font-body); transition: background 180ms, border-color 180ms; }
+.toolbarHours button[aria-expanded="true"] { background: var(--module-primary-100); border-color: var(--module-border); color: var(--module-icon); }
+.toolbarHours button:hover { border-color: var(--module-border); }
+.toolbarHours button:focus-visible { outline: 2px solid var(--module-icon); outline-offset: 2px; }
+.toolbarHours svg { flex: none; transition: transform 420ms cubic-bezier(.22,.8,.2,1); }
+.toolbarHours b { font-size: 9px; background: #ffffff90; border-radius: 4px; padding: 2px 3px; }
+.hourVerb { display: inline; }
+.toolsSearch { display: flex; align-items: center; gap: 8px; width: 100%; padding: 8px; border: 1px solid var(--module-border); border-radius: 8px; }
+.toolsSearch:focus-within { outline: 2px solid var(--module-focus); }
+.toolsSearch input { min-width: 0; width: 100%; border: 0; outline: 0; background: transparent; font: 400 16px var(--font-body); }
+@media (max-width: 1600px) { .hourVerb { display: none; } }
+@media (min-width: 901px) and (max-width: 1450px) {
+  .toolbar[data-timeline="true"] .toolbarTools .calendarSearch { width: 115px; }
+  .toolbar[data-timeline="true"] .toolbarTools { gap: 5px; }
+  .toolbar[data-timeline="true"] .hourRelation { display: none; }
+}
+@media (max-width: 760px) {
+  .fittedDayHeader strong { font-size: 18px; }
+  .toolbar[data-timeline="true"] .calendarSearch { display: none; }
+  .toolbarHours { grid-area: 2 / 1 / 3 / 5; gap: 4px; min-width: 0; }
+  .toolbarHours button { min-width: 0; padding: 0 3px; flex: 1; gap: 2px; font-size: 10px; }
+  .toolbarHours b { font-size: 8px; padding: 2px; }
+  .hourRelation, .hourVerb { display: none; }
+  .toolbar[data-timeline="true"] .toolbarTools > :global(.app-select-trigger) { grid-column: 5 / 9; }
+}
+@media (prefers-reduced-motion: reduce) { .toolbarHours svg { transition: none; } }
+
+.fittedGrid { --calendar-start: 480; --calendar-span: 840; }
+
+:global(html[data-product-motion="reduce"]) .toolbarHours svg { transition: none; }

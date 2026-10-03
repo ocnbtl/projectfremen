@@ -1,5 +1,5 @@
 "use client";
-import { motion } from "motion/react";
+import { animate, motion } from "motion/react";
 import Link from "next/link";
 import { useCalendarMotion } from "./CalendarMotion";
 import {
@@ -44,8 +44,6 @@ export default function CalendarTimeGrid({
   widenToday,
   early,
   late,
-  setEarly,
-  setLate,
   onOpen,
   onDay,
   onMove,
@@ -61,8 +59,6 @@ export default function CalendarTimeGrid({
   widenToday: boolean;
   early: boolean;
   late: boolean;
-  setEarly: (value: boolean) => void;
-  setLate: (value: boolean) => void;
   onOpen: (event: EventOccurrence) => void;
   onDay: (day: string) => void;
   onMove: (event: EventOccurrence, day: string, hour: number) => void;
@@ -75,9 +71,18 @@ export default function CalendarTimeGrid({
     { item: EventOccurrence; y: number; end: number } | undefined
   >(undefined);
   const [resizing, setResizing] = useState<{ id: string; end: number }>();
-  const startHour = early ? 0 : 8,
-    endHour = late ? 24 : 22,
-    minutes = (endHour - startHour) * 60;
+  const boundsRef = useRef({ start: early ? 0 : 8, end: late ? 24 : 22 });
+  const grid = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const from = boundsRef.current, target = { start: early ? 0 : 8, end: late ? 24 : 22 };
+    const update = (progress: number) => { const next = { start: from.start + (target.start - from.start) * progress, end: from.end + (target.end - from.end) * progress }; boundsRef.current = next; grid.current?.style.setProperty("--calendar-start", String(next.start * 60)); grid.current?.style.setProperty("--calendar-span", String((next.end - next.start) * 60)); };
+    if (reduced || (from.start === target.start && from.end === target.end)) { update(1); return; }
+    const animation = animate(0, 1, { type: "spring", stiffness: 180, damping: 28, mass: 1, restDelta: 0.0005, restSpeed: 0.005, onUpdate: update });
+    return () => animation.stop();
+  }, [early, late, reduced]);
+  const startHour = early ? 0 : 8, endHour = late ? 24 : 22, minutes = (endHour - startHour) * 60;
+  const topAt = (minute: number) => `calc((${minute} - var(--calendar-start)) * 100% / var(--calendar-span))`;
+  const heightFor = (duration: number) => `calc(${duration} * 100% / var(--calendar-span))`;
   const today = localDate(new Date(now), zone);
   const currentTime = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit", hour12: true }).format(now);
   useLayoutEffect(() => {
@@ -105,48 +110,11 @@ export default function CalendarTimeGrid({
             5,
       ),
     );
-  const inDays = (event: EventOccurrence) =>
-    days.some(
-      (day) =>
-        event.startMs < instantFor(addDays(day, 1), zone) &&
-        event.endMs > instantFor(day, zone),
-    );
-  const earlyEvents = events.filter(
-    (e) =>
-      !e.allDay &&
-      inDays(e) &&
-      (minuteOf(e.startMs, zone) < 480 ||
-        localFor(e.startMs, zone).slice(0, 10) !==
-          localFor(e.endMs - 1, zone).slice(0, 10)),
-  );
-  const lateEvents = events.filter(
-    (e) =>
-      !e.allDay &&
-      inDays(e) &&
-      (minuteOf(e.endMs - 1, zone) >= 1320 ||
-        localFor(e.startMs, zone).slice(0, 10) !==
-          localFor(e.endMs - 1, zone).slice(0, 10)),
-  );
   const columns = `58px ${days.map((day) => `minmax(0, ${widenToday && day === today ? 1.75 : 1}fr)`).join(" ")}`;
   return (
     <div className={styles.fittedCalendar}>
-      <div className={styles.hoursEdge}>
-        <button
-          type="button"
-          aria-expanded={early}
-          onClick={() => setEarly(!early)}
-        >
-          <UnigentamosIcon role="chevron-down" size={14} style={{ transform: early ? undefined : "rotate(180deg)" }} />
-          {early ? "Hide" : "Show"} before 8 am
-          {earlyEvents.length > 0 && (
-            <b>
-              {earlyEvents.length}{" "}
-              {earlyEvents.length === 1 ? "event" : "events"}
-            </b>
-          )}
-        </button>
-      </div>
       <div
+        ref={grid} id="calendar-hour-grid"
         className={styles.fittedGrid}
         style={
           {
@@ -188,7 +156,7 @@ export default function CalendarTimeGrid({
                   {new Date(`${day}T12:00`).toLocaleDateString(undefined, { weekday: "long" }).slice(0, 2)}
                 </span>
                 <span className={styles.dateLine}>
-                  <strong>{Number(day.slice(-2))}</strong>
+                  <strong data-morph-date={day}>{Number(day.slice(-2))}</strong>
                   {day === today && <small>Today</small>}
                 </span>
               </motion.button>
@@ -199,7 +167,7 @@ export default function CalendarTimeGrid({
                       group = eventGroup(calendar, item.groupId),
                       color = item.system?.color || group?.color || (calendar?.color?.toLowerCase() === "#565b86" ? "#59518B" : calendar?.color) || "#59518B";
                     return <motion.button type="button" key={item.id} layout="position" transition={{ layout: layoutTransition }}
-                      className={styles.allDayItem} style={{ "--event-color": color } as CSSProperties}
+                      data-morph-event={item.id} className={styles.allDayItem} style={{ "--event-color": color } as CSSProperties}
                       aria-label={`${item.title} · All day${group ? ` · ${group.name}` : ""}`} title={`${item.title} · All day`}
                       onClick={() => onOpen(item)}>
                       <UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={13} />
@@ -220,10 +188,8 @@ export default function CalendarTimeGrid({
           );
         })}
         <div className={styles.fittedHours} ref={hours}>
-          {Array.from({ length: endHour - startHour }, (_, i) => (
-            <motion.span layout key={startHour + i} transition={{ layout: layoutTransition }}>
-              <motion.span layout="position" transition={{ layout: layoutTransition }}>{hourName(startHour + i)}</motion.span>
-            </motion.span>
+          {Array.from({ length: 24 }, (_, i) => (
+            <span key={i} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span>{hourName(i)}</span></span>
           ))}
         </div>
         {days.map((day) => {
@@ -261,18 +227,15 @@ export default function CalendarTimeGrid({
                 if (item) onMove(item, day, atPointer(e) / 60);
               }}
             >
-              {Array.from({ length: endHour - startHour }, (_, i) => {
-                const h = startHour + i;
-                return <motion.div layout transition={{ layout: layoutTransition }} initial={false}
-                  className={styles.hourSlot} key={h} data-hour={h} aria-hidden="true" />;
+              {Array.from({ length: 24 }, (_, h) => {
+                return <div className={styles.hourSlot} key={h} data-hour={h} aria-hidden="true" style={{ position: "absolute", top: topAt(h * 60), height: heightFor(60) }} />;
               })}
               {laid.map((item) => {
                 const from =
                     item.startMs < low ? 0 : minuteOf(item.startMs, zone),
                   until =
                     item.endMs >= high ? 1440 : minuteOf(item.endMs, zone);
-                if (until <= startHour * 60 || from >= endHour * 60)
-                  return null;
+
                 const top = position(Math.max(startHour * 60, from)),
                   bottom = position(Math.min(endHour * 60, until));
                 const c = calendars.find((c) => c.id === item.calendarId),
@@ -287,23 +250,19 @@ export default function CalendarTimeGrid({
                 return (
                   <motion.div
                     key={item.id}
-                    layout={resizing ? false : true}
+                    layout={false}
                     transition={{ layout: layoutTransition }}
                     className={styles.fittedEvent}
+                    data-morph-event={item.id}
+                    inert={until <= startHour * 60 || from >= endHour * 60}
+                    aria-hidden={until <= startHour * 60 || from >= endHour * 60}
                     title={title}
                     style={
                       {
-                        top,
+                        top: topAt(from),
                         left: `calc(${(item.column / item.columns) * 100}% + 2px)`,
                         width: `calc(${100 / item.columns}% - 4px)`,
-                        height: Math.max(
-                          14,
-                          resizing?.id === item.id
-                            ? bottom -
-                                top +
-                                ((resizing.end - item.endMs) / 60000) * px
-                            : bottom - top - 1,
-                        ),
+                        height: `max(14px, calc(${resizing?.id === item.id ? (resizing.end - item.startMs) / 60000 : until - from} * 100% / var(--calendar-span) - 1px))`,
                         "--event-color": color,
                         "--event-avatar-size": `${Math.max(8, Math.min(18, bottom - top - 7))}px`,
                       } as CSSProperties
@@ -387,16 +346,14 @@ export default function CalendarTimeGrid({
                   </motion.div>
                 );
               })}
-              {day === today &&
-                minuteOf(now, zone) >= startHour * 60 &&
-                minuteOf(now, zone) < endHour * 60 && (
+              {day === today && (
                   <motion.div
                     className={styles.now}
                     role="img"
+                    aria-hidden={minuteOf(now, zone) < startHour * 60 || minuteOf(now, zone) >= endHour * 60}
                     aria-label={`Current time: ${currentTime} (${zone})`}
-                    layout="position"
-                    transition={{ layout: reduced ? { duration: 0 } : layoutTransition }}
-                    style={{ top: position(minuteOf(now, zone)) }}
+                    layout={false}
+                    style={{ top: topAt(minuteOf(now, zone)) }}
                   >
                     <time dateTime={new Date(now).toISOString()}>{currentTime}</time>
                   </motion.div>
@@ -404,21 +361,6 @@ export default function CalendarTimeGrid({
             </motion.div>
           );
         })}
-      </div>
-      <div className={styles.hoursEdge}>
-        <button
-          type="button"
-          aria-expanded={late}
-          onClick={() => setLate(!late)}
-        >
-          <UnigentamosIcon role="chevron-down" size={14} style={{ transform: late ? "rotate(180deg)" : undefined }} />
-          {late ? "Hide" : "Show"} after 10 pm
-          {lateEvents.length > 0 && (
-            <b>
-              {lateEvents.length} {lateEvents.length === 1 ? "event" : "events"}
-            </b>
-          )}
-        </button>
       </div>
     </div>
   );
