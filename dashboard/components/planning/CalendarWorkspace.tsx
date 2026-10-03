@@ -588,18 +588,16 @@ export default function CalendarWorkspace() {
         </div>
         <div className={styles.toolbarTools}>
           {timeline && <CalendarHourControls days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />}
-          <Button className={styles.mobileToday} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
-          <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" placeholder="Search events" value={query} onChange={e => setQuery(e.target.value)} /></label>
+          <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search events"} value={query} onChange={e => setQuery(e.target.value)} /></label>
           <SelectField aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
             {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
-            <Popover.Trigger asChild><Button icon={compact ? "more" : "sliders"} aria-label={compact ? "Calendar tools" : "View options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? "Tools" : "View options"}</Button></Popover.Trigger>
+            <Popover.Trigger asChild><Button icon={compact ? undefined : "sliders"} aria-label={compact ? "Calendar tools" : "View options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? <UnigentamosIcon role="sliders" candidate="settings" size={18} /> : "View options"}</Button></Popover.Trigger>
             <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar view options">
               {compact && <div className={styles.mobileToolActions}>
-                {timeline && <label className={styles.toolsSearch}><UnigentamosIcon role="search" size={16} /><input type="search" aria-label="Search events" placeholder="Search events" value={query} onChange={e => setQuery(e.target.value)} /></label>}
                 <Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button>
-                <Button icon="message" onClick={() => { setFilters(false); setAi(true); }}>Assistant</Button>
+
                 {draft && !editor && <div className={styles.draftNotice}><span>Unsaved draft</span><Button aria-label="Resume draft" onClick={() => { setFilters(false); setEditor(draft); }}>Resume</Button><Button aria-label="Discard draft" onClick={() => finishEditing()}>Discard</Button></div>}
               </div>}
               <div className={styles.viewOptionSection}>
@@ -618,7 +616,7 @@ export default function CalendarWorkspace() {
             </Popover.Content></Popover.Portal>
           </Popover.Root>
           <button type="button" aria-label="Calendars" title="Calendar settings" className={`work-button work-button--secondary ${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}><UnigentamosIcon role="sliders" candidate="settings" size={20} /><span>Calendars</span></button>
-          <Button intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>Add event</Button>
+          <Button intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>{compact ? "Add" : "Add event"}</Button>
         </div>
       </header>
       <WorkspaceFeedback

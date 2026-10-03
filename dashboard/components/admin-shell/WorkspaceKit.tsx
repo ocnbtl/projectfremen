@@ -90,6 +90,7 @@ export function WorkspaceToolbar({
         {filters && (
           <WorkspaceButton
             icon="filter"
+            aria-label={activeFilters ? `Filter (${activeFilters} active)` : "Filter"}
             aria-expanded={expanded}
             onClick={() => setExpanded(!expanded)}
           >

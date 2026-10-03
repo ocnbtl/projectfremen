@@ -49,10 +49,12 @@ type DockDrag = {
   originX: number;
   originY: number;
   moved: boolean;
+  armed?: boolean;
 };
 
 const DOCK_VIEWPORT_GAP = 12;
 const AI_DOCK_OPEN_STORAGE_KEY = "unigentamos:assistant:open";
+const AI_DOCK_POSITION_KEY = "unigentamos:assistant:position";
 
 type SharedAIDockRegistration = SharedAIDockProps & { ownerId: string; selections: Readonly<Record<string, string>> };
 type SharedAIDockHost = {
@@ -70,9 +72,12 @@ function titleCaseContext(value: string) {
 }
 
 function clampLauncher(point: DockPoint, width: number, height: number): DockPoint {
+  const viewport = window.visualViewport;
+  const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+  const availableWidth = viewport?.width || window.innerWidth, availableHeight = viewport?.height || window.innerHeight;
   return {
-    x: Math.min(Math.max(DOCK_VIEWPORT_GAP, point.x), Math.max(DOCK_VIEWPORT_GAP, window.innerWidth - width - DOCK_VIEWPORT_GAP)),
-    y: Math.min(Math.max(DOCK_VIEWPORT_GAP, point.y), Math.max(DOCK_VIEWPORT_GAP, window.innerHeight - height - DOCK_VIEWPORT_GAP))
+    x: Math.min(Math.max(left + DOCK_VIEWPORT_GAP, point.x), Math.max(left + DOCK_VIEWPORT_GAP, left + availableWidth - width - DOCK_VIEWPORT_GAP)),
+    y: Math.min(Math.max(top + DOCK_VIEWPORT_GAP, point.y), Math.max(top + DOCK_VIEWPORT_GAP, top + availableHeight - height - DOCK_VIEWPORT_GAP))
   };
 }
 
@@ -105,6 +110,8 @@ function SharedAIDockSurface({
   const closeRef = useRef<HTMLButtonElement>(null);
   const wasOpen = useRef(open);
   const launcherDrag = useRef<DockDrag | null>(null);
+  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const launcherAnchor = useRef<DockPoint | null>(null);
   const panelDrag = useRef<DockDrag | null>(null);
   const suppressLauncherClick = useRef(false);
   const [compactViewport, setCompactViewport] = useState(false);
@@ -112,6 +119,18 @@ function SharedAIDockSurface({
   const [panelRect, setPanelRect] = useState<DockRect | null>(null);
   const [dragging, setDragging] = useState<"launcher" | "panel" | null>(null);
   const [draft, setDraft] = useState("");
+
+  useEffect(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(AI_DOCK_POSITION_KEY) || "null");
+      const bounds = launcherRef.current?.getBoundingClientRect();
+      if (bounds && Number.isFinite(stored?.x) && Number.isFinite(stored?.y)) {
+        launcherAnchor.current = stored;
+        setLauncherPosition(clampLauncher(stored, bounds.width, bounds.height));
+      }
+    } catch { /* Storage is optional in private browsing. */ }
+    return () => { if (holdTimer.current) clearTimeout(holdTimer.current); };
+  }, []);
 
   useEffect(() => {
     if (open) {
@@ -147,10 +166,10 @@ function SharedAIDockSurface({
     const syncViewport = () => {
       const compact = media.matches || document.documentElement.dataset.adminPreview === "mobile";
       setCompactViewport(compact);
-      if (!compact) {
+      {
         const launcherBounds = launcherRef.current?.getBoundingClientRect();
         if (launcherBounds) {
-          setLauncherPosition((current) => current ? clampLauncher(current, launcherBounds.width, launcherBounds.height) : current);
+          setLauncherPosition((current) => current ? clampLauncher(launcherAnchor.current || current, launcherBounds.width, launcherBounds.height) : current);
         }
         setPanelRect((current) => current ? clampPanel(current) : current);
       }
@@ -160,10 +179,12 @@ function SharedAIDockSurface({
     previewObserver.observe(document.documentElement, { attributes: true, attributeFilter: ["data-admin-preview"] });
     media.addEventListener("change", syncViewport);
     window.addEventListener("resize", syncViewport);
+    window.visualViewport?.addEventListener("resize", syncViewport);
     return () => {
       previewObserver.disconnect();
       media.removeEventListener("change", syncViewport);
       window.removeEventListener("resize", syncViewport);
+      window.visualViewport?.removeEventListener("resize", syncViewport);
     };
   }, []);
 
@@ -180,7 +201,7 @@ function SharedAIDockSurface({
     context.visibleScope ? titleCaseContext(context.visibleScope) : undefined
   ].filter((value): value is string => Boolean(value));
 
-  const launcherStyle: CSSProperties | undefined = !compactViewport && launcherPosition
+  const launcherStyle: CSSProperties | undefined = launcherPosition
     ? { left: launcherPosition.x, top: launcherPosition.y, right: "auto", bottom: "auto" }
     : undefined;
   const panelStyle: CSSProperties | undefined = !compactViewport
@@ -190,7 +211,8 @@ function SharedAIDockSurface({
     : undefined;
 
   function beginLauncherDrag(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (compactViewport || event.button !== 0 || !launcherRef.current) return;
+    if (event.button !== 0 || !launcherRef.current) return;
+    suppressLauncherClick.current = false;
     const bounds = launcherRef.current.getBoundingClientRect();
     launcherDrag.current = {
       pointerId: event.pointerId,
@@ -198,9 +220,13 @@ function SharedAIDockSurface({
       startY: event.clientY,
       originX: bounds.left,
       originY: bounds.top,
-      moved: false
+      moved: false,
+      armed: event.pointerType === "mouse"
     };
     event.currentTarget.setPointerCapture(event.pointerId);
+    if (event.pointerType !== "mouse") holdTimer.current = setTimeout(() => {
+      if (launcherDrag.current) { launcherDrag.current.armed = true; setDragging("launcher"); }
+    }, 320);
   }
 
   function moveLauncher(event: ReactPointerEvent<HTMLButtonElement>) {
@@ -208,17 +234,27 @@ function SharedAIDockSurface({
     if (!drag || drag.pointerId !== event.pointerId || !launcherRef.current) return;
     const deltaX = event.clientX - drag.startX;
     const deltaY = event.clientY - drag.startY;
+    if (!drag.armed) {
+      if (Math.hypot(deltaX, deltaY) > 8) { if (holdTimer.current) clearTimeout(holdTimer.current); launcherDrag.current = null; suppressLauncherClick.current = true; }
+      return;
+    }
     if (!drag.moved && Math.hypot(deltaX, deltaY) < 4) return;
     drag.moved = true;
     setDragging("launcher");
-    const bounds = launcherRef.current.getBoundingClientRect();
-    setLauncherPosition(clampLauncher({ x: drag.originX + deltaX, y: drag.originY + deltaY }, bounds.width, bounds.height));
+    const point = clampLauncher({ x: drag.originX + deltaX, y: drag.originY + deltaY }, launcherRef.current.offsetWidth, launcherRef.current.offsetHeight);
+    launcherAnchor.current = point;
+    setLauncherPosition(point);
   }
 
   function endLauncherDrag(event: ReactPointerEvent<HTMLButtonElement>) {
+    if (holdTimer.current) clearTimeout(holdTimer.current);
+    holdTimer.current = null;
     const drag = launcherDrag.current;
     if (!drag || drag.pointerId !== event.pointerId) return;
-    suppressLauncherClick.current = drag.moved;
+    suppressLauncherClick.current = drag.moved || dragging === "launcher";
+    if (drag.moved && launcherAnchor.current) {
+      try { localStorage.setItem(AI_DOCK_POSITION_KEY, JSON.stringify(launcherAnchor.current)); } catch { /* Keep the session position if storage is unavailable. */ }
+    }
     launcherDrag.current = null;
     setDragging(null);
     if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId);
@@ -283,10 +319,20 @@ function SharedAIDockSurface({
         onPointerMove={moveLauncher}
         onPointerUp={endLauncherDrag}
         onPointerCancel={endLauncherDrag}
+        onKeyDown={event => {
+          if (!event.altKey || !["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(event.key)) return;
+          event.preventDefault();
+          const bounds = event.currentTarget.getBoundingClientRect();
+          const next = clampLauncher({ x: bounds.left + (event.key === "ArrowRight" ? 16 : event.key === "ArrowLeft" ? -16 : 0), y: bounds.top + (event.key === "ArrowDown" ? 16 : event.key === "ArrowUp" ? -16 : 0) }, bounds.width, bounds.height);
+          launcherAnchor.current = next;
+          setLauncherPosition(next);
+          try { localStorage.setItem(AI_DOCK_POSITION_KEY, JSON.stringify(next)); } catch { /* Storage is optional. */ }
+        }}
         aria-expanded={open}
         aria-controls={panelId}
         aria-label={open ? "Close AI assistant" : "Open AI assistant"}
-        title={compactViewport ? "Open assistant" : "Open assistant · drag to reposition"}
+        onContextMenu={event => event.preventDefault()}
+        title={compactViewport ? "Open assistant · hold to move" : "Open assistant · drag to reposition"}
       >
         <span className="shared-ai-dock__launcher-mark" aria-hidden="true">
           <UnigentamosIcon role="message" />

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 import { Analytics } from "@vercel/analytics/next";
 import "@fontsource-variable/plus-jakarta-sans/wght.css";
@@ -16,6 +16,8 @@ import "./workspace-system.css";
 import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
 import NavigationHost from "../components/admin-shell/NavigationHost";
 import { PersistentSharedAIDockProvider } from "../components/admin-shell/SharedAIDock";
+
+export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#ffffff" };
 
 export const metadata: Metadata = {
   applicationName: "Unigentamos",

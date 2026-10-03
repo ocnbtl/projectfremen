@@ -375,7 +375,7 @@ export default function MapWorkspace() {
       style={moduleThemeVariables("map") as CSSProperties}
     >
       <WorkspaceHeader title="Map">
-        <Button onClick={() => startTrip()}>Plan trip</Button>
+        <Button icon="travel" onClick={() => startTrip()}>Plan trip</Button>
         <Button intent="primary" icon="plus" onClick={() => newPlace()}>
           Save place
         </Button>
@@ -422,16 +422,17 @@ export default function MapWorkspace() {
         }
       >
         <Button
+          icon="search" aria-label="Find on map"
           disabled={query.trim().length < 3 || busy}
           onClick={() => void search()}
         >
           Find on map
         </Button>
-        <Button aria-pressed={pinning} onClick={() => setPinning(!pinning)}>
+        <Button icon="location" aria-label={pinning ? "Cancel pin" : "Drop pin"} aria-pressed={pinning} onClick={() => setPinning(!pinning)}>
           {pinning ? "Cancel pin" : "Drop pin"}
         </Button>
         <Button
-          className={styles.listToggle}
+          icon={mobileList ? "map" : "list"} className={styles.listToggle}
           aria-pressed={mobileList}
           onClick={() => setMobileList(!mobileList)}
         >

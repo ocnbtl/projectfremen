@@ -396,3 +396,18 @@
 .levels button {
   font-size: 10px;
 }
+@media (max-width: 760px) {
+  .shell > :global(.work-header) { display: flex; align-items: center; min-height: 40px; padding: 10px 10px 6px; gap: 8px; background: transparent; border: 0; }
+  .shell :global(.work-title h1) { font-size: 18px; }
+  .shell :global(.work-actions) { gap: 5px; flex-wrap: nowrap; }
+  .shell > :global(.work-header) :global(.work-button) { min-height: 40px; height: 40px; padding: 6px 8px; gap: 4px; font-size: 11px; }
+  .shell > :global(.work-toolbar) { display: grid; grid-template-columns: minmax(72px, 1fr) repeat(3, 36px) 46px; padding: 0 10px 8px; gap: 5px; background: transparent; border: 0; }
+  .shell > :global(.work-toolbar) :global(.work-search) { min-width: 0; width: auto; height: 40px; padding: 0 7px; gap: 4px; }
+  .shell > :global(.work-toolbar) :global(.work-search input) { min-width: 0; font-size: 16px; padding: 0; }
+  .shell > :global(.work-toolbar) :global(.work-search input)::placeholder { font-size: 11px; }
+  .shell > :global(.work-toolbar) :global(.work-button) { width: 100%; min-width: 0; min-height: 40px; height: 40px; padding: 0; gap: 3px; font-size: 11px; }
+  .shell > :global(.work-toolbar) :global(.work-button) > span { display: none; }
+  .shell > :global(.work-toolbar) .listToggle > span { display: inline; }
+  .shell > :global(.work-toolbar) .listToggle > svg { display: none; }
+  .shell :global(.work-toolbar) :global(.work-button) svg { width: 18px; }
+}
