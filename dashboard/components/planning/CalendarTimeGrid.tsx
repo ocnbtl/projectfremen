@@ -111,7 +111,7 @@ export default function CalendarTimeGrid({
             5,
       ),
     );
-  const columns = `58px ${days.map((day) => `minmax(0, ${widenToday && day === today ? 1.75 : 1}fr)`).join(" ")}`;
+  const columns = `var(--calendar-time-gutter, 58px) ${days.map((day) => `minmax(0, ${widenToday && day === today ? 1.75 : 1}fr)`).join(" ")}`;
   return (
     <div className={styles.fittedCalendar}>
       <div

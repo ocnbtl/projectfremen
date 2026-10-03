@@ -3,9 +3,9 @@ import { Children, isValidElement, useId, useLayoutEffect, useRef, useState, typ
 import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 type OptionProps = { value?: string | number; disabled?: boolean; children?: ReactNode };
-type Props = SelectHTMLAttributes<HTMLSelectElement> & { searchable?: boolean; columns?: number; triggerContent?: ReactNode; menuClassName?: string; onCreate?: () => void; createLabel?: string };
+type Props = SelectHTMLAttributes<HTMLSelectElement> & { searchable?: boolean; autoFocusSearch?: boolean; columns?: number; triggerContent?: ReactNode; menuClassName?: string; onCreate?: () => void; createLabel?: string };
 /** Nonmodal choice menus keep nested dismissals local to their owning control. */
-export default function SelectField({ value, defaultValue, onChange, children, className, disabled, required, name, id, searchable = false, columns = 1, triggerContent, menuClassName = "", onCreate, createLabel = "Create organization", ...attributes }: Props) {
+export default function SelectField({ value, defaultValue, onChange, children, className, disabled, required, name, id, searchable = false, autoFocusSearch = true, columns = 1, triggerContent, menuClassName = "", onCreate, createLabel = "Create organization", ...attributes }: Props) {
   const trigger = useRef<HTMLButtonElement>(null), menu = useRef<HTMLDivElement>(null), search = useRef<HTMLInputElement>(null);
   const listId = useId();
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [internal, setInternal] = useState(String(defaultValue ?? "")), [fieldLabel, setFieldLabel] = useState<string>();
@@ -26,7 +26,7 @@ export default function SelectField({ value, defaultValue, onChange, children, c
     </button></Popover.Trigger>
     <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content ref={menu} className={`app-select-menu app-choice-menu${columns > 1 ? " is-grid" : ""} ${menuClassName}`} sideOffset={6} collisionPadding={12}
       onEscapeKeyDown={event => event.stopImmediatePropagation()}
-      onOpenAutoFocus={event => {event.preventDefault(); if (searchable) search.current?.focus(); else (menu.current?.querySelector<HTMLElement>('[aria-selected="true"]:not([disabled])') || menu.current?.querySelector<HTMLElement>('[role="option"]:not([disabled])'))?.focus();}}
+      onOpenAutoFocus={event => {event.preventDefault(); if (searchable && autoFocusSearch) search.current?.focus(); else (menu.current?.querySelector<HTMLElement>('[aria-selected="true"]:not([disabled])') || menu.current?.querySelector<HTMLElement>('[role="option"]:not([disabled])'))?.focus({ preventScroll: true });}}
       onKeyDown={event => {
         const inSearch = event.target === search.current;
         if (inSearch && !["ArrowDown", "ArrowUp"].includes(event.key)) return;

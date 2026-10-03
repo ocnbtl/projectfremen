@@ -67,3 +67,6 @@
 .popover[data-reduced-motion="true"] { animation: none; }
 @media (prefers-reduced-motion: reduce) { .popover { animation: none; } .trigger > svg:last-child, .month svg { transition: none; } }
 :global([data-product-motion="reduce"]) .trigger > svg:last-child { transition: none; }
+/* Compact paired schedule fields remain readable in narrow event sheets. */
+.field .trigger { min-height: 50px; padding: 7px 9px; gap: 6px; }
+@media (max-width: 480px) { .field .trigger { padding: 7px; gap: 5px; } .field .trigger > svg { width: 14px; } .field .value { font-size: 12px; } .field .value small { font-size: 11px; } }

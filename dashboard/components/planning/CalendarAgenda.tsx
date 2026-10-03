@@ -8,8 +8,10 @@ import { WorkspaceButton as Button, WorkspaceEmpty } from "../admin-shell/Worksp
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { calendarDateLabel as label } from "./CalendarMiniMonth";
 import styles from "./CalendarWorkspace.module.css";
+import SelectField from "../ui/SelectField";
 
-export default function CalendarAgenda({ events, linked, zone, start, today, renderEvent, onDay }: {
+export default function CalendarAgenda({ events, linked, zone, start, today, renderEvent, onDay, rangeDays, onRangeDays }: {
+  rangeDays: number; onRangeDays: (days: number) => void;
   events: EventOccurrence[]; linked: PlanningSnapshot["dated"]; zone: string; start: string; today: string; renderEvent: (item: EventOccurrence) => ReactNode; onDay: (day: string) => void;
 }) {
   const [page, setPage] = useState(0);
@@ -24,7 +26,7 @@ export default function CalendarAgenda({ events, linked, zone, start, today, ren
   }, [events, linked, zone, start]);
   const pages = Math.max(1, Math.ceil(groups.length / 4)), current = Math.min(page, pages - 1);
   return <div className={styles.agenda}>
-    <div className={styles.agendaHeading}><span>Upcoming <strong>30 days</strong></span><span>{events.length + linked.length} {events.length + linked.length === 1 ? "event" : "events"}</span></div>
+    <div className={styles.agendaHeading}><span>{events.length + linked.length} {events.length + linked.length === 1 ? "event" : "events"} in the next</span><SelectField aria-label="Agenda date range" value={String(rangeDays)} menuClassName={styles.calendarChoiceMenu} onChange={event => onRangeDays(Number(event.target.value))}>{[7, 14, 30, 60, 90].map(days => <option key={days} value={days}>{days} days</option>)}</SelectField></div>
     {groups.slice(current * 4, current * 4 + 4).map(([day, rows]) => <section className={styles.agendaDay} key={day} data-today={day === today}>
       <button type="button" className={styles.agendaDate} onClick={() => onDay(day)} aria-label={`View ${label(day, { dateStyle: "full" })}`}>
         <strong data-morph-date={day}>{Number(day.slice(-2))}</strong><span>{label(day, { month: "short" })}<small>{day === today ? "Today" : label(day, { weekday: "long" })}</small></span>

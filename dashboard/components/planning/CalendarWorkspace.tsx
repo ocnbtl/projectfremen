@@ -11,6 +11,8 @@ import EventPeople from "./EventPeople";
 import CalendarObservanceSettings, { CalendarCountryFlag } from "./CalendarObservanceSettings";
 import { calendarObservances, defaultObservances, observanceAppearance, type HolidayCatalog } from "../../lib/modules/planning/observances";
 import EventEditorFields from "./EventEditorFields";
+import CalendarDisclosure from "./CalendarDisclosure";
+import useCalendarAutosave from "./useCalendarAutosave";
 import CalendarGroupSettings from "./CalendarGroupSettings";
 import CalendarDatePicker from "./CalendarDatePicker";
 import { CalendarScene, useCalendarMotion, useCalendarMorph } from "./CalendarMotion";
@@ -111,6 +113,7 @@ export default function CalendarWorkspace() {
   const morph = useCalendarMorph(calendarSurface);
   const previousDate = useRef("");
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
+  const [agendaDays, setAgendaDays] = useState(30);
   const [early, setEarly] = useState(false), [late, setLate] = useState(false);
   const [draft, setDraft] = useState<EventDraft | undefined>(
     () => retainedDraft,
@@ -160,7 +163,10 @@ export default function CalendarWorkspace() {
     ...confirmedSnapshot.state,
     calendars: confirmedSnapshot.state.calendars.map(calendar => ({ ...calendar, ...calendarPatches[calendar.id]?.input })),
   } }), [confirmedSnapshot, calendarPatches]);
-  function saveCalendarPreference(id: string, input: Partial<Calendar>): Promise<boolean> {
+  function saveCalendarPreference(id: string, patch: Partial<Calendar> | ((calendar: Calendar) => Partial<Calendar>)): Promise<boolean> {
+    const visible = snapshot?.state.calendars.find(calendar => calendar.id === id);
+    if (!visible) return Promise.resolve(false);
+    const input = typeof patch === "function" ? patch(visible) : patch;
     const version = ++revision.current;
     writeCount.current += 1;
     setPendingCount(writeCount.current);
@@ -169,7 +175,7 @@ export default function CalendarWorkspace() {
     const job = writes.current.then(async () => {
       try {
         const current = confirmed.current?.state.calendars.find(calendar => calendar.id === id);
-        const saved = await savePlanning("calendars", { id, ...input }, current?.updatedAt);
+        const saved = await savePlanning("calendars", { id, ...(typeof patch === "function" && current ? patch(current) : input) }, current?.updatedAt);
         if (confirmed.current) {
           confirmed.current = { ...confirmed.current, state: { ...confirmed.current.state, calendars: confirmed.current.state.calendars.map(calendar => calendar.id === id ? saved : calendar) } };
           setSnapshot(confirmed.current);
@@ -297,7 +303,7 @@ export default function CalendarWorkspace() {
       setError("This event link has an invalid date.");
     }
   }, [params, snapshot, zone, openEvent]);
-  const range = useMemo(() => calendarRange(date, view), [date, view]);
+  const range = useMemo(() => calendarRange(date, view, agendaDays), [date, view, agendaDays]);
   const holidayCountries = observanceSettings.countries.join(",");
   const holidayYears = [...new Set([range.start.slice(0, 4), addDays(range.end, -1).slice(0, 4), date.slice(0, 4)])].join(",");
   useEffect(() => {
@@ -512,7 +518,7 @@ export default function CalendarWorkspace() {
       "Event duration updated",
     );
   }
-  const timeline = view === "day" || view === "3-day" || (!compact && view === "week");
+  const timeline = view === "day" || view === "3-day" || view === "week";
   const changeView = (next: View, day?: string) => morph(() => { setView(next); if (day) setDate(day); });
   function eventButton(item: EventOccurrence) {
     const event = snapshot?.state.events.find((x) => x.id === item.eventId);
@@ -575,8 +581,8 @@ export default function CalendarWorkspace() {
         <h1>Calendar</h1>
         <div className={styles.dateNavigation}>
           <Button className={styles.todayButton} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
-          <Button aria-label="Previous period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, -1))}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></Button>
-          <Button aria-label="Next period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, 1))}><UnigentamosIcon role="chevron-right" size={18} /></Button>
+          <Button aria-label="Previous period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, -1, agendaDays))}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></Button>
+          <Button aria-label="Next period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, 1, agendaDays))}><UnigentamosIcon role="chevron-right" size={18} /></Button>
           <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => changeView(next, day)} />
         </div>
         <div className={styles.draftSlot} data-active={Boolean(draft && !editor)}>
@@ -589,7 +595,7 @@ export default function CalendarWorkspace() {
         <div className={styles.toolbarTools}>
           {timeline && <CalendarHourControls days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />}
           <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search events"} value={query} onChange={e => setQuery(e.target.value)} /></label>
-          <SelectField aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
+          <SelectField triggerContent={compact ? <span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[view]} size={16} />{view === "3-day" ? "3 days" : view[0].toUpperCase() + view.slice(1)}</span> : undefined} aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
             {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
@@ -616,8 +622,9 @@ export default function CalendarWorkspace() {
             </Popover.Content></Popover.Portal>
           </Popover.Root>
           <button type="button" aria-label="Calendars" title="Calendar settings" className={`work-button work-button--secondary ${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}><UnigentamosIcon role="sliders" candidate="settings" size={20} /><span>Calendars</span></button>
-          <Button intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>{compact ? "Add" : "Add event"}</Button>
+
         </div>
+          <Button intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>{compact ? "Add" : "Add event"}</Button>
       </header>
       <WorkspaceFeedback
         error={error || expanded.error || holidayError}
@@ -685,10 +692,10 @@ export default function CalendarWorkspace() {
             const dx = touch.clientX - start.x, dy = touch.clientY - start.y;
             if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
             if (event.cancelable) event.preventDefault();
-            setDate(current => shiftCalendar(current, view, dx < 0 ? 1 : -1));
+            setDate(current => shiftCalendar(current, view, dx < 0 ? 1 : -1, agendaDays));
           }}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
-          {compact && (view === "week" || view === "month") ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={eventButton} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
+          {compact && view === "month" ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={eventButton} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
             <div
               className={styles.month}
               style={{
@@ -739,7 +746,7 @@ export default function CalendarWorkspace() {
               ))}
             </div>
           ) : view === "agenda" ? (
-            <CalendarAgenda key={[range.start, query, showCompleted, showDated].join(":")} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={eventButton} onDay={day => changeView("day", day)} />
+            <CalendarAgenda key={[range.start, agendaDays, query, showCompleted, showDated].join(":")} rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={eventButton} onDay={day => changeView("day", day)} />
           ) : (
             <CalendarTimeGrid
               days={days}
@@ -966,7 +973,7 @@ export default function CalendarWorkspace() {
               <input type="checkbox" aria-label={observanceAppearance(observanceSettings, "birthdays").name} checked={observanceSettings.birthdays} disabled={actionBusy} onChange={e => void saveCalendarPreference("native", { observances: { ...observanceSettings, birthdays: e.target.checked } })} />
             </label>
           </section>
-          <details className={styles.settingsDisclosure}><summary><UnigentamosIcon role="plus" size={18} /><span>Add a calendar</span><UnigentamosIcon role="chevron-down" size={16} /></summary>
+          <CalendarDisclosure title="Add a calendar" icon="plus">
           <form
             className="work-form"
             onSubmit={(e) => {
@@ -1004,41 +1011,28 @@ export default function CalendarWorkspace() {
               Add calendar
             </Button>
           </form>
-          </details>
-          <details className={styles.settingsDisclosure}>
-            <summary><UnigentamosIcon role="palette" size={18} /><span>Calendar names & colors</span><UnigentamosIcon role="chevron-down" size={16} /></summary>
+          </CalendarDisclosure>
+          <CalendarDisclosure title="Calendar names & colors" icon="palette">
             {snapshot?.state.calendars
               .filter((calendar) => !calendar.archivedAt)
               .map((calendar) => (
                 <CalendarSettings
-                  key={`${calendar.id}:${calendar.updatedAt}`}
+                  key={calendar.id}
                   calendar={calendar}
                   busy={busy}
-                  onSave={(name, color) =>
-                    action(
-                      () =>
-                        savePlanning(
-                          "calendars",
-                          { id: calendar.id, name, color },
-                          calendar.updatedAt,
-                        ),
-                      "Calendar updated",
-                    )
-                  }
+                  onSave={(name, color) => saveCalendarPreference(calendar.id, { name, color })}
                 />
               ))}
             {[{ key: "birthdays", name: "People’s birthdays" }, ...observanceSettings.countries.map(code => ({ key: "holidays:" + code, name: holidayData?.countries.find(country => country.code === code)?.name || code })), { key: "custom", name: "Custom dates" }].map(entry => <CalendarSettings
-              key={entry.key + ":" + nativeCalendar?.updatedAt} calendar={observanceAppearance(observanceSettings, entry.key, entry.name)} busy={busy}
+              key={entry.key} calendar={observanceAppearance(observanceSettings, entry.key, entry.name)} busy={busy}
               icon={entry.key === "birthdays" ? "birthday" : "star"} country={entry.key.startsWith("holidays:") ? entry.key.slice(9) : undefined}
-              onSave={(name, color) => action(() => savePlanning("calendars", { id: "native", observances: { ...observanceSettings, appearances: { ...observanceSettings.appearances, [entry.key]: { name, color } } } }, nativeCalendar?.updatedAt), "Calendar updated")}
+              onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, [entry.key]: { name, color } } } }; })}
             />)}
-          </details>
-          <details className={styles.settingsDisclosure}>
-            <summary><UnigentamosIcon role="palette" size={18} /><span>Event groups & colors</span><UnigentamosIcon role="chevron-down" size={16} /></summary>
-            <CalendarGroupSettings calendars={snapshot?.state.calendars.filter(calendar => !calendar.archivedAt) || []} busy={busy} onSave={(calendar, groups) => action(() => savePlanning("calendars", { id: calendar.id, groups }, calendar.updatedAt), "Color groups saved")} />
-          </details>
-          <details className={styles.settingsDisclosure}>
-            <summary><UnigentamosIcon role="link" size={18} /><span>Import or subscribe</span><UnigentamosIcon role="chevron-down" size={16} /></summary>
+          </CalendarDisclosure>
+          <CalendarDisclosure title="Event groups & colors" icon="palette">
+            <CalendarGroupSettings calendars={snapshot?.state.calendars.filter(calendar => !calendar.archivedAt) || []} busy={busy} onSave={(calendar, groups) => saveCalendarPreference(calendar.id, { groups })} />
+          </CalendarDisclosure>
+          <CalendarDisclosure title="Import or subscribe" icon="link">
             <label>
               Name
               <input
@@ -1087,7 +1081,7 @@ export default function CalendarWorkspace() {
                 and feeds are available now.
               </p>
             )}
-          </details>
+          </CalendarDisclosure>
           </>}
           {calendarTab === "calendars" && Boolean(snapshot?.state.connections.length) && <section className="work-section">
             <h2>Connections</h2>
@@ -1216,12 +1210,13 @@ function CalendarSettings({
 }) {
   const [name, setName] = useState(calendar.name),
     [color, setColor] = useState(calendar.color);
+  const autosave = useCalendarAutosave<{ name: string; color: string }>(value => onSave(value.name, value.color), value => Boolean(value.name.trim()));
   return (
     <form
       className={styles.calendarNameRow}
       onSubmit={(event) => {
         event.preventDefault();
-        void onSave(name, color);
+        void autosave.flush();
       }}
     >
       <span className={styles.calendarNameIcon} style={{ color }}>{country ? <CalendarCountryFlag code={country} /> : <UnigentamosIcon role={icon} size={18} />}</span>
@@ -1232,7 +1227,8 @@ function CalendarSettings({
           maxLength={120}
           aria-label={`Name for ${calendar.name}`}
           value={name}
-          onChange={(event) => setName(event.target.value)}
+          onChange={(event) => { setName(event.target.value); autosave.schedule({ name: event.target.value, color }); }}
+          onBlur={() => void autosave.flush()}
         />
       </label>
       <label className={styles.calendarColorInput}>
@@ -1241,17 +1237,11 @@ function CalendarSettings({
           type="color"
           aria-label={`Color for ${calendar.name}`}
           value={color}
-          onChange={(event) => setColor(event.target.value)}
+          onChange={(event) => { setColor(event.target.value); autosave.schedule({ name, color: event.target.value }); }}
         />
       </label>
-      <Button
-        type="submit"
-        aria-label={`Save ${calendar.name}`}
-        icon="check"
-        busy={busy}
-        disabled={name === calendar.name && color === calendar.color}
-      >
-      </Button>
+      <span className={styles.autosaveStatus} role="status">{autosave.status}</span>
+      {autosave.status === "Not saved" && <Button onClick={() => void autosave.flush()}>Retry</Button>}
     </form>
   );
 }

@@ -30,7 +30,7 @@ export default function RecordLinks({
     : [];
   return (
     <div className={objectPicker ? "work-object-links" : undefined}>
-      {onChange && objectPicker && <PeopleObjectPicker iconOnly targets={available.filter((ref) => !refs.some((linked) => key(linked) === key(ref)))} value="" onChange={(value) => {
+      {onChange && objectPicker && <PeopleObjectPicker iconOnly triggerIcon="object" targets={available.filter((ref) => !refs.some((linked) => key(linked) === key(ref)))} value="" onChange={(value) => {
         const ref = available.find((candidate) => objectTargetKey(candidate) === value);
         if (ref && !refs.some((linked) => key(linked) === key(ref))) onChange([...refs, ref]);
       }} />}

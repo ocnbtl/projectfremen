@@ -35,12 +35,37 @@ export function calendarObservances(birthdays: BirthdaySource[], holidays: Holid
     }
   }
   for (const holiday of holidays) if (holidayVisible(holiday, settings)) push(`holiday:${holiday.key}:${holiday.date}`, holiday.name, holiday.date, holiday.end, { kind: "holiday", key: holiday.key, country: holiday.country, detail: `${holiday.type === "public" ? "Public holiday" : "Observance"} · ${holiday.country}` });
-  for (const custom of settings.custom.filter(x => x.visible)) for (const year of custom.annual ? [...new Set([years[0] - 1, ...years, years[years.length - 1] + 1])] : [Number(custom.date.slice(0, 4))]) {
-    let day: string;
-    try { day = Temporal.PlainDate.from(`${year}-${custom.date.slice(5)}`, { overflow: "reject" }).toString(); } catch { continue; }
+  for (const custom of settings.custom.filter(x => x.visible)) for (const day of customDateOccurrences(custom, start, end)) {
     const allDay = custom.allDay !== false;
     const span = custom.endDate ? Temporal.PlainDate.from(custom.endDate).since(Temporal.PlainDate.from(custom.date)).days : 0;
-    push(`custom:${custom.id}:${year}`, custom.title, allDay ? day : `${day}T${custom.startTime}`, allDay ? addDays(day, 1) : `${addDays(day, span)}T${custom.endTime}`, { kind: "custom", key: custom.id, detail: custom.annual ? "Custom date · Every year" : "Custom date · One time" }, undefined, allDay, allDay ? zone : custom.timeZone || zone);
+    push(`custom:${custom.id}:${day}`, custom.title, allDay ? day : `${day}T${custom.startTime}`, allDay ? addDays(day, 1) : `${addDays(day, span)}T${custom.endTime}`, { kind: "custom", key: custom.id, detail: `Custom date · ${customRepeatLabel(custom)}` }, undefined, allDay, allDay ? zone : custom.timeZone || zone);
   }
   return items.sort((a, b) => a.start.localeCompare(b.start) || a.title.localeCompare(b.title));
+}
+
+export function customRepeatLabel(custom: CalendarObservanceSettings["custom"][number]) {
+  const repeat = custom.repeat;
+  if (!repeat) return custom.annual ? "Every year" : "One time";
+  const unit = { daily: "day", weekly: "week", monthly: "month", yearly: "year" }[repeat.frequency];
+  return repeat.interval === 1 ? `Every ${unit}` : `Every ${repeat.interval} ${unit}s`;
+}
+
+function customDateOccurrences(custom: CalendarObservanceSettings["custom"][number], start: string, end: string) {
+  const seed = Temporal.PlainDate.from(custom.date), repeat = custom.repeat;
+  if (!repeat) {
+    const years = custom.annual ? Array.from({ length: Number(end.slice(0, 4)) - Number(start.slice(0, 4)) + 3 }, (_, i) => Number(start.slice(0, 4)) - 1 + i) : [seed.year];
+    return years.flatMap(year => { try { return [seed.with({ year }, { overflow: "reject" }).toString()]; } catch { return []; } });
+  }
+  // Seek directly to the range, preserving the seed's day (Jan 31 skips February).
+  const span = custom.endDate ? seed.until(Temporal.PlainDate.from(custom.endDate)).days : 0;
+  const low = Temporal.PlainDate.from(start).subtract({ days: span + 1 }), high = Temporal.PlainDate.from(end).add({ days: 1 });
+  const elapsed = repeat.frequency === "yearly" ? low.year - seed.year : repeat.frequency === "monthly" ? (low.year - seed.year) * 12 + low.month - seed.month : seed.until(low).days / (repeat.frequency === "weekly" ? 7 : 1);
+  const unit = { daily: "days", weekly: "weeks", monthly: "months", yearly: "years" }[repeat.frequency];
+  const dates: string[] = [];
+  for (let index = Math.max(0, Math.floor(elapsed / repeat.interval)); ; index++) {
+    const duration = { [unit]: index * repeat.interval };
+    if (Temporal.PlainDate.compare(seed.add(duration), high) > 0) break;
+    try { const day = seed.add(duration, { overflow: "reject" }); if (Temporal.PlainDate.compare(day, low) >= 0) dates.push(day.toString()); } catch { /* Skip dates absent from that month/year. */ }
+  }
+  return dates;
 }

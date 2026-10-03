@@ -17,7 +17,13 @@ export function normalizeObservances(value: unknown): CalendarObservanceSettings
     if (typeof item.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) throw new Error("Choose a valid custom date");
     Temporal.PlainDate.from(item.date, { overflow: "reject" });
     const base = { id: item.id, title: item.title.trim(), date: item.date, annual: item.annual === true, visible: item.visible !== false };
-    if (item.allDay !== false) return base;
+    let repeat: CalendarObservanceSettings["custom"][number]["repeat"];
+    if (item.repeat !== undefined) {
+      if (!item.repeat || !["daily", "weekly", "monthly", "yearly"].includes(item.repeat.frequency) || !Number.isInteger(item.repeat.interval) || item.repeat.interval < 1 || item.repeat.interval > 365) throw new Error("Choose a repeat interval from 1 to 365 days, weeks, months or years");
+      repeat = { frequency: item.repeat.frequency, interval: item.repeat.interval };
+    }
+    const repeated = { ...base, ...(repeat ? { repeat } : {}) };
+    if (item.allDay !== false) return repeated;
     if (![item.startTime, item.endTime].every(time => typeof time === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(time))) throw new Error("Choose valid start and end times");
     const endDate = typeof item.endDate === "string" ? item.endDate : item.date;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(endDate)) throw new Error("Choose a valid end date");
@@ -28,7 +34,7 @@ export function normalizeObservances(value: unknown): CalendarObservanceSettings
     const end = Temporal.PlainDateTime.from(`${endDate}T${item.endTime}`).toZonedDateTime(timeZone);
     if (end.epochMilliseconds <= start.epochMilliseconds) throw new Error("The end must be after the start");
     if (Temporal.PlainDate.from(endDate).since(Temporal.PlainDate.from(item.date)).days > 366) throw new Error("Custom dates can span up to one year");
-    return { ...base, allDay: false, startTime: item.startTime, endTime: item.endTime, endDate, timeZone };
+    return { ...repeated, allDay: false, startTime: item.startTime, endTime: item.endTime, endDate, timeZone };
   });
   if (new Set(custom.map(x => x.id)).size !== custom.length) throw new Error("Custom dates must have unique ids");
   const appearances: NonNullable<CalendarObservanceSettings["appearances"]> = {};

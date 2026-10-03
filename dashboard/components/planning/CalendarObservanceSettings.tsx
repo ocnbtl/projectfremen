@@ -1,11 +1,12 @@
 "use client";
 import { useState } from "react";
 import type { CalendarObservanceSettings as Settings } from "../../lib/modules/planning/types";
-import { holidayVisible, observanceAppearance, type HolidayCatalog } from "../../lib/modules/planning/observances";
+import { holidayVisible, observanceAppearance, customRepeatLabel, type HolidayCatalog } from "../../lib/modules/planning/observances";
 import { normalizeObservances } from "../../lib/modules/planning/observance-settings";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
+import { EventCheckbox } from "./EventEditorFields";
 import EventDateTimePicker from "./EventDateTimePicker";
 import { calendarDateLabel as dateLabel } from "./CalendarMiniMonth";
 import styles from "./CalendarWorkspace.module.css";
@@ -18,13 +19,14 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
 }) {
   const [country, setCountry] = useState("");
   const [custom, setCustom] = useState<Settings["custom"][number]>();
+  const [repeatDraft, setRepeatDraft] = useState<NonNullable<Settings["custom"][number]["repeat"]>>({ frequency: "yearly", interval: 1 });
   const [customError, setCustomError] = useState("");
   return <div className={styles.observanceSettings}>
     <section>
       <h3><UnigentamosIcon role="interaction-milestone" size={18} />Holiday calendars</h3>
       <p>Choose countries, then the dates you want to see.</p>
       <div className={styles.countryPicker}>
-        <SelectField searchable aria-label="Holiday country" menuClassName={styles.calendarChoiceMenu} value={country} disabled={!catalog || busy} onChange={e => setCountry(e.target.value)}>
+        <SelectField searchable autoFocusSearch={false} aria-label="Holiday country" menuClassName={styles.calendarChoiceMenu} value={country} disabled={!catalog || busy} onChange={e => setCountry(e.target.value)}>
           <option value="">Add a country…</option>
           {catalog?.countries.filter(x => !settings.countries.includes(x.code)).map(x => <option value={x.code} key={x.code}><span className={styles.countryOption}><CalendarCountryFlag code={x.code} /><span>{x.name}</span></span></option>)}
         </SelectField>
@@ -55,11 +57,11 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
       <p className={styles.holidaySource}>Regional holidays may vary. <a href="https://github.com/commenthol/date-holidays" target="_blank" rel="noreferrer">Holiday source</a></p>
     </section>
     <section>
-      <div className={styles.observanceHeading}><h3><UnigentamosIcon role="star" size={18} />Custom dates</h3><Button icon="plus" disabled={busy} onClick={() => { setCustomError(""); setCustom({ id: crypto.randomUUID(), title: "", date, annual: true, visible: true }); }}>Add date</Button></div>
-      <p>Annual dates or one-time events, such as an anniversary.</p>
+      <div className={styles.observanceHeading}><h3><UnigentamosIcon role="star" size={18} />Custom dates</h3><Button icon="plus" disabled={busy} onClick={() => { setCustomError(""); setRepeatDraft({ frequency: "yearly", interval: 1 }); setCustom({ id: crypto.randomUUID(), title: "", date, annual: true, visible: true }); }}>Add date</Button></div>
+      <p>Recurring dates or one-time events, such as an anniversary.</p>
       {settings.custom.map(item => <div className={styles.customDateRow} key={item.id}>
-        <label><input type="checkbox" checked={item.visible} disabled={busy} aria-label={`Show ${item.title}`} onChange={e => void onSave({ ...settings, custom: settings.custom.map(x => x.id === item.id ? { ...x, visible: e.target.checked } : x) })} /><span><strong>{item.title}</strong><small>{dateLabel(item.date, { month: "short", day: "numeric" })} · {item.annual ? "Every year" : item.date.slice(0, 4)}{item.allDay === false ? ` · ${item.startTime}–${item.endTime}` : " · All day"}</small></span></label>
-        <Button icon="edit" aria-label={`Edit ${item.title}`} disabled={busy} onClick={() => { setCustomError(""); setCustom(item); }} />
+        <label><input type="checkbox" checked={item.visible} disabled={busy} aria-label={`Show ${item.title}`} onChange={e => void onSave({ ...settings, custom: settings.custom.map(x => x.id === item.id ? { ...x, visible: e.target.checked } : x) })} /><span><strong>{item.title}</strong><small>{dateLabel(item.date, { month: "short", day: "numeric" })} · {customRepeatLabel(item)}{item.allDay === false ? ` · ${item.startTime}–${item.endTime}` : " · All day"}</small></span></label>
+        <Button icon="edit" aria-label={`Edit ${item.title}`} disabled={busy} onClick={() => { setCustomError(""); setCustom(item); setRepeatDraft(item.repeat || { frequency: "yearly", interval: 1 }); }} />
         <Button icon="close" aria-label={`Remove ${item.title}`} disabled={busy} onClick={() => void onSave({ ...settings, custom: settings.custom.filter(x => x.id !== item.id) })} />
       </div>)}
       {custom && <form className={`work-form ${styles.customDateForm}`} onSubmit={async e => {
@@ -72,7 +74,14 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
         <label>Name<input required maxLength={240} value={custom.title} placeholder="Anniversary, personal milestone…" onChange={e => setCustom({ ...custom, title: e.target.value })} /></label>
         <div className={styles.customDateToggles}>
           <label className={styles.calendarToggle}><input type="checkbox" checked={custom.allDay !== false} onChange={e => setCustom({ ...custom, allDay: e.target.checked, startTime: custom.startTime || "09:00", endTime: custom.endTime || "10:00", endDate: custom.endDate || custom.date, timeZone: custom.timeZone || zone })} /><span>All day</span></label>
-          <label className={styles.calendarToggle}><input type="checkbox" checked={custom.annual} onChange={e => setCustom({ ...custom, annual: e.target.checked })} /><span>Repeat every year</span></label>
+
+        </div>
+        <div className={styles.scheduleOption}>
+          <EventCheckbox label="Repeat" icon="routine" checked={Boolean(custom.repeat || custom.annual)} onChange={checked => setCustom({ ...custom, annual: false, repeat: checked ? repeatDraft : undefined })} />
+          <div className={styles.scheduleOptionFields}>
+            <input type="number" aria-label="Custom repeat interval" min="1" max="365" required value={(custom.repeat || repeatDraft).interval} onChange={event => { const next = { ...(custom.repeat || repeatDraft), interval: Number(event.target.value) }; setRepeatDraft(next); if (custom.repeat || custom.annual) setCustom({ ...custom, annual: false, repeat: next }); }} />
+            <SelectField aria-label="Custom repeat unit" value={(custom.repeat || repeatDraft).frequency} menuClassName={styles.calendarChoiceMenu} onChange={event => { const next = { ...(custom.repeat || repeatDraft), frequency: event.target.value as typeof repeatDraft.frequency }; setRepeatDraft(next); if (custom.repeat || custom.annual) setCustom({ ...custom, annual: false, repeat: next }); }}>{[["daily", "days"], ["weekly", "weeks"], ["monthly", "months"], ["yearly", "years"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</SelectField>
+          </div>
         </div>
         <div className={styles.customDateSchedule}>
           <EventDateTimePicker label={custom.allDay === false ? "Custom start" : "Custom date"} value={custom.allDay === false ? `${custom.date}T${custom.startTime}` : custom.date} allDay={custom.allDay !== false} timeZone={custom.timeZone || zone} onChange={value => setCustom({ ...custom, date: value.slice(0, 10), startTime: value.slice(11, 16) || custom.startTime, endDate: !custom.endDate || custom.endDate === custom.date ? value.slice(0, 10) : custom.endDate })} />

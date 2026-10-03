@@ -1,6 +1,7 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
 import { useState, useRef, useLayoutEffect, type CSSProperties } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import { dateScales, weeksOfYear, navigationYear, viewIcons, type CalendarView, type DateScale } from "../../lib/modules/planning/calendar-navigation";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -9,7 +10,8 @@ import { CalendarScene, useCalendarMotion } from "./CalendarMotion";
 import styles from "./CalendarWorkspace.module.css";
 
 export default function CalendarDatePicker({ value, today, view, onChange }: { value: string; today: string; view: CalendarView; onChange: (day: string, view: CalendarView) => void }) {
-  const [open, setOpen] = useState(false), [mode, setMode] = useState<DateScale>("month");
+  const [open, setOpen] = useState(false), [mode, setMode] = useState<DateScale>(view === "3-day" || view === "agenda" ? "day" : view);
+  const previousView = useRef(view);
   const [year, setYear] = useState(Number(value.slice(0, 4))), [focused, setFocused] = useState(value), [direction, setDirection] = useState(1);
   const body = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<string | null>(null);
@@ -19,16 +21,22 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
     if (button) { button.focus(); pendingFocus.current = null; }
   }, [focused, year]);
   const { reduced } = useCalendarMotion();
+  const nativeMorph = typeof document !== "undefined" && Boolean(document.documentElement.dataset.calendarMorph);
+  const heading = view === "year" ? value.slice(0, 4) : <><span className={styles.headingMonthFull}>{label(value, { month: "long" })}</span><span className={styles.headingMonthShort}>{label(value, { month: "short" })}</span><span className={styles.headingYear}>{value.slice(0, 4)}</span></>;
   const firstYear = Math.max(1900, Math.min(2189, year - 4));
   const choose = (day: string) => { onChange(day, mode); setOpen(false); };
   const changeMode = (next: DateScale) => { setMode(next); setFocused(value); };
   const move = (amount: number) => { setDirection(amount); setYear(current => Math.max(1900, Math.min(2200, current + amount * (mode === "year" ? 12 : 1)))); };
   return <Popover.Root open={open} onOpenChange={next => {
-    if (next) { setYear(navigationYear(value, view)); setFocused(value); setMode(view === "year" ? "year" : "day"); }
+    if (next) {
+      setYear(navigationYear(value, view)); setFocused(value);
+      if (view !== previousView.current) setMode(view === "3-day" || view === "agenda" ? "day" : view);
+      previousView.current = view;
+    }
     setOpen(next);
   }}>
     <Popover.Trigger asChild><button type="button" className={styles.monthTrigger} aria-label="Choose date and view">
-      <span>{view === "year" ? value.slice(0, 4) : <>{label(value, { month: "long" })}<span className={styles.headingYear}>{value.slice(0, 4)}</span></>}</span><UnigentamosIcon role="chevron-down" size={15} />
+      <span className={styles.headingLabel}>{nativeMorph ? <span>{heading}</span> : <AnimatePresence initial={false} mode="popLayout"><motion.span key={view === "year" ? value.slice(0, 4) : value.slice(0, 7)} initial={reduced ? false : { opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -5 }} transition={{ duration: reduced ? 0 : .24, ease: [.22, 1, .36, 1] }}>{heading}</motion.span></AnimatePresence>}</span><UnigentamosIcon role="chevron-down" size={15} />
     </button></Popover.Trigger>
     <Popover.Portal><Popover.Content className={`${styles.calendarPopover} ${styles.dateNavigator}`} style={moduleThemeVariables("calendar") as CSSProperties}
       data-reduced-motion={reduced} sideOffset={8} collisionPadding={12} align="start" aria-label="Navigate calendar">

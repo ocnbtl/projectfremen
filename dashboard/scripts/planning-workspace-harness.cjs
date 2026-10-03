@@ -1113,6 +1113,24 @@ async function check(label, run) {
     assert.throws(() => normalizeObservances({ ...settings, custom: [{ ...custom, startTime: "25:00" }] }), /valid start/);
     assert.throws(() => normalizeObservances({ ...settings, appearances: { birthdays: { name: "Birthday", color: "url(example)" } } }), /name and color/);
   });
+  await check("custom recurrence covers intervals, month ends, leap years and local times", () => {
+    const { calendarObservances, defaultObservances } = require("../lib/modules/planning/observances.ts");
+    const { normalizeObservances } = require("../lib/modules/planning/observance-settings.ts");
+    const base = { id: "repeat", title: "Custom repeat", date: "2026-01-31", annual: false, visible: true };
+    const rows = (item, start, end, zone = "UTC") => calendarObservances([], [], normalizeObservances({ ...defaultObservances(), custom: [item] }), start, end, zone);
+    assert.deepEqual(rows({ ...base, repeat: { frequency: "monthly", interval: 1 } }, "2026-01-01", "2026-05-01").map(x => x.start), ["2026-01-31", "2026-03-31"]);
+    assert.deepEqual(rows({ ...base, date: "2024-02-29", repeat: { frequency: "yearly", interval: 1 } }, "2025-01-01", "2029-01-01").map(x => x.start), ["2028-02-29"]);
+    assert.deepEqual(rows({ ...base, date: "2026-10-01", repeat: { frequency: "daily", interval: 2 } }, "2026-10-01", "2026-10-08").map(x => x.start), ["2026-10-01", "2026-10-03", "2026-10-05", "2026-10-07"]);
+    const weekly = { ...base, date: "2026-10-01", repeat: { frequency: "weekly", interval: 2 } };
+    assert.deepEqual(rows(weekly, "2026-10-01", "2026-11-01").map(x => x.start), ["2026-10-01", "2026-10-15", "2026-10-29"]);
+    const timed = rows({ ...weekly, date: "2026-03-01", allDay: false, startTime: "09:00", endTime: "10:00", timeZone: "America/New_York", repeat: { frequency: "weekly", interval: 1 } }, "2026-03-01", "2026-03-16", "America/New_York");
+    assert.deepEqual(timed.map(x => x.start), ["2026-03-01T09:00", "2026-03-08T09:00", "2026-03-15T09:00"]);
+    assert.equal(timed[1].startMs - timed[0].startMs, (7 * 24 - 1) * 3600000);
+    for (const interval of [0, -1, 1.5, 366]) assert.throws(() => normalizeObservances({ ...defaultObservances(), custom: [{ ...base, repeat: { frequency: "daily", interval } }] }), /repeat interval/);
+    const { calendarRange, shiftCalendar } = require("../lib/modules/planning/calendar-navigation.ts");
+    assert.deepEqual(calendarRange("2026-12-20", "agenda", 60), { start: "2026-12-20", end: "2027-02-18" });
+    assert.equal(shiftCalendar("2026-12-20", "agenda", 1, 60), "2027-02-18");
+  });
   await check("international regions join stable IDs, retain missing data and support cross-filters", async () => {
     const { worldRegions } = require("../lib/modules/planning/world-regions.ts");
     const { mapAnalysis } = require("../lib/modules/planning/map-analysis.ts");

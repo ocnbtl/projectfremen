@@ -22,7 +22,7 @@ export type CalendarObservanceSettings = {
   hiddenHolidays: string[];
   extraHolidays: string[];
   appearances?: Record<string, { name: string; color: string }>;
-  custom: { id: string; title: string; date: string; annual: boolean; visible: boolean; allDay?: boolean; startTime?: string; endTime?: string; endDate?: string; timeZone?: string }[];
+  custom: { id: string; title: string; date: string; annual: boolean; repeat?: { frequency: "daily" | "weekly" | "monthly" | "yearly"; interval: number }; visible: boolean; allDay?: boolean; startTime?: string; endTime?: string; endDate?: string; timeZone?: string }[];
 };
 export type Calendar = PlanningBase & {
   name: string;

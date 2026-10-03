@@ -77,7 +77,25 @@ export default function EventEditorFields({
           onChange={(e) => update("description", e.target.value)}
         />
       </label>
-      <section className={styles.groupField} aria-label="Color groups">
+      <section className={styles.groupField} aria-label="Calendar and color groups">
+          <label className={styles.editorCalendar} style={{ "--selected-calendar": calendarDisplayColor(calendar?.color) } as React.CSSProperties}>
+            <SelectField aria-label="Calendar"
+              value={fields.calendarId}
+              onChange={(e) => {
+                update("calendarId", e.target.value);
+                update("groupId", "");
+              }}
+            >
+              {snapshot?.state.calendars
+                .filter((c) => !c.archivedAt)
+                .map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+            </SelectField>
+          </label>
+
         <UnigentamosIcon role="palette" size={18} />
         <div className={styles.groupChoices}>
           <button
@@ -112,8 +130,7 @@ export default function EventEditorFields({
       </label>
       <section className={styles.editorSection} aria-label="Event schedule">
         <div className={styles.editorSectionTitle}>
-          <UnigentamosIcon role="clock" size={18} />
-          <strong>Date & time</strong>
+          <span className={styles.editorTimeZone}><SelectField searchable autoFocusSearch={false} aria-label="Event time zone" menuClassName={styles.calendarChoiceMenu} value={fields.timeZone} onChange={event => update("timeZone", event.target.value)} triggerContent={<span><UnigentamosIcon role="clock" size={14} />{fields.timeZone.split("/").pop()?.replaceAll("_", " ")}</span>}>{[...new Set([fields.timeZone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(zone => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</SelectField></span>
           <EventCheckbox label="All day" checked={fields.allDay} onChange={(checked) => {
                 update("allDay", checked);
                 update(
@@ -151,40 +168,6 @@ export default function EventEditorFields({
             />
           ))}
         </div>
-        <div className="work-form-pair">
-          <label className={styles.editorCalendar} style={{ "--selected-calendar": calendarDisplayColor(calendar?.color) } as React.CSSProperties}>
-            Calendar
-            <SelectField
-              value={fields.calendarId}
-              onChange={(e) => {
-                update("calendarId", e.target.value);
-                update("groupId", "");
-              }}
-            >
-              {snapshot?.state.calendars
-                .filter((c) => !c.archivedAt)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </SelectField>
-          </label>
-          <label>
-            Time zone
-            <input
-              required
-              value={fields.timeZone}
-              list="event-time-zones"
-              onChange={(e) => update("timeZone", e.target.value)}
-            />
-          </label>
-        </div>
-        <datalist id="event-time-zones">
-          {Intl.supportedValuesOf("timeZone").map((z) => (
-            <option key={z}>{z}</option>
-          ))}
-        </datalist>
       </section>
       <section
         className={styles.editorSection}
@@ -282,7 +265,7 @@ export default function EventEditorFields({
           </div>
         </div>
       </section>
-      <section className={styles.editorSection} aria-label="Linked objects">
+      <section className={`${styles.editorSection} ${styles.linkedObjects}`} aria-label="Linked objects">
         <RecordLinks
           objectPicker
           refs={linked}
@@ -314,7 +297,7 @@ export default function EventEditorFields({
   );
 }
 
-function EventCheckbox({ label, checked, onChange, icon }: { label: string; checked: boolean; onChange: (checked: boolean) => void; icon?: string }) {
+export function EventCheckbox({ label, checked, onChange, icon }: { label: string; checked: boolean; onChange: (checked: boolean) => void; icon?: string }) {
   return <label className={`${styles.quietToggle} ${styles.eventCheckbox}`}>
     <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
     <span className={styles.checkboxMark} aria-hidden="true"><UnigentamosIcon role="check" size={13} /></span>
