@@ -1,0 +1,27 @@
+.month { display: grid; grid-template-rows: repeat(6, minmax(0, 1fr)); height: 100%; min-height: 0; border: 1px solid var(--calendar-day-line, #e6e4ed); border-radius: 10px; overflow: hidden; }
+.week { display: grid; grid-template-rows: 22px repeat(2, minmax(0, 1fr)) 14px; min-height: 0; position: relative; isolation: isolate; padding-bottom: 2px; border-top: 1px dashed var(--calendar-hour-line, #eeeaf3); }
+.week:first-child { border-top: 0; }
+.day { min-width: 0; border-right: 1px solid var(--calendar-day-line, #e6e4ed); z-index: -1; }
+.day:last-of-type { border-right: 0; }
+.day[data-today="true"] { background: var(--module-quiet, #f3f2f9); }
+.date { display: flex; align-items: center; gap: 7px; height: 20px; max-width: calc(100% - 8px); padding: 2px 5px; margin: 1px 4px; border: 0; border-radius: 6px; background: transparent; color: var(--text-strong); font: 600 16px/1 var(--font-heading); cursor: pointer; }
+.date small { font: 500 10px/1 var(--font-body); color: var(--calendar-muted); overflow: hidden; text-overflow: ellipsis; }
+.day[data-outside="true"] .date { opacity: .55; }
+.day[data-today="true"] .date { color: white; background: var(--module-primary-600, #59518b); }
+.day[data-today="true"] .date small { color: inherit; }
+.event { display: flex; align-items: center; gap: 5px; min-width: 0; min-height: 0; width: auto; box-sizing: border-box; max-height: 36px; margin: 1px 5px; padding: 1px 6px; border: 2px solid color-mix(in srgb, var(--event-outline, var(--event-color)) 76%, white); border-radius: 8px; background: color-mix(in srgb, var(--event-color) 12%, white); color: var(--text-strong, #23383f); text-align: left; cursor: pointer; overflow: hidden; transition: background-color 160ms; --avatar-size: 18px; }
+.event > svg { flex: none; color: var(--event-color); }
+.copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }
+.copy strong { font: 500 11px/12px var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.copy small { font: 400 9px/10px var(--font-body); color: var(--calendar-muted, #716b80); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.event:hover { background: color-mix(in srgb, var(--event-color) 20%, white); }
+.event[data-continues-before] { border-top-left-radius: 3px; border-bottom-left-radius: 3px; margin-left: 1px; }
+.event[data-continues-after] { border-top-right-radius: 3px; border-bottom-right-radius: 3px; margin-right: 1px; }
+.more { justify-self: start; align-self: center; min-width: 0; max-width: 100%; padding: 1px 7px; border: 0; background: transparent; color: var(--module-primary-700, #59518b); font: 500 10px/1.3 var(--font-body); cursor: pointer; }
+.date:focus-visible, .event:focus-visible, .more:focus-visible { outline: 2px solid var(--module-primary-600, #59518b); outline-offset: -2px; }
+@media (max-height: 800px) {
+  .week { grid-template-rows: 20px repeat(2, minmax(0, 1fr)) 10px; }
+  .event { padding-block: 0; }
+  .more { font-size: 9px; line-height: 10px; padding-block: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .event { transition: none; } }

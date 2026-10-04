@@ -1083,6 +1083,33 @@ async function check(label, run) {
     await assert.rejects(() => savePlanningRecord("calendars", { id: "native", observances: defaultObservances() }, native.updatedAt), /changed elsewhere/);
     const { planningWritableKeys } = require("../lib/modules/planning/ownership.ts"); assert(planningWritableKeys("calendars").includes("observances"));
   });
+  await check("month event spans pack without overlap and retain continuations and overflow counts", () => {
+    const { monthWeekLayout } = require("../lib/modules/planning/month-layout.ts");
+    const { instantFor } = require("../lib/modules/planning/calendar-model.ts");
+    const zone = "America/New_York";
+    const event = (id, start, end, allDay = true) => ({ id, startMs: instantFor(start, zone), endMs: instantFor(end, zone), allDay });
+    const days = ["2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07"];
+    const trip = event("trip", "2026-11-05", "2026-11-10");
+    const single = monthWeekLayout(days, [trip], zone).segments[0];
+    assert.deepEqual([single.first, single.last, single.continuesBefore, single.continuesAfter], [4, 6, false, true]);
+    const next = monthWeekLayout(["2026-11-08", "2026-11-09", "2026-11-10"], [trip], zone).segments[0];
+    assert.deepEqual([next.first, next.last, next.continuesBefore, next.continuesAfter], [0, 1, true, false]);
+    const spanning = event("span", "2026-10-30", "2026-11-10");
+    const timed = event("timed", "2026-11-05T10:00", "2026-11-05T11:00", false);
+    const packed = monthWeekLayout(days, [trip, timed, spanning], zone);
+    assert.deepEqual(packed.hidden, [0, 0, 0, 0, 1, 0, 0]);
+    assert.equal(packed.segments.length, 2);
+    for (let i = 0; i < packed.segments.length; i++) for (let j = i + 1; j < packed.segments.length; j++) {
+      const a = packed.segments[i], b = packed.segments[j];
+      assert(a.lane !== b.lane || a.last < b.first || b.last < a.first);
+    }
+    const weekdays = monthWeekLayout(days.slice(1, 6), [spanning], zone).segments[0];
+    assert.deepEqual([weekdays.first, weekdays.last, weekdays.continuesBefore, weekdays.continuesAfter], [0, 4, true, true]);
+    assert.equal(monthWeekLayout(days, [event("ended", "2026-10-30", "2026-11-01")], zone).segments.length, 0);
+    assert.equal(monthWeekLayout(days, [event("dst", "2026-11-01", "2026-11-02")], zone).segments[0].last, 0);
+    const overnight = monthWeekLayout(days, [event("night", "2026-11-02T23:00", "2026-11-03T01:00", false)], zone);
+    assert.deepEqual(overnight.segments.map(s => [s.first, s.last]), [[1, 1], [2, 2]]);
+  });
   await check("calendar navigation retains complete years, leap days and Sunday-first week boundaries", () => {
     const { calendarRange, shiftCalendar, weeksOfYear, navigationYear } = require("../lib/modules/planning/calendar-navigation.ts");
     assert.deepEqual(calendarRange("2026-12-31", "3-day"), { start: "2026-12-31", end: "2027-01-03" });

@@ -1528,6 +1528,7 @@
 .mobileScheduleDay h2 { display: flex; align-items: baseline; gap: 8px; margin: 0; font: 600 14px/1.4 var(--font-heading); }
 .mobileScheduleDay h2 > span, .mobileScheduleDay header > small { font: 400 11px/1.4 var(--font-body); color: var(--calendar-muted); }
 .mobileScheduleDay .agendaEvent { width: 100%; display: grid; grid-template-columns: 58px 20px minmax(0, 1fr) auto; align-items: center; gap: 8px; margin: 0 0 6px; padding: 10px 8px; min-height: 54px; }
+.mobileScheduleDay .agendaEvent[data-month-all-day] { grid-template-columns: 20px minmax(0, 1fr) auto; border-radius: 10px; }
 .mobileScheduleDay .agendaTime { font-size: 11px; min-width: 0; }
 .mobileScheduleDay .eventIcon { width: 20px; }
 .mobileScheduleDay .eventCopy { min-width: 0; }

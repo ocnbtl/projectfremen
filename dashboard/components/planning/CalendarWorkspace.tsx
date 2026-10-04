@@ -2,6 +2,7 @@
 import * as Popover from "@radix-ui/react-popover";
 import { calendarDisplayColor, eventColors, eventPreviewTitle } from "./calendar-presentation";
 import CalendarMobileView from "./CalendarMobileView";
+import CalendarMonthView from "./CalendarMonthView";
 import CalendarHourControls from "./CalendarHourControls";
 import CalendarTimeGrid from "./CalendarTimeGrid";
 import CalendarYearView from "./CalendarYearView";
@@ -533,11 +534,12 @@ export default function CalendarWorkspace() {
         className={styles.agendaEvent}
         data-morph-event={item.id}
         data-birthday={item.system?.kind === "birthday" || undefined}
+        data-month-all-day={view === "month" && item.allDay || undefined}
         style={eventColors(item, calendar) as CSSProperties}
         onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
         title={item.title}
       >
-        <span className={styles.agendaTime}>{item.allDay ? "All day" : <>{timeLabel(item.startMs, zone)}<small>{timeLabel(item.endMs, zone)}</small></>}</span>
+        {!(view === "month" && item.allDay) && <span className={styles.agendaTime}>{item.allDay ? "All day" : <>{timeLabel(item.startMs, zone)}<small>{timeLabel(item.endMs, zone)}</small></>}</span>}
         <span className={styles.eventIcon}><UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={16} /></span>
         <span className={styles.eventCopy}><strong>{eventPreviewTitle(item)}</strong>{item.location && <small>{item.location}</small>}</span>
         <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
@@ -696,55 +698,9 @@ export default function CalendarWorkspace() {
           }}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
           {compact && view === "month" ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={eventButton} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
-            <div
-              className={styles.month}
-              style={{
-                gridTemplateColumns: `repeat(${showWeekends ? 7 : 5},minmax(0,1fr))`,
-              }}
-            >
-              {days.map((day) => (
-                <motion.section
-                  key={day}
-                  layout
-                  transition={{ layout: layoutTransition }}
-                  className={styles.monthDay}
-                  data-today={day === localDate(new Date(now), zone)}
-                >
-                  <motion.button
-                    layout="position"
-                    transition={{ layout: layoutTransition }}
-                    className={styles.dayNumber}
-                    aria-label={labelDate(day, { weekday: "long", month: "long", day: "numeric" })}
-                    onClick={() => {
-                      changeView("day", day);
-                    }}
-                  >
-                    <span className={styles.monthWeekday}>{labelDate(day, { weekday: "long" })}</span>
-                    <span data-morph-date={day}>{Number(day.slice(-2))}</span>
-                  </motion.button>
-                  {occurrences
-                    .filter(
-                      (x) =>
-                        localFor(x.startMs, zone).slice(0, 10) <= day &&
-                        localFor(x.endMs - 1, zone).slice(0, 10) >= day,
-                    )
-                    .slice(0, 2)
-                    .map((x) => eventButton(x))}
-                  {occurrences.filter(
-                    (x) => localFor(x.startMs, zone).slice(0, 10) === day,
-                  ).length > 2 && (
-                    <button
-                      onClick={() => {
-                        setDate(day);
-                        setDayDetail(day);
-                      }}
-                    >
-                      View all events
-                    </button>
-                  )}
-                </motion.section>
-              ))}
-            </div>
+            <CalendarMonthView days={days} date={date} today={localDate(new Date(now), zone)} events={occurrences} calendars={snapshot.state.calendars} refs={snapshot.refs} zone={zone} showWeekends={showWeekends}
+              onDay={day => changeView("day", day)} onMore={day => { setDate(day); setDayDetail(day); }}
+              onOpen={item => { if (item.system) setObservance(item); else { const event = snapshot.state.events.find(e => e.id === item.eventId); if (event) openEvent(event, item); } }} />
           ) : view === "agenda" ? (
             <CalendarAgenda key={[range.start, agendaDays, query, showCompleted, showDated].join(":")} rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={eventButton} onDay={day => changeView("day", day)} />
           ) : (
