@@ -1,7 +1,7 @@
 "use client";
 
 import * as Popover from "@radix-ui/react-popover";
-import { LayoutGroup, motion } from "motion/react";
+import { AnimatePresence, LayoutGroup, motion } from "motion/react";
 import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import { addDays, localDate, monthStart, shiftMonth, weekStart } from "../../lib/modules/planning/calendar-model";
@@ -81,7 +81,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
         data-value={value}>
         <UnigentamosIcon role="interaction-date" size={18} />
         <span className={styles.value}><span>{dateLabel(day, { month: "short", day: "numeric", year: "numeric" })}</span>
-          <small>{allDay ? "All day" : `${clockHour}:${pad(minute)} ${period}`}</small></span>
+          <small className={styles.timeValue}><AnimatePresence initial={false} mode="popLayout"><motion.span key={allDay ? "all-day" : "timed"} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -4 }} transition={{ duration: reduced ? 0 : .22 }}>{allDay ? "All day" : `${clockHour}:${pad(minute)} ${period}`}</motion.span></AnimatePresence></small></span>
         <UnigentamosIcon role="chevron-down" size={14} />
       </button></Popover.Trigger>
       <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={styles.popover} style={moduleThemeVariables("calendar") as CSSProperties}

@@ -7,6 +7,8 @@
 .trigger[data-state="open"] > svg:last-child { transform: rotate(180deg); }
 .value { display: grid; gap: 3px; font: 500 13px/1.4 var(--font-body); color: #23383f; font-variant-numeric: tabular-nums; }
 .value small { font: 500 12px/1.4 var(--font-body); color: #716b80; }
+.timeValue { position: relative; display: block; min-height: 17px; }
+.timeValue > span { display: inline-block; }
 .trigger:focus-visible, .popover button:focus-visible { outline: 2px solid var(--module-focus, #746ca5); outline-offset: 2px; }
 .popover { z-index: 1602; width: 340px; max-width: calc(100vw - 24px); max-height: var(--radix-popover-content-available-height); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 12px; border: 1px solid #e5e2ed; border-radius: 16px; background: white; color: #23383f; box-shadow: 0 0 0 1px #59518b04, 0 4px 12px #23383f08, 0 16px 48px #23383f1a; font: 400 13px/1.4 var(--font-body); transform-origin: var(--radix-popover-content-transform-origin); animation: arrive 200ms cubic-bezier(.23, 1, .32, 1); }
 .popover[data-state="closed"] { animation: leave 120ms ease-out; pointer-events: none; }

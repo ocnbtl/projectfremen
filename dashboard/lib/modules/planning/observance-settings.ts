@@ -10,6 +10,8 @@ export function normalizeObservances(value: unknown): CalendarObservanceSettings
   };
   const countries = strings(raw.countries, 250, 2);
   if (countries.some(x => !/^[A-Z]{2}$/.test(x))) throw new Error("Choose a valid holiday country");
+  const disabledCountries = raw.disabledCountries === undefined ? [] : strings(raw.disabledCountries, 250, 2);
+  if (disabledCountries.some(code => !/^[A-Z]{2}$/.test(code))) throw new Error("Choose a valid holiday country");
   if (!Array.isArray(raw.custom) || raw.custom.length > 100) throw new Error("Use up to 100 custom dates");
   const custom = raw.custom.map(item => {
     if (!item || typeof item !== "object" || typeof item.id !== "string" || !/^[a-zA-Z0-9_-]{1,100}$/.test(item.id)) throw new Error("Invalid custom date");
@@ -46,5 +48,5 @@ export function normalizeObservances(value: unknown): CalendarObservanceSettings
       appearances[key] = { name: appearance.name.trim(), color: appearance.color };
     }
   }
-  return { birthdays: raw.birthdays !== false, countries, hiddenHolidays: strings(raw.hiddenHolidays, 5000, 600), extraHolidays: strings(raw.extraHolidays, 5000, 600), custom, ...(raw.appearances !== undefined ? { appearances } : {}) };
+  return { birthdays: raw.birthdays !== false, countries, ...(raw.disabledCountries !== undefined ? { disabledCountries: disabledCountries.filter(code => countries.includes(code)) } : {}), ...(raw.customVisible !== undefined ? { customVisible: raw.customVisible !== false } : {}), hiddenHolidays: strings(raw.hiddenHolidays, 5000, 600), extraHolidays: strings(raw.extraHolidays, 5000, 600), custom, ...(raw.appearances !== undefined ? { appearances } : {}) };
 }

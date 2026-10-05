@@ -34,8 +34,8 @@ export function calendarObservances(birthdays: BirthdaySource[], holidays: Holid
       push(`birthday:${person.ref.objectId}:${year}`, `${person.ref.label}’s birthday`, day, addDays(day, 1), { kind: "birthday", key: person.ref.objectId, detail: "Birthday from People. Update the date on their profile." }, person.ref);
     }
   }
-  for (const holiday of holidays) if (holidayVisible(holiday, settings)) push(`holiday:${holiday.key}:${holiday.date}`, holiday.name, holiday.date, holiday.end, { kind: "holiday", key: holiday.key, country: holiday.country, detail: `${holiday.type === "public" ? "Public holiday" : "Observance"} · ${holiday.country}` });
-  for (const custom of settings.custom.filter(x => x.visible)) for (const day of customDateOccurrences(custom, start, end)) {
+  for (const holiday of holidays) if (!settings.disabledCountries?.includes(holiday.country) && holidayVisible(holiday, settings)) push(`holiday:${holiday.key}:${holiday.date}`, holiday.name, holiday.date, holiday.end, { kind: "holiday", key: holiday.key, country: holiday.country, detail: `${holiday.type === "public" ? "Public holiday" : "Observance"} · ${holiday.country}` });
+  for (const custom of settings.custom.filter(x => settings.customVisible !== false && x.visible)) for (const day of customDateOccurrences(custom, start, end)) {
     const allDay = custom.allDay !== false;
     const span = custom.endDate ? Temporal.PlainDate.from(custom.endDate).since(Temporal.PlainDate.from(custom.date)).days : 0;
     push(`custom:${custom.id}:${day}`, custom.title, allDay ? day : `${day}T${custom.startTime}`, allDay ? addDays(day, 1) : `${addDays(day, span)}T${custom.endTime}`, { kind: "custom", key: custom.id, detail: `Custom date · ${customRepeatLabel(custom)}` }, undefined, allDay, allDay ? zone : custom.timeZone || zone);

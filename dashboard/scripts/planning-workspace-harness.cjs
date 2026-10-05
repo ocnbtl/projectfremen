@@ -1080,6 +1080,21 @@ async function check(label, run) {
     const found = calendarObservances([], [], settings, "2026-10-02", "2026-10-03", "America/New_York"); assert.deepEqual(found.map(x => x.title), ["Annual deadline"]);
     assert.equal(calendarObservances([], [], settings, "2026-10-03", "2026-10-04", "UTC").length, 0);
   });
+  await check("calendar visibility preserves holiday choices and custom dates across persistence", async () => {
+    const { defaultObservances, calendarObservances, holidayVisible } = require("../lib/modules/planning/observances.ts");
+    const { normalizeObservances } = require("../lib/modules/planning/observance-settings.ts");
+    const holiday = { key: "US:qa", country: "US", name: "Holiday", date: "2026-10-05", end: "2026-10-06", defaultVisible: false };
+    const settings = { ...defaultObservances(), disabledCountries: ["US"], customVisible: false, extraHolidays: [holiday.key], custom: [{ id: "custom-qa", title: "Milestone", date: "2026-10-05", annual: false, visible: true }] };
+    assert(holidayVisible(holiday, settings));
+    assert.equal(calendarObservances([], [holiday], settings, "2026-10-01", "2026-11-01", "UTC").length, 0);
+    const native = (await readPlanningState()).calendars.find(x => x.id === "native");
+    await savePlanningRecord("calendars", { id: "native", observances: settings }, native.updatedAt);
+    const saved = (await readPlanningState()).calendars.find(x => x.id === "native").observances;
+    assert.deepEqual(saved, settings);
+    assert.equal(calendarObservances([], [holiday], { ...saved, disabledCountries: [], customVisible: true }, "2026-10-01", "2026-11-01", "UTC").length, 2);
+    assert.throws(() => normalizeObservances({ ...settings, disabledCountries: ["bad"] }));
+    assert.deepEqual(normalizeObservances({ ...settings, countries: [] }).disabledCountries, []);
+  });
   await check("observance settings reject malformed dates and retain canonical conflict protection", async () => {
     const { defaultObservances } = require("../lib/modules/planning/observances.ts");
     const { normalizeObservances } = require("../lib/modules/planning/observance-settings.ts");

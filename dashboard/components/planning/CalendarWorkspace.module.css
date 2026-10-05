@@ -2183,3 +2183,89 @@
  .toolbar .calendarsButton { grid-row:2; grid-column:4; }
  .toolbar .addEventButton { grid-row:2; grid-column:5; }
 }
+
+/* Compact calendar identities and anchored management panels. */
+.calendarCard { padding:12px; gap:8px; }
+.calendarCard .calendarNameRow { grid-template-columns:32px 22px minmax(0,1fr) 34px; align-items:center; gap:8px; }
+.calendarCard .calendarNameInput > span,.calendarCard .calendarColorInput > span { position:absolute; width:1px; height:1px; overflow:hidden; clip-path:inset(50%); }
+.calendarCard .calendarNameRow .calendarNameInput { min-width:0; }
+.calendarCard .calendarNameRow .calendarNameInput input { width:100%; padding:6px 8px; }
+.calendarCard .calendarNameRow .calendarColorInput input { width:34px; height:34px; min-height:34px; padding:3px; }
+.calendarCard .calendarNameRow .autosaveStatus { grid-column:3 / -1; }
+.calendarEnable { position:relative; display:grid!important; place-items:center; width:30px; height:30px; cursor:pointer; }
+.calendarEnable input { position:absolute; opacity:0; width:100%; height:100%; margin:0; cursor:pointer; }
+.calendarEnable > span { display:grid; place-items:center; width:28px; height:28px; border:2px solid var(--module-border); border-radius:50%; background:white; transition:background 220ms,border-color 220ms,box-shadow 220ms; pointer-events:none; }
+.calendarEnable > span svg { opacity:0; transform:scale(.6); transition:opacity 160ms,transform 220ms; }
+.calendarEnable input:checked + span { background:var(--calendar-card-color,var(--module-icon)); border-color:var(--calendar-card-color,var(--module-icon)); color:white; box-shadow:0 0 0 3px color-mix(in srgb,var(--calendar-card-color,var(--module-icon)) 12%,transparent); }
+.calendarEnable input:checked + span svg { opacity:1; transform:scale(1); }
+.calendarEnable input:focus-visible + span { outline:2px solid var(--module-focus); outline-offset:3px; }
+.calendarCard .groupSettingsRow { grid-template-columns:minmax(70px,1fr) minmax(140px,1.35fr) 34px; gap:8px; }
+.calendarCard .groupSettingsRow :global(.app-select-trigger) { width:100%; min-width:0; padding-inline:8px; }
+.calendarCard .groupSettingsRow input { width:100%; min-width:0; padding-inline:8px; }
+.calendarCard .groupSettingsRow input[type="color"] { width:34px; padding:3px; }
+.settingsActions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.settingsPopoverTrigger { display:inline-flex; align-items:center; justify-content:center; gap:6px; }
+.calendarCard > .settingsPopoverTrigger { justify-self:start; min-height:30px; padding:4px 8px; font-size:12px; border-color:transparent; background:var(--module-quiet); }
+.settingsPopover { width:520px; max-width:calc(100vw - 32px); max-height:min(680px,var(--radix-popover-content-available-height)); overflow-y:auto; overscroll-behavior:contain; padding:16px; z-index:1650; }
+.settingsPopover .observanceSettings { display:block; }
+.settingsPopover .observanceSettings > section { padding:0; border:0; background:transparent; }
+.settingsPopover > :global(.work-button) { margin-top:12px; }
+.importMethods { display:grid; grid-template-columns:minmax(0,1fr) 28px minmax(0,1fr); gap:12px; align-items:stretch; }
+.importMethod { display:grid; gap:10px; min-width:0; padding:14px; border:1px solid var(--module-border); border-radius:12px; background:var(--module-quiet); }
+.importMethod h4 { display:flex; align-items:center; gap:7px; margin:0; font:600 13px/1.4 var(--font-body); }
+.importMethod label { display:grid; gap:5px; min-width:0; }
+.importMethod input { width:100%; min-width:0; min-height:38px; }
+.importMethod > button { justify-self:start; }
+.importMethod input[type="file"] { padding:6px; font-size:11px!important; }
+.importMethod input[type="file"]::file-selector-button { padding:5px 7px; margin-right:6px; border:0; border-radius:6px; background:white; color:var(--module-icon); }
+.importOr { align-self:center; text-align:center; font:500 12px var(--font-body); color:var(--text-muted); }
+.headingLabel > span { gap:4px; }
+.headingYear { margin-left:0; }
+.toolbarHours button[aria-disabled="true"] { background:var(--module-secondary-100); color:var(--text-muted); opacity:.52; cursor:not-allowed; }
+@media (max-width:760px) {
+ .toolbar[data-timeline="false"] .toolbarTools { grid-template-columns:auto 86px minmax(40px,1fr) 36px; }
+ .toolbar[data-timeline="false"] .toolbarTools > :global(.app-select-trigger) { grid-column:2; }
+ .toolbar[data-timeline="false"] .calendarSearch { grid-column:3; }
+ .toolbar[data-timeline="false"] .optionsButton { grid-column:4; }
+}
+.allDayBand:not(:empty) { padding-bottom:4px; }
+.now { --now-ink:color-mix(in srgb,var(--module-secondary-700) 72%,var(--module-quiet)); background:var(--now-ink); }
+.now::before { left:0; top:50%; transform:translateY(-50%); width:6px; height:6px; background:var(--now-ink); }
+.fittedDayHeader { overflow:visible; }
+.fittedDayHeader > button:first-child { flex-shrink:0; min-width:0; max-width:100%; }
+.fittedDayHeader strong { flex-shrink:0; line-height:1.3; padding-inline:2px; box-sizing:border-box; }
+.dateHeadingIdentity { padding:1px 2px; box-sizing:border-box; }
+@container timed-event (max-width:150px) {
+ .fittedEvent .timedEventTitle { display:block; max-height:calc(var(--event-title-lines-narrow,1) * 1.4em); overflow:hidden; }
+ .fittedEvent .timedEventTitle > svg { display:block; width:12px; height:12px; float:left; margin:2px 4px 0 0; }
+ .fittedEvent .timedEventTitle > strong { display:inline; }
+}
+@media (min-width:761px) {
+ .toolbar .dateNavigation > :global(.work-button) { min-height:40px; height:40px; }
+ .toolbar .periodButton { width:40px; min-width:40px; }
+ .toolbar .periodButton svg { width:24px; height:24px; }
+ .eventSheet:global(.work-sheet) { width:min(760px,calc(100vw - 32px)); }
+ .eventSheet :global(.work-sheet-header) { padding:12px 18px; }
+ .eventSheet :global(.work-sheet-body) { padding:14px 18px; }
+ .eventForm { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:10px 16px; }
+ .eventForm > * { grid-column:1 / -1; min-width:0; }
+ .eventForm > .eventTitleField,.eventForm > .eventDescription,.eventForm > .eventSchedule,.eventForm > .eventReminders { grid-column:auto; }
+ .eventForm .eventDescription textarea { min-height:40px; height:40px; resize:vertical; }
+ .eventForm .editorSection { gap:8px; }
+ .eventForm .eventReminders { padding-top:28px; }
+ .eventForm .linkedObjects { margin-top:0; }
+ .eventForm > [aria-label="Event location"] { grid-template-columns:minmax(260px,.9fr) minmax(0,1fr); align-items:center; }
+ .eventForm > [aria-label="Event location"] > fieldset,.eventForm > [aria-label="Event location"] > p { grid-column:1 / -1; }
+ .eventForm > .linkedObjects { grid-column:1; }
+ .eventForm > :global(.work-form-footer) { grid-column:2; justify-content:flex-end; align-self:end; position:static; }
+ .eventForm .groupField { padding:6px 8px; }
+ .eventForm :global(.work-form-footer) { margin:0; padding:4px 0 0; }
+}
+@media (max-width:700px) {
+ .settingsHeading { flex-direction:column; align-items:stretch; }
+ .settingsActions { gap:6px; }
+ .settingsActions > button { flex:1 1 auto; font-size:11px; padding-inline:7px; }
+ .importMethods { grid-template-columns:minmax(0,1fr); gap:8px; }
+ .calendarCard .groupSettingsRow { grid-template-columns:minmax(64px,1fr) minmax(125px,1.25fr) 32px; gap:6px; }
+}
+@media (prefers-reduced-motion:reduce) { .calendarEnable > span,.calendarEnable > span svg { transition:none; } }

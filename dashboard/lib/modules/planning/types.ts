@@ -19,6 +19,8 @@ export type EventGroup = { id: string; name: string; color: string; icon: string
 export type CalendarObservanceSettings = {
   birthdays: boolean;
   countries: string[];
+  disabledCountries?: string[];
+  customVisible?: boolean;
   hiddenHolidays: string[];
   extraHolidays: string[];
   appearances?: Record<string, { name: string; color: string }>;

@@ -121,7 +121,7 @@ export default function EventEditorFields({
         </div>
       </section>
       <EventLocationField fields={fields} update={update} snapshot={snapshot} />
-      <section className={styles.editorSection} aria-label="Event schedule">
+      <section className={`${styles.editorSection} ${styles.eventSchedule}`} aria-label="Event schedule">
         <div className={styles.editorSectionTitle}>
           <span className={styles.editorTimeZone}><SelectField searchable autoFocusSearch={false} aria-label="Event time zone" menuClassName={styles.calendarChoiceMenu} value={fields.timeZone} onChange={event => update("timeZone", event.target.value)} triggerContent={<span><UnigentamosIcon role="clock" size={14} />{fields.timeZone.split("/").pop()?.replaceAll("_", " ")}</span>}>{[...new Set([fields.timeZone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(zone => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</SelectField></span>
           <EventCheckbox label="All day" checked={fields.allDay} onChange={(checked) => {
@@ -143,7 +143,7 @@ export default function EventEditorFields({
         <div className="work-form-pair">
           {(["start", "end"] as const).map((key) => (
             <EventDateTimePicker
-              key={`${key}:${fields.allDay}`}
+              key={key}
               label={key === "start" ? "Start" : "End"}
               allDay={fields.allDay}
               timeZone={fields.timeZone}
@@ -163,7 +163,7 @@ export default function EventEditorFields({
         </div>
       </section>
       <section
-        className={styles.editorSection}
+        className={`${styles.editorSection} ${styles.eventReminders}`}
         aria-label="Repeat and reminder"
       >
         <div className={styles.scheduleOption} data-enabled={Boolean(fields.recurrence)}>

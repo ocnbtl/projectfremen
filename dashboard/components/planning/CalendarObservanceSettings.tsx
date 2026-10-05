@@ -14,7 +14,8 @@ import styles from "./CalendarWorkspace.module.css";
 export function CalendarCountryFlag({ code }: { code: string }) {
   return <svg className={styles.countryFlag} width="24" height="16" viewBox="0 0 513 342" aria-hidden="true"><use href={`/country-flags.svg#flag-${code}`} /></svg>;
 }
-export default function CalendarObservanceSettings({ settings, catalog, loading, error, busy, year, date, zone, onSave, renderAppearance }: {
+export default function CalendarObservanceSettings({ settings, catalog, loading, error, busy, year, date, zone, onSave, renderAppearance, section, countryCode }: {
+  section?: "holidays" | "custom"; countryCode?: string;
   settings: Settings; catalog?: HolidayCatalog; loading: boolean; error: string; busy: boolean; year: string; date: string; zone: string; onSave: (settings: Settings) => Promise<boolean>; renderAppearance?: (key: string, name: string) => ReactNode;
 }) {
   const [country, setCountry] = useState("");
@@ -22,7 +23,7 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
   const [repeatDraft, setRepeatDraft] = useState<NonNullable<Settings["custom"][number]["repeat"]>>({ frequency: "yearly", interval: 1 });
   const [customError, setCustomError] = useState("");
   return <div className={styles.observanceSettings}>
-    <section>
+    {section !== "custom" && <section>
       <h3><UnigentamosIcon role="interaction-milestone" size={18} />Holiday calendars</h3>
       <p>Choose countries, then the dates you want to see.</p>
       <div className={styles.countryPicker}>
@@ -34,11 +35,11 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
       </div>
       {loading && <p role="status">Loading holiday dates…</p>}
       {error && <p role="alert">{error}</p>}
-      {settings.countries.map(code => {
+      {settings.countries.filter(code => !countryCode || code === countryCode).map(code => {
         const name = catalog?.countries.find(x => x.code === code)?.name || code;
         const appearance = observanceAppearance(settings, `holidays:${code}`, name);
         const holidays = [...new Map((catalog?.holidays || []).filter(x => x.country === code && x.date.startsWith(year)).map(x => [x.key, x])).values()];
-        return <details className={styles.holidayCountry} key={code}>
+        return <details className={styles.holidayCountry} key={code} open={countryCode ? true : undefined}>
           <summary><CalendarCountryFlag code={code} /><strong>{appearance.name}</strong><span>{year}</span><UnigentamosIcon role="chevron-down" size={15} /></summary>
           {renderAppearance?.(`holidays:${code}`, name)}
           <div className={styles.holidayList}>
@@ -56,8 +57,8 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
         </details>;
       })}
       <p className={styles.holidaySource}>Regional holidays may vary. <a href="https://github.com/commenthol/date-holidays" target="_blank" rel="noreferrer">Holiday source</a></p>
-    </section>
-    <section>
+    </section>}
+    {section !== "holidays" && <section>
       <div className={styles.observanceHeading}><h3><UnigentamosIcon role="star" size={18} />Custom dates</h3><Button icon="plus" disabled={busy} onClick={() => { setCustomError(""); setRepeatDraft({ frequency: "yearly", interval: 1 }); setCustom({ id: crypto.randomUUID(), title: "", date, annual: true, visible: true }); }}>Add date</Button></div>
       <p>Recurring dates or one-time events, such as an anniversary.</p>
       {renderAppearance?.("custom", "Custom dates")}
@@ -93,6 +94,6 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
         {customError && <p role="alert">{customError}</p>}
         <div className="work-actions"><Button type="submit" intent="primary" busy={busy}>Save date</Button><Button onClick={() => setCustom(undefined)}>Cancel</Button></div>
       </form>}
-    </section>
+    </section>}
   </div>;
 }

@@ -68,7 +68,7 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
 
         </NavigatorPane></AnimatePresence>
       </div>
-      <footer className={styles.pickerFooter}><button type="button" onClick={() => choose(today)}>Jump to today<UnigentamosIcon role="chevron-right" size={15} /></button></footer>
+      <footer className={styles.pickerFooter}><Popover.Close asChild><button type="button">Close</button></Popover.Close><button type="button" onClick={() => choose(today)}>Jump to today<UnigentamosIcon role="chevron-right" size={15} /></button></footer>
     </Popover.Content></Popover.Portal>
   </Popover.Root>;
 }

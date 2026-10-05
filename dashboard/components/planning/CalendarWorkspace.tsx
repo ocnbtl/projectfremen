@@ -33,6 +33,7 @@ import {
   useState,
   useSyncExternalStore,
   type CSSProperties,
+  type ReactNode,
   type FormEvent,
 } from "react";
 import Link from "next/link";
@@ -147,6 +148,8 @@ export default function CalendarWorkspace() {
     );
   const [observance, setObservance] = useState<EventOccurrence>();
   const [addingCalendar, setAddingCalendar] = useState(false);
+  const [feedName, setFeedName] = useState("");
+  const [importFile, setImportFile] = useState<File>();
   const [importProvider, setImportProvider] = useState("Google Calendar");
   const [holidayData, setHolidayData] = useState<HolidayCatalog>(), [holidayError, setHolidayError] = useState(""), [holidayLoading, setHolidayLoading] = useState(false);
   const [holidayRetry, setHolidayRetry] = useState(0);
@@ -548,9 +551,9 @@ export default function CalendarWorkspace() {
     kind: "ics_file" | "ics_feed" | "morgen",
     file?: File,
   ) {
-    await action(async () => {
+    return action(async () => {
       const connection = await savePlanning("connections", {
-        name: connectionName || file?.name || importProvider,
+        name: (kind === "ics_feed" ? feedName : connectionName) || file?.name || importProvider,
         kind,
         timeZone: zone,
         url: kind === "ics_feed" ? feedUrl.trim().replace(/^webcal:\/\//i, "https://") : undefined,
@@ -568,8 +571,8 @@ export default function CalendarWorkspace() {
         text: file ? await file.text() : undefined,
         timeZone: zone,
       });
-      setConnectionName("");
-      setFeedUrl("");
+      if (kind === "ics_feed") { setFeedUrl(""); setFeedName(""); }
+      else { setConnectionName(""); setImportFile(undefined); }
     }, "Calendar imported");
   }
   return (
@@ -593,7 +596,7 @@ export default function CalendarWorkspace() {
           </div>}
         </div>
         <div className={styles.toolbarTools}>
-          {timeline && <CalendarHourControls days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />}
+          <CalendarHourControls available={timeline} days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />
           <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search"} value={query} onChange={e => setQuery(e.target.value)} /></label>
           <CalendarViewToggle view={view} onChange={next => changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined)} />
           <SelectField className={styles.viewDropdown} triggerContent={compact ? <span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[view]} size={16} />{view === "3-day" ? "3 days" : view[0].toUpperCase() + view.slice(1)}</span> : undefined} aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
@@ -772,6 +775,8 @@ export default function CalendarWorkspace() {
       </WorkspaceSheet>
       <WorkspaceSheet
         anchorSelector="[data-calendar-event-trigger]"
+        className={styles.eventSheet}
+        anchorWidth={760}
         open={Boolean(editor)}
         onClose={() => setEditor(undefined)}
         title={editor?.original ? "Edit event" : "New event"}
@@ -794,7 +799,7 @@ export default function CalendarWorkspace() {
                 on your calendar, or remove it.
               </p>
             )}
-            <label>
+            <label className={styles.eventTitleField}>
               Title
               <input
                 required
@@ -919,7 +924,12 @@ export default function CalendarWorkspace() {
       >
         <div className={`work-form ${styles.calendarSettingsForm}`}>
           <WorkspaceFeedback error={error} message={notice} />
-          <div className={styles.settingsHeading}><div><h3>Your calendars</h3><p>Choose what appears. Names, colors and groups save automatically.</p></div><Button icon="plus" aria-expanded={addingCalendar} onClick={() => setAddingCalendar(value => !value)}>Add a calendar</Button></div>
+          <div className={styles.settingsHeading}><h3>Your calendars</h3><div className={styles.settingsActions}>
+            <Button icon="plus" aria-expanded={addingCalendar} onClick={() => setAddingCalendar(value => !value)}>Add a calendar</Button>
+            {(["custom", "holidays"] as const).map(section => <SettingsPopover key={section} label={section === "custom" ? "Custom dates" : "Holiday calendars"} icon={section === "custom" ? "star" : "interaction-milestone"}>
+              <CalendarObservanceSettings section={section} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />
+            </SettingsPopover>)}
+          </div></div>
           {addingCalendar && <div className={styles.newCalendarForm}>          <form
             className="work-form"
             onSubmit={(e) => {
@@ -960,57 +970,42 @@ export default function CalendarWorkspace() {
 </div>}
           <div className={styles.calendarCardGrid}>
             {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <section className={styles.calendarCard} key={c.id} style={{ "--calendar-card-color": calendarDisplayColor(c.color) } as CSSProperties}>
-              <label className={styles.calendarToggle}><UnigentamosIcon role="calendar" size={18} /><span>Show calendar</span><input type="checkbox" aria-label={c.name} checked={c.visible} disabled={actionBusy} onChange={e => void saveCalendarPreference(c.id, { visible: e.target.checked })} /></label>
-              <CalendarSettings calendar={c} busy={busy} onSave={(name, color) => saveCalendarPreference(c.id, { name, color })} />
-              <CalendarDisclosure title="Event groups" icon="palette"><CalendarGroupSettings calendars={[c]} busy={busy} onSave={(calendar, groups) => saveCalendarPreference(calendar.id, { groups })} /></CalendarDisclosure>
+              <CalendarSettings calendar={c} busy={busy} enabled={c.visible} onToggle={visible => void saveCalendarPreference(c.id, { visible })} onSave={(name, color) => saveCalendarPreference(c.id, { name, color })} />
+              <CalendarDisclosure title="Groups" icon="palette"><CalendarGroupSettings calendars={[c]} busy={busy} onSave={(calendar, groups) => saveCalendarPreference(calendar.id, { groups })} /></CalendarDisclosure>
             </section>)}
-            <section className={styles.calendarCard}>
-              <label className={styles.calendarToggle}><UnigentamosIcon role="birthday" size={18} /><span>People’s birthdays</span><input type="checkbox" aria-label="Show birthdays" checked={observanceSettings.birthdays} disabled={actionBusy} onChange={e => void saveCalendarPreference("native", { observances: { ...observanceSettings, birthdays: e.target.checked } })} /></label>
-              <CalendarSettings calendar={observanceAppearance(observanceSettings, "birthdays")} busy={busy} icon="birthday" onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, birthdays: { name, color } } } }; })} />
-            </section>
+            {["birthdays", ...observanceSettings.countries.map(code => `holidays:${code}`), "custom"].map(key => {
+              const code = key.startsWith("holidays:") ? key.slice(9) : undefined;
+              const name = code ? holidayData?.countries.find(c => c.code === code)?.name || code : undefined;
+              const appearance = observanceAppearance(observanceSettings, key, name);
+              const enabled = key === "birthdays" ? observanceSettings.birthdays : key === "custom" ? observanceSettings.customVisible !== false : !observanceSettings.disabledCountries?.includes(code!);
+              return <section className={styles.calendarCard} key={key} style={{ "--calendar-card-color": appearance.color } as CSSProperties}>
+                <CalendarSettings calendar={appearance} busy={busy} icon={key === "birthdays" ? "birthday" : "star"} country={code} enabled={enabled}
+                  onToggle={visible => void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, ...(key === "birthdays" ? { birthdays: visible } : key === "custom" ? { customVisible: visible } : { disabledCountries: visible ? (settings.disabledCountries || []).filter(c => c !== code) : [...new Set([...(settings.disabledCountries || []), code!])] }) } }; })}
+                  onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, [key]: { name, color } } } }; })} />
+                {key !== "birthdays" && <SettingsPopover label={code ? "Choose holidays" : "Edit dates"} icon={code ? "interaction-milestone" : "edit"}>
+                  <CalendarObservanceSettings section={code ? "holidays" : "custom"} countryCode={code} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />
+                </SettingsPopover>}
+              </section>;
+            })}
           </div>
           <section className={styles.importSection} aria-label="Import calendars">
-            <div className={styles.settingsHeading}><div><h3><UnigentamosIcon role="import" size={18} />Bring another calendar</h3><p>Import a file once, or subscribe to a feed and refresh it here.</p></div></div>
-            <div className={styles.importProviders} role="group" aria-label="Calendar provider">{["Google Calendar", "Apple Calendar", "Outlook", "Other"].map(provider => <Button key={provider} icon="calendar" aria-pressed={importProvider === provider} onClick={() => setImportProvider(provider)}>{provider}</Button>)}</div>
+            <div className={styles.settingsHeading}><div><h3><UnigentamosIcon role="import" size={18} />Import another calendar</h3><p>Upload a file once, or subscribe to a feed that refreshes automatically while Unigentamos is open.</p></div></div>
+            <div className={styles.importProviders} role="group" aria-label="Calendar provider">{["Google Calendar", "Apple Calendar", "Outlook", "Other"].map(provider => <Button key={provider} aria-pressed={importProvider === provider} onClick={() => setImportProvider(provider)}>{provider === "Apple Calendar" ? <img src="/contact-sources/apple.svg" width={18} height={18} alt="" /> : provider === "Google Calendar" ? <img src="/contact-sources/google-calendar.png" width={18} height={18} alt="" /> : provider === "Outlook" ? <img src="/contact-sources/outlook.svg" width={18} height={18} alt="" /> : <UnigentamosIcon role="calendar" size={18} />}{provider}</Button>)}</div>
             <p className={styles.importHelp}>{importProvider === "Google Calendar" ? <>Export a calendar and choose its .ics file below, or paste its iCal feed address. <a href="https://support.google.com/calendar/answer/37111?hl=en" target="_blank" rel="noreferrer">Google export guide ↗</a></> : importProvider === "Apple Calendar" ? <>Export an .ics file from Calendar on Mac, or use an existing shared calendar link. Shared links can be read by anyone who has them. <a href="https://support.apple.com/guide/calendar/icl1023/mac" target="_blank" rel="noreferrer">Apple export guide ↗</a></> : <>Choose an .ics calendar export or paste a published iCal subscription link.</>}</p>
-            <div className={styles.importFields}>
-            <label>
-              Name
-              <input
-                value={connectionName}
-                onChange={(e) => setConnectionName(e.target.value)}
-                placeholder="Work, personal, travel…"
-              />
-            </label>
-            <label>
-              Calendar file
-              <input
-                type="file"
-                accept=".ics,text/calendar"
-                disabled={busy}
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) void connect("ics_file", file);
-                  e.target.value = "";
-                }}
-              />
-            </label>
-            <label>
-              Calendar feed link
-              <input
-                type="text"
-                inputMode="url"
-                value={feedUrl}
-                onChange={(e) => setFeedUrl(e.target.value)}
-                placeholder="https://… or webcal://…"
-              />
-            </label>
-            <Button
-              disabled={!feedUrl || busy}
-              onClick={() => void connect("ics_feed")}
-            >
-              Subscribe to feed
-            </Button>
+            <div className={styles.importMethods}>
+              <form className={styles.importMethod} onSubmit={e => { e.preventDefault(); const form = e.currentTarget; if (importFile) void connect("ics_file", importFile).then(ok => { if (ok) form.reset(); }); }}>
+                <h4><UnigentamosIcon role="import" size={17} />Upload a file</h4>
+                <label>Name<input aria-label="Upload calendar name" value={connectionName} onChange={e => setConnectionName(e.target.value)} placeholder="Work, personal, travel…" /></label>
+                <label>Calendar file<input required type="file" accept=".ics,text/calendar" disabled={busy} onChange={e => setImportFile(e.target.files?.[0])} /></label>
+                <Button type="submit" icon="import" disabled={!importFile || busy}>Upload</Button>
+              </form>
+              <span className={styles.importOr}>or</span>
+              <form className={styles.importMethod} onSubmit={e => { e.preventDefault(); void connect("ics_feed"); }}>
+                <h4><UnigentamosIcon role="link" size={17} />Subscribe to a link</h4>
+                <label>Name<input aria-label="Subscription calendar name" value={feedName} onChange={e => setFeedName(e.target.value)} placeholder="Work, personal, travel…" /></label>
+                <label>Calendar link<input required type="text" inputMode="url" value={feedUrl} onChange={e => setFeedUrl(e.target.value)} placeholder="https://… or webcal://…" /></label>
+                <Button type="submit" icon="link" disabled={!feedUrl.trim() || busy}>Subscribe</Button>
+              </form>
             </div>
             {snapshot?.capabilities.morgen && <Button
               disabled={busy}
@@ -1019,9 +1014,6 @@ export default function CalendarWorkspace() {
               Connect Morgen
             </Button>}
           </section>
-          <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })}
-            renderAppearance={(key, name) => <CalendarSettings key={key} calendar={observanceAppearance(observanceSettings, key, name)} busy={busy} icon="star" country={key.startsWith("holidays:") ? key.slice(9) : undefined} onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, [key]: { name, color } } } }; })} />}
-          />
           {Boolean(snapshot?.state.connections.length) && <section className="work-section">
             <h2>Connections</h2>
             {snapshot?.state.connections.map((c) => (
@@ -1140,15 +1132,26 @@ function CalendarSettings({
   onSave,
   icon = "calendar",
   country,
+  enabled,
+  onToggle,
 }: {
   calendar: Pick<Calendar, "name" | "color">;
   busy: boolean;
   onSave: (name: string, color: string) => Promise<boolean>;
   icon?: string;
   country?: string;
+  enabled?: boolean;
+  onToggle?: (enabled: boolean) => void;
 }) {
   const [name, setName] = useState(calendar.name),
     [color, setColor] = useState(calendar.color);
+  const previousAppearance = useRef(calendar);
+  useEffect(() => {
+    const previous = previousAppearance.current;
+    setName(value => value === previous.name ? calendar.name : value);
+    setColor(value => value === previous.color ? calendar.color : value);
+    previousAppearance.current = calendar;
+  }, [calendar.name, calendar.color]);
   const autosave = useCalendarAutosave<{ name: string; color: string }>(value => onSave(value.name, value.color), value => Boolean(value.name.trim()));
   return (
     <form
@@ -1158,6 +1161,7 @@ function CalendarSettings({
         void autosave.flush();
       }}
     >
+      {onToggle && <label className={styles.calendarEnable}><input type="checkbox" aria-label={`Show ${calendar.name}`} checked={enabled} onChange={event => onToggle(event.target.checked)} /><span aria-hidden="true"><UnigentamosIcon role="check" size={18} /></span></label>}
       <span className={styles.calendarNameIcon} style={{ color }}>{country ? <CalendarCountryFlag code={country} /> : <UnigentamosIcon role={icon} size={18} />}</span>
       <label className={styles.calendarNameInput}>
         <span>Calendar name</span>
@@ -1187,4 +1191,13 @@ function CalendarSettings({
 
 function ViewToggle({ label, icon, checked, onChange }: { label: string; icon: string; checked: boolean; onChange: (value: boolean) => void }) {
   return <label className={styles.calendarToggle}><UnigentamosIcon role={icon} size={17} /><span>{label}</span><input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} /></label>;
+}
+
+function SettingsPopover({ label, icon, children }: { label: string; icon: string; children: ReactNode }) {
+  const trigger = useRef<HTMLButtonElement>(null);
+  return <Popover.Root><Popover.Trigger asChild><button ref={trigger} type="button" className={`work-button ${styles.settingsPopoverTrigger}`}><UnigentamosIcon role={icon} size={16} /><span>{label}</span><UnigentamosIcon role="chevron-down" size={13} /></button></Popover.Trigger>
+    <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={`${styles.calendarPopover} ${styles.settingsPopover}`} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={16} align="end" aria-label={label} onOpenAutoFocus={event => event.preventDefault()} onFocusOutside={event => event.preventDefault()} onEscapeKeyDown={event => event.stopImmediatePropagation()}>
+      {children}<Popover.Close asChild><button type="button" className="work-button">Done</button></Popover.Close>
+    </Popover.Content></Popover.Portal>
+  </Popover.Root>;
 }

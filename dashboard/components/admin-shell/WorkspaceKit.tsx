@@ -153,6 +153,8 @@ export function WorkspaceSheet({
   description,
   anchorSelector,
   presentation,
+  className,
+  anchorWidth = 620,
 }: {
   open: boolean;
   onClose: () => void;
@@ -161,6 +163,8 @@ export function WorkspaceSheet({
   description?: string;
   anchorSelector?: string;
   presentation?: "center" | "page";
+  className?: string;
+  anchorWidth?: number;
 }) {
   const [anchorStyle, setAnchorStyle] = useState<CSSProperties>();
   useLayoutEffect(() => {
@@ -169,13 +173,13 @@ export function WorkspaceSheet({
       const trigger = [...document.querySelectorAll<HTMLElement>(anchorSelector)].find(node => node.getBoundingClientRect().width > 0);
       const box = trigger?.getBoundingClientRect();
       const top = Math.min(box ? box.bottom + 8 : 100, innerHeight * .3);
-      const width = Math.min(620, innerWidth - 24);
+      const width = Math.min(anchorWidth, innerWidth - 24);
       const left = Math.max(12, Math.min((box?.right || innerWidth - 12) - width, innerWidth - width - 12));
       setAnchorStyle({ top, left, width, maxHeight: `calc(100dvh - ${top + 12}px)`, transformOrigin: `${Math.max(0, (box?.left || left) - left)}px top` });
     };
     place(); window.addEventListener("resize", place);
     return () => window.removeEventListener("resize", place);
-  }, [open, anchorSelector]);
+  }, [open, anchorSelector, anchorWidth]);
   const descriptionId = useId();
   const opener = useRef<HTMLElement | null>(null);
   useEffect(() => {
@@ -214,7 +218,7 @@ export function WorkspaceSheet({
             const target = opener.current;
             if (target?.isConnected) target.focus({ preventScroll: true });
           }}
-          className={`work-sheet${anchorSelector ? " work-sheet--anchored" : ""}${presentation ? ` work-sheet--${presentation}` : ""}`}
+          className={`work-sheet${anchorSelector ? " work-sheet--anchored" : ""}${presentation ? ` work-sheet--${presentation}` : ""}${className ? ` ${className}` : ""}`}
           style={anchorSelector ? anchorStyle : undefined}
           aria-describedby={description ? descriptionId : undefined}
         >
