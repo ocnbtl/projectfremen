@@ -15,6 +15,7 @@
     "test:people-autofill": "node ./scripts/people-autofill-harness.cjs",
     "test:people-organization-autofill": "node ./scripts/people-organization-autofill-harness.cjs",
     "test:people-refinements": "node ./scripts/people-refinements-harness.cjs",
+    "test:finance-accounts": "node ./scripts/finance-accounts-harness.cjs",
     "test:finance-redesign": "node ./scripts/finance-redesign-harness.cjs",
     "test:finance-overview": "node ./scripts/finance-overview-harness.cjs",
     "test:finance-planning": "node ./scripts/finance-planning-harness.cjs",

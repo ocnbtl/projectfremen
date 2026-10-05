@@ -1,5 +1,7 @@
 "use client";
 
+import FinanceAccountDetails from "./FinanceAccountDetails";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import InspectorRail from "../admin-shell/InspectorRail";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "../operational/DetailTabs";
 import LinkedDecisionsPanel from "../operational/LinkedDecisionsPanel";
@@ -229,16 +231,6 @@ export default function FinanceInspector({
   const billSelection = billRow ? { kind: "bill" as const, id: billRow.bill.id } : null;
   const budgetSelection = budgetRow ? { kind: "budget" as const, id: budgetRow.budget.id } : null;
   const closeSelection = closePeriod ? { kind: "close_period" as const, id: closePeriod.id } : null;
-  const accountUnreconciled = accountRow
-    ? financeState.transactions.filter((item) => !item.archivedAt && item.accountId === accountRow.account.id && (!item.reviewed || item.status === "pending"))
-    : [];
-  const accountTransfers = accountRow
-    ? financeState.transfers.filter((item) => !item.archivedAt && (item.fromAccountId === accountRow.account.id || item.toAccountId === accountRow.account.id))
-    : [];
-  const accountImports = accountRow
-    ? financeState.importBatches.filter((item) => item.accountId === accountRow.account.id).slice().reverse()
-    : [];
-
   const objectTitle = accountRow?.account.name
     || transaction?.merchant
     || billRow?.bill.name
@@ -255,7 +247,7 @@ export default function FinanceInspector({
           ? "Budget"
           : "Monthly review";
   const subtitle = accountRow
-    ? `${accountRow.account.inst} · ••${accountRow.account.mask} · ${accountRow.account.kind}`
+    ? undefined
     : transaction
       ? `${transaction.account} · ${transaction.date}`
       : billRow
@@ -280,13 +272,13 @@ export default function FinanceInspector({
         <ObjectHeader
           headingLevel="h2"
           className={styles.inspectorHeader}
-          objectType={objectType}
+          objectType={accountRow ? "" : objectType}
           title={objectTitle}
           subtitle={subtitle}
           identity={<Icon name={accountRow ? "Wallet" : transaction ? "Banknote" : billRow ? "Calendar" : budgetRow ? "PiggyBank" : "Check"} />}
-          states={stateChip}
+          states={accountRow ? undefined : stateChip}
           metadata={accountRow
-            ? <><strong>{money(accountRow.account.balance, { cents: true })}</strong><small>Recorded balance</small></>
+            ? stateChip
             : transaction
               ? money(transaction.amount, { sign: true, cents: true })
               : billRow
@@ -297,14 +289,8 @@ export default function FinanceInspector({
         />
       )}
       actions={<CloseButton onClose={onClose} />}
-      footer={<div className={styles.inspectorFooter}>
-        {accountSelection && <WorkbenchActions>
-          <WorkbenchAction onClick={() => onOperation("edit", accountSelection)}>Edit account</WorkbenchAction>
-          {!financeState.accounts.some(item => item.id === accountSelection.id && (item.bankLink || item.coinbaseLink)) && <WorkbenchAction onClick={() => onOperation("balance", accountSelection)}>Update balance</WorkbenchAction>}
-          <WorkbenchAction onClick={() => onOperation("transaction", accountSelection)}>Add transaction</WorkbenchAction>
-          <WorkbenchAction primary onClick={() => onOperation("import", accountSelection)}>Import CSV</WorkbenchAction>
-          <WorkbenchAction onClick={() => onOperation("archive", accountSelection)}>Archive</WorkbenchAction>
-        </WorkbenchActions>}
+      showCloseButton={!accountRow}
+      footer={accountRow ? undefined : <div className={styles.inspectorFooter}>
         {transactionSelection && <WorkbenchActions>
           <WorkbenchAction onClick={() => onOperation("edit", transactionSelection)}>Edit transaction</WorkbenchAction>
           <WorkbenchAction primary onClick={() => onOperation("transaction_review", transactionSelection)}>Mark reconciled</WorkbenchAction>
@@ -318,20 +304,20 @@ export default function FinanceInspector({
         {budgetSelection && <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("edit", budgetSelection)}>Edit budget</WorkbenchAction><WorkbenchAction onClick={() => onOperation("archive", budgetSelection)}>Archive</WorkbenchAction></WorkbenchActions>}
         {closeSelection && <WorkbenchActions><WorkbenchAction onClick={() => onOperation("close_check", closeSelection)}>Update check</WorkbenchAction><WorkbenchAction primary onClick={() => onOperation(closePeriod?.status === "closed" ? "reopen_close" : "complete_close", closeSelection)}>{closePeriod?.status === "closed" ? "Reopen month" : "Complete month"}</WorkbenchAction></WorkbenchActions>}
       </div>}
-      className={`finance-right-rail ${mobileOpen ? "is-mobile-open" : ""}`}
+      className={`finance-right-rail ${accountRow ? "finance-account-inspector" : ""} ${mobileOpen ? "is-mobile-open" : ""}`}
       ariaLabel={`${objectTitle} Finance inspector`}
       overlay={overlay}
       overlayOpen={overlayOpen}
       onRequestClose={onClose}
     >
-      <DetailTabs
+      <div className={accountRow ? "finance-account-tabbar" : undefined}><DetailTabs
         id="finance-object-tabs"
         className={styles.inspectorTabs}
         tabs={tabs}
         activeTab={safeTab}
         onTabChange={(tab) => onTabChange(tab as FinanceTab)}
         ariaLabel={`${objectTitle} details`}
-      />
+      />{accountSelection && <div className="finance-account-tab-actions">{[{op:"edit" as const,icon:"edit",label:"Edit account properties"},{op:"transaction" as const,icon:"plus",label:"Add transaction"},{op:"archive" as const,icon:"archive",label:"Archive account"}].map(action=><button key={action.op} type="button" title={action.label} aria-label={action.label} onClick={()=>onOperation(action.op,accountSelection)}><UnigentamosIcon role={action.icon} size={18}/></button>)}</div>}</div>
 
       {transaction && (
         <div className={styles.inspectorPanel}>
@@ -380,84 +366,7 @@ export default function FinanceInspector({
         </div>
       )}
 
-      {accountRow && (
-        <div className={styles.inspectorPanel}>
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="overview" active={safeTab === "overview"} className={styles.inspectorPanel}>
-            <div className={styles.factGrid}>
-              <div><span>Current balance</span><strong>{money(accountRow.account.balance, { cents: true })}</strong></div>
-              <div><span>Balance as of</span><strong>{financeState.accounts.find(item => item.id === accountRow.account.id)?.balanceAsOf.slice(0, 10) || "Not recorded"}</strong></div>
-              <div><span>Matched transactions</span><strong>{accountRow.activity.transactions.length}</strong></div>
-              <div><span>Matched bills</span><strong>{accountRow.activity.bills.length}</strong></div>
-              <div><span>Balance source</span><strong>{financeState.accounts.find(item => item.id === accountRow.account.id)?.balanceSource || "Not recorded"}</strong></div>
-              <div><span>Imports</span><strong>{financeState.importBatches.filter(item => item.accountId === accountRow.account.id).length}</strong></div>
-            </div>
-            <section className={styles.inspectorSection}>
-              <h3>Account activity</h3>
-              <p>{accountRow.activity.transactions.length} transactions and {accountRow.activity.bills.length} bills are linked to this account. Open a tab above to review them.</p>
-            </section>
-            <div className={styles.boundary}>
-              <strong>About this balance</strong>
-              <span>Transactions and imports do not update this recorded balance. Use Update balance when you have a newer statement or account balance.</span>
-            </div>
-            <a className={styles.compactRow} href={getModuleViewRoute("finance", "review")}>
-              <span><strong>Finance Monthly Review</strong><small>Review your balances and finish the monthly checklist</small></span>
-              <span>Open</span>
-            </a>
-          </DetailTabPanel>
-
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="transactions" active={safeTab === "transactions"} className={styles.inspectorPanel}>
-            <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("transaction", accountSelection!)}>Add transaction</WorkbenchAction><WorkbenchAction onClick={() => onOperation("import", accountSelection!)}>Import CSV</WorkbenchAction></WorkbenchActions>
-            {accountRow.activity.transactions.length ? (
-              <div className={styles.compactList}>
-                {accountRow.activity.transactions.map((item) => (
-                  <a className={styles.compactRow} href={`${getModuleViewRoute("finance", "transactions")}?selected=${encodeURIComponent(item.id)}`} key={item.id}>
-                    <span><strong>{item.merchant}</strong><small>{item.date} · {item.category} · native account reference</small></span>
-                    <span className={item.amount > 0 ? styles.positive : undefined}>{money(item.amount, { sign: true, cents: true })}</span>
-                  </a>
-                ))}
-              </div>
-            ) : <SystemState variant="empty" title="No account transactions" description="No current transaction references this account." />}
-          </DetailTabPanel>
-
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="reconcile" active={safeTab === "reconcile"} className={styles.inspectorPanel}>
-            {!financeState.accounts.some(item => item.id === accountSelection?.id && (item.bankLink || item.coinbaseLink)) && <WorkbenchActions><WorkbenchAction onClick={() => onOperation("balance", accountSelection!)}>Update balance</WorkbenchAction></WorkbenchActions>}
-            {accountUnreconciled.length ? <div className={styles.compactList}>{accountUnreconciled.map((item) => <article className={styles.workbenchRow} key={item.id}>
-              <span><strong>{item.merchant}</strong><small>{item.occurredOn} · {item.category || "Uncategorized"}</small></span>
-              <span>{money(item.direction === "expense" ? -item.amount : item.amount, { sign: true, cents: true })}</span>
-              <button type="button" onClick={() => onOperation("transaction_review", { kind: "transaction", id: item.id })}>Mark reconciled</button>
-            </article>)}</div> : <SystemState variant="empty" title="Everything is reconciled" description="This account has no pending or unreviewed transactions." />}
-          </DetailTabPanel>
-
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="transfers" active={safeTab === "transfers"} className={styles.inspectorPanel}>
-            <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("transfer", accountSelection!)}>New transfer</WorkbenchAction><WorkbenchAction onClick={() => onOperation("savings", accountSelection!)}>Savings movement</WorkbenchAction></WorkbenchActions>
-            {accountTransfers.length ? <div className={styles.compactList}>{accountTransfers.map((item) => {
-              const outgoing = item.fromAccountId === accountRow.account.id;
-              const peerId = outgoing ? item.toAccountId : item.fromAccountId;
-              const peer = financeState.accounts.find((account) => account.id === peerId)?.name || "Unavailable account";
-              return <article className={styles.compactRow} key={item.id}><span><strong>{outgoing ? `To ${peer}` : `From ${peer}`}</strong><small>{item.occurredOn} · {item.memo || "Transfer"}</small></span><span>{money(outgoing ? -item.amount : item.amount, { sign: true, cents: true })}</span></article>;
-            })}</div> : <SystemState variant="empty" title="No transfers yet" description="Record a transfer here and Finance will create the linked ledger pair." />}
-          </DetailTabPanel>
-
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="imports" active={safeTab === "imports"} className={styles.inspectorPanel}>
-            <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("import", accountSelection!)}>Import CSV</WorkbenchAction></WorkbenchActions>
-            {accountImports.length ? <div className={styles.compactList}>{accountImports.map((item) => <article className={styles.compactRow} key={item.id}><span><strong>{item.sourceFilename}</strong><small>{new Date(item.confirmedAt).toLocaleString()} · {item.counts.unreconciled} imported for review · {item.counts.rejected} skipped</small></span><span>{item.rows.length} rows</span></article>)}</div> : <SystemState variant="empty" title="No CSV imports yet" description="Choose a bank export to preview and import its transactions." />}
-          </DetailTabPanel>
-
-          <DetailTabPanel tabsId="finance-object-tabs" tabId="properties" active={safeTab === "properties"}>
-            <WorkbenchActions><WorkbenchAction primary onClick={() => onOperation("edit", accountSelection!)}>Edit account</WorkbenchAction></WorkbenchActions>
-            <div className={styles.factGrid}>
-              <div><span>Account ID</span><strong>{accountRow.account.id}</strong></div>
-              <div><span>Name</span><strong>{accountRow.account.name}</strong></div>
-              <div><span>Institution</span><strong>{accountRow.account.inst}</strong></div>
-              <div><span>Mask</span><strong>{accountRow.account.mask}</strong></div>
-              <div><span>Kind</span><strong>{accountRow.account.kind}</strong></div>
-              <div><span>Current balance</span><strong>{money(accountRow.account.balance, { cents: true })}</strong></div>
-              <div><span>Balance history</span><strong>Comparison unavailable</strong></div>
-              <div><span>Persistence</span><strong>Native Finance store</strong></div>
-            </div>
-          </DetailTabPanel>
-        </div>
-      )}
+      {accountRow && <FinanceAccountDetails row={accountRow} state={financeState} tab={safeTab} onOperation={onOperation}/> }
 
       {billRow && (
         <div className={styles.inspectorPanel}>

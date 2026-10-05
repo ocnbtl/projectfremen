@@ -1,0 +1,12 @@
+const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
+require.extensions['.ts']=(module,file)=>module._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,file);
+const {findAccountTransferCandidates:find,accountBalanceExplanation:explain,accountDate}=require('../lib/modules/finance/account-details.ts');
+const tx=(id,accountId,direction,extra={})=>({id,accountId,direction,amount:350,currency:'USD',occurredOn:'2026-10-03',status:'cleared',...extra});
+const state={accounts:[{id:'checking'},{id:'savings'}],transfers:[],transactions:[tx('out','checking','expense'),tx('in','savings','income')]};
+const before=JSON.stringify(state);assert.equal(find(state,'checking').length,1);assert.equal(find(state,'savings').length,1);assert.equal(JSON.stringify(state),before);
+for(const extra of [{status:'pending'},{archivedAt:'2026-10-04'},{transferId:'linked'},{savingsMovementId:'saved'},{currency:'EUR'},{occurredOn:'2026-10-04'},{amount:351},{accountId:'checking'}])assert.equal(find({...state,transactions:[state.transactions[0],{...state.transactions[1],...extra}]},'checking').length,0);
+assert.equal(find({...state,transactions:[...state.transactions,tx('other','savings','income')]},'checking').length,0,'Ambiguous pairs are not implied matches');
+assert.equal(find({...state,transfers:[{outgoingTransactionId:'out',incomingTransactionId:'in'}]},'checking').length,0);
+assert.equal(find({...state,accounts:[state.accounts[0],{id:'savings',archivedAt:'2026-10-04'}]},'checking').length,0);
+assert.match(explain({balanceSource:'plaid',bankLink:{}}),/bank update notifications/);assert.match(explain({balanceSource:'plaid'}),/no longer connected/);assert.match(explain({balanceSource:'manual'}),/does not change/);assert.equal(accountDate('2026-10-05'),'Oct 5, 2026');
+console.log('PASS account balance labels and transfer detection: opposite signs, distinct active accounts, same date/currency/amount, no ambiguous or already linked pairs, no mutations');
