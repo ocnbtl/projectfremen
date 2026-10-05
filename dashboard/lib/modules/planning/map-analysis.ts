@@ -1,3 +1,4 @@
+import { MAP_CATALOG, MAP_PALETTES } from "./map-catalog";
 import type { FeatureCollection } from "geojson";
 import type { RegionMetric } from "./map-providers";
 
@@ -13,27 +14,15 @@ export type MapData = {
 };
 export type MapAnalysisSettings = {
   countryCode?: string;
+  palette?: string;
   metrics: { metric: string; min?: number; max?: number }[];
   match: "all" | "any";
   scale: "quantile" | "linear";
 };
-export const MAP_METRICS: Record<string, string> = {
-  "world-population": "Population",
-  "world-density": "Population density",
-  "regional-population": "Population estimate",
-  "regional-density": "Population density",
-  population: "Population",
-  age: "Median age",
-  income: "Household income",
-};
-export const MAP_COLORS = [
-  "#edf8b1",
-  "#addd8e",
-  "#41b6c4",
-  "#2c7fb8",
-  "#253494",
-];
+export const MAP_METRICS: Record<string, string> = Object.fromEntries(Object.entries(MAP_CATALOG).map(([key, value]) => [key, value.name]));
+export const MAP_COLORS = MAP_PALETTES.terrain.colors;
 export function mapAnalysis(data: MapData[], settings: MapAnalysisSettings) {
+  const colors = (settings.palette && Object.hasOwn(MAP_PALETTES, settings.palette) ? MAP_PALETTES[settings.palette] : MAP_PALETTES.terrain).colors;
   const primary = data[0];
   if (!primary) return;
   if (
@@ -107,7 +96,7 @@ export function mapAnalysis(data: MapData[], settings: MapAnalysisSettings) {
           color:
             value === null
               ? "#c4c9c0"
-              : MAP_COLORS[thresholds.filter((t) => value >= t).length],
+              : colors[thresholds.filter((t) => value >= t).length],
           details: JSON.stringify(row?.comparisons || []),
         },
       };
@@ -116,6 +105,7 @@ export function mapAnalysis(data: MapData[], settings: MapAnalysisSettings) {
     geometry: { type: "FeatureCollection" as const, features },
     rows,
     thresholds,
+    colors,
     min,
     max,
     unit: primary.unit,

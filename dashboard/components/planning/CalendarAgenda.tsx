@@ -16,8 +16,8 @@ export default function CalendarAgenda({ events, linked, zone, start, today, ren
 }) {
   const [month, setMonth] = useState("");
   const rows = useMemo(() => [
-    ...events.map(event => ({ id: event.id, day: localFor(event.startMs, zone).slice(0, 10), last: localFor(event.endMs - 1, zone).slice(0, 10), order: event.allDay ? 0 : event.startMs, event })),
-    ...linked.map(link => ({ id: link.id, day: link.start, last: addDays(link.end, -1), order: 0, link })),
+    ...events.map(event => ({ id: event.id, day: localFor(event.startMs, zone).slice(0, 10), first: localFor(event.startMs, zone).slice(0, 10), last: localFor(event.endMs - 1, zone).slice(0, 10), order: event.allDay ? 0 : event.startMs, event })),
+    ...linked.map(link => ({ id: link.id, day: link.start, first: link.start, last: addDays(link.end, -1), order: 0, link })),
   ].map(row => ({ ...row, day: row.day < start ? start : row.day })), [events, linked, zone, start]);
   const nextMonth = (key: string) => new Date(Date.UTC(Number(key.slice(0, 4)), Number(key.slice(5, 7)), 1)).toISOString().slice(0, 10);
   const months: string[] = [];
@@ -35,9 +35,9 @@ export default function CalendarAgenda({ events, linked, zone, start, today, ren
       <button type="button" className={styles.agendaDate} onClick={() => onDay(day)} aria-label={`View ${label(day, { dateStyle: "full" })}`}>
         <strong data-morph-date={day}>{Number(day.slice(-2))}</strong><span>{label(day, { month: "short" })}<small>{day === today ? "Today" : label(day, { weekday: "long" })}</small></span>
       </button>
-      <div className={styles.agendaRows}>{rows.map(row => "event" in row ? renderEvent(row.event) : <Link key={row.id} className={styles.agendaLinked} href={row.link.ownerRef?.route || "/admin/personal"}>
+      <div className={styles.agendaRows}>{rows.map(row => <div className={styles.agendaEntry} key={row.id}>{row.last > row.first && <div className={styles.agendaSpan}><UnigentamosIcon role="calendar" size={14} /><time dateTime={row.first}>{label(row.first, {month: "short", day: "numeric", ...(row.first.slice(0,4) !== row.last.slice(0,4) ? {year: "numeric" as const} : {})})}</time><UnigentamosIcon role="chevron-right" size={12} /><time dateTime={row.last}>{label(row.last, {month: "short", day: "numeric", year: "numeric"})}</time>{row.first < start && <small>Ongoing</small>}</div>}{"event" in row ? renderEvent(row.event) : <Link key={row.id} className={styles.agendaLinked} href={row.link.ownerRef?.route || "/admin/personal"}>
         <span>Linked</span><UnigentamosIcon role={row.link.completed ? "check" : "link"} size={17} /><strong>{row.link.title}</strong>{row.link.completed && <small>Completed</small>}
-      </Link>)}</div>
+      </Link>}</div>)}</div>
     </section>)}
     {!visible.length && <WorkspaceEmpty title={activeMonth ? "No events this month" : "Room to plan"}>Add an event, choose another month, or expand the date range.</WorkspaceEmpty>}
   </div>;

@@ -16,6 +16,7 @@ import CalendarDisclosure from "./CalendarDisclosure";
 import useCalendarAutosave from "./useCalendarAutosave";
 import CalendarGroupSettings from "./CalendarGroupSettings";
 import CalendarDatePicker from "./CalendarDatePicker";
+import CalendarViewToggle from "./CalendarViewToggle";
 import { CalendarScene, useCalendarMotion, useCalendarMorph } from "./CalendarMotion";
 import { motion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -597,7 +598,8 @@ export default function CalendarWorkspace() {
         <div className={styles.toolbarTools}>
           {timeline && <CalendarHourControls days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />}
           <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search events"} value={query} onChange={e => setQuery(e.target.value)} /></label>
-          <SelectField triggerContent={compact ? <span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[view]} size={16} />{view === "3-day" ? "3 days" : view[0].toUpperCase() + view.slice(1)}</span> : undefined} aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
+          <CalendarViewToggle view={view} onChange={next => changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined)} />
+          <SelectField className={styles.viewDropdown} triggerContent={compact ? <span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[view]} size={16} />{view === "3-day" ? "3 days" : view[0].toUpperCase() + view.slice(1)}</span> : undefined} aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
             {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
@@ -623,10 +625,10 @@ export default function CalendarWorkspace() {
               </label>
             </Popover.Content></Popover.Portal>
           </Popover.Root>
-          <button type="button" aria-label="Settings" title="Calendar settings" className={`work-button work-button--secondary ${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}><UnigentamosIcon role="sliders" candidate="settings" size={20} /><span>Settings</span></button>
+          <button type="button" data-calendar-settings-trigger aria-label="Settings" title="Calendar settings" className={`work-button work-button--secondary ${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}><UnigentamosIcon role="sliders" candidate="settings" size={20} /><span>Settings</span></button>
 
         </div>
-          <Button intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>{compact ? "Add" : "Add event"}</Button>
+          <Button data-calendar-event-trigger intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>{compact ? "Add" : "Add event"}</Button>
       </header>
       <WorkspaceFeedback
         error={error || expanded.error || holidayError}
@@ -768,6 +770,7 @@ export default function CalendarWorkspace() {
         )}
       </WorkspaceSheet>
       <WorkspaceSheet
+        anchorSelector="[data-calendar-event-trigger]"
         open={Boolean(editor)}
         onClose={() => setEditor(undefined)}
         title={editor?.original ? "Edit event" : "New event"}
@@ -910,7 +913,8 @@ export default function CalendarWorkspace() {
       <WorkspaceSheet
         open={connections}
         onClose={() => setConnections(false)}
-        title="Calendars and connections"
+        anchorSelector="[data-calendar-settings-trigger], [aria-label='Calendar tools']"
+        title="Settings and calendars"
       >
         <div className={`work-form ${styles.calendarSettingsForm}`}>
           <WorkspaceFeedback error={error} message={notice} />

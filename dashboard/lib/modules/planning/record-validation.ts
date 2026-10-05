@@ -1,3 +1,4 @@
+import { MAP_CATALOG, MAP_PALETTES } from "./map-catalog";
 import { createNativeObjectRef } from "../../native-objects/routes";
 import { normalizeObservances } from "./observance-settings";
 import { isModuleId, type NativeObjectRef } from "../../native-objects/types";
@@ -324,18 +325,11 @@ function normalizeAnalysis(value: unknown) {
     ...(raw.countryCode && /^[A-Z]{3}$/.test(raw.countryCode) ? { countryCode: raw.countryCode } : {}),
     match: raw.match === "any" ? "any" : "all",
     scale: raw.scale === "linear" ? "linear" : "quantile",
+    palette: raw.palette && Object.hasOwn(MAP_PALETTES, raw.palette) ? raw.palette : "terrain",
     metrics: raw.metrics.map((m) => {
       if (
         !m ||
-        ![
-          "world-population",
-          "world-density",
-          "regional-population",
-          "regional-density",
-          "population",
-          "age",
-          "income",
-        ].includes(m.metric) ||
+        !Object.hasOwn(MAP_CATALOG, m.metric) ||
         seen.has(m.metric)
       )
         throw new Error("Choose distinct supported map layers");

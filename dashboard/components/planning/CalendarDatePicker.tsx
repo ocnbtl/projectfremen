@@ -1,12 +1,12 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
-import { useState, useRef, useLayoutEffect, type CSSProperties } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useState, useRef, useLayoutEffect, forwardRef, type ReactNode, type CSSProperties } from "react";
+import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import { dateScales, weeksOfYear, navigationYear, viewIcons, type CalendarView, type DateScale } from "../../lib/modules/planning/calendar-navigation";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import CalendarMiniMonth, { calendarDateLabel as label } from "./CalendarMiniMonth";
-import { CalendarScene, useCalendarMotion } from "./CalendarMotion";
+import { useCalendarMotion } from "./CalendarMotion";
 import styles from "./CalendarWorkspace.module.css";
 
 export default function CalendarDatePicker({ value, today, view, onChange }: { value: string; today: string; view: CalendarView; onChange: (day: string, view: CalendarView) => void }) {
@@ -25,7 +25,7 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
   const heading = view === "year" ? value.slice(0, 4) : <><span className={styles.headingMonthFull}>{label(value, { month: "long" })}</span><span className={styles.headingMonthShort}>{label(value, { month: "short" })}</span><span className={styles.headingYear}>{value.slice(0, 4)}</span></>;
   const firstYear = Math.max(1900, Math.min(2189, year - 4));
   const choose = (day: string) => { onChange(day, mode); setOpen(false); };
-  const changeMode = (next: DateScale) => { setMode(next); setFocused(value); };
+  const changeMode = (next: DateScale) => { setDirection(dateScales.indexOf(next) > dateScales.indexOf(mode) ? 1 : -1); setMode(next); setFocused(value); };
   const move = (amount: number) => { setDirection(amount); setYear(current => Math.max(1900, Math.min(2200, current + amount * (mode === "year" ? 12 : 1)))); };
   return <Popover.Root open={open} onOpenChange={next => {
     if (next) {
@@ -54,7 +54,7 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
         <button type="button" className={styles.pickerArrow} disabled={year >= 2200} aria-label={mode === "year" ? "Next years" : "Next year"} onClick={() => move(1)}><UnigentamosIcon role="chevron-right" size={18} /></button>
       </header>
       <div ref={body} className={styles.navigatorBody} data-mode={mode} data-month-collection id="calendar-date-choices" role="tabpanel" aria-label={`${mode} choices`}>
-        <CalendarScene id={`${mode}:${year}`} direction={direction}>
+        <AnimatePresence initial={false} mode="popLayout" custom={direction}><NavigatorPane key={`${mode}:${year}`} direction={direction} reduced={reduced}>
           {mode === "month" ? <div className={styles.monthChoices}>{Array.from({ length: 12 }, (_, i) => {
             const day = `${year}-${String(i + 1).padStart(2, "0")}-01`;
             return <button type="button" key={day} aria-pressed={value.slice(0, 7) === day.slice(0, 7)} onClick={() => choose(day)}>{label(day, { month: "long" })}</button>;
@@ -66,9 +66,14 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
             <CalendarMiniMonth month={`${year}-${focused.slice(5, 7)}-01`} value={focused} today={today} onSelect={choose} onFocusDate={day => { pendingFocus.current = day; setFocused(day); setYear(Number(day.slice(0, 4))); }} />
           </div>}
 
-        </CalendarScene>
+        </NavigatorPane></AnimatePresence>
       </div>
-      <footer className={styles.pickerFooter}><button type="button" onClick={() => choose(today)}><UnigentamosIcon role="today" size={15} />Jump to today</button></footer>
+      <footer className={styles.pickerFooter}><button type="button" onClick={() => choose(today)}>Jump to today<UnigentamosIcon role="chevron-right" size={15} /></button></footer>
     </Popover.Content></Popover.Portal>
   </Popover.Root>;
 }
+
+const NavigatorPane = forwardRef<HTMLDivElement, {direction: number; reduced: boolean; children: ReactNode}>(function NavigatorPane({direction, reduced, children}, ref) {
+  const present = useIsPresent();
+  return <motion.div ref={ref} inert={!present} aria-hidden={!present || undefined} custom={direction} variants={{enter: (d: number) => ({opacity: 0, x: d * 24}), center: {opacity: 1, x: 0}, exit: (d: number) => ({opacity: 0, x: -d * 24})}} initial={reduced ? false : "enter"} animate="center" exit="exit" transition={{duration: reduced ? 0 : .32, ease: [.22,1,.36,1]}} className={styles.navigatorPane}>{children}</motion.div>;
+});

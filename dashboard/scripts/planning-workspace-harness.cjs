@@ -1248,6 +1248,45 @@ async function check(label, run) {
     assert.deepEqual(parsePlaceSearch({ features: [] }, "query"), []);
     assert.throws(() => parsePlaceSearch({ error: "unavailable" }, "query"), /unexpected/);
   });
+  await check("expanded data catalog preserves source units, latest values and country-only scope", async () => {
+    const { MAP_CATALOG } = require("../lib/modules/planning/map-catalog.ts");
+    const { demographics } = require("../lib/modules/planning/map-providers.ts");
+    const original = global.fetch;
+    try {
+      global.fetch = async url => new Response(JSON.stringify(String(url).includes("/indicator/") ? [{}, [
+        {countryiso3code:"USA", value: 10, date:"2022"},
+        {countryiso3code:"USA", value: null, date:"2025"},
+        {countryiso3code:"USA", value: 15, date:"2024"},
+        {countryiso3code:"CAN", value: null, date:"2025"},
+        {countryiso3code:"WLD", value: 99, date:"2025"}
+      ]] : [{}, [
+        {id:"USA", iso2Code:"US", name:"United States", region:{id:"NAC"}, longitude:"-100", latitude:"40"},
+        {id:"CAN", iso2Code:"CA", name:"Canada", region:{id:"NAC"}, longitude:"-100", latitude:"60"},
+        {id:"WLD", name:"World", region:{id:"NA"}}
+      ]]), {headers:{"content-type":"application/json"}});
+      for (const metric of Object.keys(MAP_CATALOG).filter(key => key.startsWith("world-"))) {
+        const data = await demographics(metric, "country", "");
+        assert.equal(data.unit, MAP_CATALOG[metric].unit);
+        assert.equal(data.rows.find(r => r.id === "USA").value, 15);
+        assert.equal(data.rows.find(r => r.id === "USA").year, "2024");
+        assert.equal(data.rows.find(r => r.id === "CAN").value, null);
+        assert(!data.rows.some(r => r.id === "WLD"));
+        await assert.rejects(() => demographics(metric, "county", "39"), /country level/);
+      }
+    } finally { global.fetch = original; }
+  });
+  await check("map palettes and cross filters survive saving without converting missing values to zero", () => {
+    const { mapAnalysis } = require("../lib/modules/planning/map-analysis.ts");
+    const { MAP_PALETTES } = require("../lib/modules/planning/map-catalog.ts");
+    const data = values => ({source:"Fixture", sourceUrl:"https://example.com", period:"2024", unit:"%", geography:"Country", geometry:{type:"FeatureCollection", features:[]}, rows:values.map((value, i) => ({id:String(i), name:String(i), value, year:"2024"}))});
+    const settings = {metrics:[{metric:"world-internet", min:40}, {metric:"world-electricity", min:50}], match:"all", scale:"quantile", palette:"indigo"};
+    assert.equal(mapAnalysis([data([60, null, 20]), data([70, 80, 90])], settings).matched, 1);
+    assert.equal(mapAnalysis([data([60, null, 20]), data([70, 80, 90])], {...settings, match:"any"}).rows[1].comparisons[0].value, null);
+    assert.deepEqual(mapAnalysis([data([60, null, 20]), data([70, 80, 90])], settings).colors, MAP_PALETTES.indigo.colors);
+    const saved = normalizePlanningRecord("savedViews", {id:"data-view", createdAt:stamp, updatedAt:stamp, name:"Access", center:[0,0], zoom:2, layer:"world-internet", level:"country", analysis:settings});
+    assert.equal(saved.analysis.palette, "indigo");
+    assert.deepEqual(saved.analysis.metrics, settings.metrics);
+  });
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );

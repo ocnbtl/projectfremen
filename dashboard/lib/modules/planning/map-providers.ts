@@ -1,3 +1,4 @@
+import { MAP_CATALOG } from "./map-catalog";
 import { parsePlaceSearch } from "./place-search";
 import { feature } from "topojson-client";
 import world from "world-atlas/countries-110m.json";
@@ -105,9 +106,9 @@ export async function demographics(
   level: string,
   state: string,
 ) {
-  if (metric === "world-population" || metric === "world-density") {
-    const indicator =
-      metric === "world-population" ? "SP.POP.TOTL" : "EN.POP.DNST";
+  if (metric.startsWith("world-") && MAP_CATALOG[metric]?.indicator) {
+    if (level !== "country") throw new Error("This dataset is available at country level");
+    const indicator = MAP_CATALOG[metric].indicator;
     const [data, countries] = await Promise.all([
       publicJson(
         `https://api.worldbank.org/v2/country/all/indicator/${indicator}?format=json&per_page=20000&date=2020:2025`,
@@ -124,7 +125,7 @@ export async function demographics(
         .map((x: any) => [x.id, x]),
     );
     const rows = new Map<string, RegionMetric>();
-    for (const row of data[1]) {
+    for (const row of [...data[1]].sort((a: any, b: any) => Number(b.date) - Number(a.date))) {
       const country: any = countryMap.get(row.countryiso3code);
       if (!country) continue;
       const previous = rows.get(country.id);
@@ -132,7 +133,7 @@ export async function demographics(
       rows.set(country.id, {
         id: country.id,
         name: country.name,
-        value: typeof row.value === "number" ? row.value : null,
+        value: typeof row.value === "number" && Number.isFinite(row.value) ? row.value : null,
         year: row.date,
         longitude: Number(country.longitude),
         latitude: Number(country.latitude),
@@ -143,7 +144,7 @@ export async function demographics(
       source: "World Bank",
       sourceUrl: `https://data.worldbank.org/indicator/${indicator}`,
       period: "Latest available, 2020–2025",
-      unit: metric === "world-density" ? "people / km²" : "people",
+      unit: MAP_CATALOG[metric].unit,
       geography: "Country",
       geometry: countryGeometry([...rows.values()], countries[1]),
       geometryNote:

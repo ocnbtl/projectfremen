@@ -1187,3 +1187,11 @@ html[data-reduce-motion="true"] .app-top-nav .app-top-nav__label { transition: n
   .people-redesign-shell .people-directory-list.is-grid .people-row-name strong { font-weight: 600; }
   .people-redesign-shell .people-directory-list.is-grid .people-row-main > small { font-weight: 400; }
 }
+
+/* Calendar editors grow down from their command, retaining modal focus and nested pickers. */
+.work-sheet.work-sheet--anchored { right: auto; bottom: auto; border-radius: 16px; border: 1px solid var(--module-border, #d5e2e7); overflow: hidden; animation: work-anchor-in 300ms cubic-bezier(.22,1,.36,1); }
+.work-sheet--anchored .work-sheet-header { padding: 14px 20px; }
+.work-sheet--anchored .work-sheet-body { padding: 16px 20px; }
+@keyframes work-anchor-in { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .work-sheet.work-sheet--anchored { animation: none; } }
+html[data-product-motion="reduce"] .work-sheet.work-sheet--anchored { animation: none; }

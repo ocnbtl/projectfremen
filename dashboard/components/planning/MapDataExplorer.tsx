@@ -5,11 +5,11 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import {
   mapAnalysis,
-  MAP_COLORS,
   MAP_METRICS,
   type MapAnalysisSettings,
   type MapData,
 } from "../../lib/modules/planning/map-analysis";
+import { MAP_CATALOG, MAP_PALETTES } from "../../lib/modules/planning/map-catalog";
 import styles from "./MapWorkspace.module.css";
 import countryCatalog from "../../data/map/world-regions-catalog.json";
 import { STATE_FLAGS } from "../../lib/modules/planning/map-flags";
@@ -52,7 +52,7 @@ export default function MapDataExplorer({
   const [sort, setSort] = useState("value"),
     [onlyMatches, setOnlyMatches] = useState(false),
     [page, setPage] = useState(0);
-  const [metricQuery, setMetricQuery] = useState(""), [regionQuery, setRegionQuery] = useState("");
+  const [regionQuery, setRegionQuery] = useState("");
   const countryCode = settings.countryCode || "USA";
   const international = countryCode !== "USA";
   const levels = international ? usLevels.slice(0, 3) : usLevels;
@@ -71,7 +71,7 @@ export default function MapDataExplorer({
   const [loadedKey, setLoadedKey] = useState("");
   const country = level === "country",
     available = country
-      ? ["world-population", "world-density"]
+      ? Object.keys(MAP_CATALOG).filter(key => key.startsWith("world-"))
       : international ? ["regional-population", "regional-density"]
       : ["population", "age", "income"];
   const invalidRange = settings.metrics.some(
@@ -233,26 +233,17 @@ export default function MapDataExplorer({
         )}
         <fieldset className={styles.dataMetrics}>
           <legend>Data layers</legend>
-          <label className={styles.dataSearch}><UnigentamosIcon role="search" size={16} /><input type="search" aria-label="Search data layers" placeholder="Search available data" value={metricQuery} onChange={e => setMetricQuery(e.target.value)} /></label>
-          {available.filter(metric => MAP_METRICS[metric].toLowerCase().includes(metricQuery.toLowerCase())).map((metric) => (
-            <label key={metric} className={styles.metricCard}>
-              <input
-                type="checkbox"
-                checked={settings.metrics.some((m) => m.metric === metric)}
-                onChange={(e) =>
-                  onSettings({
-                    ...settings,
-                    metrics: e.target.checked
-                      ? [...settings.metrics, { metric }]
-                      : settings.metrics.filter((m) => m.metric !== metric),
-                  })
-                }
-              />
-              <UnigentamosIcon role={metric === "income" ? "module-finance" : metric === "age" ? "clock" : metric.includes("density") ? "view-grid" : "module-people"} size={20} />
-              <span><strong>{MAP_METRICS[metric]}</strong><small>{metric === "income" ? "Median household earnings · USD" : metric === "age" ? "Median resident age · years" : metric.includes("density") ? "People per square kilometer" : "Total residents · people"}</small></span>
-            </label>
-          ))}
-          {!available.some(metric => MAP_METRICS[metric].toLowerCase().includes(metricQuery.toLowerCase())) && <small>No matching layers at this geographic level.</small>}
+          <div className={styles.metricCatalog}>
+          {[...new Set(available.map(metric => MAP_CATALOG[metric].category))].map(category => <section key={category} className={styles.metricCategory}>
+            <h3>{category}</h3><div className={styles.metricGrid}>{available.filter(metric => MAP_CATALOG[metric].category === category).map(metric => {
+              const item = MAP_CATALOG[metric], selected = settings.metrics.some(m => m.metric === metric);
+              return <button type="button" key={metric} className={styles.metricCard} aria-pressed={selected} disabled={!selected && settings.metrics.length >= 3} onClick={() => onSettings({...settings, metrics: selected ? settings.metrics.filter(m => m.metric !== metric) : [...settings.metrics, {metric}]})}>
+                <UnigentamosIcon role={item.icon} size={20} /><span><strong>{item.name}</strong><small>{item.description}</small></span><span className={styles.metricCheck}><UnigentamosIcon role={selected ? "check" : "plus"} size={14} /></span>
+              </button>;
+            })}</div>
+          </section>)}
+          </div>
+          <div className={styles.layerSelection}><span>{settings.metrics.length} / 3 layers</span>{!!settings.metrics.length && <button type="button" onClick={() => { onSettings({...settings, metrics: []}); setData([]); }}>Clear</button>}</div>
         </fieldset>
         {settings.metrics.length > 1 && (
           <label>
@@ -279,18 +270,6 @@ export default function MapDataExplorer({
             </SelectField>
           </label>
         )}
-        <Button
-          busy={busy}
-          disabled={
-            invalidRange ||
-            !settings.metrics.length ||
-            (!country && !international && level !== "state" && !state)
-          }
-          onClick={() => void load()}
-        >
-          Apply data
-        </Button>
-        {!!settings.metrics.length && <Button icon="close" onClick={() => { onSettings({ ...settings, metrics: [] }); setData([]); }}>Clear layers</Button>}
         {error && (
           <p role="alert" className={styles.dataError}>
             {error}
@@ -299,7 +278,7 @@ export default function MapDataExplorer({
         {!!settings.metrics.length && (
           <>
             <div className={styles.dataHeading}>
-              <strong>Cross-filter regions</strong>
+              <strong><UnigentamosIcon role="sliders" size={16} /> Filter regions</strong>
               <SelectField
                 aria-label="Combine filters"
                 value={settings.match}
@@ -366,9 +345,10 @@ export default function MapDataExplorer({
                 <option value="linear">Equal numeric ranges</option>
               </SelectField>
             </label>
-            <small className="work-muted">Balanced bands make regional differences easier to see. Use density to compare population concentration across differently sized regions.</small>
+            <fieldset className={styles.palettePicker}><legend>Map colors</legend><div>{Object.entries(MAP_PALETTES).map(([key, palette]) => <button type="button" key={key} aria-label={palette.name} title={palette.name} aria-pressed={(settings.palette || "terrain") === key} onClick={() => onSettings({...settings, palette: key})}>{palette.colors.map(color => <i key={color} style={{background: color}} />)}</button>)}</div></fieldset>
           </>
         )}
+        <div className={styles.applyDataBar}><Button icon="view-grid" busy={busy} intent="primary" disabled={invalidRange || !settings.metrics.length || (!country && !international && level !== "state" && !state)} onClick={() => void load()}>{loadedKey === key && result ? "Refresh data" : `Apply ${settings.metrics.length || ""} ${settings.metrics.length === 1 ? "layer" : "layers"}`}</Button>{result && <span role="status">{result.matched} / {result.rows.length} regions</span>}</div>
         {result && (
           <>
             <small>
@@ -418,7 +398,7 @@ export default function MapDataExplorer({
                     <span key={i}>
                       {c.label}:{" "}
                       {c.value === null ? "No data" : c.value.toLocaleString()}{" "}
-                      {c.unit}
+                      {c.unit} · {c.year || "No year"}
                       {c.uncertainty != null
                         ? ` ± ${c.uncertainty.toLocaleString()}`
                         : ""}
@@ -460,7 +440,7 @@ export function MapDataLegend({ result }: { result: AnalysisResult }) {
       </span>
       <span>{result.data[0].period}</span>
       <div>
-        {MAP_COLORS.map((color, i) => (
+        {result.colors.map((color, i) => (
           <i
             key={color}
             style={{ background: color }}
