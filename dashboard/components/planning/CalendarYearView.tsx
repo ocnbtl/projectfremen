@@ -30,8 +30,8 @@ export default function CalendarYearView({ date, today, zone, events, calendars,
     }
     return result;
   }, [events, year, zone, showWeekends]);
-  const renderMarks = (day: string) => <span className={styles.yearMarks} aria-hidden="true">{(marks.get(day) || []).map(mark => <span key={mark.event.id} data-year-event={mark.event.id} data-before={mark.before} data-after={mark.after} title={mark.event.title} style={{ ...eventColors(mark.event, calendars.find(c => c.id === mark.event.calendarId)), "--year-lane": mark.lane } as CSSProperties} />)}{(counts.get(day) || 0) > (marks.get(day)?.length || 0) && <b>+</b>}</span>;
+  const renderMarks = (day: string) => <span className={styles.yearMarks} aria-hidden="true">{(marks.get(day) || []).map(mark => <span key={mark.event.id} data-year-event={mark.event.id} data-before={mark.before} data-after={mark.after} title={mark.event.title} style={{ ...eventColors(mark.event, calendars.find(c => c.id === mark.event.calendarId)), "--year-lane": mark.lane } as CSSProperties} />)}</span>;
   return <div className={styles.yearView} data-month-collection aria-label={`${year} year calendar`}>
-    {Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}-01`).map(month => <CalendarMiniMonth key={month} overview={compact} month={month} value={date} today={today} showWeekends={showWeekends} counts={counts} renderMarks={renderMarks} onSelect={onDay} onMonth={onMonth} />)}
+    {Array.from({ length: 12 }, (_, index) => `${year}-${String(index + 1).padStart(2, "0")}-01`).map(month => <CalendarMiniMonth fitWeeks key={month} overview={compact} month={month} value={date} today={today} showWeekends={showWeekends} counts={counts} renderMarks={renderMarks} onSelect={onDay} onMonth={onMonth} />)}
   </div>;
 }

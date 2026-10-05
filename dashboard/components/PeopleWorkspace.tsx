@@ -4274,10 +4274,9 @@ export default function PeopleWorkspace({
             action={{ label: "Reload", onSelect: () => window.location.reload() }}
           />
         ) : activeSidebarView === "recently-deleted" ? (
-          <section className="people-utility-surface people-deleted-surface" aria-labelledby="people-deleted-title">
+          <section className="people-utility-surface people-deleted-surface" aria-label="Recently deleted profiles">
             <header>
               <div>
-                <h2 id="people-deleted-title">Recently Deleted</h2>
                 <p>Profiles stay recoverable here with their links and history. Restore them anytime, or permanently delete them when you choose.</p>
               </div>
               <strong>{archivedPeople.length}</strong>
@@ -4295,10 +4294,10 @@ export default function PeopleWorkspace({
                       compact
                     />
                     <div>
-                      <strong>{record.title}</strong>
+                      <strong>{record.title}{record.starred && <span className="people-deleted-star" aria-label="Starred"> ★</span>}</strong>
                       <span>Deleted {record.archivedAt ? formatFullDate(record.archivedAt) : "recently"}</span>
                     </div>
-                    {record.starred && <span className="people-deleted-star" aria-label="Starred">★</span>}
+
                     <span className="people-deleted-actions">
                     <button
                       type="button"
@@ -4322,7 +4321,7 @@ export default function PeopleWorkspace({
           </section>
         ) : resolvedUtilityNotice ? (
           <section className="people-utility-surface">
-            <h2>{activeViewLabel}</h2>
+            {activeSidebarView !== "duplicates" && <h2>{activeViewLabel}</h2>}
             {!["duplicates","import","export","import-export"].includes(activeSidebarView) && <p>{resolvedUtilityNotice}</p>}
             {activeSidebarView === "all-lists" && (
               <div className="people-utility-grid">
@@ -4334,7 +4333,7 @@ export default function PeopleWorkspace({
                 ))}
               </div>
             )}
-            {activeSidebarView === "duplicates" && <div className="people-duplicate-review">{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):null}<section className="people-duplicate-summary"><h3>{duplicateMatches.length === 0 ? "Zero" : duplicateMatches.length} detected duplicate {duplicateMatches.length === 1 ? "pair" : "pairs"} across People and Organizations</h3><p>We scan these details for duplicates, keeping your information private and secure.</p><ul>{["Names", "Email addresses", "Phone numbers", "Social profiles", "Websites"].map(label => <li key={label}><PeopleIcon name="check" />{label}</li>)}</ul><div className="people-duplicate-key"><span><UnigentamosIcon role="duplicates" size={20} />Green: no duplicates detected</span><span><UnigentamosIcon role="duplicates-warning" size={20} />Red: possible duplicates to review</span></div><small>Matches are suggestions. Profiles change only when you edit them.</small></section></div>}
+            {activeSidebarView === "duplicates" && <div className="people-duplicate-review">{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):null}<section className="people-duplicate-summary"><h3>{duplicateMatches.length === 0 ? "Zero" : duplicateMatches.length} detected duplicate {duplicateMatches.length === 1 ? "pair" : "pairs"} across People and Organizations</h3><p>We scan these details for duplicates, keeping your information private and secure.</p><ul>{["Names", "Email addresses", "Phone numbers", "Social profiles", "Websites"].map(label => <li key={label}><PeopleIcon name="check" />{label}</li>)}</ul><div className="people-duplicate-key"><span><UnigentamosIcon role="duplicates" size={20} />Green: no duplicates detected</span><span><UnigentamosIcon role="duplicates-warning" size={20} />Red: possible duplicates to review</span></div></section></div>}
             {(activeSidebarView === "import-export" || activeSidebarView === "import" || activeSidebarView === "export") && (
               <PeopleTransfer key={activeSidebarView} mode={activeSidebarView === "export" ? "export" : "import"} people={people} onBusy={setTransferBusy} onChanged={records=>setPeople(records.filter(record=>record.className === "person" || record.className === "org"))}/>
             )}

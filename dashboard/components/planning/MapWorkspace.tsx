@@ -1,4 +1,5 @@
 "use client";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import * as Popover from "@radix-ui/react-popover";
 import PlaceLocationFields from "./PlaceLocationFields";
 import MapDataExplorer, {
@@ -24,7 +25,6 @@ import type { FeatureCollection } from "geojson";
 import {
   WorkspaceButton as Button,
   WorkspaceHeader,
-  WorkspaceToolbar,
   WorkspaceSheet,
   WorkspaceFeedback,
   WorkspaceEmpty,
@@ -385,12 +385,9 @@ export default function MapWorkspace() {
           Save place
         </Button>
       </WorkspaceHeader>
-      <WorkspaceToolbar
-        query={query}
-        onQuery={setQuery}
-        placeholder="Search places or addresses"
-        activeFilters={tag ? 1 : 0}
-        filters={
+      <div className="work-toolbar">
+        <label className="work-search"><UnigentamosIcon role="search" size={20} /><input type="search" aria-label="Search places or addresses" placeholder="Search places or addresses" value={query} onChange={e => setQuery(e.target.value)} /><button type="button" className={styles.addressSearch} aria-label="Find address on map" disabled={query.trim().length < 3 || busy} onClick={() => void search()}><UnigentamosIcon role="chevron-right" size={16} /></button></label>
+        <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!tag}>Filter{tag ? " (1)" : ""}</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
           <>
             <label>
               Tag
@@ -424,67 +421,11 @@ export default function MapWorkspace() {
               Reset filters
             </Button>
           </>
-        }
-      >
-        <Button
-          icon="search" aria-label="Search addresses"
-          disabled={query.trim().length < 3 || busy}
-          onClick={() => void search()}
-        >
-          Search addresses
-        </Button>
+        </Popover.Content></Popover.Portal></Popover.Root>
         <Button icon="location" aria-label={pinning ? "Cancel pin" : "Drop pin"} aria-pressed={pinning} onClick={() => setPinning(!pinning)}>
           {pinning ? "Cancel pin" : "Drop pin"}
         </Button>
-        <Button
-          icon={mobileList ? "map" : "list"} aria-label={mobileList ? "Show map" : "Show places list"} className={styles.listToggle}
-          aria-pressed={mobileList}
-          onClick={() => setMobileList(!mobileList)}
-        >
-          {mobileList ? "Map" : "List"}
-        </Button>
-        <Popover.Root><Popover.Trigger asChild><Button icon="build" aria-label="Explore data">Explore data{analysis.metrics.length ? ' (' + analysis.metrics.length + ')' : ''}</Button></Popover.Trigger>
-          <Popover.Portal forceMount><Popover.Content forceMount className={styles.dataPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="end" aria-label="Explore map data" onOpenAutoFocus={e => e.preventDefault()}>
-            <header className={styles.explorerHeader}><div><strong>Explore data</strong><small>Compare places through geographic data</small></div><Popover.Close asChild><Button aria-label="Close data explorer" icon="close">Close</Button></Popover.Close></header>
-          <MapDataExplorer
-            level={level}
-            state={stateCode}
-            states={STATES}
-            settings={analysis}
-            onLevel={(next) => {
-              setLevel(next);
-              setView(undefined);
-            }}
-            onState={(next) => {
-              setStateCode(next);
-              setView(undefined);
-            }}
-            onSettings={(next) => {
-              setAnalysis(next);
-              setView(undefined);
-            }}
-            onResult={setAnalysisResult}
-            loadKey={analysisLoadKey}
-          />
-
-          </Popover.Content></Popover.Portal>
-        </Popover.Root>
-      </WorkspaceToolbar>
-      </div>
-      <WorkspaceFeedback error={error} message={notice} />
-      {pinning && (
-        <p className={styles.hint}>
-          Select a point on the map, or use Save place to enter coordinates.
-        </p>
-      )}
-      {snapshot?.persistence === "device" && (
-        <p className="work-muted" role="status">
-          Saved on this device. Pending changes will synchronize when the
-          connection is restored.
-        </p>
-      )}
-      <div className={styles.workspace}>
-        <aside className={styles.directory} data-mobile-open={mobileList}>
+        <Popover.Root open={mobileList} onOpenChange={setMobileList}><Popover.Trigger asChild><Button icon="list" aria-label="Saved places" className={styles.listToggle} aria-pressed={mobileList}>Saved places</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.placesPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Saved places and trips" onOpenAutoFocus={e => e.preventDefault()}><header className={styles.explorerHeader}><strong>Saved places</strong><Popover.Close asChild><Button icon="close" aria-label="Close saved places">Close</Button></Popover.Close></header>        <div className={styles.placesDirectory}>
           <details className={styles.savedViews}>
             <summary>Saved views</summary>
             <div className="work-form">
@@ -558,6 +499,7 @@ export default function MapWorkspace() {
                   className="work-row"
                   key={i}
                   onClick={() => {
+                    setMobileList(false);
                     newPlace(p);
                     setView({ center: [p.longitude, p.latitude], zoom: 13 });
                   }}
@@ -627,8 +569,50 @@ export default function MapWorkspace() {
             />
             Photo locations
           </label>
-        </aside>
-        <div className={styles.map} data-mobile-hidden={mobileList}>
+        </div></Popover.Content></Popover.Portal></Popover.Root>
+        <Popover.Root><Popover.Trigger asChild><Button icon="build" aria-label="Explore data">Explore data{analysis.metrics.length ? ' (' + analysis.metrics.length + ')' : ''}</Button></Popover.Trigger>
+          <Popover.Portal forceMount><Popover.Content forceMount className={styles.dataPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="end" aria-label="Explore map data" onOpenAutoFocus={e => e.preventDefault()}>
+            <header className={styles.explorerHeader}><div><strong>Explore data</strong><small>Compare places through geographic data</small></div><Popover.Close asChild><Button aria-label="Close data explorer" icon="close">Close</Button></Popover.Close></header>
+          <MapDataExplorer
+            level={level}
+            state={stateCode}
+            states={STATES}
+            settings={analysis}
+            onLevel={(next) => {
+              setLevel(next);
+              setView(undefined);
+            }}
+            onState={(next) => {
+              setStateCode(next);
+              setView(undefined);
+            }}
+            onSettings={(next) => {
+              setAnalysis(next);
+              setView(undefined);
+            }}
+            onResult={setAnalysisResult}
+            loadKey={analysisLoadKey}
+          />
+
+          </Popover.Content></Popover.Portal>
+        </Popover.Root>
+      </div>
+      </div>
+      <WorkspaceFeedback error={error} message={notice} />
+      {pinning && (
+        <p className={styles.hint}>
+          Select a point on the map, or use Save place to enter coordinates.
+        </p>
+      )}
+      {snapshot?.persistence === "device" && (
+        <p className="work-muted" role="status">
+          Saved on this device. Pending changes will synchronize when the
+          connection is restored.
+        </p>
+      )}
+      <div className={styles.workspace}>
+
+        <div className={styles.map}>
           <MapCanvas
             photos={photos}
             places={places}

@@ -221,6 +221,8 @@ export default function CalendarTimeGrid({
                     transition={{ layout: layoutTransition }}
                     className={styles.fittedEvent}
                     data-morph-event={item.id}
+                    data-compact={bottom - top < 44}
+                    data-tiny={bottom - top < 26}
                     inert={until <= startHour * 60 || from >= endHour * 60}
                     aria-hidden={until <= startHour * 60 || from >= endHour * 60}
                     title={title}
@@ -231,7 +233,7 @@ export default function CalendarTimeGrid({
                         width: `calc(${100 / item.columns}% - 4px)`,
                         height: `max(14px, calc(${resizing?.id === item.id ? (resizing.end - item.startMs) / 60000 : until - from} * 100% / var(--calendar-span) - 1px))`,
                         ...eventColors(item, c),
-                        "--event-avatar-size": `${Math.max(8, Math.min(18, bottom - top - 7))}px`,
+                        "--event-avatar-size": `${Math.max(14, Math.min(24, bottom - top - 12))}px`,
                       } as CSSProperties
                     }
                   >
@@ -249,12 +251,7 @@ export default function CalendarTimeGrid({
                       onClick={() => onOpen(item)}
                       aria-label={title}
                     >
-                      <span className={styles.timedEventTitle}>{(group || item.system) && <UnigentamosIcon role={item.system ? "star" : group!.icon} size={12} />}<strong>{eventPreviewTitle(item)}</strong><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
-                      {bottom - top > 30 && (
-                        <span>
-                          {clock(from)}–{clock(until)}
-                        </span>
-                      )}
+                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{(group || item.system) && <UnigentamosIcon role={item.system ? "star" : group!.icon} size={13} />}<strong>{eventPreviewTitle(item)}</strong></span>{bottom - top >= 44 && <small>{clock(from)}–{clock(until)}</small>}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
                     </motion.button>
                     {!item.system && <button
                       type="button"

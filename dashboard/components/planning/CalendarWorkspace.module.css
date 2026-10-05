@@ -689,11 +689,7 @@
   font-weight: 500;
   white-space: nowrap;
 }
-.fittedEvent > button:first-child > span:not(.timedEventTitle) {
-  display: block;
-  font-size: 10px;
-  margin-top: 3px;
-}
+
 
 .fittedResize {
   position: absolute;
@@ -1904,7 +1900,6 @@
 .yearMarks > span { position: absolute; left: 1px; right: 1px; top: calc(var(--year-lane) * var(--year-mark-step)); height: var(--year-mark-height); box-sizing: border-box; border: 1px solid var(--event-outline); background: color-mix(in srgb, var(--event-color) 48%, white); border-radius: 3px; }
 .yearMarks > span[data-before="true"] { left: -2px; border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; }
 .yearMarks > span[data-after="true"] { right: -2px; border-right: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.yearMarks > b { position: absolute; right: 0; bottom: 0; font: 600 8px/1 var(--font-body); }
 .yearView .overviewDate[data-has-events]::after { display: none; }
 @media (min-width: 1500px) and (min-height: 900px) {
  .yearView { --year-mark-height: 7px; --year-mark-step: 8px; }
@@ -1925,3 +1920,53 @@
 }
 @media (min-width: 1181px) and (max-width: 1550px) { .toolbar { grid-template-columns: 0 auto minmax(140px,1fr) auto auto auto auto auto; } .toolbar h1 { display: none; } }
 @media (max-width: 760px) { .allDayBand { max-height: 112px; } .allDayBand .allDayItem { font-size: 9px; gap: 3px; padding-inline: 3px; } .yearView .overviewDate { padding-bottom: 9px; } .yearMarks { transform: scaleY(.6); transform-origin: bottom; } }
+
+/* Keep animated navigator content inside its viewport throughout the spring. */
+.navigatorBody, .calendarChoiceMenu { overflow-x: hidden; }
+.navigatorBody .calendarStage { overflow-x: clip; }
+.content[data-view="agenda"] { overflow-y: auto; }
+.agenda { width: 100%; max-width: 1440px; box-sizing: border-box; margin-inline: auto; padding: 4px 16px 32px; }
+.agendaHeading { align-items: center; padding-block: 8px 12px; min-height: 40px; }
+.agendaHeading > :global(.app-select-trigger) { display: inline-flex; align-items: center; justify-content: center; vertical-align: middle; margin: 0; }
+.agendaMonths { display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; gap: 8px; padding: 0 0 18px; }
+.agendaMonths button { display: inline-flex; width: auto; flex: none; align-items: center; gap: 9px; min-height: 34px; padding: 6px 12px; border: 1px solid var(--module-border); border-radius: 9px; background: transparent; color: var(--text-strong); font: 500 12px/1.4 var(--font-body); cursor: pointer; transition: background 160ms ease, border-color 160ms ease; }
+.agendaMonths button[aria-pressed="true"] { background: var(--module-quiet); border-color: var(--module-icon); color: var(--module-icon); }
+.agendaMonths button > span { font-size: 10px; background: var(--module-quiet); padding: 2px 5px; border-radius: 5px; }
+.agendaDay { grid-template-columns: 112px minmax(0,1fr); gap: 16px; padding: 14px 0; }
+.agendaRows .agendaEvent { min-height: 54px; padding: 10px 14px; border-radius: 10px; }
+.yearMarks > span { border-width: 2px; box-sizing: border-box; }
+.yearView { --year-mark-height: 6px; --year-mark-step: 7px; row-gap: 4px; padding-inline: 8px; }
+.yearView .miniDays button { padding-bottom: 21px; }
+.yearMarks { height: 20px; }
+@media (min-width: 1500px) and (min-height: 900px) {
+ .yearView { --year-mark-height: 8px; --year-mark-step: 9px; row-gap: 2px; }
+ .yearView .miniMonth { padding: 2px; gap: 2px; }
+ .yearView .miniDays button { font-size: 13px; padding-bottom: 27px; }
+ .yearView .miniDays { gap: 0 1px; }
+ .yearMarks { height: 26px; }
+}
+/* The event body shares all-day typography, with a balanced avatar and time rail. */
+.fittedEvent { border-radius: 8px; }
+.fittedEvent > button:not(.fittedResize) { padding: 6px 8px; font: 500 11px/1.4 var(--font-body); justify-content: center; }
+.fittedEvent > button:first-child > .timedEventContent { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; margin: 0; font: inherit; }
+.timedEventCopy { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
+.fittedEvent .timedEventTitle { gap: 5px; line-height: 1.4; }
+.timedEventTitle > svg { flex: none; }
+.timedEventCopy > small { display: block; font: 400 10px/1.3 var(--font-body); color: var(--text-secondary); white-space: nowrap; }
+.timedEventContent > .eventPeople { --avatar-size: var(--event-avatar-size, 24px); flex: none; align-self: center; margin: 0; }
+.fittedEvent[data-compact="true"] > button:not(.fittedResize) { padding: 3px 6px; }
+.fittedEvent[data-tiny="true"] > button:not(.fittedResize) { padding: 0 4px; }
+.fittedEvent[data-tiny="true"] .eventPeople { display: none; }
+@media (max-width: 760px) {
+ .agenda { padding-inline: 2px; }
+ .agendaDay { grid-template-columns: 1fr; gap: 4px; }
+ .agendaDate { align-items: center; padding-block: 2px 5px; }
+ .agendaDate > strong { font-size: 24px; }
+ .agendaDate small { display: inline; margin-left: 6px; }
+ .yearView { --year-mark-height: 6px; --year-mark-step: 7px; }
+ .yearView .overviewDate { padding-bottom: 12px; }
+ .yearMarks { height: 20px; }
+ .content[data-view="week"] .fittedEvent > button:not(.fittedResize), .content[data-view="3-day"] .fittedEvent > button:not(.fittedResize) { padding-inline: 3px; font-size: 9px; }
+ .content[data-view="week"] .timedEventContent { gap: 3px; }
+ .content[data-view="week"] .timedEventCopy > small { font-size: 8px; }
+}

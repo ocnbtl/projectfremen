@@ -245,3 +245,17 @@
 .people-deleted-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface-panel); font: 500 12px/1.4 var(--font-body); cursor: pointer; }
 .people-deleted-actions > button svg { width: 16px; height: 16px; }
 .people-deleted-actions > button:disabled { opacity: .5; cursor: wait; }
+
+.people-redesign-shell .people-duplicate-summary h3 { font: 600 14px/1.5 var(--font-body); margin-bottom: 10px; }
+.people-redesign-shell .people-deleted-list article { align-items: center; gap: 12px; }
+.people-redesign-shell .people-deleted-actions { grid-column: 3; grid-row: 1; flex-wrap: nowrap; gap: 6px; width: auto; }
+.people-redesign-shell .people-deleted-actions > button { width: auto; min-width: 0; height: 34px; min-height: 34px; padding: 6px 10px; white-space: nowrap; color: var(--text-strong, #23383f); background: var(--surface-panel, white); font-size: 12px; }
+.people-redesign-shell .people-deleted-actions > .people-permanent-delete { color: #98443b; }
+@media (max-width: 600px) {
+ .people-redesign-shell .people-deleted-list article { grid-template-columns: 40px minmax(0,1fr) auto; gap: 6px; padding-inline: 6px; }
+ .people-redesign-shell .people-deleted-actions { gap: 4px; }
+ .people-redesign-shell .people-deleted-actions > button { padding-inline: 6px; font-size: 10px; gap: 4px; }
+ .people-redesign-shell .people-deleted-actions > button svg { width: 13px; height: 13px; }
+ .people-redesign-shell .people-deleted-list article > div { min-width: 0; }
+ .people-redesign-shell .people-deleted-list article > div > strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+}

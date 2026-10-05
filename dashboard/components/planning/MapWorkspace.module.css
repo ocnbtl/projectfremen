@@ -478,3 +478,28 @@
  .directory[data-mobile-open="true"] { display: block; }
  .listToggle { display: inline-flex; }
 }
+
+/* Local menus keep the map visible and the toolbar stable. */
+.placesPopover, .filterPopover { box-sizing: border-box; width: min(380px, calc(100vw - 24px)); max-height: min(680px, var(--radix-popover-content-available-height, 75dvh)); overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; border: 1px solid var(--module-border); border-radius: 14px; padding: 14px; background: var(--panel-bg, white); box-shadow: 0 14px 48px #10202626; z-index: 75; animation: dataReveal 180ms ease-out; }
+.filterPopover { width: min(300px, calc(100vw - 24px)); display: grid; gap: 14px; }
+.filterPopover label { display: grid; gap: 6px; min-width: 0; font: 500 12px/1.4 var(--font-body); }
+.filterPopover :global(.app-select-trigger) { width: 100%; min-width: 0; font-size: 12px; }
+.placesDirectory { display: grid; gap: 8px; }
+.placesDirectory :global(.work-row) { width: 100%; min-width: 0; padding: 10px; border-radius: 9px; }
+.placesDirectory :global(.work-row) small { overflow-wrap: anywhere; }
+.placesDirectory .savedViews { margin: 0 0 8px; }
+.mapToolbar .listToggle { display: inline-flex; }
+.mapToolbar .listToggle[aria-pressed="true"] { background: var(--module-quiet); border-color: var(--module-icon); color: var(--module-icon); }
+.mapToolbar :global(.work-search) { display: flex; align-items: center; padding: 0 8px; box-sizing: border-box; border-radius: 8px; }
+.mapToolbar :global(.work-search):focus-within { outline: 2px solid var(--module-primary-400); outline-offset: 2px; }
+.mapToolbar :global(.work-search input) { flex: 1; width: 100%; border: 0; outline: none !important; box-shadow: none !important; height: 100%; padding: 0; }
+.addressSearch { display: grid; place-items: center; flex: none; width: 26px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--module-icon); cursor: pointer; }
+.addressSearch:disabled { opacity: .3; cursor: default; }
+.addressSearch:hover:not(:disabled) { background: var(--module-quiet); }
+@media (max-width: 760px) {
+ .mapToolbar :global(.work-toolbar) > button:nth-of-type(1) { grid-row: 2; grid-column: 2; }
+ .mapToolbar :global(.work-toolbar) > button:nth-of-type(2) { grid-row: 2; grid-column: 3; }
+ .mapToolbar :global(.work-toolbar) > button:nth-of-type(3) { grid-row: 2; grid-column: 4; }
+ .mapToolbar :global(.work-toolbar) > button:nth-of-type(4) { grid-row: 2; grid-column: 5; }
+}
+@media (prefers-reduced-motion: reduce) { .placesPopover, .filterPopover { animation: none; } }

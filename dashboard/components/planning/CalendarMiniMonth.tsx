@@ -6,18 +6,21 @@ import styles from "./CalendarWorkspace.module.css";
 
 export const calendarDateLabel = (date: string, options: Intl.DateTimeFormatOptions) => new Date(`${date}T12:00`).toLocaleDateString(undefined, options);
 
-export default function CalendarMiniMonth({ month, value, today, showWeekends = true, counts, renderMarks, onSelect, onMonth, onFocusDate, overview = false }: {
-  renderMarks?: (day: string) => ReactNode;
+export default function CalendarMiniMonth({ month, value, today, showWeekends = true, counts, renderMarks, onSelect, onMonth, onFocusDate, overview = false, fitWeeks = false }: {
+  fitWeeks?: boolean; renderMarks?: (day: string) => ReactNode;
   overview?: boolean; month: string; value: string; today: string; showWeekends?: boolean; counts?: Map<string, number>;
   onSelect: (day: string) => void; onMonth?: (day: string) => void; onFocusDate?: (day: string) => void;
 }) {
   const start = weekStart(monthStart(month));
+  const nextMonth = new Date(Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)), 1));
+  const end = nextMonth.toISOString().slice(0, 10);
+  const weeks = fitWeeks ? Math.ceil((Date.parse(end) - Date.parse(start)) / 86400000 / 7) : 6;
   const title = calendarDateLabel(month, { month: "long" });
   return <section className={styles.miniMonth} data-overview={overview || undefined} data-mini-month={month.slice(0, 7)} aria-label={calendarDateLabel(month, { month: "long", year: "numeric" })}>
     {onMonth ? <button type="button" className={styles.miniMonthHeading} onClick={() => onMonth(month)} aria-label={`View ${calendarDateLabel(month, { month: "long", year: "numeric" })}`}>{title}</button> : <h3>{title}</h3>}
-    <div className={styles.miniDays} style={{ gridTemplateColumns: `repeat(${showWeekends ? 7 : 5}, minmax(0, 1fr))` }}>
+    <div className={styles.miniDays} style={{ gridTemplateColumns: `repeat(${showWeekends ? 7 : 5}, minmax(0, 1fr))`, ...(fitWeeks ? { gridTemplateRows: `16px repeat(${weeks}, minmax(0, 1fr))` } : {}) }}>
       {visibleWeekdays(showWeekends).map(day => <span className={styles.miniWeekday} key={day} title={day}>{day.slice(0, 2)}</span>)}
-      {Array.from({ length: 42 }, (_, index) => {
+      {Array.from({ length: weeks * 7 }, (_, index) => {
         if (!showWeekends && [0, 6].includes(index % 7)) return null;
         const day = addDays(start, index), outside = day.slice(0, 7) !== month.slice(0, 7), count = counts?.get(day) || 0;
         if (outside) return <span key={day} aria-hidden="true" />;
