@@ -22,11 +22,11 @@ export default function CalendarGroupSettings({ calendars, busy, onSave }: {
   const calendar = calendars.find(item => item.id === selectedId) || calendars[0];
   if (!calendar) return <p className="work-muted">Add a calendar to manage its color groups.</p>;
   return <div className={styles.groupSettings}>
-    <label>Calendar
+    {calendars.length > 1 && <label>Calendar
       <SelectField aria-label="Group calendar" value={calendar.id}  menuClassName={styles.calendarChoiceMenu} onChange={event => setSelectedId(event.target.value)}>
         {calendars.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
       </SelectField>
-    </label>
+    </label>}
     <GroupEditor key={calendar.id} calendar={calendar} onSave={onSave} />
   </div>;
 }

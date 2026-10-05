@@ -9,7 +9,7 @@ export function eventTimeLabel(ms: number, zone: string) {
   }).formatToParts(ms);
   const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(value => value.type === type)?.value;
   const minute = part("minute");
-  return `${part("hour")}${minute === "00" ? "" : `:${minute}`} ${part("dayPeriod") === "AM" ? "am" : "pm"}`;
+  return `${part("hour")}${minute === "00" ? "" : `:${minute}`}${part("dayPeriod") === "AM" ? "am" : "pm"}`;
 }
 
 export function eventTimeRange(startMs: number, endMs: number, zone: string) {

@@ -152,6 +152,7 @@ export function WorkspaceSheet({
   children,
   description,
   anchorSelector,
+  presentation,
 }: {
   open: boolean;
   onClose: () => void;
@@ -159,6 +160,7 @@ export function WorkspaceSheet({
   children: ReactNode;
   description?: string;
   anchorSelector?: string;
+  presentation?: "center" | "page";
 }) {
   const [anchorStyle, setAnchorStyle] = useState<CSSProperties>();
   useLayoutEffect(() => {
@@ -212,7 +214,7 @@ export function WorkspaceSheet({
             const target = opener.current;
             if (target?.isConnected) target.focus({ preventScroll: true });
           }}
-          className={`work-sheet${anchorSelector ? " work-sheet--anchored" : ""}`}
+          className={`work-sheet${anchorSelector ? " work-sheet--anchored" : ""}${presentation ? ` work-sheet--${presentation}` : ""}`}
           style={anchorSelector ? anchorStyle : undefined}
           aria-describedby={description ? descriptionId : undefined}
         >

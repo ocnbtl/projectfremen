@@ -1195,3 +1195,16 @@ html[data-reduce-motion="true"] .app-top-nav .app-top-nav__label { transition: n
 @keyframes work-anchor-in { from { opacity: 0; transform: translateY(-8px) scale(.98); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .work-sheet.work-sheet--anchored { animation: none; } }
 html[data-product-motion="reduce"] .work-sheet.work-sheet--anchored { animation: none; }
+
+
+/* Dialogs used by Calendar details and its unified settings page. */
+.work-sheet.work-sheet--center, .work-sheet.work-sheet--page { inset: 50% auto auto 50%; transform: translate(-50%, -50%); width: min(860px, calc(100vw - 32px)); max-height: calc(100dvh - 32px); border-radius: 18px; overflow: hidden; animation: work-center-in 240ms var(--work-ease); }
+.work-sheet.work-sheet--page { width: min(1060px, calc(100vw - 32px)); height: min(880px, calc(100dvh - 32px)); }
+.work-sheet--center .work-sheet-body { flex: 0 1 auto; padding: 16px; }
+.work-sheet--page .work-sheet-body { background: var(--surface-ground, #fafbfc); }
+@keyframes work-center-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 10px)) scale(.985); } to { opacity: 1; transform: translate(-50%, -50%) scale(1); } }
+.app-top-nav { border-bottom: 0; box-shadow: none; }
+@media (max-width: 600px) { .work-sheet.work-sheet--center,.work-sheet.work-sheet--page { width: calc(100vw - 16px); max-height: calc(100dvh - 16px); border-radius: 14px; } .work-sheet--page .work-sheet-body { padding: 14px; } }
+@media (prefers-reduced-motion: reduce) { .work-sheet.work-sheet--center,.work-sheet.work-sheet--page { animation: none; } }
+
+html[data-product-motion="reduce"] :is(.work-sheet.work-sheet--center, .work-sheet.work-sheet--page) { animation:none; }

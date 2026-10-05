@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import type { CalendarObservanceSettings as Settings } from "../../lib/modules/planning/types";
 import { holidayVisible, observanceAppearance, customRepeatLabel, type HolidayCatalog } from "../../lib/modules/planning/observances";
 import { normalizeObservances } from "../../lib/modules/planning/observance-settings";
@@ -14,8 +14,8 @@ import styles from "./CalendarWorkspace.module.css";
 export function CalendarCountryFlag({ code }: { code: string }) {
   return <svg className={styles.countryFlag} width="24" height="16" viewBox="0 0 513 342" aria-hidden="true"><use href={`/country-flags.svg#flag-${code}`} /></svg>;
 }
-export default function CalendarObservanceSettings({ settings, catalog, loading, error, busy, year, date, zone, onSave }: {
-  settings: Settings; catalog?: HolidayCatalog; loading: boolean; error: string; busy: boolean; year: string; date: string; zone: string; onSave: (settings: Settings) => Promise<boolean>;
+export default function CalendarObservanceSettings({ settings, catalog, loading, error, busy, year, date, zone, onSave, renderAppearance }: {
+  settings: Settings; catalog?: HolidayCatalog; loading: boolean; error: string; busy: boolean; year: string; date: string; zone: string; onSave: (settings: Settings) => Promise<boolean>; renderAppearance?: (key: string, name: string) => ReactNode;
 }) {
   const [country, setCountry] = useState("");
   const [custom, setCustom] = useState<Settings["custom"][number]>();
@@ -40,6 +40,7 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
         const holidays = [...new Map((catalog?.holidays || []).filter(x => x.country === code && x.date.startsWith(year)).map(x => [x.key, x])).values()];
         return <details className={styles.holidayCountry} key={code}>
           <summary><CalendarCountryFlag code={code} /><strong>{appearance.name}</strong><span>{year}</span><UnigentamosIcon role="chevron-down" size={15} /></summary>
+          {renderAppearance?.(`holidays:${code}`, name)}
           <div className={styles.holidayList}>
             {holidays.map(holiday => <label className={styles.holidayChoice} key={holiday.key}>
               <input type="checkbox" checked={holidayVisible(holiday, settings)} disabled={busy || loading} aria-label={`${holiday.name} (${name})`} onChange={e => void onSave({ ...settings,
@@ -59,6 +60,7 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
     <section>
       <div className={styles.observanceHeading}><h3><UnigentamosIcon role="star" size={18} />Custom dates</h3><Button icon="plus" disabled={busy} onClick={() => { setCustomError(""); setRepeatDraft({ frequency: "yearly", interval: 1 }); setCustom({ id: crypto.randomUUID(), title: "", date, annual: true, visible: true }); }}>Add date</Button></div>
       <p>Recurring dates or one-time events, such as an anniversary.</p>
+      {renderAppearance?.("custom", "Custom dates")}
       {settings.custom.map(item => <div className={styles.customDateRow} key={item.id}>
         <label><input type="checkbox" checked={item.visible} disabled={busy} aria-label={`Show ${item.title}`} onChange={e => void onSave({ ...settings, custom: settings.custom.map(x => x.id === item.id ? { ...x, visible: e.target.checked } : x) })} /><span><strong>{item.title}</strong><small>{dateLabel(item.date, { month: "short", day: "numeric" })} · {customRepeatLabel(item)}{item.allDay === false ? ` · ${item.startTime}–${item.endTime}` : " · All day"}</small></span></label>
         <Button icon="edit" aria-label={`Edit ${item.title}`} disabled={busy} onClick={() => { setCustomError(""); setCustom(item); setRepeatDraft(item.repeat || { frequency: "yearly", interval: 1 }); }} />

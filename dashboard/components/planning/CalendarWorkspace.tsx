@@ -3,6 +3,7 @@ import * as Popover from "@radix-ui/react-popover";
 import { calendarDisplayColor, eventColors, eventPreviewTitle, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
 import CalendarMobileView from "./CalendarMobileView";
 import CalendarMonthView from "./CalendarMonthView";
+import { monthWeekLayout } from "../../lib/modules/planning/month-layout";
 import CalendarHourControls from "./CalendarHourControls";
 import CalendarTimeGrid from "./CalendarTimeGrid";
 import CalendarYearView from "./CalendarYearView";
@@ -145,7 +146,8 @@ export default function CalendarWorkspace() {
       MODULE_COLOR_SYSTEM.calendar.tokens.icon,
     );
   const [observance, setObservance] = useState<EventOccurrence>();
-  const [calendarTab, setCalendarTab] = useState<"calendars" | "holidays">("calendars");
+  const [addingCalendar, setAddingCalendar] = useState(false);
+  const [importProvider, setImportProvider] = useState("Google Calendar");
   const [holidayData, setHolidayData] = useState<HolidayCatalog>(), [holidayError, setHolidayError] = useState(""), [holidayLoading, setHolidayLoading] = useState(false);
   const [holidayRetry, setHolidayRetry] = useState(0);
   // Keep the UI responsive while ordered writes preserve record-version checks.
@@ -349,8 +351,8 @@ export default function CalendarWorkspace() {
         visibleCalendars.has(item.calendarId) &&
         `${item.title} ${item.description} ${item.location}`
           .toLowerCase()
-          .includes(query.toLowerCase()),
-    ), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.toLowerCase()))];
+          .includes(query.trim().toLowerCase()),
+    ), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
   }, [expanded.items, snapshot?.state.calendars, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
   const dated = showDated
     ? (snapshot?.dated || []).filter(
@@ -358,7 +360,7 @@ export default function CalendarWorkspace() {
           (showCompleted || !x.completed) &&
           x.start < range.end &&
           x.end > range.start &&
-          x.title.toLowerCase().includes(query.toLowerCase()),
+          x.title.toLowerCase().includes(query.trim().toLowerCase()),
       )
     : [];
   async function action(work: () => Promise<unknown>, message: string) {
@@ -516,7 +518,7 @@ export default function CalendarWorkspace() {
   }
   const timeline = view === "day" || view === "3-day" || view === "week";
   const changeView = (next: View, day?: string) => morph(() => { setView(next); if (day) setDate(day); });
-  function eventButton(item: EventOccurrence) {
+  function eventButton(item: EventOccurrence, detail = false) {
     const event = snapshot?.state.events.find((x) => x.id === item.eventId);
     const calendar = snapshot?.state.calendars.find(
       (x) => x.id === item.calendarId,
@@ -526,7 +528,7 @@ export default function CalendarWorkspace() {
       <button
         type="button"
         key={item.id}
-        className={styles.agendaEvent}
+        className={`${styles.agendaEvent} ${detail ? styles.dayDetailEvent : ""}`}
         data-morph-event={item.id}
         data-birthday={item.system?.kind === "birthday" || undefined}
         data-month-all-day={view === "month" && item.allDay || undefined}
@@ -534,9 +536,10 @@ export default function CalendarWorkspace() {
         onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
         title={item.title}
       >
-        {!(view === "month" && item.allDay) && <span className={styles.agendaTime}>{item.allDay ? "All day" : <>{eventTimeLabel(item.startMs, zone)}<small>to {eventTimeLabel(item.endMs, zone)}</small></>}</span>}
+        {detail ? <span className={styles.detailTime}>{!item.allDay && eventTimeRange(item.startMs, item.endMs, zone)}</span> : !(view === "month" && item.allDay) && <span className={styles.agendaTime}>{item.allDay ? "All day" : <>{eventTimeLabel(item.startMs, zone)}<small>to {eventTimeLabel(item.endMs, zone)}</small></>}</span>}
         <span className={styles.eventIcon}><UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={16} /></span>
-        <span className={styles.eventCopy}><strong>{eventPreviewTitle(item)}</strong>{item.location && <small>{item.location}</small>}</span>
+        <span className={styles.eventCopy}><strong>{eventPreviewTitle(item)}</strong>{!detail && item.location && <small>{item.location}</small>}</span>
+        {detail && item.location && <span className={styles.detailLocation}><UnigentamosIcon role="location" size={16} />{item.location}</span>}
         <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
       </button>
     );
@@ -547,10 +550,10 @@ export default function CalendarWorkspace() {
   ) {
     await action(async () => {
       const connection = await savePlanning("connections", {
-        name: connectionName || file?.name || "Calendar connection",
+        name: connectionName || file?.name || importProvider,
         kind,
         timeZone: zone,
-        url: kind === "ics_feed" ? feedUrl : undefined,
+        url: kind === "ics_feed" ? feedUrl.trim().replace(/^webcal:\/\//i, "https://") : undefined,
       });
       if (kind !== "morgen")
         await savePlanning("calendars", {
@@ -591,7 +594,7 @@ export default function CalendarWorkspace() {
         </div>
         <div className={styles.toolbarTools}>
           {timeline && <CalendarHourControls days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />}
-          <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search events"} value={query} onChange={e => setQuery(e.target.value)} /></label>
+          <label className={styles.calendarSearch}><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search"} value={query} onChange={e => setQuery(e.target.value)} /></label>
           <CalendarViewToggle view={view} onChange={next => changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined)} />
           <SelectField className={styles.viewDropdown} triggerContent={compact ? <span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[view]} size={16} />{view === "3-day" ? "3 days" : view[0].toUpperCase() + view.slice(1)}</span> : undefined} aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
             {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}
@@ -629,6 +632,7 @@ export default function CalendarWorkspace() {
         message={notice}
         onRetry={error || holidayError ? () => { void refresh(); setHolidayRetry(value => value + 1); } : undefined}
       />
+      {query.trim() && <p className={styles.searchStatus} role="status">{occurrences.length + dated.length ? `${occurrences.length + dated.length} matching events in this view` : "No matching events in this view"}</p>}
       {snapshot?.persistence === "device" && (
         <p className={styles.contextNotice} role="status">
           Saved on this device. Pending changes will sync when your Vault
@@ -693,12 +697,12 @@ export default function CalendarWorkspace() {
             setDate(current => shiftCalendar(current, view, dx < 0 ? 1 : -1, agendaDays));
           }}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
-          {compact && view === "month" ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={eventButton} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} calendars={snapshot.state.calendars} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
+          {compact && view === "month" ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={item => eventButton(item)} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} calendars={snapshot.state.calendars} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
             <CalendarMonthView days={days} date={date} today={localDate(new Date(now), zone)} events={occurrences} calendars={snapshot.state.calendars} refs={snapshot.refs} zone={zone} showWeekends={showWeekends}
-              onDay={day => changeView("day", day)} onMore={day => { setDate(day); setDayDetail(day); }}
+              onDay={day => changeView("day", day)} onMore={day => setDayDetail(day)}
               onOpen={item => { if (item.system) setObservance(item); else { const event = snapshot.state.events.find(e => e.id === item.eventId); if (event) openEvent(event, item); } }} />
           ) : view === "agenda" ? (
-            <CalendarAgenda key={[range.start, agendaDays, query, showCompleted, showDated].join(":")} rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={eventButton} onDay={day => changeView("day", day)} />
+            <CalendarAgenda key={[range.start, agendaDays, query, showCompleted, showDated].join(":")} rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={item => eventButton(item)} onDay={day => changeView("day", day)} />
           ) : (
             <CalendarTimeGrid
               days={days}
@@ -727,6 +731,7 @@ export default function CalendarWorkspace() {
         </div>
       )}
       <WorkspaceSheet
+        presentation="center"
         open={Boolean(dayDetail)}
         onClose={() => setDayDetail(undefined)}
         title={
@@ -740,14 +745,16 @@ export default function CalendarWorkspace() {
         }
       >
         {dayDetail && (
-          <>
-            {occurrences
-              .filter(
-                (x) =>
-                  localFor(x.startMs, zone).slice(0, 10) <= dayDetail &&
-                  localFor(x.endMs - 1, zone).slice(0, 10) >= dayDetail,
-              )
-              .map(eventButton)}
+          <div className={styles.dayDetailList}>
+            {(() => {
+              const columns = showWeekends ? 7 : 5;
+              const row = Math.floor(Math.max(0, days.indexOf(dayDetail)) / columns);
+              const week = days.slice(row * columns, (row + 1) * columns);
+              const column = week.indexOf(dayDetail);
+              return monthWeekLayout(week, occurrences, zone, Number.MAX_SAFE_INTEGER).segments
+                .filter(segment => segment.first <= column && segment.last >= column)
+                .map(segment => eventButton(segment.event, true));
+            })()}
             {dated
               .filter((x) => x.start <= dayDetail && x.end > dayDetail)
               .map((x) => (
@@ -760,7 +767,7 @@ export default function CalendarWorkspace() {
                   {x.completed ? " · Completed" : ""}
                 </Link>
               ))}
-          </>
+          </div>
         )}
       </WorkspaceSheet>
       <WorkspaceSheet
@@ -901,34 +908,19 @@ export default function CalendarWorkspace() {
           {!observance.allDay && <p><UnigentamosIcon role="clock" size={18} />{eventTimeRange(observance.startMs, observance.endMs, zone)} · {zone.replaceAll("_", " ")}</p>}
           <p>{observance.system?.detail}</p>
           {observance.ownerRef && <Link className="work-button" href={observance.ownerRef.route}>Open {observance.ownerRef.label}’s profile</Link>}
-          <Button icon="sliders" onClick={() => { setObservance(undefined); setCalendarTab(observance.system?.kind === "birthday" ? "calendars" : "holidays"); setConnections(true); }}>Manage {observance.system?.kind === "birthday" ? "birthdays" : "holidays & dates"}</Button>
+          <Button icon="sliders" onClick={() => { setObservance(undefined); setConnections(true); }}>Manage {observance.system?.kind === "birthday" ? "birthdays" : "holidays & dates"}</Button>
         </div>}
       </WorkspaceSheet>
       <WorkspaceSheet
         open={connections}
         onClose={() => setConnections(false)}
-        anchorSelector="[data-calendar-settings-trigger], [aria-label='Calendar tools']"
+        presentation="page"
         title="Settings and calendars"
       >
         <div className={`work-form ${styles.calendarSettingsForm}`}>
           <WorkspaceFeedback error={error} message={notice} />
-          <div className={styles.settingsTabs} role="group" aria-label="Calendar settings sections">
-            <button type="button" aria-pressed={calendarTab === "calendars"} onClick={() => setCalendarTab("calendars")}><UnigentamosIcon role="calendar" size={16} />Calendars</button>
-            <button type="button" aria-pressed={calendarTab === "holidays"} onClick={() => setCalendarTab("holidays")}><UnigentamosIcon role="star" size={16} />Holidays</button>
-          </div>
-          {calendarTab === "holidays" ? <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} /> : <>
-          <section className={styles.calendarVisibility} aria-label="Visible calendars">
-            {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <label className={styles.calendarToggle} key={c.id}>
-              <span className={styles.visibilityIcon} style={{ color: calendarDisplayColor(c.color), background: "color-mix(in srgb, " + calendarDisplayColor(c.color) + " 10%, white)" }}><UnigentamosIcon role="calendar" size={18} /></span><span className={styles.visibilityName}>{c.name}</span>
-              <input type="checkbox" aria-label={c.name} checked={c.visible} disabled={actionBusy} onChange={e => void saveCalendarPreference(c.id, { visible: e.target.checked })} />
-            </label>)}
-            <label className={styles.calendarToggle}>
-              <span className={styles.visibilityIcon} style={{ color: observanceAppearance(observanceSettings, "birthdays").color }}><UnigentamosIcon role="birthday" size={18} /></span><span className={styles.visibilityName}>{observanceAppearance(observanceSettings, "birthdays").name}</span>
-              <input type="checkbox" aria-label={observanceAppearance(observanceSettings, "birthdays").name} checked={observanceSettings.birthdays} disabled={actionBusy} onChange={e => void saveCalendarPreference("native", { observances: { ...observanceSettings, birthdays: e.target.checked } })} />
-            </label>
-          </section>
-          <CalendarDisclosure title="Add a calendar" icon="plus">
-          <form
+          <div className={styles.settingsHeading}><div><h3>Your calendars</h3><p>Choose what appears. Names, colors and groups save automatically.</p></div><Button icon="plus" aria-expanded={addingCalendar} onClick={() => setAddingCalendar(value => !value)}>Add a calendar</Button></div>
+          {addingCalendar && <div className={styles.newCalendarForm}>          <form
             className="work-form"
             onSubmit={(e) => {
               e.preventDefault();
@@ -941,7 +933,7 @@ export default function CalendarWorkspace() {
                   }),
                 "Calendar added",
               ).then((ok) => {
-                if (ok) setCalendarName("");
+                if (ok) { setCalendarName(""); setAddingCalendar(false); }
               });
             }}
           >
@@ -965,28 +957,23 @@ export default function CalendarWorkspace() {
               Add calendar
             </Button>
           </form>
-          </CalendarDisclosure>
-          <CalendarDisclosure title="Calendar names & colors" icon="palette">
-            {snapshot?.state.calendars
-              .filter((calendar) => !calendar.archivedAt)
-              .map((calendar) => (
-                <CalendarSettings
-                  key={calendar.id}
-                  calendar={calendar}
-                  busy={busy}
-                  onSave={(name, color) => saveCalendarPreference(calendar.id, { name, color })}
-                />
-              ))}
-            {[{ key: "birthdays", name: "People’s birthdays" }, ...observanceSettings.countries.map(code => ({ key: "holidays:" + code, name: holidayData?.countries.find(country => country.code === code)?.name || code })), { key: "custom", name: "Custom dates" }].map(entry => <CalendarSettings
-              key={entry.key} calendar={observanceAppearance(observanceSettings, entry.key, entry.name)} busy={busy}
-              icon={entry.key === "birthdays" ? "birthday" : "star"} country={entry.key.startsWith("holidays:") ? entry.key.slice(9) : undefined}
-              onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, [entry.key]: { name, color } } } }; })}
-            />)}
-          </CalendarDisclosure>
-          <CalendarDisclosure title="Event groups & colors" icon="palette">
-            <CalendarGroupSettings calendars={snapshot?.state.calendars.filter(calendar => !calendar.archivedAt) || []} busy={busy} onSave={(calendar, groups) => saveCalendarPreference(calendar.id, { groups })} />
-          </CalendarDisclosure>
-          <CalendarDisclosure title="Import or subscribe" icon="link">
+</div>}
+          <div className={styles.calendarCardGrid}>
+            {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <section className={styles.calendarCard} key={c.id} style={{ "--calendar-card-color": calendarDisplayColor(c.color) } as CSSProperties}>
+              <label className={styles.calendarToggle}><UnigentamosIcon role="calendar" size={18} /><span>Show calendar</span><input type="checkbox" aria-label={c.name} checked={c.visible} disabled={actionBusy} onChange={e => void saveCalendarPreference(c.id, { visible: e.target.checked })} /></label>
+              <CalendarSettings calendar={c} busy={busy} onSave={(name, color) => saveCalendarPreference(c.id, { name, color })} />
+              <CalendarDisclosure title="Event groups" icon="palette"><CalendarGroupSettings calendars={[c]} busy={busy} onSave={(calendar, groups) => saveCalendarPreference(calendar.id, { groups })} /></CalendarDisclosure>
+            </section>)}
+            <section className={styles.calendarCard}>
+              <label className={styles.calendarToggle}><UnigentamosIcon role="birthday" size={18} /><span>People’s birthdays</span><input type="checkbox" aria-label="Show birthdays" checked={observanceSettings.birthdays} disabled={actionBusy} onChange={e => void saveCalendarPreference("native", { observances: { ...observanceSettings, birthdays: e.target.checked } })} /></label>
+              <CalendarSettings calendar={observanceAppearance(observanceSettings, "birthdays")} busy={busy} icon="birthday" onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, birthdays: { name, color } } } }; })} />
+            </section>
+          </div>
+          <section className={styles.importSection} aria-label="Import calendars">
+            <div className={styles.settingsHeading}><div><h3><UnigentamosIcon role="import" size={18} />Bring another calendar</h3><p>Import a file once, or subscribe to a feed and refresh it here.</p></div></div>
+            <div className={styles.importProviders} role="group" aria-label="Calendar provider">{["Google Calendar", "Apple Calendar", "Outlook", "Other"].map(provider => <Button key={provider} icon="calendar" aria-pressed={importProvider === provider} onClick={() => setImportProvider(provider)}>{provider}</Button>)}</div>
+            <p className={styles.importHelp}>{importProvider === "Google Calendar" ? <>Export a calendar and choose its .ics file below, or paste its iCal feed address. <a href="https://support.google.com/calendar/answer/37111?hl=en" target="_blank" rel="noreferrer">Google export guide ↗</a></> : importProvider === "Apple Calendar" ? <>Export an .ics file from Calendar on Mac, or use an existing shared calendar link. Shared links can be read by anyone who has them. <a href="https://support.apple.com/guide/calendar/icl1023/mac" target="_blank" rel="noreferrer">Apple export guide ↗</a></> : <>Choose an .ics calendar export or paste a published iCal subscription link.</>}</p>
+            <div className={styles.importFields}>
             <label>
               Name
               <input
@@ -1009,12 +996,13 @@ export default function CalendarWorkspace() {
               />
             </label>
             <label>
-              HTTPS calendar feed
+              Calendar feed link
               <input
-                type="url"
+                type="text"
+                inputMode="url"
                 value={feedUrl}
                 onChange={(e) => setFeedUrl(e.target.value)}
-                placeholder="https://…"
+                placeholder="https://… or webcal://…"
               />
             </label>
             <Button
@@ -1023,21 +1011,18 @@ export default function CalendarWorkspace() {
             >
               Subscribe to feed
             </Button>
-            <Button
-              disabled={!snapshot?.capabilities.morgen || busy}
+            </div>
+            {snapshot?.capabilities.morgen && <Button
+              disabled={busy}
               onClick={() => void connect("morgen")}
             >
               Connect Morgen
-            </Button>
-            {!snapshot?.capabilities.morgen && (
-              <p className="work-muted">
-                Morgen requires an API key and account entitlement. File imports
-                and feeds are available now.
-              </p>
-            )}
-          </CalendarDisclosure>
-          </>}
-          {calendarTab === "calendars" && Boolean(snapshot?.state.connections.length) && <section className="work-section">
+            </Button>}
+          </section>
+          <CalendarObservanceSettings settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })}
+            renderAppearance={(key, name) => <CalendarSettings key={key} calendar={observanceAppearance(observanceSettings, key, name)} busy={busy} icon="star" country={key.startsWith("holidays:") ? key.slice(9) : undefined} onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, [key]: { name, color } } } }; })} />}
+          />
+          {Boolean(snapshot?.state.connections.length) && <section className="work-section">
             <h2>Connections</h2>
             {snapshot?.state.connections.map((c) => (
               <div className={styles.connection} key={c.id}>

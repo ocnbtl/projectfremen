@@ -2046,9 +2046,9 @@
  .yearView .miniDays button {grid-template-rows:minmax(0,1fr) 7px;}
  .yearView .yearMarks {height:7px;}
 }
-/* Wide displays expose the six views; compact displays keep the established picker. */
+/* Spacious displays expose all six views; phones keep the compact picker. */
 .viewToggle { display: none; }
-@media (min-width: 1600px) {
+@media (min-width: 761px) {
  .toolbarTools > .viewDropdown { display: none; }
  .viewToggle { display: flex; align-items: center; flex: none; order: 0; height: 40px; padding: 3px; gap: 2px; border-radius: 10px; background: var(--module-quiet); }
  .viewToggle button { position: relative; display: flex; align-items: center; justify-content: center; gap: 7px; height: 34px; min-width: 36px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-secondary, #60747c); cursor: pointer; }
@@ -2090,4 +2090,96 @@
  .timedEventContent > .eventPeople > span + span { margin-left: 0; }
  .fittedEvent:not([data-roomy="true"]) .eventPeople { display: none; }
  .fittedEvent:not([data-time-room="true"]) .timedEventRange { display: none; }
+}
+
+
+/* Tablet and desktop toolbar: navigation and search, then view and actions. */
+@media (min-width: 761px) {
+ .shell > .toolbar { display:flex; flex-wrap:nowrap; gap:6px; padding:6px 16px 10px; align-items:center; }
+ .toolbar .toolbarTools { display:contents; }
+ .toolbar .dateNavigation { order:0; flex:none; gap:4px; }
+ .toolbar[data-timeline] .calendarSearch { order:1; flex:1 1 140px; min-width:68px; width:auto; max-width:240px; margin-right:auto; }
+ .toolbar .viewToggle, .toolbarTools > .viewDropdown { order:2; flex:none; }
+ .toolbar .toolbarHours { order:3; flex:none; }
+ .toolbar .optionsButton { order:4; }
+ .toolbar .calendarsButton { order:5; }
+ .toolbar .addEventButton { order:6; margin-left:0; flex:none; }
+ .toolbar .periodButton { width:38px; min-width:38px; padding:0; }
+ .toolbar .periodButton svg { width:22px; height:22px; }
+ .toolbar .headingYear { font-size:18px; }
+ .toolbar .monthTrigger { font-size:18px; }
+ .content[data-view="month"] { padding-bottom:max(8px,env(safe-area-inset-bottom)); overflow:hidden; }
+}
+@media (min-width: 761px) and (max-width: 1599px) {
+ .toolbar .viewToggle { height:38px; gap:1px; padding:2px; width:max-content; }
+ .viewToggle button { min-width:28px; width:auto; flex:none; padding:0 6px; gap:4px; }
+ .viewToggle button svg { width:16px; height:16px; }
+ .viewToggleLabel { font-size:11px; }
+ .toolbar .toolbarUtility { min-width:36px; width:36px; padding:0; }
+ .toolbar .toolbarUtility > span { display:none; }
+ .toolbar h1 { display:none; }
+ .toolbar .hourVerb,.toolbar .hourRelation { display:none; }
+ .toolbar .toolbarHours button { padding-inline:5px; }
+ .toolbar .addEventButton { padding-inline:8px; font-size:12px; }
+}
+.dayDetailList { display:grid; gap:8px; }
+.dayDetailList .dayDetailEvent { display:grid; grid-template-columns:118px 20px minmax(0,1fr) auto auto; align-items:center; gap:12px; min-height:58px; padding:10px 12px; margin:0; width:100%; }
+.dayDetailEvent .detailTime { grid-column:1; white-space:nowrap; font:500 12px/1.3 var(--font-body); color:var(--text-secondary); }
+.dayDetailEvent .eventIcon { grid-column:2; margin:0; }
+.dayDetailEvent .eventCopy { grid-column:3; min-width:0; }
+.dayDetailEvent .eventCopy strong { font:500 13px/1.4 var(--font-body); white-space:normal; }
+.detailLocation { display:flex; align-items:center; gap:5px; min-width:0; font:400 13px/1.4 var(--font-body); overflow-wrap:anywhere; }
+.detailLocation svg { flex:none; }
+.dayDetailList .dayDetailEvent .eventPeople { --avatar-size:32px; max-width:none; margin:0; }
+@media (max-width:600px) {
+ .dayDetailList .dayDetailEvent { grid-template-columns:90px 16px minmax(0,1fr) auto; gap:6px; padding:8px; }
+ .dayDetailEvent .detailTime { font-size:10px; }
+ .dayDetailEvent .detailLocation { grid-column:3 / 5; grid-row:2; }
+ .dayDetailEvent .eventPeople { grid-column:4; grid-row:1; }
+}
+.calendarSettingsForm { display:grid; gap:22px; max-width:none; }
+.settingsHeading { display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.settingsHeading h3 { display:flex; align-items:center; gap:8px; font:600 16px/1.4 var(--font-heading); margin:0; }
+.settingsHeading p,.importHelp { font:400 12px/1.5 var(--font-body); color:var(--text-secondary); margin:4px 0 0; }
+.calendarCardGrid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; align-items:start; }
+.calendarCard { min-width:0; padding:14px; border:1px solid color-mix(in srgb,var(--calendar-card-color,var(--module-icon,#59518b)) 22%,white); border-radius:14px; background:white; display:grid; gap:8px; }
+.calendarCard .calendarToggle { display:flex; flex-direction:row; gap:8px; min-height:30px; padding:0; border:0; background:none; font-size:12px; }
+.calendarCard .calendarToggle > input { margin-left:auto; }
+.calendarCard .calendarNameRow { margin:0; grid-template-columns:20px minmax(0,1fr) 36px; gap:8px; }
+.calendarCard .calendarNameRow input { font-size:13px; min-height:36px; }
+.calendarCard .calendarNameRow .autosaveStatus { grid-column:2 / -1; min-height:0; }
+.calendarCard .calendarNameRow .autosaveStatus:empty { display:none; }
+.calendarCard .disclosureTrigger { padding:8px; min-height:34px; font-size:12px; }
+.calendarCard .disclosureInner { padding:8px 0 0; }
+.calendarCard .groupSettingsRow { grid-template-columns:minmax(0,1fr) 108px 32px; gap:6px; }
+.calendarCard .groupSettingsRow input { font-size:12px; }
+.importSection { padding:18px; border-radius:14px; border:1px solid var(--module-border,#dedbe9); background:white; display:grid; gap:12px; }
+.importProviders { display:flex; flex-wrap:wrap; gap:6px; }
+.importProviders button { font-size:12px; }
+.importProviders button[aria-pressed="true"] { background:var(--module-quiet,#f3f2f9); border-color:var(--module-icon,#59518b); color:var(--module-icon,#59518b); }
+.importFields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:end; gap:12px; }
+.importFields label { min-width:0; font-size:12px; }
+.importFields input { width:100%; min-width:0; font-size:13px; }
+.newCalendarForm { padding:14px; border-radius:12px; background:var(--module-quiet,#f3f2f9); }
+.newCalendarForm form { grid-template-columns:minmax(0,1fr) 70px auto; align-items:end; gap:12px; }
+.calendarSettingsForm .observanceSettings { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-items:start; gap:18px; }
+.calendarSettingsForm .observanceSettings > section { min-width:0; padding:16px; border-radius:14px; background:white; border:1px solid var(--module-border,#dedbe9); }
+.calendarSettingsForm .observanceSettings h3 { font-size:15px; }
+.observanceColors { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+@media (max-width:700px) { .calendarCardGrid,.calendarSettingsForm .observanceSettings,.observanceColors { grid-template-columns:1fr; } .settingsHeading { align-items:flex-start; } .settingsHeading h3 { font-size:15px; } .settingsHeading > button { padding-inline:8px; font-size:11px; } .importFields { grid-template-columns:1fr; } .newCalendarForm form { grid-template-columns:minmax(0,1fr) 48px; } }
+
+
+.dayDetailList .dayDetailEvent .eventPeople { grid-column:5; }
+.searchStatus { margin:0; padding:0 18px 6px; font:500 12px/1.4 var(--font-body); color:var(--text-secondary); }
+.importFields input[type="file"]::file-selector-button { border:0; border-radius:6px; padding:6px 10px; margin-right:10px; background:var(--module-quiet,#f3f2f9); color:var(--module-icon,#59518b); font:500 12px var(--font-body); cursor:pointer; }
+@media (max-width:600px) { .dayDetailList .dayDetailEvent .eventPeople { grid-column:4; } }
+@media (min-width:761px) and (max-width:999px) {
+ .shell > .toolbar { display:grid; grid-template-columns:minmax(0,1fr) auto auto auto auto; }
+ .toolbar .dateNavigation { grid-row:1; grid-column:1 / 4; }
+ .toolbar[data-timeline] .calendarSearch { grid-row:1; grid-column:4 / 6; max-width:none; width:100%; }
+ .toolbar .viewToggle { grid-row:2; grid-column:1; justify-self:end; }
+ .toolbar .toolbarHours { grid-row:2; grid-column:2; }
+ .toolbar .optionsButton { grid-row:2; grid-column:3; }
+ .toolbar .calendarsButton { grid-row:2; grid-column:4; }
+ .toolbar .addEventButton { grid-row:2; grid-column:5; }
 }
