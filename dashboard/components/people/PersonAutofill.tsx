@@ -91,9 +91,9 @@ export default function PersonAutofill({ name, values, onApply, organizations = 
       {linkedinUrl && <div className="people-profile-text-import">
         <button type="button" className="people-profile-text-toggle" aria-expanded={pasteOpen} aria-controls={pasteId} onClick={() => setPasteOpen((current) => !current)}>Paste profile text</button>
         {pasteOpen && <div id={pasteId} className="people-profile-text-panel">
-          <p><a href={linkedinUrl} target="_blank" rel="noopener noreferrer">Open LinkedIn profile</a>, then copy the name, About, Experience, and Education sections. Keep their headings and dates.</p>
+          <p><a href={linkedinUrl} target="_blank" rel="noopener noreferrer">Open LinkedIn profile</a> and copy Experience, Education, or About. Keep the headings and dates; the person's name isn't needed.</p>
           <label htmlFor={`${pasteId}-text`}>Profile text for {name || "this person"}</label>
-          <textarea id={`${pasteId}-text`} value={profileText} onChange={(event) => { setProfileText(event.target.value); setPasteError(""); }} maxLength={MAX_PROFILE_TEXT_LENGTH + 1} rows={7} placeholder={`${name || "Full name"}\nAbout\n…\nExperience\n…\nEducation\n…`} spellCheck={false} />
+          <textarea id={`${pasteId}-text`} value={profileText} onChange={(event) => { setProfileText(event.target.value); setPasteError(""); }} maxLength={MAX_PROFILE_TEXT_LENGTH + 1} rows={7} placeholder={`Experience\nRole\nEmployer\n2022 – Present\n\nEducation\nSchool\nDegree\n2018 – 2022`} spellCheck={false} />
           <p className="people-profile-text-hint">Profile text is read in this browser. Employers and schools are checked for public details. Review, then Save to create or link organizations.</p>
           {pasteError && <p role="alert">{pasteError}</p>}
           <button type="button" className="people-profile-text-apply" disabled={disabled || busy || !name.trim() || !profileText.trim()} onClick={fillFromText}>Fill from pasted text</button>

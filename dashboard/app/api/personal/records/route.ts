@@ -4,6 +4,7 @@ import { appendAuditEvent, getRequestIp } from "../../../../lib/audit-log";
 import { isCsrfRequestValid } from "../../../../lib/csrf";
 import {
   createPersonalRecord,
+  permanentlyDeletePeopleRecord,
   getRecordsForDomain,
   readPersonalRecords,
   updatePersonalRecord
@@ -171,5 +172,22 @@ export async function PATCH(request: Request) {
       { ok: false, error: message },
       message.startsWith("This record changed after it was opened") ? 409 : 400
     );
+  }
+}
+
+export async function DELETE(request: Request) {
+  if (!(await hasAdminSession())) return json({ ok: false, error: "Unauthorized" }, 401);
+  if (!isCsrfRequestValid(request)) return json({ ok: false, error: "Invalid CSRF token" }, 403);
+  try {
+    const raw = await request.text();
+    if (raw.length > 2048) throw new Error("Delete request is too large.");
+    const body = JSON.parse(raw);
+    if (typeof body.id !== "string" || body.confirm !== body.id || typeof body.expectedUpdatedAt !== "string") throw new Error("Confirm the profile to permanently delete.");
+    const items = await permanentlyDeletePeopleRecord(body.id, body.expectedUpdatedAt);
+    await appendAuditEvent({ at: new Date().toISOString(), action: "people.permanent_delete.success", path: new URL(request.url).pathname, method: "DELETE", ip: getRequestIp(request), status: "ok", detail: body.id });
+    return json({ ok: true, items });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unable to delete this profile.";
+    return json({ ok: false, error: message }, message.startsWith("This record changed") ? 409 : 400);
   }
 }

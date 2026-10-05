@@ -1,11 +1,13 @@
 "use client";
+import { peopleWithRelationships, isSchoolOrganization } from "../lib/modules/people/relationships";
+
 import RelatedRecords from "./planning/RelatedRecords";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { motion, useReducedMotion } from "motion/react";
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
-import { mirrorPersonalRecord } from "../lib/local-first/domain-mirror";
+import { mirrorPersonalRecord, removePersonalRecordMirror } from "../lib/local-first/domain-mirror";
 import {
   buildFollowUpCreationRoute,
   type FollowUpSourceRef
@@ -490,7 +492,7 @@ type ProfileField = {
   placeholder?: string;
 };
 
-type OrganizationOption = Pick<PersonalRecord, "id" | "title">;
+type OrganizationOption = Pick<PersonalRecord, "id" | "title" | "profile">;
 
 const STATUS_LABELS: Record<PersonalRecordStatus, string> = {
   idea: "Loose tie",
@@ -1660,7 +1662,7 @@ function EducationEntriesEditor({
         <article className="people-repeatable-entry" data-education-entry={entry.id} key={entry.id}>
           <div className="people-repeatable-fields people-repeatable-fields-education">
             <label>
-              <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>University</span>
+              <span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>School</span>
               <SelectField searchable onCreate={() => onCreateOrganization(entry.id)}
                 aria-label={`Education ${index + 1} organization`}
                 value={entry.organizationId || ""}
@@ -1669,11 +1671,11 @@ function EducationEntriesEditor({
                   onChange(entry.id, { organizationId: organization?.id, institution: organization?.title || entry.institution });
                 }}
               >
-                <option value="">{entry.institution || "Select university"}</option>
+                <option value="">{entry.institution || "Select school"}</option>
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.institution || "Unavailable organization"} · unavailable</option>
                 )}
-                {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.title}</option>)}
+                {organizations.map((organization) => <option value={organization.id} key={organization.id}><span className="people-organization-choice"><PeopleProfileAvatar label={organization.title} initials={organization.title.slice(0, 1)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt} compact /><span>{organization.title}</span></span></option>)}
               </SelectField>
             </label>
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Degree</span><input aria-label={`Education ${index + 1} degree`} value={entry.degree || ""} onChange={(event) => onChange(entry.id, { degree: event.target.value })} placeholder="Bachelor’s, Master’s, PhD..." /></label>
@@ -1726,7 +1728,7 @@ function OccupationEntriesEditor({
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.employer || "Unavailable organization"} · unavailable</option>
                 )}
-                {organizations.map((organization) => <option value={organization.id} key={organization.id}>{organization.title}</option>)}
+                {organizations.map((organization) => <option value={organization.id} key={organization.id}><span className="people-organization-choice"><PeopleProfileAvatar label={organization.title} initials={organization.title.slice(0, 1)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt} compact /><span>{organization.title}</span></span></option>)}
               </SelectField>
             </label>
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>When</span><SelectField aria-label={`Occupation ${index + 1} timing`} value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></SelectField></label>
@@ -1761,11 +1763,10 @@ function LocationEntriesEditor({
         <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>Places</h4></div>
         <PeopleAddButton label="Place" onClick={onAdd} />
       </header>
-      {!organization && onComesFromChange && !entries.length && <label className="people-comes-from-field is-standalone" title="Comes from"><UnigentamosIcon role="hometown" size={18} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="Origin" /></label>}
+      {!organization && onComesFromChange && <label className="people-comes-from-field is-standalone" title="Comes from"><UnigentamosIcon role="location" candidate="map-pin" size={18} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="Origin" /></label>}
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
           <div className={`people-repeatable-fields people-repeatable-fields-location people-place-row${organization ? " is-organization" : ""}`}>
-            {!organization && (index === 0 && onComesFromChange ? <label className="people-comes-from-field" title="Comes from"><UnigentamosIcon role="hometown" size={18} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="Origin" /></label> : <span className="people-place-origin-spacer" aria-hidden="true" />)}
             <PlaceLabelPicker value={entry.label || ""} index={index} onChange={label => onChange(entry.id, { label })} />
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City</span><input aria-label={`Place ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing…" /></label>
             <label className="people-location-address-field"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><input aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street address" /></label>
@@ -2357,6 +2358,7 @@ export default function PeopleWorkspace({
   }
 
   const activePeople = useMemo(() => people.filter((record) => !record.archivedAt), [people]);
+  const relationshipIds = useMemo(() => peopleWithRelationships(activePeople, objectLinks.filter(isUsableObjectLink)), [activePeople, objectLinks]);
   const allInteractionItems = useMemo(() => sortTimelineItems([
     ...interactionRecords.map(canonicalInteractionItem).filter((item): item is PeopleTimelineItem => Boolean(item)),
     ...activePeople.flatMap(legacyTimelineItems)
@@ -2379,7 +2381,7 @@ export default function PeopleWorkspace({
   const organizationOptions = useMemo<OrganizationOption[]>(
     () => activePeople
       .filter((record) => record.className === "org")
-      .map((record) => ({ id: record.id, title: record.title }))
+      .map((record) => ({ id: record.id, title: record.title, profile: record.profile }))
       .sort((left, right) => left.title.localeCompare(right.title)),
     [activePeople]
   );
@@ -2402,7 +2404,7 @@ export default function PeopleWorkspace({
       return [];
     }
     const matches = activePeople.filter((record) => {
-      if (!matchesSidebarView(record, activeSidebarView, latestInteractionDateByParticipant.get(record.id))) return false;
+      if (activeSidebarView === "relationship-map" ? !relationshipIds.has(record.id) : !matchesSidebarView(record, activeSidebarView, latestInteractionDateByParticipant.get(record.id))) return false;
       if (!matchesFilter(record, activeFilter)) return false;
       if (!matchesRelationshipFilter(record, relationshipFilter)) return false;
       if (!matchesLocationFilter(record, locationFilter)) return false;
@@ -2411,7 +2413,7 @@ export default function PeopleWorkspace({
       return getSearchText(record).includes(normalizedQuery);
     });
     return sortPeople(matches, sortMode, latestInteractionDateByParticipant);
-  }, [activeFilter, activePeople, activeSidebarView, lastContactFilter, latestInteractionDateByParticipant, locationFilter, query, relationshipFilter, sortMode]);
+  }, [relationshipIds, activeFilter, activePeople, activeSidebarView, lastContactFilter, latestInteractionDateByParticipant, locationFilter, query, relationshipFilter, sortMode]);
 
   const filterLocationOptions = useMemo(() => Array.from(new Set(activePeople.flatMap((record) => {
     const profile = getProfile(record);
@@ -2491,7 +2493,7 @@ export default function PeopleWorkspace({
       recent: countFor("recent"),
       upcoming: countFor("upcoming"),
       attention: countFor("attention"),
-      relationshipMap: countFor("relationship-map"),
+      relationshipMap: relationshipIds.size,
       noContact90: countFor("no-contact-90"),
       birthdaysMonth: countFor("birthdays-month"),
       newPeople: countFor("new-people"),
@@ -2503,7 +2505,7 @@ export default function PeopleWorkspace({
       neighbors: countFor("neighbors"),
       healthWellness: countFor("health-wellness")
     };
-  }, [activePeople, latestInteractionDateByParticipant]);
+  }, [activePeople, latestInteractionDateByParticipant, relationshipIds]);
 
   const selectedProfile = getProfile(selectedPerson);
   const selectedNotes = selectedProfile.notes.split(/\r?\n/).map((note) => note.trim()).filter(Boolean);
@@ -2861,7 +2863,7 @@ export default function PeopleWorkspace({
       return;
     }
     if (item.surface === "utility") {
-      setUtilityNotice(`${item.label} is ready as a People workspace surface. Actions that would change stored data stay disabled until the matching backend support exists.`);
+      setUtilityNotice("");
       setDetailMode("profile");
       updatePeopleUrl(
         { sidebar: item.id, filter: "all", person: "" },
@@ -3339,7 +3341,7 @@ export default function PeopleWorkspace({
       if (updatedPerson) await mirrorPersonalRecord(updatedPerson);
       setPeople(nextPeople);
       setSelectedId(id);
-      if (updatedPerson) {
+      if (updatedPerson && (patch.profile || patch.subjects)) {
         setProfileDraft(getProfile(updatedPerson));
         setProfileGroups(updatedPerson.subjects);
       }
@@ -3503,6 +3505,20 @@ export default function PeopleWorkspace({
     router.replace(`${getModuleRoute("people")}?sidebar=recently-deleted`);
   }
 
+  async function permanentlyDeleteProfile(record: PersonalRecord) {
+    if (lifecycleSaving || !window.confirm('Permanently delete ' + record.title + '? This profile cannot be restored. Shared interactions and other linked records will remain.')) return;
+    setLifecycleSaving("delete"); setError("");
+    try {
+      const response = await fetch("/api/personal/records", { method: "DELETE", headers: buildJsonHeadersWithCsrf(), body: JSON.stringify({ id: record.id, confirm: record.id, expectedUpdatedAt: record.updatedAt }) });
+      const payload = await response.json(); if (!response.ok || !payload.ok) throw new Error(payload.error || "Unable to delete this profile.");
+      await removePersonalRecordMirror(record);
+      setPeople(payload.items.filter((r: PersonalRecord) => r.className === "person" || r.className === "org"));
+      if (selectedId === record.id) setSelectedId("");
+      setUtilityNotice(record.title + " was permanently deleted.");
+    } catch (error) { setError(error instanceof Error ? error.message : "Unable to delete this profile."); }
+    finally { setLifecycleSaving(""); }
+  }
+
   async function restoreProfile(record: PersonalRecord) {
     if (lifecycleSaving) return;
     setLifecycleSaving("restore");
@@ -3515,7 +3531,7 @@ export default function PeopleWorkspace({
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedPerson) return;
+    if (!selectedPerson || profileSaving || lifecycleSaving) return;
     setProfileSaving(true);
     const saved = await saveProfileDraft(profileDraft);
     setProfileSaving(false);
@@ -3928,7 +3944,7 @@ export default function PeopleWorkspace({
             />
             <EducationEntriesEditor
               entries={quickEducation}
-              organizations={organizationOptions} onCreateOrganization={(entryId)=>setInlineOrganization({kind:"education",entryId,quick:true})}
+              organizations={organizationOptions.filter(isSchoolOrganization)} onCreateOrganization={(entryId)=>setInlineOrganization({kind:"education",entryId,quick:true})}
               onChange={(id, patch) => setQuickEducation((current) => updateEntry(current, id, patch))}
               onAdd={() => setQuickEducation((current) => [...current, newEducationEntry()])}
               onRemove={(id) => setQuickEducation((current) => removeEntry(current, id))}
@@ -4262,7 +4278,7 @@ export default function PeopleWorkspace({
             <header>
               <div>
                 <h2 id="people-deleted-title">Recently Deleted</h2>
-                <p>Profiles stay recoverable here with their links, history, and star intact.</p>
+                <p>Profiles stay recoverable here with their links and history. Restore them anytime, or permanently delete them when you choose.</p>
               </div>
               <strong>{archivedPeople.length}</strong>
             </header>
@@ -4283,6 +4299,7 @@ export default function PeopleWorkspace({
                       <span>Deleted {record.archivedAt ? formatFullDate(record.archivedAt) : "recently"}</span>
                     </div>
                     {record.starred && <span className="people-deleted-star" aria-label="Starred">★</span>}
+                    <span className="people-deleted-actions">
                     <button
                       type="button"
                       aria-label={`Restore ${record.title}`}
@@ -4291,6 +4308,8 @@ export default function PeopleWorkspace({
                     >
                       {lifecycleSaving === "restore" ? "Restoring..." : "Restore"}
                     </button>
+                    <button type="button" className="people-permanent-delete" disabled={Boolean(lifecycleSaving)} onClick={() => void permanentlyDeleteProfile(record)}><PeopleIcon name="delete" />Permanently Delete</button>
+                    </span>
                   </article>
                 ))}
               </div>
@@ -4315,7 +4334,7 @@ export default function PeopleWorkspace({
                 ))}
               </div>
             )}
-            {activeSidebarView === "duplicates" && <div className="people-duplicate-review"><p>{duplicateMatches.length} possible {duplicateMatches.length===1?"duplicate pair":"duplicate pairs"} across people and organizations. Matching details are suggestions for review; no records are changed.</p>{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):<div className="notes-empty-state"><UnigentamosIcon role="duplicates" size={24}/><h3>No Duplicates Detected</h3><p>Checked names, email addresses, phone numbers, social profiles, and organization websites. Similar names alone may belong to different people.</p></div>}</div>}
+            {activeSidebarView === "duplicates" && <div className="people-duplicate-review">{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):null}<section className="people-duplicate-summary"><h3>{duplicateMatches.length === 0 ? "Zero" : duplicateMatches.length} detected duplicate {duplicateMatches.length === 1 ? "pair" : "pairs"} across People and Organizations</h3><p>We scan these details for duplicates, keeping your information private and secure.</p><ul>{["Names", "Email addresses", "Phone numbers", "Social profiles", "Websites"].map(label => <li key={label}><PeopleIcon name="check" />{label}</li>)}</ul><div className="people-duplicate-key"><span><UnigentamosIcon role="duplicates" size={20} />Green: no duplicates detected</span><span><UnigentamosIcon role="duplicates-warning" size={20} />Red: possible duplicates to review</span></div><small>Matches are suggestions. Profiles change only when you edit them.</small></section></div>}
             {(activeSidebarView === "import-export" || activeSidebarView === "import" || activeSidebarView === "export") && (
               <PeopleTransfer key={activeSidebarView} mode={activeSidebarView === "export" ? "export" : "import"} people={people} onBusy={setTransferBusy} onChanged={records=>setPeople(records.filter(record=>record.className === "person" || record.className === "org"))}/>
             )}
@@ -4522,7 +4541,7 @@ export default function PeopleWorkspace({
               <div className="people-profile-view-actions" aria-label={`${activeView} actions`}>
                 {activeView === "properties" && <>
                   <button type="button" onClick={requestCancelEditor} disabled={profileSaving}><PeopleIcon name="close" /><span>Cancel</span></button>
-                  <button type="submit" form="people-profile-properties-form" disabled={profileSaving}><PeopleIcon name="check" /><span>{profileSaving ? "Saving..." : "Save"}</span></button>
+                  <button type="submit" form="people-profile-properties-form" disabled={profileSaving || Boolean(lifecycleSaving)}><PeopleIcon name="check" /><span>{profileSaving ? "Saving..." : "Save"}</span></button>
                 </>}
                 {activeView === "timeline" && <>
                   <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
@@ -4684,7 +4703,7 @@ export default function PeopleWorkspace({
                             />
                             <EducationEntriesEditor
                               entries={profileDraft.education}
-                              organizations={organizationOptions} onCreateOrganization={(entryId)=>setInlineOrganization({kind:"education",entryId,quick:false})}
+                              organizations={organizationOptions.filter(isSchoolOrganization)} onCreateOrganization={(entryId)=>setInlineOrganization({kind:"education",entryId,quick:false})}
                               onChange={updateProfileEducation}
                               onAdd={() => setProfileDraft((current) => ({ ...current, education: [...current.education, newEducationEntry()] }))}
                               onRemove={(id) => setProfileDraft((current) => ({ ...current, education: removeEntry(current.education, id) }))}
@@ -5072,13 +5091,13 @@ export default function PeopleWorkspace({
             <button
               type="button"
               onClick={() => document.querySelector<HTMLFormElement>(addingPerson ? ".people-capture-form" : ".people-edit-form")?.requestSubmit()}
-              disabled={saving || profileSaving}
+              disabled={saving || profileSaving || Boolean(lifecycleSaving)}
             >
               <PeopleIcon name="check" /><span>{saving || profileSaving ? "Saving…" : "Save"}</span>
             </button>
       </nav>}
 
-      {inlineOrganization && <InlineOrganizationDialog existingIds={people.map(record=>record.id)} onClose={()=>setInlineOrganization(null)} onSaved={(record,records)=>{
+      {inlineOrganization && <InlineOrganizationDialog school={inlineOrganization.kind === "education"} existingIds={people.map(record=>record.id)} onClose={()=>setInlineOrganization(null)} onSaved={(record,records)=>{
         const pending=inlineOrganization;setPeople(records.filter(item=>item.className === "person" || item.className === "org"));
         if(pending.kind === "job") {const patch={organizationId:record.id,employer:record.title};if(pending.quick)setQuickOccupations(current=>updateEntry(current,pending.entryId,patch));else setProfileDraft(current=>({...current,occupations:updateEntry(current.occupations,pending.entryId,patch)}));}
         else {const patch={organizationId:record.id,institution:record.title};if(pending.quick)setQuickEducation(current=>updateEntry(current,pending.entryId,patch));else setProfileDraft(current=>({...current,education:updateEntry(current.education,pending.entryId,patch)}));}

@@ -2,6 +2,7 @@ import { normalizeOrganizationUrl, organizationLinkField } from "../modules/peop
 import { normalizeBirthday } from "../modules/people/birthday";
 import { personNameKey, personProfileLink, type PersonAutofillResult, type PersonSuggestion, type PersonJobSuggestion, type PersonEducationSuggestion } from "../modules/people/person-autofill";
 import { fetchPublicPage } from "./public-page";
+import { extractPastedPersonProfile } from "../modules/people/profile-text";
 
 const list = (value: unknown): unknown[] => value == null ? [] : Array.isArray(value) ? value : [value];
 const object = (value: unknown): Record<string, unknown> => value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -55,7 +56,7 @@ export function extractPersonPage(html: string, sourceUrl: string, name: string)
   const people = nodes.filter((node) => list(node["@type"]).some((type) => /(?:^|[/#])Person$/.test(String(type))));
   const matches = people.filter((node) => [named(node), [text(node.givenName), text(node.additionalName), text(node.familyName)].filter(Boolean).join(" "), ...list(node.alternateName).map(named)].filter(Boolean).some((label) => matchesName(label, name)));
   const h1 = text(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i)?.[1]);
-  const headlineMatches = [h1, title.split(/\s[|–—-]\s/)[0]].some((label) => matchesName(label, name));
+  const headlineMatches = [h1, title.split(/\s[|–—-]\s/)[0].replace(/\s*\(@[^)]+\).*$/, "")].some((label) => matchesName(label, name));
   // An unrelated Person node is not authority for the person whose name is in a page title.
   if (!matches.length && (!headlineMatches || people.length)) return result;
   const identities = new Set(matches.map((node) => linkUrl(node.url || node["@id"], source)).filter(Boolean));
@@ -105,6 +106,15 @@ export function extractPersonPage(html: string, sourceUrl: string, name: string)
     }
   }
   const visible = html.replace(/<(script|style|nav|footer)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+  // Public profile sections often contain more roles than their JSON-LD summary.
+  if (headlineMatches && /\b(?:Experience|Education)\b/i.test(visible)) {
+    const lines = visible.replace(/<br\s*\/?\s*>|<\/(?:h[1-6]|p|div|li|section|article|time)>/gi, "\n").split("\n").map(line => text(line, 1500)).filter(Boolean).join("\n");
+    try {
+      const sections = extractPastedPersonProfile(name, source, `${name}\n${lines}`.slice(0, 60000));
+      result.occupations.push(...sections.occupations.map(item => ({ ...item, ...evidence("Role and dates in the public Experience section") })));
+      result.education.push(...sections.education.map(item => ({ ...item, ...evidence("School and qualification in the public Education section") })));
+    } catch { /* Other independently matched public evidence remains available. */ }
+  }
   // A machine-readable birthday may omit the year; never derive it from an age.
   if (headlineMatches) for (const tag of visible.matchAll(/<(?:time|meta)\b[^>]*>/gi)) {
     if (attr(tag[0], "itemprop") === "birthDate") add("birthday", normalizeBirthday(attr(tag[0], "datetime") || attr(tag[0], "content")), "Published birthday on the named public profile");
@@ -157,7 +167,7 @@ export async function discoverPerson(name: string, urls: string[], dependencies:
   const unavailableSource = (url: string, unmatched = false) => {
     const linkedin = personProfileLink(url)?.field === "linkedin";
     unavailableSources.push({ url, message: linkedin
-      ? "LinkedIn did not provide a readable profile to Autofill. Your signed-in browser may show more. Open the profile, copy its name, About, Experience, and Education, then use Paste profile text below."
+      ? "LinkedIn did not provide a readable profile to Autofill. Your signed-in browser may show more. Try another public biography, or use Paste profile text with just Experience or Education; the name is optional."
       : unmatched ? "This page could not be matched to the person's name." : "This page could not be read. Try another public profile link." });
   };
   let unavailable = 0, firstError: unknown;

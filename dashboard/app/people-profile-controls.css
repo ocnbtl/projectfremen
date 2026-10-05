@@ -180,3 +180,68 @@
   .people-redesign-shell .people-group-picker .people-group-choice > .people-group-fill,
   .people-redesign-shell .people-group-picker .people-group-choice > .people-group-crest { transition: none; animation: none !important; }
 }
+.people-redesign-shell :is(.people-profile-view-bar, .people-profile-tabs, .people-active-tab-panel, .people-edit-layout, .people-profile-form, .people-profile-panel) { background: transparent; }
+.people-redesign-shell .people-profile-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 22px 20px; }
+.people-redesign-shell .people-profile-form > * { grid-column: 1 / -1; }
+.people-redesign-shell .people-profile-form > [data-profile-section="locations"] { grid-column: 1; }
+.people-redesign-shell .people-profile-form > [data-profile-section="cadence"] { grid-column: 2; }
+.people-redesign-shell .people-profile-form > .people-themed-section { background: transparent; border: 0; box-shadow: none; padding: 0; }
+.people-organization-choice { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.people-organization-choice > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.people-organization-choice .people-avatar { flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; }
+.people-redesign-shell .people-duplicate-summary { max-width: 820px; margin: 24px auto; padding: 24px; }
+.people-redesign-shell .people-duplicate-summary h3 { font-size: clamp(19px, 2vw, 26px); line-height: 1.4; font-weight: 600; margin: 0 0 14px; }
+.people-duplicate-summary > p { font-size: 14px; line-height: 1.65; }
+.people-duplicate-summary ul { display: flex; flex-wrap: wrap; gap: 12px; padding: 0; margin: 28px 0; list-style: none; }
+.people-duplicate-summary li { display: flex; align-items: center; gap: 9px; border: 1px solid var(--border-soft); border-radius: 12px; padding: 12px 16px; font-size: 13px; background: var(--surface-panel); }
+.people-duplicate-summary li svg { width: 17px; color: #47755b; }
+.people-duplicate-key { display: flex; flex-wrap: wrap; gap: 16px 28px; margin-bottom: 18px; }
+.people-duplicate-key span { display: flex; align-items: center; gap: 8px; font-size: 12px; }
+.people-duplicate-key span:first-child { color: #397357; }
+.people-duplicate-key span:last-child { color: #aa4d43; }
+.people-permanent-delete { color: #98443b !important; }
+@media (max-width: 900px) {
+  .people-redesign-shell .people-profile-form { grid-template-columns: minmax(0, 1fr); }
+  .people-redesign-shell .people-profile-form > :is([data-profile-section="locations"], [data-profile-section="cadence"]) { grid-column: 1; }
+  .people-redesign-shell .people-duplicate-summary { padding: 12px 0; }
+}
+
+/* Places share one softly bounded surface; origin stays compact beside cadence. */
+.people-redesign-shell .people-repeatable-fields.people-place-row,
+.people-redesign-shell .people-repeatable-fields.people-place-row.is-organization { grid-template-columns: 36px minmax(0, 1fr) minmax(0, 1.35fr) 32px !important; gap: 7px; align-items: center; }
+.people-redesign-shell [data-people-location-editor] > .people-repeatable-entry { padding: 9px; border: 1px solid var(--border-soft); border-radius: 13px; background: var(--surface-panel); margin-top: 10px; }
+.people-redesign-shell .people-place-row .people-field-label { display: none; }
+.people-redesign-shell .people-place-row input { border-color: transparent; background: transparent; padding-inline: 5px; }
+.people-redesign-shell .people-comes-from-field.is-standalone { max-width: 260px; padding: 0 10px; border: 1px solid var(--border-soft); border-radius: 11px; background: var(--surface-panel); }
+.people-redesign-shell .people-comes-from-field.is-standalone input { border: 0; box-shadow: none; background: transparent; }
+.people-redesign-shell :is(.people-profile-view-bar, .people-profile-tabs, .people-active-tab-panel, .people-edit-layout, .people-profile-form, .people-profile-panel) { background: transparent; }
+@media (max-width: 600px) {
+  .people-redesign-shell .people-repeatable-fields.people-place-row,
+  .people-redesign-shell .people-repeatable-fields.people-place-row.is-organization { grid-template-columns: 32px minmax(0, 1fr) 32px !important; }
+  .people-redesign-shell .people-place-row .people-location-address-field { grid-column: 2 !important; grid-row: 2 !important; }
+  .people-redesign-shell .people-place-row .people-location-remove { grid-column: 3 !important; grid-row: 1 / 3 !important; align-self: center; }
+}
+.people-redesign-shell .people-profile-form .people-themed-section { background: transparent !important; border: 0 !important; border-radius: 0; box-shadow: none; }
+.people-redesign-shell .people-profile-form :is(.people-profile-section-heading, .people-repeatable-heading) { background: transparent !important; border: 0 !important; padding-inline: 0; }
+.people-redesign-shell .people-profile-form > .people-profile-section > :is(.people-profile-field-grid, .people-contact-channel-grid, .people-notes-editor, .people-birthday-field),
+.people-redesign-shell .people-profile-form .people-repeatable-section > :is(.people-repeatable-entry, .people-repeatable-empty, .people-comes-from-field) { margin-inline: 0; }
+.people-organization-choice .people-row-avatar { display: grid; place-items: center; flex: 0 0 28px; width: 28px; height: 28px; border-radius: 50%; overflow: hidden; }
+.people-organization-choice .people-row-avatar img { border-radius: 50%; }
+.people-redesign-shell .people-profile-form .people-contact-channel-section { background: transparent !important; border: 0 !important; }
+.people-redesign-shell [data-people-location-editor] { container-type: inline-size; }
+@container (max-width: 380px) {
+  .people-redesign-shell .people-repeatable-fields.people-place-row,
+  .people-redesign-shell .people-repeatable-fields.people-place-row.is-organization { grid-template-columns: 32px minmax(0, 1fr) 32px !important; }
+  .people-redesign-shell .people-place-row .people-location-address-field { grid-column: 2 !important; grid-row: 2 !important; }
+  .people-redesign-shell .people-place-row .people-location-remove { grid-column: 3 !important; grid-row: 1 / 3 !important; align-self: center; }
+  .people-redesign-shell .people-place-row .people-place-label-trigger { grid-row: 1 / 3 !important; align-self: center; }
+}
+@container (max-width: 340px) {
+  .people-redesign-shell .people-profile-field-grid.people-cadence-fields.is-profile { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+  .people-redesign-shell .people-cadence-fields.is-profile > label:last-child { grid-column: 1 / -1; }
+}
+.people-redesign-shell .people-deleted-list article { grid-template-columns: 40px minmax(0, 1fr) auto; }
+.people-redesign-shell .people-deleted-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; grid-column: 2 / -1; }
+.people-deleted-actions > button { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 8px 12px; border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface-panel); font: 500 12px/1.4 var(--font-body); cursor: pointer; }
+.people-deleted-actions > button svg { width: 16px; height: 16px; }
+.people-deleted-actions > button:disabled { opacity: .5; cursor: wait; }

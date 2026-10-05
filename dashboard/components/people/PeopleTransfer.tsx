@@ -487,7 +487,7 @@ export default function PeopleTransfer({
       disabled={busy || !ready}
       aria-label={mode === "import" ? "Contact import" : "Contact export"}
     >
-      <header className="people-transfer-intro">
+      <header className={`people-transfer-intro ${mode === "import" ? "is-import" : ""}`}>
         <span>
           <UnigentamosIcon
             role={mode === "import" ? "import" : "export"}
@@ -502,11 +502,12 @@ export default function PeopleTransfer({
           </h3>
           <p>
             {mode === "import"
-              ? "Choose a contact file, keep the people you want, and bring their employers along."
+              ? ""
               : "Select people and organizations, choose what to include, then download or share."}
           </p>
         </div>
       </header>
+      {mode === "import" && <ol className="people-import-steps"><li><span>1</span>Choose a contact file</li><li><span>2</span>Keep the people you want</li><li><span>3</span>Autofill organization details</li></ol>}
       {error && (
         <p role="alert" className="people-transfer-error">
           {error}
@@ -1005,13 +1006,10 @@ export default function PeopleTransfer({
             <button
               type="button"
               onClick={() =>
-                setSelected(
-                  (current) =>
-                    new Set([...current, ...visibleExports.map((p) => p.id)]),
-                )
+                setSelected(new Set(people.filter(p => !p.archivedAt).map(p => p.id)))
               }
             >
-              Select shown
+              Select All
             </button>
             <button type="button" onClick={() => setSelected(new Set())}>
               Clear
@@ -1055,16 +1053,15 @@ export default function PeopleTransfer({
             <aside className="people-transfer-inclusions">
               <h4>Include in your export</h4>
               <p>
-                Contact details are included. Add private context only when you
-                want to share it.
+                Contact details are already included.<br />Add private context only when you want to share it.
               </p>
               {(
                 [
-                  ["notes", "Profile notes & saved memories", "Text saved in Notes, plus memory entries and their dates. Interaction logs are separate.", "notes"],
-                  ["dreams", "Life dreams", "Personal aspirations entered in the About section.", "life-dream"],
-                  ["interactions", "Logged interactions", "Conversation titles, summaries, dates, times, approaches, and participant names.", "interaction"],
-                  ["objects", "Relationships & linked objects", "Family and associated people, employers, schools, projects, and other object references. Linked profiles are not exported in full unless selected.", "object"],
-                  ["extras", "Original file fields & research sources", "Unmapped columns, original values preserved during import, and employer research source URLs.", "contact-file"],
+                  ["notes", "Profile notes & saved memories", "Notes and dated memories.", "notes"],
+                  ["dreams", "Life dreams", "Their hopes and goals.", "life-dream"],
+                  ["interactions", "Logged interactions", "Conversations, dates, and participants.", "interaction"],
+                  ["objects", "Relationships & linked objects", "Connections to people, work, schools, and objects. Full profiles must be selected separately.", "object"],
+                  ["extras", "Original file fields & research sources", "Extra imported details and source links.", "contact-file"],
                 ] as const
               ).map(([key, label, description, icon]) => (
                 <label className="people-transfer-toggle" key={key}>
@@ -1092,7 +1089,7 @@ export default function PeopleTransfer({
                   disabled={format === "csv"}
                   onChange={(e) => setPictures(e.target.checked)}
                 />
-                <UnigentamosIcon role="person" size={20}/><span><strong>Profile pictures</strong><small>{format === "csv" ? "Pictures are available in vCard and JSON files." : "Embed the saved profile photos in the file."}</small></span><i className="people-transfer-switch" aria-hidden="true" />
+                <UnigentamosIcon role="person" size={20}/><span><strong>Profile pictures</strong><small>{format === "csv" ? "Pictures are available in vCard and JSON files." : "Include saved photos."}</small></span><i className="people-transfer-switch" aria-hidden="true" />
               </label>
               <label>
                 Format
@@ -1107,8 +1104,7 @@ export default function PeopleTransfer({
                 </SelectField>
               </label>
               <small>
-                vCard and CSV include extra fields as structured data; receiving
-                apps may only use standard contact fields.
+                Some apps import only basic contact details. Use JSON to keep everything you select.
               </small>
             </aside>
           </div>

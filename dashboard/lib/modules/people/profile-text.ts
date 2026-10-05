@@ -31,20 +31,22 @@ function shortAbout(input: string, name: string): string {
 export function extractPastedPersonProfile(name: string, sourceUrl: string, profileText: string): PersonAutofillResult {
   if (!name.trim()) throw new Error("Enter the person's name first.");
   const source = personProfileLink(sourceUrl);
-  if (source?.field !== "linkedin") throw new Error("Add the person's LinkedIn profile link first.");
-  if (!profileText.trim()) throw new Error("Paste the profile name and the About, Experience, and Education sections.");
+  if (!source) throw new Error("Add the person's LinkedIn or public profile link first.");
+  if (!profileText.trim()) throw new Error("Paste the Experience, Education, or About sections.");
   if (profileText.length > MAX_PROFILE_TEXT_LENGTH) throw new Error("Paste just the profile name, About, Experience, Education, and contact links (up to 60,000 characters).");
   if (/<(?:script|html|body)\b/i.test(profileText)) throw new Error("Paste the visible profile text, not page HTML.");
-  const lines = profileText.replace(/\r/g, "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").split("\n")
-    .map((line) => line.replace(/[\u200b-\u200d\ufeff]/g, "").replace(/\s+/g, " ").trim()).filter(Boolean)
+  const lines = profileText.replace(/\r/g, "").replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, "").replace(/(\d{4})\s*\n\s*([-–—])\s*\n?\s*/g, "$1 $2 ").split("\n")
+    .map((line) => line.replace(/[\u200b-\u200d\ufeff]/g, "").replace(/\s+/g, " ").trim().replace(/^(Experience|Education|About):$/i, "$1")).filter(Boolean)
     .filter((line, index, all) => index === 0 || line !== all[index - 1]);
   const boundary = lines.findIndex((line) => /^(About|Experience|Education|Activity|People also viewed|People you may know|More profiles for you)$/i.test(line));
   const identityLines = lines.slice(0, Math.min(boundary < 0 ? 80 : boundary, 80));
   const identityIndex = identityLines.findIndex((line) => personNameKey(line.replace(/\s*\([^)]*\)\s*$/, "").split(/\s+[·•]\s+/)[0]) === personNameKey(name));
-  if (identityIndex < 0) throw new Error(`The pasted profile header must include ${name}. Copy the name along with the profile sections so another person's details aren't mixed in.`);
+  // Section-only copies belong to the profile the user is actively editing.
+  // Keep the mismatch check when an actual profile header was included.
+  if (identityIndex < 0 && boundary > 0) throw new Error(`The pasted profile header does not match ${name}. Copy only the Experience or Education section, or check the selected person.`);
   const sections = new Map<string, string[]>();
   let section = "header";
-  for (const line of lines.slice(identityIndex)) {
+  for (const line of lines.slice(Math.max(0, identityIndex))) {
     if (sectionNames.test(line)) {
       section = line.toLowerCase();
       // Stop before recommendations for other people, including their biographies.
@@ -73,10 +75,18 @@ export function extractPastedPersonProfile(name: string, sourceUrl: string, prof
     if (!status || !candidates.length) continue;
     let title = "", employer = "";
     const last = candidates.at(-1)!;
-    if (candidates.length >= 2 && (/\s*[·•]\s*/.test(last) || !groupEmployer)) {
+    const compactRole = last.match(/^(.{2,100}?)\s+at\s+(.{2,140})$/i);
+    if (compactRole) { title = compactRole[1]; employer = compactRole[2]; groupEmployer = ""; groupStart = -1; }
+    else if (candidates.length >= 2 && (/\s*[·•]\s*/.test(last) || !groupEmployer)) {
       title = candidates.at(-2)!; employer = value(last); groupEmployer = ""; groupStart = -1;
     } else if (groupEmployer) { title = last; employer = groupEmployer; }
     if (title && employer) result.occupations.push({ title, employer, status, ...evidence("Role, employer, and dates") });
+  }
+  // Some copied profiles use a compact "Role at Employer" line before the dates.
+  for (let index = 1; index < work.length; index++) {
+    const range = work[index].match(dateRange), role = work[index - 1].match(/^(.{2,100}?)\s+at\s+(.{2,140})$/i);
+    const status = range ? timing(range) : undefined;
+    if (role && status) result.occupations.push({ title: role[1], employer: role[2], status, ...evidence("Role, employer, and dates") });
   }
   // A clear headline is useful even when the Experience section wasn't copied.
   if (!result.occupations.length) {

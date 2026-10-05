@@ -2156,6 +2156,19 @@ export async function readPersonalRecords(): Promise<PersonalRecord[]> {
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
+/** Permanently remove only an already archived contact at the reviewed version. */
+export async function permanentlyDeletePeopleRecord(id: string, expectedUpdatedAt: string): Promise<PersonalRecord[]> {
+  if (!expectedUpdatedAt) throw new Error("Refresh this profile before permanently deleting it.");
+  return mutateJsonFile<Array<Partial<PersonalRecord> & Record<string, unknown>>, PersonalRecord[]>(FILE_NAME, [], stored => {
+    const record = stored.find(r => r.id === id);
+    if (!record || !["person", "org"].includes(String(record.className))) throw new Error("Contact profile not found.");
+    if (!record.archivedAt) throw new Error("Move the profile to Recently Deleted first.");
+    if (record.updatedAt !== expectedUpdatedAt) throw new Error("This record changed after it was opened. Refresh before deleting it.");
+    const next = stored.filter(r => r.id !== id);
+    return { value: next, result: next.map(normalizeRecord).filter(r => isAllowedDomain(r.domain)) };
+  });
+}
+
 export function getRecordsForDomain(records: PersonalRecord[], domain: string): PersonalRecord[] {
   return records.filter((record) => record.domain === domain);
 }

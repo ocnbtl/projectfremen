@@ -198,6 +198,43 @@ May 2020 - Aug 2020`);
   await assert.rejects(() => store.createPersonalRecord({ domain: 'notes-docs', title: 'Wrong company', className: 'person', profile: wrongSiteDraft }, { autofill: wrongSiteDraft.autofill }), /different website/);
   assert.equal((await store.readPersonalRecords()).length, afterRace.length);
 
+  const sectionsOnly = `Experience:
+Lead Designer
+Example Studio · Full-time
+2022 – Present
+Designer
+Earlier Studio
+2019
+–
+2022
+Intern at First Studio
+2018 – 2019
+Education:
+Example University
+Bachelor of Arts, Design
+2014 – 2018
+Cedar High School
+High School Diploma
+2010 – 2014`;
+  const sectionsResult = extractPastedPersonProfile('Jane Doe', linkedinUrl, sectionsOnly);
+  assert.deepEqual(sectionsResult.occupations.map(j => j.employer), ['Example Studio', 'Earlier Studio', 'First Studio']);
+  assert.equal(sectionsResult.education.length, 2);
+  const publicSections = extractPersonPage('<h1>Jane Doe</h1>' + sectionsOnly.split('\n').map(line => `<div>${line}</div>`).join(''), url, 'Jane Doe');
+  assert.equal(publicSections.occupations.length, 3, 'Readable public work sections do not require pasted text');
+  assert.equal(publicSections.education.length, 2);
+  assert(extractPersonPage('<title>Jane Doe (@jane) • Instagram photos</title>', 'https://instagram.com/jane', 'Jane Doe').matched);
+
+  const toDelete = (await store.createPersonalRecord({ domain: 'notes-docs', className: 'person', title: 'Deletion fixture' })).find(r => r.title === 'Deletion fixture');
+  await assert.rejects(() => store.permanentlyDeletePeopleRecord(toDelete.id, toDelete.updatedAt), /Recently Deleted|archive/i);
+  const archived = (await store.updatePersonalRecord(toDelete.id, { action: 'archive', archiveReason: 'Test' }, { expectedUpdatedAt: toDelete.updatedAt })).find(r => r.id === toDelete.id);
+  await assert.rejects(() => store.permanentlyDeletePeopleRecord(archived.id, 'stale-version'), /changed/);
+  const beforeDelete = await store.readPersonalRecords();
+  const afterDelete = await store.permanentlyDeletePeopleRecord(archived.id, archived.updatedAt);
+  assert.equal(afterDelete.length, beforeDelete.length - 1);
+  assert(!afterDelete.some(r => r.id === archived.id));
+  assert.deepEqual(afterDelete.find(r => r.id === saved.id), beforeDelete.find(r => r.id === saved.id), 'Other profiles remain unchanged');
+  await assert.rejects(() => store.updatePersonalRecord(archived.id, { title: 'Do not resurrect' }, { expectedUpdatedAt: archived.updatedAt }), /not found/i);
+
   // Route boundary checks use isolated dependency stubs, never production sessions.
   let authorized = false, csrf = false, discoveryCalls = 0;
   const Module = require('node:module'), originalLoad = Module._load;

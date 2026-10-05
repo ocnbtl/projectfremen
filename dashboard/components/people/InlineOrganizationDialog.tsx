@@ -13,12 +13,12 @@ import SelectField from "../ui/SelectField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
 /** An independent draft layered over the person editor; parent state never unmounts. */
-export default function InlineOrganizationDialog({existingIds,onSaved,onClose}:{existingIds:string[];onSaved:(record:PersonalRecord,records:PersonalRecord[])=>void;onClose:()=>void}) {
-  const [values,setValues]=useState<OrganizationAutofillValues>({});
+export default function InlineOrganizationDialog({existingIds,onSaved,onClose,school=false}:{existingIds:string[];onSaved:(record:PersonalRecord,records:PersonalRecord[])=>void;onClose:()=>void;school?:boolean}) {
+  const [values,setValues]=useState<OrganizationAutofillValues>(school ? { organizationType: "University / School" } : {});
   const [photo,setPhoto]=useState(""),[photoOpen,setPhotoOpen]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(""),[discard,setDiscard]=useState(false);
   const locked=useRef(false);
   const change=(field:keyof OrganizationAutofillValues,value:string)=>setValues(current=>({...current,[field]:value}));
-  const close=()=>{if(locked.current)return; if(Object.values(values).some(Boolean)||photo)setDiscard(true);else onClose();};
+  const close=()=>{if(locked.current)return; if(Object.entries(values).some(([key,value])=>Boolean(value) && !(school && key === "organizationType" && value === "University / School"))||photo)setDiscard(true);else onClose();};
   async function save(event:React.FormEvent) {
     event.preventDefault(); if(locked.current || !values.name?.trim())return; locked.current=true;setBusy(true);setError("");
     try {

@@ -31,6 +31,17 @@ export async function mirrorPersonalRecord(record: PersonalRecord): Promise<bool
   return mirrorCanonicalRecord("personal-records", record.className, personalKind(record), record as unknown as Record<string, unknown>);
 }
 
+/** Hide the local history mirror after its canonical profile has been deleted. */
+export async function removePersonalRecordMirror(record: PersonalRecord): Promise<void> {
+  if (!browserVault.isUnlocked()) return;
+  try {
+    const objectId = await deterministicVaultObjectId(`personal-records:${record.className}:${record.id}`);
+    if (await browserVault.readObject(objectId)) await browserVault.saveObject({ objectId, objectKind: personalKind(record), fields: {}, tombstone: true });
+  } catch {
+    window.dispatchEvent(new CustomEvent("unigentamos-vault-mirror-error", { detail: { message: "Profile deleted; its encrypted history mirror could not be updated on this device." } }));
+  }
+}
+
 export async function mirrorCanonicalRecord(
   module: CanonicalModule,
   collection: string,

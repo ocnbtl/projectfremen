@@ -37,3 +37,13 @@ for (const [stored, code, display] of [['+16145550142','+1','614-555-0142'],['+5
   assert.equal(normalizePhoneForStorage(display, code), stored);
 }
 console.log('People duplicate and phone refinements: passed');
+const {peopleWithRelationships,isSchoolOrganization}=require('../lib/modules/people/relationships.ts');
+const linkedRecords=[person('p','Pat',{occupations:[{organizationId:'org'}],education:[{institution:'Local School'}]}),organization('org','Employer'),organization('school','Local School'),person('unlinked','Alone'),person('gone','Deleted',{}, {archivedAt:'2026-01-01'})].map(r=>({...r,relations:{related:[]},projects:[]}));
+assert.deepEqual([...peopleWithRelationships(linkedRecords)].sort(),['org','p','school']);
+assert.deepEqual([...peopleWithRelationships(linkedRecords,[{source:{module:'people',objectId:'unlinked'},target:{module:'calendar',objectId:'event'}}])].sort(),['org','p','school','unlinked']);
+assert(isSchoolOrganization(organization('s','Cedar Middle School')));
+assert(isSchoolOrganization(organization('s','Riverside',{organizationType:'University / School'})));
+assert(!isSchoolOrganization(organization('o','Software Studio',{organizationType:'Company',industry:'Software'})));
+assert(!isSchoolOrganization(organization('o','Health Clinic',{organizationType:'Business',industry:'Primary care'})));
+assert(!isSchoolOrganization(organization('o','Cedar University Alumni',{organizationType:'University / School',industry:'Alumni organization'})));
+console.log('Relationship coverage and school-only choices: passed');

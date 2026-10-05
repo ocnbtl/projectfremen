@@ -544,3 +544,17 @@
     transition: none;
   }
 }
+
+.people-transfer-intro.is-import { justify-content: center; text-align: center; }
+.people-transfer-intro.is-import > div { flex: initial; }
+.people-transfer-intro.is-import p:empty { display: none; }
+.people-import-steps { display: flex; flex-wrap: wrap; justify-content: center; gap: 16px 28px; list-style: none; padding: 0; margin: 20px 0 28px; }
+.people-import-steps li { display: flex; align-items: center; gap: 9px; font-size: 13px; }
+.people-import-steps li > span { display: grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: #e7eee3; color: #496544; font-weight: 600; }
+@media (min-width: 701px) {
+  .people-transfer-export-grid > .people-transfer-list { height: 0; min-height: 100%; max-height: none; }
+}
+.people-transfer-export-grid > .people-transfer-list { scrollbar-width: auto; scrollbar-color: #9eaaa0 #e9eee9; }
+.people-transfer-export-grid > .people-transfer-list::-webkit-scrollbar { width: 12px; }
+.people-transfer-export-grid > .people-transfer-list::-webkit-scrollbar-track { border-radius: 20px; background: #e9eee9; }
+.people-transfer-export-grid > .people-transfer-list::-webkit-scrollbar-thumb { border: 3px solid #e9eee9; border-radius: 20px; background: #9eaaa0; }
