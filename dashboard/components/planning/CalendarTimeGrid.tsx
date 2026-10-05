@@ -159,7 +159,7 @@ export default function CalendarTimeGrid({
             </motion.div>
           );
         })}
-        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} onOpen={onOpen} />
+        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} onOpen={onOpen} />
         <div className={styles.fittedHours} ref={hours}>
           {Array.from({ length: 24 }, (_, i) => (
             <span key={i} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span>{hourName(i)}</span></span>

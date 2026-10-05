@@ -1889,9 +1889,11 @@
 
 /* Shared all-day lanes keep multi-day commitments continuous above the timeline. */
 .fittedGrid { grid-template-rows: auto auto minmax(0, 1fr); }
-.allDayBand { grid-column: 1 / -1; display: grid; grid-auto-rows: minmax(28px, auto); max-height: 150px; overflow: auto; gap: 3px 0; padding-bottom: 4px; min-width: 0; }
+.allDayBand { grid-column: 1 / -1; display: grid; grid-auto-rows: minmax(28px, auto); max-height: 150px; overflow: auto; gap: 3px 0; min-width: 0; isolation: isolate; background: transparent; }
 .allDayBand:empty { padding: 0; height: 0; }
-.allDayBand .allDayItem { width: auto; min-height: 28px; padding: 4px 6px; margin-inline: 3px; border-radius: 8px; }
+.allDayColumn { min-width: 0; border-left: 1px solid var(--calendar-day-line); pointer-events: none; z-index: -1; }
+.allDayColumn[data-today="true"] { background: var(--module-quiet, #f3f2f9); }
+.allDayBand .allDayItem { width: auto; min-height: 28px; padding: 4px 6px; margin-inline: 3px; border-radius: 8px; overflow: hidden; box-shadow: none; }
 .allDayBand .allDayItem[data-continues-before] { border-top-left-radius: 3px; border-bottom-left-radius: 3px; }
 .allDayBand .allDayItem[data-continues-after] { border-top-right-radius: 3px; border-bottom-right-radius: 3px; }
 .allDayBand .allDayItem > svg { flex: none; }
