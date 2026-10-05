@@ -1,6 +1,6 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
-import { calendarDisplayColor, eventColors, eventPreviewTitle } from "./calendar-presentation";
+import { calendarDisplayColor, eventColors, eventPreviewTitle, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
 import CalendarMobileView from "./CalendarMobileView";
 import CalendarMonthView from "./CalendarMonthView";
 import CalendarHourControls from "./CalendarHourControls";
@@ -99,12 +99,6 @@ const labelDate = (
   date: string,
   options: Intl.DateTimeFormatOptions = { month: "long", day: "numeric" },
 ) => new Date(`${date}T12:00:00`).toLocaleDateString(undefined, options);
-const timeLabel = (ms: number, zone: string) =>
-  new Intl.DateTimeFormat(undefined, {
-    hour: "numeric",
-    minute: "2-digit",
-    timeZone: zone,
-  }).format(ms);
 const subscribeCompact = (notify: () => void) => { const query = matchMedia("(max-width: 760px)"); query.addEventListener("change", notify); return () => query.removeEventListener("change", notify); };
 const readCompact = () => matchMedia("(max-width: 760px)").matches;
 export default function CalendarWorkspace() {
@@ -540,7 +534,7 @@ export default function CalendarWorkspace() {
         onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
         title={item.title}
       >
-        {!(view === "month" && item.allDay) && <span className={styles.agendaTime}>{item.allDay ? "All day" : <>{timeLabel(item.startMs, zone)}<small>{timeLabel(item.endMs, zone)}</small></>}</span>}
+        {!(view === "month" && item.allDay) && <span className={styles.agendaTime}>{item.allDay ? "All day" : <>{eventTimeLabel(item.startMs, zone)}<small>to {eventTimeLabel(item.endMs, zone)}</small></>}</span>}
         <span className={styles.eventIcon}><UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={16} /></span>
         <span className={styles.eventCopy}><strong>{eventPreviewTitle(item)}</strong>{item.location && <small>{item.location}</small>}</span>
         <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
@@ -904,7 +898,7 @@ export default function CalendarWorkspace() {
         {observance && <div className={styles.observanceDetail}>
           <EventPeople refs={observance.linkedRefs} available={snapshot?.refs} limit={100} />
           <p><UnigentamosIcon role={observance.system?.kind === "birthday" ? "birthday" : "star"} size={18} />{labelDate(localFor(observance.startMs, zone).slice(0, 10), { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
-          {!observance.allDay && <p><UnigentamosIcon role="clock" size={18} />{timeLabel(observance.startMs, zone)}–{timeLabel(observance.endMs, zone)} · {zone.replaceAll("_", " ")}</p>}
+          {!observance.allDay && <p><UnigentamosIcon role="clock" size={18} />{eventTimeRange(observance.startMs, observance.endMs, zone)} · {zone.replaceAll("_", " ")}</p>}
           <p>{observance.system?.detail}</p>
           {observance.ownerRef && <Link className="work-button" href={observance.ownerRef.route}>Open {observance.ownerRef.label}’s profile</Link>}
           <Button icon="sliders" onClick={() => { setObservance(undefined); setCalendarTab(observance.system?.kind === "birthday" ? "calendars" : "holidays"); setConnections(true); }}>Manage {observance.system?.kind === "birthday" ? "birthdays" : "holidays & dates"}</Button>

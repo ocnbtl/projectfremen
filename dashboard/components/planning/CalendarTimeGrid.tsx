@@ -1,6 +1,6 @@
 "use client";
 import { animate, motion } from "motion/react";
-import { eventColors, eventPreviewTitle } from "./calendar-presentation";
+import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-presentation";
 import { useCalendarMotion } from "./CalendarMotion";
 import {
   useLayoutEffect,
@@ -32,7 +32,6 @@ const minuteOf = (ms: number, zone: string) => {
   return Number(s.slice(11, 13)) * 60 + Number(s.slice(14, 16));
 };
 const hourName = (h: number) => `${h % 12 || 12} ${h < 12 ? "am" : "pm"}`;
-const clock = (minute: number) => `${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 export default function CalendarTimeGrid({
   days,
   zone,
@@ -215,7 +214,8 @@ export default function CalendarTimeGrid({
                   bottom = position(Math.min(endHour * 60, until));
                 const c = calendars.find((c) => c.id === item.calendarId),
                   group = eventGroup(c, item.groupId);
-                const title = `${item.title} · ${clock(from)}–${clock(until)}${group ? ` · ${group.name}` : ""}`;
+                const timing = eventTimeRange(Math.max(item.startMs, low), Math.min(item.endMs, high), zone);
+                const title = `${item.title} · ${timing}${group ? ` · ${group.name}` : ""}`;
                 return (
                   <motion.div
                     key={item.id}
@@ -253,7 +253,7 @@ export default function CalendarTimeGrid({
                       onClick={() => onOpen(item)}
                       aria-label={title}
                     >
-                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{(group || item.system) && <UnigentamosIcon role={item.system ? "star" : group!.icon} size={13} />}<strong>{eventPreviewTitle(item)}</strong></span>{bottom - top >= 44 && <small>{clock(from)}–{clock(until)}</small>}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
+                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{(group || item.system) && <UnigentamosIcon role={item.system ? "star" : group!.icon} size={13} />}<strong>{eventPreviewTitle(item)}</strong></span>{bottom - top >= 44 && <small>{timing}</small>}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
                     </motion.button>
                     {!item.system && <button
                       type="button"

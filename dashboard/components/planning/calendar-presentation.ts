@@ -2,6 +2,20 @@ import type { Calendar, EventOccurrence } from "../../lib/modules/planning/types
 import { eventGroup } from "../../lib/modules/planning/calendar-groups";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 
+/** Keep event previews consistent across browser locales and calendar time zones. */
+export function eventTimeLabel(ms: number, zone: string) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: zone, hour: "numeric", minute: "2-digit", hour12: true,
+  }).formatToParts(ms);
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find(value => value.type === type)?.value;
+  const minute = part("minute");
+  return `${part("hour")}${minute === "00" ? "" : `:${minute}`} ${part("dayPeriod") === "AM" ? "a.m." : "p.m."}`;
+}
+
+export function eventTimeRange(startMs: number, endMs: number, zone: string) {
+  return `${eventTimeLabel(startMs, zone)} to ${eventTimeLabel(endMs, zone)}`;
+}
+
 export function calendarDisplayColor(color?: string) {
   return !color || color.toLowerCase() === "#565b86" ? MODULE_COLOR_SYSTEM.calendar.tokens.icon : color;
 }

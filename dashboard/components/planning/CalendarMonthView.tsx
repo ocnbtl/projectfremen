@@ -5,7 +5,7 @@ import type { Calendar, EventOccurrence } from "../../lib/modules/planning/types
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import { monthWeekLayout } from "../../lib/modules/planning/month-layout";
 import { eventGroup } from "../../lib/modules/planning/calendar-groups";
-import { eventColors, eventPreviewTitle } from "./calendar-presentation";
+import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-presentation";
 import { calendarDateLabel as label } from "./CalendarMiniMonth";
 import { useCalendarMotion } from "./CalendarMotion";
 import EventPeople from "./EventPeople";
@@ -17,7 +17,6 @@ export default function CalendarMonthView({ days, date, today, events, calendars
   zone: string; showWeekends: boolean; onDay: (day: string) => void; onMore: (day: string) => void; onOpen: (event: EventOccurrence) => void;
 }) {
   const { layoutTransition } = useCalendarMotion(), columns = showWeekends ? 7 : 5;
-  const time = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { timeZone: zone, hour: "numeric", minute: "2-digit" });
   return <div className={styles.month} aria-label="Month calendar">
     {Array.from({ length: days.length / columns }, (_, row) => {
       const week = days.slice(row * columns, (row + 1) * columns), { segments, hidden } = monthWeekLayout(week, events, zone);
@@ -31,7 +30,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
           const { event, first, last, lane, continuesBefore, continuesAfter } = segment;
           const calendar = calendars.find(item => item.id === event.calendarId), group = eventGroup(calendar, event.groupId);
           const continuation = `${continuesBefore ? ", continues from earlier dates" : ""}${continuesAfter ? ", continues on later dates" : ""}`;
-          const timing = event.allDay ? "" : `${time(event.startMs)} – ${time(event.endMs)}`;
+          const timing = event.allDay ? "" : eventTimeRange(event.startMs, event.endMs, zone);
           return <motion.button key={`${event.id}:${first}`} layout transition={{ layout: layoutTransition }} type="button" className={styles.event}
             style={{ ...eventColors(event, calendar), gridColumn: `${first + 1} / ${last + 2}`, gridRow: lane + 2 } as CSSProperties}
             data-morph-event={event.id} data-month-event={event.id} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
