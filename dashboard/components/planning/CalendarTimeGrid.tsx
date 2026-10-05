@@ -1,6 +1,6 @@
 "use client";
 import { animate, motion } from "motion/react";
-import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-presentation";
+import { eventColors, eventPreviewTitle, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
 import { useCalendarMotion } from "./CalendarMotion";
 import {
   useLayoutEffect,
@@ -225,6 +225,8 @@ export default function CalendarTimeGrid({
                     data-morph-event={item.id}
                     data-compact={bottom - top < 44}
                     data-tiny={bottom - top < 26}
+                    data-roomy={bottom - top >= 100}
+                    data-time-room={bottom - top >= 64}
                     inert={until <= startHour * 60 || from >= endHour * 60}
                     aria-hidden={until <= startHour * 60 || from >= endHour * 60}
                     title={title}
@@ -236,6 +238,7 @@ export default function CalendarTimeGrid({
                         height: `max(14px, calc(${resizing?.id === item.id ? (resizing.end - item.startMs) / 60000 : until - from} * 100% / var(--calendar-span) - 1px))`,
                         ...eventColors(item, c),
                         "--event-title-lines": Math.max(1, Math.floor((bottom - top - 32) / 16)),
+                        "--event-title-lines-narrow": Math.max(1, Math.floor((bottom - top - (bottom - top >= 100 ? 96 : 48)) / 16)),
                         "--event-avatar-size": `${Math.max(14, Math.min(24, bottom - top - 12))}px`,
                       } as CSSProperties
                     }
@@ -254,7 +257,7 @@ export default function CalendarTimeGrid({
                       onClick={() => onOpen(item)}
                       aria-label={title}
                     >
-                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{(group || item.system) && <UnigentamosIcon role={item.system ? "star" : group!.icon} size={13} />}<strong>{eventPreviewTitle(item)}</strong></span>{bottom - top >= 44 && <small>{timing}</small>}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
+                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{(group || item.system) && <UnigentamosIcon role={item.system ? "star" : group!.icon} size={13} />}<strong>{eventPreviewTitle(item)}</strong></span>{bottom - top >= 44 && <small className={styles.timedEventRange}><span>{eventTimeLabel(Math.max(item.startMs, low), zone)}</span>{" "}<span>to {eventTimeLabel(Math.min(item.endMs, high), zone)}</span></small>}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
                     </motion.button>
                     {!item.system && <button
                       type="button"

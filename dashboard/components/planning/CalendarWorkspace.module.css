@@ -1946,7 +1946,7 @@
  .yearMarks { height: 26px; }
 }
 /* The event body shares all-day typography, with a balanced avatar and time rail. */
-.fittedEvent { border-radius: 8px; }
+.fittedEvent { border-radius: 8px; container-type: inline-size; container-name: timed-event; }
 .fittedEvent > button:not(.fittedResize) { padding: 6px 8px; font: 500 11px/1.4 var(--font-body); justify-content: center; }
 .fittedEvent > button:first-child > .timedEventContent { display: flex; align-items: center; gap: 8px; min-width: 0; width: 100%; margin: 0; font: inherit; }
 .timedEventCopy { display: flex; flex-direction: column; gap: 3px; min-width: 0; flex: 1; }
@@ -1954,6 +1954,7 @@
 .fittedEvent .timedEventTitle > strong { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: var(--event-title-lines, 1); white-space: normal; overflow-wrap: anywhere; }
 .timedEventTitle > svg { flex: none; }
 .timedEventCopy > small { display: block; font: 400 10px/1.3 var(--font-body); color: var(--text-secondary); white-space: nowrap; }
+.timedEventRange > span { white-space: nowrap; }
 .timedEventContent > .eventPeople { --avatar-size: var(--event-avatar-size, 24px); flex: none; align-self: center; margin: 0; }
 .fittedEvent[data-compact="true"] > button:not(.fittedResize) { padding: 3px 6px; }
 .fittedEvent[data-tiny="true"] > button:not(.fittedResize) { padding: 0 4px; }
@@ -2076,4 +2077,17 @@
 @media (min-width: 1600px) {
  .viewToggle { width: max-content; }
  .viewToggle button { width: auto; flex: none; }
+}
+
+/* Narrow event cards give the title the full column; people use a separate row. */
+@container timed-event (max-width: 150px) {
+ .fittedEvent > button:first-child > .timedEventContent { flex-direction: column; align-items: stretch; gap: 6px; }
+ .timedEventCopy { flex: none; width: 100%; }
+ .fittedEvent .timedEventTitle > svg { display: none; }
+ .fittedEvent .timedEventTitle > strong { -webkit-line-clamp: var(--event-title-lines-narrow, 1); }
+ .timedEventCopy > .timedEventRange { white-space: normal; }
+ .timedEventContent > .eventPeople { --avatar-size: 20px; align-self: flex-start; max-width: 100%; flex-wrap: wrap; gap: 2px; overflow: hidden; }
+ .timedEventContent > .eventPeople > span + span { margin-left: 0; }
+ .fittedEvent:not([data-roomy="true"]) .eventPeople { display: none; }
+ .fittedEvent:not([data-time-room="true"]) .timedEventRange { display: none; }
 }
