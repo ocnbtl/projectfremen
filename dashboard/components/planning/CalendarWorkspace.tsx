@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 import * as Popover from "@radix-ui/react-popover";
 import { calendarDisplayColor, eventColors, eventPreviewTitle, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
 import CalendarMobileView from "./CalendarMobileView";
@@ -575,6 +576,8 @@ export default function CalendarWorkspace() {
       else { setConnectionName(""); setImportFile(undefined); }
     }, "Calendar imported");
   }
+  if (!snapshot && !error) return <LogoLoader label="Loading calendar" viewport />;
+
   return (
     <div
       className={`work-surface ${styles.shell}`}
@@ -679,9 +682,9 @@ export default function CalendarWorkspace() {
       ) : null}
       {!snapshot ? (
         <WorkspaceEmpty
-          title={error ? "Calendar unavailable" : "Loading your calendar"}
+          title="Calendar unavailable"
         >
-          Your records will appear here when loading completes.
+          {error || "Please try loading your calendar again."}
         </WorkspaceEmpty>
       ) : (
         <div ref={calendarSurface} className={styles.content} data-view={view} data-morph-focus={date}

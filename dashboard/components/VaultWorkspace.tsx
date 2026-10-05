@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "./operational/LogoLoader";
 
 import Link from "next/link";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -254,6 +255,7 @@ export default function VaultWorkspace({
   initialKind?: VaultObjectKind | "all";
   focusSearch?: boolean;
 }) {
+  const [checkingDevice, setCheckingDevice] = useState(true);
   const [status, setStatus] = useState<VaultStatus | null>(null);
   const [password, setPassword] = useState("");
   const [deviceName, setDeviceName] = useState("Windows desktop");
@@ -312,7 +314,7 @@ export default function VaultWorkspace({
     setSetupTarget(suggested.target);
     setDeviceName(suggested.name);
     setOnline(navigator.onLine);
-    refresh().then(() => setMessage((current) => current === "Checking this device…" ? "" : current)).catch(() => setMessage("We could not check this device. Try again."));
+    refresh().then(() => setMessage((current) => current === "Checking this device…" ? "" : current)).catch(() => setMessage("We could not check this device. Try again.")).finally(() => setCheckingDevice(false));
     const handleOnline = () => { setOnline(navigator.onLine); void browserVault.syncOnce().finally(refresh); };
     const handleVaultDataChanged = () => { void Promise.all([loadObjects(), refresh()]); };
     window.addEventListener("online", handleOnline);
@@ -342,9 +344,9 @@ export default function VaultWorkspace({
   }, [activeKind, deferredRecordQuery]);
 
   useEffect(() => {
-    if (!focusSearch) return;
+    if (!focusSearch || checkingDevice) return;
     window.requestAnimationFrame(() => recordSearchRef.current?.focus());
-  }, [focusSearch]);
+  }, [focusSearch, checkingDevice]);
 
   useEffect(() => () => {
     if (mediaPreview) URL.revokeObjectURL(mediaPreview.url);
@@ -992,6 +994,8 @@ export default function VaultWorkspace({
     ["Devices", deviceCountLabel],
     ["Time", clockLabel]
   ], [clockLabel, deviceCountLabel, networkLabel, stateLabel]);
+
+  if (checkingDevice) return <LogoLoader label="Loading Vault" viewport />;
 
   return (
     <main className={styles.page}>

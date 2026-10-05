@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "./operational/LogoLoader";
 
 import { useEffect, useMemo, useState } from "react";
 import { buildCsrfHeaders } from "../lib/client-csrf";
@@ -131,7 +132,7 @@ export default function DocsIndexPanel() {
       </div>
 
       {loading ? (
-        <p className="muted">Loading docs...</p>
+        <LogoLoader label="Loading documents" />
       ) : (
         <table style={{ marginTop: 12 }}>
           <thead>

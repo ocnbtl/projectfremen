@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "./operational/LogoLoader";
 
 import { useEffect, useMemo, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
@@ -423,7 +424,7 @@ export default function KpiManager() {
       </form>
 
       {loading ? (
-        <p className="muted">Loading KPI values...</p>
+        <LogoLoader label="Loading KPI values" />
       ) : (
         <div className="kpi-groups">
           {groupedItems.map((group) => (

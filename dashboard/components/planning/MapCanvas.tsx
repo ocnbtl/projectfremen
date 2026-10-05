@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 import { motionTokens } from "../../lib/design-system/motion";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 import { regionBounds } from "../../lib/modules/planning/map-bounds";
@@ -498,6 +499,7 @@ export default function MapCanvas(props: Props) {
         style={{ position: "absolute", inset: 0 }}
         aria-label="Interactive map. Saved places are also available in the adjacent list."
       />
+      {!ready && !error && <LogoLoader label="Loading map" viewport />}
       {error && (
         <p className="map-provider-error" role="status">
           {error}

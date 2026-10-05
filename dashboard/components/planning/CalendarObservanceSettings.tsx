@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 import { useState, type ReactNode } from "react";
 import type { CalendarObservanceSettings as Settings } from "../../lib/modules/planning/types";
 import { holidayVisible, observanceAppearance, customRepeatLabel, type HolidayCatalog } from "../../lib/modules/planning/observances";
@@ -33,7 +34,7 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
         </SelectField>
         <Button icon="plus" disabled={!country || busy} onClick={async () => { if (await onSave({ ...settings, countries: [...settings.countries, country] })) setCountry(""); }}>Add</Button>
       </div>
-      {loading && <p role="status">Loading holiday dates…</p>}
+      {loading && <LogoLoader label="Loading holiday dates" />}
       {error && <p role="alert">{error}</p>}
       {settings.countries.filter(code => !countryCode || code === countryCode).map(code => {
         const name = catalog?.countries.find(x => x.code === code)?.name || code;

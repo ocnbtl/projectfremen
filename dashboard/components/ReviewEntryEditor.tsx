@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "./operational/LogoLoader";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -171,7 +172,7 @@ export default function ReviewEntryEditor({
       {error && <p className="pill warn">{error}</p>}
 
       {!loaded ? (
-        <p className="muted">Loading entry...</p>
+        <LogoLoader label="Loading entry" />
       ) : (
         <>
           <div className="review-editor-meta">

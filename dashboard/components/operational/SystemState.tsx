@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import LogoLoader from "./LogoLoader";
 
 export type SystemStateVariant = "loading" | "empty" | "error" | "read_only" | "stale";
 
@@ -32,26 +33,11 @@ export default function SystemState({
   title = DEFAULT_TITLES[variant],
   description,
   action,
-  skeletonRows = 4,
   compact = false,
   className
 }: SystemStateProps) {
   if (variant === "loading") {
-    return (
-      <div
-        className={["system-state", "is-loading", compact && "is-compact", className].filter(Boolean).join(" ")}
-        role="status"
-        aria-live="polite"
-        aria-label={title}
-      >
-        <span className="sr-only">{title}</span>
-        <div className="system-state__skeleton" aria-hidden="true">
-          {Array.from({ length: skeletonRows }, (_, index) => (
-            <span key={index} />
-          ))}
-        </div>
-      </div>
-    );
+    return <LogoLoader label={title} />;
   }
 
   const unavailable = action && (action.disabled || !action.onSelect);

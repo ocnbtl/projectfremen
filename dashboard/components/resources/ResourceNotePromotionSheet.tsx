@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 
 import Link from "next/link";
 import type { FormEvent } from "react";
@@ -429,9 +430,7 @@ export default function ResourceNotePromotionSheet({
                           />
                         </label>
                         {notesState === "loading" || notesState === "idle" ? (
-                          <div className={styles.noteLoading} role="status">
-                            Loading Notes…
-                          </div>
+                          <LogoLoader label="Loading Notes" />
                         ) : notesState === "error" ? (
                           <div className={styles.error} role="alert">
                             <strong>Notes could not be loaded</strong>

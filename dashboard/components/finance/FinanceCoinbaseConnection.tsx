@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 
 import { useEffect, useState } from "react";
 import type { FinanceState } from "../../lib/modules/finance/native-types";
@@ -31,7 +32,7 @@ export default function FinanceCoinbaseConnection({ state, onChanged }: { state:
     <div className="finance-bank-heading"><span className="finance-activity-mark"><Icon name="Link" /></span><div><h3>Coinbase</h3><p>Personal portfolio · View only</p></div></div>
     {(error || view?.error) && <p className="finance-bank-error" role="alert">{error || view?.error}</p>}
     {notice && <p className="finance-bank-notice" role="status">{notice}</p>}
-    {!view && !error && <p role="status">Loading Coinbase…</p>}
+    {!view && !error && <LogoLoader label="Loading Coinbase" />}
     {!view && error && <button className="finance-action" disabled={busy} onClick={() => void run()}>Retry Coinbase</button>}
     {view && !view.configured && <p className="finance-utility-intro">Secure server setup is needed before connecting Coinbase. Your manual accounts remain available.</p>}
     {view?.configured && !view.connected && <>

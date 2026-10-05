@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -47,7 +48,7 @@ export default function RelatedRecords({
       {error ? (
         <p>Related records could not load. Your links are preserved.</p>
       ) : !loaded ? (
-        <p role="status">Loading related records…</p>
+        <LogoLoader label="Loading related records" />
       ) : items.length ? (
         <div>
           {items.map(({ ref, detail }) => (

@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 import TravelModeField from "../planning/TravelModeField";
 
 import dynamic from "next/dynamic";
@@ -42,7 +43,7 @@ import styles from "./PersonalLifeWorkspace.module.css";
 
 const TravelWorldMap = dynamic(() => import("./TravelWorldMap"), {
   ssr: false,
-  loading: () => <div className={styles.worldMapLoading}>Loading the world map…</div>
+  loading: () => <div className={styles.worldMapLoading}><LogoLoader label="Loading map" /></div>
 });
 
 export type PersonalLifeView = "passwords" | "lists" | "travel" | "personal-build" | "car";

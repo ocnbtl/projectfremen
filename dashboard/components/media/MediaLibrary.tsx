@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 import Link from "next/link";
 import {
   smallPreview,
@@ -762,7 +763,7 @@ export default function MediaLibrary({
                   <p>Download to open this file.</p>
                 )
               ) : (
-                <p>Loading encrypted file…</p>
+                <LogoLoader label="Loading encrypted file" />
               )}
             </div>
             <div className="work-actions">

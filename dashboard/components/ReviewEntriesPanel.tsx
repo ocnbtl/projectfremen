@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "./operational/LogoLoader";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -144,7 +145,7 @@ export default function ReviewEntriesPanel({
       </div>
 
       {loading ? (
-        <p className="muted">Loading entries...</p>
+        <LogoLoader label="Loading entries" />
       ) : items.length === 0 ? (
         <p className="muted">No entries yet. Create your first {title.toLowerCase()} review entry.</p>
       ) : (

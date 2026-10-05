@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "./operational/LogoLoader";
 import { peopleWithRelationships, isSchoolOrganization } from "../lib/modules/people/relationships";
 
 import RelatedRecords from "./planning/RelatedRecords";
@@ -81,7 +82,7 @@ import { usePersonalOpsFollowUps } from "./operational/usePersonalOpsFollowUps";
 import { useProjectsState } from "./operational/useProjectsState";
 
 const PeopleTransfer = dynamic(() => import("./people/PeopleTransfer"), {
-  loading: () => <p role="status">Opening contact transfer…</p>
+  loading: () => <LogoLoader label="Opening contact transfer" />
 });
 
 type RecordsResponse = {
@@ -4886,7 +4887,7 @@ export default function PeopleWorkspace({
                       <strong className="people-section-count" aria-label={`${selectedProjectConnections.length} linked projects`}>{selectedProjectConnections.length}</strong>
                     </header>
                     {projectsError && <p className="people-notice" role="alert">{projectsError}</p>}
-                    {projectsLoading ? <p>Loading projects…</p> : selectedProjectConnections.length > 0 ? (
+                    {projectsLoading ? <LogoLoader label="Loading projects" /> : selectedProjectConnections.length > 0 ? (
                       <LinkedProjectsPanel
                         personId={selectedPerson.id}
                         personLabel={selectedPerson.title}

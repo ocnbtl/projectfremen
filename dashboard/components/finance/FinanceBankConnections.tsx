@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 
 import { useEffect, useRef, useState } from "react";
 import type { FinanceState } from "../../lib/modules/finance/native-types";
@@ -143,7 +144,7 @@ export default function FinanceBankConnections({ state, onChanged }: { state: Fi
     <div className="finance-bank-heading"><span className="finance-activity-mark"><Icon name="Link" /></span><div><h3>Bank connections</h3><p>Personal accounts · powered by Plaid</p></div></div>
     {error && <p className="finance-bank-error" role="alert">{error}</p>}
     {notice && <p className="finance-bank-notice" role="status">{notice}</p>}
-    {!banking && !error && <p role="status">Loading connections…</p>}
+    {!banking && !error && <LogoLoader label="Loading connections" />}
     {!banking && error && <button className="finance-action" onClick={() => void run({ operation: "cancel", sessionId: "" }, "Connections reloaded.")}>Retry</button>}
     {banking && !banking.configured && <div className="finance-inline-empty"><strong>Secure setup is still needed</strong><p>Plaid Trial is ready. The site needs its server credentials, encryption key and registered return address before your first connection.</p><p>Keep using manual accounts and CSV imports while setup is completed.</p></div>}
     {banking?.configured && <>

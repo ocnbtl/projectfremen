@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "./operational/LogoLoader";
 
 import { useEffect, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../lib/client-csrf";
@@ -94,7 +95,7 @@ export default function ObsidianExportPanel() {
       {error && <p className="pill warn">{error}</p>}
 
       {loading ? (
-        <p className="muted">Loading export status...</p>
+        <LogoLoader label="Loading export status" />
       ) : (
         <>
           <p className="muted" style={{ marginTop: 0 }}>

@@ -1,4 +1,5 @@
 "use client";
+import LogoLoader from "../operational/LogoLoader";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { EventOccurrence } from "../../lib/modules/planning/types";
@@ -41,7 +42,7 @@ export default function CommandAgenda() {
       {error ? (
         <p>Calendar could not load. Open Calendar to retry.</p>
       ) : !loaded ? (
-        <p role="status">Loading today’s events…</p>
+        <LogoLoader label="Loading events" />
       ) : events.length ? (
         <div className="command-agenda-list">
           {events.map((event) => (
