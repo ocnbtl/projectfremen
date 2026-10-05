@@ -1,6 +1,7 @@
 "use client";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import * as Popover from "@radix-ui/react-popover";
+import TripPlanner from "./TripPlanner";
 import PlaceLocationFields from "./PlaceLocationFields";
 import MapDataExplorer, {
   MapDataLegend,
@@ -31,7 +32,6 @@ import {
 } from "../admin-shell/WorkspaceKit";
 import SharedAIDock from "../admin-shell/SharedAIDock";
 import SelectField from "../ui/SelectField";
-import DateField from "../people/DateField";
 import RecordLinks from "./RecordLinks";
 import {
   planningRequest,
@@ -42,7 +42,6 @@ import {
 import type { Place } from "../../lib/modules/planning/types";
 import type {
   PersonalTrip,
-  TravelMode,
 } from "../../lib/modules/personal-life/types";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
@@ -306,27 +305,6 @@ export default function MapWorkspace() {
     );
     setRoute(existing?.route as unknown as FeatureCollection | undefined);
   }
-  function addStop(place: Place) {
-    setTrip((current) =>
-      current
-        ? {
-            ...current,
-            stops: [
-              ...(current.stops || []),
-              {
-                id: crypto.randomUUID(),
-                placeId: place.id,
-                name: place.name,
-                latitude: place.latitude,
-                longitude: place.longitude,
-              },
-            ],
-            route: undefined,
-          }
-        : current,
-    );
-    setRoute(undefined);
-  }
   async function saveTrip(e: FormEvent) {
     e.preventDefault();
     if (!trip) return;
@@ -335,7 +313,7 @@ export default function MapWorkspace() {
       await action(async () => {
         const result = await savePlanningTrip({
           ...trip,
-          place: first?.name || trip.place,
+          place: trip.place?.trim() || first?.name,
           latitude: first?.latitude ?? trip.latitude,
           longitude: first?.longitude ?? trip.longitude,
         });
@@ -745,197 +723,9 @@ export default function MapWorkspace() {
         title="Trip itinerary"
       >
         {trip && (
-          <form className="work-form" onSubmit={saveTrip}>
-            <WorkspaceFeedback error={error} message={notice} />
-            <label>
-              Trip name
-              <input
-                required
-                value={trip.name || ""}
-                onChange={(e) => setTrip({ ...trip, name: e.target.value })}
-              />
-            </label>
-            <div className="work-form-pair">
-              <DateField
-                label="Starts"
-                required={false}
-                value={trip.startDate?.slice(0, 10) || ""}
-                onChange={(startDate) => setTrip({ ...trip, startDate })}
-              />
-              <DateField
-                label="Ends"
-                required={false}
-                value={trip.endDate?.slice(0, 10) || ""}
-                onChange={(endDate) => setTrip({ ...trip, endDate })}
-              />
-            </div>
-            <label>
-              Travel mode
-              <SelectField
-                value={trip.travelMode || "car"}
-                onChange={(e) => {
-                  setTrip({
-                    ...trip,
-                    travelMode: e.target.value as TravelMode,
-                    route: undefined,
-                  });
-                  setRoute(undefined);
-                }}
-              >
-                {[
-                  "car",
-                  "walk",
-                  "bike",
-                  "plane",
-                  "train",
-                  "boat",
-                  "bus",
-                  "other",
-                ].map((x) => (
-                  <option key={x}>{x}</option>
-                ))}
-              </SelectField>
-            </label>
-            <section>
-              <h2>Stops</h2>
-              {trip.stops?.map((stop, index) => (
-                <div className={styles.stop} key={stop.id}>
-                  <strong>
-                    {index + 1}. {stop.name}
-                  </strong>
-                  {index > 0 && trip.route?.legs?.[index - 1] && (
-                    <small>
-                      From previous stop:{" "}
-                      {(trip.route.legs[index - 1].distance / 1000).toFixed(1)}{" "}
-                      km · about{" "}
-                      {Math.ceil(trip.route.legs[index - 1].duration / 60)} min
-                    </small>
-                  )}
-                  <label>
-                    Arrival
-                    <input
-                      type="datetime-local"
-                      value={stop.arrival || ""}
-                      onChange={(e) =>
-                        setTrip({
-                          ...trip,
-                          stops: trip.stops!.map((s) =>
-                            s.id === stop.id
-                              ? { ...s, arrival: e.target.value }
-                              : s,
-                          ),
-                        })
-                      }
-                    />
-                  </label>
-                  <div className="work-actions">
-                    <Button
-                      disabled={index === 0}
-                      aria-label={`Move ${stop.name} earlier`}
-                      onClick={() => {
-                        const stops = [...trip.stops!];
-                        [stops[index - 1], stops[index]] = [
-                          stops[index],
-                          stops[index - 1],
-                        ];
-                        setTrip({ ...trip, stops, route: undefined });
-                        setRoute(undefined);
-                      }}
-                    >
-                      ↑
-                    </Button>
-                    <Button
-                      disabled={index === trip.stops!.length - 1}
-                      aria-label={`Move ${stop.name} later`}
-                      onClick={() => {
-                        const stops = [...trip.stops!];
-                        [stops[index + 1], stops[index]] = [
-                          stops[index],
-                          stops[index + 1],
-                        ];
-                        setTrip({ ...trip, stops, route: undefined });
-                        setRoute(undefined);
-                      }}
-                    >
-                      ↓
-                    </Button>
-                    <Button
-                      aria-label={`Remove ${stop.name}`}
-                      onClick={() => {
-                        setTrip({
-                          ...trip,
-                          stops: trip.stops!.filter((x) => x.id !== stop.id),
-                          route: undefined,
-                        });
-                        setRoute(undefined);
-                      }}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              ))}
-              <label>
-                Add a saved place
-                <SelectField
-                  value=""
-                  onChange={(e) => {
-                    const place = snapshot?.state.places.find(
-                      (x) => x.id === e.target.value,
-                    );
-                    if (place) addStop(place);
-                  }}
-                >
-                  <option value="">Choose place</option>
-                  {snapshot?.state.places
-                    .filter((p) => !p.archivedAt)
-                    .map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                </SelectField>
-              </label>
-            </section>
-            <Button
-              disabled={
-                busy ||
-                (trip.stops?.length || 0) < 2 ||
-                !["car", "walk", "bike"].includes(trip.travelMode || "")
-              }
-              onClick={() => void calculate()}
-            >
-              Calculate route
-            </Button>
-            {trip.route && (
-              <p>
-                {(trip.route.distance / 1000).toFixed(1)} km · about{" "}
-                {Math.round(trip.route.duration / 60)} min
-                <br />
-                <small>Estimated travel time without live traffic.</small>
-              </p>
-            )}
-            <label>
-              Notes
-              <textarea
-                value={trip.notes || ""}
-                onChange={(e) => setTrip({ ...trip, notes: e.target.value })}
-              />
-            </label>
-            <Button
-              type="submit"
-              intent="primary"
-              busy={busy}
-              disabled={!trip.stops?.length && !trip.place}
-            >
-              Save trip
-            </Button>
-            {trip.id && (
-              <Link href={`/admin/personal/travel?selected=${trip.id}`}>
-                Open in Personal
-              </Link>
-            )}
-          </form>
+          <TripPlanner trip={trip} places={snapshot?.state.places || []} busy={busy} error={error} notice={notice}
+            onChange={next => { setTrip(next); setRoute(next.route as unknown as FeatureCollection | undefined); }}
+            onSave={saveTrip} onCalculate={() => void calculate()} />
         )}
       </WorkspaceSheet>
       <SharedAIDock

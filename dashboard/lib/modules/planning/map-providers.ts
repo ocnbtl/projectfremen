@@ -56,6 +56,7 @@ export async function routeStops(coordinates: unknown, mode: string) {
   });
   const profiles: Record<string, string> = {
     car: "driving-car",
+    van: "driving-car",
     bike: "cycling-regular",
     walk: "foot-walking",
   };

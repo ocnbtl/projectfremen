@@ -412,6 +412,7 @@ async function check(label, run) {
         ],
         before = JSON.stringify(stops);
       await assert.rejects(routeStops(stops, "car"), /OPENROUTESERVICE/);
+      await assert.rejects(routeStops(stops, "van"), /OPENROUTESERVICE/);
       assert.equal(JSON.stringify(stops), before);
       await assert.rejects(
         routeStops(
@@ -426,6 +427,15 @@ async function check(label, run) {
     },
   );
   let place;
+  await check("van trips retain their mode, route and stop notes through normalization", () => {
+    const { normalizeTrip } = require("../lib/modules/personal-life/trip-schema.ts");
+    const input = { name: "Van weekend", place: "Lake", travelMode: "van", latitude: 39, longitude: -84,
+      stops: [{id:"first",name:"Lake",latitude:39,longitude:-84,notes:"Campsite booked",arrival:"2026-10-10T16:00"}],
+      route: {type:"FeatureCollection",features:[],mode:"van",distance:1000,duration:120,legs:[],calculatedAt:stamp} };
+    const saved=normalizeTrip(input,stamp), reopened=normalizeTrip(JSON.parse(JSON.stringify(saved)),stamp);
+    assert.equal(reopened.travelMode,"van"); assert.equal(reopened.route.mode,"van");
+    assert.equal(reopened.stops[0].notes,"Campsite booked"); assert.equal(reopened.stops[0].arrival,"2026-10-10T16:00");
+  });
   await check(
     "place persistence reopens the same identity and rejects stale updates",
     async () => {

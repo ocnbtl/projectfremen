@@ -1,4 +1,5 @@
 "use client";
+import TravelModeField from "../planning/TravelModeField";
 
 import dynamic from "next/dynamic";
 import type { FormEvent } from "react";
@@ -339,6 +340,7 @@ export default function PersonalLifeWorkspace({
     if (editor.collection === "trips") {
       values.latitude = Number(editor.values.latitude);
       values.longitude = Number(editor.values.longitude);
+      if (existing && (existing as PersonalTrip).travelMode !== editor.values.travelMode) values.route = null;
     }
     if (editor.collection === "vehicles") values.modifications = (existing as PersonalVehicle | undefined)?.modifications || [];
     const saved = await saveObject(editor.collection, values, existing);
@@ -851,14 +853,14 @@ export default function PersonalLifeWorkspace({
       </form>
     </div>}
 
-    {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} onSubmit={submitEditor}><header><div>{editor.collection !== "trips" && <span>Personal record</span>}<h2>{editor.collection === "trips" ? tripEditorTitle : `${editor.id ? "Edit" : "Add"} ${editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}`}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)}><PersonalOpsIcon name="close" /></button></header>
+    {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} data-trip-editor={editor.collection === "trips" || undefined} onSubmit={submitEditor}><header><div>{editor.collection !== "trips" && <span>Personal record</span>}<h2>{editor.collection === "trips" ? tripEditorTitle : `${editor.id ? "Edit" : "Add"} ${editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}`}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)}><PersonalOpsIcon name="close" /></button></header>
       {editor.collection === "lists" && <>{input("Title", "title", editorValue("title"), (value) => setEditorValue("title", value), { required: true })}<label><span>Type</span><select value={editorValue("kind")} onChange={(event) => setEditorValue("kind", event.target.value)}><option value="shopping">Things to buy</option><option value="watchlist">Watchlist</option><option value="favorites">Favorites</option><option value="packing">Packing</option><option value="custom">Custom</option></select></label><label className={styles.full}><span>Description</span><textarea value={editorValue("description")} onChange={(event) => setEditorValue("description", event.target.value)} rows={3} /></label></>}
       {editor.collection === "trips" && <>
         <label className={styles.full}><span>Status</span><select value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}>{Object.entries(TRIP_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
         {input(tripEditorStatus === "want" ? "Place name" : tripEditorStatus === "lived" ? "Home label" : "Trip name", "name", editorValue("name"), (value) => setEditorValue("name", value), { required: true, placeholder: tripEditorStatus === "planned" ? "Weekend in Montréal" : "Name this place" })}
         {input(tripEditorStatus === "planned" ? "Destination" : "Place", "place", editorValue("place"), (value) => setEditorValue("place", value), { required: true, placeholder: "City or country" })}
         {input("Region", "region", editorValue("region"), (value) => setEditorValue("region", value), { placeholder: "State, province, or region" })}
-        {(tripEditorStatus === "been" || tripEditorStatus === "planned") && <label><span>Travel mode</span><select value={editorValue("travelMode")} onChange={(event) => setEditorValue("travelMode", event.target.value)}>{["car", "plane", "train", "boat", "bus", "bike", "walk", "other"].map((value) => <option value={value} key={value}>{value}</option>)}</select></label>}
+        {(tripEditorStatus === "been" || tripEditorStatus === "planned") && <label><span>Travel mode</span><TravelModeField value={editorValue("travelMode")} onChange={value => setEditorValue("travelMode", value)} /></label>}
         {tripEditorStatus === "want" && input("Target date", "startDate", editorValue("startDate"), (value) => setEditorValue("startDate", value), { type: "date" })}
         {tripEditorStatus === "been" && <>{input("Arrived", "startDate", editorValue("startDate"), (value) => setEditorValue("startDate", value), { type: "date" })}{input("Returned", "endDate", editorValue("endDate"), (value) => setEditorValue("endDate", value), { type: "date" })}</>}
         {tripEditorStatus === "lived" && <>{input("Moved in", "startDate", editorValue("startDate"), (value) => setEditorValue("startDate", value), { type: "date" })}{input("Moved out", "endDate", editorValue("endDate"), (value) => setEditorValue("endDate", value), { type: "date" })}</>}

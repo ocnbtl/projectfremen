@@ -360,3 +360,12 @@
 
 :global(html[data-admin-preview="mobile"]) .credentialRow > [role="cell"] + [role="cell"],
 :global(html[data-personal-preview="mobile"]) .credentialRow > [role="cell"] + [role="cell"] { border-inline-start: 0; }
+
+/* Trip planning shares the Map planner's type and control rhythm. */
+.editor[data-trip-editor] {gap:16px;padding:24px;border-radius:16px;}
+.editor[data-trip-editor] label {font:500 12px/18px var(--font-body);gap:6px;min-width:0;}
+.editor[data-trip-editor] input,.editor[data-trip-editor] select,.editor[data-trip-editor] textarea,.editor[data-trip-editor] :global(.app-select-trigger) {font:400 14px/20px var(--font-body);min-height:42px;border-radius:8px;min-width:0;}
+.editor[data-trip-editor] header h2 {font:600 20px/28px var(--font-heading);}
+.editor[data-trip-editor] footer button {font:500 14px/20px var(--font-body);min-height:42px;border-radius:8px;}
+.editor[data-trip-editor] .coordinateFields legend {font:500 12px/18px var(--font-body);}
+@media(max-width:600px){.editor[data-trip-editor]{padding:16px;}.editor[data-trip-editor] input,.editor[data-trip-editor] select,.editor[data-trip-editor] textarea,.editor[data-trip-editor] :global(.app-select-trigger){font-size:16px;min-height:44px;}}

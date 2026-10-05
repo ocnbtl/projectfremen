@@ -1,0 +1,36 @@
+.planner { display:grid; gap:24px; color:var(--text-primary,#23383f); font:400 14px/1.5 var(--font-body,Inter,sans-serif); }
+.planner .section {display:grid;gap:12px;min-width:0;}
+.sectionHeading {display:flex;align-items:flex-start;gap:10px;}
+.sectionHeading>svg {color:var(--module-icon,#50752f);margin-top:2px;flex-shrink:0;}
+.planner .sectionHeading h3 {font:600 16px/24px var(--font-heading);margin:0;color:var(--text-primary,#23383f);}
+.planner p {margin:0;font:400 13px/1.5 var(--font-body,Inter,sans-serif);color:var(--text-secondary,#60747c);}
+.planner label {display:grid;gap:6px;font:500 12px/18px var(--font-body,Inter,sans-serif);min-width:0;}
+.planner :global(.people-date-field)>span {font:500 12px/18px var(--font-body,Inter,sans-serif);}
+.planner :global(.people-date-trigger) {font:400 14px/20px var(--font-body,Inter,sans-serif);min-height:42px;}
+.planner input,.planner textarea,.planner :global(.app-select-trigger) {width:100%;min-width:0;max-width:100%;box-sizing:border-box;font:400 14px/20px var(--font-body,Inter,sans-serif);border-radius:8px;}
+.planner input {min-height:42px;}
+.planner textarea {min-height:88px;resize:vertical;}
+.pair,.stopFields {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;min-width:0;}
+.modeLabel {display:inline-flex;align-items:center;gap:9px;font:inherit;}
+.modeLabel svg {flex-shrink:0;}
+.stops {display:grid;gap:12px;list-style:none;margin:0;padding:0;}
+.stop {border:1px solid var(--border-color,#d5e2e7);border-radius:12px;padding:12px;display:grid;gap:12px;background:var(--surface,#fff);min-width:0;}
+.stopHeading {display:flex;align-items:center;gap:8px;min-width:0;}
+.stopHeading strong {flex:1;min-width:0;font-size:14px;font-weight:600;overflow-wrap:anywhere;}
+.stopNumber {display:grid;place-items:center;border-radius:50%;width:26px;height:26px;flex-shrink:0;background:var(--module-quiet,#f3f8ed);color:var(--module-icon,#50752f);font-size:12px;font-weight:600;}
+.stopActions {display:flex;gap:4px;}
+.planner .stopActions button {width:32px;min-width:32px;height:32px;min-height:32px;padding:6px;gap:0;}
+.stopActions button>span:empty {display:none;}
+.moveEarlier svg {transform:rotate(180deg);}
+.planner .leg {display:flex;align-items:center;gap:6px;font-size:12px;}
+.route {display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:12px;border-radius:12px;background:var(--module-quiet,#f3f8ed);}
+.route strong {font-size:14px;font-variant-numeric:tabular-nums;}
+.route strong span {font-weight:400;}
+.route p {flex-basis:100%;}
+.empty {padding:12px;border:1px dashed var(--border-color,#d5e2e7);border-radius:10px;}
+.secondary,.footer>span {color:var(--text-secondary,#60747c);font-size:12px;font-weight:400;}
+.footer {display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.footer a {display:flex;align-items:center;gap:4px;font-size:13px;}
+.planner button {transition:background-color 180ms ease,border-color 180ms ease;}
+@media(max-width:600px) { .planner input,.planner textarea,.planner :global(.app-select-trigger){font-size:16px;min-height:44px;} .stopFields{grid-template-columns:minmax(0,1fr);} .planner .stopActions button{width:40px;min-width:40px;height:44px;} .planner{gap:24px;} }
+@media(prefers-reduced-motion:reduce){.planner button{transition:none;}}

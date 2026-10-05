@@ -1,3 +1,4 @@
+import { TRAVEL_MODE_VALUES } from "./travel-modes";
 import type { PersonalTrip } from "./types";
 export const TRIP_WRITABLE_KEYS = [
   "name",
@@ -104,7 +105,7 @@ function normalizeRoute(value: unknown): PersonalTrip["route"] | undefined {
     distance: nonnegative(value.distance),
     duration: nonnegative(value.duration),
     calculatedAt: iso(value.calculatedAt, "Route calculation date"),
-    mode: member(value.mode, ["car", "walk", "bike"] as const, "car"),
+    mode: member(value.mode, ["car", "van", "walk", "bike"] as const, "car"),
     legs,
   };
 }
@@ -141,16 +142,7 @@ export function normalizeTrip(
     ),
     travelMode: member(
       raw.travelMode,
-      [
-        "car",
-        "plane",
-        "train",
-        "boat",
-        "bus",
-        "bike",
-        "walk",
-        "other",
-      ] as const,
+      TRAVEL_MODE_VALUES,
       "plane",
     ),
     latitude: coordinate(raw.latitude, -90, 90),

@@ -281,7 +281,7 @@ export async function savePlanningTrip(
               collection: "trips",
               id: input.id,
               expectedUpdatedAt: input.updatedAt,
-              patch: input,
+              patch: { ...input, route: input.route ?? null },
             }
           : { collection: "trips", input },
       ),
