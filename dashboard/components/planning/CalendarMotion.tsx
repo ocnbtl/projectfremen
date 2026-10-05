@@ -6,7 +6,7 @@ import { useMotionPreference } from "../admin-shell/ExperienceProvider";
 import { flushSync } from "react-dom";
 import styles from "./CalendarWorkspace.module.css";
 
-export const calendarSpring = { type: "spring" as const, stiffness: 340, damping: 36, mass: 0.9 };
+export const calendarSpring = { type: "spring" as const, stiffness: 210, damping: 30, mass: 1 };
 const reducedQuery = "(prefers-reduced-motion: reduce)";
 const subscribeMotion = (notify: () => void) => {
   const query = window.matchMedia(reducedQuery);
@@ -20,7 +20,10 @@ export function useCalendarMotion() {
   const systemReduced = useSyncExternalStore(subscribeMotion, readMotion, serverMotion);
   const { preference } = useMotionPreference();
   const reduced = !!systemReduced || preference === "reduce";
-  return { reduced, layoutTransition: reduced ? { duration: 0 } : calendarSpring };
+  // Native snapshots already interpolate geometry. A second layout animation
+  // would capture transformed text and then jump when the snapshots disappear.
+  const snapshotting = typeof document !== "undefined" && !!document.documentElement.dataset.calendarMorph;
+  return { reduced, layoutTransition: reduced || snapshotting ? { duration: 0 } : calendarSpring };
 }
 
 export function CalendarScene({ id, direction = 1, children }: { id: string; direction?: number; children: ReactNode }) {
@@ -58,8 +61,8 @@ export function useCalendarMorph(root: RefObject<HTMLElement | null>) {
     const version = ++revision.current;
     active.current?.skipTransition(); cleanup.current();
     if (reduced || !document.startViewTransition || !root.current) { update(); return; }
-    const names = new Map<string, string>(), touched = new Map<HTMLElement, string>();
-    const capture = () => {
+    const names = new Map<string, string>(), touched = new Map<HTMLElement, string>(), classes = new Map<HTMLElement, string>();
+    const capture = (incoming = false) => {
       const surface = root.current; if (!surface) return;
       const rect = surface.getBoundingClientRect(), used = new Set<string>();
       if (!touched.has(surface)) touched.set(surface, surface.style.viewTransitionName); surface.style.viewTransitionName = "calendar-surface";
@@ -68,15 +71,28 @@ export function useCalendarMorph(root: RefObject<HTMLElement | null>) {
       for (const node of nodes) {
         const box = node.getBoundingClientRect(), key = node.dataset.morphDate ? "date:" + node.dataset.morphDate : "event:" + node.dataset.morphEvent;
         if (node.inert || used.has(key) || !box.width || box.bottom < rect.top || box.top > Math.min(rect.bottom, innerHeight) || names.size > 120 && !names.has(key)) continue;
+        // View-transition layers escape scroll clipping. Leave clipped events
+        // inside their parent snapshot instead of exposing offscreen portraits.
+        let clipped = false;
+        for (let parent = node.parentElement; parent && parent !== surface; parent = parent.parentElement) {
+          const style = getComputedStyle(parent), bounds = parent.getBoundingClientRect();
+          if (/(auto|scroll|hidden|clip)/.test(style.overflowY) && (box.top < bounds.top - 1 || box.bottom > bounds.bottom + 1) || /(auto|scroll|hidden|clip)/.test(style.overflowX) && (box.left < bounds.left - 1 || box.right > bounds.right + 1)) { clipped = true; break; }
+        }
+        if (clipped) continue;
+        const entering = incoming && !names.has(key);
         used.add(key); if (!names.has(key)) names.set(key, "calendar-item-" + names.size);
         if (!touched.has(node)) touched.set(node, node.style.viewTransitionName);
         node.style.viewTransitionName = names.get(key)!;
+        if (entering && node.dataset.morphDate) {
+          classes.set(node, node.style.getPropertyValue("view-transition-class"));
+          node.style.setProperty("view-transition-class", "calendar-entering-date");
+        }
       }
     };
     document.documentElement.dataset.calendarMorph = "true";
-    cleanup.current = () => { for (const [node, name] of touched) node.style.viewTransitionName = name; delete document.documentElement.dataset.calendarMorph; };
+    cleanup.current = () => { for (const [node, name] of touched) node.style.viewTransitionName = name; for (const [node, value] of classes) node.style.setProperty("view-transition-class", value); delete document.documentElement.dataset.calendarMorph; };
     capture();
-    const transition = document.startViewTransition(() => { if (version !== revision.current) return; flushSync(update); capture(); });
+    const transition = document.startViewTransition(() => { if (version !== revision.current) return; flushSync(update); capture(true); });
     active.current = transition;
     void transition.ready.catch(() => {}); // Unsupported/hidden documents still apply the update.
     void transition.finished.finally(() => { if (version === revision.current) { cleanup.current(); active.current = null; } }).catch(() => {});

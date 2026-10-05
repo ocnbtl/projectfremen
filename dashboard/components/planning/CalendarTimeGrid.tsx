@@ -143,6 +143,7 @@ export default function CalendarTimeGrid({
                 aria-label={`Events on ${day}`}
                 aria-current={day === today ? "date" : undefined}
               >
+                <span className={styles.dateHeadingIdentity} data-morph-date={day}>
                 <span className={styles.weekdayName}>
                   {new Date(`${day}T12:00`).toLocaleDateString(undefined, {
                     weekday: "long",
@@ -152,8 +153,9 @@ export default function CalendarTimeGrid({
                   {new Date(`${day}T12:00`).toLocaleDateString(undefined, { weekday: "long" }).slice(0, 2)}
                 </span>
                 <span className={styles.dateLine}>
-                  <strong data-morph-date={day}>{Number(day.slice(-2))}</strong>
+                  <strong>{Number(day.slice(-2))}</strong>
                   {day === today && <small>Today</small>}
+                </span>
                 </span>
               </motion.button>
             </motion.div>

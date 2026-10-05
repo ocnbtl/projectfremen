@@ -22,7 +22,7 @@ export default function CalendarYearView({ date, today, zone, events, calendars,
     const end = `${Number(year) + 1}-01-01`;
     for (let start = weekStart(`${year}-01-01`); start < end; start = addDays(start, 7)) {
       const days = Array.from({ length: 7 }, (_, i) => addDays(start, i)).filter(day => showWeekends || ![0, 6].includes(new Date(day + "T12:00").getDay()));
-      for (const segment of monthWeekLayout(days, events, zone, 3).segments) for (let i = segment.first; i <= segment.last; i++) {
+      for (const segment of monthWeekLayout(days, events, zone, 2).segments) for (let i = segment.first; i <= segment.last; i++) {
         const day = days[i], rows = result.get(day) || [];
         rows.push({ event: segment.event, lane: segment.lane, before: i > segment.first && day.slice(-2) !== "01", after: i < segment.last && addDays(day, 1).slice(0, 7) === day.slice(0, 7) });
         result.set(day, rows);
