@@ -235,6 +235,7 @@ export default function CalendarTimeGrid({
                         width: `calc(${100 / item.columns}% - 4px)`,
                         height: `max(14px, calc(${resizing?.id === item.id ? (resizing.end - item.startMs) / 60000 : until - from} * 100% / var(--calendar-span) - 1px))`,
                         ...eventColors(item, c),
+                        "--event-title-lines": Math.max(1, Math.floor((bottom - top - 32) / 16)),
                         "--event-avatar-size": `${Math.max(14, Math.min(24, bottom - top - 12))}px`,
                       } as CSSProperties
                     }
