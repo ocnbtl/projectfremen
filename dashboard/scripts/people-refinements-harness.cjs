@@ -47,3 +47,12 @@ assert(!isSchoolOrganization(organization('o','Software Studio',{organizationTyp
 assert(!isSchoolOrganization(organization('o','Health Clinic',{organizationType:'Business',industry:'Primary care'})));
 assert(!isSchoolOrganization(organization('o','Cedar University Alumni',{organizationType:'University / School',industry:'Alumni organization'})));
 console.log('Relationship coverage and school-only choices: passed');
+const {normalizePeopleProfileLink: link}=require('../lib/modules/people/links.ts');
+assert.equal(link('website','example.com/'),'https://example.com');
+assert.equal(link('website',' https://example.com/path?q=one#two '),'https://example.com/path?q=one#two');
+assert.equal(link('instagram','@pat.example'),'https://www.instagram.com/pat.example');
+assert.equal(link('x','pat_example'),'https://x.com/pat_example');
+assert.equal(link('linkedin','cedar',true),'https://www.linkedin.com/company/cedar');
+assert.equal(link('website',''),'');
+for(const invalid of ['javascript:alert(1)','ftp://example.com','https://user:password@example.com','not an address']) assert.throws(()=>link('website',invalid),/Website needs/);
+console.log('Profile links accept bare addresses and handles without bypassing validation: passed');

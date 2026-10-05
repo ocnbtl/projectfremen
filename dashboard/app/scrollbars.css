@@ -1,0 +1,10 @@
+/* Native scrolling with the site's quiet ink and rounded geometry. */
+:root { --scroll-thumb: #9ca9a5; --scroll-thumb-hover: #738780; }
+* { scrollbar-width: thin; scrollbar-color: var(--scroll-thumb) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; border-radius: 999px; }
+*::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 999px; background: var(--scroll-thumb); background-clip: padding-box; }
+*::-webkit-scrollbar-thumb:hover { background-color: var(--scroll-thumb-hover); }
+*::-webkit-scrollbar-corner { background: transparent; }
+.people-redesign-shell :is(.people-directory-panel, .people-active-tab-panel) { scrollbar-gutter: stable; scrollbar-color: var(--scroll-thumb) transparent; }
+@media (forced-colors: active) { * { scrollbar-color: auto; } }

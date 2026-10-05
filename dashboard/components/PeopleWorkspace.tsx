@@ -13,7 +13,7 @@ import {
   type FollowUpSourceRef
 } from "../lib/modules/personal-ops/follow-up-links";
 import { sortPeopleMemories } from "../lib/modules/people/memories";
-import { PEOPLE_PROFILE_LINK_KEYS, withoutTrailingLinkSlash } from "../lib/modules/people/links";
+import { PEOPLE_PROFILE_LINK_KEYS, normalizePeopleProfileLink, withoutTrailingLinkSlash } from "../lib/modules/people/links";
 import { getSourceProjectConnections } from "../lib/modules/projects/people-links";
 import { createProjectsRepository } from "../lib/modules/projects/repository";
 import { peopleCreateInputToLegacy, peopleUpdateInputToLegacy } from "../lib/modules/people/legacy-adapter";
@@ -1323,7 +1323,7 @@ function lastContactTimestamp(record: PersonalRecord, interactionDate = ""): num
   return Number.isNaN(timestamp) ? Number.NEGATIVE_INFINITY : timestamp;
 }
 
-function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile {
+function buildProfilePayload(draft: ContactProfileDraft, organization = false): PersonalContactProfile {
   const { projects: _projects, autofill: _autofill, ...profileDraft } = draft;
   const education = cleanEducationEntries(draft.education);
   const occupations = cleanOccupationEntries(draft.occupations);
@@ -1338,7 +1338,7 @@ function buildProfilePayload(draft: ContactProfileDraft): PersonalContactProfile
   const primaryPhone = phones.find((entry) => entry.category === "primary") || phones[0];
   return {
     ...profileDraft,
-    ...Object.fromEntries(PEOPLE_PROFILE_LINK_KEYS.map((key) => [key, withoutTrailingLinkSlash(draft[key])])),
+    ...Object.fromEntries(PEOPLE_PROFILE_LINK_KEYS.map((key) => [key, normalizePeopleProfileLink(key, draft[key], organization)])),
     phoneCountryCode: primaryPhone?.countryCode || canonicalCountryCode(draft.phoneCountryCode),
     phoneNumber: primaryPhone?.number || "",
     primaryEmail: primaryEmail?.address || "",
@@ -1763,7 +1763,7 @@ function LocationEntriesEditor({
         <div className="people-repeatable-title"><span><PeopleIcon name="location" /></span><h4>Places</h4></div>
         <PeopleAddButton label="Place" onClick={onAdd} />
       </header>
-      {!organization && onComesFromChange && <label className="people-comes-from-field is-standalone" title="Comes from"><UnigentamosIcon role="location" candidate="map-pin" size={18} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="Origin" /></label>}
+      {!organization && onComesFromChange && <label className="people-origin-field"><span>Origin</span><span className="people-comes-from-field is-standalone"><UnigentamosIcon role="location" candidate="map-pin" size={18} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="City or region" /></span></label>}
       {entries.length > 0 ? entries.map((entry, index) => (
         <article className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
           <div className={`people-repeatable-fields people-repeatable-fields-location people-place-row${organization ? " is-organization" : ""}`}>
@@ -2010,6 +2010,7 @@ export default function PeopleWorkspace({
   const [lastContact, setLastContact] = useState("");
   const [nextContact, setNextContact] = useState("");
   const [cadence, setCadence] = useState("NONE");
+  const [personAutofillBusy, setPersonAutofillBusy] = useState(false);
   const [quickPersonAutofill, setQuickPersonAutofill] = useState<PersonAutofillPending>();
   const [referenceUrl, setReferenceUrl] = useState("");
   const [quickInstagram, setQuickInstagram] = useState("");
@@ -2949,7 +2950,9 @@ export default function PeopleWorkspace({
         nextDraft = { ...nextDraft, photoUrl: payload.photo.url, photoUpdatedAt: payload.photo.updatedAt };
       } catch (error) { setError(error instanceof Error ? error.message : "The picture could not be saved."); return false; }
     }
-    const builtProfile = buildProfilePayload(nextDraft);
+    let builtProfile: PersonalContactProfile;
+    try { builtProfile = buildProfilePayload(nextDraft, selectedPerson.className === "org"); }
+    catch (error) { setError(error instanceof Error ? error.message : "Check the profile details and try again. Your draft is still here."); return false; }
     const profile = selectedPerson.className === "org"
       ? {
           ...builtProfile,
@@ -3085,68 +3088,69 @@ export default function PeopleWorkspace({
 
   async function submitPerson(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving || personAutofillBusy) return;
     setSaving(true);
     setError("");
 
-    const derivedName = className === "person" ? derivePersonNameParts(name) : { firstName: "", middleName: "", lastName: "" };
-    const resolvedName = className === "person" ? {
-      firstName: quickFirstName.trim() || derivedName.firstName,
-      middleName: quickMiddleName.trim() || derivedName.middleName,
-      lastName: quickLastName.trim() || derivedName.lastName
-    } : derivedName;
-    const organizationLocation = className === "org" ? cleanLocationEntries(quickLocations)[0] : undefined;
-    const profile = buildProfilePayload({
-      ...EMPTY_PROFILE_DRAFT,
-      fullName: name,
-      ...resolvedName,
-      nickname: className === "person" ? quickNickname : "",
-      birthday: className === "person" ? quickBirthday : "",
-      context: quickContext,
-      lifeDream: className === "person" ? joinTextEntries(quickLifeDreams.filter((dream) => dream.trim())) : "",
-      notes: joinTextEntries(quickNotes.filter((note) => note.trim())),
-      organizationType: className === "org" ? quickOrganizationType : "",
-      industry: className === "org" ? quickIndustry : "",
-      foundedYear: className === "org" ? quickFoundedYear : "",
-      teamSize: className === "org" ? quickTeamSize : "",
-      headquarters: organizationLocation?.location || organizationLocation?.address || "",
-      associatedPeople: className === "org" ? joinList(quickOrganizationPeople) : "",
-      emails: className === "person" ? quickEmails : [],
-      phones: className === "person" ? quickPhones : [],
-      education: className === "person" ? quickEducation : [],
-      occupations: className === "person" ? quickOccupations : [],
-      locations: quickLocations,
-      comesFrom: className === "person" ? quickComesFrom : "",
-      lastContact: className === "person" ? lastContact : "",
-      nextContact: className === "person" ? nextContact : "",
-      contactCadence: className === "person" ? cadence : "",
-      website: referenceUrl,
-      instagram: quickInstagram,
-      tiktok: quickTikTok,
-      x: quickX,
-      linkedin: quickLinkedIn,
-      youtube: quickYouTube
-    });
-
-    const legacyInput = peopleCreateInputToLegacy({
-      fullName: name.trim(),
-      type: className === "org" ? "organization" : "person",
-      status: className === "org" ? "active" : status,
-      context: quickContext,
-      profile,
-      time: {
-        reviewCadence: className === "person" ? cadence : "",
-        lastReview: className === "person" ? lastContact : "",
-        nextReview: className === "person" ? nextContact : ""
-      },
-      areas: ["Relationships"],
-      subjects: className === "org" ? [] : groups,
-      projects: [],
-      externalSources: [profile.website, profile.instagram, profile.tiktok, profile.x, profile.linkedin, profile.youtube]
-        .filter((value): value is string => Boolean(value)),
-      sourceUrl: profile.website
-    });
-
     try {
+      const derivedName = className === "person" ? derivePersonNameParts(name) : { firstName: "", middleName: "", lastName: "" };
+      const resolvedName = className === "person" ? {
+        firstName: quickFirstName.trim() || derivedName.firstName,
+        middleName: quickMiddleName.trim() || derivedName.middleName,
+        lastName: quickLastName.trim() || derivedName.lastName
+      } : derivedName;
+      const organizationLocation = className === "org" ? cleanLocationEntries(quickLocations)[0] : undefined;
+      const profile = buildProfilePayload({
+        ...EMPTY_PROFILE_DRAFT,
+        fullName: name,
+        ...resolvedName,
+        nickname: className === "person" ? quickNickname : "",
+        birthday: className === "person" ? quickBirthday : "",
+        context: quickContext,
+        lifeDream: className === "person" ? joinTextEntries(quickLifeDreams.filter((dream) => dream.trim())) : "",
+        notes: joinTextEntries(quickNotes.filter((note) => note.trim())),
+        organizationType: className === "org" ? quickOrganizationType : "",
+        industry: className === "org" ? quickIndustry : "",
+        foundedYear: className === "org" ? quickFoundedYear : "",
+        teamSize: className === "org" ? quickTeamSize : "",
+        headquarters: organizationLocation?.location || organizationLocation?.address || "",
+        associatedPeople: className === "org" ? joinList(quickOrganizationPeople) : "",
+        emails: className === "person" ? quickEmails : [],
+        phones: className === "person" ? quickPhones : [],
+        education: className === "person" ? quickEducation : [],
+        occupations: className === "person" ? quickOccupations : [],
+        locations: quickLocations,
+        comesFrom: className === "person" ? quickComesFrom : "",
+        lastContact: className === "person" ? lastContact : "",
+        nextContact: className === "person" ? nextContact : "",
+        contactCadence: className === "person" ? cadence : "",
+        website: referenceUrl,
+        instagram: quickInstagram,
+        tiktok: quickTikTok,
+        x: quickX,
+        linkedin: quickLinkedIn,
+        youtube: quickYouTube
+      }, className === "org");
+
+      const legacyInput = peopleCreateInputToLegacy({
+        fullName: name.trim(),
+        type: className === "org" ? "organization" : "person",
+        status: className === "org" ? "active" : status,
+        context: quickContext,
+        profile,
+        time: {
+          reviewCadence: className === "person" ? cadence : "",
+          lastReview: className === "person" ? lastContact : "",
+          nextReview: className === "person" ? nextContact : ""
+        },
+        areas: ["Relationships"],
+        subjects: className === "org" ? [] : groups,
+        projects: [],
+        externalSources: [profile.website, profile.instagram, profile.tiktok, profile.x, profile.linkedin, profile.youtube]
+          .filter((value): value is string => Boolean(value)),
+        sourceUrl: profile.website
+      });
+
       const response = await fetch("/api/personal/records", {
         method: "POST",
         headers: buildJsonHeadersWithCsrf(),
@@ -3266,7 +3270,7 @@ export default function PeopleWorkspace({
           : `${createdPerson?.title || "Person"} was created with ${linkedObjectCount} object ${linkedObjectCount === 1 ? "link" : "links"}.`);
       }
       if (createdPerson) {
-        await mirrorPersonalRecord(createdPerson);
+        void Promise.all(nextPeople.filter(record => record.id === createdPerson.id || (record.className === "org" && people.find(previous => previous.id === record.id)?.updatedAt !== record.updatedAt)).map(mirrorPersonalRecord));
         await releaseDirtyHistoryGuard();
         router.replace(`${getNativeObjectRoute({ module: "people", objectType: createdPerson.className === "org" ? "organization" : "person", objectId: createdPerson.id })}?tab=overview`);
       }
@@ -3338,7 +3342,8 @@ export default function PeopleWorkspace({
 
       const nextPeople = payload.items.filter((record) => record.className === "person" || record.className === "org");
       const updatedPerson = nextPeople.find((record) => record.id === id);
-      if (updatedPerson) await mirrorPersonalRecord(updatedPerson);
+      // The canonical save is complete; mirror the person and enriched organizations together.
+      void Promise.all(nextPeople.filter(record => record.id === id || (record.className === "org" && people.find(previous => previous.id === record.id)?.updatedAt !== record.updatedAt)).map(mirrorPersonalRecord));
       setPeople(nextPeople);
       setSelectedId(id);
       if (updatedPerson && (patch.profile || patch.subjects)) {
@@ -3531,10 +3536,13 @@ export default function PeopleWorkspace({
 
   async function saveProfile(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedPerson || profileSaving || lifecycleSaving) return;
+    if (!selectedPerson || profileSaving || lifecycleSaving || personAutofillBusy) return;
     setProfileSaving(true);
-    const saved = await saveProfileDraft(profileDraft);
-    setProfileSaving(false);
+    setError("");
+    let saved = false;
+    try { saved = await saveProfileDraft(profileDraft); }
+    catch (error) { setError(error instanceof Error ? error.message : "Unable to save. Your draft is still here."); }
+    finally { setProfileSaving(false); }
     if (!saved) return;
     setDetailMode("profile");
     setActiveView(editorReturnView);
@@ -3834,7 +3842,7 @@ export default function PeopleWorkspace({
         <div className="people-edit-toolbar">
           <button type="button" onClick={requestCancelEditor}><PeopleIcon name="close" /><span>Cancel</span></button>
           <strong>{className === "org" ? "New Organization" : "New Person"}</strong>
-          <button type="submit" disabled={saving}><PeopleIcon name="check" /><span>{saving ? "Saving..." : "Save"}</span></button>
+          <button type="submit" disabled={saving || personAutofillBusy}><PeopleIcon name="check" /><span>{personAutofillBusy ? "Autofilling…" : saving ? "Saving..." : "Save"}</span></button>
         </div>
         <fieldset className="people-record-type-toggle">
           <legend className="sr-only">Record type</legend>
@@ -3907,7 +3915,7 @@ export default function PeopleWorkspace({
               <header className="people-profile-section-heading people-autofill-heading">
                 <span><PeopleIcon name="communication" /></span>
                 <h4 id="people-create-communication-title">Communication</h4>
-                <PersonAutofill name={name} values={quickPersonAutofillValues} onApply={applyQuickPersonAutofill} organizations={organizationAutofillSeeds} disabled={saving} />
+                <PersonAutofill name={name} values={quickPersonAutofillValues} onApply={applyQuickPersonAutofill} organizations={organizationAutofillSeeds} onBusyChange={setPersonAutofillBusy} disabled={saving} />
               </header>
               <div className="people-contact-channel-grid">
                 <EmailEntriesEditor
@@ -3927,12 +3935,12 @@ export default function PeopleWorkspace({
                 />
               </div>
               <div className="people-profile-field-grid people-create-social-grid">
-                <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
-                <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/in/..." /></label>
-                <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
-                <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(withoutTrailingLinkSlash(event.target.value))} placeholder="https://instagram.com/..." /></label>
-                <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(withoutTrailingLinkSlash(event.target.value))} placeholder="https://tiktok.com/@..." /></label>
-                <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
+                <label>Website<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
+                <label>LinkedIn<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/in/..." /></label>
+                <label>X<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
+                <label>Instagram<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickInstagram} onChange={(event) => setQuickInstagram(withoutTrailingLinkSlash(event.target.value))} placeholder="https://instagram.com/..." /></label>
+                <label>TikTok<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickTikTok} onChange={(event) => setQuickTikTok(withoutTrailingLinkSlash(event.target.value))} placeholder="https://tiktok.com/@..." /></label>
+                <label>YouTube<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
               </div>
             </section>
             <OccupationEntriesEditor
@@ -4016,12 +4024,12 @@ export default function PeopleWorkspace({
               <OrganizationAutofill name={name} values={organizationAutofillValues} onApply={applyOrganizationSuggestions} onPhoto={setQuickPhoto} hasPhoto={Boolean(quickPhoto)} disabled={saving} />
             </header>
             <div className="people-profile-field-grid people-create-social-grid people-create-social-grid-no-divider">
-              <label>Website<input type="url" value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
-              <label>LinkedIn<input type="url" value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/company/..." /></label>
-              <label>X<input type="url" value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
-              <label>Instagram<input type="url" value={quickInstagram} onChange={(event) => setQuickInstagram(withoutTrailingLinkSlash(event.target.value))} placeholder="https://instagram.com/..." /></label>
-              <label>TikTok<input type="url" value={quickTikTok} onChange={(event) => setQuickTikTok(withoutTrailingLinkSlash(event.target.value))} placeholder="https://tiktok.com/@..." /></label>
-              <label>YouTube<input type="url" value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
+              <label>Website<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
+              <label>LinkedIn<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickLinkedIn} onChange={(event) => setQuickLinkedIn(withoutTrailingLinkSlash(event.target.value))} placeholder="https://linkedin.com/company/..." /></label>
+              <label>X<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickX} onChange={(event) => setQuickX(withoutTrailingLinkSlash(event.target.value))} placeholder="https://x.com/..." /></label>
+              <label>Instagram<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickInstagram} onChange={(event) => setQuickInstagram(withoutTrailingLinkSlash(event.target.value))} placeholder="https://instagram.com/..." /></label>
+              <label>TikTok<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickTikTok} onChange={(event) => setQuickTikTok(withoutTrailingLinkSlash(event.target.value))} placeholder="https://tiktok.com/@..." /></label>
+              <label>YouTube<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={quickYouTube} onChange={(event) => setQuickYouTube(withoutTrailingLinkSlash(event.target.value))} placeholder="https://youtube.com/@..." /></label>
 
             </div>
           </section>
@@ -4540,7 +4548,7 @@ export default function PeopleWorkspace({
               <div className="people-profile-view-actions" aria-label={`${activeView} actions`}>
                 {activeView === "properties" && <>
                   <button type="button" onClick={requestCancelEditor} disabled={profileSaving}><PeopleIcon name="close" /><span>Cancel</span></button>
-                  <button type="submit" form="people-profile-properties-form" disabled={profileSaving || Boolean(lifecycleSaving)}><PeopleIcon name="check" /><span>{profileSaving ? "Saving..." : "Save"}</span></button>
+                  <button type="submit" form="people-profile-properties-form" disabled={profileSaving || personAutofillBusy || Boolean(lifecycleSaving)}><PeopleIcon name="check" /><span>{personAutofillBusy ? "Autofilling…" : profileSaving ? "Saving..." : "Save"}</span></button>
                 </>}
                 {activeView === "timeline" && <>
                   <PeopleAddButton label="Interaction" ariaLabel="Log interaction" icon="interaction" onClick={() => openInteractionComposer(selectedPerson)} />
@@ -4549,6 +4557,7 @@ export default function PeopleWorkspace({
                 {activeView === "links" && <PeopleAddButton label="Object" icon="object-add" ariaLabel="Add object" onClick={() => setObjectLinkOpen(true)} />}
               </div>
               </div>
+              {activeView === "properties" && error && <p className="people-profile-save-error" role="alert">{error}</p>}
               </>
             )}
 
@@ -4563,7 +4572,7 @@ export default function PeopleWorkspace({
               renderAddPersonForm("people-empty-add")
             ) : detailMode === "edit" ? (
               <div className="people-edit-layout">
-                <form id="people-profile-properties-form" aria-label={selectedPerson.className === "org" ? "Edit Organization" : "Edit Profile"} className="people-profile-form people-edit-form" onSubmit={saveProfile}>
+                <form id="people-profile-properties-form" aria-label={selectedPerson.className === "org" ? "Edit Organization" : "Edit Profile"} className="people-profile-form people-edit-form" onSubmit={saveProfile} onInvalidCapture={(event) => { const field = event.target as HTMLInputElement; setError(`${field.closest("label")?.textContent?.trim() || "A profile field"}: ${field.validationMessage} Your other edits are still here.`); }}>
                   {(selectedPerson.className === "org" ? ORGANIZATION_PROFILE_SECTIONS : PROFILE_SECTIONS).map((section) => (
                     <Fragment key={section.title}>
                     <section className={`people-profile-section people-themed-section module-ref-tone-${section.tone}`} data-profile-section={section.title.toLowerCase().replace(/\s+/g, "-")}>
@@ -4572,7 +4581,7 @@ export default function PeopleWorkspace({
                         <h4>{section.title}</h4>
                         {section.title === "About" && selectedPerson.className === "person" && <div className="people-about-additions"><PeopleAddButton label="Life dream" icon="life-dream" iconOnly onClick={()=>setAboutExtras(current=>({...current,dream:true}))}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setAboutExtras(current=>({...current,notes:true}))}/></div>}
                         {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} onPhoto={setProfilePhotoDraft} hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)} disabled={profileSaving} />}
-                        {section.title === "Communication" && selectedPerson.className === "person" && <PersonAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileDraft} onApply={applyProfilePersonAutofill} organizations={organizationAutofillSeeds} disabled={profileSaving} />}
+                        {section.title === "Communication" && selectedPerson.className === "person" && <PersonAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileDraft} onApply={applyProfilePersonAutofill} organizations={organizationAutofillSeeds} onBusyChange={setPersonAutofillBusy} disabled={profileSaving} />}
                       </header>
                       {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">
                         <EmailEntriesEditor
@@ -4640,11 +4649,13 @@ export default function PeopleWorkspace({
                               />
                             ) : (
                               <input
-                                type={field.type || "text"}
+                                type={field.type === "url" ? "text" : field.type || "text"}
+                                autoCapitalize={field.type === "url" ? "off" : undefined}
+                                spellCheck={field.type === "url" ? false : undefined}
                                 list={field.key === "livesIn" ? "people-location-suggestions" : undefined}
                                 value={profileDraft[field.key]}
                                 onChange={(event) => updateProfileDraft(field.key, event.target.value)}
-                                inputMode={field.key === "foundedYear" ? "numeric" : undefined}
+                                inputMode={field.key === "foundedYear" ? "numeric" : field.type === "url" ? "url" : undefined}
                                 pattern={field.key === "foundedYear" ? "\\d{4}" : undefined}
                                 placeholder={field.placeholder}
                               />
@@ -5090,9 +5101,9 @@ export default function PeopleWorkspace({
             <button
               type="button"
               onClick={() => document.querySelector<HTMLFormElement>(addingPerson ? ".people-capture-form" : ".people-edit-form")?.requestSubmit()}
-              disabled={saving || profileSaving || Boolean(lifecycleSaving)}
+              disabled={saving || profileSaving || personAutofillBusy || Boolean(lifecycleSaving)}
             >
-              <PeopleIcon name="check" /><span>{saving || profileSaving ? "Saving…" : "Save"}</span>
+              <PeopleIcon name="check" /><span>{personAutofillBusy ? "Autofilling…" : saving || profileSaving ? "Saving…" : "Save"}</span>
             </button>
       </nav>}
 

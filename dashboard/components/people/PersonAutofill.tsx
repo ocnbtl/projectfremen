@@ -7,12 +7,14 @@ import { extractPastedPersonProfile, MAX_PROFILE_TEXT_LENGTH } from "../../lib/m
 import { enrichPersonOrganizations } from "../../lib/modules/people/person-organization-autofill";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
-export default function PersonAutofill({ name, values, onApply, organizations = [], disabled = false }: {
+export default function PersonAutofill({ name, values, onApply, organizations = [], onBusyChange, disabled = false }: {
   name: string; values: PersonAutofillValues; onApply: (result: PersonAutofillResult) => void; disabled?: boolean;
+  onBusyChange?: (busy: boolean) => void;
   organizations?: { id: string; title: string; website: string }[];
 }) {
   const [result, setResult] = useState<PersonAutofillResult | null>(null);
   const [busy, setBusy] = useState(false), [notice, setNotice] = useState("");
+  useEffect(() => { onBusyChange?.(busy); return () => onBusyChange?.(false); }, [busy, onBusyChange]);
   const [progress, setProgress] = useState("");
   const [pasteOpen, setPasteOpen] = useState(false), [profileText, setProfileText] = useState(""), [pasteError, setPasteError] = useState("");
   const pasteId = useId();
