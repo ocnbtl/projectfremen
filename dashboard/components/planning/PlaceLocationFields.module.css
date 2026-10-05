@@ -1,0 +1,12 @@
+.fields { display: grid; gap: 10px; min-width: 0; }
+.fields label { display: grid; gap: 5px; min-width: 0; font: 500 12px/1.4 var(--font-body); }
+.fields input { width: 100%; min-width: 0; box-sizing: border-box; font-size: 12px; }
+.lookup { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.lookup small, .message { font: 400 11px/1.5 var(--font-body); color: var(--text-secondary); margin: 0; }
+.coordinates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.matches { display: grid; gap: 4px; max-height: 210px; overflow: auto; border-radius: 9px; padding: 4px; background: var(--module-quiet); }
+.matches button { display: grid; text-align: left; gap: 3px; width: 100%; border: 1px solid var(--module-border); border-radius: 8px; background: var(--panel-bg, white); color: var(--text-strong); padding: 9px; cursor: pointer; }
+.matches button:hover { background: var(--module-secondary-100); }
+.matches strong, .matches span { font: 500 12px/1.4 var(--font-body); }
+.matches small { font: 400 10px/1.4 var(--font-body); color: var(--text-secondary); }
+@media (max-width: 760px) { .fields.fields input { font-size: 16px; } }

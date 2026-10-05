@@ -1230,6 +1230,14 @@ async function check(label, run) {
     assert.deepEqual(regionBounds(points([[-5, 50], [5, 55]])), [[-5, 50], [5, 55]]);
     assert.equal(regionBounds(points([])), undefined);
   });
+  await check("geocoding candidates reject malformed geometry and retain valid address coordinates", () => {
+    const { parsePlaceSearch } = require("../lib/modules/planning/place-search.ts");
+    const feature = (coordinates, properties = {}) => ({ geometry: { type: "Point", coordinates }, properties });
+    const results = parsePlaceSearch({ features: [null, feature([2.2945, 48.8584], { name: "Tower", street: "Avenue", town: "Paris", postcode: "75007", country: "France" }), feature([181, 40]), feature([5, 91]), feature(["2", "48"]), feature([NaN, 30])] }, "query");
+    assert.deepEqual(results, [{ name: "Tower", address: "Avenue, Paris, 75007, France", latitude: 48.8584, longitude: 2.2945 }]);
+    assert.deepEqual(parsePlaceSearch({ features: [] }, "query"), []);
+    assert.throws(() => parsePlaceSearch({ error: "unavailable" }, "query"), /unexpected/);
+  });
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );

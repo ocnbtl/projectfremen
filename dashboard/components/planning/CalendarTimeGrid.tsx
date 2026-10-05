@@ -1,7 +1,6 @@
 "use client";
 import { animate, motion } from "motion/react";
 import { eventColors, eventPreviewTitle } from "./calendar-presentation";
-import Link from "next/link";
 import { useCalendarMotion } from "./CalendarMotion";
 import {
   useLayoutEffect,
@@ -23,9 +22,9 @@ import {
   localFor,
 } from "../../lib/modules/planning/calendar-model";
 import { eventGroup } from "../../lib/modules/planning/calendar-groups";
-import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import EventPeople from "./EventPeople";
+import CalendarAllDayBand from "./CalendarAllDayBand";
 import styles from "./CalendarWorkspace.module.css";
 
 const minuteOf = (ms: number, zone: string) => {
@@ -128,10 +127,6 @@ export default function CalendarTimeGrid({
           {zone.split("/").pop()?.replaceAll("_", " ")}
         </div>
         {days.map((day) => {
-          const allDay = events.filter(
-              (e) => e.allDay && e.start <= day && e.end > day,
-            ),
-            links = dated.filter((d) => d.start <= day && d.end > day);
           return (
             <motion.div
               className={styles.fittedDayHeader}
@@ -161,32 +156,10 @@ export default function CalendarTimeGrid({
                   {day === today && <small>Today</small>}
                 </span>
               </motion.button>
-              {!!(allDay.length + links.length) && (
-                <div className={styles.allDayItems} role="group" aria-label={`All-day and linked events on ${day}`} data-all-day-date={day}>
-                  {allDay.map(item => {
-                    const calendar = calendars.find(c => c.id === item.calendarId),
-                      group = eventGroup(calendar, item.groupId);
-                    return <motion.button type="button" key={item.id} layout="position" transition={{ layout: layoutTransition }}
-                      data-morph-event={item.id} className={styles.allDayItem} data-birthday={item.system?.kind === "birthday" || undefined} style={eventColors(item, calendar) as CSSProperties}
-                      aria-label={`${item.title} · All day${group ? ` · ${group.name}` : ""}`} title={`${item.title} · All day`}
-                      onClick={() => onOpen(item)}>
-                      <UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={13} />
-                      <span className={styles.eventTitle}>{eventPreviewTitle(item)}</span>
-                      <EventPeople refs={item.linkedRefs} available={refs} />
-                    </motion.button>;
-                  })}
-                  {links.map(link => <Link key={link.id} className={styles.allDayItem}
-                    style={{ "--event-color": MODULE_COLOR_SYSTEM[link.ownerRef?.module || "personal_ops"].tokens.icon } as CSSProperties}
-                    href={link.ownerRef?.route || "/admin/personal"} data-completed={link.completed || undefined}
-                    aria-label={`${link.title} · Linked${link.completed ? " · Completed" : ""}`} title={link.title}>
-                    <UnigentamosIcon role={link.completed ? "check" : "link"} size={13} />
-                    <span>{link.title}</span>
-                  </Link>)}
-                </div>
-              )}
             </motion.div>
           );
         })}
+        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} onOpen={onOpen} />
         <div className={styles.fittedHours} ref={hours}>
           {Array.from({ length: 24 }, (_, i) => (
             <span key={i} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span>{hourName(i)}</span></span>

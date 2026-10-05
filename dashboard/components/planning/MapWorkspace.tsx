@@ -1,4 +1,6 @@
 "use client";
+import * as Popover from "@radix-ui/react-popover";
+import PlaceLocationFields from "./PlaceLocationFields";
 import MapDataExplorer, {
   MapDataLegend,
   type AnalysisResult,
@@ -260,8 +262,8 @@ export default function MapWorkspace() {
         : {
             name: "",
             address: "",
-            latitude: viewport.center[1],
-            longitude: viewport.center[0],
+            latitude: undefined,
+            longitude: undefined,
             tags: [],
             notes: "",
             linkedRefs: [],
@@ -271,7 +273,7 @@ export default function MapWorkspace() {
   async function search() {
     await action(
       async () =>
-        setSearchResults(await mapRequest<SearchPlace[]>({ q: query })),
+        { const results = await mapRequest<SearchPlace[]>({ q: query }); setSearchResults(results); setMobileList(true); if (!results.length) setError("No matching addresses found. Add a city or postal code."); },
       "",
     );
   }
@@ -374,16 +376,19 @@ export default function MapWorkspace() {
       className={`work-surface ${styles.shell}`}
       style={moduleThemeVariables("map") as CSSProperties}
     >
+      <div className={styles.mapToolbar} aria-label="Map controls" onKeyDown={e => {
+        if (e.key === "Enter" && e.target instanceof HTMLInputElement && e.target.closest(".work-search") && query.trim().length >= 3 && !busy) { e.preventDefault(); void search(); }
+      }}>
       <WorkspaceHeader title="Map">
         <Button icon="travel" onClick={() => startTrip()}>Plan trip</Button>
-        <Button intent="primary" icon="plus" onClick={() => newPlace()}>
+        <Button intent="primary" icon="plus" aria-label="Save place" onClick={() => newPlace()}>
           Save place
         </Button>
       </WorkspaceHeader>
       <WorkspaceToolbar
         query={query}
         onQuery={setQuery}
-        placeholder="Search saved places"
+        placeholder="Search places or addresses"
         activeFilters={tag ? 1 : 0}
         filters={
           <>
@@ -422,37 +427,25 @@ export default function MapWorkspace() {
         }
       >
         <Button
-          icon="search" aria-label="Find on map"
+          icon="search" aria-label="Search addresses"
           disabled={query.trim().length < 3 || busy}
           onClick={() => void search()}
         >
-          Find on map
+          Search addresses
         </Button>
         <Button icon="location" aria-label={pinning ? "Cancel pin" : "Drop pin"} aria-pressed={pinning} onClick={() => setPinning(!pinning)}>
           {pinning ? "Cancel pin" : "Drop pin"}
         </Button>
         <Button
-          icon={mobileList ? "map" : "list"} className={styles.listToggle}
+          icon={mobileList ? "map" : "list"} aria-label={mobileList ? "Show map" : "Show places list"} className={styles.listToggle}
           aria-pressed={mobileList}
           onClick={() => setMobileList(!mobileList)}
         >
           {mobileList ? "Map" : "List"}
         </Button>
-      </WorkspaceToolbar>
-      <WorkspaceFeedback error={error} message={notice} />
-      {pinning && (
-        <p className={styles.hint}>
-          Select a point on the map, or use Save place to enter coordinates.
-        </p>
-      )}
-      {snapshot?.persistence === "device" && (
-        <p className="work-muted" role="status">
-          Saved on this device. Pending changes will synchronize when the
-          connection is restored.
-        </p>
-      )}
-      <div className={styles.workspace}>
-        <aside className={styles.directory} data-mobile-open={mobileList}>
+        <Popover.Root><Popover.Trigger asChild><Button icon="build" aria-label="Explore data">Explore data{analysis.metrics.length ? ' (' + analysis.metrics.length + ')' : ''}</Button></Popover.Trigger>
+          <Popover.Portal forceMount><Popover.Content forceMount className={styles.dataPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="end" aria-label="Explore map data" onOpenAutoFocus={e => e.preventDefault()}>
+            <header className={styles.explorerHeader}><div><strong>Explore data</strong><small>Compare places through geographic data</small></div><Popover.Close asChild><Button aria-label="Close data explorer" icon="close">Close</Button></Popover.Close></header>
           <MapDataExplorer
             level={level}
             state={stateCode}
@@ -473,6 +466,25 @@ export default function MapWorkspace() {
             onResult={setAnalysisResult}
             loadKey={analysisLoadKey}
           />
+
+          </Popover.Content></Popover.Portal>
+        </Popover.Root>
+      </WorkspaceToolbar>
+      </div>
+      <WorkspaceFeedback error={error} message={notice} />
+      {pinning && (
+        <p className={styles.hint}>
+          Select a point on the map, or use Save place to enter coordinates.
+        </p>
+      )}
+      {snapshot?.persistence === "device" && (
+        <p className="work-muted" role="status">
+          Saved on this device. Pending changes will synchronize when the
+          connection is restored.
+        </p>
+      )}
+      <div className={styles.workspace}>
+        <aside className={styles.directory} data-mobile-open={mobileList}>
           <details className={styles.savedViews}>
             <summary>Saved views</summary>
             <div className="work-form">
@@ -682,45 +694,7 @@ export default function MapWorkspace() {
                 onChange={(e) => setEditor({ ...editor, name: e.target.value })}
               />
             </label>
-            <label>
-              Address
-              <input
-                value={editor.address || ""}
-                onChange={(e) =>
-                  setEditor({ ...editor, address: e.target.value })
-                }
-              />
-            </label>
-            <div className="work-form-pair">
-              <label>
-                Latitude
-                <input
-                  required
-                  type="number"
-                  step="any"
-                  min="-90"
-                  max="90"
-                  value={editor.latitude ?? ""}
-                  onChange={(e) =>
-                    setEditor({ ...editor, latitude: Number(e.target.value) })
-                  }
-                />
-              </label>
-              <label>
-                Longitude
-                <input
-                  required
-                  type="number"
-                  step="any"
-                  min="-180"
-                  max="180"
-                  value={editor.longitude ?? ""}
-                  onChange={(e) =>
-                    setEditor({ ...editor, longitude: Number(e.target.value) })
-                  }
-                />
-              </label>
-            </div>
+            <PlaceLocationFields value={editor} onChange={patch => setEditor(current => current ? { ...current, ...patch } : current)} />
             <label>
               Tags
               <input

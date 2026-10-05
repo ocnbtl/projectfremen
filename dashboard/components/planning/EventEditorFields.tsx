@@ -4,6 +4,7 @@ import { useState } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 import RecordLinks from "./RecordLinks";
+import EventLocationField from "./EventLocationField";
 import EventDateTimePicker from "./EventDateTimePicker";
 import type {
   EventFields,
@@ -119,15 +120,7 @@ export default function EventEditorFields({
           ))}
         </div>
       </section>
-      <label className={styles.locationField}>
-        <UnigentamosIcon role="location" size={18} />
-        <input
-          aria-label="Address or meeting link"
-          placeholder="Address or meeting link"
-          value={fields.location}
-          onChange={(e) => update("location", e.target.value)}
-        />
-      </label>
+      <EventLocationField fields={fields} update={update} snapshot={snapshot} />
       <section className={styles.editorSection} aria-label="Event schedule">
         <div className={styles.editorSectionTitle}>
           <span className={styles.editorTimeZone}><SelectField searchable autoFocusSearch={false} aria-label="Event time zone" menuClassName={styles.calendarChoiceMenu} value={fields.timeZone} onChange={event => update("timeZone", event.target.value)} triggerContent={<span><UnigentamosIcon role="clock" size={14} />{fields.timeZone.split("/").pop()?.replaceAll("_", " ")}</span>}>{[...new Set([fields.timeZone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(zone => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</SelectField></span>

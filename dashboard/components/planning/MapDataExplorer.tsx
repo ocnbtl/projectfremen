@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import SelectField from "../ui/SelectField";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import {
   mapAnalysis,
@@ -51,6 +52,7 @@ export default function MapDataExplorer({
   const [sort, setSort] = useState("value"),
     [onlyMatches, setOnlyMatches] = useState(false),
     [page, setPage] = useState(0);
+  const [metricQuery, setMetricQuery] = useState(""), [regionQuery, setRegionQuery] = useState("");
   const countryCode = settings.countryCode || "USA";
   const international = countryCode !== "USA";
   const levels = international ? usLevels.slice(0, 3) : usLevels;
@@ -140,7 +142,8 @@ export default function MapDataExplorer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadKey]);
   const shown = (result?.rows || [])
-    .filter((r) => !onlyMatches || r.matches)
+    .filter(r => r.name.toLowerCase().includes(regionQuery.toLowerCase()))
+    .filter((r) => !onlyMatches || (r.matches && r.value !== null))
     .sort((a, b) =>
       sort === "name"
         ? a.name.localeCompare(b.name)
@@ -148,11 +151,10 @@ export default function MapDataExplorer({
     );
   return (
     <section className={styles.layers} aria-label="Map data explorer">
-      <h2>Explore data</h2>
       <div className={styles.explorerForm}>
         <label>
           Country or territory
-          <SelectField aria-label="Data country" searchable value={country ? "WORLD" : countryCode}
+          <SelectField aria-label="Data country" searchable autoFocusSearch={false} value={country ? "WORLD" : countryCode}
             onChange={(e) => {
               const next = e.target.value;
               onLevel(next === "WORLD" ? "country" : "state");
@@ -211,6 +213,7 @@ export default function MapDataExplorer({
             <SelectField
               aria-label="Data state"
               searchable
+              autoFocusSearch={false}
               value={state}
               onChange={(e) => onState(e.target.value)}
             >
@@ -230,8 +233,9 @@ export default function MapDataExplorer({
         )}
         <fieldset className={styles.dataMetrics}>
           <legend>Data layers</legend>
-          {available.map((metric) => (
-            <label key={metric}>
+          <label className={styles.dataSearch}><UnigentamosIcon role="search" size={16} /><input type="search" aria-label="Search data layers" placeholder="Search available data" value={metricQuery} onChange={e => setMetricQuery(e.target.value)} /></label>
+          {available.filter(metric => MAP_METRICS[metric].toLowerCase().includes(metricQuery.toLowerCase())).map((metric) => (
+            <label key={metric} className={styles.metricCard}>
               <input
                 type="checkbox"
                 checked={settings.metrics.some((m) => m.metric === metric)}
@@ -244,9 +248,11 @@ export default function MapDataExplorer({
                   })
                 }
               />
-              {MAP_METRICS[metric]}
+              <UnigentamosIcon role={metric === "income" ? "module-finance" : metric === "age" ? "clock" : metric.includes("density") ? "view-grid" : "module-people"} size={20} />
+              <span><strong>{MAP_METRICS[metric]}</strong><small>{metric === "income" ? "Median household earnings · USD" : metric === "age" ? "Median resident age · years" : metric.includes("density") ? "People per square kilometer" : "Total residents · people"}</small></span>
             </label>
           ))}
+          {!available.some(metric => MAP_METRICS[metric].toLowerCase().includes(metricQuery.toLowerCase())) && <small>No matching layers at this geographic level.</small>}
         </fieldset>
         {settings.metrics.length > 1 && (
           <label>
@@ -284,6 +290,7 @@ export default function MapDataExplorer({
         >
           Apply data
         </Button>
+        {!!settings.metrics.length && <Button icon="close" onClick={() => { onSettings({ ...settings, metrics: [] }); setData([]); }}>Clear layers</Button>}
         {error && (
           <p role="alert" className={styles.dataError}>
             {error}
@@ -370,6 +377,7 @@ export default function MapDataExplorer({
             </small>
             {data.map((d, i) => (
               <p className={styles.source} key={i}>
+                <strong className={styles.coverageTotal}>{d.rows.filter(row => row.value !== null && Number.isFinite(row.value)).length.toLocaleString()} / {d.rows.length.toLocaleString()} returned {level === "country" ? "countries" : level === "state" ? "states / provinces" : level === "county" ? "counties / districts" : level === "place" ? "cities / towns" : "tracts"} with data</strong>
                 <a href={d.sourceUrl} target="_blank" rel="noreferrer">
                   {MAP_METRICS[settings.metrics[i].metric]} · {d.source}
                 </a>
@@ -400,6 +408,8 @@ export default function MapDataExplorer({
               <option value="value">Highest value</option>
               <option value="name">Name</option>
             </SelectField>
+            <label className={styles.dataSearch}><UnigentamosIcon role="search" size={16} /><input type="search" aria-label="Search data regions" placeholder="Find a state, county or region" value={regionQuery} onChange={e => { setRegionQuery(e.target.value); setPage(0); }} /></label>
+            {!shown.length && <p className="work-muted">No regions match this search and filter combination.</p>}
             <div className={styles.regionTable}>
               {shown.slice(page * 25, page * 25 + 25).map((r) => (
                 <div key={r.id}>
@@ -415,7 +425,7 @@ export default function MapDataExplorer({
                     </span>
                   ))}
                   <small>
-                    {r.year} · {r.matches ? "Matches" : "Outside filters"}
+                    {r.year} · {r.value === null ? "No data" : r.matches ? "Matches" : "Outside filters"}
                   </small>
                 </div>
               ))}

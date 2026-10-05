@@ -1,3 +1,4 @@
+import { parsePlaceSearch } from "./place-search";
 import { feature } from "topojson-client";
 import world from "world-atlas/countries-110m.json";
 import type { FeatureCollection } from "geojson";
@@ -40,22 +41,7 @@ export async function searchPlaces(query: string) {
   const data = await publicJson(
     `https://photon.komoot.io/api/?${new URLSearchParams({ q: query, limit: "8" })}`,
   );
-  if (!Array.isArray(data.features))
-    throw new Error("Place search returned an unexpected result");
-  return data.features.map((feature: any) => ({
-    name: feature.properties.name || feature.properties.street || query,
-    address: [
-      feature.properties.housenumber,
-      feature.properties.street,
-      feature.properties.city,
-      feature.properties.state,
-      feature.properties.country,
-    ]
-      .filter(Boolean)
-      .join(", "),
-    longitude: feature.geometry.coordinates[0],
-    latitude: feature.geometry.coordinates[1],
-  }));
+  return parsePlaceSearch(data, query);
 }
 export async function routeStops(coordinates: unknown, mode: string) {
   if (

@@ -50,6 +50,7 @@ export async function POST(request: Request) {
     const raw = await request.text();
     if (raw.length > 20000) throw new Error("Route request is too large");
     const body = JSON.parse(raw);
+    if (body.operation === "geocode") return json({ ok: true, data: await searchPlaces(typeof body.address === "string" ? body.address : "") });
     return json({
       ok: true,
       data: await routeStops(body.coordinates, body.mode),
