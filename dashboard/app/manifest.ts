@@ -11,7 +11,7 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: "#173b35",
     icons: [
       {
-        src: "/unigentamos-logo.svg",
+        src: "/unigentamos-favicon.svg",
         sizes: "any",
         type: "image/svg+xml",
         purpose: "any"

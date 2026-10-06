@@ -17,6 +17,7 @@ import "./scrollbars.css";
 import "./finance-accounts.css";
 import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
 import NavigationHost from "../components/admin-shell/NavigationHost";
+import LoadingHost from "../components/operational/LoadingHost";
 import { PersistentSharedAIDockProvider } from "../components/admin-shell/SharedAIDock";
 
 export const viewport: Viewport = { width: "device-width", initialScale: 1, viewportFit: "cover", themeColor: "#ffffff" };
@@ -26,9 +27,9 @@ export const metadata: Metadata = {
   title: "Unigentamos",
   description: "A collective of ventures, ideas, and experiences working towards a better world.",
   icons: {
-    icon: "/unigentamos-logo.svg",
-    shortcut: "/unigentamos-logo.svg",
-    apple: "/unigentamos-logo.svg"
+    icon: [{ url: "/unigentamos-favicon.svg", type: "image/svg+xml" }, { url: "/favicon-32.png", sizes: "32x32", type: "image/png" }],
+    shortcut: "/favicon-32.png",
+    apple: "/apple-touch-icon.png"
   },
   openGraph: {
     title: "Unigentamos",
@@ -55,7 +56,7 @@ export default function RootLayout({
   return (
     <html lang="en" data-scroll-behavior="smooth">
       <body>
-        <PersistentSharedAIDockProvider><NavigationHost>{children}</NavigationHost></PersistentSharedAIDockProvider>
+        <LoadingHost><PersistentSharedAIDockProvider><NavigationHost>{children}</NavigationHost></PersistentSharedAIDockProvider></LoadingHost>
         <ServiceWorkerRegistration />
         {process.env.VERCEL === "1" ? <Analytics /> : null}
       </body>

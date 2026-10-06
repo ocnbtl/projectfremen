@@ -22,22 +22,31 @@
   height: 64px;
   max-width: none;
   transform-origin: center;
-  animation: logo-orbit 2800ms cubic-bezier(.65, 0, .25, 1) infinite;
+  animation: logo-orbit 1100ms linear infinite;
   will-change: transform;
 }
 
-/* A gentle wind-up, a quick sweep, then a soft arrival. Zero velocity at
-   both ends keeps the full-turn loop continuous, without a speed jump. */
+/* Continuous momentum with two quick sweeps per turn. The matching endpoint
+   velocities avoid a stop/start at the loop seam. */
 @keyframes logo-orbit {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  0% { transform: rotate(0deg); animation-timing-function: cubic-bezier(.4,.2,.6,.8); }
+  50% { transform: rotate(180deg); animation-timing-function: cubic-bezier(.4,.2,.6,.8); }
+  100% { transform: rotate(360deg); }
 }
+
+.host { pointer-events:none; visibility:hidden; opacity:0; transition:opacity 140ms ease-out; }
+.host[data-loading-phase="visible"] { visibility:visible; opacity:1; }
+.host[data-loading-phase="leaving"] { visibility:visible; opacity:0; }
+.host[data-loading-phase="idle"] .logo { animation-play-state:paused; }
 
 @media (prefers-reduced-motion: reduce) {
   .logo { animation: none !important; will-change: auto; }
+  .host { transition:none; }
 }
 :global(html[data-product-motion="reduce"]) .logo,
 :global(html[data-reduce-motion="true"]) .logo {
   animation: none !important;
   will-change: auto;
 }
+:global(html[data-product-motion="reduce"]) .host,
+:global(html[data-reduce-motion="true"]) .host { transition:none; }
