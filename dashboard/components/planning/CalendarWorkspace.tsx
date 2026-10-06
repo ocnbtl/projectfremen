@@ -11,6 +11,8 @@ import CalendarYearView from "./CalendarYearView";
 import CalendarAgenda from "./CalendarAgenda";
 import { calendarRange, shiftCalendar, viewIcons, type CalendarView as View } from "../../lib/modules/planning/calendar-navigation";
 import EventPeople from "./EventPeople";
+import EventObjects from "./EventObjects";
+import { calendarDateLabel } from "./CalendarMiniMonth";
 import CalendarObservanceSettings, { CalendarCountryFlag } from "./CalendarObservanceSettings";
 import { calendarObservances, defaultObservances, observanceAppearance, type HolidayCatalog } from "../../lib/modules/planning/observances";
 import EventEditorFields from "./EventEditorFields";
@@ -540,10 +542,12 @@ export default function CalendarWorkspace() {
         onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
         title={item.title}
       >
-        {detail ? <span className={styles.detailTime}>{!item.allDay && eventTimeRange(item.startMs, item.endMs, zone)}</span> : !(view === "month" && item.allDay) && <span className={styles.agendaTime}>{item.allDay ? "All day" : <>{eventTimeLabel(item.startMs, zone)}<small>to {eventTimeLabel(item.endMs, zone)}</small></>}</span>}
+        <span className={detail ? styles.detailTime : styles.agendaTime}>{!item.allDay && eventTimeRange(item.startMs, item.endMs, zone)}</span>
         <span className={styles.eventIcon}><UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={16} /></span>
-        <span className={styles.eventCopy}><strong>{eventPreviewTitle(item)}</strong>{!detail && item.location && <small>{item.location}</small>}</span>
-        {detail && item.location && <span className={styles.detailLocation}><UnigentamosIcon role="location" size={16} />{item.location}</span>}
+        <span className={styles.eventCopy}><strong>{eventPreviewTitle(item)}</strong>
+          {localFor(item.endMs - 1, zone).slice(0, 10) > localFor(item.startMs, zone).slice(0, 10) && <span className={styles.eventDateRange}><UnigentamosIcon role="calendar" size={14} />{calendarDateLabel(localFor(item.startMs, zone).slice(0, 10), { month: "short", day: "numeric" })} – {calendarDateLabel(localFor(item.endMs - 1, zone).slice(0, 10), { month: "short", day: "numeric", year: "numeric" })}</span>}
+        </span>
+        <EventObjects event={item} available={snapshot?.refs} />
         <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
       </button>
     );
@@ -708,7 +712,7 @@ export default function CalendarWorkspace() {
               onDay={day => changeView("day", day)} onMore={day => setDayDetail(day)}
               onOpen={item => { if (item.system) setObservance(item); else { const event = snapshot.state.events.find(e => e.id === item.eventId); if (event) openEvent(event, item); } }} />
           ) : view === "agenda" ? (
-            <CalendarAgenda key={[range.start, agendaDays, query, showCompleted, showDated].join(":")} rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={item => eventButton(item)} onDay={day => changeView("day", day)} />
+            <CalendarAgenda rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={item => eventButton(item)} onDay={day => changeView("day", day)} />
           ) : (
             <CalendarTimeGrid
               days={days}
@@ -923,7 +927,7 @@ export default function CalendarWorkspace() {
         open={connections}
         onClose={() => setConnections(false)}
         presentation="page"
-        title="Settings and calendars"
+        title="Settings"
       >
         <div className={`work-form ${styles.calendarSettingsForm}`}>
           <WorkspaceFeedback error={error} message={notice} />
@@ -974,7 +978,7 @@ export default function CalendarWorkspace() {
           <div className={styles.calendarCardGrid}>
             {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <section className={styles.calendarCard} key={c.id} style={{ "--calendar-card-color": calendarDisplayColor(c.color) } as CSSProperties}>
               <CalendarSettings calendar={c} busy={busy} enabled={c.visible} onToggle={visible => void saveCalendarPreference(c.id, { visible })} onSave={(name, color) => saveCalendarPreference(c.id, { name, color })} />
-              <CalendarDisclosure title="Groups" icon="palette"><CalendarGroupSettings calendars={[c]} busy={busy} onSave={(calendar, groups) => saveCalendarPreference(calendar.id, { groups })} /></CalendarDisclosure>
+              <CalendarDisclosure title="Edit groups" icon="palette"><CalendarGroupSettings calendars={[c]} busy={busy} onSave={(calendar, groups) => saveCalendarPreference(calendar.id, { groups })} /></CalendarDisclosure>
             </section>)}
             {["birthdays", ...observanceSettings.countries.map(code => `holidays:${code}`), "custom"].map(key => {
               const code = key.startsWith("holidays:") ? key.slice(9) : undefined;
@@ -985,9 +989,9 @@ export default function CalendarWorkspace() {
                 <CalendarSettings calendar={appearance} busy={busy} icon={key === "birthdays" ? "birthday" : "star"} country={code} enabled={enabled}
                   onToggle={visible => void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, ...(key === "birthdays" ? { birthdays: visible } : key === "custom" ? { customVisible: visible } : { disabledCountries: visible ? (settings.disabledCountries || []).filter(c => c !== code) : [...new Set([...(settings.disabledCountries || []), code!])] }) } }; })}
                   onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, [key]: { name, color } } } }; })} />
-                {key !== "birthdays" && <SettingsPopover label={code ? "Choose holidays" : "Edit dates"} icon={code ? "interaction-milestone" : "edit"}>
+                {key === "birthdays" ? <CalendarDisclosure title="Choose birthdays" icon="birthday"><div className={styles.birthdayChoices}>{(snapshot?.birthdays || []).map(person => <label key={person.ref.objectId} className={styles.calendarToggle}><EventPeople refs={[person.ref]} available={snapshot?.refs} /><span>{person.ref.label}</span><input type="checkbox" aria-label={`Show birthday for ${person.ref.label}`} checked={!observanceSettings.hiddenBirthdays?.includes(person.ref.objectId)} onChange={e => { const checked = e.target.checked; void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, hiddenBirthdays: checked ? (settings.hiddenBirthdays || []).filter(id => id !== person.ref.objectId) : [...new Set([...(settings.hiddenBirthdays || []), person.ref.objectId])] } }; }); }} /></label>)}{!snapshot?.birthdays?.length && <p>Add birthdays to people’s profiles to choose them here.</p>}</div></CalendarDisclosure> : <CalendarDisclosure title={code ? "Choose holidays" : "Edit dates"} icon={code ? "interaction-milestone" : "edit"}>
                   <CalendarObservanceSettings section={code ? "holidays" : "custom"} countryCode={code} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />
-                </SettingsPopover>}
+                </CalendarDisclosure>}
               </section>;
             })}
           </div>
@@ -997,10 +1001,10 @@ export default function CalendarWorkspace() {
             <p className={styles.importHelp}>{importProvider === "Google Calendar" ? <>Export a calendar and choose its .ics file below, or paste its iCal feed address. <a href="https://support.google.com/calendar/answer/37111?hl=en" target="_blank" rel="noreferrer">Google export guide ↗</a></> : importProvider === "Apple Calendar" ? <>Export an .ics file from Calendar on Mac, or use an existing shared calendar link. Shared links can be read by anyone who has them. <a href="https://support.apple.com/guide/calendar/icl1023/mac" target="_blank" rel="noreferrer">Apple export guide ↗</a></> : <>Choose an .ics calendar export or paste a published iCal subscription link.</>}</p>
             <div className={styles.importMethods}>
               <form className={styles.importMethod} onSubmit={e => { e.preventDefault(); const form = e.currentTarget; if (importFile) void connect("ics_file", importFile).then(ok => { if (ok) form.reset(); }); }}>
-                <h4><UnigentamosIcon role="import" size={17} />Upload a file</h4>
+                <h4><UnigentamosIcon role="export" size={17} />Upload a file</h4>
                 <label>Name<input aria-label="Upload calendar name" value={connectionName} onChange={e => setConnectionName(e.target.value)} placeholder="Work, personal, travel…" /></label>
                 <label>Calendar file<input required type="file" accept=".ics,text/calendar" disabled={busy} onChange={e => setImportFile(e.target.files?.[0])} /></label>
-                <Button type="submit" icon="import" disabled={!importFile || busy}>Upload</Button>
+                <Button type="submit" icon="export" disabled={!importFile || busy}>Upload</Button>
               </form>
               <span className={styles.importOr}>or</span>
               <form className={styles.importMethod} onSubmit={e => { e.preventDefault(); void connect("ics_feed"); }}>
@@ -1199,7 +1203,7 @@ function ViewToggle({ label, icon, checked, onChange }: { label: string; icon: s
 function SettingsPopover({ label, icon, children }: { label: string; icon: string; children: ReactNode }) {
   const trigger = useRef<HTMLButtonElement>(null);
   return <Popover.Root><Popover.Trigger asChild><button ref={trigger} type="button" className={`work-button ${styles.settingsPopoverTrigger}`}><UnigentamosIcon role={icon} size={16} /><span>{label}</span><UnigentamosIcon role="chevron-down" size={13} /></button></Popover.Trigger>
-    <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={`${styles.calendarPopover} ${styles.settingsPopover}`} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={16} align="end" aria-label={label} onOpenAutoFocus={event => event.preventDefault()} onFocusOutside={event => event.preventDefault()} onEscapeKeyDown={event => event.stopImmediatePropagation()}>
+    <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={`${styles.calendarPopover} ${styles.settingsPopover}`} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={16} collisionBoundary={trigger.current?.closest<HTMLElement>('[role="dialog"]')} sticky="always" align="end" aria-label={label} onOpenAutoFocus={event => event.preventDefault()} onFocusOutside={event => event.preventDefault()} onEscapeKeyDown={event => event.stopImmediatePropagation()}>
       {children}<Popover.Close asChild><button type="button" className="work-button">Done</button></Popover.Close>
     </Popover.Content></Popover.Portal>
   </Popover.Root>;

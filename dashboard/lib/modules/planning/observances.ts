@@ -24,6 +24,7 @@ export function calendarObservances(birthdays: BirthdaySource[], holidays: Holid
   };
   const years = Array.from({ length: Number(end.slice(0, 4)) - Number(start.slice(0, 4)) + 1 }, (_, i) => Number(start.slice(0, 4)) + i);
   if (settings.birthdays) for (const person of birthdays) {
+    if (settings.hiddenBirthdays?.includes(person.ref.objectId)) continue;
     const parts = parseBirthday(person.birthday);
     if (!parts) continue;
     for (const year of years) {

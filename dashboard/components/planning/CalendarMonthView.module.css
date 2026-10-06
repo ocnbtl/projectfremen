@@ -14,6 +14,8 @@
 .copy { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0; }
 .copy strong { font: 500 11px/12px var(--font-body); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .copy small { font: 400 9px/10px var(--font-body); color: var(--calendar-muted, #716b80); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.copy small { font-weight:600; }
+.event > [data-event-objects] { max-width:38%; flex-wrap:nowrap; font-size:10px; }
 .event:hover { background: color-mix(in srgb, var(--event-color) 20%, white); }
 .event[data-continues-before] { border-top-left-radius: 3px; border-bottom-left-radius: 3px; margin-left: 1px; }
 .event[data-continues-after] { border-top-right-radius: 3px; border-bottom-right-radius: 3px; margin-right: 1px; }

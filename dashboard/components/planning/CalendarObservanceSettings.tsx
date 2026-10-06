@@ -25,10 +25,9 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
   const [customError, setCustomError] = useState("");
   return <div className={styles.observanceSettings}>
     {section !== "custom" && <section>
-      <h3><UnigentamosIcon role="interaction-milestone" size={18} />Holiday calendars</h3>
-      <p>Choose countries, then the dates you want to see.</p>
+      <div className={styles.holidayHeading}><h3><UnigentamosIcon role="interaction-milestone" size={18} />Holiday calendars</h3><p>Choose countries, then the dates you want to see.</p></div>
       <div className={styles.countryPicker}>
-        <SelectField searchable autoFocusSearch={false} aria-label="Holiday country" menuClassName={styles.calendarChoiceMenu} value={country} disabled={!catalog || busy} onChange={e => setCountry(e.target.value)}>
+        <SelectField contained searchable autoFocusSearch={false} aria-label="Holiday country" menuClassName={styles.calendarChoiceMenu} value={country} disabled={!catalog || busy} onChange={e => setCountry(e.target.value)}>
           <option value="">Add a country…</option>
           {catalog?.countries.filter(x => !settings.countries.includes(x.code)).map(x => <option value={x.code} key={x.code}><span className={styles.countryOption}><CalendarCountryFlag code={x.code} /><span>{x.name}</span></span></option>)}
         </SelectField>
@@ -84,14 +83,14 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
           <EventCheckbox label="Repeat" icon="routine" checked={Boolean(custom.repeat || custom.annual)} onChange={checked => setCustom({ ...custom, annual: false, repeat: checked ? repeatDraft : undefined })} />
           <div className={styles.scheduleOptionFields}>
             <input type="number" aria-label="Custom repeat interval" min="1" max="365" required value={(custom.repeat || repeatDraft).interval} onChange={event => { const next = { ...(custom.repeat || repeatDraft), interval: Number(event.target.value) }; setRepeatDraft(next); if (custom.repeat || custom.annual) setCustom({ ...custom, annual: false, repeat: next }); }} />
-            <SelectField aria-label="Custom repeat unit" value={(custom.repeat || repeatDraft).frequency} menuClassName={styles.calendarChoiceMenu} onChange={event => { const next = { ...(custom.repeat || repeatDraft), frequency: event.target.value as typeof repeatDraft.frequency }; setRepeatDraft(next); if (custom.repeat || custom.annual) setCustom({ ...custom, annual: false, repeat: next }); }}>{[["daily", "days"], ["weekly", "weeks"], ["monthly", "months"], ["yearly", "years"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</SelectField>
+            <SelectField contained aria-label="Custom repeat unit" value={(custom.repeat || repeatDraft).frequency} menuClassName={styles.calendarChoiceMenu} onChange={event => { const next = { ...(custom.repeat || repeatDraft), frequency: event.target.value as typeof repeatDraft.frequency }; setRepeatDraft(next); if (custom.repeat || custom.annual) setCustom({ ...custom, annual: false, repeat: next }); }}>{[["daily", "days"], ["weekly", "weeks"], ["monthly", "months"], ["yearly", "years"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</SelectField>
           </div>
         </div>
         <div className={styles.customDateSchedule}>
           <EventDateTimePicker label={custom.allDay === false ? "Custom start" : "Custom date"} value={custom.allDay === false ? `${custom.date}T${custom.startTime}` : custom.date} allDay={custom.allDay !== false} timeZone={custom.timeZone || zone} onChange={value => setCustom({ ...custom, date: value.slice(0, 10), startTime: value.slice(11, 16) || custom.startTime, endDate: !custom.endDate || custom.endDate === custom.date ? value.slice(0, 10) : custom.endDate })} />
           {custom.allDay === false && <EventDateTimePicker label="Custom end" value={`${custom.endDate || custom.date}T${custom.endTime}`} allDay={false} timeZone={custom.timeZone || zone} onChange={value => setCustom({ ...custom, endDate: value.slice(0, 10), endTime: value.slice(11, 16) })} />}
         </div>
-        {custom.allDay === false && <label>Time zone<SelectField searchable aria-label="Custom date time zone" menuClassName={styles.calendarChoiceMenu} value={custom.timeZone || zone} onChange={e => setCustom({ ...custom, timeZone: e.target.value })}>{[...new Set([zone, custom.timeZone || zone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(z => <option key={z} value={z}>{z.replaceAll("_", " ").replaceAll("/", " / ")}</option>)}</SelectField></label>}
+        {custom.allDay === false && <label>Time zone<SelectField contained searchable aria-label="Custom date time zone" menuClassName={styles.calendarChoiceMenu} value={custom.timeZone || zone} onChange={e => setCustom({ ...custom, timeZone: e.target.value })}>{[...new Set([zone, custom.timeZone || zone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(z => <option key={z} value={z}>{z.replaceAll("_", " ").replaceAll("/", " / ")}</option>)}</SelectField></label>}
         {customError && <p role="alert">{customError}</p>}
         <div className="work-actions"><Button type="submit" intent="primary" busy={busy}>Save date</Button><Button onClick={() => setCustom(undefined)}>Cancel</Button></div>
       </form>}

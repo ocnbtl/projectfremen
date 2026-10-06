@@ -1327,6 +1327,21 @@ async function check(label, run) {
     assert(planningWritableKeys("places").includes("addressParts"));
     assert(planningWritableKeys("places").includes("countryCode"));
   });
+  await check("individual birthday visibility persists without changing People records", async () => {
+    const { defaultObservances, calendarObservances } = require("../lib/modules/planning/observances.ts");
+    const { normalizeObservances } = require("../lib/modules/planning/observance-settings.ts");
+    const person = id => ({ ref: { module:"people", objectType:"person", objectId:id, label:id, route:`/admin/people/${id}` }, birthday:"--10-05" });
+    const people = [person("hidden-person"), person("visible-person")];
+    const settings = normalizeObservances({...defaultObservances(), hiddenBirthdays:["hidden-person", "hidden-person"]});
+    assert.deepEqual(settings.hiddenBirthdays, ["hidden-person"]);
+    assert.deepEqual(calendarObservances(people, [], settings, "2026-10-01", "2026-11-01", "UTC").map(x => x.ownerRef.objectId), ["visible-person"]);
+    const calendar = (await readPlanningState()).calendars.find(x => x.id === "native");
+    await savePlanningRecord("calendars", {id:calendar.id, observances:settings}, calendar.updatedAt);
+    assert.deepEqual((await readPlanningState()).calendars.find(x => x.id === "native").observances.hiddenBirthdays, ["hidden-person"]);
+    assert.equal(people[0].birthday, "--10-05");
+    assert.equal(calendarObservances(people, [], {...settings, hiddenBirthdays:[]}, "2026-10-01", "2026-11-01", "UTC").length, 2);
+    assert.throws(() => normalizeObservances({...settings, hiddenBirthdays:[123]}), /selection/);
+  });
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );

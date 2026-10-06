@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import { ADDRESS_COUNTRIES, addressCountries, addressFields, addressFieldLabel, formatPlaceAddress, type AddressParts } from "../../lib/modules/planning/place-address";
@@ -13,7 +13,7 @@ const extraFlags = new Set(["AQ", "BV", "GS", "HM", "PN", "TF", "UM"]);
 function CountryFlag({ code }: { code: string }) {
   return extraFlags.has(code) ? <img className={styles.flag} src={`/address-flags/${code}.svg`} alt="" /> : <svg className={styles.flag} viewBox="0 0 513 342" aria-hidden="true"><use href={`/country-flags.svg#flag-${code}`} /></svg>;
 }
-export default function PlaceLocationFields({ value, onChange }: { value: PlaceLocation; onChange: (patch: PlaceLocation) => void }) {
+export default function PlaceLocationFields({ value, onChange, compact = false, leading }: { value: PlaceLocation; onChange: (patch: PlaceLocation) => void; compact?: boolean; leading?: ReactNode }) {
   const [matches, setMatches] = useState<PlaceLocation[]>([]), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
   const request = useRef<AbortController | null>(null), trigger = useRef<HTMLDivElement>(null), addressId = useId();
   const address = value.address || "", country = value.countryCode || "US";
@@ -38,7 +38,8 @@ export default function PlaceLocationFields({ value, onChange }: { value: PlaceL
     } catch (error) { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "Address lookup is unavailable."); }
     finally { if (!controller.signal.aborted) setBusy(false); }
   }
-  return <div className={styles.fields}>
+  return <div className={`${styles.fields} ${compact ? styles.compact : ""}`}>
+    {leading}
     <div className={styles.addressHeading}><label htmlFor={addressId}><UnigentamosIcon role="location" size={16} />Address</label><SelectField searchable autoFocusSearch={false} className={styles.country} aria-label="Address country" value={country} triggerContent={<span className={styles.countryValue}><CountryFlag code={country} /><span>{country}</span><UnigentamosIcon role="chevron-down" size={14} /></span>} onChange={e => {
       const countryCode = e.target.value;
       onChange({ countryCode, ...(value.addressParts ? { address: formatPlaceAddress(parts, countryCode) } : {}) });

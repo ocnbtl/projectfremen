@@ -48,5 +48,5 @@ export function normalizeObservances(value: unknown): CalendarObservanceSettings
       appearances[key] = { name: appearance.name.trim(), color: appearance.color };
     }
   }
-  return { birthdays: raw.birthdays !== false, countries, ...(raw.disabledCountries !== undefined ? { disabledCountries: disabledCountries.filter(code => countries.includes(code)) } : {}), ...(raw.customVisible !== undefined ? { customVisible: raw.customVisible !== false } : {}), hiddenHolidays: strings(raw.hiddenHolidays, 5000, 600), extraHolidays: strings(raw.extraHolidays, 5000, 600), custom, ...(raw.appearances !== undefined ? { appearances } : {}) };
+  return { birthdays: raw.birthdays !== false, ...(raw.hiddenBirthdays !== undefined ? { hiddenBirthdays: strings(raw.hiddenBirthdays, 10000, 200) } : {}), countries, ...(raw.disabledCountries !== undefined ? { disabledCountries: disabledCountries.filter(code => countries.includes(code)) } : {}), ...(raw.customVisible !== undefined ? { customVisible: raw.customVisible !== false } : {}), hiddenHolidays: strings(raw.hiddenHolidays, 5000, 600), extraHolidays: strings(raw.extraHolidays, 5000, 600), custom, ...(raw.appearances !== undefined ? { appearances } : {}) };
 }

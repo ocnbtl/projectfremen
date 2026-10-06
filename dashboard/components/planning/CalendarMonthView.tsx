@@ -9,6 +9,7 @@ import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-prese
 import { calendarDateLabel as label } from "./CalendarMiniMonth";
 import { useCalendarMotion } from "./CalendarMotion";
 import EventPeople from "./EventPeople";
+import EventObjects from "./EventObjects";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./CalendarMonthView.module.css";
 
@@ -38,7 +39,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
             {continuesBefore && <UnigentamosIcon role="chevron-right" size={12} style={{ transform: "rotate(180deg)" }} />}
             <UnigentamosIcon role={event.system ? event.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={14} />
             <span className={styles.copy}><strong>{eventPreviewTitle(event)}</strong>{timing && <small>{timing}</small>}</span>
-            <EventPeople refs={event.linkedRefs} available={refs} limit={2} />
+            <EventObjects event={event} available={refs} /><EventPeople refs={event.linkedRefs} available={refs} limit={2} />
             {continuesAfter && <UnigentamosIcon role="chevron-right" size={12} />}
           </motion.button>;
         })}

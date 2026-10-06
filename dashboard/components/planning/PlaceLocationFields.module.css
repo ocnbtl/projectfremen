@@ -8,6 +8,16 @@
 .flag { width: 24px; height: 16px; border-radius: 3px; flex: none; object-fit: cover; }
 .locality { display: grid; gap: 10px; }
 .locality:empty { display: none; }
+.compact { gap:7px 12px; grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr); }
+.compact > label { grid-column:1; grid-row:1 / 3; align-self:end; }
+.compact .addressHeading { grid-column:2; grid-row:1; }
+.compact > input { grid-column:2; grid-row:2; }
+.compact .locality,.compact .coordinates,.compact .message { grid-column:1 / -1; }
+.compact .locality,.compact .coordinates { gap:6px; }
+.compact .fullLabel { display:none; }
+.compact .autofill { padding-inline:8px; }
+.compact input { min-height:34px; height:34px; padding-block:5px; }
+.compact .autofill { min-height:34px; height:34px; }
 .coordinates { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: end; }
 .autofill.autofill { font: 500 13px/1.4 var(--font-body); min-height: 40px; white-space: nowrap; gap: 5px; }
 .message { font: 400 12px/1.4 var(--font-body); color: var(--text-secondary); margin: 0; }

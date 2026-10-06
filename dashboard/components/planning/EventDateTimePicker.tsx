@@ -85,7 +85,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
         <UnigentamosIcon role="chevron-down" size={14} />
       </button></Popover.Trigger>
       <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={styles.popover} style={moduleThemeVariables("calendar") as CSSProperties}
-        data-reduced-motion={reduced} sideOffset={8} collisionPadding={12} align="start" aria-label={`${label} date${allDay ? "" : " and time"}`}
+        data-reduced-motion={reduced} sideOffset={8} collisionPadding={12} collisionBoundary={trigger.current?.closest<HTMLElement>('[role="dialog"]')} align="start" aria-label={`${label} date${allDay ? "" : " and time"}`}
         onEscapeKeyDown={event => event.stopImmediatePropagation()}
         onOpenAutoFocus={event => {
           event.preventDefault();

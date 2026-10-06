@@ -9,4 +9,12 @@
 .create > label { display: grid; gap: 5px; font-size: 12px; }
 .create > small { font-size: 11px; color: var(--text-secondary); }
 .location > p { font-size: 12px; color: var(--color-danger, #a33b42); }
+.address input,.saved :global(.app-select-trigger) { font:400 13px/1.5 var(--font-body); color:var(--text-strong); min-height:40px; }
+.address input::placeholder,.saved :global(.app-select-trigger) { color:var(--text-secondary); font-size:13px; }
+.create { grid-template-columns:auto minmax(0,1fr); align-items:start; gap:10px 14px; padding:10px; }
+.create > div { grid-column:1 / -1; }
+.create > button { justify-self:start; align-self:end; }
+.create > button { min-height:34px; padding-block:5px; }
+.create > small { align-self:center; }
+@media (max-width:600px) { .create { grid-template-columns:minmax(0,1fr); } }
 @media (max-width: 760px) { .location.location input { font-size: 16px; } }

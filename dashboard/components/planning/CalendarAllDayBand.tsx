@@ -11,6 +11,7 @@ import { eventColors, eventPreviewTitle } from "./calendar-presentation";
 import { useCalendarMotion } from "./CalendarMotion";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import EventPeople from "./EventPeople";
+import EventObjects from "./EventObjects";
 import styles from "./CalendarWorkspace.module.css";
 
 export default function CalendarAllDayBand({ days, events, calendars, refs, dated, zone, columns, today, onOpen }: {
@@ -35,7 +36,7 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
         aria-label={title} title={title} onClick={() => onOpen(event)}>
         {continuesBefore && <UnigentamosIcon role="chevron-right" size={12} style={{ transform: "rotate(180deg)" }} />}
         <UnigentamosIcon role={event.system ? event.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={13} />
-        <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventPeople refs={event.linkedRefs} available={refs} />
+        <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventObjects event={event} available={refs} /><EventPeople refs={event.linkedRefs} available={refs} />
         {continuesAfter && <UnigentamosIcon role="chevron-right" size={12} />}
       </motion.button>;
     })}

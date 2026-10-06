@@ -24,6 +24,7 @@ import {
 import { eventGroup } from "../../lib/modules/planning/calendar-groups";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import EventPeople from "./EventPeople";
+import EventObjects from "./EventObjects";
 import CalendarAllDayBand from "./CalendarAllDayBand";
 import styles from "./CalendarWorkspace.module.css";
 
@@ -257,7 +258,7 @@ export default function CalendarTimeGrid({
                       onClick={() => onOpen(item)}
                       aria-label={title}
                     >
-                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{<UnigentamosIcon role={item.system ? "star" : group?.icon || "interaction-date"} size={13} />}<strong>{eventPreviewTitle(item)}</strong></span>{bottom - top >= 44 && <small className={styles.timedEventRange}><span>{eventTimeLabel(Math.max(item.startMs, low), zone)}</span>{" "}<span>to {eventTimeLabel(Math.min(item.endMs, high), zone)}</span></small>}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
+                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{<UnigentamosIcon role={item.system ? "star" : group?.icon || "interaction-date"} size={13} />}<strong>{eventPreviewTitle(item)}</strong></span>{bottom - top >= 44 && <small className={styles.timedEventRange}>{timing}</small>}{bottom - top >= 76 && <EventObjects event={item} available={refs} />}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
                     </motion.button>
                     {!item.system && <button
                       type="button"

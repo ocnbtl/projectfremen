@@ -20,6 +20,7 @@ export type Place = PlanningBase & {
 export type EventGroup = { id: string; name: string; color: string; icon: string };
 export type CalendarObservanceSettings = {
   birthdays: boolean;
+  hiddenBirthdays?: string[];
   countries: string[];
   disabledCountries?: string[];
   customVisible?: boolean;
