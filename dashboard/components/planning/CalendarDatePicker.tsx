@@ -1,6 +1,6 @@
 "use client";
 import * as Popover from "@radix-ui/react-popover";
-import { useState, useRef, useLayoutEffect, forwardRef, type ReactNode, type CSSProperties } from "react";
+import { useState, useId, useRef, useLayoutEffect, forwardRef, type ReactNode, type CSSProperties } from "react";
 import { AnimatePresence, motion, useIsPresent } from "motion/react";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import { dateScales, weeksOfYear, navigationYear, viewIcons, type CalendarView, type DateScale } from "../../lib/modules/planning/calendar-navigation";
@@ -11,7 +11,7 @@ import styles from "./CalendarWorkspace.module.css";
 
 export default function CalendarDatePicker({ value, today, view, onChange }: { value: string; today: string; view: CalendarView; onChange: (day: string, view: CalendarView) => void }) {
   const [open, setOpen] = useState(false), [mode, setMode] = useState<DateScale>(view === "3-day" || view === "agenda" ? "day" : view);
-  const previousView = useRef(view);
+  const previousView = useRef(view), sliderId = useId();
   const [year, setYear] = useState(Number(value.slice(0, 4))), [focused, setFocused] = useState(value), [direction, setDirection] = useState(1);
   const body = useRef<HTMLDivElement>(null);
   const pendingFocus = useRef<string | null>(null);
@@ -46,7 +46,7 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
             if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
             event.preventDefault(); const next = event.key === "Home" ? 0 : event.key === "End" ? 3 : (index + (event.key === "ArrowRight" ? 1 : 3)) % 4;
             changeMode(dateScales[next]); (event.currentTarget.parentElement?.children[next] as HTMLButtonElement)?.focus();
-          }}><UnigentamosIcon role={viewIcons[scale]} size={15} />{scale[0].toUpperCase() + scale.slice(1)}</button>)}
+          }}>{mode === scale && <motion.span aria-hidden="true" className={styles.navigatorHighlight} layoutId={sliderId} transition={reduced ? {duration:0} : {type:"spring", stiffness:360, damping:32}} />}<UnigentamosIcon role={viewIcons[scale]} size={15} /><span>{scale[0].toUpperCase() + scale.slice(1)}</span></button>)}
       </div>
       <header className={styles.pickerHeading}>
         <button type="button" className={styles.pickerArrow} disabled={year <= 1900} aria-label={mode === "year" ? "Previous years" : "Previous year"} onClick={() => move(-1)}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></button>

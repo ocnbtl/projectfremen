@@ -18,15 +18,16 @@ export function EventObjectIdentity({ record }: { record: PreviewRef }) {
 }
 
 /** Compact previews retain an explicit count; opening the event exposes every link. */
-export default function EventObjects({ event, available = [] }: { event: EventOccurrence; available?: NativeObjectRef[] }) {
+export default function EventObjects({ event, available = [], list = false, maxItems = 6 }: { event: EventOccurrence; available?: NativeObjectRef[]; list?: boolean; maxItems?: number }) {
   const element = useRef<HTMLSpanElement>(null), [width, setWidth] = useState(300);
-  const refs = [...new Map(event.linkedRefs.filter(ref => !(ref.module === "people" && ref.objectType === "person")).map(ref => [ref.module + ":" + ref.objectType + ":" + ref.objectId, available.find(item => item.module === ref.module && item.objectType === ref.objectType && item.objectId === ref.objectId) || ref])).values()];
+  const refs = [...new Map(event.linkedRefs.filter(ref => list || !(ref.module === "people" && ref.objectType === "person")).map(ref => [ref.module + ":" + ref.objectType + ":" + ref.objectId, available.find(item => item.module === ref.module && item.objectType === ref.objectType && item.objectId === ref.objectId) || ref])).values()];
   if (event.placeId && !refs.some(ref => ref.module === "map" && ref.objectId === event.placeId)) {
     const place = available.find(ref => ref.module === "map" && ref.objectType === "place" && ref.objectId === event.placeId);
     if (place) refs.unshift(place);
   }
   const location = !refs.some(ref => ref.module === "map" && ref.objectType === "place") && event.location;
-  const items = location ? [{ module: "map", objectType: "place", objectId: "event-location", label: location, route: "" } as NativeObjectRef, ...refs] : refs;
+  const rank = (ref: NativeObjectRef) => ref.objectType === "person" ? 0 : ref.module === "map" ? 1 : 2;
+  const items = (location ? [{ module: "map", objectType: "place", objectId: "event-location", label: location, route: "" } as NativeObjectRef, ...refs] : refs).sort((a,b) => rank(a) - rank(b));
   const count = items.length;
   useLayoutEffect(() => {
     if (!element.current) return;
@@ -35,9 +36,9 @@ export default function EventObjects({ event, available = [] }: { event: EventOc
     return () => observer.disconnect();
   }, [count]);
   if (!count) return null;
-  const limit = Math.max(1, Math.floor(width / 120));
+  const limit = list ? maxItems : Math.max(1, Math.floor(width / 120));
   const shown = items.slice(0, limit), remaining = items.slice(limit);
-  return <span ref={element} className={styles.objects} data-event-objects data-icon-only={width < 65 || undefined} title={items.map(ref => ref.label).join(" · ")} aria-label={"Linked objects: " + items.map(ref => ref.label).join(", ")}>
+  return <span ref={element} className={styles.objects} style={list ? undefined : {width:Math.min(count * 150,900)}} data-event-objects data-object-list={list || undefined} data-icon-only={!list && width < 65 || undefined} title={items.map(ref => ref.label).join(" · ")} aria-label={"Linked objects: " + items.map(ref => ref.label).join(", ")}>
     {shown.map(ref => <span className={styles.chip} key={ref.module + ":" + ref.objectType + ":" + ref.objectId} title={ref.label}>
       <EventObjectIdentity record={ref} /><span className={styles.label}>{ref.label}</span>
     </span>)}

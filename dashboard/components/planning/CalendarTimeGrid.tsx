@@ -24,6 +24,7 @@ import {
 import { eventGroup } from "../../lib/modules/planning/calendar-groups";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import EventPeople from "./EventPeople";
+import EventGlyph from "./EventGlyph";
 import EventObjects from "./EventObjects";
 import CalendarAllDayBand from "./CalendarAllDayBand";
 import styles from "./CalendarWorkspace.module.css";
@@ -283,7 +284,7 @@ export default function CalendarTimeGrid({
                       onClick={() => onOpen(item)}
                       aria-label={title}
                     >
-                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{<UnigentamosIcon role={item.system ? "star" : group?.icon || "interaction-date"} size={13} />}<strong>{eventPreviewTitle(item)}</strong>{bottom - top < 60 && linkedLabels.length > 0 && <span className={styles.compactLinks} aria-label={`Linked objects: ${linkedLabels.join(", ")}`}><UnigentamosIcon role="object" size={11} />{linkedLabels.length}</span>}</span>{bottom - top >= 44 && <small className={styles.timedEventRange}>{timing}</small>}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} />{bottom - top >= 60 && <EventObjects event={item} available={refs} />}</span>
+                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}><EventGlyph event={item} icon={group?.icon} size={18} /><strong>{eventPreviewTitle(item)}</strong>{bottom - top < 60 && linkedLabels.length > 0 && <span className={styles.compactLinks} aria-label={`Linked objects: ${linkedLabels.join(", ")}`}><UnigentamosIcon role="object" size={11} />{linkedLabels.length}</span>}</span>{bottom - top >= 44 && <small className={styles.timedEventRange}><UnigentamosIcon role="clock" size={14} />{timing}</small>}</span>{bottom - top < 100 && <EventPeople refs={item.linkedRefs} available={refs} limit={2} />}{bottom - top >= 60 && <EventObjects event={item} available={refs} list={bottom - top >= 100} maxItems={Math.max(1,Math.floor((bottom - top - 85) / 40))} />}</span>
                     </motion.button>
                     {!item.system && <button
                       type="button"

@@ -35,3 +35,17 @@
 .event { max-height:52px; }
 .copy { gap:1px; }
 .event > [data-event-objects] { flex:1 1 40%; min-width:22px; max-width:45%; font-size:10px; line-height:12px; --linked-object-size:14px; }
+
+/* Keep the heading breathing room without inflating event cards. */
+.week { grid-template-rows:30px repeat(2,minmax(0,38px)) minmax(24px,1fr); row-gap:3px; }
+.event { max-height:38px; height:100%; margin-block:0; --avatar-size:26px; gap:7px; }
+.copy { flex:0 1 auto; }
+.copy strong { font-size:12px; font-weight:600; line-height:1.3; }
+.event > [data-event-people] { margin:0; flex:none; }
+.event > [data-event-objects] { flex:0 1 auto; width:auto; max-width:45%; }
+.day[data-today="true"] .date { color:var(--text-strong); background:transparent; }
+.more { align-self:start; }
+@media(max-height:850px) { .week { grid-template-rows:25px repeat(2,minmax(0,1fr)) 24px; row-gap:2px; } .event { --avatar-size:22px; } }
+@media(max-width:760px) { .event { gap:3px; --avatar-size:18px; } .copy strong {font-size:10px;} }
+
+.event[data-continues-after] > svg:last-child {margin-left:auto;}

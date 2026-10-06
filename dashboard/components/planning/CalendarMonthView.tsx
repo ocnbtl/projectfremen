@@ -9,6 +9,7 @@ import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-prese
 import { calendarDateLabel as label } from "./CalendarMiniMonth";
 import { useCalendarMotion } from "./CalendarMotion";
 import EventPeople from "./EventPeople";
+import EventGlyph from "./EventGlyph";
 import EventObjects from "./EventObjects";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./CalendarMonthView.module.css";
@@ -37,9 +38,9 @@ export default function CalendarMonthView({ days, date, today, events, calendars
             data-morph-event={event.id} data-month-event={event.id} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
             aria-label={`${event.title}${timing ? `, ${timing}` : ""}${continuation}`} title={`${event.title}${timing ? ` · ${timing}` : ""}${continuation}`} onClick={() => onOpen(event)}>
             {continuesBefore && <UnigentamosIcon role="chevron-right" size={12} style={{ transform: "rotate(180deg)" }} />}
-            <UnigentamosIcon role={event.system ? event.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={14} />
+            <EventGlyph event={event} icon={group?.icon} size={16} />
             <span className={styles.copy}><strong>{eventPreviewTitle(event)}</strong>{timing && <small>{timing}</small>}</span>
-            <EventObjects event={event} available={refs} /><EventPeople refs={event.linkedRefs} available={refs} limit={2} />
+            <EventPeople refs={event.linkedRefs} available={refs} limit={2} /><EventObjects event={event} available={refs} />
             {continuesAfter && <UnigentamosIcon role="chevron-right" size={12} />}
           </motion.button>;
         })}

@@ -12,7 +12,9 @@ import CalendarYearView from "./CalendarYearView";
 import CalendarAgenda from "./CalendarAgenda";
 import { calendarRange, shiftCalendar, viewIcons, type CalendarView as View } from "../../lib/modules/planning/calendar-navigation";
 import EventPeople from "./EventPeople";
+import EventGlyph from "./EventGlyph";
 import EventObjects from "./EventObjects";
+import EventTiming from "./EventTiming";
 import { timeChange, timeChangePatch, canUndoTimeChange, type EventTimeChange } from "../../lib/modules/planning/event-time-history";
 import { calendarDateLabel } from "./CalendarMiniMonth";
 import CalendarObservanceSettings, { CalendarCountryFlag } from "./CalendarObservanceSettings";
@@ -548,13 +550,12 @@ export default function CalendarWorkspace() {
         onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
         title={item.title}
       >
-        <span className={detail ? styles.detailTime : styles.agendaTime}>{!item.allDay && eventTimeRange(item.startMs, item.endMs, zone)}</span>
-        <span className={styles.eventIcon}><UnigentamosIcon role={item.system ? item.system.kind === "birthday" ? "birthday" : "star" : group?.icon || "interaction-date"} size={16} /></span>
+        <span className={detail ? styles.detailTime : styles.agendaTime}><EventTiming event={item} zone={zone} /></span>
+        <span className={styles.eventIcon}><EventGlyph event={item} icon={group?.icon} size={18} /></span>
         <span className={styles.eventCopy}><strong>{eventPreviewTitle(item)}</strong>
-          {localFor(item.endMs - 1, zone).slice(0, 10) > localFor(item.startMs, zone).slice(0, 10) && <span className={styles.eventDateRange}><UnigentamosIcon role="calendar" size={14} />{calendarDateLabel(localFor(item.startMs, zone).slice(0, 10), { month: "short", day: "numeric" })} – {calendarDateLabel(localFor(item.endMs - 1, zone).slice(0, 10), { month: "short", day: "numeric", year: "numeric" })}</span>}
         </span>
-        <EventObjects event={item} available={snapshot?.refs} />
         <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
+        <EventObjects event={item} available={snapshot?.refs} />
       </button>
     );
   }
@@ -935,15 +936,16 @@ export default function CalendarWorkspace() {
         open={connections}
         onClose={() => setConnections(false)}
         presentation="page"
-        title="Settings"
+        title="Settings" titleIcon="sliders" className={styles.settingsSheet}
       >
         <div className={`work-form ${styles.calendarSettingsForm}`}>
           <WorkspaceFeedback error={error} message={notice} />
           <div className={styles.settingsHeading}><h3>Your calendars</h3><div className={styles.settingsActions}>
-            <Button icon="plus" aria-expanded={addingCalendar} onClick={() => setAddingCalendar(value => !value)}>Add a calendar</Button>
-            {(["custom", "holidays"] as const).map(section => <SettingsPopover key={section} label={section === "custom" ? "Custom dates" : "Holiday calendars"} icon={section === "custom" ? "star" : "interaction-milestone"}>
-              <CalendarObservanceSettings section={section} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />
+
+            {(["holidays", "custom"] as const).map(section => <SettingsPopover key={section} label={section === "custom" ? "Custom dates" : "Holiday calendars"} icon={section === "custom" ? "star" : "interaction-milestone"}>
+              <CalendarObservanceSettings section={section} footer={section === "custom" ? <Popover.Close asChild><Button>Done</Button></Popover.Close> : undefined} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />
             </SettingsPopover>)}
+            <Button icon="plus" intent="primary" aria-expanded={addingCalendar} onClick={() => setAddingCalendar(value => !value)}>Add a calendar</Button>
           </div></div>
           {addingCalendar && <div className={styles.newCalendarForm}>          <form
             className="work-form"
@@ -997,7 +999,7 @@ export default function CalendarWorkspace() {
                 <CalendarSettings calendar={appearance} busy={busy} icon={key === "birthdays" ? "birthday" : "star"} country={code} enabled={enabled}
                   onToggle={visible => void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, ...(key === "birthdays" ? { birthdays: visible } : key === "custom" ? { customVisible: visible } : { disabledCountries: visible ? (settings.disabledCountries || []).filter(c => c !== code) : [...new Set([...(settings.disabledCountries || []), code!])] }) } }; })}
                   onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, [key]: { name, color } } } }; })} />
-                {key === "birthdays" ? <CalendarDisclosure title="Choose birthdays" icon="birthday"><div className={styles.birthdayChoices}>{(snapshot?.birthdays || []).map(person => <label key={person.ref.objectId} className={styles.calendarToggle}><EventPeople refs={[person.ref]} available={snapshot?.refs} /><span>{person.ref.label}</span><input type="checkbox" aria-label={`Show birthday for ${person.ref.label}`} checked={!observanceSettings.hiddenBirthdays?.includes(person.ref.objectId)} onChange={e => { const checked = e.target.checked; void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, hiddenBirthdays: checked ? (settings.hiddenBirthdays || []).filter(id => id !== person.ref.objectId) : [...new Set([...(settings.hiddenBirthdays || []), person.ref.objectId])] } }; }); }} /></label>)}{!snapshot?.birthdays?.length && <p>Add birthdays to people’s profiles to choose them here.</p>}</div></CalendarDisclosure> : <CalendarDisclosure title={code ? "Choose holidays" : "Edit dates"} icon={code ? "interaction-milestone" : "edit"}>
+                {key === "birthdays" ? <CalendarDisclosure title="Choose birthdays" icon="birthday"><div className={styles.birthdayChoices}>{(snapshot?.birthdays || []).map(person => <label key={person.ref.objectId} className={styles.calendarToggle}><EventPeople refs={[person.ref]} available={snapshot?.refs} /><span>{person.ref.label}</span><input type="checkbox" aria-label={`Show birthday for ${person.ref.label}`} checked={!observanceSettings.hiddenBirthdays?.includes(person.ref.objectId)} onChange={e => { const checked = e.target.checked; void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, hiddenBirthdays: checked ? (settings.hiddenBirthdays || []).filter(id => id !== person.ref.objectId) : [...new Set([...(settings.hiddenBirthdays || []), person.ref.objectId])] } }; }); }} /></label>)}{!snapshot?.birthdays?.length && <p>Add birthdays to people’s profiles to choose them here.</p>}</div></CalendarDisclosure> : <CalendarDisclosure title={code ? "Edit holidays" : "Edit dates"} icon={code ? "interaction-milestone" : "edit"} leading={code ? <span className={styles.holidayCardYear}>{date.slice(0,4)}</span> : undefined} actions={code ? <Button icon="delete" aria-label={`Remove ${name} holiday calendar`} disabled={busy} onClick={() => void saveCalendarPreference("native", current => ({ observances: { ...(current.observances || defaultObservances()), countries: (current.observances || defaultObservances()).countries.filter(country => country !== code) } }))} /> : undefined}>
                   <CalendarObservanceSettings section={code ? "holidays" : "custom"} countryCode={code} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />
                 </CalendarDisclosure>}
               </section>;
@@ -1212,7 +1214,7 @@ function SettingsPopover({ label, icon, children }: { label: string; icon: strin
   const trigger = useRef<HTMLButtonElement>(null);
   return <Popover.Root><Popover.Trigger asChild><button ref={trigger} type="button" className={`work-button ${styles.settingsPopoverTrigger}`}><UnigentamosIcon role={icon} size={16} /><span>{label}</span><UnigentamosIcon role="chevron-down" size={13} /></button></Popover.Trigger>
     <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={`${styles.calendarPopover} ${styles.settingsPopover}`} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={16} collisionBoundary={trigger.current?.closest<HTMLElement>('[role="dialog"]')} sticky="always" align="end" aria-label={label} onOpenAutoFocus={event => event.preventDefault()} onFocusOutside={event => event.preventDefault()} onEscapeKeyDown={event => event.stopImmediatePropagation()}>
-      {children}<Popover.Close asChild><button type="button" className="work-button">Done</button></Popover.Close>
+      {children}{label !== "Custom dates" && <Popover.Close asChild><button type="button" className="work-button">Done</button></Popover.Close>}
     </Popover.Content></Popover.Portal>
   </Popover.Root>;
 }

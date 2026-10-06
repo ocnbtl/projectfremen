@@ -7,3 +7,18 @@
 .visual svg { flex:none; display:block; }
 .objects .more { display:inline-flex; flex:none; align-items:center; justify-content:center; min-width:var(--linked-object-size,18px); height:var(--linked-object-size,18px); border-radius:5px; background:color-mix(in srgb,var(--event-color,var(--module-icon)) 12%,transparent); font:600 10px/1 var(--font-body); margin:0; }
 .objects[data-icon-only] .label { display:none; }
+
+.objects .chip { background:transparent; padding:0; }
+.objects[data-object-list] { display:flex; flex-direction:column; align-items:stretch; gap:7px; width:100%; --linked-object-size:32px; }
+.objects[data-object-list] .chip { width:100%; display:flex; gap:8px; }
+.objects[data-object-list] .chip::before { content:"•"; color:var(--event-color); flex:none; }
+.objects[data-object-list] .label { flex:1; white-space:normal; overflow-wrap:break-word; font-size:12px; }
+.objects[data-object-list] .visual { order:2; margin-left:auto; }
+@container timed-event (max-width:160px) { .objects[data-object-list] { --linked-object-size:22px; gap:5px; } .objects[data-object-list] .label { font-size:10px; } }
+@container timed-event (max-width:80px) { .objects[data-object-list] .chip { flex-wrap:wrap; gap:2px; } .objects[data-object-list] .visual { margin-left:0; } .objects[data-object-list] .label { flex-basis:calc(100% - 8px); } }
+
+@container timed-event (max-width:80px) {
+ .objects[data-object-list] { flex-direction:row; flex-wrap:wrap; gap:4px; }
+ .objects[data-object-list] .chip { width:auto; flex:none; }
+ .objects[data-object-list] .chip::before,.objects[data-object-list] .label { display:none; }
+}

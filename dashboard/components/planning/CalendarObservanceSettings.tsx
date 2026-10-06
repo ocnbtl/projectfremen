@@ -1,6 +1,8 @@
 "use client";
+import { AnimatePresence, motion } from "motion/react";
+import { useCalendarMotion } from "./CalendarMotion";
 import LogoLoader from "../operational/LogoLoader";
-import { useState, type ReactNode } from "react";
+import { useState, useId, type ReactNode } from "react";
 import type { CalendarObservanceSettings as Settings } from "../../lib/modules/planning/types";
 import { holidayVisible, observanceAppearance, customRepeatLabel, type HolidayCatalog } from "../../lib/modules/planning/observances";
 import { normalizeObservances } from "../../lib/modules/planning/observance-settings";
@@ -15,34 +17,37 @@ import styles from "./CalendarWorkspace.module.css";
 export function CalendarCountryFlag({ code }: { code: string }) {
   return <svg className={styles.countryFlag} width="24" height="16" viewBox="0 0 513 342" aria-hidden="true"><use href={`/country-flags.svg#flag-${code}`} /></svg>;
 }
-export default function CalendarObservanceSettings({ settings, catalog, loading, error, busy, year, date, zone, onSave, renderAppearance, section, countryCode }: {
-  section?: "holidays" | "custom"; countryCode?: string;
+export default function CalendarObservanceSettings({ settings, catalog, loading, error, busy, year, date, zone, onSave, renderAppearance, section, countryCode, footer }: {
+  footer?: ReactNode; section?: "holidays" | "custom"; countryCode?: string;
   settings: Settings; catalog?: HolidayCatalog; loading: boolean; error: string; busy: boolean; year: string; date: string; zone: string; onSave: (settings: Settings) => Promise<boolean>; renderAppearance?: (key: string, name: string) => ReactNode;
 }) {
+  const editorId = useId();
+  const { reduced, layoutTransition } = useCalendarMotion();
+  const [editingCountries, setEditingCountries] = useState<string[]>([]);
   const [country, setCountry] = useState("");
   const [custom, setCustom] = useState<Settings["custom"][number]>();
   const [repeatDraft, setRepeatDraft] = useState<NonNullable<Settings["custom"][number]["repeat"]>>({ frequency: "yearly", interval: 1 });
   const [customError, setCustomError] = useState("");
   return <div className={styles.observanceSettings}>
     {section !== "custom" && <section>
-      <div className={styles.holidayHeading}><h3><UnigentamosIcon role="interaction-milestone" size={18} />Holiday calendars</h3><p>Choose countries, then the dates you want to see.</p></div>
+      {!countryCode && <><div className={styles.holidayHeading}><h3><UnigentamosIcon role="interaction-milestone" size={18} />Holiday calendars</h3><p>Choose countries, then pick the holidays you want to see.</p></div>
       <div className={styles.countryPicker}>
-        <SelectField contained searchable autoFocusSearch={false} aria-label="Holiday country" menuClassName={styles.calendarChoiceMenu} value={country} disabled={!catalog || busy} onChange={e => setCountry(e.target.value)}>
-          <option value="">Add a country…</option>
+        <SelectField contained searchable autoFocusSearch={false} aria-label="Holiday country" menuClassName={styles.calendarChoiceMenu} value={country} triggerContent={country ? undefined : <span>Select a country</span>} disabled={!catalog || busy} onChange={e => setCountry(e.target.value)}>
           {catalog?.countries.filter(x => !settings.countries.includes(x.code)).map(x => <option value={x.code} key={x.code}><span className={styles.countryOption}><CalendarCountryFlag code={x.code} /><span>{x.name}</span></span></option>)}
         </SelectField>
         <Button icon="plus" disabled={!country || busy} onClick={async () => { if (await onSave({ ...settings, countries: [...settings.countries, country] })) setCountry(""); }}>Add</Button>
       </div>
+      </>}
       {loading && <LogoLoader label="Loading holiday dates" />}
       {error && <p role="alert">{error}</p>}
       {settings.countries.filter(code => !countryCode || code === countryCode).map(code => {
         const name = catalog?.countries.find(x => x.code === code)?.name || code;
         const appearance = observanceAppearance(settings, `holidays:${code}`, name);
         const holidays = [...new Map((catalog?.holidays || []).filter(x => x.country === code && x.date.startsWith(year)).map(x => [x.key, x])).values()];
-        return <details className={styles.holidayCountry} key={code} open={countryCode ? true : undefined}>
-          <summary><CalendarCountryFlag code={code} /><strong>{appearance.name}</strong><span>{year}</span><UnigentamosIcon role="chevron-down" size={15} /></summary>
+        return <section className={styles.holidayCountry} key={code}>
+          {!countryCode && <div className={styles.holidayCountryHeader}>{!countryCode && <><CalendarCountryFlag code={code} /><strong>{appearance.name}</strong></>}<span>{year}</span>{!countryCode && <Button icon="edit" aria-expanded={editingCountries.includes(code)} onClick={() => setEditingCountries(items => items.includes(code) ? items.filter(item => item !== code) : [...items, code])}>Edit holidays</Button>}<Button icon="delete" aria-label={"Remove " + name + " holiday calendar"} disabled={busy} onClick={() => void onSave({ ...settings, countries: settings.countries.filter(x => x !== code) })} /></div>}
           {renderAppearance?.(`holidays:${code}`, name)}
-          <div className={styles.holidayList}>
+          <AnimatePresence initial={false}>{(countryCode || editingCountries.includes(code)) && <motion.div initial={reduced ? false : {height:0, opacity:0}} animate={{height:"auto", opacity:1}} exit={{height:0, opacity:0}} transition={layoutTransition} className={styles.holidayList}>
             {holidays.map(holiday => <label className={styles.holidayChoice} key={holiday.key}>
               <input type="checkbox" checked={holidayVisible(holiday, settings)} disabled={busy || loading} aria-label={`${holiday.name} (${name})`} onChange={e => void onSave({ ...settings,
                 hiddenHolidays: e.target.checked ? settings.hiddenHolidays.filter(x => x !== holiday.key) : [...new Set([...settings.hiddenHolidays, holiday.key])],
@@ -52,14 +57,13 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
               <span className={styles.holidayName}><strong>{holiday.name}</strong><small>{holiday.type === "public" ? "Public holiday" : "Observance"}</small></span>
             </label>)}
             {!holidays.length && !loading && <p>No dates are available for this year. Add a custom date below.</p>}
-          </div>
-          <Button intent="quiet" icon="close" disabled={busy} onClick={() => void onSave({ ...settings, countries: settings.countries.filter(x => x !== code) })}>Remove {name}</Button>
-        </details>;
+          </motion.div>}</AnimatePresence>
+        </section>;
       })}
       <p className={styles.holidaySource}>Regional holidays may vary. <a href="https://github.com/commenthol/date-holidays" target="_blank" rel="noreferrer">Holiday source</a></p>
     </section>}
     {section !== "holidays" && <section>
-      <div className={styles.observanceHeading}><h3><UnigentamosIcon role="star" size={18} />Custom dates</h3><Button icon="plus" disabled={busy} onClick={() => { setCustomError(""); setRepeatDraft({ frequency: "yearly", interval: 1 }); setCustom({ id: crypto.randomUUID(), title: "", date, annual: true, visible: true }); }}>Add date</Button></div>
+      <div className={styles.observanceHeading}><h3><UnigentamosIcon role="star" size={18} />Custom dates</h3></div>
       <p>Recurring dates or one-time events, such as an anniversary.</p>
       {renderAppearance?.("custom", "Custom dates")}
       {settings.custom.map(item => <div className={styles.customDateRow} key={item.id}>
@@ -67,7 +71,7 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
         <Button icon="edit" aria-label={`Edit ${item.title}`} disabled={busy} onClick={() => { setCustomError(""); setCustom(item); setRepeatDraft(item.repeat || { frequency: "yearly", interval: 1 }); }} />
         <Button icon="close" aria-label={`Remove ${item.title}`} disabled={busy} onClick={() => void onSave({ ...settings, custom: settings.custom.filter(x => x.id !== item.id) })} />
       </div>)}
-      {custom && <form className={`work-form ${styles.customDateForm}`} onSubmit={async e => {
+      <AnimatePresence initial={false}>{custom && <motion.form layout layoutId={editorId} initial={reduced ? false : {opacity:0, height:0}} animate={{opacity:1, height:"auto"}} exit={{opacity:0, height:0}} transition={layoutTransition} className={`work-form ${styles.customDateForm}`} onSubmit={async e => {
         e.preventDefault(); setCustomError("");
         try {
           const next = settings.custom.some(x => x.id === custom.id) ? settings.custom.map(x => x.id === custom.id ? custom : x) : [...settings.custom, custom];
@@ -75,9 +79,17 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
         } catch (e) { setCustomError((e as Error).message); }
       }}>
         <label>Name<input required maxLength={240} value={custom.title} placeholder="Anniversary, personal milestone…" onChange={e => setCustom({ ...custom, title: e.target.value })} /></label>
-        <div className={styles.customDateToggles}>
+        <div className={styles.customDateFirstRow}>
+          <EventDateTimePicker dateOnly label="Date" value={custom.date} allDay={true} timeZone={custom.timeZone || zone} onChange={value => setCustom({ ...custom, date: value.slice(0, 10), startTime: value.slice(11, 16) || custom.startTime, endDate: !custom.endDate || custom.endDate === custom.date ? value.slice(0, 10) : custom.endDate })} />        <div className={styles.customDateToggles}>
           <label className={styles.calendarToggle}><input type="checkbox" checked={custom.allDay !== false} onChange={e => setCustom({ ...custom, allDay: e.target.checked, startTime: custom.startTime || "09:00", endTime: custom.endTime || "10:00", endDate: custom.endDate || custom.date, timeZone: custom.timeZone || zone })} /><span>All day</span></label>
 
+        </div>
+</div>
+        <div className={styles.customDateSchedule}>
+          {custom.allDay === false && <EventDateTimePicker label={custom.allDay === false ? "Custom start" : "Custom date"} value={custom.allDay === false ? `${custom.date}T${custom.startTime}` : custom.date} allDay={custom.allDay !== false} timeZone={custom.timeZone || zone} onChange={value => setCustom({ ...custom, date: value.slice(0, 10), startTime: value.slice(11, 16) || custom.startTime, endDate: !custom.endDate || custom.endDate === custom.date ? value.slice(0, 10) : custom.endDate })} />}
+
+          {custom.allDay === false && <EventDateTimePicker label="Custom end" value={`${custom.endDate || custom.date}T${custom.endTime}`} allDay={false} timeZone={custom.timeZone || zone} onChange={value => setCustom({ ...custom, endDate: value.slice(0, 10), endTime: value.slice(11, 16) })} />}
+        {custom.allDay === false && <label>Time zone<SelectField contained searchable aria-label="Custom date time zone" menuClassName={styles.calendarChoiceMenu} value={custom.timeZone || zone} onChange={e => setCustom({ ...custom, timeZone: e.target.value })}>{[...new Set([zone, custom.timeZone || zone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(z => <option key={z} value={z}>{z.replaceAll("_", " ").replaceAll("/", " / ")}</option>)}</SelectField></label>}
         </div>
         <div className={styles.scheduleOption}>
           <EventCheckbox label="Repeat" icon="routine" checked={Boolean(custom.repeat || custom.annual)} onChange={checked => setCustom({ ...custom, annual: false, repeat: checked ? repeatDraft : undefined })} />
@@ -86,14 +98,10 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
             <SelectField contained aria-label="Custom repeat unit" value={(custom.repeat || repeatDraft).frequency} menuClassName={styles.calendarChoiceMenu} onChange={event => { const next = { ...(custom.repeat || repeatDraft), frequency: event.target.value as typeof repeatDraft.frequency }; setRepeatDraft(next); if (custom.repeat || custom.annual) setCustom({ ...custom, annual: false, repeat: next }); }}>{[["daily", "days"], ["weekly", "weeks"], ["monthly", "months"], ["yearly", "years"]].map(([value, label]) => <option key={value} value={value}>{label}</option>)}</SelectField>
           </div>
         </div>
-        <div className={styles.customDateSchedule}>
-          <EventDateTimePicker label={custom.allDay === false ? "Custom start" : "Custom date"} value={custom.allDay === false ? `${custom.date}T${custom.startTime}` : custom.date} allDay={custom.allDay !== false} timeZone={custom.timeZone || zone} onChange={value => setCustom({ ...custom, date: value.slice(0, 10), startTime: value.slice(11, 16) || custom.startTime, endDate: !custom.endDate || custom.endDate === custom.date ? value.slice(0, 10) : custom.endDate })} />
-          {custom.allDay === false && <EventDateTimePicker label="Custom end" value={`${custom.endDate || custom.date}T${custom.endTime}`} allDay={false} timeZone={custom.timeZone || zone} onChange={value => setCustom({ ...custom, endDate: value.slice(0, 10), endTime: value.slice(11, 16) })} />}
-        </div>
-        {custom.allDay === false && <label>Time zone<SelectField contained searchable aria-label="Custom date time zone" menuClassName={styles.calendarChoiceMenu} value={custom.timeZone || zone} onChange={e => setCustom({ ...custom, timeZone: e.target.value })}>{[...new Set([zone, custom.timeZone || zone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(z => <option key={z} value={z}>{z.replaceAll("_", " ").replaceAll("/", " / ")}</option>)}</SelectField></label>}
         {customError && <p role="alert">{customError}</p>}
-        <div className="work-actions"><Button type="submit" intent="primary" busy={busy}>Save date</Button><Button onClick={() => setCustom(undefined)}>Cancel</Button></div>
-      </form>}
+        <div className={styles.customDateActions}><Button onClick={() => setCustom(undefined)}>Cancel</Button><Button type="submit" intent="primary" busy={busy}>Save date</Button></div>
+      </motion.form>}</AnimatePresence>
+      <motion.div layout className={styles.customDateActions}>{!custom && <motion.span layoutId={editorId} transition={layoutTransition}><Button icon="plus" disabled={busy} onClick={() => { setCustomError(""); setRepeatDraft({ frequency: "yearly", interval: 1 }); setCustom({ id: crypto.randomUUID(), title: "", date, annual: true, visible: true }); }}>Add date</Button></motion.span>}{footer}</motion.div>
     </section>}
   </div>;
 }

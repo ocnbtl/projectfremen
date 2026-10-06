@@ -38,17 +38,18 @@ function GroupEditor({ calendar, onSave }: { calendar: Calendar; onSave: (calend
   return <form className={styles.groupSettings} aria-label="Manage color groups" onSubmit={event => { event.preventDefault(); void autosave.flush(); }}>
     <div className={styles.groupSettingsRows}>
       {groups.map((group, index) => <div className={styles.groupSettingsRow} key={group.id}>
-        <label>Name
+        <label aria-label="Group name">
           <input aria-label={`Group ${index + 1} name`} required maxLength={80} value={group.name}  placeholder="Group name" onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, name: event.target.value } : item))} />
         </label>
-        <label>Icon
+        <label aria-label="Group icon">
           <SelectField aria-label={`Group ${index + 1} icon`} value={group.icon}  menuClassName={styles.calendarChoiceMenu} onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, icon: event.target.value } : item))}>
             {[...new Set([...GROUP_ICONS, group.icon])].map(icon => <option key={icon} value={icon}><span className={styles.viewChoice}><UnigentamosIcon role={icon} size={16} />{iconNames[icon] || icon}</span></option>)}
           </SelectField>
         </label>
-        <label>Color
+        <label aria-label="Group color">
           <input aria-label={`Group ${index + 1} color`} type="color" value={group.color}  onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, color: event.target.value } : item))} />
         </label>
+        <Button icon="delete" aria-label={`Remove ${group.name} group`} onClick={() => updateGroups(items => items.filter(item => item.id !== group.id))} />
       </div>)}
     </div>
     <Button icon="plus" disabled={groups.length >= 100} onClick={() => updateGroups(items => [...items, { id: crypto.randomUUID(), name: "New group", color: MODULE_COLOR_SYSTEM.calendar.tokens.action, icon: "star" }])}>Add group</Button>

@@ -154,6 +154,7 @@ export function WorkspaceSheet({
   anchorSelector,
   presentation,
   className,
+  titleIcon,
   anchorWidth = 620,
   headerActions,
 }: {
@@ -165,6 +166,7 @@ export function WorkspaceSheet({
   anchorSelector?: string;
   presentation?: "center" | "page";
   className?: string;
+  titleIcon?: string;
   anchorWidth?: number;
   headerActions?: ReactNode;
 }) {
@@ -225,7 +227,7 @@ export function WorkspaceSheet({
           aria-describedby={description ? descriptionId : undefined}
         >
           <div className="work-sheet-header">
-            <Dialog.Title>{title}</Dialog.Title>
+            <Dialog.Title>{titleIcon && <UnigentamosIcon role={titleIcon} candidate={titleIcon === "sliders" ? "settings" : undefined} size={22} />}{title}</Dialog.Title>
             <div className="work-sheet-header-actions">
             {headerActions}
             <Dialog.Close asChild>
