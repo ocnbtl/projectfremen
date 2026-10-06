@@ -1,3 +1,4 @@
+import { reconcilePlaces } from "../../../lib/modules/planning/place-reconciliation";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
 import { isCsrfRequestValid } from "../../../lib/csrf";
@@ -383,6 +384,15 @@ export async function POST(request: Request) {
         return { state: next, result: { count: incoming.length } };
       });
     } else throw new Error("Unknown planning operation");
+    let placeSyncPending = false;
+    if (body.operation === "save" && body.collection === "events" && result && typeof result === "object" && "id" in result) {
+      try {
+        const id = String(result.id);
+        const sync = await reconcilePlaces({ eventIds: [id], limit: 1 });
+        placeSyncPending = sync.remaining || sync.conflicts > 0;
+        result = (await readPlanningState()).events.find(event => event.id === id) || result;
+      } catch { placeSyncPending = true; }
+    }
     await appendAuditEvent({
       at: new Date().toISOString(),
       action: `planning.${body.operation}.success`,
@@ -391,7 +401,7 @@ export async function POST(request: Request) {
       ip: getRequestIp(request),
       status: "ok",
     });
-    return json({ ok: true, item: result });
+    return json({ ok: true, item: result, placeSyncPending });
   } catch (error) {
     if (refreshingId)
       await mutatePlanningState((state) => ({

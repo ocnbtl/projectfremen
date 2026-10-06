@@ -65,11 +65,12 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
   if (collection === "places")
     fields = {
       name: string(raw.name, "Place name", 240, true),
-      address: string(raw.address, "Address"),
+      address: string(raw.address, "Address", 1400),
       ...(raw.countryCode ? { countryCode: normalizeAddressCountry(raw.countryCode) } : {}),
       ...(raw.addressParts != null ? { addressParts: normalizeAddressParts(raw.addressParts) } : {}),
-      latitude: coordinate(raw.latitude, 90),
-      longitude: coordinate(raw.longitude, 180),
+      ...((raw.latitude == null || raw.latitude === "") && (raw.longitude == null || raw.longitude === "")
+        ? { latitude: undefined, longitude: undefined }
+        : { latitude: coordinate(raw.latitude, 90), longitude: coordinate(raw.longitude, 180) }),
       notes: string(raw.notes, "Notes", 10000),
       tags: Array.isArray(raw.tags)
         ? raw.tags
@@ -92,7 +93,7 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       calendarId: string(raw.calendarId, "Calendar", 300, true),
       groupId: string(raw.groupId, "Color group", 100),
       placeId: string(raw.placeId, "Place", 300),
-      location: string(raw.location, "Location"),
+      location: string(raw.location, "Location", 1400),
       linkedRefs: refs(raw.linkedRefs),
       recurrence: string(raw.recurrence, "Recurrence", 500),
       kind: raw.kind === "time_block" ? "time_block" : "event",

@@ -1,3 +1,4 @@
+import { reconcilePlaces } from "../../../../lib/modules/planning/place-reconciliation";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import { appendAuditEvent, getRequestIp } from "../../../../lib/audit-log";
@@ -54,7 +55,8 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const items = await createPersonalRecord({
+    const previousIds = new Set((await readPersonalRecords()).map(item => item.id));
+    let items = await createPersonalRecord({
       domain: String(body.domain ?? ""),
       title: String(body.title ?? ""),
       className: String(body.className ?? body.kind ?? ""),
@@ -79,6 +81,13 @@ export async function POST(request: Request) {
       interaction: typeof body.interaction === "object" && body.interaction ? body.interaction : undefined
     }, { initialPhoto: typeof body.initialPhoto === "string" ? body.initialPhoto : undefined, autofill: body.autofill });
 
+    let placeSyncPending = false;
+    try {
+      const sync = await reconcilePlaces({ recordIds: items.filter(item => !previousIds.has(item.id)).map(item => item.id), limit: 30 });
+      placeSyncPending = sync.remaining || sync.conflicts > 0;
+      items = await readPersonalRecords();
+    } catch { placeSyncPending = true; }
+
     await appendAuditEvent({
       at: new Date().toISOString(),
       action: "personal.record.create.success",
@@ -89,7 +98,7 @@ export async function POST(request: Request) {
       detail: String(body.domain ?? "")
     });
 
-    return json({ ok: true, items });
+    return json({ ok: true, items, placeSyncPending });
   } catch (error) {
     return json(
       { ok: false, error: error instanceof Error ? error.message : "Failed to create record" },
@@ -124,7 +133,7 @@ export async function PATCH(request: Request) {
     const action = body.action === "review" || body.action === "archive" || body.action === "restore"
       ? body.action
       : undefined;
-    const items = await updatePersonalRecord(id, {
+    let items = await updatePersonalRecord(id, {
       title: typeof body.title === "string" ? body.title : undefined,
       status: typeof body.status === "string" ? body.status : undefined,
       action,
@@ -150,6 +159,14 @@ export async function PATCH(request: Request) {
           : undefined
     }, { expectedUpdatedAt: expectedUpdatedAt || undefined, autofill: body.autofill });
 
+    let placeSyncPending = false;
+    if (body.profile && !action) {
+      try {
+        const sync = await reconcilePlaces({ recordIds: [id], limit: 16 });
+        placeSyncPending = sync.remaining || sync.conflicts > 0;
+        items = await readPersonalRecords();
+      } catch { placeSyncPending = true; }
+    }
     const updated = items.find((item) => item.id === id);
     await appendAuditEvent({
       at: new Date().toISOString(),
@@ -165,7 +182,7 @@ export async function PATCH(request: Request) {
       detail: `${updated?.domain || "unknown"}:${id}`
     });
 
-    return json({ ok: true, items });
+    return json({ ok: true, items, placeSyncPending });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Failed to update record";
     return json(

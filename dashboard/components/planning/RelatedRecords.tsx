@@ -44,7 +44,7 @@ export default function RelatedRecords({
   if (hideEmpty && !error && (!loaded || !items.length)) return null;
   return (
     <section className="work-related">
-      <h3>Places, events and media</h3>
+      <h3>Linked objects</h3>
       {error ? (
         <p>Related records could not load. Your links are preserved.</p>
       ) : !loaded ? (
@@ -69,7 +69,7 @@ export default function RelatedRecords({
           ))}
         </div>
       ) : (
-        <p className="work-muted">No places, events or media linked yet.</p>
+        <p className="work-muted">No linked objects yet.</p>
       )}
     </section>
   );

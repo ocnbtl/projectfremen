@@ -1,4 +1,5 @@
 "use client";
+import PlaceSync from "./PlaceSync";
 import LogoLoader from "../operational/LogoLoader";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import * as Popover from "@radix-ui/react-popover";
@@ -40,6 +41,7 @@ import {
   savePlanningTrip,
   type PlanningSnapshot,
 } from "../../lib/modules/planning/repository";
+import { hasPlaceCoordinates } from "../../lib/modules/planning/place-identity";
 import type { Place } from "../../lib/modules/planning/types";
 import type {
   PersonalTrip,
@@ -357,6 +359,7 @@ export default function MapWorkspace() {
       className={`work-surface ${styles.shell}`}
       style={moduleThemeVariables("map") as CSSProperties}
     >
+      <PlaceSync onComplete={refresh} />
       <div className={styles.mapToolbar} aria-label="Map controls" onKeyDown={e => {
         if (e.key === "Enter" && e.target instanceof HTMLInputElement && e.target.closest(".work-search") && query.trim().length >= 3 && !busy) { e.preventDefault(); void search(); }
       }}>
@@ -510,8 +513,9 @@ export default function MapWorkspace() {
                 <strong>{p.name}</strong>
                 <small>
                   {p.address ||
-                    `${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}`}
+                    (hasPlaceCoordinates(p) ? `${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}` : "Address saved · pin not set")}
                 </small>
+                {!hasPlaceCoordinates(p) && p.address && <small>Pin not set</small>}
                 {p.tags.length > 0 && <small>{p.tags.join(" · ")}</small>}
               </div>
             </button>
@@ -596,8 +600,8 @@ export default function MapWorkspace() {
         <div className={styles.map}>
           <MapCanvas
             photos={photos}
-            places={places}
-            selected={selected}
+            places={places.filter(hasPlaceCoordinates)}
+            selected={hasPlaceCoordinates(selected) ? selected : undefined}
             pinning={pinning}
             onSelect={setSelectedId}
             onPin={(longitude, latitude) => {
@@ -625,7 +629,7 @@ export default function MapWorkspace() {
                   ×
                 </Button>
               </div>
-              <p>{selected.address}</p>
+              <p>{selected.address}</p>{!hasPlaceCoordinates(selected) && <p className="work-muted">Address saved. Add coordinates to show its pin on the map.</p>}
               {selected.notes && <p>{selected.notes}</p>}
               <RecordLinks refs={selected.linkedRefs} />
               <RelatedRecords module="map" type="place" id={selected.id} />

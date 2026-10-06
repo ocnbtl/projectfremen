@@ -29,7 +29,8 @@
     "regress": "node ./scripts/regression-harness.mjs",
     "predev": "node ./scripts/prepare-map-assets.cjs",
     "prebuild": "node ./scripts/prepare-map-assets.cjs",
-    "test:planning": "node ./scripts/planning-workspace-harness.cjs"
+    "test:planning": "node ./scripts/planning-workspace-harness.cjs",
+    "test:places": "node ./scripts/place-integration-harness.cjs"
   },
   "dependencies": {
     "@fontsource-variable/inconsolata": "5.2.8",

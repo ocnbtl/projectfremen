@@ -1,4 +1,8 @@
 "use client";
+import PlaceSync from "./planning/PlaceSync";
+import ProfilePlaceField from "./planning/ProfilePlaceField";
+import { planningRequest, type PlanningSnapshot } from "../lib/modules/planning/repository";
+import type { Place } from "../lib/modules/planning/types";
 import LogoLoader from "./operational/LogoLoader";
 import { peopleWithRelationships, isSchoolOrganization } from "../lib/modules/people/relationships";
 
@@ -973,7 +977,7 @@ function cleanLocationEntries(entries: PersonalLocationEntry[]): PersonalLocatio
       location: entry.location?.trim() || undefined,
       address: entry.address?.trim() || undefined
     }))
-    .filter((entry) => entry.location || entry.address);
+    .filter((entry) => entry.placeId || entry.location || entry.address);
 }
 
 function updateEntry<T extends { id: string }>(entries: T[], id: string, patch: Partial<T>): T[] {
@@ -1758,6 +1762,8 @@ function LocationEntriesEditor({
   onAdd: () => void;
   onRemove: (id: string) => void;
 }) {
+  const [places, setPlaces] = useState<Place[]>([]);
+  useEffect(() => { let active = true; void planningRequest<PlanningSnapshot>().then(snapshot => { if (active) setPlaces(snapshot.state.places.filter(place => !place.archivedAt)); }).catch(() => {}); return () => { active = false; }; }, []);
   return (
     <section className="people-repeatable-section people-themed-section module-ref-tone-cyan" data-people-location-editor data-profile-section="locations">
       <header className="people-repeatable-heading">
@@ -1766,14 +1772,15 @@ function LocationEntriesEditor({
       </header>
       {!organization && onComesFromChange && <label className="people-origin-field"><span>Origin</span><span className="people-comes-from-field is-standalone"><UnigentamosIcon role="location" candidate="map-pin" size={18} /><input aria-label="Comes from" list="people-location-suggestions" value={comesFrom} onChange={event => onComesFromChange(event.target.value)} placeholder="City or region" /></span></label>}
       {entries.length > 0 ? entries.map((entry, index) => (
-        <article className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
-          <div className={`people-repeatable-fields people-repeatable-fields-location people-place-row${organization ? " is-organization" : ""}`}>
+        <motion.article layout="position" transition={{ duration: .24 }} className="people-repeatable-entry" data-location-entry={entry.id} key={entry.id}>
+          <ProfilePlaceField places={places} placeId={entry.placeId} index={index} onSelect={place => onChange(entry.id, { placeId: place.id, address: place.address || "", location: "" })} onEdit={() => onChange(entry.id, { placeId: "" })} />
+          <div className={`people-repeatable-fields people-repeatable-fields-location people-place-row${organization ? " is-organization" : ""}`} style={entry.placeId ? { gridTemplateColumns: "minmax(0, 1fr) auto" } : undefined}>
             <PlaceLabelPicker value={entry.label || ""} index={index} onChange={label => onChange(entry.id, { label })} />
-            <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City</span><input aria-label={`Place ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value })} placeholder="Start typing…" /></label>
-            <label className="people-location-address-field"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><input aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value })} placeholder="Street address" /></label>
+            {!entry.placeId && <><label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>City</span><input aria-label={`Place ${index + 1} city`} list="people-location-suggestions" value={entry.location || ""} onChange={(event) => onChange(entry.id, { location: event.target.value, placeId: "" })} placeholder="Start typing…" /></label>
+            <label className="people-location-address-field"><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Street address</span><input aria-label={`Place ${index + 1} street address`} value={entry.address || ""} onChange={(event) => onChange(entry.id, { address: event.target.value, placeId: "" })} placeholder="Street address" /></label></>}
             <RemoveIconButton className="people-location-remove" label={`Remove place ${index + 1}`} onClick={() => onRemove(entry.id)} />
           </div>
-        </article>
+        </motion.article>
       )) : <p className="people-repeatable-empty">No place added.</p>}
     </section>
   );
@@ -2721,6 +2728,8 @@ export default function PeopleWorkspace({
       || JSON.stringify(profileGroups) !== JSON.stringify(selectedPerson.subjects)
     )
   );
+  const placeSyncEditingRef = useRef(false);
+  placeSyncEditingRef.current = addingPerson || detailMode === "edit";
   const editorDirty = addingPerson ? addFormDirty : detailMode === "edit" && profileFormDirty;
 
   function guardDirtyNavigation(destination: string) {
@@ -4054,6 +4063,7 @@ export default function PeopleWorkspace({
 
   return (
     <section className={shellClassName} aria-label="People workspace">
+      <PlaceSync enabled={!addingPerson && detailMode !== "edit"} onComplete={async () => { const response = await fetch("/api/personal/records", { cache: "no-store" }); const body = await response.json(); if (response.ok && body.ok && !placeSyncEditingRef.current) setPeople(body.items.filter((record: PersonalRecord) => record.className === "person" || record.className === "org")); }} />
       <span id="people-unavailable-actions" className="sr-only">
         This action is intentionally unavailable until its native owner or persistence path is connected.
       </span>

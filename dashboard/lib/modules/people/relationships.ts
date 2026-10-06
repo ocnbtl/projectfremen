@@ -10,7 +10,7 @@ export function peopleWithRelationships(records: PersonalRecord[], links: { stat
     const references = [...record.relations.related, ...record.projects, ...(p?.associatedPeople || []), ...(p?.children || []),
       ...[p?.partner, p?.primaryEmployer, p?.secondaryEmployer, p?.pastEmployer].filter((v): v is string => Boolean(v)),
       ...(p?.occupations || []).map(e => e.organizationId || e.employer || ""), ...(p?.education || []).map(e => e.organizationId || e.institution || "")].filter(Boolean);
-    if (references.length) ids.add(record.id);
+    if (references.length || p?.locations?.some(location => location.placeId)) ids.add(record.id);
     for (const value of references) { const target = resolve(value); if (target) ids.add(target.id); }
   }
   for (const link of links.filter(l => l.status !== "removed")) for (const ref of [link.source, link.target]) if (ref.module === "people" && active.some(r => r.id === ref.objectId)) ids.add(ref.objectId);

@@ -12,7 +12,7 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Place } from "../../lib/modules/planning/types";
 import { useMotionPreference } from "../admin-shell/ExperienceProvider";
 type Props = {
-  places: Place[];
+  places: (Place & { latitude: number; longitude: number })[];
   photos?: {
     id: string;
     label: string;
@@ -20,7 +20,7 @@ type Props = {
     latitude: number;
     longitude: number;
   }[];
-  selected?: Place;
+  selected?: Place & { latitude: number; longitude: number };
   pinning: boolean;
   onSelect: (id: string) => void;
   onPin: (longitude: number, latitude: number) => void;

@@ -12,6 +12,7 @@ import { readPersonalRecords, type PersonalRecord } from "../../../lib/personal-
 import { readNativeObjectLinks } from "../../../lib/native-objects/link-store";
 import { createNativeObjectRef } from "../../../lib/native-objects/routes";
 import { requireAdminSession } from "../../../lib/require-admin";
+import { readPlanningState } from "../../../lib/modules/planning/store";
 
 export type PeopleRouteMode = "directory" | "profile" | "new" | "edit";
 
@@ -23,7 +24,7 @@ export default async function PeopleRoutePage({
   personId?: string;
 }) {
   await requireAdminSession();
-  const [recordsResult, followUpsResult, projectsResult, objectLinksResult, personalLifeResult, financeResult] = await Promise.all([
+  const [recordsResult, followUpsResult, projectsResult, objectLinksResult, personalLifeResult, financeResult, places] = await Promise.all([
     readPersonalRecords()
       .then((records) => ({ ok: true as const, records }))
       .catch((error: unknown) => ({
@@ -51,7 +52,8 @@ export default async function PeopleRoutePage({
       .catch(() => ({ ok: false as const, state: { lists: [] } })),
     readFinanceState()
       .then((state) => ({ ok: true as const, state }))
-      .catch(() => ({ ok: false as const, state: { accounts: [] } }))
+      .catch(() => ({ ok: false as const, state: { accounts: [] } })),
+    readPlanningState().then(state => state.places.filter(place => !place.archivedAt)).catch(() => [])
   ]);
   const records: PersonalRecord[] = recordsResult.ok ? recordsResult.records : [];
   const loadError = recordsResult.ok ? "" : recordsResult.error;
@@ -62,6 +64,7 @@ export default async function PeopleRoutePage({
     (record): record is PersonalRecord => record.className === "interaction" && Boolean(record.interaction)
   );
   const objectTargets = [
+    ...places.map(place => createNativeObjectRef({ module: "map", objectType: "place", objectId: place.id, label: place.name, versionId: place.updatedAt })),
     ...records
       .filter((record) => !record.archivedAt && record.className === "file")
       .map((record) => createNativeObjectRef({

@@ -231,6 +231,7 @@ export type PersonalOccupationEntry = {
 
 export type PersonalLocationEntry = {
   id: string;
+  placeId?: string;
   label?: string;
   location?: string;
   address?: string;
@@ -983,8 +984,8 @@ function normalizeLocationEntries(value: unknown, strict = false): PersonalLocat
     const raw = item as Record<string, unknown>;
     const label = profileEntryText(raw.label, 80, strict, `Location ${index + 1} label`);
     const location = profileEntryText(raw.location, 320, strict, `Location ${index + 1} city or region`);
-    const address = profileEntryText(raw.address, 1000, strict, `Location ${index + 1} address`);
-    if (!location && !address) {
+    const address = profileEntryText(raw.address, 1400, strict, `Location ${index + 1} address`);
+    if (!location && !address && !raw.placeId) {
       if (strict) throw new Error(`Location ${index + 1} needs a city, region, or street address`);
       continue;
     }
@@ -992,7 +993,8 @@ function normalizeLocationEntries(value: unknown, strict = false): PersonalLocat
       id: profileEntryId("location", raw.id, `${label}:${location}:${address}`, index, ids, strict),
       label: label || undefined,
       location: location || undefined,
-      address: address || undefined
+      address: address || undefined,
+      placeId: profileEntryText(raw.placeId, 300, strict, `Location ${index + 1} place`) || undefined
     });
   }
   return entries;
@@ -1093,6 +1095,7 @@ function reconcileContactProfileCollections(
 
   if (profile.livesIn || profile.address) {
     const replacement: PersonalLocationEntry = {
+      ...locations[0],
       id: locations[0]?.id || deterministicProfileEntryId("location", `${profile.livesIn || ""}:${profile.address || ""}`, 0),
       label: locations[0]?.label || "Primary home",
       location: profile.livesIn || locations[0]?.location,
@@ -1408,6 +1411,7 @@ function mergeContactProfile(
   return reconcileContactProfileCollections({
     ...current,
     ...patch,
+    headquarters: patch.locations && !locations.length ? undefined : patch.headquarters ?? current?.headquarters,
     universityAffiliation,
     primaryOccupation,
     primaryEmployer,
@@ -2151,8 +2155,22 @@ export async function readPersonalRecords(): Promise<PersonalRecord[]> {
   const records = existing
     .map(normalizeRecord)
     .filter((record) => isAllowedDomain(record.domain));
+  const places = records.some(record => record.profile?.locations.some(location => location.placeId))
+    ? (await readJsonFile<{ places: import("./modules/planning/types").Place[] }>("planning-records.json", { places: [] }).catch(() => ({ places: [] }))).places || []
+    : [];
   return records
-    .map((record) => ({ ...record, profile: resolveOrganizationReferences(record.profile, records, false) }))
+    .map((record) => {
+      const profile = resolveOrganizationReferences(record.profile, records, false);
+      if (!profile || !profile.locations.some(location => location.placeId)) return { ...record, profile };
+      // Read through the canonical Place; the original address remains in stored profile history.
+      const locations = profile.locations.map(location => {
+        const place = places.find(place => place.id === location.placeId && !place.archivedAt);
+        if (!place) return location;
+        const locality = place.addressParts?.city || (location.location && place.address.toLowerCase().includes(location.location.toLowerCase()) ? location.location : "");
+        return { ...location, address: place.address || location.address, location: locality || undefined };
+      });
+      return { ...record, profile: { ...profile, locations, address: locations[0]?.address, livesIn: locations[0]?.location } };
+    })
     .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 

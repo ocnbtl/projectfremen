@@ -2,6 +2,7 @@
 import type { FormEvent, ReactNode } from "react";
 import Link from "next/link";
 import type { PersonalTrip } from "../../lib/modules/personal-life/types";
+import { hasPlaceCoordinates } from "../../lib/modules/planning/place-identity";
 import type { Place } from "../../lib/modules/planning/types";
 import { supportsTripRouting } from "../../lib/modules/personal-life/travel-modes";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -40,7 +41,7 @@ export default function TripPlanner({trip,places,busy,error,notice,onChange,onSa
         {index>0&&trip.route?.legs?.[index-1]&&<p className={styles.leg}><UnigentamosIcon role="clock" size={15}/>{(trip.route.legs[index-1].distance/1000).toFixed(1)} km · about {Math.ceil(trip.route.legs[index-1].duration/60)} min from previous stop</p>}
         <div className={styles.stopFields}><label>Arrival<input type="datetime-local" value={stop.arrival||""} onChange={e=>onChange({...trip,stops:stops.map(s=>s.id===stop.id?{...s,arrival:e.target.value}:s)})}/></label><label>Stop notes<input value={stop.notes||""} placeholder="Check-in, booking, or something to see" onChange={e=>onChange({...trip,stops:stops.map(s=>s.id===stop.id?{...s,notes:e.target.value}:s)})}/></label></div>
       </li>)}</ol>
-      <label>Add a saved place<SelectField value="" searchable autoFocusSearch={false} onChange={e=>{const place=places.find(p=>p.id===e.target.value);if(place)updateStops([...stops,{id:crypto.randomUUID(),placeId:place.id,name:place.name,latitude:place.latitude,longitude:place.longitude}]);}}><option value="">Choose a place…</option>{places.filter(p=>!p.archivedAt).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</SelectField></label>
+      <label>Add a saved place<SelectField value="" searchable autoFocusSearch={false} onChange={e=>{const place=places.find(p=>p.id===e.target.value);if(hasPlaceCoordinates(place))updateStops([...stops,{id:crypto.randomUUID(),placeId:place.id,name:place.name,latitude:place.latitude,longitude:place.longitude}]);}}><option value="">Choose a place…</option>{places.filter(p=>!p.archivedAt).filter(hasPlaceCoordinates).map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</SelectField></label>
       <div className={styles.route}><Button icon="location" disabled={busy||stops.length<2||!supportsTripRouting(mode)} onClick={onCalculate}>Calculate route</Button>{trip.route&&<strong>{(trip.route.distance/1000).toFixed(1)} km <span>· about {Math.round(trip.route.duration/60)} min</span></strong>}
       <p>{!supportsTripRouting(mode)?"Keep stops and arrival times here; route estimates are available for car, van, bike, and walking trips.":mode==="van"?"Standard driving estimate. Vehicle height, weight, and live traffic are not included.":stops.length<2?"Add at least two stops to estimate distance and travel time.":"Estimates exclude live traffic. Save the trip to keep your route."}</p></div>
     </section>

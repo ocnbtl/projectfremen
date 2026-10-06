@@ -36,8 +36,9 @@ export async function GET(request: Request) {
         (r) =>
           r.module === module && r.objectId === id && r.objectType === type,
       );
+    const profile = module === "people" ? records.find(record => record.id === id && !record.archivedAt) : undefined;
     for (const p of planning.places)
-      if (!p.archivedAt && matches(p.linkedRefs))
+      if (!p.archivedAt && (matches(p.linkedRefs) || profile?.profile?.locations.some(location => location.placeId === p.id)))
         items.push({
           ref: createNativeObjectRef({
             module: "map",
@@ -47,6 +48,10 @@ export async function GET(request: Request) {
           }),
           detail: p.address || "Saved place",
         });
+    if (module === "map" && type === "place")
+      for (const record of records)
+        if (!record.archivedAt && ["person", "org"].includes(record.className) && record.profile?.locations.some(location => location.placeId === id))
+          items.push({ ref: createNativeObjectRef({ module: "people", objectType: record.className === "org" ? "organization" : "person", objectId: record.id, label: record.title }), detail: record.profile.locations.filter(location => location.placeId === id).map(location => location.label || "Place").join(" · ") });
     for (const e of planning.events)
       if (
         !e.archivedAt &&

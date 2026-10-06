@@ -1,0 +1,12 @@
+.picker { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto auto; gap: 8px; align-items: center; min-width: 0; margin-bottom: 10px; color: var(--ink, #273a40); }
+.picker > :global(.app-select-trigger) { min-width: 0; width: 100%; font-size: 13px; }
+.picker > :global(.app-select-trigger) > span { display: block; max-width: 100%; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker > :global(.app-select-trigger) > span > span { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.picker small { grid-column: 2 / -1; font-size: 12px; line-height: 1.4; opacity: .7; overflow-wrap: anywhere; }
+.picker .open, .picker .edit { display: inline-flex; align-items: center; justify-content: center; min-height: 34px; width: 34px; height: 34px; border-radius: 9px; background: color-mix(in srgb, #869959 10%, transparent); color: inherit; border: 1px solid color-mix(in srgb, #869959 22%, transparent); text-decoration: none; padding: 6px; font: inherit; font-size: 12px; cursor: pointer; transition: background 180ms ease, border-color 180ms ease; }
+.open:hover, .edit:hover { background: color-mix(in srgb, #869959 18%, transparent); }
+.sync { position: fixed; bottom: 18px; left: 18px; z-index: 40; max-width: min(440px, calc(100vw - 36px)); padding: 12px 16px; border: 1px solid #d8dfd5; border-radius: 12px; background: #fafcf9; font-size: 12px; box-shadow: 0 6px 24px #273a4012; }
+.sync button { margin-left: 8px; color: inherit; font: inherit; text-decoration: underline; background: none; border: 0; cursor: pointer; }
+.picker small { animation: place-reveal 220ms ease both; }
+@keyframes place-reveal { from { opacity: 0; transform: translateY(-3px); } to { opacity: .7; transform: translateY(0); } }
+@media (prefers-reduced-motion: reduce) { .picker small { animation: none; } .picker .open, .picker .edit { transition: none; } }

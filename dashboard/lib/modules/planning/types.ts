@@ -11,8 +11,8 @@ export type Place = PlanningBase & {
   address: string;
   countryCode?: string;
   addressParts?: import("./place-address").AddressParts;
-  latitude: number;
-  longitude: number;
+  latitude?: number;
+  longitude?: number;
   notes: string;
   tags: string[];
   linkedRefs: NativeObjectRef[];

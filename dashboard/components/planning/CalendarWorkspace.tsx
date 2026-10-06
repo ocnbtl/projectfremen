@@ -1,4 +1,5 @@
 "use client";
+import PlaceSync from "./PlaceSync";
 import LogoLoader from "../operational/LogoLoader";
 import * as Popover from "@radix-ui/react-popover";
 import { calendarDisplayColor, eventColors, eventPreviewTitle, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
@@ -592,6 +593,7 @@ export default function CalendarWorkspace() {
       className={`work-surface ${styles.shell}`}
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
+      <PlaceSync onComplete={refresh} />
       <header className={styles.toolbar} data-timeline={timeline} aria-label="Calendar controls">
         <h1>Calendar</h1>
         <div className={styles.dateNavigation}>

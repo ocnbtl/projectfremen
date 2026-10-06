@@ -4,6 +4,7 @@ import { mutateJsonFile, readJsonFile } from "../../file-store";
 import { createNativeObjectRef } from "../../native-objects/routes";
 import { isModuleId, type NativeObjectRef } from "../../native-objects/types";
 import { instantFor, validateEventTime } from "./calendar-model";
+import { addressIdentity } from "./place-identity";
 import {
   emptyPlanningState,
   PLANNING_COLLECTIONS,
@@ -43,6 +44,19 @@ export async function savePlanningRecord<K extends PlanningCollection>(
     (raw) => {
       const state = planningState(raw),
         id = typeof input.id === "string" ? input.id : crypto.randomUUID();
+      if (collection === "places" && !input.id && typeof input.address === "string" && input.address.trim()) {
+        const matches = state.places.filter(place => !place.archivedAt && addressIdentity(place.address) === addressIdentity(String(input.address)));
+        if (matches.length > 1) throw new Error("Several places use this address. Choose the saved place to link.");
+        if (matches.length === 1) {
+          const existing = matches[0];
+          const refs = [...new Map([...existing.linkedRefs, ...(Array.isArray(input.linkedRefs) ? input.linkedRefs : [])].map(ref => [`${ref.module}:${ref.objectType}:${ref.objectId}`, ref])).values()];
+          // A confirmed pin may enrich an address-only place; never move an existing pin implicitly.
+          const pin = existing.latitude == null && existing.longitude == null && input.latitude != null && input.longitude != null ? { latitude: input.latitude, longitude: input.longitude } : {};
+          if (refs.length === existing.linkedRefs.length && !("latitude" in pin)) return { value: state, result: existing as PlanningCollections[K], changed: false };
+          const item = normalizePlanningRecord("places", { ...existing, ...pin, linkedRefs: refs, updatedAt: new Date(Math.max(Date.now(), Date.parse(existing.updatedAt) + 1)).toISOString() });
+          return { value: { ...state, places: state.places.map(place => place.id === item.id ? item : place) }, result: item as PlanningCollections[K] };
+        }
+      }
       const current = state[collection].find((x) => x.id === id);
       if (current && current.updatedAt !== expectedUpdatedAt)
         throw Object.assign(
