@@ -1302,6 +1302,31 @@ async function check(label, run) {
     assert.equal(saved.analysis.palette, "indigo");
     assert.deepEqual(saved.analysis.metrics, settings.metrics);
   });
+  await check("country address layouts preserve international order and entered fields", () => {
+    const { formatPlaceAddress, addressFields, normalizeAddressCountry, addressCountries } = require("../lib/modules/planning/place-address.ts");
+    const us = {street:"123 Main St", city:"Cincinnati", region:"OH", postalCode:"45202", district:""};
+    assert.equal(formatPlaceAddress(us, "US"), "123 Main St, Cincinnati, OH 45202, United States");
+    assert.equal(formatPlaceAddress({...us, street:"10 Downing Street", city:"London", region:"", postalCode:"SW1A 2AA"}, "GB"), "10 Downing Street, London, SW1A 2AA, United Kingdom");
+    assert.equal(formatPlaceAddress({...us, street:"Unter den Linden 1", city:"Berlin", region:"", postalCode:"10117"}, "DE"), "Unter den Linden 1, 10117 Berlin, Germany");
+    assert(!addressFields("HK").includes("postalCode"));
+    assert(formatPlaceAddress(us, "GB").includes("OH"), "Country changes must not discard an entered region");
+    assert(addressCountries.length >= 249);
+    assert.throws(() => normalizeAddressCountry("__proto__"), /valid address country/);
+    assert.equal(normalizeAddressCountry("us"), "US");
+  });
+  await check("place address details persist and survive coordinate-only changes", async () => {
+    const parts = {street:"123 Main St", city:"Cincinnati", region:"OH", postalCode:"45202", district:""};
+    const address = "123 Main St, Cincinnati, OH 45202, United States";
+    const saved = await savePlanningRecord("places", {name:"Address fixture", address, countryCode:"US", addressParts:parts, latitude:39.1, longitude:-84.5, notes:"", tags:[], linkedRefs:[]});
+    const updated = await savePlanningRecord("places", {id:saved.id, latitude:39.2}, saved.updatedAt);
+    assert.equal(updated.address, address);
+    assert.equal(updated.countryCode, "US");
+    assert.deepEqual(updated.addressParts, parts);
+    assert.deepEqual((await readPlanningState()).places.find(p => p.id === saved.id).addressParts, parts);
+    const { planningWritableKeys } = require("../lib/modules/planning/ownership.ts");
+    assert(planningWritableKeys("places").includes("addressParts"));
+    assert(planningWritableKeys("places").includes("countryCode"));
+  });
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );

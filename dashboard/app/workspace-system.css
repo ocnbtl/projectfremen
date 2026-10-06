@@ -1206,3 +1206,9 @@ html[data-product-motion="reduce"] .work-sheet.work-sheet--anchored { animation:
 @media (prefers-reduced-motion: reduce) { .work-sheet.work-sheet--center,.work-sheet.work-sheet--page { animation: none; } }
 
 html[data-product-motion="reduce"] :is(.work-sheet.work-sheet--center, .work-sheet.work-sheet--page) { animation:none; }
+
+.work-sheet-header-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.work-object-link-trigger { flex: none; }
+.work-links > span { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; border-radius: 10px; background: #f4f7f5; }
+.work-links > span > a { background: transparent; min-width: 0; overflow-wrap: anywhere; }
+.work-links > span > .work-button { display: inline-grid; place-items: center; flex: 0 0 32px; width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; margin: 0 4px 0 0; border: 0; border-radius: 7px; }

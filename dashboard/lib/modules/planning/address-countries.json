@@ -1,0 +1,1766 @@
+{
+  "AC": {
+    "name": "Ascension Island",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AD": {
+    "name": "Andorra",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AE": {
+    "name": "United Arab Emirates",
+    "format": "%N%n%O%n%A%n%S",
+    "region": "emirate",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AF": {
+    "name": "Afghanistan",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AG": {
+    "name": "Antigua & Barbuda",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AI": {
+    "name": "Anguilla",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AL": {
+    "name": "Albania",
+    "format": "%N%n%O%n%A%n%Z%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AM": {
+    "name": "Armenia",
+    "format": "%N%n%O%n%A%n%Z%n%C%n%S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AO": {
+    "name": "Angola",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AQ": {
+    "name": "Antarctica",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AR": {
+    "name": "Argentina",
+    "format": "%N%n%O%n%A%n%Z %C%n%S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AS": {
+    "name": "American Samoa",
+    "format": "%N%n%O%n%A%n%C %S %Z",
+    "region": "state",
+    "city": "city",
+    "postal": "zip"
+  },
+  "AT": {
+    "name": "Austria",
+    "format": "%O%n%N%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AU": {
+    "name": "Australia",
+    "format": "%O%n%N%n%A%n%C %S %Z",
+    "region": "state",
+    "city": "suburb",
+    "postal": "postal"
+  },
+  "AW": {
+    "name": "Aruba",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AX": {
+    "name": "Åland Islands",
+    "format": "%O%n%N%n%A%nAX-%Z %C%nÅLAND",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "AZ": {
+    "name": "Azerbaijan",
+    "format": "%N%n%O%n%A%nAZ %Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BA": {
+    "name": "Bosnia & Herzegovina",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BB": {
+    "name": "Barbados",
+    "format": "%N%n%O%n%A%n%C, %S %Z",
+    "region": "parish",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BD": {
+    "name": "Bangladesh",
+    "format": "%N%n%O%n%A%n%C - %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BE": {
+    "name": "Belgium",
+    "format": "%O%n%N%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BF": {
+    "name": "Burkina Faso",
+    "format": "%N%n%O%n%A%n%C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BG": {
+    "name": "Bulgaria",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BH": {
+    "name": "Bahrain",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BI": {
+    "name": "Burundi",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BJ": {
+    "name": "Benin",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BL": {
+    "name": "St. Barthélemy",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BM": {
+    "name": "Bermuda",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BN": {
+    "name": "Brunei",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BO": {
+    "name": "Bolivia",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BQ": {
+    "name": "Caribbean Netherlands",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BR": {
+    "name": "Brazil",
+    "format": "%O%n%N%n%A%n%D%n%C-%S%n%Z",
+    "region": "state",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BS": {
+    "name": "Bahamas",
+    "format": "%N%n%O%n%A%n%C, %S",
+    "region": "island",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BT": {
+    "name": "Bhutan",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BV": {
+    "name": "Bouvet Island",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BW": {
+    "name": "Botswana",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BY": {
+    "name": "Belarus",
+    "format": "%O%n%N%n%A%n%Z, %C%n%S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "BZ": {
+    "name": "Belize",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CA": {
+    "name": "Canada",
+    "format": "%N%n%O%n%A%n%C %S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CC": {
+    "name": "Cocos (Keeling) Islands",
+    "format": "%O%n%N%n%A%n%C %S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CD": {
+    "name": "Congo - Kinshasa",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CF": {
+    "name": "Central African Republic",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CG": {
+    "name": "Congo - Brazzaville",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CH": {
+    "name": "Switzerland",
+    "format": "%O%n%N%n%A%nCH-%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CI": {
+    "name": "Côte d’Ivoire",
+    "format": "%N%n%O%n%X %A %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CK": {
+    "name": "Cook Islands",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CL": {
+    "name": "Chile",
+    "format": "%N%n%O%n%A%n%Z %C%n%S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CM": {
+    "name": "Cameroon",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CN": {
+    "name": "China",
+    "format": "%N%n%O%n%A%n%D%n%C%n%S, %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CO": {
+    "name": "Colombia",
+    "format": "%N%n%O%n%A%n%D%n%C, %S, %Z",
+    "region": "department",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CR": {
+    "name": "Costa Rica",
+    "format": "%N%n%O%n%A%n%S, %C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CU": {
+    "name": "Cuba",
+    "format": "%N%n%O%n%A%n%C %S%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CV": {
+    "name": "Cape Verde",
+    "format": "%N%n%O%n%A%n%Z %C%n%S",
+    "region": "island",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CW": {
+    "name": "Curaçao",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CX": {
+    "name": "Christmas Island",
+    "format": "%O%n%N%n%A%n%C %S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CY": {
+    "name": "Cyprus",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "CZ": {
+    "name": "Czechia",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "DE": {
+    "name": "Germany",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "DJ": {
+    "name": "Djibouti",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "DK": {
+    "name": "Denmark",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "DM": {
+    "name": "Dominica",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "DO": {
+    "name": "Dominican Republic",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "DZ": {
+    "name": "Algeria",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "EC": {
+    "name": "Ecuador",
+    "format": "%N%n%O%n%A%n%Z%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "EE": {
+    "name": "Estonia",
+    "format": "%N%n%O%n%A%n%Z %C %S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "EG": {
+    "name": "Egypt",
+    "format": "%N%n%O%n%A%n%C%n%S%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "EH": {
+    "name": "Western Sahara",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ER": {
+    "name": "Eritrea",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ES": {
+    "name": "Spain",
+    "format": "%N%n%O%n%A%n%Z %C %S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ET": {
+    "name": "Ethiopia",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "FI": {
+    "name": "Finland",
+    "format": "%O%n%N%n%A%nFI-%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "FJ": {
+    "name": "Fiji",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "FK": {
+    "name": "Falkland Islands",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "FM": {
+    "name": "Micronesia",
+    "format": "%N%n%O%n%A%n%C %S %Z",
+    "region": "state",
+    "city": "city",
+    "postal": "zip"
+  },
+  "FO": {
+    "name": "Faroe Islands",
+    "format": "%N%n%O%n%A%nFO%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "FR": {
+    "name": "France",
+    "format": "%O%n%N%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GA": {
+    "name": "Gabon",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GB": {
+    "name": "United Kingdom",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "post_town",
+    "postal": "postal"
+  },
+  "GD": {
+    "name": "Grenada",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GE": {
+    "name": "Georgia",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GF": {
+    "name": "French Guiana",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GG": {
+    "name": "Guernsey",
+    "format": "%N%n%O%n%A%n%C%nGUERNSEY%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GH": {
+    "name": "Ghana",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GI": {
+    "name": "Gibraltar",
+    "format": "%N%n%O%n%A%nGIBRALTAR%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GL": {
+    "name": "Greenland",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GM": {
+    "name": "Gambia",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GN": {
+    "name": "Guinea",
+    "format": "%N%n%O%n%Z %A %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GP": {
+    "name": "Guadeloupe",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GQ": {
+    "name": "Equatorial Guinea",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GR": {
+    "name": "Greece",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GS": {
+    "name": "South Georgia & South Sandwich Islands",
+    "format": "%N%n%O%n%A%n%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GT": {
+    "name": "Guatemala",
+    "format": "%N%n%O%n%A%n%Z- %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GU": {
+    "name": "Guam",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "zip"
+  },
+  "GW": {
+    "name": "Guinea-Bissau",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "GY": {
+    "name": "Guyana",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "HK": {
+    "name": "Hong Kong SAR China",
+    "format": "%N%n%O%n%A%n%C%n%S",
+    "region": "area",
+    "city": "district",
+    "postal": "postal"
+  },
+  "HM": {
+    "name": "Heard & McDonald Islands",
+    "format": "%O%n%N%n%A%n%C %S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "HN": {
+    "name": "Honduras",
+    "format": "%N%n%O%n%A%n%C, %S%n%Z",
+    "region": "department",
+    "city": "city",
+    "postal": "postal"
+  },
+  "HR": {
+    "name": "Croatia",
+    "format": "%N%n%O%n%A%nHR-%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "HT": {
+    "name": "Haiti",
+    "format": "%N%n%O%n%A%nHT%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "HU": {
+    "name": "Hungary",
+    "format": "%N%n%O%n%C%n%A%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ID": {
+    "name": "Indonesia",
+    "format": "%N%n%O%n%A%n%C%n%S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "IE": {
+    "name": "Ireland",
+    "format": "%N%n%O%n%A%n%D%n%C%n%S%n%Z",
+    "region": "county",
+    "city": "city",
+    "postal": "eircode"
+  },
+  "IL": {
+    "name": "Israel",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "IM": {
+    "name": "Isle of Man",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "IN": {
+    "name": "India",
+    "format": "%N%n%O%n%A%n%T%n%F%n%L%n%C %Z%n%S",
+    "region": "state",
+    "city": "city",
+    "postal": "pin"
+  },
+  "IO": {
+    "name": "British Indian Ocean Territory",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "IQ": {
+    "name": "Iraq",
+    "format": "%O%n%N%n%A%n%C, %S%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "IR": {
+    "name": "Iran",
+    "format": "%O%n%N%n%S%n%C, %D%n%A%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "IS": {
+    "name": "Iceland",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "IT": {
+    "name": "Italy",
+    "format": "%N%n%O%n%A%n%Z %C %S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "JE": {
+    "name": "Jersey",
+    "format": "%N%n%O%n%A%n%C%nJERSEY%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "JM": {
+    "name": "Jamaica",
+    "format": "%N%n%O%n%A%n%C%n%S %X",
+    "region": "parish",
+    "city": "city",
+    "postal": "postal"
+  },
+  "JO": {
+    "name": "Jordan",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "JP": {
+    "name": "Japan",
+    "format": "%N%n%O%n%A, %S%n%Z",
+    "region": "prefecture",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KE": {
+    "name": "Kenya",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KG": {
+    "name": "Kyrgyzstan",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KH": {
+    "name": "Cambodia",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KI": {
+    "name": "Kiribati",
+    "format": "%N%n%O%n%A%n%S%n%C",
+    "region": "island",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KM": {
+    "name": "Comoros",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KN": {
+    "name": "St. Kitts & Nevis",
+    "format": "%N%n%O%n%A%n%C, %S",
+    "region": "island",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KP": {
+    "name": "North Korea",
+    "format": "%N%n%O%n%A%n%C%n%S, %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KR": {
+    "name": "South Korea",
+    "format": "%N%n%O%n%A%n%D%n%C%n%S%n%Z",
+    "region": "do_si",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KW": {
+    "name": "Kuwait",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KY": {
+    "name": "Cayman Islands",
+    "format": "%N%n%O%n%A%n%S %Z",
+    "region": "island",
+    "city": "city",
+    "postal": "postal"
+  },
+  "KZ": {
+    "name": "Kazakhstan",
+    "format": "%Z%n%S%n%C%n%A%n%O%n%N",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LA": {
+    "name": "Laos",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LB": {
+    "name": "Lebanon",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LC": {
+    "name": "St. Lucia",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LI": {
+    "name": "Liechtenstein",
+    "format": "%O%n%N%n%A%nFL-%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LK": {
+    "name": "Sri Lanka",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LR": {
+    "name": "Liberia",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LS": {
+    "name": "Lesotho",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LT": {
+    "name": "Lithuania",
+    "format": "%O%n%N%n%A%nLT-%Z %C %S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LU": {
+    "name": "Luxembourg",
+    "format": "%O%n%N%n%A%nL-%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LV": {
+    "name": "Latvia",
+    "format": "%N%n%O%n%A%n%S%n%C, %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "LY": {
+    "name": "Libya",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MA": {
+    "name": "Morocco",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MC": {
+    "name": "Monaco",
+    "format": "%N%n%O%n%A%nMC-%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MD": {
+    "name": "Moldova",
+    "format": "%N%n%O%n%A%nMD-%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ME": {
+    "name": "Montenegro",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MF": {
+    "name": "St. Martin",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MG": {
+    "name": "Madagascar",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MH": {
+    "name": "Marshall Islands",
+    "format": "%N%n%O%n%A%n%C %S %Z",
+    "region": "state",
+    "city": "city",
+    "postal": "zip"
+  },
+  "MK": {
+    "name": "North Macedonia",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ML": {
+    "name": "Mali",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MM": {
+    "name": "Myanmar (Burma)",
+    "format": "%N%n%O%n%A%n%C, %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MN": {
+    "name": "Mongolia",
+    "format": "%N%n%O%n%A%n%C%n%S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MO": {
+    "name": "Macao SAR China",
+    "format": "%N%n%O%n%A",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MP": {
+    "name": "Northern Mariana Islands",
+    "format": "%N%n%O%n%A%n%C %S %Z",
+    "region": "state",
+    "city": "city",
+    "postal": "zip"
+  },
+  "MQ": {
+    "name": "Martinique",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MR": {
+    "name": "Mauritania",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MS": {
+    "name": "Montserrat",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MT": {
+    "name": "Malta",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MU": {
+    "name": "Mauritius",
+    "format": "%N%n%O%n%A%n%Z%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MV": {
+    "name": "Maldives",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MW": {
+    "name": "Malawi",
+    "format": "%N%n%O%n%A%n%C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MX": {
+    "name": "Mexico",
+    "format": "%N%n%O%n%A%n%D%n%Z %C, %S",
+    "region": "state",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MY": {
+    "name": "Malaysia",
+    "format": "%N%n%O%n%A%n%D%n%Z %C%n%S",
+    "region": "state",
+    "city": "city",
+    "postal": "postal"
+  },
+  "MZ": {
+    "name": "Mozambique",
+    "format": "%N%n%O%n%A%n%Z %C%S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NA": {
+    "name": "Namibia",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NC": {
+    "name": "New Caledonia",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NE": {
+    "name": "Niger",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NF": {
+    "name": "Norfolk Island",
+    "format": "%O%n%N%n%A%n%C %S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NG": {
+    "name": "Nigeria",
+    "format": "%N%n%O%n%A%n%D%n%C %Z%n%S",
+    "region": "state",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NI": {
+    "name": "Nicaragua",
+    "format": "%N%n%O%n%A%n%Z%n%C, %S",
+    "region": "department",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NL": {
+    "name": "Netherlands",
+    "format": "%O%n%N%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NO": {
+    "name": "Norway",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "post_town",
+    "postal": "postal"
+  },
+  "NP": {
+    "name": "Nepal",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NR": {
+    "name": "Nauru",
+    "format": "%N%n%O%n%A%n%S",
+    "region": "district",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NU": {
+    "name": "Niue",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "NZ": {
+    "name": "New Zealand",
+    "format": "%N%n%O%n%A%n%D%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "OM": {
+    "name": "Oman",
+    "format": "%N%n%O%n%A%n%Z%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PA": {
+    "name": "Panama",
+    "format": "%N%n%O%n%A%n%C%n%S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PE": {
+    "name": "Peru",
+    "format": "%N%n%O%n%A%n%C %Z%n%S",
+    "region": "province",
+    "city": "district",
+    "postal": "postal"
+  },
+  "PF": {
+    "name": "French Polynesia",
+    "format": "%N%n%O%n%A%n%Z %C %S",
+    "region": "island",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PG": {
+    "name": "Papua New Guinea",
+    "format": "%N%n%O%n%A%n%C %Z %S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PH": {
+    "name": "Philippines",
+    "format": "%N%n%O%n%A%n%D, %C%n%Z %S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PK": {
+    "name": "Pakistan",
+    "format": "%N%n%O%n%A%n%D%n%C-%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PL": {
+    "name": "Poland",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PM": {
+    "name": "St. Pierre & Miquelon",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PN": {
+    "name": "Pitcairn Islands",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PR": {
+    "name": "Puerto Rico",
+    "format": "%N%n%O%n%A%n%C PR %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "zip"
+  },
+  "PS": {
+    "name": "Palestinian Territories",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PT": {
+    "name": "Portugal",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "PW": {
+    "name": "Palau",
+    "format": "%N%n%O%n%A%n%C %S %Z",
+    "region": "state",
+    "city": "city",
+    "postal": "zip"
+  },
+  "PY": {
+    "name": "Paraguay",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "QA": {
+    "name": "Qatar",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "RE": {
+    "name": "Réunion",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "RO": {
+    "name": "Romania",
+    "format": "%N%n%O%n%A%n%Z %S %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "RS": {
+    "name": "Serbia",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "RU": {
+    "name": "Russia",
+    "format": "%N%n%O%n%A%n%C%n%S%n%Z",
+    "region": "oblast",
+    "city": "city",
+    "postal": "postal"
+  },
+  "RW": {
+    "name": "Rwanda",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SA": {
+    "name": "Saudi Arabia",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SB": {
+    "name": "Solomon Islands",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SC": {
+    "name": "Seychelles",
+    "format": "%N%n%O%n%A%n%C%n%S",
+    "region": "island",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SD": {
+    "name": "Sudan",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "district",
+    "postal": "postal"
+  },
+  "SE": {
+    "name": "Sweden",
+    "format": "%O%n%N%n%A%nSE-%Z %C",
+    "region": "province",
+    "city": "post_town",
+    "postal": "postal"
+  },
+  "SG": {
+    "name": "Singapore",
+    "format": "%N%n%O%n%A%nSINGAPORE %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SH": {
+    "name": "St. Helena",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SI": {
+    "name": "Slovenia",
+    "format": "%N%n%O%n%A%nSI-%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SJ": {
+    "name": "Svalbard & Jan Mayen",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "post_town",
+    "postal": "postal"
+  },
+  "SK": {
+    "name": "Slovakia",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SL": {
+    "name": "Sierra Leone",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SM": {
+    "name": "San Marino",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SN": {
+    "name": "Senegal",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SO": {
+    "name": "Somalia",
+    "format": "%N%n%O%n%A%n%C, %S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SR": {
+    "name": "Suriname",
+    "format": "%N%n%O%n%A%n%C%n%S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SS": {
+    "name": "South Sudan",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ST": {
+    "name": "São Tomé & Príncipe",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SV": {
+    "name": "El Salvador",
+    "format": "%N%n%O%n%A%n%Z-%C%n%S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SX": {
+    "name": "Sint Maarten",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "SY": {
+    "name": "Syria",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "district",
+    "postal": "postal"
+  },
+  "SZ": {
+    "name": "Eswatini",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TA": {
+    "name": "Tristan da Cunha",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TC": {
+    "name": "Turks & Caicos Islands",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TD": {
+    "name": "Chad",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TF": {
+    "name": "French Southern Territories",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TG": {
+    "name": "Togo",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TH": {
+    "name": "Thailand",
+    "format": "%N%n%O%n%A%n%D, %C%n%S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TJ": {
+    "name": "Tajikistan",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TK": {
+    "name": "Tokelau",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TL": {
+    "name": "Timor-Leste",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TM": {
+    "name": "Turkmenistan",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TN": {
+    "name": "Tunisia",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TO": {
+    "name": "Tonga",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TR": {
+    "name": "Türkiye",
+    "format": "%N%n%O%n%A%n%Z %C/%S",
+    "region": "province",
+    "city": "district",
+    "postal": "postal"
+  },
+  "TT": {
+    "name": "Trinidad & Tobago",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TV": {
+    "name": "Tuvalu",
+    "format": "%N%n%O%n%A%n%C%n%S",
+    "region": "island",
+    "city": "city",
+    "postal": "postal"
+  },
+  "TW": {
+    "name": "Taiwan",
+    "format": "%N%n%O%n%A%n%C, %S %Z",
+    "region": "county",
+    "city": "district",
+    "postal": "postal"
+  },
+  "TZ": {
+    "name": "Tanzania",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "UA": {
+    "name": "Ukraine",
+    "format": "%N%n%O%n%A%n%C%n%S%n%Z",
+    "region": "oblast",
+    "city": "city",
+    "postal": "postal"
+  },
+  "UG": {
+    "name": "Uganda",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "UM": {
+    "name": "U.S. Outlying Islands",
+    "format": "%N%n%O%n%A%n%C %S %Z",
+    "region": "state",
+    "city": "city",
+    "postal": "zip"
+  },
+  "US": {
+    "name": "United States",
+    "format": "%N%n%O%n%A%n%C, %S %Z",
+    "region": "state",
+    "city": "city",
+    "postal": "zip"
+  },
+  "UY": {
+    "name": "Uruguay",
+    "format": "%N%n%O%n%A%n%Z %C %S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "UZ": {
+    "name": "Uzbekistan",
+    "format": "%N%n%O%n%A%n%Z %C%n%S",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "VA": {
+    "name": "Vatican City",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "VC": {
+    "name": "St. Vincent & Grenadines",
+    "format": "%N%n%O%n%A%n%C %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "VE": {
+    "name": "Venezuela",
+    "format": "%N%n%O%n%A%n%C %Z, %S",
+    "region": "state",
+    "city": "city",
+    "postal": "postal"
+  },
+  "VG": {
+    "name": "British Virgin Islands",
+    "format": "%N%n%O%n%A%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "VI": {
+    "name": "U.S. Virgin Islands",
+    "format": "%N%n%O%n%A%n%C %S %Z",
+    "region": "state",
+    "city": "city",
+    "postal": "zip"
+  },
+  "VN": {
+    "name": "Vietnam",
+    "format": "%N%n%O%n%A%n%C%n%S %Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "VU": {
+    "name": "Vanuatu",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "WF": {
+    "name": "Wallis & Futuna",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "WS": {
+    "name": "Samoa",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "XK": {
+    "name": "Kosovo",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "YE": {
+    "name": "Yemen",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "YT": {
+    "name": "Mayotte",
+    "format": "%O%n%N%n%A%n%Z %C %X",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ZA": {
+    "name": "South Africa",
+    "format": "%N%n%O%n%A%n%D%n%C%n%Z",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ZM": {
+    "name": "Zambia",
+    "format": "%N%n%O%n%A%n%Z %C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  },
+  "ZW": {
+    "name": "Zimbabwe",
+    "format": "%N%n%O%n%A%n%C",
+    "region": "province",
+    "city": "city",
+    "postal": "postal"
+  }
+}

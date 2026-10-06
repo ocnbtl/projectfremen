@@ -1,4 +1,5 @@
 import { MAP_CATALOG, MAP_PALETTES } from "./map-catalog";
+import { normalizeAddressCountry, normalizeAddressParts } from "./place-address";
 import { createNativeObjectRef } from "../../native-objects/routes";
 import { normalizeObservances } from "./observance-settings";
 import { isModuleId, type NativeObjectRef } from "../../native-objects/types";
@@ -65,6 +66,8 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
     fields = {
       name: string(raw.name, "Place name", 240, true),
       address: string(raw.address, "Address"),
+      ...(raw.countryCode ? { countryCode: normalizeAddressCountry(raw.countryCode) } : {}),
+      ...(raw.addressParts != null ? { addressParts: normalizeAddressParts(raw.addressParts) } : {}),
       latitude: coordinate(raw.latitude, 90),
       longitude: coordinate(raw.longitude, 180),
       notes: string(raw.notes, "Notes", 10000),

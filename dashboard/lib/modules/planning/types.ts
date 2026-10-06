@@ -9,6 +9,8 @@ export type PlanningBase = {
 export type Place = PlanningBase & {
   name: string;
   address: string;
+  countryCode?: string;
+  addressParts?: import("./place-address").AddressParts;
   latitude: number;
   longitude: number;
   notes: string;

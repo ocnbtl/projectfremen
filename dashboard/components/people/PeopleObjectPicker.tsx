@@ -35,13 +35,14 @@ export const objectTargetTypeLabel = (target: NativeObjectRef) => kindOf(target)
 export const objectTargetIcon = (target: NativeObjectRef) => kinds.find(item => item.id === kindOf(target))!.icon;
 
 /** One search surface for draft links and existing profiles; selection never writes a record. */
-export default function PeopleObjectPicker({ targets, value, onChange, disabled = false, iconOnly = false, triggerIcon = "link" }: {
+export default function PeopleObjectPicker({ targets, value, onChange, disabled = false, iconOnly = false, triggerIcon = "link", triggerLabel = "Link a record" }: {
   targets: NativeObjectRef[];
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   iconOnly?: boolean;
   triggerIcon?: string;
+  triggerLabel?: string;
 }) {
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>("all");
@@ -63,7 +64,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
 
   return <Popover.Root open={open} onOpenChange={next => { setOpen(next); if (next) { setQuery(""); setKind("all"); setLimit(60); } }}>
     <Popover.Trigger asChild>
-      <button type="button" className="people-object-picker-trigger" data-icon-only={iconOnly || undefined} aria-label={iconOnly ? "Link a record" : "Object to link"} title={iconOnly ? "Link a record" : undefined} aria-description={selected ? `${selected.label} · ${objectTargetTypeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
+      <button type="button" className="people-object-picker-trigger" data-icon-only={iconOnly || undefined} aria-label={iconOnly ? triggerLabel : "Object to link"} title={iconOnly ? triggerLabel : undefined} aria-description={selected ? `${selected.label} · ${objectTargetTypeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
         <UnigentamosIcon role={iconOnly ? triggerIcon : kinds.find(item => item.id === (selected ? kindOf(selected) : "all"))!.icon} size={20} />
         {!iconOnly && <><span><strong>{selected?.label || "Link an Object"}</strong>{selected && <small>{objectTargetTypeLabel(selected)}</small>}</span>
         <UnigentamosIcon role="chevron-down" size={16} /></>}

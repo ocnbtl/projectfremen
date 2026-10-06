@@ -155,6 +155,7 @@ export function WorkspaceSheet({
   presentation,
   className,
   anchorWidth = 620,
+  headerActions,
 }: {
   open: boolean;
   onClose: () => void;
@@ -165,6 +166,7 @@ export function WorkspaceSheet({
   presentation?: "center" | "page";
   className?: string;
   anchorWidth?: number;
+  headerActions?: ReactNode;
 }) {
   const [anchorStyle, setAnchorStyle] = useState<CSSProperties>();
   useLayoutEffect(() => {
@@ -224,11 +226,14 @@ export function WorkspaceSheet({
         >
           <div className="work-sheet-header">
             <Dialog.Title>{title}</Dialog.Title>
+            <div className="work-sheet-header-actions">
+            {headerActions}
             <Dialog.Close asChild>
               <WorkspaceButton aria-label="Close details" icon="close">
                 Close
               </WorkspaceButton>
             </Dialog.Close>
+            </div>
           </div>
           {description && (
             <Dialog.Description id={descriptionId}>

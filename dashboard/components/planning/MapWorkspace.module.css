@@ -537,3 +537,25 @@
 .layerSelection > button { width: auto; flex: none; }
 .palettePicker > div { align-items: center; }
 .palettePicker button { width: auto; flex: none; }
+
+/* Place creation stays compact, with one consistent field scale. */
+.placeEditor.placeEditor { width: min(720px, calc(100vw - 24px)); }
+.placeEditor :global(.work-sheet-header) { border-bottom: 0; padding: 16px 20px 10px; gap: 10px; }
+.placeEditor :global(.work-sheet-body) { padding: 6px 20px 18px; }
+.placeForm.placeForm { gap: 12px; }
+.placeForm label { font: 500 13px/1.4 var(--font-body); gap: 5px; min-width: 0; }
+.placeForm :is(input, textarea) { font: 400 13px/1.4 var(--font-body); min-height: 38px; padding: 8px 10px; box-sizing: border-box; }
+.placeForm textarea { min-height: 62px; resize: vertical; }
+.placeForm :is(input, textarea):focus-visible { outline-offset: -2px; }
+.placeDetails { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr); gap: 12px; align-items: start; }
+.placeForm :global(.work-actions:empty) { display: none; }
+.placeForm :global(.work-object-links--labeled) { display: grid; gap: 8px; }
+.placeForm :global(.work-object-link-trigger) { display: flex; align-items: center; gap: 10px; font: 500 13px/1.4 var(--font-body); }
+.placeForm :global(.work-links:empty) { display: none; }
+@media (max-width: 760px) {
+  .placeEditor :global(.work-sheet-header) { padding: 12px 14px 8px; }
+  .placeEditor :global(.work-sheet-body) { padding: 4px 14px max(14px, env(safe-area-inset-bottom)); }
+  .placeForm :is(input, textarea) { font-size: 16px; }
+  .placeForm.placeForm { gap: 10px; }
+  .placeDetails { gap: 10px; }
+}

@@ -645,10 +645,13 @@ export default function MapWorkspace() {
       <WorkspaceSheet
         open={Boolean(editor)}
         onClose={() => setEditor(undefined)}
-        title={editor?.id ? "Edit place" : "Save place"}
+        title={editor?.id ? "Edit place" : "Add place"}
+        className={styles.placeEditor}
+        presentation="center"
+        headerActions={<Button intent="primary" type="submit" form="map-place-editor" busy={busy}>Save place</Button>}
       >
         {editor && (
-          <form className="work-form" onSubmit={savePlace}>
+          <form id="map-place-editor" className={`work-form ${styles.placeForm}`} onSubmit={savePlace}>
             <WorkspaceFeedback error={error} />
             <label>
               Name
@@ -660,7 +663,7 @@ export default function MapWorkspace() {
               />
             </label>
             <PlaceLocationFields value={editor} onChange={patch => setEditor(current => current ? { ...current, ...patch } : current)} />
-            <label>
+            <div className={styles.placeDetails}><label>
               Tags
               <input
                 value={editor.tags?.join(", ") || ""}
@@ -675,21 +678,22 @@ export default function MapWorkspace() {
             <label>
               Notes
               <textarea
+                rows={2}
                 value={editor.notes || ""}
                 onChange={(e) =>
                   setEditor({ ...editor, notes: e.target.value })
                 }
               />
             </label>
+            </div>
             <RecordLinks
+              objectPicker
+              pickerLabel="Link an object"
               refs={editor.linkedRefs || []}
               available={snapshot?.refs}
               onChange={(linkedRefs) => setEditor({ ...editor, linkedRefs })}
             />
             <div className="work-actions">
-              <Button intent="primary" type="submit" busy={busy}>
-                Save place
-              </Button>
               {editor.id && (
                 <Button
                   intent="danger"

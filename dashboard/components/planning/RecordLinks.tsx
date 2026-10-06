@@ -10,11 +10,13 @@ export default function RecordLinks({
   available = [],
   onChange,
   objectPicker = false,
+  pickerLabel,
 }: {
   refs: NativeObjectRef[];
   available?: NativeObjectRef[];
   onChange?: (refs: NativeObjectRef[]) => void;
   objectPicker?: boolean;
+  pickerLabel?: string;
 }) {
   const [query, setQuery] = useState("");
   const key = (ref: NativeObjectRef) =>
@@ -29,11 +31,11 @@ export default function RecordLinks({
         .slice(0, 12)
     : [];
   return (
-    <div className={objectPicker ? "work-object-links" : undefined}>
-      {onChange && objectPicker && <PeopleObjectPicker iconOnly triggerIcon="object" targets={available.filter((ref) => !refs.some((linked) => key(linked) === key(ref)))} value="" onChange={(value) => {
+    <div className={objectPicker ? `work-object-links${pickerLabel ? " work-object-links--labeled" : ""}` : undefined}>
+      {onChange && objectPicker && <div className="work-object-link-trigger">{pickerLabel && <span>{pickerLabel}</span>}<PeopleObjectPicker iconOnly triggerIcon="object" triggerLabel={pickerLabel} targets={available.filter((ref) => !refs.some((linked) => key(linked) === key(ref)))} value="" onChange={(value) => {
         const ref = available.find((candidate) => objectTargetKey(candidate) === value);
         if (ref && !refs.some((linked) => key(linked) === key(ref))) onChange([...refs, ref]);
-      }} />}
+      }} /></div>}
       <div className="work-links">
         {refs.map((ref) => (
           <span key={key(ref)}>

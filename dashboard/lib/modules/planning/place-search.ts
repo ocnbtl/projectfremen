@@ -1,4 +1,5 @@
-export type PlaceSearchResult = { name: string; address: string; latitude: number; longitude: number };
+import { ADDRESS_COUNTRIES, formatPlaceAddress, type AddressParts } from "./place-address";
+export type PlaceSearchResult = { name: string; address: string; latitude: number; longitude: number; countryCode?: string; addressParts?: AddressParts };
 
 /** External search candidates are suggestions, never saved coordinates until selected. */
 export function parsePlaceSearch(data: unknown, query: string): PlaceSearchResult[] {
@@ -11,7 +12,10 @@ export function parsePlaceSearch(data: unknown, query: string): PlaceSearchResul
     if (typeof latitude !== "number" || typeof longitude !== "number" || !Number.isFinite(latitude) || !Number.isFinite(longitude) || Math.abs(latitude) > 90 || Math.abs(longitude) > 180) return [];
     const text = (key: string) => typeof properties[key] === "string" ? properties[key].trim().slice(0, 240) : "";
     const name = text("name") || text("street") || query;
-    const address = [text("housenumber"), text("street"), text("city") || text("town") || text("village"), text("state"), text("postcode"), text("country")].filter(Boolean).join(", ");
-    return [{ name, address: address || name, longitude, latitude }];
+    const parts: AddressParts = { street: [text("housenumber"), text("street")].filter(Boolean).join(" "), city: text("city") || text("town") || text("village"), region: text("statecode").replace(/^[A-Z]{2}-/, "") || text("state"), postalCode: text("postcode"), district: "" };
+    const code = text("countrycode").toUpperCase();
+    const countryCode = Object.hasOwn(ADDRESS_COUNTRIES, code) ? code : undefined;
+    const address = countryCode ? formatPlaceAddress(parts, countryCode) : [parts.street, parts.city, [parts.region, parts.postalCode].filter(Boolean).join(" "), text("country")].filter(Boolean).join(", ");
+    return [{ name, address: address || name, longitude, latitude, ...(countryCode ? { countryCode, addressParts: parts } : {}) }];
   }).slice(0, 8);
 }
