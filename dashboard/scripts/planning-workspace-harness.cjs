@@ -1342,6 +1342,30 @@ async function check(label, run) {
     assert.equal(calendarObservances(people, [], {...settings, hiddenBirthdays:[]}, "2026-10-01", "2026-11-01", "UTC").length, 2);
     assert.throws(() => normalizeObservances({...settings, hiddenBirthdays:[123]}), /selection/);
   });
+  await check("time undo preserves linked objects and unrelated edits and rejects changed times", async () => {
+    const { timeChange, timeChangePatch, canUndoTimeChange } = require("../lib/modules/planning/event-time-history.ts");
+    for (const recurring of [false, true]) {
+      const original = event({ id: `undo-${recurring}`, recurrence: recurring ? "FREQ=WEEKLY;COUNT=3" : "" });
+      const occurrence = eventOccurrences([original], "2026-03-01", "2026-03-20", "America/New_York")[0];
+      const change = timeChange(original, occurrence, "2026-03-02T10:00:00", "2026-03-02T12:00:00");
+      const moved = { ...original, ...timeChangePatch(original, change) };
+      assert(canUndoTimeChange(moved, change));
+      assert(canUndoTimeChange({...moved, ...timeChangePatch(moved, {...change, after:{start:"2026-03-02T10:00", end:"2026-03-02T12:00"}})}, change), "Equivalent minute/second precision permits consecutive undo");
+      const edited = { ...moved, title: "Updated title", description: "Keep these notes", linkedRefs: [{module:"people",objectType:"organization",objectId:"org-test",label:"Organization",route:"/admin/people/org-test"}] };
+      const restored = {...edited, ...timeChangePatch(edited, change, true)};
+      const result = eventOccurrences([restored], "2026-03-01", "2026-03-20", "America/New_York")[0];
+      assert.equal(result.startMs, occurrence.startMs);
+      assert.equal(result.endMs, occurrence.endMs);
+      assert.equal(result.title, "Updated title");
+      assert.equal(result.linkedRefs[0].objectId, "org-test");
+      assert.equal(result.description, "Keep these notes");
+      const newer = {...moved, ...timeChangePatch(moved, {...change, after:{...change.after, end:"2026-03-02T13:00:00"}})};
+      assert(!canUndoTimeChange(newer, change));
+      assert(!canUndoTimeChange({...moved, archivedAt:stamp}, change));
+      // Imported events retain their provider data while changing local timing overrides.
+      if (!recurring) assert(canUndoTimeChange({...original, overrides:change.after}, change));
+    }
+  });
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );

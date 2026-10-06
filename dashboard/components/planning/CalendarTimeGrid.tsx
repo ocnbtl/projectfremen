@@ -71,6 +71,8 @@ export default function CalendarTimeGrid({
     { item: EventOccurrence; y: number; end: number } | undefined
   >(undefined);
   const [resizing, setResizing] = useState<{ id: string; end: number }>();
+  const dragging = useRef<{ item: EventOccurrence; offset: number } | undefined>(undefined);
+  const [dragPreview, setDragPreview] = useState<{ item: EventOccurrence; day: string; minute: number; x: number; y: number; width: number; height: number }>();
   const boundsRef = useRef({ start: early ? 0 : 8, end: late ? 24 : 22 });
   const grid = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
@@ -122,6 +124,10 @@ export default function CalendarTimeGrid({
             "--hour-height": `${px * 60}px`,
           } as CSSProperties
         }
+        onDragLeave={(event) => {
+          const rect = event.currentTarget.getBoundingClientRect();
+          if (event.clientX <= rect.left || event.clientX >= rect.right || event.clientY <= rect.top || event.clientY >= rect.bottom) setDragPreview(undefined);
+        }}
       >
         <div className={styles.fittedZone}>
           {zone.split("/").pop()?.replaceAll("_", " ")}
@@ -190,6 +196,14 @@ export default function CalendarTimeGrid({
                   )
                 ) {
                   e.preventDefault();
+                  e.dataTransfer.dropEffect = "move";
+                  const drag = dragging.current;
+                  if (drag && grid.current) {
+                    const column = e.currentTarget.getBoundingClientRect(), surface = grid.current.getBoundingClientRect();
+                    const duration = (drag.item.endMs - drag.item.startMs) / 60000;
+                    const minute = Math.max(startHour * 60, Math.min(endHour * 60 - Math.min(duration, minutes), atPointer(e) - drag.offset));
+                    setDragPreview({ item: drag.item, day, minute, x: column.left - surface.left + 2, y: column.top - surface.top + position(minute), width: column.width - 4, height: Math.min(duration, minutes) * px - 1 });
+                  }
                 }
               }}
               onDrop={(e) => {
@@ -199,7 +213,9 @@ export default function CalendarTimeGrid({
                     x.id ===
                     e.dataTransfer.getData("application/x-unigentamos-event"),
                 );
-                if (item) onMove(item, day, atPointer(e) / 60);
+                if (item) onMove(item, day, (dragPreview?.day === day ? dragPreview.minute : atPointer(e)) / 60);
+                dragging.current = undefined;
+                setDragPreview(undefined);
               }}
             >
               {Array.from({ length: 24 }, (_, h) => {
@@ -216,7 +232,8 @@ export default function CalendarTimeGrid({
                 const c = calendars.find((c) => c.id === item.calendarId),
                   group = eventGroup(c, item.groupId);
                 const timing = eventTimeRange(Math.max(item.startMs, low), Math.min(item.endMs, high), zone);
-                const title = `${item.title} · ${timing}${group ? ` · ${group.name}` : ""}`;
+                const linkedLabels = [...new Set([...item.linkedRefs.map(ref => ref.label), ...(item.placeId ? [refs.find(ref => ref.module === "map" && ref.objectId === item.placeId)?.label || item.location] : [item.location])].filter(Boolean))];
+                const title = `${item.title} · ${timing}${group ? ` · ${group.name}` : ""}${linkedLabels.length ? ` · Linked: ${linkedLabels.join(", ")}` : ""}`;
                 return (
                   <motion.div
                     key={item.id}
@@ -228,6 +245,7 @@ export default function CalendarTimeGrid({
                     data-tiny={bottom - top < 26}
                     data-roomy={bottom - top >= 100}
                     data-time-room={bottom - top >= 64}
+                    data-dragging={dragPreview?.item.id === item.id || undefined}
                     inert={until <= startHour * 60 || from >= endHour * 60}
                     aria-hidden={until <= startHour * 60 || from >= endHour * 60}
                     title={title}
@@ -249,16 +267,23 @@ export default function CalendarTimeGrid({
                       transition={{ layout: layoutTransition }}
                       type="button"
                       draggable={!item.system}
-                      onDragStartCapture={(e) =>
+                      onDragStartCapture={(e) => {
                         e.dataTransfer.setData(
                           "application/x-unigentamos-event",
                           item.id,
-                        )
-                      }
+                        );
+                        e.dataTransfer.effectAllowed = "move";
+                        const rect = e.currentTarget.getBoundingClientRect();
+                        dragging.current = { item, offset: Math.round((e.clientY - rect.top) / px / 5) * 5 };
+                        // The custom spring preview replaces the browser's offset drag image.
+                        const image = document.createElement("canvas"); image.width = 1; image.height = 1;
+                        e.dataTransfer.setDragImage(image, 0, 0);
+                      }}
+                      onDragEnd={() => { dragging.current = undefined; setDragPreview(undefined); }}
                       onClick={() => onOpen(item)}
                       aria-label={title}
                     >
-                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{<UnigentamosIcon role={item.system ? "star" : group?.icon || "interaction-date"} size={13} />}<strong>{eventPreviewTitle(item)}</strong></span>{bottom - top >= 44 && <small className={styles.timedEventRange}>{timing}</small>}{bottom - top >= 76 && <EventObjects event={item} available={refs} />}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} /></span>
+                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}>{<UnigentamosIcon role={item.system ? "star" : group?.icon || "interaction-date"} size={13} />}<strong>{eventPreviewTitle(item)}</strong>{bottom - top < 60 && linkedLabels.length > 0 && <span className={styles.compactLinks} aria-label={`Linked objects: ${linkedLabels.join(", ")}`}><UnigentamosIcon role="object" size={11} />{linkedLabels.length}</span>}</span>{bottom - top >= 44 && <small className={styles.timedEventRange}>{timing}</small>}</span><EventPeople refs={item.linkedRefs} available={refs} limit={2} />{bottom - top >= 60 && <EventObjects event={item} available={refs} />}</span>
                     </motion.button>
                     {!item.system && <button
                       type="button"
@@ -332,6 +357,13 @@ export default function CalendarTimeGrid({
             </motion.div>
           );
         })}
+        {dragPreview && <motion.div className={styles.eventDragPreview} data-drag-preview initial={false}
+          animate={{ x: dragPreview.x, y: dragPreview.y, width: dragPreview.width, height: dragPreview.height }}
+          transition={reduced ? { duration: 0 } : { type: "spring", stiffness: 420, damping: 38, mass: .7 }}
+          style={eventColors(dragPreview.item, calendars.find(calendar => calendar.id === dragPreview.item.calendarId)) as CSSProperties}>
+          <strong>{eventPreviewTitle(dragPreview.item)}</strong>
+          <span>{eventTimeRange(instantFor(`${dragPreview.day}T${String(Math.floor(dragPreview.minute / 60)).padStart(2, "0")}:${String(dragPreview.minute % 60).padStart(2, "0")}`, zone), instantFor(`${dragPreview.day}T${String(Math.floor(dragPreview.minute / 60)).padStart(2, "0")}:${String(dragPreview.minute % 60).padStart(2, "0")}`, zone) + dragPreview.item.endMs - dragPreview.item.startMs, zone)}</span>
+        </motion.div>}
       </div>
     </div>
   );

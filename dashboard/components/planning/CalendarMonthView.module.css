@@ -31,3 +31,7 @@
 
 /* Reserve a real touch target for overflow without growing the page. */
 @media (min-width:761px) { .week { grid-template-rows:22px repeat(2,minmax(0,1fr)) 26px; } .more { min-height:26px; padding:4px 8px; border-radius:6px; font-size:11px; line-height:16px; } .more:hover { background:var(--module-quiet,#f3f2f9); } }
+
+.event { max-height:52px; }
+.copy { gap:1px; }
+.event > [data-event-objects] { flex:1 1 40%; min-width:22px; max-width:45%; font-size:10px; line-height:12px; --linked-object-size:14px; }

@@ -2321,3 +2321,26 @@
  .dayDetailList .dayDetailEvent .eventObjects { grid-column:3 / -1; grid-row:2; }
  .eventForm .eventDescription textarea { padding-block:9px; }
 }
+
+/* Linked context has its own space rather than competing with the event title. */
+.eventSummary { display:flex; flex-direction:column; gap:3px; flex:1; min-width:0; overflow:hidden; }
+.eventSummary .eventTitle { flex:none; }
+.agendaRows .agendaEvent > [data-event-objects] { grid-column:4; font-size:12px; }
+.fittedEvent [data-event-objects] { margin-top:4px; }
+.fittedEvent > button:first-child > .timedEventContent { flex-wrap:wrap; }
+.timedEventContent > [data-event-objects] { flex:none; width:100%; }
+@media (max-width:760px) {
+ .agendaRows .agendaEvent > [data-event-objects],.dayDetailList .dayDetailEvent > [data-event-objects] { grid-column:3 / -1; grid-row:2; }
+ .mobileScheduleDay .agendaEvent[data-month-all-day] > [data-event-objects] { grid-column:2 / -1; }
+}
+.fittedGrid { position:relative; }
+.fittedEvent[data-dragging] { opacity:.28; }
+.fittedEvent { transition:height 140ms cubic-bezier(.2,.8,.2,1); }
+.eventDragPreview { position:absolute; top:0; left:0; z-index:8; pointer-events:none; box-sizing:border-box; display:flex; flex-direction:column; gap:4px; padding:8px; overflow:hidden; border:2px solid var(--event-outline,var(--event-color)); border-radius:9px; color:var(--text-strong); background:color-mix(in srgb,var(--event-color) 18%,white); box-shadow:0 5px 18px #25213924; font:500 11px/1.4 var(--font-body); }
+.eventDragPreview strong { font-weight:600; }
+.eventDragPreview span { font-size:10px; }
+.undoTime { position:fixed; bottom:max(22px,env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:30; display:flex; align-items:center; gap:6px; max-width:75vw; padding:9px 14px; border:1px solid var(--module-primary-300); border-radius:12px; background:var(--module-quiet,#f3f2f9); box-shadow:0 4px 18px #25213918; color:var(--module-primary-700); font:500 12px/1.4 var(--font-body); cursor:pointer; }
+.undoTime:disabled { opacity:.5; cursor:wait; }
+@media(prefers-reduced-motion:reduce) { .fittedEvent { transition:none; } }
+
+.compactLinks { display:inline-flex; align-items:center; gap:2px; flex:none; font:600 9px/1 var(--font-body); color:var(--event-color); }

@@ -12,6 +12,7 @@ import CalendarAgenda from "./CalendarAgenda";
 import { calendarRange, shiftCalendar, viewIcons, type CalendarView as View } from "../../lib/modules/planning/calendar-navigation";
 import EventPeople from "./EventPeople";
 import EventObjects from "./EventObjects";
+import { timeChange, timeChangePatch, canUndoTimeChange, type EventTimeChange } from "../../lib/modules/planning/event-time-history";
 import { calendarDateLabel } from "./CalendarMiniMonth";
 import CalendarObservanceSettings, { CalendarCountryFlag } from "./CalendarObservanceSettings";
 import { calendarObservances, defaultObservances, observanceAppearance, type HolidayCatalog } from "../../lib/modules/planning/observances";
@@ -465,62 +466,66 @@ export default function CalendarWorkspace() {
     )
       finishEditing(editor);
   }
-  async function move(item: EventOccurrence, day: string, hour: number) {
-    const original = snapshot?.state.events.find((x) => x.id === item.eventId);
+  const [timeHistory, setTimeHistory] = useState<EventTimeChange[]>([]);
+  const changingTime = useRef(false);
+  async function commitTime(change: EventTimeChange, undo = false) {
+    if (changingTime.current || busy) return;
+    const original = confirmed.current?.state.events.find(item => item.id === change.eventId);
     if (!original) return;
-    const displayStart = `${day}T${String(Math.floor(hour)).padStart(2, "0")}:${String(Math.round((hour % 1) * 60)).padStart(2, "0")}`,
-      ms = instantFor(displayStart, zone),
-      start = localFor(ms, item.timeZone),
-      end = localFor(ms + item.endMs - item.startMs, item.timeZone);
-    await action(
-      () =>
-        savePlanning(
-          "events",
-          original.recurrence || original.recurrenceDates?.length
-            ? {
-                id: original.id,
-                exceptions: {
-                  ...original.exceptions,
-                  [item.occurrenceKey]: {
-                    ...original.exceptions[item.occurrenceKey],
-                    start,
-                    end,
-                  },
-                },
-              }
-            : { id: original.id, start, end },
-          original.updatedAt,
-        ),
-      "Time updated",
-    );
+    if (undo && !canUndoTimeChange(original, change)) {
+      setError("This event changed since your move. Open it to review its current time.");
+      return;
+    }
+    changingTime.current = true;
+    writeCount.current += 1;
+    revision.current += 1;
+    setBusy(true);
+    setError("");
+    const patch = timeChangePatch(original, change, undo);
+    // Paint the dropped position immediately; a failed save restores confirmed data.
+    setSnapshot(current => current && ({ ...current, state: { ...current.state, events: current.state.events.map(event => event.id !== original.id ? event : original.source && !change.occurrenceKey ? { ...event, overrides: { ...event.overrides, ...(undo ? change.before : change.after) } } : { ...event, ...patch }) } }));
+    try {
+      const saved = await savePlanning("events", patch, original.updatedAt);
+      if (confirmed.current) {
+        confirmed.current = { ...confirmed.current, state: { ...confirmed.current.state, events: confirmed.current.state.events.map(event => event.id === saved.id ? saved : event) } };
+        setSnapshot(confirmed.current);
+      }
+      setTimeHistory(history => undo ? history.slice(0, -1) : [...history.slice(-19), change]);
+      setNotice(undo ? "Previous event time restored" : "Event time updated · Ctrl+Z or Undo to restore");
+    } catch (error) {
+      setSnapshot(confirmed.current);
+      setError((error as Error).message);
+    } finally {
+      changingTime.current = false;
+      writeCount.current -= 1;
+      revision.current += 1;
+      setBusy(false);
+      void refresh();
+    }
+  }
+  const undoLatest = () => { const change = timeHistory.at(-1); if (change) void commitTime(change, true); };
+  useEffect(() => {
+    const undoKey = (event: KeyboardEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey || event.key.toLowerCase() !== "z" || event.repeat || editor || connections || busy || !timeHistory.length || target?.closest('input, textarea, select, [contenteditable="true"], [role="textbox"], [role="dialog"]')) return;
+      event.preventDefault();
+      undoLatest();
+    };
+    window.addEventListener("keydown", undoKey);
+    return () => window.removeEventListener("keydown", undoKey);
+  });
+  async function move(item: EventOccurrence, day: string, hour: number) {
+    const original = snapshot?.state.events.find(x => x.id === item.eventId);
+    if (!original) return;
+    const minute = Math.round(hour * 60), displayStart = `${day}T${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
+    const ms = instantFor(displayStart, zone), start = localFor(ms, item.timeZone), end = localFor(ms + item.endMs - item.startMs, item.timeZone);
+    if (ms === item.startMs) return;
+    await commitTime(timeChange(original, item, start, end));
   }
   async function resizeEvent(item: EventOccurrence, endMs: number) {
-    const original = snapshot?.state.events.find((e) => e.id === item.eventId);
-    if (!original) return;
-    const end = localFor(
-      Math.max(item.startMs + 5 * 60000, endMs),
-      item.timeZone,
-    );
-    await action(
-      () =>
-        savePlanning(
-          "events",
-          original.recurrence || original.recurrenceDates?.length
-            ? {
-                id: original.id,
-                exceptions: {
-                  ...original.exceptions,
-                  [item.occurrenceKey]: {
-                    ...original.exceptions[item.occurrenceKey],
-                    end,
-                  },
-                },
-              }
-            : { id: original.id, end },
-          original.updatedAt,
-        ),
-      "Event duration updated",
-    );
+    const original = snapshot?.state.events.find(x => x.id === item.eventId);
+    if (!original || endMs === item.endMs) return;
+    await commitTime(timeChange(original, item, item.start, localFor(Math.max(item.startMs + 300000, endMs), item.timeZone)));
   }
   const timeline = view === "day" || view === "3-day" || view === "week";
   const changeView = (next: View, day?: string) => morph(() => { setView(next); if (day) setDate(day); });
@@ -642,6 +647,7 @@ export default function CalendarWorkspace() {
         message={notice}
         onRetry={error || holidayError ? () => { void refresh(); setHolidayRetry(value => value + 1); } : undefined}
       />
+      {!!timeHistory.length && <button type="button" className={styles.undoTime} disabled={busy} onClick={undoLatest} title="Undo last event time change (Ctrl+Z / Cmd+Z)"><UnigentamosIcon role="chevron-right" size={15} style={{ transform: "rotate(180deg)" }} />Undo move · {timeHistory.at(-1)?.title}</button>}
       {query.trim() && <p className={styles.searchStatus} role="status">{occurrences.length + dated.length ? `${occurrences.length + dated.length} matching events in this view` : "No matching events in this view"}</p>}
       {snapshot?.persistence === "device" && (
         <p className={styles.contextNotice} role="status">
