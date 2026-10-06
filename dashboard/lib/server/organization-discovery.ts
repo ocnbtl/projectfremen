@@ -6,7 +6,7 @@ import { fetchLinkedInLogo, fetchOrganizationLogo, type OrganizationLogo } from 
 import { findOrganizationSocialProfiles, SOCIAL_DOMAINS } from "./organization-social-search";
 import { findOrganizationKnowledge } from "./organization-knowledge";
 import { approximateTeamSize } from "../modules/people/team-size";
-import { writeOrganizationDescription } from "./organization-description";
+import { writeOrganizationDescription, organizationDescriptionScore } from "./organization-description";
 import { normalizeOrganizationIndustry, organizationIndustryOptions } from "../modules/people/organization-industries";
 
 const MAX_PAGES = 10;
@@ -182,10 +182,9 @@ export async function discoverOrganization(name: string, urls: string[], depende
   const suggestions = [...candidates.values()].map(({ item }) => {
     if (item.field === "context") {
       // A home-page slogan must not crowd out a factual about-page description.
-      for (const source of descriptionSources.sort((a, b) => a.priority - b.priority)) {
-        const value = writeOrganizationDescription(source.item.value, resolvedName || publishedName?.value || "");
-        if (value) return { ...source.item, value, evidence: `${source.item.evidence}; editorial summary of source text: ${source.item.value}` };
-      }
+      const best = descriptionSources.map(source => ({ ...source, value: writeOrganizationDescription(source.item.value, resolvedName || publishedName?.value || "") }))
+        .filter(source => source.value).sort((a, b) => organizationDescriptionScore(b.value) - organizationDescriptionScore(a.value) || a.priority - b.priority)[0];
+      if (best) return { ...best.item, value: best.value, evidence: `${best.item.evidence}; editorial summary of source text: ${best.item.value}` };
       return { ...item, value: "" };
     }
     if (item.field === "industry") {

@@ -40,6 +40,9 @@ try {
     ['Example', 'Example has grown into...', ''],
     ['Example', 'Example provides software and', ''],
     ['Example', 'Our story', ''],
+    ['California Closets', 'California Closets is here to provide the support and information.', ''],
+    ['Example', "We're here to provide support and information on our products.", ''],
+    ['California Closets', 'We design custom closets and storage systems.', 'California Closets designs custom closets and storage systems.'],
   ]) assert.equal(describe(source, name), expected, source);
   const editorialPages = {
     'https://editorial.example': '<meta name="description" content="Our vision is a better tomorrow."><a href="/about">About</a>',
@@ -53,6 +56,19 @@ try {
   assert.equal(summary.value, 'Example provides software development.');
   assert.equal(summary.sourceUrl, 'https://editorial.example/about');
   assert.ok(summary.evidence.includes('We provide software development.'), 'Keep original source evidence separate from editorial prose');
+  const closetPages = {
+    'https://closets.example': '<meta name="description" content="We are here to provide support and information."><a href="/contact">Contact</a><a href="/company">Company</a>',
+    'https://closets.example/contact': '<meta name="description" content="California Closets is here to provide the support and information.">',
+    'https://closets.example/company': '<header><p>We provide support and information.</p></header><h5>Today, California Closets operates a multinational franchise and company-owned organization with showrooms across the United States, Canada, Mexico, and the Caribbean, delivering custom-designed organizational solutions for the whole home.</h5>',
+  };
+  const closet = await discoverOrganization('California Closets', ['https://closets.example'], { fetchPage: async url => {
+    if (!closetPages[url]) throw new Error('Unavailable');
+    return { sourceUrl: url, html: closetPages[url] };
+  }});
+  const closetDescription = closet.suggestions.find(item => item.field === 'context');
+  assert.ok(closetDescription.value.includes('organizational solutions for the whole home.'));
+  assert.equal(closetDescription.sourceUrl, 'https://closets.example/company');
+  assert.ok(!closetDescription.value.includes('support and information'));
   const { normalizeOrganizationUrl, organizationProfileLink, emptyOrganizationSuggestions, organizationSeedUrls } = require(path.join(temporary, "modules/people/organization-autofill.js"));
   const { withoutTrailingLinkSlash } = require(path.join(temporary, "modules/people/links.js"));
   const { normalizeOrganizationIndustry, ORGANIZATION_INDUSTRY_OPTIONS } = require(path.join(temporary, "modules/people/organization-industries.js"));
@@ -432,6 +448,11 @@ try {
   console.log("Organization autofill: DNS/socket/redirect and byte limits; all six seed fields; profile-only links; reverse social discovery; complete organization details; source provenance; conflicts; draft preservation; ten-page bound; blocked-page recovery passed.");
   if (process.argv.includes("--kent")) {
     const r = await discoverOrganization("Kent State University", ["https://www.kent.edu"]); console.log(JSON.stringify(r,null,2));
+  }
+  if (process.argv.includes("--closets")) {
+    const result = await discoverOrganization('California Closets', ['https://www.californiaclosets.com/', 'https://www.linkedin.com/company/california-closets/']);
+    console.log(JSON.stringify({ description: result.suggestions.find(item => item.field === 'context'), fields: result.suggestions.map(item => item.field), sources: result.sources, issues: result.sourceIssues }, null, 2));
+    assert.ok(result.suggestions.find(item => item.field === 'context')?.value.match(/closet|storage|organizational solutions/i));
   }
   if (process.argv.includes("--live")) {
     for (const [name, url] of [["Mozilla", "https://www.mozilla.org/en-US/"], ["Cloudflare", "https://www.cloudflare.com/"], ["", "https://www.instagram.com/mozilla/"]]) {

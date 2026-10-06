@@ -1,6 +1,7 @@
 import { normalizeOrganizationUrl, organizationLinkField, organizationProfileLink, organizationSuggestionError, type OrganizationAutofillResult, type OrganizationAutofillField, type OrganizationSuggestion } from "../modules/people/organization-autofill";
 import { isLinkedInLogoUrl, isInstagramLogoUrl, type OrganizationLogo } from "./organization-logo";
 import { classifyOrganizationEvidence } from "./organization-classification";
+import { writeOrganizationDescription, organizationDescriptionScore } from "./organization-description";
 
 function text(value: unknown, limit = 800): string {
   if (typeof value !== "string" && typeof value !== "number") return "";
@@ -383,18 +384,25 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
   // into the organization's identity. About pages need an explicit self-subject.
   const pathname = new URL(source).pathname.replace(/\/+$/, "");
   const homepage = /^(?:\/[a-z]{2}(?:-[a-z]{2})?)?(?:\/(?:home|index(?:\.html?)?))?$/i.test(pathname);
-  const aboutPage = /(?:^|\/)(?:about(?:-us)?|our-story|our-company|who-we-are)(?:\/|$)/i.test(pathname);
+  const aboutPage = /(?:^|\/)(?:about(?:-us)?|company|our-story|our-company|who-we-are)(?:\/|$)/i.test(pathname);
   if (!social && !hasOtherOrganization && (homepage || aboutPage) && !conflicts.has("organizationType")) {
     const description = suggestions.find(item => item.field === "context");
-    const ownedHtml = visibleHtml.replace(/<(nav|footer|aside|article|blockquote)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
+    const ownedHtml = visibleHtml.replace(/<(header|nav|footer|aside|article|blockquote)\b[^>]*>[\s\S]*?<\/\1\s*>/gi, "");
     const selfDescription = (value: string) => {
-      const subject = value.match(/^(.{1,120}?)\s+(?:is|are|offers?|provides?|specializes? in|specialises? in|operates?|delivers?)\b/i)?.[1];
+      const subject = value.replace(/^Today,\s*/i, "").match(/^(.{1,120}?)\s+(?:is|are|offers?|provides?|specializes? in|specialises? in|operates?|delivers?|designs?|builds?|manufactures?|develops?)\b/i)?.[1];
       return Boolean(subject && (/^we$/i.test(subject) || nameKey(subject) === nameKey(organizationName)));
     };
-    const statements = [...ownedHtml.matchAll(/<(?:p|h1|h2)\b[^>]*>([\s\S]*?)<\/(?:p|h1|h2)\s*>/gi)]
-      .map((match) => text(match[1], 1200)).flatMap((value) => value.split(/(?<=[.!?])\s+/)).filter(selfDescription).slice(0, 12);
+    const statements = [...ownedHtml.matchAll(/<(p|h[1-6])\b[^>]*>([\s\S]*?)<\/\1\s*>/gi)]
+      .map((match) => text(match[2], 1200)).flatMap((value) => value.split(/(?<=[.!?])\s+/)).filter(selfDescription).slice(0, 12);
     const headings = homepage ? [...ownedHtml.matchAll(/<h[12]\b[^>]*>([\s\S]*?)<\/h[12]\s*>/gi)].map((match) => text(match[1], 240)).slice(0, 12) : [];
     const evidence = [...(description && (homepage || selfDescription(description.value)) ? [description.value] : []), ...headings, ...statements];
+    const best = evidence.map(raw => ({ raw, summary: writeOrganizationDescription(raw, organizationName) }))
+      .filter(item => item.summary).sort((a, b) => organizationDescriptionScore(b.summary) - organizationDescriptionScore(a.summary))[0];
+    const currentSummary = description && writeOrganizationDescription(description.value, organizationName);
+    if (best && (!currentSummary || organizationDescriptionScore(best.summary) > organizationDescriptionScore(currentSummary))) {
+      if (description) suggestions.splice(suggestions.indexOf(description), 1);
+      add("context", best.raw, "Published organization service description");
+    }
     const inferred = classifyOrganizationEvidence(evidence, suggestions.find(item => item.field === "organizationType")?.value || identity.organizationType);
     if (inferred) {
       const provenance = `Inferred classification from published services: ${inferred.evidence}`;
@@ -402,8 +410,9 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
       add("industry", inferred.industry, provenance);
       // Replace an uninformative metadata label in the draft, never a user's
       // saved About text. Use the actual source words rather than inventing copy.
-      if (!description || /^(?:home|welcome|about(?: us)?|charter options|services|official (?:site|website))\.?$/i.test(description.value)) {
-        if (description) suggestions.splice(suggestions.indexOf(description), 1);
+      const currentDescription = suggestions.find(item => item.field === "context");
+      if (!currentDescription || /^(?:home|welcome|about(?: us)?|charter options|services|official (?:site|website))\.?$/i.test(currentDescription.value)) {
+        if (currentDescription) suggestions.splice(suggestions.indexOf(currentDescription), 1);
         add("context", inferred.evidence, "Published organization service description");
       }
     }
@@ -423,7 +432,7 @@ export function extractOrganizationPage(html: string, sourceUrl: string, organiz
         if ((candidateHost !== sourceHost && !candidateHost.endsWith(`.${sourceHost}`)) || url.search || /\.(?:pdf|jpg|png|zip)$/i.test(url.pathname)) continue;
         if (/(?:sales|demo|events?|webinar|blog|press|legal|privacy|manifesto|leadership)/i.test(url.pathname)) continue;
         if (/(?:^|[\/_-])(?:about|contact|company|history|who-we-are|our-story|our-company|headquarters|locations|facts|figures|at-a-glance|university-overview)(?:[\/_-]|$)/i.test(url.pathname) || /^(?:About\b.*|Contact(?: us)?|Our (?:story|history)|Who we are|Locations|Company|Facts.*|.*at a glance)$/i.test(label)) {
-          links.push({ url: normalizeOrganizationUrl(url.toString()), kind: "detail", priority: /university-overview|company-overview/i.test(url.pathname) ? 0.5 : /facts|figures|at-a-glance/i.test(url.pathname) ? 1 : /contact|headquarters/i.test(`${url.pathname} ${label}`) ? 2 : 3 });
+          links.push({ url: normalizeOrganizationUrl(url.toString()), kind: "detail", priority: /about|company|our-story|who-we-are|university-overview/i.test(url.pathname) ? 0.5 : /facts|figures|at-a-glance/i.test(url.pathname) ? 1 : /contact|headquarters/i.test(`${url.pathname} ${label}`) ? 2 : 3 });
         }
       } catch { /* Not a public navigation link. */ }
     }

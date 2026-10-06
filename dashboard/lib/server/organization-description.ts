@@ -24,7 +24,7 @@ const proseWords = new Set(("a an the and or in of for to with through across fr
   "is are offers provides delivers creates designs builds develops manufactures sells serves supports operates manages " +
   "represents publishes produces connects helps specializes focuses supplies").split(/\s+/));
 const roles = /\b(?:company|firm|agency|organization|organisation|university|school|college|hospital|clinic|rescue|charity|foundation|association|network|manufacturer|retailer|lender|bank|credit union|studio|practice|bakery|country club|brand|health system|chain of (?:hotels|resorts))\b/i;
-const offerings = /\b(?:charters?|tours?|rentals?|management|services?|software|hosting|tools|counsel|delivery|financing|construction|engineering|training|education|research|care|clothing|apparel|products|snacks|groceries|drinks|essentials|consulting|transport|shipping|manufacturing|installation|catering|pastries|cakes|massage|reflexology|body scrub|exfoliation)\b/i;
+const offerings = /\b(?:charters?|tours?|rentals?|management|services?|software|hosting|tools|counsel|delivery|financing|construction|engineering|training|education|research|care|clothing|apparel|products|snacks|groceries|drinks|essentials|consulting|transport|shipping|manufacturing|installation|catering|pastries|cakes|massage|reflexology|body scrub|exfoliation|closets?|storage|cabinetry|furniture|organizational solutions)\b/i;
 const escape = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 const article = (phrase: string) => /^(?:uni(?:vers|que|t)|euro|one\b|US\b)/i.test(phrase) ? "a" : /^(?:[aeiou]|honest|hour|MBA\b)/i.test(phrase) ? "an" : "a";
 function clean(value: string): string {
@@ -45,6 +45,9 @@ function sentenceCase(value: string, name: string): string {
 function neutralSentence(raw: string, name: string): string {
   let value = clean(raw);
   if (!value || /(?:\.{2,}|…|[?])\s*$/.test(value)) return "";
+  // Customer-service prompts are not descriptions of an organization's work.
+  if (/\b(?:here to (?:help|provide|support)|support and information|questions or concerns|accept (?:all )?cookies|privacy preferences)\b/i.test(value)) return "";
+  value = value.replace(/^Today,\s*/i, "");
   // Reject slogans, instructions and uncertain/negative claims rather than
   // accidentally turning them into affirmative statements of services.
   if (/\b(?:no longer|do not|don't|does not|doesn't|used to|may offer|might offer|our clients|our partners|our vision|our mission|we believe|we aspire|we strive)\b/i.test(value)
@@ -109,4 +112,10 @@ export function writeOrganizationDescription(raw: string, organizationName: stri
     if (result.length === 2) break;
   }
   return result.join(" ");
+}
+
+/** Rank meaningful, source-backed offerings above generic corporate metadata. */
+export function organizationDescriptionScore(value: string): number {
+  return (offerings.test(value) ? 4 : 0) + (roles.test(value) ? 1 : 0)
+    + (/\b(?:designs|manufactures|provides|offers|specializes|delivers|builds|develops|operates)\b/i.test(value) ? 2 : 0);
 }

@@ -4022,7 +4022,7 @@ export default function PeopleWorkspace({
             <header className="people-profile-section-heading people-autofill-heading">
               <span><PeopleIcon name="communication" /></span>
               <h4 id="people-organization-links-title">Links</h4>
-              <OrganizationAutofill name={name} values={organizationAutofillValues} onApply={applyOrganizationSuggestions} onPhoto={setQuickPhoto} hasPhoto={Boolean(quickPhoto)} disabled={saving} />
+              <OrganizationAutofill name={name} values={organizationAutofillValues} onApply={applyOrganizationSuggestions} onDescription={setQuickContext} onPhoto={setQuickPhoto} hasPhoto={Boolean(quickPhoto)} disabled={saving} />
             </header>
             <div className="people-profile-field-grid people-create-social-grid people-create-social-grid-no-divider">
               <label>Website<input type="text" inputMode="url" autoCapitalize="off" spellCheck={false} value={referenceUrl} onChange={(event) => setReferenceUrl(withoutTrailingLinkSlash(event.target.value))} placeholder="https://..." /></label>
@@ -4581,7 +4581,7 @@ export default function PeopleWorkspace({
                         <span><PeopleIcon name={profileSectionIcon(section.title)} /></span>
                         <h4>{section.title}</h4>
                         {section.title === "About" && selectedPerson.className === "person" && <div className="people-about-additions"><PeopleAddButton label="Life dream" icon="life-dream" iconOnly onClick={()=>setAboutExtras(current=>({...current,dream:true}))}/><PeopleAddButton label="Notes" icon="notes" iconOnly onClick={()=>setAboutExtras(current=>({...current,notes:true}))}/></div>}
-                        {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} onPhoto={setProfilePhotoDraft} hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)} disabled={profileSaving} />}
+                        {section.title === "Links" && selectedPerson.className === "org" && <OrganizationAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileAutofillValues(profileDraft)} onApply={applyProfileOrganizationSuggestions} onDescription={context => setProfileDraft(current => ({ ...current, context }))} onPhoto={setProfilePhotoDraft} hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)} disabled={profileSaving} />}
                         {section.title === "Communication" && selectedPerson.className === "person" && <PersonAutofill key={selectedPerson.id} name={profileDraft.fullName} values={profileDraft} onApply={applyProfilePersonAutofill} organizations={organizationAutofillSeeds} onBusyChange={setPersonAutofillBusy} disabled={profileSaving} />}
                       </header>
                       {section.title === "Communication" && selectedPerson.className === "person" && <div className="people-contact-channel-grid">

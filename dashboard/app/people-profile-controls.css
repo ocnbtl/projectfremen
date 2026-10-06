@@ -129,10 +129,11 @@
 .people-object-picker-menu > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .people-object-picker-menu > header strong { font-weight: 600; font-size: 15px; }
 .people-object-picker-menu > header button, .people-object-picker-search button { display: grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; background: transparent; color: #55635d; cursor: pointer; border-radius: 8px; }
-.people-object-picker-types { display: flex; gap: 4px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px; }
+.people-object-picker-types { display: flex; gap: 4px; overflow-x: auto; padding: 6px 4px 8px; margin: -6px -4px 8px; }
 .people-object-picker-types button { display: flex; flex: 1 0 auto; flex-direction: column; align-items: center; gap: 7px; width: auto; min-width: 0; padding: 10px 8px; min-height: 64px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #55635d; cursor: pointer; font-size: 11px; }
 .people-object-picker-types button[aria-pressed="true"] { background: #edf0e4; border-color: #d1d8bd; color: #485332; }
 .people-object-picker-types button:hover { background: #f3f5ee; }
+.people-object-picker-types button:hover, .people-object-picker-types button:focus-visible { transform: none !important; }
 .people-object-create-list .people-object-summary { display: flex; align-items: center; gap: 12px; min-width: 0; color: var(--text-strong); text-decoration: none; padding: 6px 0; }
 .people-object-summary > svg { flex: 0 0 auto; color: var(--people-section-accent, #596640); }
 .people-object-summary > span { display: grid; gap: 4px; min-width: 0; }
@@ -276,3 +277,27 @@
 @media (max-width: 760px) { .people-redesign-shell .people-origin-field .people-comes-from-field { height: 44px; min-height: 44px; } }
 .people-redesign-shell .people-profile-form > .people-themed-section { align-content: start; }
 .people-redesign-shell .people-profile-form > :is([data-profile-section="locations"], [data-profile-section="cadence"]) > header { min-height: 44px; }
+
+/* Keep place fields legible as one card, with room around every control. */
+.people-redesign-shell .people-repeatable-fields.people-place-row { padding: 10px !important; gap: 12px; }
+.people-redesign-shell .people-place-row .people-field-label { display: block; font-size: 11px; line-height: 1.4; color: var(--text-subtle); margin: 0 0 4px; }
+.people-redesign-shell .people-place-row .people-visually-hidden { position: static; width: auto; height: auto; clip: auto; clip-path: none; overflow: visible; font-size: 11px; color: var(--text-subtle); }
+.people-redesign-shell .people-place-row > label { display: grid; gap: 3px; }
+.people-redesign-shell .people-place-row input { background: var(--surface-panel, #fff); border: 1px solid var(--border-soft) !important; border-radius: 8px; padding-inline: 9px; font-size: 12px; }
+.people-redesign-shell .people-place-row .people-location-remove { align-self: center; margin: 0 !important; padding: 7px !important; }
+.people-redesign-shell .people-place-row .people-place-label-trigger { align-self: center; }
+.people-object-picker-results > button { grid-template-columns: 40px minmax(0, 1fr) 16px; }
+.people-object-picker-result-icon { width: 40px !important; height: 40px !important; min-width: 40px; overflow: hidden; border-radius: 10px; background: #edf0e4; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
+.people-object-picker-result-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.people-object-picker-result-icon[data-preview-kind="person"] { border-radius: 50%; }
+.people-object-picker-result-icon[data-preview-kind="organization"] img { object-fit: contain; padding: 2px; background: white; }
+.people-object-picker-result-icon[data-preview-kind="project"] { background: var(--module-projects-soft, #e8eef4); color: #375d71; }
+.people-object-picker-result-icon[data-preview-kind="note"] { border-radius: 5px 10px 5px 5px; background: #f4f0e7; color: #8a7553; }
+.people-object-picker-result-icon .object-preview-initials { font-size: 13px; font-weight: 600; }
+.people-object-picker-result-icon small { font-size: 8px; line-height: 1.1; }
+.people-autofill-description { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px; margin-block: 10px; border: 1px solid var(--border-soft); border-radius: 12px; background: var(--people-olive-soft, #edf0e4); }
+.people-autofill-description > strong, .people-autofill-description > p { flex-basis: 100%; margin: 0; }
+.people-autofill-description > button { margin-left: auto; border: 0; border-radius: 8px; padding: 8px 12px; background: var(--people-olive-strong, #5a6040); color: white; font: inherit; cursor: pointer; }
+.people-redesign-shell .people-profile-form > [data-profile-section="locations"]:has(.is-organization) { grid-column: 1 / -1; }
+.people-redesign-shell .people-place-row .people-location-remove { width: 32px !important; min-width: 32px !important; max-width: 32px !important; height: 36px; color: var(--text-subtle) !important; background: transparent !important; box-shadow: none !important; }
+.people-redesign-shell .people-place-row .people-location-remove:hover { background: #fff0ec !important; color: #a13e32 !important; }

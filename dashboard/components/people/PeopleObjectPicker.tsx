@@ -1,9 +1,10 @@
 "use client";
 
-import { useId, useMemo, useRef, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import ObjectPreview, { type ObjectPreviewData } from "./ObjectPreview";
 
 const kinds = [
   { id: "all", label: "All", icon: "object" },
@@ -59,6 +60,25 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
   }, [targets, kind, query]);
   const currentKind = kinds.find(item => item.id === kind)!;
   const shown = filtered.slice(0, limit);
+  const [previews, setPreviews] = useState<Record<string, ObjectPreviewData>>({});
+  const previewIds = shown.filter(target => ["people", "resources", "media"].includes(target.module)).map(target => target.objectId).join("|");
+  useEffect(() => {
+    if (!open || !previewIds) return;
+    const controller = new AbortController();
+    const ids = previewIds.split("|");
+    const batches: string[][] = [];
+    for (let i = 0; i < ids.length; i += 120) batches.push(ids.slice(i, i + 120));
+    void Promise.all(batches.map(async batch => {
+      const params = new URLSearchParams();
+      for (const id of batch) params.append("id", id);
+      const response = await fetch(`/api/native-links/previews?${params}`, { signal: controller.signal });
+      const result = response.ok ? await response.json() : null;
+      return result?.ok ? result.items as ObjectPreviewData[] : [];
+    })).then(results => {
+      if (!controller.signal.aborted) setPreviews(Object.fromEntries(results.flat().map(item => [item.id, item])));
+    }).catch(() => undefined);
+    return () => controller.abort();
+  }, [open, previewIds]);
   const tabTarget = shown.some(target => objectTargetKey(target) === value) ? value : shown[0] ? objectTargetKey(shown[0]) : "";
   const select = (target: NativeObjectRef) => { onChange(objectTargetKey(target)); setOpen(false); };
 
@@ -102,7 +122,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
               options[Math.max(0, Math.min(options.length - 1, next))]?.focus();
             }}>
             {shown.map(target => <button type="button" role="option" tabIndex={objectTargetKey(target) === tabTarget ? 0 : -1} aria-selected={objectTargetKey(target) === value} data-select-value={objectTargetKey(target)} key={objectTargetKey(target)} onClick={() => select(target)}>
-              <span className="people-object-picker-result-icon"><UnigentamosIcon role={kinds.find(item => item.id === kindOf(target))!.icon} size={20} /></span>
+              <ObjectPreview target={target} preview={previews[target.objectId]} icon={objectTargetIcon(target)} />
               <span><strong>{target.label}</strong><small>{objectTargetTypeLabel(target)}</small></span>
               <UnigentamosIcon role={objectTargetKey(target) === value ? "check" : "plus"} size={16} />
             </button>)}

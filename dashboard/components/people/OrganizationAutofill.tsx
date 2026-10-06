@@ -6,12 +6,13 @@ import { ORGANIZATION_AUTOFILL_LABELS, emptyOrganizationSuggestions, organizatio
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
 /** Placed directly in the Links heading; all changes remain an unsaved form draft. */
-export default function OrganizationAutofill({ name, values, onApply, onPhoto, hasPhoto = false, disabled = false }: {
+export default function OrganizationAutofill({ name, values, onApply, onPhoto, onDescription, hasPhoto = false, disabled = false }: {
   name: string;
   values: OrganizationAutofillValues;
   onApply: (suggestions: OrganizationSuggestion[], fetchedAt: string) => void;
   disabled?: boolean;
   onPhoto?: (dataUrl: string) => void;
+  onDescription?: (description: string) => void;
   hasPhoto?: boolean;
 }) {
   const [result, setResult] = useState<OrganizationAutofillResult | null>(null);
@@ -19,6 +20,7 @@ export default function OrganizationAutofill({ name, values, onApply, onPhoto, h
   const [notice, setNotice] = useState("");
   const [profileText, setProfileText] = useState("");
   const [pasteOpen, setPasteOpen] = useState(false);
+  const [description, setDescription] = useState<(OrganizationSuggestion & { organizationName: string }) | null>(null);
   const pasteId = useId();
   const controller = useRef<AbortController | null>(null);
   const latest = useRef({ name, values, onApply, onPhoto, hasPhoto });
@@ -42,6 +44,7 @@ export default function OrganizationAutofill({ name, values, onApply, onPhoto, h
     controller.current = request;
     setBusy(true);
     setResult(null);
+    setDescription(null);
     setNotice("");
     try {
       const response = await fetch("/api/people/organizations/autofill", {
@@ -58,6 +61,8 @@ export default function OrganizationAutofill({ name, values, onApply, onPhoto, h
       const next = payload.result as OrganizationAutofillResult;
       if (!fromText && next.sourceIssues?.length && !next.suggestions.some(item => ["context", "industry", "organizationType"].includes(item.field))) setPasteOpen(true);
       const chosen = emptyOrganizationSuggestions(next.suggestions, latest.current.values);
+      const proposed = next.suggestions.find(item => item.field === "context");
+      if (proposed && latest.current.values.context?.trim() && proposed.value !== latest.current.values.context.trim()) setDescription({ ...proposed, organizationName: name });
       // Clear before applying: the autofilled name/links must not invalidate their own result.
       controller.current = null;
       latest.current.onApply(chosen, next.fetchedAt);
@@ -79,6 +84,7 @@ export default function OrganizationAutofill({ name, values, onApply, onPhoto, h
     </button>
     {(busy || notice || result) && <div className="people-autofill-feedback">
       <p role="status" aria-live="polite">{busy ? "Finding connected links and organization details…" : notice}</p>
+      {description && description.organizationName === name && onDescription && <div className="people-autofill-description"><strong>Suggested description</strong><p>{description.value}</p><a href={description.sourceUrl} target="_blank" rel="noopener noreferrer">View source</a><button type="button" disabled={disabled || busy} onClick={() => { onDescription(description.value); setDescription(null); setNotice("Description updated in your draft. Review it, then Save."); }}>Use this description</button></div>}
       {result && <details className="people-autofill-sources">
         <summary>Autofill sources</summary>
         <p>{result.message}</p>
