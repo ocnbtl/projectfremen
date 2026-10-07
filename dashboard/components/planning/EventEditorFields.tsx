@@ -54,27 +54,27 @@ export default function EventEditorFields({ fields, update, snapshot }: {
           <input aria-label="Reminder amount" type="number" min={0} max={43200/reminderUnit} step="any" disabled={fields.reminderMinutes === null} value={Number((reminderDraft/reminderUnit).toFixed(5))} onChange={e => reminder(Math.round(Number(e.target.value)*reminderUnit))} />
           <SelectField aria-label="Reminder unit" value={String(reminderUnit)} disabled={fields.reminderMinutes === null} onChange={e => { const next=Number(e.target.value); reminder(Math.min(43200,Math.round(reminderDraft/reminderUnit*next))); setReminderUnit(next); }}><option value="1">minutes before</option><option value="60">hours before</option><option value="1440">days before</option></SelectField>
         </div>
-        <EventDateSegments label="Starts" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.start} onChange={value => update("start",value)} />
-        <EventDateSegments label="Ends" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.allDay ? addDays(fields.end,-1) : fields.end} onChange={value => update("end",fields.allDay ? addDays(value,1) : value)} />
         <div className={styles.optionRow}>
-          <span className={styles.repeatLabel}><UnigentamosIcon role="routine" size={18} />Repeat</span>
-          <input aria-label="Repeat interval" type="number" min={1} max={365} required={Boolean(fields.recurrence)} value={rule.INTERVAL || 1} disabled={!simpleRule} onChange={e => repeat(`FREQ=${rule.FREQ || "WEEKLY"};INTERVAL=${e.target.value}`)} />
-          <SelectField aria-label="Repeat unit" value={!fields.recurrence ? "none" : simpleRule ? rule.FREQ : "custom"} onChange={e => { if (e.target.value === "none") update("recurrence",""); else if (e.target.value === "custom") update("recurrence",recurrenceDraft); else repeat(`FREQ=${e.target.value};INTERVAL=${rule.INTERVAL || 1}`); }}>
-            <option value="none">Does not repeat</option><option value="DAILY">days</option><option value="WEEKLY">weeks</option><option value="MONTHLY">months</option><option value="YEARLY">years</option>{!simpleRule && <option value="custom">Custom schedule</option>}
+          <EventCheckbox label="Repeat" checked={Boolean(fields.recurrence)} onChange={checked => update("recurrence", checked ? recurrenceDraft : "")} />
+          <input aria-label="Repeat interval" type="number" min={1} max={365} required={Boolean(fields.recurrence)} value={rule.INTERVAL || 1} disabled={!fields.recurrence || !simpleRule} onChange={e => repeat(`FREQ=${rule.FREQ || "WEEKLY"};INTERVAL=${e.target.value}`)} />
+          <SelectField aria-label="Repeat unit" disabled={!fields.recurrence} value={simpleRule ? rule.FREQ : "custom"} onChange={e => { if (e.target.value === "custom") update("recurrence",recurrenceDraft); else repeat(`FREQ=${e.target.value};INTERVAL=${rule.INTERVAL || 1}`); }}>
+            <option value="DAILY">days</option><option value="WEEKLY">weeks</option><option value="MONTHLY">months</option><option value="YEARLY">years</option>{!simpleRule && <option value="custom">Custom schedule</option>}
           </SelectField>
         </div>
+        <EventDateSegments label="Starts" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.start} onChange={value => update("start",value)} />
+        <EventDateSegments label="Ends" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.allDay ? addDays(fields.end,-1) : fields.end} onChange={value => update("end",fields.allDay ? addDays(value,1) : value)} />
         {!simpleRule && fields.recurrence && <label>Custom recurrence<input value={recurrenceDraft} onChange={e => repeat(e.target.value)} /><small>Includes the imported schedule and end date.</small></label>}
       </section>
     </div>
     <div className={styles.right}>
       <section className={styles.calendar} aria-label="Calendar and color groups">
-        <label>Calendar<SelectField aria-label="Calendar" value={fields.calendarId} onChange={e => { update("calendarId",e.target.value); update("groupId",""); }} triggerContent={<span className={styles.calendarValue}><span style={{background:calendarDisplayColor(calendar?.color)}} /><UnigentamosIcon role="calendar" size={18} />{calendar?.name || "Choose calendar"}<UnigentamosIcon role="chevron-down" size={14} /></span>}>
+        <label className={styles.calendarSelect}>Calendar<SelectField aria-label="Calendar" value={fields.calendarId} onChange={e => { update("calendarId",e.target.value); update("groupId",""); }} triggerContent={<span className={styles.calendarValue}><span style={{background:calendarDisplayColor(calendar?.color)}} /><UnigentamosIcon role="calendar" size={18} />{calendar?.name || "Choose calendar"}<UnigentamosIcon role="chevron-down" size={14} /></span>}>
           {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </SelectField></label>
-        <button className={styles.groupTrigger} type="button" aria-expanded={groupsOpen} onClick={() => setGroupsOpen(!groupsOpen)}><UnigentamosIcon role={selectedGroup?.icon || "palette"} size={16} /><span>{selectedGroup?.name || "Color group"}</span><UnigentamosIcon role="chevron-down" size={13} /></button>
-        <AnimatePresence initial={false}>{groupsOpen && <motion.div className={styles.groupPanel} initial={reduced ? false : {height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} transition={layoutTransition}><div className={styles.groups}>
+        <div className={styles.groupArea}><button className={styles.groupTrigger} type="button" aria-expanded={groupsOpen} onClick={() => setGroupsOpen(!groupsOpen)}><UnigentamosIcon role={selectedGroup?.icon || "palette"} size={16} /><span>{selectedGroup?.name || "Color group"}</span><UnigentamosIcon role="chevron-down" size={13} /></button>
+        <AnimatePresence initial={false}>{groupsOpen && <motion.div className={styles.groupPanel} initial={reduced ? false : {x:-8,opacity:0}} animate={{x:0,opacity:1}} exit={{x:-8,opacity:0}} transition={layoutTransition}><div className={styles.groups}>
           <button type="button" aria-pressed={!fields.groupId} onClick={() => update("groupId","")}>None</button>{groups.map(g => <button type="button" key={g.id} aria-pressed={fields.groupId === g.id} style={{"--group-color":g.color} as CSSProperties} onClick={() => update("groupId",g.id)}><UnigentamosIcon role={g.icon} size={16} />{g.name}</button>)}
-        </div></motion.div>}</AnimatePresence>
+        </div></motion.div>}</AnimatePresence></div>
       </section>
       <EventLocationField fields={fields} update={update} snapshot={snapshot} />
       <section className={styles.links} aria-label="Linked objects"><RecordLinks objectPicker pickerLabel="Link an object" refs={linked} available={snapshot?.refs} onChange={refs => {

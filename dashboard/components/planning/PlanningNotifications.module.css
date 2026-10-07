@@ -34,3 +34,10 @@
 @keyframes reminders-in {from{opacity:0;transform:translateY(-8px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes reminders-out {to{opacity:0;transform:translateY(-5px) scale(.98)}}
 @media(prefers-reduced-motion:reduce){.panel[data-state]{animation:none}.item,.actions button{transition:none}}
+
+.links { display:flex; flex-wrap:wrap; gap:6px 12px; padding:8px 0 0 51px; --linked-object-size:22px; }
+.links a { display:inline-flex; align-items:center; gap:5px; color:var(--text-secondary); font-size:11px; text-decoration:none; min-width:0; }
+.links a:hover {color:var(--module-action);}
+.links a > span:last-child {overflow-wrap:anywhere;}
+.location {display:flex;align-items:center;gap:5px;padding:7px 0 0 51px;font-size:11px;color:var(--text-secondary);}
+.copy time { flex-wrap:wrap; }

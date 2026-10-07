@@ -12,6 +12,7 @@ export default function EventDateSegments({ label, value, allDay, timeZone, onCh
 }) {
   const [editing, setEditing] = useState<Segment>();
   const [draft, setDraft] = useState("");
+  const skipBlur = useRef<Segment | undefined>(undefined);
   const inputs = useRef<Partial<Record<Segment, HTMLInputElement | null>>>({});
   const year = Number(value.slice(0,4)), month = Number(value.slice(5,7)), day = Number(value.slice(8,10));
   const hour = Number(value.slice(11,13) || 9), minute = Number(value.slice(14,16) || 0);
@@ -44,8 +45,8 @@ export default function EventDateSegments({ label, value, allDay, timeZone, onCh
       value={editing === segment ? draft : values[segment]} maxLength={segment === "year" ? 4 : 2}
       onFocus={e => { setEditing(segment); setDraft(values[segment]); e.currentTarget.select(); }}
       onClick={e => e.currentTarget.select()}
-      onChange={e => { const raw=e.target.value; if (segment === "period" ? /^[apm]*$/i.test(raw) : /^\d*$/.test(raw)) { setDraft(raw); if (segment === "period" && /^[ap]$/i.test(raw)) { commit(segment,raw); setDraft(raw.toLowerCase()+"m"); } } }}
-      onBlur={() => { commit(segment,draft); setEditing(undefined); }}
+      onChange={e => { const raw=e.target.value; if (segment === "period" ? /^[apm]*$/i.test(raw) : /^\d*$/.test(raw)) { setDraft(raw); if (segment !== "period" && raw.length === (segment === "year" ? 4 : 2)) { commit(segment, raw); const next=order[order.indexOf(segment)+1]; if (next) { skipBlur.current=segment; inputs.current[next]?.focus(); } } if (segment === "period" && /^[ap]$/i.test(raw)) { commit(segment,raw); setDraft(raw.toLowerCase()+"m"); } } }}
+      onBlur={e => { if (skipBlur.current === segment) { skipBlur.current=undefined; return; } commit(segment,e.currentTarget.value); setEditing(undefined); }}
       onKeyDown={e => {
         if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
         if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); setDraft(values[segment]); }

@@ -28,3 +28,12 @@
 .objects[data-object-list] .visual {margin-left:0;}
 .objects .visual {color:inherit;}
 @container timed-event (max-width:80px) {.objects[data-object-list] .visual {margin-left:0;}}
+
+.visual,.visual img { border-radius:50%; clip-path:circle(50%); }
+.visual[data-organization] img { padding:0; }
+.objects:not([data-object-list]) .visual[data-location] { width:14px; }
+.objects[data-object-list] .label { font-size:11px; line-height:1.4; }
+.objects[data-object-list][data-object-align="start"] .chip { justify-content:flex-start; width:auto; }
+.objects[data-object-list][data-object-align="start"] .visual { order:0; }
+.objects[data-object-list][data-object-align="start"] .label { flex:0 1 auto; text-align:left; }
+@container timed-event (max-width:160px) { .objects[data-object-list] .label {font-size:9px;} }

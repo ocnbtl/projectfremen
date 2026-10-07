@@ -9,6 +9,17 @@ export const GROUP_ICONS = [
   "star",
   "goal",
   "users",
+  "reminder",
+  "module-projects",
+  "module-notes",
+  "module-media",
+  "module-resources",
+  "module-finance",
+  "birthday",
+  "location",
+  "organization",
+  "clock",
+  "interaction-milestone",
 ];
 export const DEFAULT_EVENT_GROUPS: EventGroup[] = [
   { id: "work", name: "Work", color: "#59518B", icon: "briefcase" },

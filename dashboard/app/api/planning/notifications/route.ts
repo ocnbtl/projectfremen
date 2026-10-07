@@ -1,3 +1,4 @@
+import { readPersonalRecords } from "../../../../lib/personal-records-store";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import { readPlanningState } from "../../../../lib/modules/planning/store";
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
       addDays(today, 2),
       zone,
     );
+    const records = events.some(e => e.linkedRefs.length) ? await readPersonalRecords().catch(() => []) : [];
     const reminders = events
       .filter(
         (e) =>
@@ -44,6 +46,11 @@ export async function GET(request: Request) {
                 date: localDate(new Date(e.startMs), zone),
                 title: e.title,
                 startMs: e.startMs,
+                endMs: e.endMs,
+                timeZone: zone,
+                linkedRefs: e.linkedRefs.map(ref => { const record=records.find(r => r.id === ref.objectId); return record ? {...ref, preview:{imageUrl:record.profile?.photoUrl || record.resourceProfile?.metadata?.imageUrl || "", imageUpdatedAt:record.profile?.photoUpdatedAt}} : ref; }),
+                place: (() => { const p=state.places.find(p => p.id === e.placeId); return p ? {id:p.id,name:p.name} : undefined; })(),
+                location: e.location,
                 allDay: e.allDay,
                 receipt,
               },

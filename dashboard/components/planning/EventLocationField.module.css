@@ -23,3 +23,14 @@
 @keyframes place-out {to{opacity:0;transform:translateY(-4px) scale(.98)}}
 @media(prefers-reduced-motion:reduce){.popover[data-state]{animation:none;}}
 @media(max-width:700px){.location .address input {font-size:16px;} .popover {padding:12px;} .create footer {flex-wrap:wrap;}}
+
+.popover:global(.work-form) { gap:8px; }
+.popover header { margin:0; }
+.popover header strong { font-size:13px; font-weight:600; }
+.popover header button:hover { background:var(--module-quiet); color:var(--module-action); }
+.popover input[type="search"] { font:400 13px/1.5 var(--font-body); min-height:34px; padding:6px 9px; }
+.places > button { padding:7px; }
+.places strong { font:500 13px/1.4 var(--font-body); }
+.create footer { flex-wrap:wrap; gap:8px; }
+.create footer small { max-width:none; white-space:nowrap; font-size:11px; }
+@media(max-width:700px) { .popover input[type="search"] {font-size:16px;} }

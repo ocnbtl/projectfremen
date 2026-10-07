@@ -2,6 +2,8 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
+import { EventObjectIdentity } from "./EventObjects";
+import type { NativeObjectRef } from "../../lib/native-objects/types";
 import type { ReminderReceipt } from "../../lib/modules/planning/types";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { WorkspaceButton } from "../admin-shell/WorkspaceKit";
@@ -14,6 +16,11 @@ type Reminder = {
   date: string;
   title: string;
   startMs: number;
+  endMs: number;
+  timeZone: string;
+  linkedRefs: NativeObjectRef[];
+  place?: {id:string;name:string};
+  location?: string;
   allDay: boolean;
   receipt?: ReminderReceipt;
 };
@@ -138,14 +145,19 @@ export default function PlanningNotifications() {
       {!loaded && !error && <div className={styles.empty} role="status"><UnigentamosIcon role="clock" size={28} /><strong>Checking reminders…</strong></div>}
       {loaded && !error && !items.length && <div className={styles.empty}><span><UnigentamosIcon role="check" size={24} /></span><strong>You’re all caught up</strong><p>Your event reminders will appear here.</p></div>}
       {items.length > 0 && <div className={styles.items}>{error && <p className={styles.note}>Showing the last successful check.</p>}{items.map(item => {
-        const date=new Date(item.startMs), past=item.startMs < Date.now();
+        const date=new Date(item.startMs);
+        const time=(ms:number) => new Date(ms).toLocaleTimeString("en-US",{timeZone:item.timeZone,hour:"numeric",minute:"2-digit",hour12:true}).toLowerCase().replace(/:00(?=\s)/, "").replace(/\s/g, "");
+        const links=[...(item.linkedRefs || [])];
+        if(item.place && !links.some(r => r.module === "map" && r.objectId === item.place!.id)) links.push({module:"map",objectType:"place",objectId:item.place.id,label:item.place.name,route:"/admin/map"});
         return <article key={item.id} className={styles.item} data-busy={busy === item.id || undefined}>
           <Link className={styles.event} onClick={() => setOpen(false)} href={`/admin/calendar?selected=${encodeURIComponent(item.eventId)}&occurrence=${encodeURIComponent(item.occurrenceKey)}&date=${encodeURIComponent(item.date)}`}>
             <span className={styles.date}><small>{date.toLocaleDateString("en-US",{month:"short"})}</small><b>{date.getDate()}</b></span>
-            <span className={styles.copy}><strong>{item.title}</strong><time dateTime={date.toISOString()}><UnigentamosIcon role="clock" size={13} />{item.allDay ? "All day" : date.toLocaleTimeString("en-US",{hour:"numeric",minute:"2-digit",hour12:true}).toLowerCase().replace(/\s/g,"")}{past && <span className={styles.missed}>Earlier</span>}</time></span>
+            <span className={styles.copy}><strong>{item.title}</strong><time dateTime={date.toISOString()}><UnigentamosIcon role="clock" size={13} />{item.allDay ? "All day" : `${time(item.startMs)} to ${time(item.endMs)}` }</time></span>
             <UnigentamosIcon role="chevron-right" size={15} />
           </Link>
-          <div className={styles.actions}><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"snoozed")} aria-label={`Snooze ${item.title} for 15 minutes`}><UnigentamosIcon role="clock" size={15} />15 min</button><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"dismissed")} aria-label={`Dismiss ${item.title}`}><UnigentamosIcon role="check" size={15} />Dismiss</button></div>
+          {links.length > 0 && <div className={styles.links}>{links.map(ref => <Link key={`${ref.module}:${ref.objectType}:${ref.objectId}`} href={ref.route} onClick={() => setOpen(false)}><EventObjectIdentity record={ref} /><span>{ref.label}</span></Link>)}</div>}
+          {!links.some(r => r.module === "map") && item.location && <div className={styles.location}><UnigentamosIcon role="location" size={14}/>{item.location}</div>}
+          <div className={styles.actions}><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"snoozed")} aria-label={`Snooze ${item.title} for 15 minutes`}><UnigentamosIcon role="clock" size={15} />Snooze 15 min</button><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"dismissed")} aria-label={`Dismiss ${item.title}`}><UnigentamosIcon role="check" size={15} />Dismiss</button></div>
         </article>;
       })}{total > items.length && <p className={styles.note}>{items.length} of {total} reminders. More appear as you clear these.</p>}</div>}
       <footer className={styles.footer}><Link href="/admin/calendar" onClick={() => setOpen(false)}><UnigentamosIcon role="calendar" size={16} />Open calendar<UnigentamosIcon role="chevron-right" size={14} /></Link></footer>

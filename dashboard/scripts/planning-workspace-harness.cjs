@@ -1061,6 +1061,11 @@ async function check(label, run) {
     assert.equal(calendarObservances(birthdays.slice(1), [], defaultObservances(), "2028-02-01", "2028-03-02", "UTC")[0].start, "2028-02-29");
     assert.equal(calendarObservances(birthdays, [], { ...defaultObservances(), birthdays: false }, "2026-12-28", "2027-01-04", "UTC").length, 0);
   });
+  await check("expanded group icons survive calendar validation", () => {
+    const { normalizePlanningRecord } = require("../lib/modules/planning/record-validation.ts");
+    const { GROUP_ICONS } = require("../lib/modules/planning/calendar-groups.ts");
+    for (const icon of GROUP_ICONS) assert.equal(normalizePlanningRecord("calendars",{id:"qa",name:"QA",createdAt:"2026-10-07T00:00:00Z",updatedAt:"2026-10-07T00:00:00Z",groups:[{id:icon,name:icon,color:"#59518b",icon}]}).groups[0].icon,icon);
+  });
   await check("country holidays retain calendar dates, observed dates and individual visibility", () => {
     const { holidayCatalog } = require("../lib/modules/planning/holiday-catalog.ts");
     const { calendarObservances, defaultObservances } = require("../lib/modules/planning/observances.ts");
@@ -1069,7 +1074,9 @@ async function check(label, run) {
     assert.deepEqual(independence.map(x => x.date), ["2026-07-03", "2026-07-04"]);
     const tax = catalog.holidays.find(x => x.country === "US" && x.name === "Tax Day");
     const defaults = calendarObservances([], catalog.holidays, defaultObservances(), "2026-01-01", "2027-01-01", "Pacific/Auckland");
-    assert(!defaults.some(x => x.title === "Tax Day")); assert(!defaults.some(x => x.system.country === "CA"));
+    assert(defaults.some(x => x.title === "Tax Day"));
+    const hidden = calendarObservances([], catalog.holidays, { ...defaultObservances(), hiddenHolidays:[tax.key] }, "2026-01-01", "2027-01-01", "UTC");
+    assert(!hidden.some(x => x.title === "Tax Day")); assert(!defaults.some(x => x.system.country === "CA"));
     const enabled = calendarObservances([], catalog.holidays, { ...defaultObservances(), countries: ["US", "CA"], hiddenHolidays: [independence[0].key], extraHolidays: [tax.key] }, "2026-01-01", "2027-01-01", "Pacific/Auckland");
     assert(enabled.some(x => x.title === "Tax Day")); assert(enabled.some(x => x.system.country === "CA")); assert(!enabled.some(x => x.title.startsWith("Independence Day")));
     assert.equal(enabled.find(x => x.title === "Halloween").start, "2026-10-31");

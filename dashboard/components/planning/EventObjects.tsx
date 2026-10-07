@@ -12,13 +12,13 @@ export function EventObjectIdentity({ record }: { record: PreviewRef }) {
   const source = safe ? raw + (record.preview?.imageUpdatedAt ? (raw.includes("?") ? "&" : "?") + "v=" + encodeURIComponent(record.preview.imageUpdatedAt) : "") : "";
   const [failed, setFailed] = useState("");
   const icon = record.module === "map" ? "location" : record.objectType === "organization" ? "organization" : record.module === "personal_ops" ? "module-personal" : "module-" + record.module;
-  return <span className={styles.visual} data-organization={record.objectType === "organization" || undefined}>
+  return <span className={styles.visual} data-location={!source && record.module === "map" || undefined} data-organization={record.objectType === "organization" || undefined}>
     {source && failed !== source ? <img src={source} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(source)} /> : <UnigentamosIcon role={icon} size={14} />}
   </span>;
 }
 
 /** Compact previews retain an explicit count; opening the event exposes every link. */
-export default function EventObjects({ event, available = [], list = false, maxItems = 6 }: { event: EventOccurrence; available?: NativeObjectRef[]; list?: boolean; maxItems?: number }) {
+export default function EventObjects({ event, available = [], list = false, align = "end", maxItems = 6 }: { event: EventOccurrence; available?: NativeObjectRef[]; list?: boolean; align?: "start" | "end"; maxItems?: number }) {
   const element = useRef<HTMLSpanElement>(null), [width, setWidth] = useState(300);
   const refs = [...new Map(event.linkedRefs.filter(ref => list || !(ref.module === "people" && ref.objectType === "person")).map(ref => [ref.module + ":" + ref.objectType + ":" + ref.objectId, available.find(item => item.module === ref.module && item.objectType === ref.objectType && item.objectId === ref.objectId) || ref])).values()];
   if (event.placeId && !refs.some(ref => ref.module === "map" && ref.objectId === event.placeId)) {
@@ -38,7 +38,7 @@ export default function EventObjects({ event, available = [], list = false, maxI
   if (!count) return null;
   const limit = list ? maxItems : Math.max(1, Math.floor(width / 120));
   const shown = items.slice(0, limit), remaining = items.slice(limit);
-  return <span ref={element} className={styles.objects} style={list ? undefined : {width:Math.min(count * 150,900)}} data-event-objects data-object-list={list || undefined} data-icon-only={!list && width < 65 || undefined} title={items.map(ref => ref.label).join(" · ")} aria-label={"Linked objects: " + items.map(ref => ref.label).join(", ")}>
+  return <span ref={element} className={styles.objects} style={list ? undefined : {width:Math.min(count * 150,900)}} data-event-objects data-object-list={list || undefined} data-object-align={align} data-icon-only={!list && width < 65 || undefined} title={items.map(ref => ref.label).join(" · ")} aria-label={"Linked objects: " + items.map(ref => ref.label).join(", ")}>
     {shown.map(ref => <span className={styles.chip} key={ref.module + ":" + ref.objectType + ":" + ref.objectId} title={ref.label}>
       <EventObjectIdentity record={ref} /><span className={styles.label}>{ref.label}</span>
     </span>)}

@@ -966,7 +966,7 @@ export default function CalendarWorkspace() {
 </div>}
           <div className={styles.calendarCardGrid}>
             {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <section className={styles.calendarCard} key={c.id} style={{ "--calendar-card-color": calendarDisplayColor(c.color) } as CSSProperties}>
-              <CalendarSettings calendar={c} busy={busy} enabled={c.visible} onToggle={visible => void saveCalendarPreference(c.id, { visible })} onSave={(name, color) => saveCalendarPreference(c.id, { name, color })} />
+              <CalendarSettings calendar={c} busy={busy} onRemove={() => void saveCalendarPreference(c.id, { archivedAt: new Date().toISOString(), visible: false })} enabled={c.visible} onToggle={visible => void saveCalendarPreference(c.id, { visible })} onSave={(name, color) => saveCalendarPreference(c.id, { name, color })} />
               <CalendarDisclosure title="Edit groups" icon="palette"><CalendarGroupSettings calendars={[c]} busy={busy} onSave={(calendar, groups) => saveCalendarPreference(calendar.id, { groups })} /></CalendarDisclosure>
             </section>)}
             {["birthdays", ...observanceSettings.countries.map(code => `holidays:${code}`), "custom"].map(key => {
@@ -975,10 +975,10 @@ export default function CalendarWorkspace() {
               const appearance = observanceAppearance(observanceSettings, key, name);
               const enabled = key === "birthdays" ? observanceSettings.birthdays : key === "custom" ? observanceSettings.customVisible !== false : !observanceSettings.disabledCountries?.includes(code!);
               return <section className={styles.calendarCard} key={key} style={{ "--calendar-card-color": appearance.color } as CSSProperties}>
-                <CalendarSettings calendar={appearance} busy={busy} icon={key === "birthdays" ? "birthday" : "star"} country={code} enabled={enabled}
+                <CalendarSettings calendar={appearance} busy={busy} icon={key === "birthdays" ? "birthday" : "star"} country={code} enabled={enabled} onRemove={code ? () => void saveCalendarPreference("native", current => ({ observances: { ...(current.observances || defaultObservances()), countries: (current.observances || defaultObservances()).countries.filter(country => country !== code) } })) : undefined}
                   onToggle={visible => void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, ...(key === "birthdays" ? { birthdays: visible } : key === "custom" ? { customVisible: visible } : { disabledCountries: visible ? (settings.disabledCountries || []).filter(c => c !== code) : [...new Set([...(settings.disabledCountries || []), code!])] }) } }; })}
                   onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, [key]: { name, color } } } }; })} />
-                {key === "birthdays" ? <CalendarDisclosure title="Choose birthdays" icon="birthday"><div className={styles.birthdayChoices}>{(snapshot?.birthdays || []).map(person => <label key={person.ref.objectId} className={styles.calendarToggle}><EventPeople refs={[person.ref]} available={snapshot?.refs} /><span>{person.ref.label}</span><input type="checkbox" aria-label={`Show birthday for ${person.ref.label}`} checked={!observanceSettings.hiddenBirthdays?.includes(person.ref.objectId)} onChange={e => { const checked = e.target.checked; void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, hiddenBirthdays: checked ? (settings.hiddenBirthdays || []).filter(id => id !== person.ref.objectId) : [...new Set([...(settings.hiddenBirthdays || []), person.ref.objectId])] } }; }); }} /></label>)}{!snapshot?.birthdays?.length && <p>Add birthdays to people’s profiles to choose them here.</p>}</div></CalendarDisclosure> : <CalendarDisclosure title={code ? "Edit holidays" : "Edit dates"} icon={code ? "interaction-milestone" : "edit"} leading={code ? <span className={styles.holidayCardYear}>{date.slice(0,4)}</span> : undefined} actions={code ? <Button icon="delete" aria-label={`Remove ${name} holiday calendar`} disabled={busy} onClick={() => void saveCalendarPreference("native", current => ({ observances: { ...(current.observances || defaultObservances()), countries: (current.observances || defaultObservances()).countries.filter(country => country !== code) } }))} /> : undefined}>
+                {key === "birthdays" ? <CalendarDisclosure title="Choose birthdays" icon="birthday"><div className={styles.birthdayChoices}>{(snapshot?.birthdays || []).map(person => <label key={person.ref.objectId} className={styles.calendarToggle}><EventPeople refs={[person.ref]} available={snapshot?.refs} /><span>{person.ref.label}</span><input type="checkbox" aria-label={`Show birthday for ${person.ref.label}`} checked={!observanceSettings.hiddenBirthdays?.includes(person.ref.objectId)} onChange={e => { const checked = e.target.checked; void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, hiddenBirthdays: checked ? (settings.hiddenBirthdays || []).filter(id => id !== person.ref.objectId) : [...new Set([...(settings.hiddenBirthdays || []), person.ref.objectId])] } }; }); }} /></label>)}{!snapshot?.birthdays?.length && <p>Add birthdays to people’s profiles to choose them here.</p>}</div></CalendarDisclosure> : <CalendarDisclosure title={code ? `Edit holidays (${date.slice(0,4)})` : "Edit dates"} icon={code ? "interaction-milestone" : "edit"}>
                   <CalendarObservanceSettings section={code ? "holidays" : "custom"} countryCode={code} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />
                 </CalendarDisclosure>}
               </section>;
@@ -992,7 +992,7 @@ export default function CalendarWorkspace() {
               <form className={styles.importMethod} onSubmit={e => { e.preventDefault(); const form = e.currentTarget; if (importFile) void connect("ics_file", importFile).then(ok => { if (ok) form.reset(); }); }}>
                 <h4><UnigentamosIcon role="export" size={17} />Upload a file</h4>
                 <label>Name<input aria-label="Upload calendar name" value={connectionName} onChange={e => setConnectionName(e.target.value)} placeholder="Work, personal, travel…" /></label>
-                <label>Calendar file<input required type="file" accept=".ics,text/calendar" disabled={busy} onChange={e => setImportFile(e.target.files?.[0])} /></label>
+                <label className={styles.calendarFile}>Calendar file<span className={styles.fileButton}><UnigentamosIcon role="export" size={16} />Choose file<input aria-label="Calendar file" required type="file" accept=".ics,text/calendar" disabled={busy} onChange={e => setImportFile(e.target.files?.[0])} /></span>{importFile && <span className={styles.fileName}>{importFile.name}</span>}</label>
                 <Button type="submit" icon="export" disabled={!importFile || busy}>Upload</Button>
               </form>
               <span className={styles.importOr}>or</span>
@@ -1130,6 +1130,7 @@ function CalendarSettings({
   country,
   enabled,
   onToggle,
+  onRemove,
 }: {
   calendar: Pick<Calendar, "name" | "color">;
   busy: boolean;
@@ -1138,6 +1139,7 @@ function CalendarSettings({
   country?: string;
   enabled?: boolean;
   onToggle?: (enabled: boolean) => void;
+  onRemove?: () => void;
 }) {
   const [name, setName] = useState(calendar.name),
     [color, setColor] = useState(calendar.color);
@@ -1179,6 +1181,7 @@ function CalendarSettings({
           onChange={(event) => { setColor(event.target.value); autosave.schedule({ name, color: event.target.value }); }}
         />
       </label>
+      {onRemove && <Button className={styles.calendarRemove} icon="delete" aria-label={`Remove ${calendar.name} calendar`} disabled={busy} onClick={onRemove} />}
       <span className={styles.autosaveStatus} role="status">{autosave.status}</span>
       {autosave.status === "Not saved" && <Button onClick={() => void autosave.flush()}>Retry</Button>}
     </form>

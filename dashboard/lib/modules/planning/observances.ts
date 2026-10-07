@@ -11,7 +11,7 @@ export const defaultObservances = (): CalendarObservanceSettings => ({ birthdays
 export const observanceAppearance = (settings: CalendarObservanceSettings, key: string, name = "Holidays") => settings.appearances?.[key] || { name: key === "birthdays" ? "People’s birthdays" : key === "custom" ? "Custom dates" : name, color: key === "birthdays" ? "#5A6040" : "#716B80" };
 
 export const holidayVisible = (holiday: HolidayDate, settings: CalendarObservanceSettings) =>
-  settings.countries.includes(holiday.country) && !settings.hiddenHolidays.includes(holiday.key) && (holiday.defaultVisible || settings.extraHolidays.includes(holiday.key));
+  settings.countries.includes(holiday.country) && !settings.hiddenHolidays.includes(holiday.key);
 
 /** Derived annotations never create editable copies of People or holiday records. */
 export function calendarObservances(birthdays: BirthdaySource[], holidays: HolidayDate[], settings: CalendarObservanceSettings, start: string, end: string, zone: string): EventOccurrence[] {

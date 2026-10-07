@@ -53,7 +53,7 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
                 hiddenHolidays: e.target.checked ? settings.hiddenHolidays.filter(x => x !== holiday.key) : [...new Set([...settings.hiddenHolidays, holiday.key])],
                 extraHolidays: e.target.checked ? [...new Set([...settings.extraHolidays, holiday.key])] : settings.extraHolidays.filter(x => x !== holiday.key),
               })} />
-              <time className={styles.holidayDate} dateTime={holiday.date}><span>{dateLabel(holiday.date, { month: "short" })}</span><strong>{Number(holiday.date.slice(-2))}</strong></time>
+              <time className={styles.holidayDate} dateTime={holiday.date}>{holiday.date.slice(5)}</time>
               <span className={styles.holidayName}><strong>{holiday.name}</strong><small>{holiday.type === "public" ? "Public holiday" : "Observance"}</small></span>
             </label>)}
             {!holidays.length && !loading && <p>No dates are available for this year. Add a custom date below.</p>}

@@ -49,3 +49,5 @@
 @media(max-width:760px) { .event { gap:3px; --avatar-size:18px; } .copy strong {font-size:10px;} }
 
 .event[data-continues-after] > svg:last-child {margin-left:auto;}
+
+.event > svg,.event > [data-event-objects] { color:var(--text-strong); }

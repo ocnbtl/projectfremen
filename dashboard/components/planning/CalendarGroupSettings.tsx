@@ -38,13 +38,13 @@ function GroupEditor({ calendar, onSave }: { calendar: Calendar; onSave: (calend
   return <form className={styles.groupSettings} aria-label="Manage color groups" onSubmit={event => { event.preventDefault(); void autosave.flush(); }}>
     <div className={styles.groupSettingsRows}>
       {groups.map((group, index) => <div className={styles.groupSettingsRow} key={group.id}>
+        <label aria-label="Group icon">
+          <SelectField aria-label={`Group ${index + 1} icon`} columns={6} triggerContent={<UnigentamosIcon role={group.icon} size={18} />} value={group.icon} menuClassName={`${styles.calendarChoiceMenu} ${styles.groupIconMenu}`} onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, icon: event.target.value } : item))}>
+            {[...new Set([...GROUP_ICONS, group.icon])].map(icon => <option key={icon} value={icon}><span className={styles.viewChoice}><UnigentamosIcon role={icon} size={16} /><span className="sr-only">{iconNames[icon] || icon}</span></span></option>)}
+          </SelectField>
+        </label>
         <label aria-label="Group name">
           <input aria-label={`Group ${index + 1} name`} required maxLength={80} value={group.name}  placeholder="Group name" onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, name: event.target.value } : item))} />
-        </label>
-        <label aria-label="Group icon">
-          <SelectField aria-label={`Group ${index + 1} icon`} value={group.icon}  menuClassName={styles.calendarChoiceMenu} onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, icon: event.target.value } : item))}>
-            {[...new Set([...GROUP_ICONS, group.icon])].map(icon => <option key={icon} value={icon}><span className={styles.viewChoice}><UnigentamosIcon role={icon} size={16} />{iconNames[icon] || icon}</span></option>)}
-          </SelectField>
         </label>
         <label aria-label="Group color">
           <input aria-label={`Group ${index + 1} color`} type="color" value={group.color}  onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, color: event.target.value } : item))} />

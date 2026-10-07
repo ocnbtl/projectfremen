@@ -1,3 +1,4 @@
+import { GROUP_ICONS } from "./calendar-groups";
 import { MAP_CATALOG, MAP_PALETTES } from "./map-catalog";
 import { normalizeAddressCountry, normalizeAddressParts } from "./place-address";
 import { createNativeObjectRef } from "../../native-objects/routes";
@@ -304,16 +305,7 @@ function normalizeGroups(value: unknown) {
       id,
       name: string(group.name, "Group name", 80, true),
       color,
-      icon: [
-        "briefcase",
-        "university",
-        "person",
-        "routine",
-        "travel",
-        "star",
-        "goal",
-        "users",
-      ].includes(group.icon)
+      icon: GROUP_ICONS.includes(group.icon)
         ? group.icon
         : "star",
     };
