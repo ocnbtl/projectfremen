@@ -298,6 +298,7 @@ export default function CalendarWorkspace() {
         addDays(targetDate, -1),
         addDays(targetDate, 2),
         zone,
+        snapshot?.birthdays,
       ).find((item) => item.occurrenceKey === occurrenceKey);
       if (!occurrence) {
         setError(
@@ -343,6 +344,7 @@ export default function CalendarWorkspace() {
           range.start,
           range.end,
           zone,
+          snapshot?.birthdays,
         ),
         error: "",
       };

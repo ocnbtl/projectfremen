@@ -83,6 +83,35 @@ async function check(label, run) {
   console.log(`PASS ${label}`);
 }
 (async () => {
+  await check("custom repeat interpretation, persistence, leap years and current birthdays", () => {
+    const {parseRepeatLanguage,anchoredDay}=require("../lib/modules/planning/repeat-language.ts");
+    const people=[{ref:{module:"people",objectType:"person",objectId:"jon",label:"Jonathan Marshall",route:"/admin/people/jon"},birthday:"--03-01"}];
+    const parse=text=>parseRepeatLanguage(text,people);
+    assert.equal(parse("repeat every 17 days").recurrence,"FREQ=DAILY;INTERVAL=17");
+    assert.equal(parse("every weekday").recurrence,"FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR");
+    assert.equal(parse("every last Friday").recurrence,"FREQ=MONTHLY;BYDAY=-1FR");
+    assert.equal(parse("every Monday and Thursday for 4 times").recurrence,"FREQ=WEEKLY;BYDAY=MO,TH;COUNT=4");
+    const halloween=parse("repeat every year 10 days before Halloween");
+    assert.equal(anchoredDay(halloween.recurrenceAnchor,2028),"2028-10-21");
+    assert.equal(anchoredDay(parse("every Halloween").recurrenceAnchor,2027),"2027-10-31");
+    const birthday=parse("repeat three days before Jonathan's birthday");
+    assert.equal(anchoredDay(birthday.recurrenceAnchor,2027,people),"2027-02-26");
+    assert.equal(anchoredDay(birthday.recurrenceAnchor,2028,people),"2028-02-27");
+    assert.equal(anchoredDay(birthday.recurrenceAnchor,2028,[{...people[0],birthday:"--03-02"}]),"2028-02-28");
+    assert.equal(anchoredDay(birthday.recurrenceAnchor,2028,[]),null);
+    assert.throws(()=>parseRepeatLanguage("three days before Jonathan's birthday",[...people,{...people[0],ref:{...people[0].ref,objectId:"jon2",label:"Jonathan Smith"}}]),/full name/);
+    assert.throws(()=>parse("every 0 days"));assert.throws(()=>parse("every year on February 30"));assert.throws(()=>parse("whenever I feel like it"));
+    const recurring=normalizePlanningRecord("events",event({...halloween,start:"2026-01-01T09:00",end:"2026-01-01T10:00"}));
+    assert.deepEqual(recurring.recurrenceAnchor,halloween.recurrenceAnchor);
+    assert.deepEqual(eventOccurrences([recurring],"2026-01-01","2029-01-01","UTC").map(e=>e.start.slice(0,10)),["2026-10-21","2027-10-21","2028-10-21"]);
+    const crossYear=event({...parse("3 days before New Year's Day"),start:"2026-01-01T09:00",end:"2026-01-01T10:00"});
+    assert.equal(eventOccurrences([crossYear],"2026-12-01","2027-01-01","UTC")[0].start.slice(0,10),"2026-12-29");
+    const recurringBirthday=event({...birthday,start:"2026-01-01T09:00",end:"2026-01-01T10:00"});
+    assert.equal(eventOccurrences([recurringBirthday],"2028-02-01","2028-03-10","UTC",people)[0].start.slice(0,10),"2028-02-27");
+    assert.equal(eventOccurrences([recurringBirthday],"2028-02-01","2028-03-10","UTC",[]).length,0);
+    assert.equal(normalizePlanningRecord("events",event({reminderMinutes:20160})).reminderMinutes,20160);
+    assert.throws(()=>normalizePlanningRecord("events",event({...halloween,recurrence:"FREQ=DAILY"})),/annual/);
+  });
   await check(
     "lightweight location validation stays separate from event time validation",
     () => {

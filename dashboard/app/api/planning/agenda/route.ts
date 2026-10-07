@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { repeatBirthdays } from "../../../../lib/modules/planning/repeat-birthdays";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import { readPlanningState } from "../../../../lib/modules/planning/store";
 import {
@@ -27,6 +28,7 @@ export async function GET(request: Request) {
       today,
       addDays(today, 1),
       zone,
+      await repeatBirthdays(state.events),
     )
       .filter((e) => visible.has(e.calendarId))
       .slice(0, 6);

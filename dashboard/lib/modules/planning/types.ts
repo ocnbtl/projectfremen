@@ -52,6 +52,7 @@ export type EventFields = {
   location: string;
   linkedRefs: NativeObjectRef[];
   recurrence: string;
+  recurrenceAnchor?: import("./repeat-language").RepeatAnchor | null;
   recurrenceDates?: string[];
   participants?: { name: string; email?: string }[];
   reminderMinutes: number | null;

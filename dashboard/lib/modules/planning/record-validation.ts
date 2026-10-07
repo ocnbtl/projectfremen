@@ -1,4 +1,5 @@
 import { GROUP_ICONS } from "./calendar-groups";
+import { validateRepeatAnchor } from "./repeat-language";
 import { MAP_CATALOG, MAP_PALETTES } from "./map-catalog";
 import { normalizeAddressCountry, normalizeAddressParts } from "./place-address";
 import { createNativeObjectRef } from "../../native-objects/routes";
@@ -97,6 +98,7 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       location: string(raw.location, "Location", 1400),
       linkedRefs: refs(raw.linkedRefs),
       recurrence: string(raw.recurrence, "Recurrence", 500),
+      recurrenceAnchor: validateRepeatAnchor(raw.recurrenceAnchor),
       kind: raw.kind === "time_block" ? "time_block" : "event",
       reminderMinutes:
         raw.reminderMinutes == null

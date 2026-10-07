@@ -1,8 +1,8 @@
 "use client";
 
 import * as Popover from "@radix-ui/react-popover";
-import { AnimatePresence, LayoutGroup, motion } from "motion/react";
-import { useId, useLayoutEffect, useRef, useState, type CSSProperties } from "react";
+import { AnimatePresence, LayoutGroup, motion, useIsPresent } from "motion/react";
+import { useId, useLayoutEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { moduleThemeVariables } from "../../lib/design-system/color-system";
 import { addDays, localDate, monthStart, shiftMonth, weekStart } from "../../lib/modules/planning/calendar-model";
 import { calendarWeekdays as weekdays } from "../../lib/calendar-week";
@@ -120,7 +120,8 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
             <button type="button" className={styles.arrow} aria-label={`Next ${mode === "days" ? "month" : "year"}`} onClick={() => move(1)}><UnigentamosIcon role="chevron-right" size={18} /></button>
           </header>
           <div className={styles.dateArea}>
-            <CalendarScene id={`${mode}-${page.slice(0, mode === "days" ? 7 : 4)}`} direction={direction}>
+            <AnimatePresence initial={false} custom={direction}>
+            <PickerSlide key={`${mode}-${page.slice(0,mode === "days" ? 7 : 4)}`} direction={direction} reduced={reduced}>
               {mode === "months" ? <div className={styles.months}>
                 {Array.from({ length: 12 }, (_, index) => {
                   const month = `${year}-${pad(index + 1)}-01`;
@@ -144,13 +145,13 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
                         if (next.length !== 10 || next < "0001-01-01" || next > "9999-12-31") return;
                         setDirection(next > date ? 1 : -1); pendingFocus.current = true; setPage(next); setFocused(next);
                       }}>
-                      {selected && <motion.span className={styles.selection} layoutId="selected-day" transition={layoutTransition} />}
+                      {selected && <span className={styles.selection} />}
                       <span className={styles.dayNumber}>{Number(date.slice(-2))}</span>
                     </button></div>;
                   })}
                 </div>)}
               </div>}
-            </CalendarScene>
+            </PickerSlide></AnimatePresence>
           </div>
           </div> : <section className={styles.timeArea} role="tabpanel" id={`${id}-time-panel`} aria-labelledby={`${id}-time-tab`}>
             <div className={styles.timeHeading}><span><UnigentamosIcon role="clock" size={15} />Time</span><small title={timeZone}>{timeZone.split("/").at(-1)?.replaceAll("_", " ")}</small></div>
@@ -179,4 +180,11 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
       </Popover.Content></Popover.Portal>
     </Popover.Root>
   </div>;
+}
+
+function PickerSlide({direction,reduced,children}: {direction:number;reduced:boolean;children:ReactNode}) {
+  const present=useIsPresent();
+  return <motion.div className={styles.dateSlide} custom={direction} inert={!present} aria-hidden={!present || undefined}
+    variants={{enter:(d:number)=>({x:reduced?0:d*18,opacity:reduced?1:0}),visible:{x:0,opacity:1},exit:(d:number)=>({x:reduced?0:d*-18,opacity:0})}}
+    initial="enter" animate="visible" exit="exit" transition={{duration:reduced?0:.28,ease:[.22,.61,.36,1]}}>{children}</motion.div>;
 }

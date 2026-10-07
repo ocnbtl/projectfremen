@@ -30,6 +30,7 @@ export function planningWritableKeys(collection: PlanningCollection): string[] {
       "location",
       "linkedRefs",
       "recurrence",
+      "recurrenceAnchor",
       "recurrenceDates",
       "participants",
       "reminderMinutes",

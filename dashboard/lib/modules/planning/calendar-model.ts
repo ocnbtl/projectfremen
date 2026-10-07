@@ -1,5 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import ICAL from "ical.js";
+import { anchoredDay, validateRepeatAnchor } from "./repeat-language";
+import type { BirthdaySource } from "./observances";
 import {
   effectiveEvent,
   type CalendarEvent,
@@ -37,6 +39,10 @@ export function shiftMonth(date: string, months: number): string {
 }
 
 export function validateEventTime(fields: EventFields): void {
+  if (fields.recurrenceAnchor) {
+    validateRepeatAnchor(fields.recurrenceAnchor);
+    if (fields.recurrence !== "FREQ=YEARLY") throw new Error("A date reference needs an annual repeat rule");
+  }
   if (
     fields.allDay &&
     (!/^\d{4}-\d{2}-\d{2}$/.test(fields.start) ||
@@ -71,6 +77,7 @@ export function eventOccurrences(
   from: string,
   to: string,
   displayZone: string,
+  birthdays?: BirthdaySource[],
 ): EventOccurrence[] {
   const low = instantFor(from, displayZone),
     high = instantFor(to, displayZone);
@@ -129,6 +136,17 @@ export function eventOccurrences(
         });
     };
     for (const date of event.recurrenceDates || []) add(date);
+    if (event.recurrenceAnchor) {
+      const firstYear = Math.max(1, Number(from.slice(0,4)) - Math.ceil(Math.abs(duration.total({unit:"days",relativeTo:Temporal.PlainDateTime.from(event.start.length===10 ? `${event.start}T00:00` : event.start)}))/365) - 2);
+      for (let year=firstYear; year<=Math.min(9999,Number(to.slice(0,4))+2); year++) {
+        const date=anchoredDay(event.recurrenceAnchor,year,birthdays);
+        if (!date) continue;
+        const key=date+(event.allDay?"":event.start.slice(10));
+        if (key>=event.start) add(key);
+      }
+      for (const [key,exception] of Object.entries(exceptions)) if (exception.start) add(key);
+      continue;
+    }
     if (!event.recurrence) {
       add(event.start);
       continue;

@@ -1,4 +1,5 @@
 import { readPersonalRecords } from "../../../../lib/personal-records-store";
+import { repeatBirthdays } from "../../../../lib/modules/planning/repeat-birthdays";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import { readPlanningState } from "../../../../lib/modules/planning/store";
@@ -22,8 +23,9 @@ export async function GET(request: Request) {
     const events = eventOccurrences(
       state.events,
       addDays(today, -30),
-      addDays(today, 2),
+      addDays(today, 31),
       zone,
+      await repeatBirthdays(state.events),
     );
     const records = events.some(e => e.linkedRefs.length) ? await readPersonalRecords().catch(() => []) : [];
     const reminders = events

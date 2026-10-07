@@ -75,3 +75,33 @@
 .editor .calendarSelect {width:max-content;max-width:48%;}
 .editor .calendarSelect > button {width:fit-content;min-width:0;}
 .editor .groups button {width:auto;min-height:26px;flex:0 1 auto;}
+
+/* Equal, tight optical spacing on both sides of the time separator. */
+.editor .segment[data-segment="hour"] { text-align:right; padding-right:1px; }
+.editor .segment[data-segment="minute"] { text-align:left; padding-left:1px; }
+.dateRow > div:first-child { flex:0 0 18px; width:18px; }
+.calendar { position:relative; align-items:center; height:120px; min-height:120px; flex:none; }
+.editor .calendarSelect { align-self:center; max-width:36%; }
+.calendarValue > span,.calendarOption > span { display:inline-block; width:14px; height:14px; border-radius:50%; flex:0 0 14px; }
+.calendarOption { display:inline-flex; align-items:center; gap:8px; }
+.groupArea { padding-top:20px; display:flex; align-items:center; gap:6px; height:100%; box-sizing:border-box; }
+.groupTrigger { flex:none; max-width:none; white-space:nowrap; font-size:11px; gap:4px; }
+.groupTrigger[aria-expanded="true"] svg:last-child { transform:rotate(180deg); }
+.groupPanel { flex:1; min-width:0; max-height:100px; overflow:auto; scrollbar-width:thin; }
+.groups { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; padding:2px; }
+.editor .groups button { justify-content:center; padding:4px 3px; gap:3px; min-width:0; white-space:nowrap; }
+.groups button svg { flex:none; width:12px; height:12px; }
+.groups button span { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.repeatArea { min-width:0; }
+.customRepeat { display:grid; gap:5px; margin:5px 0 0 24px; }
+.customRepeat small { font-size:11px; color:var(--text-secondary); line-height:1.5; }
+.repeatInput { display:flex; gap:6px; }
+.editor .repeatInput input { min-width:0; flex:1; font-size:12px; }
+.repeatInput button { width:auto; flex:none; font-size:12px; background:#59518b; color:white; }
+@media(max-width:700px) {
+  .calendar {height:180px;min-height:180px;align-items:flex-start;}
+  .editor .calendarSelect {align-self:flex-start;max-width:52%;}
+  .groupArea {height:60px;}
+  .groupPanel {position:absolute;left:0;right:0;top:70px;max-height:100px;}
+  .groups {grid-template-columns:repeat(3,minmax(0,1fr));}
+}
