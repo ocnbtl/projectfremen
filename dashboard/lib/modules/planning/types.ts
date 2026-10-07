@@ -17,7 +17,7 @@ export type Place = PlanningBase & {
   tags: string[];
   linkedRefs: NativeObjectRef[];
 };
-export type EventGroup = { id: string; name: string; color: string; icon: string };
+export type EventGroup = { id: string; name: string; color: string; icon: string; iconSource?: "auto" | "manual" };
 export type CalendarObservanceSettings = {
   birthdays: boolean;
   hiddenBirthdays?: string[];

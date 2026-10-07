@@ -310,6 +310,7 @@ function normalizeGroups(value: unknown) {
       icon: GROUP_ICONS.includes(group.icon)
         ? group.icon
         : "star",
+      ...(group.iconSource === "auto" || group.iconSource === "manual" ? { iconSource: group.iconSource } : {}),
     };
   });
 }

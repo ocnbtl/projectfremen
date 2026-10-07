@@ -1148,6 +1148,33 @@ async function check(label, run) {
     assert(!matchesChoiceSearch("York New", "New York", "ny")); // Legacy selectors retain contiguous matching.
     assert(matchesChoiceSearch("york", "New York", "ny"));
   });
+  await check("group names match icon meanings while manual choices survive renaming and persistence", async () => {
+    const { suggestGroupIcon, renameCalendarGroup } = require("../lib/modules/planning/group-icon-matching.ts");
+    const cases = [
+      ["Cleaning", "calendar-group-vacuum-cleaner"], ["Meditation", "calendar-group-yoga"],
+      ["Soccer", "calendar-group-ball-football"], ["Work", "briefcase"], ["My school", "university"],
+      ["Travel", "travel"], ["Dentist", "calendar-group-dental"], ["Scissors", "calendar-group-cut"],
+      ["Café", "interaction-catch-up"], ["Grocery shopping", "calendar-group-shopping-cart"],
+      ["Night shifts", "dormant"], ["Yoga", "calendar-group-yoga"], ["Running", "calendar-group-run"],
+      ["Family", "calendar-group-home-heart"], ["Birthday", "birthday"], ["Gym workouts", "calendar-group-barbell"],
+    ];
+    for (const [name, icon] of cases) assert.equal(suggestGroupIcon(name), icon, name);
+    for (const name of ["", "a", "New group", "My calendar", "Zqxv blorp", "ca"]) assert.equal(suggestGroupIcon(name), null, name);
+    const draft = { id: "autofill", name: "New group", color: "#59518B", icon: "star", iconSource: "auto" };
+    const auto = renameCalendarGroup(draft, "Cleaning");
+    assert.equal(auto.icon, "calendar-group-vacuum-cleaner");
+    assert.equal(renameCalendarGroup(auto, "Meditation").icon, "calendar-group-yoga");
+    assert.equal(renameCalendarGroup(auto, "Zqxv blorp").icon, "star");
+    const manual = { ...auto, icon: "star", iconSource: "manual" };
+    assert.equal(renameCalendarGroup(manual, "Meditation").icon, "star");
+    assert.equal(renameCalendarGroup({ ...draft, icon: "car", iconSource: undefined }, "Meditation").icon, "car");
+    const saved = await savePlanningRecord("calendars", { id: "group-icon-autofill", name: "Autofill QA", color: "#59518B", groups: [auto, { ...manual, id: "manual" }] });
+    const reopened = (await readPlanningState()).calendars.find(item => item.id === saved.id);
+    assert.equal(reopened.groups[0].iconSource, "auto");
+    assert.equal(renameCalendarGroup(reopened.groups[0], "Meditation").icon, "calendar-group-yoga");
+    assert.equal(reopened.groups[1].iconSource, "manual");
+    assert.equal(renameCalendarGroup(reopened.groups[1], "Meditation").icon, "star");
+  });
   await check("country holidays retain calendar dates, observed dates and individual visibility", () => {
     const { holidayCatalog } = require("../lib/modules/planning/holiday-catalog.ts");
     const { calendarObservances, defaultObservances } = require("../lib/modules/planning/observances.ts");
