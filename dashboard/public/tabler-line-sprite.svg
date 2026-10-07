@@ -934,6 +934,13 @@
     <path d="M9.183 6.117a6 6 0 1 0 4.511 3.986" />
       <path d="M14.813 17.883a6 6 0 1 0 -4.496 -3.954" />
   </symbol>
+  <symbol id="tabler-cleaning-broom" viewBox="0 0 24 24">
+    <path d="M15 3l-4 9" />
+    <path d="M8 11l6 3" />
+    <path d="M8 11c-1 4 -2 6 -5 8c3 2 7 3 10 1c-1 -3 -1 -5 1 -6" />
+    <path d="M8 16l-2 4" />
+    <path d="M10 17l-1 4" />
+  </symbol>
   <symbol id="tabler-click" viewBox="0 0 24 24">
     <path d="M3 12l3 0" />
       <path d="M12 3l0 3" />
@@ -1901,6 +1908,14 @@
   </symbol>
   <symbol id="tabler-medical-cross" viewBox="0 0 24 24">
     <path d="M13 3a1 1 0 0 1 1 1v4.535l3.928 -2.267a1 1 0 0 1 1.366 .366l1 1.732a1 1 0 0 1 -.366 1.366l-3.927 2.268l3.927 2.269a1 1 0 0 1 .366 1.366l-1 1.732a1 1 0 0 1 -1.366 .366l-3.928 -2.269v4.536a1 1 0 0 1 -1 1h-2a1 1 0 0 1 -1 -1v-4.536l-3.928 2.268a1 1 0 0 1 -1.366 -.366l-1 -1.732a1 1 0 0 1 .366 -1.366l3.927 -2.268l-3.927 -2.268a1 1 0 0 1 -.366 -1.366l1 -1.732a1 1 0 0 1 1.366 -.366l3.928 2.267v-4.535a1 1 0 0 1 1 -1h2" />
+  </symbol>
+  <symbol id="tabler-meditation-seated" viewBox="0 0 24 24">
+    <path d="M10 5a2 2 0 1 0 4 0a2 2 0 1 0 -4 0" />
+    <path d="M9 14v-3a3 3 0 0 1 6 0v3" />
+    <path d="M9 11l-3 5H3" />
+    <path d="M15 11l3 5h3" />
+    <path d="M8 16l8 4H6a2 2 0 0 1 -1 -3l2 -1" />
+    <path d="M16 16l3 1a2 2 0 0 1 -1 3h-2" />
   </symbol>
   <symbol id="tabler-menu" viewBox="0 0 24 24">
     <path d="M4 8l16 0" />

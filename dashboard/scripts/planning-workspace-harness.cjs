@@ -1138,6 +1138,11 @@ async function check(label, run) {
     }
     for (const query of ["dentist", "school pickup", "night shift", "taxes", "pilates", "camper", "visa", "DMV", "caregiver", "podcast", "harvest", "usability", "recycling", "café", "1:1"])
       assert(GROUP_ICON_CATALOG.some(icon => matchesChoiceSearch(query, icon.label, icon.role, icon.keywords)), `No icon for ${query}`);
+    for (const [query, role] of [["scissors", "calendar-group-cut"], ["tooth", "calendar-group-dental"], ["megaphone", "calendar-group-speakerphone"], ["seated lotus", "calendar-group-yoga"], ["sweeping broom", "calendar-group-vacuum-cleaner"], ["piggy bank", "piggy-bank"], ["hourglass", "calendar-group-hourglass"], ["head and shoulders", "person"]]) {
+      const icon = GROUP_ICON_CATALOG.find(item => item.role === role);
+      const entry = registry.find(item => item.id === role);
+      assert(matchesChoiceSearch(query, icon.label, icon.role, `${entry.defaultCandidate} ${icon.description} ${icon.keywords}`), `Missing visual search: ${query}`);
+    }
     assert(matchesChoiceSearch("tax preparation", "Tax preparation", "tax", "taxes accounting"));
     assert(!matchesChoiceSearch("tax swimming", "Tax preparation", "tax", "taxes accounting"));
     assert(!matchesChoiceSearch("York New", "New York", "ny")); // Legacy selectors retain contiguous matching.

@@ -1,14 +1,15 @@
 "use client";
 
 import useCalendarAutosave from "./useCalendarAutosave";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Calendar, EventGroup } from "../../lib/modules/planning/types";
 import { calendarGroups, GROUP_ICON_CATALOG } from "../../lib/modules/planning/calendar-groups";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
-import { getIconEntry } from "../../lib/icons/icon-registry";
+import { candidateLabel, getIconEntry, isIconCandidate } from "../../lib/icons/icon-registry";
+import { useIconSelections } from "../icons/IconSystemProvider";
 import styles from "./CalendarWorkspace.module.css";
 
 
@@ -32,6 +33,15 @@ export default function CalendarGroupSettings({ calendars, busy, onSave }: {
 }
 
 function GroupEditor({ calendar, onSave }: { calendar: Calendar; onSave: (calendar: Calendar, groups: EventGroup[]) => Promise<boolean> }) {
+  const selections = useIconSelections();
+  const [iconColumns, setIconColumns] = useState(8);
+  useEffect(() => {
+    const screen = window.matchMedia("(max-width: 600px)");
+    const resize = () => setIconColumns(screen.matches ? 6 : 8);
+    resize();
+    screen.addEventListener("change", resize);
+    return () => screen.removeEventListener("change", resize);
+  }, []);
   const [groups, setGroups] = useState(() => calendarGroups(calendar).map(group => ({ ...group })));
   const autosave = useCalendarAutosave<EventGroup[]>(value => onSave(calendar, value), value => value.every(group => Boolean(group.name.trim())));
   const updateGroups = (update: (groups: EventGroup[]) => EventGroup[]) => { const next = update(groups); setGroups(next); autosave.schedule(next); };
@@ -39,8 +49,13 @@ function GroupEditor({ calendar, onSave }: { calendar: Calendar; onSave: (calend
     <div className={styles.groupSettingsRows}>
       {groups.map((group, index) => <div className={styles.groupSettingsRow} key={group.id}>
         <label aria-label="Group icon">
-          <SelectField aria-label={`Group ${index + 1} icon`} searchable autoFocusSearch={false} contained columns={6} triggerContent={<UnigentamosIcon role={group.icon} size={18} />} value={group.icon} menuClassName={`${styles.calendarChoiceMenu} ${styles.groupIconMenu}`} onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, icon: event.target.value } : item))}>
-            {[...GROUP_ICON_CATALOG, ...(!GROUP_ICON_CATALOG.some(icon => icon.role === group.icon) ? [{ role: group.icon, label: getIconEntry(group.icon).label, keywords: "" }] : [])].map(icon => <option key={icon.role} value={icon.role} title={icon.label} data-search={icon.keywords}><span className={styles.viewChoice}><UnigentamosIcon role={icon.role} size={16} /><span className="sr-only">{icon.label}</span></span></option>)}
+          <SelectField aria-label={`Group ${index + 1} icon`} searchable autoFocusSearch={false} contained columns={iconColumns} triggerContent={<UnigentamosIcon role={group.icon} size={18} />} value={group.icon} menuClassName={`${styles.calendarChoiceMenu} ${styles.groupIconMenu}`} onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, icon: event.target.value } : item))}>
+            {[...GROUP_ICON_CATALOG, ...(!GROUP_ICON_CATALOG.some(icon => icon.role === group.icon) ? [{ role: group.icon, label: getIconEntry(group.icon).label, keywords: "", description: "" }] : [])].map(icon => {
+              const entry = getIconEntry(icon.role);
+              const candidate = isIconCandidate(icon.role, selections[icon.role]) ? selections[icon.role] : entry.defaultCandidate;
+              const iconName = candidateLabel(candidate);
+              return <option key={icon.role} value={icon.role} title={`${icon.label} · ${iconName}${icon.description ? ` — ${icon.description}` : ""}`} data-search={`${iconName} ${icon.description} ${icon.keywords}`}><span className={styles.viewChoice}><UnigentamosIcon role={icon.role} size={22} /><span className="sr-only">{icon.label}</span></span></option>;
+            })}
           </SelectField>
         </label>
         <label aria-label="Group name">

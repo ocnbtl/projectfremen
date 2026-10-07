@@ -27,12 +27,14 @@ const symbols = [];
 
 for (const candidate of candidates) {
   const custom = customIcons[candidate];
-  const source = await readFile(path.join(iconDirectory, `${custom?.source || candidate}.svg`), "utf8");
+  const source = custom?.paths
+    ? `<svg>${custom.paths.map(geometry => `<path d="${geometry}" />`).join("\n")}</svg>`
+    : await readFile(path.join(iconDirectory, `${custom?.source || candidate}.svg`), "utf8");
   const match = source.match(/<svg[^>]*>([\s\S]*?)<\/svg>/i);
   if (!match) throw new Error(`Tabler SVG ${candidate} could not be parsed`);
   const body = match[1]
     .replace(/<path\s+stroke="none"\s+d="M0 0h24v24H0z"\s+fill="none"\s*\/>/i, "")
-    .replace(/<path\s+d="([^"]+)"\s*\/>/g, (path, geometry) => custom?.omitPaths.includes(geometry) ? "" : path)
+    .replace(/<path\s+d="([^"]+)"\s*\/>/g, (path, geometry) => custom?.omitPaths?.includes(geometry) ? "" : path)
     .trim();
   symbols.push(`  <symbol id="tabler-${candidate}" viewBox="0 0 24 24">\n    ${body.replace(/\n/g, "\n    ")}\n  </symbol>`);
 }

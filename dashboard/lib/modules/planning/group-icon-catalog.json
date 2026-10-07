@@ -2,1116 +2,1339 @@
   {
     "role": "briefcase",
     "label": "Occupation",
-    "keywords": "business development prospecting"
+    "keywords": "business development prospecting suitcase business job career office employment",
+    "description": "Work bag with handle"
   },
   {
     "role": "university",
     "label": "School and learning",
-    "keywords": "customer training enablement lectures class lecture school"
+    "keywords": "customer training enablement lectures class lecture school education campus academy classroom college university studying",
+    "description": "School building with a flag"
   },
   {
     "role": "person",
     "label": "Person",
-    "keywords": ""
+    "keywords": "human individual profile contact self portrait avatar",
+    "description": "Person head and shoulders"
   },
   {
     "role": "routine",
     "label": "Recurring routines",
-    "keywords": "subscription reviews recurring review"
+    "keywords": "subscription reviews recurring review recurring cycle again routine habit repetition refresh",
+    "description": "Looping arrows"
   },
   {
     "role": "travel",
     "label": "World and time zones",
-    "keywords": "time zone coordination timezone international travel"
+    "keywords": "time zone coordination timezone international travel earth planet global international geography travel",
+    "description": "Globe with latitude and longitude"
   },
   {
     "role": "star",
     "label": "Star",
-    "keywords": ""
+    "keywords": "favorite favourite important highlight rating special",
+    "description": "Five pointed star"
   },
   {
     "role": "goal",
     "label": "Goal",
-    "keywords": ""
+    "keywords": "bullseye aim objective goal achievement milestone",
+    "description": "Arrow hitting a target"
   },
   {
     "role": "users",
     "label": "People group",
-    "keywords": "group projects project collaboration"
+    "keywords": "group projects project collaboration friends team family group together social colleagues",
+    "description": "Two people"
   },
   {
     "role": "reminder",
     "label": "Reminder",
-    "keywords": ""
+    "keywords": "alarm notification alert reminder chime",
+    "description": "Ringing bell"
   },
   {
     "role": "module-projects",
     "label": "Projects",
-    "keywords": ""
+    "keywords": "project workflow tasks planning progress kanban board",
+    "description": "Columns on a task board"
   },
   {
     "role": "module-notes",
     "label": "Notes",
-    "keywords": ""
+    "keywords": "memo sticky note notepad writing reminder",
+    "description": "Square note with folded corner"
   },
   {
     "role": "module-media",
     "label": "Media",
-    "keywords": "portfolio updates showcase"
+    "keywords": "portfolio updates showcase image picture gallery scenery photograph visual",
+    "description": "Landscape photograph"
   },
   {
     "role": "module-resources",
     "label": "Resources",
-    "keywords": "library visits reading books"
+    "keywords": "library visits reading books library reading literature reference studying learning",
+    "description": "Stack of books"
   },
   {
     "role": "module-finance",
     "label": "Finance",
-    "keywords": "investment reviews investments portfolio stocks"
+    "keywords": "investment reviews investments portfolio stocks trend analytics graph growth finances performance",
+    "description": "Rising line chart"
   },
   {
     "role": "birthday",
     "label": "Birthday",
-    "keywords": "birthdays birthday party celebration"
+    "keywords": "birthdays birthday party celebration celebration dessert baking anniversary birthday party",
+    "description": "Birthday cake with candles"
   },
   {
     "role": "location",
     "label": "Location",
-    "keywords": "site visits visit inspection location"
+    "keywords": "site visits visit inspection location pin destination address place position navigation",
+    "description": "Location marker"
   },
   {
     "role": "organization",
     "label": "Organization",
-    "keywords": "community meetings neighborhood meeting"
+    "keywords": "community meetings neighborhood meeting community company organization neighbourhood neighborhood town",
+    "description": "Group of buildings"
   },
   {
     "role": "clock",
     "label": "Time",
-    "keywords": ""
+    "keywords": "time watch hour duration schedule appointment",
+    "description": "Clock face with hands"
   },
   {
     "role": "interaction-milestone",
     "label": "Milestone interaction",
-    "keywords": ""
+    "keywords": "milestone marker checkpoint finish achievement",
+    "description": "Flag on a pole"
   },
   {
     "role": "hometown",
     "label": "Hometown",
-    "keywords": ""
+    "keywords": "household residence dwelling hometown domestic property",
+    "description": "House with roof"
   },
   {
     "role": "partner",
     "label": "Partnership and care",
-    "keywords": "partnership calls partner alliance caregiver shifts respite coverage"
+    "keywords": "partnership calls partner alliance caregiver shifts respite coverage agreement friendship partnership care support trust",
+    "description": "Hands joined beneath a heart"
   },
   {
     "role": "active",
     "label": "Active",
-    "keywords": ""
+    "keywords": "health fitness activity vital signs pulse rhythm",
+    "description": "Heartbeat pulse line"
   },
   {
     "role": "dormant",
     "label": "Dormant",
-    "keywords": "night shifts shift overnight roster"
+    "keywords": "night shifts shift overnight roster night sleep rest evening lunar quiet",
+    "description": "Crescent moon"
   },
   {
     "role": "dog",
     "label": "Pets and animals",
-    "keywords": "animal care pet vet"
+    "keywords": "animal care pet vet pet dog cat puppy kitten animal veterinarian",
+    "description": "Animal paw print"
   },
   {
     "role": "walk",
     "label": "Walk",
-    "keywords": ""
+    "keywords": "walking stroll pedestrian steps movement commute",
+    "description": "Walking person"
   },
   {
     "role": "feed",
     "label": "Meals",
-    "keywords": ""
+    "keywords": "meal food eating breakfast lunch dinner cereal",
+    "description": "Bowl and spoon"
   },
   {
     "role": "droplet",
     "label": "Water",
-    "keywords": ""
+    "keywords": "water hydration rain fluid drinking shower",
+    "description": "Drop of liquid"
   },
   {
     "role": "car",
     "label": "Car",
-    "keywords": "road trips trip driving car"
+    "keywords": "road trips trip driving car automobile driving vehicle taxi commute road",
+    "description": "Car viewed from the front"
   },
   {
     "role": "travel-van",
     "label": "Travel by van",
-    "keywords": "camper trips van rv trip"
+    "keywords": "camper trips van rv trip van RV motorhome camping caravan road trip",
+    "description": "Camper van"
   },
   {
     "role": "travel-plane",
     "label": "Travel by plane",
-    "keywords": "flights flight airport plane"
+    "keywords": "flights flight airport plane aircraft flight flying airport aviation travel",
+    "description": "Airplane"
   },
   {
     "role": "travel-train",
     "label": "Travel by train",
-    "keywords": "train journeys railway rail"
+    "keywords": "train journeys railway rail rail railway subway metro transit locomotive",
+    "description": "Train engine"
   },
   {
     "role": "travel-boat",
     "label": "Travel by boat",
-    "keywords": "boat travel ferry cruise sailing"
+    "keywords": "boat travel ferry cruise sailing vessel cruise ferry sailing sea ocean boat",
+    "description": "Boat on water"
   },
   {
     "role": "travel-bus",
     "label": "Travel by bus",
-    "keywords": "school trips field trip excursion"
+    "keywords": "school trips field trip excursion coach shuttle public transport transit schoolbus",
+    "description": "Passenger bus"
   },
   {
     "role": "travel-bike",
     "label": "Travel by bike",
-    "keywords": "cycling rides bicycle ride"
+    "keywords": "cycling rides bicycle ride cycling cycle pedal biking exercise commute",
+    "description": "Bicycle"
   },
   {
     "role": "module-map",
     "label": "Map",
-    "keywords": ""
+    "keywords": "navigation route directions geography itinerary exploration",
+    "description": "Folded map"
   },
   {
     "role": "module-personal",
     "label": "Personal",
-    "keywords": "social checkins checkin companion loneliness"
+    "keywords": "social checkins checkin companion loneliness personal self care affection wellbeing wellness",
+    "description": "Person with heart"
   },
   {
     "role": "module-reviews",
     "label": "Reviews",
-    "keywords": ""
+    "keywords": "review checklist audit approval completed inspection",
+    "description": "Clipboard with check mark"
   },
   {
     "role": "module-vault",
     "label": "Vault",
-    "keywords": ""
+    "keywords": "security protection privacy vault safe confidential",
+    "description": "Shield with padlock"
   },
   {
     "role": "build",
     "label": "Personal build",
-    "keywords": ""
+    "keywords": "build layers structure stack overlap design",
+    "description": "Stacked layers"
   },
   {
     "role": "palette",
     "label": "Art and design",
-    "keywords": "design reviews visual art review"
+    "keywords": "design reviews visual art review painting colors colours art creativity design",
+    "description": "Artist paint palette"
   },
   {
     "role": "component",
     "label": "Component",
-    "keywords": ""
+    "keywords": "component parts pieces modular blocks assembly",
+    "description": "Interlocking geometric pieces"
   },
   {
     "role": "motion",
     "label": "Motion",
-    "keywords": ""
+    "keywords": "wave oscillation rhythm motion signal sound frequency",
+    "description": "Smooth wave"
   },
   {
     "role": "photo-camera",
     "label": "Photography",
-    "keywords": "local sightseeing tourism photos photo shoots photography shoot"
+    "keywords": "local sightseeing tourism photos photo shoots photography shoot photography photo picture shoot snapshot recording",
+    "description": "Camera with lens"
   },
   {
     "role": "interaction-memory",
     "label": "Memory interaction",
-    "keywords": ""
+    "keywords": "memories keepsake favorite favourite scrapbook nostalgia",
+    "description": "Photograph with heart"
   },
   {
     "role": "interaction-note",
     "label": "Note interaction",
-    "keywords": "writing sessions script copy drafting"
+    "keywords": "writing sessions script copy drafting writing drawing sketch editing notes draft",
+    "description": "Writing pencil"
   },
   {
     "role": "interaction-catch-up",
     "label": "Catch-up interaction",
-    "keywords": " cafe coffee catchup"
+    "keywords": " cafe coffee catchup mug drink caffeine cafe café tea break meeting",
+    "description": "Coffee cup"
   },
   {
     "role": "interaction-meeting",
     "label": "Meeting interaction",
-    "keywords": "team meetings standup sync meeting colleagues"
+    "keywords": "team meetings standup sync meeting colleagues team community gathering meeting crowd collaboration",
+    "description": "Group of people"
   },
   {
     "role": "interaction-call",
     "label": "Call interaction",
-    "keywords": "discovery calls client call"
+    "keywords": "discovery calls client call call telephone conversation contact ringing",
+    "description": "Telephone handset with signal"
   },
   {
     "role": "interaction-message",
     "label": "Message interaction",
-    "keywords": "audience engagement comments community"
+    "keywords": "audience engagement comments community chat conversation text message talking communication",
+    "description": "Speech bubble"
   },
   {
     "role": "email",
     "label": "Email",
-    "keywords": "email catchup inbox correspondence"
+    "keywords": "email catchup inbox correspondence email letter post correspondence inbox newsletter",
+    "description": "Envelope"
   },
   {
     "role": "website",
     "label": "Website",
-    "keywords": ""
+    "keywords": "website internet online browser web domain",
+    "description": "Globe with web lettering"
   },
   {
     "role": "relationship-map",
     "label": "Relationships",
-    "keywords": "professional networking connections referrals"
+    "keywords": "professional networking connections referrals network connections relationships hierarchy referral partnership",
+    "description": "Connected nodes"
   },
   {
     "role": "industry",
     "label": "Industry",
-    "keywords": ""
+    "keywords": "industry manufacturing production warehouse plant industrial",
+    "description": "Factory building"
   },
   {
     "role": "wallet",
     "label": "Wallet",
-    "keywords": "budget reviews spending review"
+    "keywords": "budget reviews spending review money cash spending budget purse payment",
+    "description": "Wallet"
   },
   {
     "role": "piggy-bank",
     "label": "Savings",
-    "keywords": "savings planning saving emergency fund"
+    "keywords": "savings planning saving emergency fund pig savings saving budget coins finance",
+    "description": "Piggy bank"
   },
   {
     "role": "credit-card",
     "label": "Credit card",
-    "keywords": "bill payments bills payment utilities"
+    "keywords": "bill payments bills payment utilities payment debit credit purchase subscription banking",
+    "description": "Bank card"
   },
   {
     "role": "banknote",
     "label": "Banknote",
-    "keywords": ""
+    "keywords": "cash money currency bill payment income salary",
+    "description": "Paper banknote"
   },
   {
     "role": "life-dream",
     "label": "Life dream",
-    "keywords": ""
+    "keywords": "dawn morning sunrise new beginning dream aspiration",
+    "description": "Sun rising over horizon"
   },
   {
     "role": "sparkles",
     "label": "Enhance",
-    "keywords": ""
+    "keywords": "shine sparkle magic clean polish enhance special",
+    "description": "Sparkling stars"
   },
   {
     "role": "resource",
     "label": "Resource",
-    "keywords": "documentation writing docs"
+    "keywords": "documentation writing docs file paper document text report article resource",
+    "description": "Document with lines"
   },
   {
     "role": "object",
     "label": "Object",
-    "keywords": ""
+    "keywords": "box object block geometry package container",
+    "description": "Three dimensional cube"
   },
   {
     "role": "password",
     "label": "Password",
-    "keywords": ""
+    "keywords": "password access unlock lock security entry",
+    "description": "Key"
   },
   {
     "role": "review",
     "label": "Review",
-    "keywords": ""
+    "keywords": "done complete approved verified success tick checkmark",
+    "description": "Check mark in circle"
   },
   {
     "role": "timeline",
     "label": "Timeline",
-    "keywords": ""
+    "keywords": "history sequence chronology schedule milestones",
+    "description": "Connected timeline points"
   },
   {
     "role": "follow-up",
     "label": "Follow-up",
-    "keywords": ""
+    "keywords": "followup follow up reply next return response",
+    "description": "Forward curved arrow"
   },
   {
     "role": "decision",
     "label": "Decision",
-    "keywords": ""
+    "keywords": "decision alternative fork choice direction path",
+    "description": "Branching route"
   },
   {
     "role": "calendar-group-focus-2",
     "label": "Deep work",
-    "keywords": "deep work focus concentration quiet block"
+    "keywords": "deep work focus concentration quiet block concentration focus deep work attention center target",
+    "description": "Focus crosshair"
   },
   {
     "role": "interaction-history",
     "label": "Interaction history",
-    "keywords": "one to ones 1:1 manager check in"
+    "keywords": "one to ones 1:1 manager check in conversation discussion chat history messages",
+    "description": "Overlapping speech bubbles"
   },
   {
     "role": "calendar-group-presentation",
     "label": "Presentations",
-    "keywords": "presentations slides demo speaking"
+    "keywords": "presentations slides demo speaking slides talk lecture pitch screen presentation",
+    "description": "Presentation board"
   },
   {
     "role": "calendar-group-calendar-stats",
     "label": "Planning sessions",
-    "keywords": "planning sessions priorities roadmap"
+    "keywords": "planning sessions priorities roadmap planning schedule metrics monthly review statistics",
+    "description": "Calendar with chart"
   },
   {
     "role": "calendar-group-microscope",
     "label": "Research blocks",
-    "keywords": "research blocks investigation discovery"
+    "keywords": "research blocks investigation discovery research science biology investigation laboratory magnification",
+    "description": "Microscope"
   },
   {
     "role": "calendar-group-git-branch",
     "label": "Decision reviews",
-    "keywords": "decision reviews choices options"
+    "keywords": "decision reviews choices options branch fork version decision tree programming",
+    "description": "Branching lines with nodes"
   },
   {
     "role": "calendar-group-tools-kitchen-2",
     "label": "Lunch breaks",
-    "keywords": "lunch breaks break meal restaurant reservations dining reservation"
+    "keywords": "lunch breaks break meal restaurant reservations dining reservation cutlery utensils restaurant dining eating meal food",
+    "description": "Fork and knife"
   },
   {
     "role": "calendar-group-chess",
     "label": "Strategy planning",
-    "keywords": "strategy planning vision business"
+    "keywords": "strategy planning vision business strategy chess game tactics planning competition",
+    "description": "Chess piece"
   },
   {
     "role": "calendar-group-building-bank",
     "label": "Banking and institutions",
-    "keywords": "investor meetings fundraising capital government appointments dmv municipal appointment"
+    "keywords": "investor meetings fundraising capital government appointments dmv municipal appointment bank finance institution government courthouse treasury",
+    "description": "Bank building with columns"
   },
   {
     "role": "calendar-group-user-search",
     "label": "Hiring interviews",
-    "keywords": "hiring interviews interview recruitment"
+    "keywords": "hiring interviews interview recruitment recruiting hiring interview candidate finding people",
+    "description": "Person with magnifying glass"
   },
   {
     "role": "calendar-group-rocket",
     "label": "Product launches",
-    "keywords": "product launches launch release startup"
+    "keywords": "product launches launch release startup launch startup space takeoff growth innovation",
+    "description": "Rocket ship"
   },
   {
     "role": "calendar-group-settings",
     "label": "Operations reviews",
-    "keywords": "operations reviews process systems"
+    "keywords": "operations reviews process systems settings configuration maintenance operations machinery adjustment",
+    "description": "Gear cog"
   },
   {
     "role": "calendar-group-ear",
     "label": "Customer discovery",
-    "keywords": "customer discovery listen research"
+    "keywords": "customer discovery listen research listening hearing audio accessibility feedback discovery",
+    "description": "Human ear"
   },
   {
     "role": "calendar-group-building-skyscraper",
     "label": "Board meetings",
-    "keywords": "board meetings executive leadership"
+    "keywords": "board meetings executive leadership skyscraper corporate tower city office headquarters",
+    "description": "Tall office building"
   },
   {
     "role": "calendar-group-chart-pie",
     "label": "Runway reviews",
-    "keywords": "runway reviews budget allocation"
+    "keywords": "runway reviews budget allocation proportion breakdown share statistics budget distribution",
+    "description": "Pie chart"
   },
   {
     "role": "calendar-group-compass",
     "label": "Company offsites",
-    "keywords": "company offsites offsite retreat direction"
+    "keywords": "company offsites offsite retreat direction direction orientation exploration adventure navigation",
+    "description": "Compass needle"
   },
   {
     "role": "calendar-group-file-pencil",
     "label": "Proposal writing",
-    "keywords": "proposal writing scope quote"
+    "keywords": "proposal writing scope quote proposal writing drafting editing paperwork application",
+    "description": "Document and pencil"
   },
   {
     "role": "calendar-group-chalkboard",
     "label": "Client workshops",
-    "keywords": "client workshops workshop facilitation"
+    "keywords": "client workshops workshop facilitation whiteboard blackboard teaching workshop brainstorming lessons",
+    "description": "Writing board"
   },
   {
     "role": "calendar-group-hourglass",
     "label": "Billable work",
-    "keywords": "billable work timesheet hours"
+    "keywords": "billable work timesheet hours timer waiting duration deadline time billable",
+    "description": "Sand timer"
   },
   {
     "role": "calendar-group-package-export",
     "label": "Client delivery",
-    "keywords": "client delivery deliverable handoff"
+    "keywords": "client delivery deliverable handoff package parcel shipment delivery dispatch export",
+    "description": "Box with outward arrow"
   },
   {
     "role": "calendar-group-receipt",
     "label": "Invoice followups",
-    "keywords": "invoice followups billing payment"
+    "keywords": "invoice followups billing payment invoice bill expenses purchase payment accounting",
+    "description": "Itemized receipt"
   },
   {
     "role": "calendar-group-signature",
     "label": "Contract renewals",
-    "keywords": "contract renewals signing renewal"
+    "keywords": "contract renewals signing renewal sign contract agreement autograph approval legal",
+    "description": "Handwritten signature"
   },
   {
     "role": "send",
     "label": "Send",
-    "keywords": "prospect outreach sales"
+    "keywords": "prospect outreach sales send dispatch message delivery outgoing submit",
+    "description": "Paper airplane"
   },
   {
     "role": "calendar-group-device-desktop",
     "label": "Sales demos",
-    "keywords": "sales demos demo walkthrough product"
+    "keywords": "sales demos demo walkthrough product desktop screen display computer workstation demo",
+    "description": "Computer monitor"
   },
   {
     "role": "filter",
     "label": "Filter",
-    "keywords": "pipeline reviews funnel leads"
+    "keywords": "pipeline reviews funnel leads filter sort refine narrow selection criteria",
+    "description": "Funnel"
   },
   {
     "role": "calendar-group-arrows-exchange",
     "label": "Negotiations",
-    "keywords": "negotiations negotiate negotiation exchange"
+    "keywords": "negotiations negotiate negotiation exchange exchange negotiation swap trade transaction transfer",
+    "description": "Opposing exchange arrows"
   },
   {
     "role": "calendar-group-door-enter",
     "label": "Customer onboarding",
-    "keywords": "customer onboarding welcome kickoff"
+    "keywords": "customer onboarding welcome kickoff enter arrival access onboarding welcome admission",
+    "description": "Arrow entering doorway"
   },
   {
     "role": "calendar-group-user-check",
     "label": "Account reviews",
-    "keywords": "account reviews customer review"
+    "keywords": "account reviews customer review verified person approval account review attendance",
+    "description": "Person with check mark"
   },
   {
     "role": "calendar-group-refresh",
     "label": "Renewal conversations",
-    "keywords": "renewal conversations retention renew"
+    "keywords": "renewal conversations retention renew renew reload refresh update rotation repeat",
+    "description": "Circular refresh arrows"
   },
   {
     "role": "calendar-group-headset",
     "label": "Support coverage",
-    "keywords": "support coverage helpdesk customer service"
+    "keywords": "support coverage helpdesk customer service support helpdesk call center audio customer service",
+    "description": "Headphones with microphone"
   },
   {
     "role": "alert",
     "label": "Alert",
-    "keywords": "escalation handling urgent incident"
+    "keywords": "escalation handling urgent incident warning caution alert danger hazard important",
+    "description": "Warning triangle"
   },
   {
     "role": "calendar-group-book-2",
     "label": "Study sessions",
-    "keywords": "study sessions studying homework"
+    "keywords": "study sessions studying homework reading textbook study education novel literature",
+    "description": "Closed book"
   },
   {
     "role": "calendar-group-pencil-question",
     "label": "Exams",
-    "keywords": "exams exam test quiz"
+    "keywords": "exams exam test quiz exam quiz test assessment question writing",
+    "description": "Pencil with question mark"
   },
   {
     "role": "calendar-group-file-check",
     "label": "Assignment deadlines",
-    "keywords": "assignment deadlines deadline submission"
+    "keywords": "assignment deadlines deadline submission assignment submission deadline approved completed paperwork",
+    "description": "Document with check mark"
   },
   {
     "role": "calendar-group-flask",
     "label": "Lab sessions",
-    "keywords": "lab sessions experiment laboratory"
+    "keywords": "lab sessions experiment laboratory science chemistry experiment laboratory research liquid",
+    "description": "Laboratory flask"
   },
   {
     "role": "calendar-group-door",
     "label": "Office hours",
-    "keywords": "office hours professor"
+    "keywords": "office hours professor door entrance exit access room office hours",
+    "description": "Doorway"
   },
   {
     "role": "calendar-group-language",
     "label": "Language practice",
-    "keywords": "language practice vocabulary conversation"
+    "keywords": "language practice vocabulary conversation language translate translation multilingual vocabulary practice",
+    "description": "Translation characters"
   },
   {
     "role": "calendar-group-certificate",
     "label": "Graduation milestones",
-    "keywords": "graduation milestones diploma certification"
+    "keywords": "graduation milestones diploma certification diploma qualification award graduation credential recognition",
+    "description": "Certificate with seal"
   },
   {
     "role": "calendar-group-notebook",
     "label": "Lesson preparation",
-    "keywords": "lesson preparation planning"
+    "keywords": "lesson preparation planning journal notebook lessons notes writing school stationery",
+    "description": "Spiral notebook"
   },
   {
     "role": "calendar-group-chalkboard-teacher",
     "label": "Classroom teaching",
-    "keywords": "classroom teaching instruction"
+    "keywords": "classroom teaching instruction teaching instructor classroom education lecture training",
+    "description": "Teacher beside board"
   },
   {
     "role": "calendar-group-checks",
     "label": "Grading time",
-    "keywords": "grading time marking assessment"
+    "keywords": "grading time marking assessment grading checked complete done confirmation approval",
+    "description": "Two check marks"
   },
   {
     "role": "calendar-group-friends",
     "label": "Parent conferences",
-    "keywords": "parent conferences conference teacher meeting"
+    "keywords": "parent conferences conference teacher meeting friendship parent family buddy partner social",
+    "description": "Two people together"
   },
   {
     "role": "calendar-group-message-question",
     "label": "Student advising",
-    "keywords": "student advising mentoring guidance"
+    "keywords": "student advising mentoring guidance question help advice inquiry support consultation",
+    "description": "Speech bubble with question"
   },
   {
     "role": "calendar-group-presentation-analytics",
     "label": "Staff development",
-    "keywords": "staff development pedagogy"
+    "keywords": "staff development pedagogy training analytics presentation seminar development",
+    "description": "Board with chart"
   },
   {
     "role": "calendar-group-building-pavilion",
     "label": "Venues and assemblies",
-    "keywords": "school assemblies assembly auditorium event venue bookings booking"
+    "keywords": "school assemblies assembly auditorium event venue bookings booking venue shelter assembly gathering outdoor gazebo",
+    "description": "Covered pavilion"
   },
   {
     "role": "calendar-group-mood-kid",
     "label": "Recess supervision",
-    "keywords": "recess supervision playground"
+    "keywords": "recess supervision playground child kid children youth play recess parenting",
+    "description": "Child face"
   },
   {
     "role": "calendar-group-masks-theater",
     "label": "Student performances",
-    "keywords": "student performances school play performance theatre"
+    "keywords": "student performances school play performance theatre theater theatre acting performance drama stage",
+    "description": "Comedy and tragedy masks"
   },
   {
     "role": "calendar-group-backpack",
     "label": "School dropoff",
-    "keywords": "school dropoff pickup backpack"
+    "keywords": "school dropoff pickup backpack rucksack schoolbag bag school hiking student travel",
+    "description": "Backpack"
   },
   {
     "role": "calendar-group-baby-carriage",
     "label": "Childcare handoffs",
-    "keywords": "childcare handoffs daycare babysitter nanny"
+    "keywords": "childcare handoffs daycare babysitter nanny pram infant childcare baby parenting newborn",
+    "description": "Baby stroller"
   },
   {
     "role": "calendar-group-soup",
     "label": "Family meals",
-    "keywords": "family meals dinner meal"
+    "keywords": "family meals dinner meal warm meal soup dinner cooking family food",
+    "description": "Bowl of soup"
   },
   {
     "role": "calendar-group-balloon",
     "label": "Children activities",
-    "keywords": "children activities kids activity playdate"
+    "keywords": "children activities kids activity playdate party celebration children birthday festival fun",
+    "description": "Party balloon"
   },
   {
     "role": "calendar-group-calendar-heart",
     "label": "Family appointments",
-    "keywords": "family appointments appointment care"
+    "keywords": "family appointments appointment care family appointment anniversary relationship special date",
+    "description": "Calendar with heart"
   },
   {
     "role": "calendar-group-arrows-left-right",
     "label": "Custody exchanges",
-    "keywords": "custody exchanges co parenting exchange handoff"
+    "keywords": "custody exchanges co parenting exchange handoff exchange switch swap handoff custody bidirectional",
+    "description": "Left and right arrows"
   },
   {
     "role": "calendar-group-home-heart",
     "label": "Family visits",
-    "keywords": "family visits visit relatives"
+    "keywords": "family visits visit relatives family home visit belonging loved ones domestic",
+    "description": "House with heart"
   },
   {
     "role": "calendar-group-list-check",
     "label": "Household planning",
-    "keywords": "household planning chores family"
+    "keywords": "household planning chores family tasks chores list planning to do checklist complete",
+    "description": "Checklist"
   },
   {
     "role": "calendar-group-hearts",
     "label": "Date nights",
-    "keywords": "date nights night anniversary couple"
+    "keywords": "date nights night anniversary couple romance love dating relationship affection couple",
+    "description": "Two hearts"
   },
   {
     "role": "calendar-group-stethoscope",
     "label": "Doctor visits",
-    "keywords": "doctor visits physician medical appointment"
+    "keywords": "doctor visits physician medical appointment doctor physician clinic medical examination healthcare",
+    "description": "Stethoscope"
   },
   {
     "role": "calendar-group-pill",
     "label": "Medication routines",
-    "keywords": "medication routines medicine prescription"
+    "keywords": "medication routines medicine prescription medication medicine prescription supplement dosage pharmacy",
+    "description": "Medicine capsule"
   },
   {
     "role": "calendar-group-first-aid-kit",
     "label": "Pharmacy pickups",
-    "keywords": "pharmacy pickups prescription pickup"
+    "keywords": "pharmacy pickups prescription pickup medical first aid emergency supplies pharmacy care",
+    "description": "First aid bag"
   },
   {
     "role": "calendar-group-physiotherapist",
     "label": "Physical therapy",
-    "keywords": "physical therapy rehab rehabilitation"
+    "keywords": "physical therapy rehab rehabilitation rehabilitation physio mobility recovery therapy exercise",
+    "description": "Therapist assisting a person"
   },
   {
     "role": "calendar-group-nurse",
     "label": "Home nurse visits",
-    "keywords": "home nurse visits nursing visit"
+    "keywords": "home nurse visits nursing visit nursing nurse caregiver care health practitioner",
+    "description": "Nurse with medical cap"
   },
   {
     "role": "calendar-group-wheelchair",
     "label": "Mobility transport",
-    "keywords": "mobility transport accessible"
+    "keywords": "mobility transport accessible accessibility mobility disability accessible transport",
+    "description": "Person in wheelchair"
   },
   {
     "role": "calendar-group-clipboard-heart",
     "label": "Care paperwork",
-    "keywords": "care paperwork plan health records"
+    "keywords": "care paperwork plan health records care plan medical chart patient health records",
+    "description": "Clipboard with heart"
   },
   {
     "role": "calendar-group-bed",
     "label": "Rest and lodging",
-    "keywords": "rest periods recovery nap hotel stays accommodation lodging"
+    "keywords": "rest periods recovery nap hotel stays accommodation lodging sleep rest lodging hotel overnight recovery accommodation",
+    "description": "Bed with pillow"
   },
   {
     "role": "calendar-group-dental",
     "label": "Dental visits",
-    "keywords": "dental visits dentist teeth cleaning"
+    "keywords": "dental visits dentist teeth cleaning dentist teeth tooth dental oral hygiene orthodontist",
+    "description": "Tooth"
   },
   {
     "role": "calendar-group-eyeglass",
     "label": "Eye exams",
-    "keywords": "eye exams optometrist vision glasses"
+    "keywords": "eye exams optometrist vision glasses glasses spectacles eyewear vision eye optometrist reading",
+    "description": "Pair of glasses"
   },
   {
     "role": "calendar-group-brain",
     "label": "Therapy appointments",
-    "keywords": "therapy appointments counseling mental health"
+    "keywords": "therapy appointments counseling mental health mind thinking cognition mental health therapy psychology",
+    "description": "Human brain"
   },
   {
     "role": "calendar-group-yoga",
     "label": "Meditation",
-    "keywords": "meditation mindfulness breathwork yoga classes stretching pilates"
+    "keywords": "meditation mindfulness breathwork yoga classes stretching pilates meditate meditation seated lotus pose breathing mindfulness calm stillness relaxation yoga",
+    "description": "Person sitting cross legged with hands on knees"
   },
   {
     "role": "calendar-group-scan",
     "label": "Preventive screenings",
-    "keywords": "preventive screenings screening scan checkup"
+    "keywords": "preventive screenings screening scan checkup scan scanner imaging screening document digital capture",
+    "description": "Scanning frame"
   },
   {
     "role": "calendar-group-vaccine",
     "label": "Vaccinations",
-    "keywords": "vaccinations vaccine vaccination immunization"
+    "keywords": "vaccinations vaccine vaccination immunization vaccine vaccination injection immunization shot medicine",
+    "description": "Syringe"
   },
   {
     "role": "calendar-group-test-pipe",
     "label": "Blood tests",
-    "keywords": "blood tests test lab draw"
+    "keywords": "blood tests test lab draw tube blood test laboratory sample chemistry experiment",
+    "description": "Test tube"
   },
   {
     "role": "calendar-group-apple",
     "label": "Nutrition coaching",
-    "keywords": "nutrition coaching diet dietitian"
+    "keywords": "nutrition coaching diet dietitian fruit nutrition healthy eating diet snack food",
+    "description": "Apple fruit"
   },
   {
     "role": "calendar-group-moon-stars",
     "label": "Sleep routines",
-    "keywords": "sleep routines bedtime night"
+    "keywords": "sleep routines bedtime night sleep bedtime night dreams evening lunar rest",
+    "description": "Moon and stars"
   },
   {
     "role": "calendar-group-writing",
     "label": "Wellness journaling",
-    "keywords": "wellness journaling journal reflection gratitude"
+    "keywords": "wellness journaling journal reflection gratitude journal writing handwriting reflection diary notes",
+    "description": "Hand writing with pen"
   },
   {
     "role": "calendar-group-barbell",
     "label": "Gym workouts",
-    "keywords": "gym workouts strength lifting workout"
+    "keywords": "gym workouts strength lifting workout weights weightlifting gym strength fitness lifting workout",
+    "description": "Barbell weights"
   },
   {
     "role": "calendar-group-run",
     "label": "Running training",
-    "keywords": "running training jogging marathon"
+    "keywords": "running training jogging marathon runner running jogging sprint racing exercise athletics",
+    "description": "Running person"
   },
   {
     "role": "calendar-group-swimming",
     "label": "Swimming practice",
-    "keywords": "swimming practice swim pool"
+    "keywords": "swimming practice swim pool swim swimming pool water aquatics exercise",
+    "description": "Person swimming"
   },
   {
     "role": "calendar-group-ball-american-football",
     "label": "Football practice",
-    "keywords": "football practice gridiron"
+    "keywords": "football practice gridiron football gridiron rugby ball sports game practice",
+    "description": "American football"
   },
   {
     "role": "calendar-group-ball-football",
     "label": "Soccer matches",
-    "keywords": "soccer matches football match"
+    "keywords": "soccer matches football match soccer football futbol ball sports match",
+    "description": "Soccer ball"
   },
   {
     "role": "calendar-group-ball-basketball",
     "label": "Basketball games",
-    "keywords": "basketball games hoops game"
+    "keywords": "basketball games hoops game basketball hoop court ball sports game",
+    "description": "Basketball"
   },
   {
     "role": "calendar-group-ball-tennis",
     "label": "Tennis sessions",
-    "keywords": "tennis sessions racket session"
+    "keywords": "tennis sessions racket session tennis racket racquet ball sports match",
+    "description": "Tennis ball"
   },
   {
     "role": "calendar-group-flag-check",
     "label": "Race events",
-    "keywords": "race events competition finish"
+    "keywords": "race events competition finish race finish racing competition motorsport victory",
+    "description": "Checkered finish flag"
   },
   {
     "role": "calendar-group-sun",
     "label": "Day shifts",
-    "keywords": "day shifts shift daytime roster"
+    "keywords": "day shifts shift daytime roster sunshine daylight day morning weather summer",
+    "description": "Sun with rays"
   },
   {
     "role": "calendar-group-phone-incoming",
     "label": "On call coverage",
-    "keywords": "on call coverage pager"
+    "keywords": "on call coverage pager incoming call oncall on call duty coverage",
+    "description": "Telephone with incoming arrow"
   },
   {
     "role": "calendar-group-arrows-transfer-up",
     "label": "Shift handovers",
-    "keywords": "shift handovers handover change"
+    "keywords": "shift handovers handover change handover handoff shift transfer exchange transition",
+    "description": "Transfer arrows"
   },
   {
     "role": "calendar-group-clipboard-plus",
     "label": "Patient rounds",
-    "keywords": "patient rounds clinical ward"
+    "keywords": "patient rounds clinical ward patient rounds intake chart medical record add",
+    "description": "Clipboard with plus"
   },
   {
     "role": "calendar-group-medical-cross",
     "label": "Procedures",
-    "keywords": "procedures procedure clinical treatment"
+    "keywords": "procedures procedure clinical treatment health medical hospital clinic first aid procedure",
+    "description": "Medical cross"
   },
   {
     "role": "calendar-group-ambulance",
     "label": "Emergency duty",
-    "keywords": "emergency duty ambulance urgent"
+    "keywords": "emergency duty ambulance urgent emergency paramedic rescue patient transport medical",
+    "description": "Emergency ambulance"
   },
   {
     "role": "calendar-group-report-medical",
     "label": "Case conferences",
-    "keywords": "case conferences conference clinical review"
+    "keywords": "case conferences conference clinical review patient case clinical report chart diagnosis review",
+    "description": "Medical report"
   },
   {
     "role": "calendar-group-id-badge",
     "label": "Certification renewal",
-    "keywords": "certification renewal credential license"
+    "keywords": "certification renewal credential license credential certification identification staff pass lanyard",
+    "description": "Identity badge"
   },
   {
     "role": "calendar-group-battery-charging",
     "label": "Recovery days",
-    "keywords": "recovery days recharge rest day"
+    "keywords": "recovery days recharge rest day energy recharge recovery rest power battery charging",
+    "description": "Charging battery"
   },
   {
     "role": "calendar-group-e-passport",
     "label": "Travel paperwork",
-    "keywords": "travel paperwork passport visa documents"
+    "keywords": "travel paperwork passport visa documents passport visa immigration border travel identity documents",
+    "description": "Passport booklet"
   },
   {
     "role": "calendar-group-device-laptop",
     "label": "Coworking bookings",
-    "keywords": "coworking bookings remote laptop desk"
+    "keywords": "coworking bookings remote laptop desk notebook computer laptop remote work coding coworking",
+    "description": "Laptop computer"
   },
   {
     "role": "calendar-group-video",
     "label": "Video shoots",
-    "keywords": "video shoots filming shoot"
+    "keywords": "video shoots filming shoot filming movie video cinema recording shoot",
+    "description": "Video camera"
   },
   {
     "role": "calendar-group-cut",
     "label": "Editing sessions",
-    "keywords": "editing sessions edit postproduction"
+    "keywords": "editing sessions edit postproduction cut editing scissors trim craft sewing haircut",
+    "description": "Scissors"
   },
   {
     "role": "calendar-group-microphone",
     "label": "Podcast recording",
-    "keywords": "podcast recording voice"
+    "keywords": "podcast recording voice mic podcast recording singing voice interview audio",
+    "description": "Microphone"
   },
   {
     "role": "calendar-group-music",
     "label": "Music recording",
-    "keywords": "music recording rehearsal"
+    "keywords": "music recording rehearsal song melody music instrument rehearsal performance",
+    "description": "Musical notes"
   },
   {
     "role": "calendar-group-broadcast",
     "label": "Livestreams",
-    "keywords": "livestreams live stream streaming broadcast"
+    "keywords": "livestreams live stream streaming broadcast live stream streaming transmission radio broadcast signal",
+    "description": "Broadcast signal"
   },
   {
     "role": "export",
     "label": "Export",
-    "keywords": "content publishing publish upload"
+    "keywords": "content publishing publish upload upload publish export backup share submit",
+    "description": "Upward arrow from tray"
   },
   {
     "role": "calendar-group-code",
     "label": "Coding sessions",
-    "keywords": "coding sessions programming developer"
+    "keywords": "coding sessions programming developer coding programming developer software markup scripting",
+    "description": "Code angle brackets"
   },
   {
     "role": "calendar-group-git-pull-request",
     "label": "Code reviews",
-    "keywords": "code reviews review pull request"
+    "keywords": "code reviews review pull request review merge code programming version control",
+    "description": "Pull request branches"
   },
   {
     "role": "calendar-group-cloud-upload",
     "label": "Deployments",
-    "keywords": "deployments deployment deploy release production"
+    "keywords": "deployments deployment deploy release production cloud deployment deploy upload sync backup hosting",
+    "description": "Cloud with upload arrow"
   },
   {
     "role": "calendar-group-bug",
     "label": "Bug triage",
-    "keywords": "bug triage debugging"
+    "keywords": "bug triage debugging bug insect beetle debugging issue defect software",
+    "description": "Bug insect"
   },
   {
     "role": "calendar-group-fire-extinguisher",
     "label": "Incident response",
-    "keywords": "incident response outage"
+    "keywords": "incident response outage fire emergency incident safety response firefighting",
+    "description": "Fire extinguisher"
   },
   {
     "role": "calendar-group-sitemap",
     "label": "Design sprints",
-    "keywords": "design sprints sprint architecture"
+    "keywords": "design sprints sprint architecture sitemap hierarchy organization structure architecture tree",
+    "description": "Hierarchy of connected boxes"
   },
   {
     "role": "calendar-group-click",
     "label": "User testing",
-    "keywords": "user testing usability prototype"
+    "keywords": "user testing usability prototype click cursor mouse pointer interaction testing usability",
+    "description": "Clicking pointer"
   },
   {
     "role": "calendar-group-shield-check",
     "label": "Security reviews",
-    "keywords": "security reviews audit vulnerability"
+    "keywords": "security reviews audit vulnerability security protected verified safe trust audit compliance",
+    "description": "Shield with check mark"
   },
   {
     "role": "calendar-group-chart-dots",
     "label": "Data analysis",
-    "keywords": "data analysis analytics"
+    "keywords": "data analysis analytics data analytics scatter plot graph statistics research",
+    "description": "Chart with plotted points"
   },
   {
     "role": "calendar-group-server",
     "label": "Maintenance windows",
-    "keywords": "maintenance windows server infrastructure"
+    "keywords": "maintenance windows server infrastructure server hosting infrastructure maintenance database hardware",
+    "description": "Stacked server units"
   },
   {
     "role": "calendar-group-tool",
     "label": "Repair jobs",
-    "keywords": "repair jobs fix service job"
+    "keywords": "repair jobs fix service job wrench spanner repair fix maintenance service tool",
+    "description": "Adjustable wrench"
   },
   {
     "role": "calendar-group-hammer",
     "label": "Installations",
-    "keywords": "installations installation install construction"
+    "keywords": "installations installation install construction hammer construction carpentry building installation repair",
+    "description": "Hammer"
   },
   {
     "role": "calendar-group-bolt",
     "label": "Electrical work",
-    "keywords": "electrical work electrician wiring"
+    "keywords": "electrical work electrician wiring electricity lightning power energy electrical charging fast",
+    "description": "Lightning bolt"
   },
   {
     "role": "calendar-group-pipeline",
     "label": "Plumbing work",
-    "keywords": "plumbing work plumber water"
+    "keywords": "plumbing work plumber water pipe plumbing water gas pipeline infrastructure repair",
+    "description": "Connected pipes"
   },
   {
     "role": "calendar-group-air-conditioning",
     "label": "HVAC service",
-    "keywords": "hvac service air conditioning cooling"
+    "keywords": "hvac service air conditioning cooling AC HVAC cooling ventilation heating climate fan",
+    "description": "Air conditioner"
   },
   {
     "role": "calendar-group-forklift",
     "label": "Material pickups",
-    "keywords": "material pickups materials supply pickup"
+    "keywords": "material pickups materials supply pickup warehouse lifting materials pallet logistics equipment",
+    "description": "Forklift truck"
   },
   {
     "role": "calendar-group-helmet",
     "label": "Safety briefings",
-    "keywords": "safety briefings ppe toolbox briefing"
+    "keywords": "safety briefings ppe toolbox briefing hardhat protection construction safety headgear worksite",
+    "description": "Safety helmet"
   },
   {
     "role": "calendar-group-engine",
     "label": "Equipment servicing",
-    "keywords": "equipment servicing engine service"
+    "keywords": "equipment servicing engine service motor engine vehicle machine mechanic maintenance",
+    "description": "Engine block"
   },
   {
     "role": "calendar-group-clipboard-search",
     "label": "Inspections",
-    "keywords": "inspections inspection checklist compliance"
+    "keywords": "inspections inspection checklist compliance inspection audit examine investigation checklist search",
+    "description": "Clipboard with magnifying glass"
   },
   {
     "role": "calendar-group-vacuum-cleaner",
     "label": "House cleaning",
-    "keywords": "house cleaning vacuum housework"
+    "keywords": "house cleaning vacuum housework broom brush sweep sweeping cleaning housekeeping housework chores dust tidy janitorial",
+    "description": "Broom with long handle and bristles"
   },
   {
     "role": "calendar-group-wash-machine",
     "label": "Laundry days",
-    "keywords": "laundry days washing clothes"
+    "keywords": "laundry days washing clothes washer washing laundry clothes cleaning appliance",
+    "description": "Front loading washing machine"
   },
   {
     "role": "calendar-group-shopping-cart",
     "label": "Grocery shopping",
-    "keywords": "grocery shopping groceries supermarket"
+    "keywords": "grocery shopping groceries supermarket trolley grocery groceries shopping retail purchase store",
+    "description": "Shopping cart"
   },
   {
     "role": "calendar-group-home-cog",
     "label": "Home maintenance",
-    "keywords": "home maintenance upkeep"
+    "keywords": "home maintenance upkeep home maintenance repair domestic upkeep household property",
+    "description": "House with gear"
   },
   {
     "role": "calendar-group-plant",
     "label": "Garden care",
-    "keywords": "garden care gardening plants"
+    "keywords": "garden care gardening plants plant gardening growth houseplant pot indoor greenery",
+    "description": "Potted plant"
   },
   {
     "role": "delete",
     "label": "Delete",
-    "keywords": "waste collection trash rubbish garbage"
+    "keywords": "waste collection trash rubbish garbage bin garbage rubbish waste delete remove trashcan disposal",
+    "description": "Trash can"
   },
   {
     "role": "calendar-group-recycle",
     "label": "Recycling pickups",
-    "keywords": "recycling pickups recycle collection"
+    "keywords": "recycling pickups recycle collection recycling recycle reuse sustainability waste circular",
+    "description": "Three recycling arrows"
   },
   {
     "role": "calendar-group-home-search",
     "label": "Property viewings",
-    "keywords": "property viewings viewing open house"
+    "keywords": "property viewings viewing open house property search house hunting real estate viewing",
+    "description": "House with magnifying glass"
   },
   {
     "role": "calendar-group-file-certificate",
     "label": "Lease renewals",
-    "keywords": "lease renewals rental renewal"
+    "keywords": "lease renewals rental renewal certificate lease contract license licence renewal legal",
+    "description": "Document with seal"
   },
   {
     "role": "calendar-group-truck-delivery",
     "label": "Moving days",
-    "keywords": "moving days movers relocation delivery"
+    "keywords": "moving days movers relocation delivery moving delivery courier shipment logistics parcel freight",
+    "description": "Delivery truck"
   },
   {
     "role": "calendar-group-calculator",
     "label": "Tax preparation",
-    "keywords": "tax preparation taxes accounting"
+    "keywords": "tax preparation taxes accounting calculate maths math accounting tax arithmetic budget",
+    "description": "Calculator keypad"
   },
   {
     "role": "calendar-group-shield",
     "label": "Insurance reviews",
-    "keywords": "insurance reviews coverage policy"
+    "keywords": "insurance reviews coverage policy protection insurance security safety coverage defense",
+    "description": "Shield"
   },
   {
     "role": "calendar-group-scale",
     "label": "Legal appointments",
-    "keywords": "legal appointments lawyer court"
+    "keywords": "legal appointments lawyer court justice law legal balance weighing equality fair",
+    "description": "Balance scales"
   },
   {
     "role": "calendar-group-id",
     "label": "Document renewals",
-    "keywords": "document renewals id identity renewal documents"
+    "keywords": "document renewals id identity renewal documents ID identity identification document license licence permit",
+    "description": "Identity card"
   },
   {
     "role": "calendar-group-heart",
     "label": "Volunteer shifts",
-    "keywords": "volunteer shifts service giving"
+    "keywords": "volunteer shifts service giving love care affection health volunteer donation support",
+    "description": "Heart shape"
   },
   {
     "role": "calendar-group-gift",
     "label": "Fundraising events",
-    "keywords": "fundraising events donation charity"
+    "keywords": "fundraising events donation charity present gift celebration donation reward surprise fundraising",
+    "description": "Wrapped present"
   },
   {
     "role": "calendar-group-basket",
     "label": "Food drives",
-    "keywords": "food drives drive pantry donations"
+    "keywords": "food drives drive pantry donations basket food hamper groceries picnic charity collection",
+    "description": "Woven basket"
   },
   {
     "role": "calendar-group-pray",
     "label": "Faith gatherings",
-    "keywords": "faith gatherings worship prayer religious"
+    "keywords": "faith gatherings worship prayer religious prayer faith worship spiritual religion devotion reflection",
+    "description": "Kneeling person praying"
   },
   {
     "role": "calendar-group-truck",
     "label": "Mutual aid deliveries",
-    "keywords": "mutual aid deliveries supply delivery"
+    "keywords": "mutual aid deliveries supply delivery lorry freight cargo transport delivery logistics hauling",
+    "description": "Cargo truck"
   },
   {
     "role": "calendar-group-building-monument",
     "label": "Civic participation",
-    "keywords": "civic participation council voting town hall"
+    "keywords": "civic participation council voting town hall civic government monument history landmark public heritage",
+    "description": "Monument with columns"
   },
   {
     "role": "calendar-group-speakerphone",
     "label": "Announcements and sound",
-    "keywords": "public outreach campaigning advocacy equipment rentals audio rental"
+    "keywords": "public outreach campaigning advocacy equipment rentals audio rental megaphone announcement loudspeaker sound rally publicity broadcast",
+    "description": "Megaphone"
   },
   {
     "role": "calendar-group-leaf",
     "label": "Environmental cleanup",
-    "keywords": "environmental cleanup environment conservation"
+    "keywords": "environmental cleanup environment conservation nature environment ecology green foliage sustainability plant",
+    "description": "Single leaf"
   },
   {
     "role": "calendar-group-accessible",
     "label": "Accessibility support",
-    "keywords": "accessibility support inclusion"
+    "keywords": "accessibility support inclusion accessible inclusion disability universal access support",
+    "description": "Accessibility figure"
   },
   {
     "role": "calendar-group-chef-hat",
     "label": "Catering preparation",
-    "keywords": "catering preparation cooking chef"
+    "keywords": "catering preparation cooking chef chef cooking kitchen catering baking culinary restaurant",
+    "description": "Chef toque"
   },
   {
     "role": "calendar-group-tent",
     "label": "Event setup",
-    "keywords": "event setup tents staging"
+    "keywords": "event setup tents staging camp camping campsite shelter event setup outdoors",
+    "description": "Pitched tent"
   },
   {
     "role": "calendar-group-luggage",
     "label": "Guest arrivals",
-    "keywords": "guest arrivals arrival checkin luggage"
+    "keywords": "guest arrivals arrival checkin luggage luggage baggage suitcase packing travel guest arrival",
+    "description": "Rolling suitcase"
   },
   {
     "role": "calendar-group-ticket",
     "label": "Entertainment bookings",
-    "keywords": "entertainment bookings concert ticket booking"
+    "keywords": "entertainment bookings concert ticket booking ticket admission concert cinema show booking entertainment",
+    "description": "Admission ticket"
   },
   {
     "role": "calendar-group-rings",
     "label": "Wedding coordination",
-    "keywords": "wedding coordination marriage ceremony"
+    "keywords": "wedding coordination marriage ceremony wedding marriage engagement rings union ceremony",
+    "description": "Two linked rings"
   },
   {
     "role": "calendar-group-calendar-user",
     "label": "Staff scheduling",
-    "keywords": "staff scheduling roster"
+    "keywords": "staff scheduling roster staff scheduling availability rota roster booking",
+    "description": "Calendar with person"
   },
   {
     "role": "calendar-group-box",
     "label": "Postevent teardown",
-    "keywords": "postevent teardown packing storage"
+    "keywords": "postevent teardown packing storage box packaging storage packing parcel container moving",
+    "description": "Cardboard box"
   },
   {
     "role": "calendar-group-trekking",
     "label": "Hiking trips",
-    "keywords": "hiking trips trail trek"
+    "keywords": "hiking trips trail trek hike hiking trekking trail backpacking outdoors expedition",
+    "description": "Hiker with walking stick"
   },
   {
     "role": "calendar-group-campfire",
     "label": "Camping weekends",
-    "keywords": "camping weekends campfire outdoors"
+    "keywords": "camping weekends campfire outdoors campfire bonfire fire camping warmth outdoors",
+    "description": "Fire over logs"
   },
   {
     "role": "calendar-group-fish-hook",
     "label": "Fishing outings",
-    "keywords": "fishing outings angling tide"
+    "keywords": "fishing outings angling tide angling fishing hook tackle bait recreation",
+    "description": "Fishing hook"
   },
   {
     "role": "calendar-group-horse",
     "label": "Horse riding",
-    "keywords": "horse riding equestrian"
+    "keywords": "horse riding equestrian horse riding equestrian pony animal stable ranch",
+    "description": "Horse"
   },
   {
     "role": "calendar-group-tractor",
     "label": "Farm chores",
-    "keywords": "farm chores farming agriculture"
+    "keywords": "farm chores farming agriculture agriculture farming tractor rural chores field machinery",
+    "description": "Farm tractor"
   },
   {
     "role": "calendar-group-wheat",
     "label": "Harvest schedules",
-    "keywords": "harvest schedules crop growing"
+    "keywords": "harvest schedules crop growing grain wheat harvest crop agriculture farming cereal",
+    "description": "Wheat stalk"
   },
   {
     "role": "calendar-group-cloud",
     "label": "Weather windows",
-    "keywords": "weather windows forecast outdoor window"
+    "keywords": "weather windows forecast outdoor window cloud weather overcast sky forecast climate",
+    "description": "Cloud"
   },
   {
     "role": "calendar-group-telescope",
     "label": "Stargazing nights",
-    "keywords": "stargazing nights astronomy telescope"
+    "keywords": "stargazing nights astronomy telescope astronomy stargazing stars telescope space observation",
+    "description": "Telescope on stand"
   },
   {
     "role": "calendar-group-device-gamepad-2",
     "label": "Gaming sessions",
-    "keywords": "gaming sessions video game board"
+    "keywords": "gaming sessions video game board gamepad controller gaming video games console esports play",
+    "description": "Game controller"
   }
 ]
