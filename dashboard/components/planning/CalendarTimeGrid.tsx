@@ -87,7 +87,7 @@ export default function CalendarTimeGrid({
   const topAt = (minute: number) => `calc((${minute} - var(--calendar-start)) * 100% / var(--calendar-span))`;
   const heightFor = (duration: number) => `calc(${duration} * 100% / var(--calendar-span))`;
   const today = localDate(new Date(now), zone);
-  const currentTime = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit", hour12: true }).format(now);
+  const currentTime = new Intl.DateTimeFormat("en-US", { timeZone: zone, hour: "numeric", minute: "2-digit", hour12: true }).format(now).toLowerCase().replace(/\s/g, "");
   useLayoutEffect(() => {
     const element = hours.current;
     if (!element) return;
@@ -345,14 +345,14 @@ export default function CalendarTimeGrid({
               })}
               {day === today && (
                   <motion.div
-                    className={styles.now}
+                    className={styles.nowMarker}
                     role="img"
-                    aria-hidden={minuteOf(now, zone) < startHour * 60 || minuteOf(now, zone) >= endHour * 60}
                     aria-label={`Current time: ${currentTime} (${zone})`}
                     layout={false}
-                    style={{ top: topAt(minuteOf(now, zone)) }}
+                    style={{ "--now-position": `clamp(3px, ${topAt(minuteOf(now, zone))}, calc(100% - 3px))` } as CSSProperties}
                   >
-                    <time dateTime={new Date(now).toISOString()}>{currentTime}</time>
+                    <span className={styles.now} />
+                    <time className={styles.nowLabel} dateTime={new Date(now).toISOString()}>{currentTime}</time>
                   </motion.div>
                 )}
             </motion.div>

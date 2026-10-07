@@ -29,8 +29,6 @@
 .note {padding:10px;}
 .error {padding:4px 18px 14px;}
 .error p {font-size:12px;}
-.footer {padding:12px 18px;flex:none;border-top:1px solid var(--module-quiet);}
-.footer a {display:flex;align-items:center;gap:7px;width:fit-content;color:var(--module-primary-700);font-size:12px;font-weight:600;text-decoration:none;}
 @keyframes reminders-in {from{opacity:0;transform:translateY(-8px) scale(.96)}to{opacity:1;transform:none}}
 @keyframes reminders-out {to{opacity:0;transform:translateY(-5px) scale(.98)}}
 @media(prefers-reduced-motion:reduce){.panel[data-state]{animation:none}.item,.actions button{transition:none}}

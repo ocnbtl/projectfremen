@@ -160,7 +160,6 @@ export default function PlanningNotifications() {
           </div><div className={styles.actions}><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"snoozed")} aria-label={`Snooze ${item.title} for 15 minutes`}><UnigentamosIcon role="clock" size={15} />Snooze 15 min</button><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"dismissed")} aria-label={`Dismiss ${item.title}`}><UnigentamosIcon role="check" size={15} />Dismiss</button></div>
         </article>;
       })}{total > items.length && <p className={styles.note}>{items.length} of {total} reminders. More appear as you clear these.</p>}</div>}
-      <footer className={styles.footer}><Link href="/admin/calendar" onClick={() => setOpen(false)}><UnigentamosIcon role="calendar" size={16} />Open calendar<UnigentamosIcon role="chevron-right" size={14} /></Link></footer>
     </Popover.Content></Popover.Portal>
   </Popover.Root>;
 }
