@@ -19,14 +19,16 @@ export default function CalendarMonthView({ days, date, today, events, calendars
 }) {
   const { layoutTransition } = useCalendarMotion(), columns = showWeekends ? 7 : 5;
   const container = useRef<HTMLDivElement>(null);
-  const [height, setHeight] = useState(0);
+  const [size, setSize] = useState({ width: 0, height: 0 });
   useLayoutEffect(() => {
     if (!container.current) return;
-    const observer = new ResizeObserver(entries => setHeight(entries[0].contentRect.height));
+    const observer = new ResizeObserver(([entry]) => setSize({ width: entry.contentRect.width, height: entry.contentRect.height }));
     observer.observe(container.current);
     return () => observer.disconnect();
   }, []);
-  const rowHeight = height / (days.length / columns), eventHeight = rowHeight < 150 ? 34 : 36;
+  const rowHeight = size.height / (days.length / columns), eventHeight = rowHeight < 150 ? 34 : 36;
+  // Only simplify a continuation when an earlier, visible segment carries its details.
+  const detailedEvents = new Set<string>();
   return <div ref={container} className={styles.month} aria-label="Month calendar">
     {Array.from({ length: days.length / columns }, (_, row) => {
       const week = days.slice(row * columns, (row + 1) * columns);
@@ -44,14 +46,17 @@ export default function CalendarMonthView({ days, date, today, events, calendars
           const calendar = calendars.find(item => item.id === event.calendarId), group = eventGroup(calendar, event.groupId);
           const continuation = `${continuesBefore ? ", continues from earlier dates" : ""}${continuesAfter ? ", continues on later dates" : ""}`;
           const timing = event.allDay ? "" : eventTimeRange(event.startMs, event.endMs, zone);
+          const span = last - first + 1;
+          const compactContinuation = continuesBefore && detailedEvents.has(event.id) && (span === 1 || size.width / columns * span < 300);
+          if (!compactContinuation) detailedEvents.add(event.id);
           return <TaskEventCard event={event} onComplete={onComplete} key={`${event.id}:${first}`} layout transition={{ layout: layoutTransition }} className={styles.event}
             style={{ ...eventColors(event, calendar), gridColumn: `${first + 1} / ${last + 2}`, gridRow: lane + 2 } as CSSProperties}
-            data-morph-event={event.id} data-month-event={event.id} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
+            data-morph-event={event.id} data-month-event={event.id} data-compact-continuation={compactContinuation || undefined} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
             aria-label={`${event.title}${timing ? `, ${timing}` : ""}${continuation}`} title={`${event.title}${timing ? ` · ${timing}` : ""}${continuation}`} onClick={() => onOpen(event)}>
             {(continuesBefore || continuesAfter) && <EventContinuation before={continuesBefore} after={continuesAfter} />}
             <EventGlyph event={event} icon={group?.icon} size={16} />
-            <span className={styles.copy}><strong>{eventPreviewTitle(event)}</strong>{timing && <small>{timing}</small>}</span>
-            <EventLinksPreview event={event} available={refs} />
+            <span className={styles.copy}><strong>{eventPreviewTitle(event)}</strong>{timing && !compactContinuation && <small>{timing}</small>}</span>
+            {!compactContinuation && <EventLinksPreview event={event} available={refs} />}
 
           </TaskEventCard>;
         })}
