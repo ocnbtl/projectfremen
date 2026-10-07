@@ -6,6 +6,16 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./EventObjects.module.css";
 
 type PreviewRef = NativeObjectRef & { preview?: { imageUrl?: string; imageUpdatedAt?: string } };
+export function eventObjectRefs(event: EventOccurrence, available: NativeObjectRef[] = []) {
+  const refs = [...new Map(event.linkedRefs.map(ref => [ref.module + ":" + ref.objectType + ":" + ref.objectId, available.find(item => item.module === ref.module && item.objectType === ref.objectType && item.objectId === ref.objectId) || ref])).values()];
+  if (event.placeId && !refs.some(ref => ref.module === "map" && ref.objectId === event.placeId)) {
+    const place = available.find(ref => ref.module === "map" && ref.objectId === event.placeId);
+    if (place) refs.push(place);
+  }
+  if (event.location && !refs.some(ref => ref.module === "map")) refs.push({module:"map",objectType:"place",objectId:"event-location",label:event.location,route:""});
+  const rank = (ref: NativeObjectRef) => ref.objectType === "person" ? 0 : ref.module === "map" ? 1 : 2;
+  return refs.sort((a,b) => rank(a) - rank(b));
+}
 export function EventObjectIdentity({ record }: { record: PreviewRef }) {
   const raw = record.preview?.imageUrl || "";
   const safe = /^\/api\/people\/photos\/personal-[0-9a-f-]+$/i.test(raw) || /^https:\/\//.test(raw);

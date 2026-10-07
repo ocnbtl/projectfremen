@@ -545,6 +545,10 @@ export default function CalendarWorkspace() {
   }
   const timeline = view === "day" || view === "3-day" || view === "week";
   const changeView = (next: View, day?: string) => morph(() => { setView(next); if (day) setDate(day); });
+  const changePeriod = (direction: 1 | -1) => {
+    const update = () => setDate(current => shiftCalendar(current, view, direction, agendaDays));
+    if (view === "month") morph(update); else update();
+  };
   function eventButton(item: EventOccurrence, detail = false) {
     const event = snapshot?.state.events.find((x) => x.id === item.eventId);
     const calendar = snapshot?.state.calendars.find(
@@ -611,8 +615,8 @@ export default function CalendarWorkspace() {
         <h1>Calendar</h1>
         <div className={styles.dateNavigation}>
           <Button className={styles.todayButton} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
-          <Button aria-label="Previous period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, -1, agendaDays))}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></Button>
-          <Button aria-label="Next period" className={styles.periodButton} onClick={() => setDate(shiftCalendar(date, view, 1, agendaDays))}><UnigentamosIcon role="chevron-right" size={18} /></Button>
+          <Button aria-label="Previous period" className={styles.periodButton} onClick={() => changePeriod(-1)}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></Button>
+          <Button aria-label="Next period" className={styles.periodButton} onClick={() => changePeriod(1)}><UnigentamosIcon role="chevron-right" size={18} /></Button>
           <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => changeView(next, day)} />
         </div>
         <div className={styles.draftSlot} data-active={Boolean(draft && !editor)}>
@@ -725,7 +729,7 @@ export default function CalendarWorkspace() {
             const dx = touch.clientX - start.x, dy = touch.clientY - start.y;
             if (Math.abs(dx) < 64 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
             if (event.cancelable) event.preventDefault();
-            setDate(current => shiftCalendar(current, view, dx < 0 ? 1 : -1, agendaDays));
+            changePeriod(dx < 0 ? 1 : -1);
           }}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
           {compact && view === "month" ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={item => eventButton(item)} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} calendars={snapshot.state.calendars} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (

@@ -1,6 +1,5 @@
 "use client";
 import TaskEventCard from "./TaskEventCard";
-import { motion } from "motion/react";
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Calendar, EventOccurrence } from "../../lib/modules/planning/types";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
@@ -9,10 +8,9 @@ import { eventGroup } from "../../lib/modules/planning/calendar-groups";
 import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-presentation";
 import { calendarDateLabel as label } from "./CalendarMiniMonth";
 import { useCalendarMotion } from "./CalendarMotion";
-import EventPeople from "./EventPeople";
+import EventLinksPreview from "./EventLinksPreview";
 import EventGlyph from "./EventGlyph";
 import EventContinuation from "./EventContinuation";
-import EventObjects from "./EventObjects";
 import styles from "./CalendarMonthView.module.css";
 
 export default function CalendarMonthView({ days, date, today, events, calendars, refs, zone, showWeekends, onDay, onMore, onOpen, onComplete }: {
@@ -28,7 +26,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
     observer.observe(container.current);
     return () => observer.disconnect();
   }, []);
-  const rowHeight = height / (days.length / columns), eventHeight = rowHeight < 150 ? 30 : 36;
+  const rowHeight = height / (days.length / columns), eventHeight = rowHeight < 150 ? 34 : 36;
   return <div ref={container} className={styles.month} aria-label="Month calendar">
     {Array.from({ length: days.length / columns }, (_, row) => {
       const week = days.slice(row * columns, (row + 1) * columns);
@@ -53,7 +51,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
             {(continuesBefore || continuesAfter) && <EventContinuation before={continuesBefore} after={continuesAfter} />}
             <EventGlyph event={event} icon={group?.icon} size={16} />
             <span className={styles.copy}><strong>{eventPreviewTitle(event)}</strong>{timing && <small>{timing}</small>}</span>
-            <EventPeople refs={event.linkedRefs} available={refs} limit={2} /><EventObjects event={event} available={refs} />
+            <EventLinksPreview event={event} available={refs} />
 
           </TaskEventCard>;
         })}

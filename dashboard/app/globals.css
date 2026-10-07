@@ -3780,6 +3780,12 @@ html[data-calendar-morph]::view-transition-new(.calendar-date-header) { animatio
 html[data-calendar-morph]::view-transition-image-pair(*) { overflow: clip; }
 @keyframes calendar-date-arrive { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }
 html[data-calendar-morph]::view-transition-new(.calendar-entering-date) { animation: calendar-date-arrive 640ms ease both; }
+/* Month navigation keeps shared events visible from departure to arrival. */
+html[data-calendar-month-morph]::view-transition-group(*) { animation-duration:420ms; animation-timing-function:cubic-bezier(.4,0,.2,1); }
+html[data-calendar-month-morph]::view-transition-old(*),html[data-calendar-month-morph]::view-transition-new(*) { animation-duration:220ms; }
+html[data-calendar-month-morph]::view-transition-old(.calendar-shared-event) { animation:none; opacity:0; }
+html[data-calendar-month-morph]::view-transition-new(.calendar-shared-event) { animation:none; opacity:1; }
+html[data-calendar-month-morph]::view-transition-new(.calendar-entering-date) { animation-duration:300ms; }
 @media (prefers-reduced-motion: reduce) {
   html[data-calendar-morph]::view-transition-group(*), html[data-calendar-morph]::view-transition-old(*), html[data-calendar-morph]::view-transition-new(*) { animation-duration: 1ms; }
 }

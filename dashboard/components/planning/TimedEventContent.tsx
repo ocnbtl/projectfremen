@@ -5,7 +5,8 @@ import type { EventOccurrence } from "../../lib/modules/planning/types";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import EventGlyph from "./EventGlyph";
 import EventObjects from "./EventObjects";
-import EventPeople from "./EventPeople";
+import EventLinksPreview from "./EventLinksPreview";
+import { eventObjectRefs } from "./EventObjects";
 import { TaskCheck } from "./TaskEventCard";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { eventPreviewTitle } from "./calendar-presentation";
@@ -21,7 +22,8 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   const place = available.find(r => r.module === "map" && r.objectId === event.placeId)?.label || event.linkedRefs.find(r => r.module === "map")?.label || event.location;
   const title = eventPreviewTitle(event);
   const vertical = height >= 82;
-  const requiredWidth = title.length * 6.5 + timing.length * 5.5 + (place ? place.length * 6 + 24 : 0) + (event.isTask ? 82 : 58);
+  const hasObjects = eventObjectRefs(event,available).some(ref => ref.module !== "map");
+  const requiredWidth = title.length * 6.5 + timing.length * 5.5 + (place ? place.length * 6 + 24 : 0) + (event.isTask ? 82 : 58) + (hasObjects ? 38 : 0);
   const collapsed = !vertical && width < requiredWidth;
   // In tall but narrow columns, use the available height before collapsing metadata.
   const narrow = vertical && width < 82;
@@ -33,8 +35,8 @@ export default function TimedEventContent({ event, timing, icon, height, availab
       {!collapsed && !narrow && <span className={styles.time}><UnigentamosIcon role="clock" size={14}/><span>{timing}</span></span>}
       {place && !collapsed && !narrow && <span className={styles.place}><UnigentamosIcon role="location" size={14}/><span>{place}</span></span>}
       {vertical && height >= 140 && <EventObjects event={event} available={available} excludePlaces list align={singleDay ? "start" : "end"} maxItems={Math.max(1,Math.floor((height - 100) / 36))} />}
-      {!vertical && !collapsed && width > requiredWidth + 60 && <EventPeople refs={event.linkedRefs} available={available} limit={2}/>}
     </button>
     {(collapsed || narrow) && <span className={styles.details}>{popup("clock",timing,"Time")}{place && popup("location",place,"Place")}</span>}
+    {!vertical && <EventLinksPreview event={event} available={available} excludePlaces />}
   </div>;
 }

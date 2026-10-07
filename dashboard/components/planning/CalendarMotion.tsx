@@ -62,8 +62,12 @@ export function useCalendarMorph(root: RefObject<HTMLElement | null>) {
     active.current?.skipTransition(); cleanup.current();
     if (reduced || !document.startViewTransition || !root.current) { update(); return; }
     const names = new Map<string, string>(), touched = new Map<HTMLElement, string>(), classes = new Map<HTMLElement, string>();
+    const outgoing = new Map<string, HTMLElement>(), fromMonth = root.current.dataset.view === "month";
+    const mark = (node: HTMLElement, name: string) => { if (!classes.has(node)) classes.set(node,node.style.getPropertyValue("view-transition-class")); node.style.setProperty("view-transition-class",name); };
     const capture = (incoming = false) => {
       const surface = root.current; if (!surface) return;
+      const monthChange = fromMonth && surface.dataset.view === "month";
+      if (incoming && monthChange) document.documentElement.dataset.calendarMonthMorph = "true";
       const rect = surface.getBoundingClientRect(), used = new Set<string>();
       if (!touched.has(surface)) touched.set(surface, surface.style.viewTransitionName); surface.style.viewTransitionName = "calendar-surface";
       const focus = Date.parse(surface.dataset.morphFocus || "");
@@ -83,14 +87,18 @@ export function useCalendarMorph(root: RefObject<HTMLElement | null>) {
         used.add(key); if (!names.has(key)) names.set(key, "calendar-item-" + names.size);
         if (!touched.has(node)) touched.set(node, node.style.viewTransitionName);
         node.style.viewTransitionName = names.get(key)!;
+        if (!incoming) outgoing.set(key,node);
+        if (incoming && monthChange && node.dataset.morphEvent && outgoing.has(key)) {
+          // Keep one opaque identity throughout its trip between month rows.
+          mark(outgoing.get(key)!,"calendar-shared-event"); mark(node,"calendar-shared-event");
+        }
         if (entering && node.dataset.morphDate) {
-          classes.set(node, node.style.getPropertyValue("view-transition-class"));
-          node.style.setProperty("view-transition-class", "calendar-entering-date");
+          mark(node,"calendar-entering-date");
         }
       }
     };
     document.documentElement.dataset.calendarMorph = "true";
-    cleanup.current = () => { for (const [node, name] of touched) node.style.viewTransitionName = name; for (const [node, value] of classes) node.style.setProperty("view-transition-class", value); delete document.documentElement.dataset.calendarMorph; };
+    cleanup.current = () => { for (const [node, name] of touched) node.style.viewTransitionName = name; for (const [node, value] of classes) node.style.setProperty("view-transition-class", value); delete document.documentElement.dataset.calendarMorph; delete document.documentElement.dataset.calendarMonthMorph; };
     capture();
     const transition = document.startViewTransition(() => { if (version !== revision.current) return; flushSync(update); capture(true); });
     active.current = transition;

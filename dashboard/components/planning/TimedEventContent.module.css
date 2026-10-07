@@ -2,7 +2,7 @@
 .content .open { display:flex; align-items:center; gap:12px; flex:1; min-width:0; max-height:100%; padding:0; margin:0; border:0; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; overflow:hidden; }
 .title,.time,.place { display:flex; align-items:center; gap:5px; min-width:0; }
 .title { flex:0 1 auto; }
-.content .title strong { min-width:0;max-width:100%;font-size:13px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.content .title strong { min-width:0;max-width:100%;font:var(--calendar-event-title-font,600 13px/1.35 var(--font-body)); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .time { font-size:11px; font-weight:500; flex:none; white-space:nowrap; }
 .place { font-size:11px; }
 .title > svg,.time > svg,.place > svg { flex:none; color:inherit; }
@@ -25,17 +25,15 @@
 .content[data-narrow="true"] { flex-wrap:wrap; gap:4px; padding-inline:4px; align-content:flex-start; }
 .content[data-narrow="true"] .open { flex-basis:100%; }
 .content[data-narrow="true"] .title { gap:3px; }
-.content[data-narrow="true"] .title strong { font-size:10px; }
 .content[data-narrow="true"] .title > svg { width:12px; }
 .content[data-narrow="true"] .time { white-space:normal; }
 .content[data-tiny="true"] {padding-block:0;padding-inline:4px;gap:4px;}
-.content[data-tiny="true"] .title strong {font-size:11px;}
 .content[data-tiny="true"] .detailButton {height:18px;width:18px;}
 .content[data-tiny="true"] > button:first-child {width:14px;height:14px;min-height:14px;}
+.content[data-tiny="true"] > [data-event-links] {height:16px;min-height:16px;--avatar-size:16px;--linked-object-size:16px;}
 .content[data-slim="true"]:not([data-vertical="true"]) {padding-inline:3px;gap:2px;}
 .content[data-slim="true"]:not([data-vertical="true"]) .title > svg {display:none;}
 .content[data-slim="true"] .detailButton {width:17px;}
-.content[data-slim="true"]:not([data-vertical="true"]) .title strong {font-size:10px;}
 .content[data-slim="true"]:not([data-vertical="true"]) > button:first-child:not(.open) {width:11px;height:11px;min-height:11px;}
 .content[data-slim="true"]:not([data-vertical="true"]) .detailButton {width:13px;}
 .content[data-slim="true"]:not([data-vertical="true"]) .detailButton svg {width:11px;height:11px;}
