@@ -18,7 +18,7 @@ export function EventObjectIdentity({ record }: { record: PreviewRef }) {
 }
 
 /** Compact previews retain an explicit count; opening the event exposes every link. */
-export default function EventObjects({ event, available = [], list = false, align = "end", maxItems = 6 }: { event: EventOccurrence; available?: NativeObjectRef[]; list?: boolean; align?: "start" | "end"; maxItems?: number }) {
+export default function EventObjects({ event, available = [], list = false, align = "end", maxItems = 6, excludePlaces = false }: { event: EventOccurrence; available?: NativeObjectRef[]; list?: boolean; align?: "start" | "end"; maxItems?: number; excludePlaces?: boolean }) {
   const element = useRef<HTMLSpanElement>(null), [width, setWidth] = useState(300);
   const refs = [...new Map(event.linkedRefs.filter(ref => list || !(ref.module === "people" && ref.objectType === "person")).map(ref => [ref.module + ":" + ref.objectType + ":" + ref.objectId, available.find(item => item.module === ref.module && item.objectType === ref.objectType && item.objectId === ref.objectId) || ref])).values()];
   if (event.placeId && !refs.some(ref => ref.module === "map" && ref.objectId === event.placeId)) {
@@ -27,7 +27,7 @@ export default function EventObjects({ event, available = [], list = false, alig
   }
   const location = !refs.some(ref => ref.module === "map" && ref.objectType === "place") && event.location;
   const rank = (ref: NativeObjectRef) => ref.objectType === "person" ? 0 : ref.module === "map" ? 1 : 2;
-  const items = (location ? [{ module: "map", objectType: "place", objectId: "event-location", label: location, route: "" } as NativeObjectRef, ...refs] : refs).sort((a,b) => rank(a) - rank(b));
+  const items = (location ? [{ module: "map", objectType: "place", objectId: "event-location", label: location, route: "" } as NativeObjectRef, ...refs] : refs).filter(ref => !excludePlaces || ref.module !== "map").sort((a,b) => rank(a) - rank(b));
   const count = items.length;
   useLayoutEffect(() => {
     if (!element.current) return;

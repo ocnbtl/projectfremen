@@ -24,6 +24,8 @@ export function planningWritableKeys(collection: PlanningCollection): string[] {
       "end",
       "timeZone",
       "allDay",
+      "isTask",
+      "completed",
       "calendarId",
       "groupId",
       "placeId",

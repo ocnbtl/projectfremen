@@ -1,6 +1,6 @@
 "use client";
 import { animate, motion } from "motion/react";
-import { eventColors, eventPreviewTitle, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
+import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-presentation";
 import { useCalendarMotion } from "./CalendarMotion";
 import {
   useLayoutEffect,
@@ -23,9 +23,8 @@ import {
 } from "../../lib/modules/planning/calendar-model";
 import { eventGroup } from "../../lib/modules/planning/calendar-groups";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import EventPeople from "./EventPeople";
-import EventGlyph from "./EventGlyph";
-import EventObjects from "./EventObjects";
+import TimedEventContent from "./TimedEventContent";
+import EventResizeHandle from "./EventResizeHandle";
 import CalendarAllDayBand from "./CalendarAllDayBand";
 import styles from "./CalendarWorkspace.module.css";
 
@@ -49,6 +48,7 @@ export default function CalendarTimeGrid({
   onDay,
   onMove,
   onResize,
+  onComplete,
 }: {
   days: string[];
   zone: string;
@@ -63,15 +63,13 @@ export default function CalendarTimeGrid({
   onOpen: (event: EventOccurrence) => void;
   onDay: (day: string) => void;
   onMove: (event: EventOccurrence, day: string, hour: number) => void;
-  onResize: (event: EventOccurrence, endMs: number) => void;
+  onResize: (event: EventOccurrence, value: number, edge: "start" | "end") => void;
+  onComplete: (event: EventOccurrence) => void;
 }) {
   const { reduced, layoutTransition } = useCalendarMotion();
   const [height, setHeight] = useState(400),
     hours = useRef<HTMLDivElement>(null);
-  const resize = useRef<
-    { item: EventOccurrence; y: number; end: number } | undefined
-  >(undefined);
-  const [resizing, setResizing] = useState<{ id: string; end: number }>();
+  const [resizing, setResizing] = useState<{ id: string; startMs: number; endMs: number }>();
   const dragging = useRef<{ item: EventOccurrence; offset: number } | undefined>(undefined);
   const [dragPreview, setDragPreview] = useState<{ item: EventOccurrence; day: string; minute: number; x: number; y: number; width: number; height: number }>();
   const boundsRef = useRef({ start: early ? 0 : 8, end: late ? 24 : 22 });
@@ -168,7 +166,7 @@ export default function CalendarTimeGrid({
             </motion.div>
           );
         })}
-        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} onOpen={onOpen} />
+        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} onOpen={onOpen} onComplete={onComplete} />
         <div className={styles.fittedHours} ref={hours}>
           {Array.from({ length: 24 }, (_, i) => (
             <span key={i} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span>{hourName(i)}</span></span>
@@ -252,10 +250,10 @@ export default function CalendarTimeGrid({
                     title={title}
                     style={
                       {
-                        top: topAt(from),
+                        top: topAt(resizing?.id === item.id ? from + (resizing.startMs - item.startMs) / 60000 : from),
                         left: `calc(${(item.column / item.columns) * 100}% + 2px)`,
                         width: `calc(${100 / item.columns}% - 4px)`,
-                        height: `max(14px, calc(${resizing?.id === item.id ? (resizing.end - item.startMs) / 60000 : until - from} * 100% / var(--calendar-span) - 1px))`,
+                        height: `max(14px, calc(${resizing?.id === item.id ? until - from + (resizing.endMs - item.endMs - (resizing.startMs - item.startMs)) / 60000 : until - from} * 100% / var(--calendar-span) - 1px))`,
                         ...eventColors(item, c),
                         "--event-title-lines": Math.max(1, Math.floor((bottom - top - 32) / 16)),
                         "--event-title-lines-narrow": Math.max(1, Math.floor((bottom - top - (bottom - top >= 100 ? 96 : 48)) / 16)),
@@ -263,83 +261,22 @@ export default function CalendarTimeGrid({
                       } as CSSProperties
                     }
                   >
-                    <motion.button
-                      layout="position"
-                      transition={{ layout: layoutTransition }}
-                      type="button"
-                      draggable={!item.system}
-                      onDragStartCapture={(e) => {
+                    <TimedEventContent event={item} icon={group?.icon} timing={timing} height={bottom - top} available={refs} singleDay={days.length === 1} onOpen={() => onOpen(item)} onComplete={onComplete}
+                      onDragStart={(e) => {
                         e.dataTransfer.setData(
                           "application/x-unigentamos-event",
                           item.id,
                         );
                         e.dataTransfer.effectAllowed = "move";
-                        const rect = e.currentTarget.getBoundingClientRect();
+                        const rect = e.currentTarget.closest("[data-morph-event]")!.getBoundingClientRect();
                         dragging.current = { item, offset: Math.round((e.clientY - rect.top) / px / 5) * 5 };
                         // The custom spring preview replaces the browser's offset drag image.
                         const image = document.createElement("canvas"); image.width = 1; image.height = 1;
                         e.dataTransfer.setDragImage(image, 0, 0);
                       }}
-                      onDragEnd={() => { dragging.current = undefined; setDragPreview(undefined); }}
-                      onClick={() => onOpen(item)}
-                      aria-label={title}
-                    >
-                      <span className={styles.timedEventContent}><span className={styles.timedEventCopy}><span className={styles.timedEventTitle}><EventGlyph event={item} icon={group?.icon} size={18} /><strong>{eventPreviewTitle(item)}</strong>{bottom - top < 60 && linkedLabels.filter(label => !item.linkedRefs.some(ref => ref.objectType === "person" && ref.label === label)).length > 0 && <span className={styles.compactLinks} aria-label={`Linked objects: ${linkedLabels.join(", ")}`}><UnigentamosIcon role="object" size={11} />{linkedLabels.length}</span>}</span>{bottom - top >= 44 && <small className={styles.timedEventRange}><UnigentamosIcon role="clock" size={14} />{timing}</small>}</span>{bottom - top < 100 && <EventPeople refs={item.linkedRefs} available={refs} limit={2} />}{bottom - top >= 60 && <EventObjects event={item} align={days.length === 1 ? "start" : "end"} available={refs} list={bottom - top >= 100} maxItems={Math.max(1,Math.floor((bottom - top - 85) / 40))} />}</span>
-                    </motion.button>
-                    {!item.system && <button
-                      type="button"
-                      className={styles.fittedResize}
-                      aria-label={`Resize ${item.title}; arrow keys adjust by 5 minutes`}
-                      onKeyDown={(e) => {
-                        if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-                          e.preventDefault();
-                          onResize(
-                            item,
-                            Math.max(
-                              item.startMs + 300000,
-                              item.endMs +
-                                (e.key === "ArrowUp" ? -1 : 1) * 300000,
-                            ),
-                          );
-                        }
-                      }}
-                      onPointerDown={(e) => {
-                        if (e.pointerType !== "mouse") return;
-                        e.stopPropagation();
-                        resize.current = {
-                          item,
-                          y: e.clientY,
-                          end: item.endMs,
-                        };
-                        e.currentTarget.setPointerCapture(e.pointerId);
-                      }}
-                      onPointerMove={(e) => {
-                        if (resize.current?.item.id === item.id) {
-                          e.stopPropagation();
-                          const end = Math.max(
-                            item.startMs + 300000,
-                            resize.current.end +
-                              Math.round(
-                                (e.clientY - resize.current.y) / px / 5,
-                              ) *
-                                300000,
-                          );
-                          resize.current.end = resize.current.item.endMs;
-                          setResizing({ id: item.id, end });
-                        }
-                      }}
-                      onPointerUp={(e) => {
-                        e.stopPropagation();
-                        if (resizing?.id === item.id)
-                          onResize(item, resizing.end);
-                        resize.current = undefined;
-                        setResizing(undefined);
-                      }}
-                      onPointerCancel={() => {
-                        resize.current = undefined;
-                        setResizing(undefined);
-                      }}
-                    />}
+                      onDragEnd={() => { dragging.current = undefined; setDragPreview(undefined); }} />
+                    {!item.system && (["start", "end"] as const).filter(edge => edge === "start" ? item.startMs >= low : item.endMs <= high).map(edge => <EventResizeHandle key={edge} event={item} edge={edge} pixelsPerMinute={px}
+                      onPreview={value => setResizing(value ? {id:item.id,...value} : undefined)} onResize={onResize} />)}
                   </motion.div>
                 );
               })}

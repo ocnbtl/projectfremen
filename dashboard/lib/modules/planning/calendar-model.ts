@@ -90,7 +90,9 @@ export function eventOccurrences(
     )
       continue;
     const event = effectiveEvent(original);
-    const exceptions = { ...original.sourceExceptions, ...original.exceptions };
+    const exceptions = { ...original.sourceExceptions };
+    for (const [key, local] of Object.entries(original.exceptions || {}))
+      exceptions[key] = { ...exceptions[key], ...local };
     const duration = Temporal.PlainDateTime.from(
       event.end.length === 10 ? `${event.end}T00:00:00` : event.end,
     ).since(

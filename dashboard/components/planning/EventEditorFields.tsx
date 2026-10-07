@@ -42,6 +42,11 @@ export default function EventEditorFields({ fields, update, snapshot }: {
             update("start",checked ? start : `${start}T09:00`);
             update("end",checked ? (fields.end.endsWith("T00:00") && end > start ? end : addDays(end,1)) : `${addDays(end,-1)}T10:00`);
           }} />
+          <EventCheckbox label="Task" checked={Boolean(fields.isTask)} onChange={checked => {
+            update("isTask",checked);
+            if (checked) { update("reminderMinutes",60); setReminderDraft(60); setReminderUnit(60); }
+            else update("completed",false);
+          }} />
           <SelectField searchable autoFocusSearch={false} aria-label="Event time zone" value={fields.timeZone} onChange={e => update("timeZone",e.target.value)} triggerContent={<span className={styles.zone}><UnigentamosIcon role="clock" size={15} />{fields.timeZone.split("/").pop()?.replaceAll("_"," ")}<UnigentamosIcon role="chevron-down" size={12} /></span>}>
             {[...new Set([fields.timeZone,"UTC",...Intl.supportedValuesOf("timeZone")])].map(zone => <option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
           </SelectField>

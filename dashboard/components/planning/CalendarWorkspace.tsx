@@ -14,6 +14,8 @@ import { calendarRange, shiftCalendar, viewIcons, type CalendarView as View } fr
 import EventPeople from "./EventPeople";
 import EventGlyph from "./EventGlyph";
 import EventObjects from "./EventObjects";
+import TaskEventCard from "./TaskEventCard";
+import { taskCompletionPatch, resizedEventTime } from "../../lib/modules/planning/calendar-tasks";
 import EventTiming from "./EventTiming";
 import { timeChange, timeChangePatch, canUndoTimeChange, type EventTimeChange } from "../../lib/modules/planning/event-time-history";
 import { calendarDateLabel } from "./CalendarMiniMonth";
@@ -360,12 +362,13 @@ export default function CalendarWorkspace() {
     );
     return [...expanded.items.filter(
       (item) =>
+        (showCompleted || !item.isTask || !item.completed) &&
         visibleCalendars.has(item.calendarId) &&
         `${item.title} ${item.description} ${item.location}`
           .toLowerCase()
           .includes(query.trim().toLowerCase()),
     ), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
-  }, [expanded.items, snapshot?.state.calendars, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
+  }, [showCompleted, expanded.items, snapshot?.state.calendars, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
   const dated = showDated
     ? (snapshot?.dated || []).filter(
         (x) =>
@@ -527,10 +530,18 @@ export default function CalendarWorkspace() {
     if (ms === item.startMs) return;
     await commitTime(timeChange(original, item, start, end));
   }
-  async function resizeEvent(item: EventOccurrence, endMs: number) {
+  async function resizeEvent(item: EventOccurrence, value: number, edge: "start" | "end") {
     const original = snapshot?.state.events.find(x => x.id === item.eventId);
-    if (!original || endMs === item.endMs) return;
-    await commitTime(timeChange(original, item, item.start, localFor(Math.max(item.startMs + 300000, endMs), item.timeZone)));
+    if (!original) return;
+    const next = resizedEventTime(item, edge, value);
+    if (next.startMs === item.startMs && next.endMs === item.endMs) return;
+    await commitTime(timeChange(original, item, localFor(next.startMs, item.timeZone), localFor(next.endMs, item.timeZone)));
+  }
+  async function completeTask(item: EventOccurrence) {
+    if (busy) return;
+    const original = confirmed.current?.state.events.find(event => event.id === item.eventId);
+    if (!original) return;
+    await action(() => savePlanning("events", taskCompletionPatch(original, item.occurrenceKey, !item.completed), original.updatedAt), item.completed ? "Task reopened" : "Task completed");
   }
   const timeline = view === "day" || view === "3-day" || view === "week";
   const changeView = (next: View, day?: string) => morph(() => { setView(next); if (day) setDate(day); });
@@ -541,8 +552,7 @@ export default function CalendarWorkspace() {
     );
     const group = eventGroup(calendar, item.groupId);
     return (
-      <button
-        type="button"
+      <TaskEventCard event={item} onComplete={item => void completeTask(item)}
         key={item.id}
         className={`${styles.agendaEvent} ${detail ? styles.dayDetailEvent : ""}`}
         data-morph-event={item.id}
@@ -558,7 +568,7 @@ export default function CalendarWorkspace() {
         </span>
         <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
         <EventObjects event={item} available={snapshot?.refs} />
-      </button>
+      </TaskEventCard>
     );
   }
   async function connect(
@@ -719,13 +729,14 @@ export default function CalendarWorkspace() {
           }}>
           <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
           {compact && view === "month" ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={item => eventButton(item)} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} calendars={snapshot.state.calendars} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
-            <CalendarMonthView days={days} date={date} today={localDate(new Date(now), zone)} events={occurrences} calendars={snapshot.state.calendars} refs={snapshot.refs} zone={zone} showWeekends={showWeekends}
+            <CalendarMonthView onComplete={item => void completeTask(item)} days={days} date={date} today={localDate(new Date(now), zone)} events={occurrences} calendars={snapshot.state.calendars} refs={snapshot.refs} zone={zone} showWeekends={showWeekends}
               onDay={day => changeView("day", day)} onMore={day => setDayDetail(day)}
               onOpen={item => { if (item.system) setObservance(item); else { const event = snapshot.state.events.find(e => e.id === item.eventId); if (event) openEvent(event, item); } }} />
           ) : view === "agenda" ? (
             <CalendarAgenda rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={item => eventButton(item)} onDay={day => changeView("day", day)} />
           ) : (
             <CalendarTimeGrid
+              onComplete={item => void completeTask(item)}
               days={days}
               zone={zone}
               now={now}
@@ -980,7 +991,7 @@ export default function CalendarWorkspace() {
                 <CalendarSettings calendar={appearance} busy={busy} icon={key === "birthdays" ? "birthday" : "star"} country={code} enabled={enabled} onRemove={code ? () => void saveCalendarPreference("native", current => ({ observances: { ...(current.observances || defaultObservances()), countries: (current.observances || defaultObservances()).countries.filter(country => country !== code) } })) : undefined}
                   onToggle={visible => void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, ...(key === "birthdays" ? { birthdays: visible } : key === "custom" ? { customVisible: visible } : { disabledCountries: visible ? (settings.disabledCountries || []).filter(c => c !== code) : [...new Set([...(settings.disabledCountries || []), code!])] }) } }; })}
                   onSave={(name, color) => saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, appearances: { ...settings.appearances, [key]: { name, color } } } }; })} />
-                {key === "birthdays" ? <CalendarDisclosure title="Choose birthdays" icon="birthday"><div className={styles.birthdayChoices}>{(snapshot?.birthdays || []).map(person => <label key={person.ref.objectId} className={styles.calendarToggle}><EventPeople refs={[person.ref]} available={snapshot?.refs} /><span>{person.ref.label}</span><input type="checkbox" aria-label={`Show birthday for ${person.ref.label}`} checked={!observanceSettings.hiddenBirthdays?.includes(person.ref.objectId)} onChange={e => { const checked = e.target.checked; void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, hiddenBirthdays: checked ? (settings.hiddenBirthdays || []).filter(id => id !== person.ref.objectId) : [...new Set([...(settings.hiddenBirthdays || []), person.ref.objectId])] } }; }); }} /></label>)}{!snapshot?.birthdays?.length && <p>Add birthdays to people’s profiles to choose them here.</p>}</div></CalendarDisclosure> : <CalendarDisclosure title={code ? `Edit holidays (${date.slice(0,4)})` : "Edit dates"} icon={code ? "interaction-milestone" : "edit"}>
+                {key === "birthdays" ? <CalendarDisclosure title="Choose birthdays" icon="birthday"><div className={styles.birthdayChoices}>{(snapshot?.birthdays || []).map(person => <label key={person.ref.objectId} className={styles.calendarToggle}><EventPeople refs={[person.ref]} available={snapshot?.refs} /><span>{person.ref.label}</span><input type="checkbox" aria-label={`Show birthday for ${person.ref.label}`} checked={!observanceSettings.hiddenBirthdays?.includes(person.ref.objectId)} onChange={e => { const checked = e.target.checked; void saveCalendarPreference("native", current => { const settings = current.observances || defaultObservances(); return { observances: { ...settings, hiddenBirthdays: checked ? (settings.hiddenBirthdays || []).filter(id => id !== person.ref.objectId) : [...new Set([...(settings.hiddenBirthdays || []), person.ref.objectId])] } }; }); }} /></label>)}{!snapshot?.birthdays?.length && <p>Add birthdays to people’s profiles to choose them here.</p>}</div></CalendarDisclosure> : <CalendarDisclosure title={code ? `Select holidays (${date.slice(0,4)})` : "Adjust dates"} icon={code ? "interaction-milestone" : "edit"}>
                   <CalendarObservanceSettings section={code ? "holidays" : "custom"} countryCode={code} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />
                 </CalendarDisclosure>}
               </section>;

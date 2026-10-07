@@ -1,3 +1,4 @@
+import { taskCompletionPatch } from "../../../lib/modules/planning/calendar-tasks";
 import { reconcilePlaces } from "../../../lib/modules/planning/place-reconciliation";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
@@ -222,7 +223,12 @@ export async function POST(request: Request) {
       throw new Error("This request is too large");
     const body = JSON.parse(raw);
     let result: unknown;
-    if (body.operation === "save") {
+    if (body.operation === "complete-task") {
+      if (typeof body.completed !== "boolean" || typeof body.occurrenceKey !== "string" || typeof body.expectedUpdatedAt !== "string") throw new Error("Choose a task and its current revision");
+      const event = (await readPlanningState()).events.find(item => item.id === body.eventId);
+      if (!event) throw new Error("Task not found");
+      result = await savePlanningRecord("events", taskCompletionPatch(event, body.occurrenceKey, body.completed), body.expectedUpdatedAt);
+    } else if (body.operation === "save") {
       if (
         !isPlanningCollection(body.collection) ||
         !body.input ||

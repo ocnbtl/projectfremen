@@ -23,6 +23,8 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
   const { reduced } = useCalendarMotion();
   const nativeMorph = typeof document !== "undefined" && Boolean(document.documentElement.dataset.calendarMorph);
   const heading = view === "year" ? value.slice(0, 4) : <><span className={styles.headingMonthFull}>{label(value, { month: "long" })}</span><span className={styles.headingMonthShort}>{label(value, { month: "short" })}</span><span className={styles.headingYear}>{value.slice(0, 4)}</span></>;
+  const monthIndex = Number(focused.slice(5,7)) - 1;
+  const dayWeeks = Math.ceil((new Date(year,monthIndex,1).getDay() + new Date(year,monthIndex+1,0).getDate()) / 7);
   const firstYear = Math.max(1900, Math.min(2189, year - 4));
   const choose = (day: string) => { onChange(day, mode); setOpen(false); };
   const changeMode = (next: DateScale) => { setDirection(dateScales.indexOf(next) > dateScales.indexOf(mode) ? 1 : -1); setMode(next); setFocused(value); };
@@ -53,7 +55,7 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
         <strong aria-live="polite">{mode === "year" ? `${firstYear}–${firstYear + 11}` : year}</strong>
         <button type="button" className={styles.pickerArrow} disabled={year >= 2200} aria-label={mode === "year" ? "Next years" : "Next year"} onClick={() => move(1)}><UnigentamosIcon role="chevron-right" size={18} /></button>
       </header>
-      <div ref={body} className={styles.navigatorBody} data-mode={mode} data-month-collection id="calendar-date-choices" role="tabpanel" aria-label={`${mode} choices`}>
+      <div ref={body} style={{"--navigator-height":`${mode === "day" ? 104 + dayWeeks * 28 : 282}px`} as CSSProperties} className={styles.navigatorBody} data-mode={mode} data-month-collection id="calendar-date-choices" role="tabpanel" aria-label={`${mode} choices`}>
         <AnimatePresence initial={false} mode="sync" custom={direction}><NavigatorPane key={`${mode}:${year}`} direction={direction} reduced={reduced}>
           {mode === "month" ? <div className={styles.monthChoices}>{Array.from({ length: 12 }, (_, i) => {
             const day = `${year}-${String(i + 1).padStart(2, "0")}-01`;
@@ -63,7 +65,7 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
             <strong>W{week.number}</strong><small>{label(week.start, { month: "short", day: "numeric" })}</small>
           </button>)}</div> : <div className={styles.navigatorDayChoices}>
             <div className={styles.navigatorMonthStrip} aria-label="Choose a month">{Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}-01`).map(month => <button type="button" key={month} aria-pressed={focused.slice(0, 7) === month.slice(0, 7)} onClick={() => setFocused(month)}>{label(month, { month: "short" })}</button>)}</div>
-            <CalendarMiniMonth month={`${year}-${focused.slice(5, 7)}-01`} value={focused} today={today} onSelect={choose} onFocusDate={day => { pendingFocus.current = day; setFocused(day); setYear(Number(day.slice(0, 4))); }} />
+            <CalendarMiniMonth fitWeeks month={`${year}-${focused.slice(5, 7)}-01`} value={focused} today={today} onSelect={choose} onFocusDate={day => { pendingFocus.current = day; setFocused(day); setYear(Number(day.slice(0, 4))); }} />
           </div>}
 
         </NavigatorPane></AnimatePresence>

@@ -30,7 +30,7 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
   const [customError, setCustomError] = useState("");
   return <div className={styles.observanceSettings}>
     {section !== "custom" && <section>
-      {!countryCode && <><div className={styles.holidayHeading}><h3><UnigentamosIcon role="interaction-milestone" size={18} />Holiday calendars</h3><p>Choose countries, then pick the holidays you want to see.</p></div>
+      {!countryCode && <><div className={styles.holidayHeading}><h3><UnigentamosIcon role="interaction-milestone" size={18} />Holiday calendars</h3><p>Choose a country to see its holidays, then pick the ones you’d like to see.</p></div>
       <div className={styles.countryPicker}>
         <SelectField contained searchable autoFocusSearch={false} aria-label="Holiday country" menuClassName={styles.calendarChoiceMenu} value={country} triggerContent={country ? undefined : <span>Select a country</span>} disabled={!catalog || busy} onChange={e => setCountry(e.target.value)}>
           {catalog?.countries.filter(x => !settings.countries.includes(x.code)).map(x => <option value={x.code} key={x.code}><span className={styles.countryOption}><CalendarCountryFlag code={x.code} /><span>{x.name}</span></span></option>)}
@@ -45,7 +45,7 @@ export default function CalendarObservanceSettings({ settings, catalog, loading,
         const appearance = observanceAppearance(settings, `holidays:${code}`, name);
         const holidays = [...new Map((catalog?.holidays || []).filter(x => x.country === code && x.date.startsWith(year)).map(x => [x.key, x])).values()];
         return <section className={styles.holidayCountry} key={code}>
-          {!countryCode && <div className={styles.holidayCountryHeader}>{!countryCode && <><CalendarCountryFlag code={code} /><strong>{appearance.name}</strong></>}<span>{year}</span>{!countryCode && <Button icon="edit" aria-expanded={editingCountries.includes(code)} onClick={() => setEditingCountries(items => items.includes(code) ? items.filter(item => item !== code) : [...items, code])}>Edit holidays</Button>}<Button icon="delete" aria-label={"Remove " + name + " holiday calendar"} disabled={busy} onClick={() => void onSave({ ...settings, countries: settings.countries.filter(x => x !== code) })} /></div>}
+          {!countryCode && <div className={styles.holidayCountryHeader}>{!countryCode && <><CalendarCountryFlag code={code} /><strong>{appearance.name}</strong></>}<span>{year}</span>{!countryCode && <Button icon="edit" aria-expanded={editingCountries.includes(code)} onClick={() => setEditingCountries(items => items.includes(code) ? items.filter(item => item !== code) : [...items, code])}>Select holidays</Button>}<Button icon="delete" aria-label={"Remove " + name + " holiday calendar"} disabled={busy} onClick={() => void onSave({ ...settings, countries: settings.countries.filter(x => x !== code) })} /></div>}
           {renderAppearance?.(`holidays:${code}`, name)}
           <AnimatePresence initial={false}>{(countryCode || editingCountries.includes(code)) && <motion.div initial={reduced ? false : {height:0, opacity:0}} animate={{height:"auto", opacity:1}} exit={{height:0, opacity:0}} transition={layoutTransition} className={styles.holidayList}>
             {holidays.map(holiday => <label className={styles.holidayChoice} key={holiday.key}>

@@ -1,4 +1,5 @@
 "use client";
+import TaskEventCard from "./TaskEventCard";
 import { motion } from "motion/react";
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Calendar, EventOccurrence } from "../../lib/modules/planning/types";
@@ -14,9 +15,9 @@ import EventContinuation from "./EventContinuation";
 import EventObjects from "./EventObjects";
 import styles from "./CalendarMonthView.module.css";
 
-export default function CalendarMonthView({ days, date, today, events, calendars, refs, zone, showWeekends, onDay, onMore, onOpen }: {
+export default function CalendarMonthView({ days, date, today, events, calendars, refs, zone, showWeekends, onDay, onMore, onOpen, onComplete }: {
   days: string[]; date: string; today: string; events: EventOccurrence[]; calendars: Calendar[]; refs: NativeObjectRef[];
-  zone: string; showWeekends: boolean; onDay: (day: string) => void; onMore: (day: string) => void; onOpen: (event: EventOccurrence) => void;
+  zone: string; showWeekends: boolean; onDay: (day: string) => void; onMore: (day: string) => void; onOpen: (event: EventOccurrence) => void; onComplete: (event: EventOccurrence) => void;
 }) {
   const { layoutTransition } = useCalendarMotion(), columns = showWeekends ? 7 : 5;
   const container = useRef<HTMLDivElement>(null);
@@ -45,7 +46,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
           const calendar = calendars.find(item => item.id === event.calendarId), group = eventGroup(calendar, event.groupId);
           const continuation = `${continuesBefore ? ", continues from earlier dates" : ""}${continuesAfter ? ", continues on later dates" : ""}`;
           const timing = event.allDay ? "" : eventTimeRange(event.startMs, event.endMs, zone);
-          return <motion.button key={`${event.id}:${first}`} layout transition={{ layout: layoutTransition }} type="button" className={styles.event}
+          return <TaskEventCard event={event} onComplete={onComplete} key={`${event.id}:${first}`} layout transition={{ layout: layoutTransition }} className={styles.event}
             style={{ ...eventColors(event, calendar), gridColumn: `${first + 1} / ${last + 2}`, gridRow: lane + 2 } as CSSProperties}
             data-morph-event={event.id} data-month-event={event.id} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
             aria-label={`${event.title}${timing ? `, ${timing}` : ""}${continuation}`} title={`${event.title}${timing ? ` · ${timing}` : ""}${continuation}`} onClick={() => onOpen(event)}>
@@ -54,7 +55,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
             <span className={styles.copy}><strong>{eventPreviewTitle(event)}</strong>{timing && <small>{timing}</small>}</span>
             <EventPeople refs={event.linkedRefs} available={refs} limit={2} /><EventObjects event={event} available={refs} />
 
-          </motion.button>;
+          </TaskEventCard>;
         })}
         {hidden.map((count, column) => count > 0 && <button type="button" key={week[column]} className={styles.more} style={{ gridColumn: column + 1, gridRow: capacity + 2 }} onClick={() => onMore(week[column])} aria-label={`${count} more events on ${label(week[column], { month: "long", day: "numeric" })}`}>+{count} more</button>)}
       </div>;

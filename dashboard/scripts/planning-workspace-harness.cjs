@@ -1487,6 +1487,57 @@ async function check(label, run) {
       if (!recurring) assert(canUndoTimeChange({...original, overrides:change.after}, change));
     }
   });
+  await check("calendar tasks persist and complete only the selected occurrence", async () => {
+    const { taskCompletionPatch } = require("../lib/modules/planning/calendar-tasks.ts");
+    const { planningWritableKeys } = require("../lib/modules/planning/ownership.ts");
+    assert(planningWritableKeys("events").includes("isTask"));
+    assert(planningWritableKeys("events").includes("completed"));
+    for (const recurring of [false,true]) {
+      const original = await savePlanningRecord("events", {...event({id:undefined,calendarId:"native",isTask:true,reminderMinutes:60,recurrence:recurring ? "FREQ=DAILY;COUNT=3" : ""}),createdAt:undefined,updatedAt:undefined});
+      const occurrences = eventOccurrences([original],"2026-03-01","2026-03-05","America/New_York");
+      const patch = taskCompletionPatch(original,occurrences[0].occurrenceKey,true);
+      const saved = await savePlanningRecord("events",patch,original.updatedAt);
+      assert.equal(saved.isTask,true);
+      assert.equal(saved.reminderMinutes,60);
+      const expanded = eventOccurrences([saved],"2026-03-01","2026-03-05","America/New_York");
+      assert.equal(expanded[0].completed,true);
+      if (recurring) assert(!expanded[1].completed);
+      await assert.rejects(() => savePlanningRecord("events",patch,original.updatedAt),/changed elsewhere/);
+      const reopened = await savePlanningRecord("events",taskCompletionPatch(saved,expanded[0].occurrenceKey,false),saved.updatedAt);
+      assert.equal(eventOccurrences([reopened],"2026-03-01","2026-03-05","America/New_York")[0].completed,false);
+    }
+    const imported = event({isTask:true,recurrence:"",source:{connectionId:"test",uid:"test"},overrides:{description:"Keep notes"}});
+    assert.deepEqual(taskCompletionPatch(imported,imported.start,true).overrides,{description:"Keep notes",completed:true});
+    const repeating = event({isTask:true,recurrence:"FREQ=DAILY",exceptions:{[event().start]:{location:"Keep this place"}}});
+    assert.deepEqual(taskCompletionPatch(repeating,repeating.start,true).exceptions[repeating.start],{location:"Keep this place",completed:true});
+    const importedRepeat = event({isTask:true,sourceExceptions:{[event().start]:{start:"2026-03-02T11:00",end:"2026-03-02T12:00",location:"Source location"}}});
+    const marked = {...importedRepeat,...taskCompletionPatch(importedRepeat,importedRepeat.start,true)};
+    const occurrence = eventOccurrences([marked],"2026-03-01","2026-03-04","America/New_York")[0];
+    assert.equal(occurrence.start,"2026-03-02T11:00"); assert.equal(occurrence.location,"Source location"); assert.equal(occurrence.completed,true);
+    assert.throws(() => taskCompletionPatch(event(),event().start,true),/no longer available/);
+    assert.throws(() => taskCompletionPatch(event({isTask:true}),"wrong",true),/valid/);
+  });
+  await check("task reminder boundaries, snooze, dismiss and completion stay distinct", () => {
+    const {reminderIsDue,taskReminderStatus} = require("../lib/modules/planning/calendar-tasks.ts");
+    const item = eventOccurrences([event({isTask:true,reminderMinutes:60})],"2026-03-01","2026-03-02","America/New_York")[0];
+    assert(!reminderIsDue(item,undefined,item.startMs-3600001));
+    assert(reminderIsDue(item,undefined,item.startMs-3600000));
+    assert.equal(taskReminderStatus(item.startMs,item.endMs,item.startMs-60000),"Upcoming task in 1 min");
+    assert.equal(taskReminderStatus(item.startMs,item.endMs,item.startMs),"Task ongoing");
+    assert.equal(taskReminderStatus(item.startMs,item.endMs,item.endMs),"Task overdue");
+    assert(!reminderIsDue({...item,completed:true},undefined,item.endMs));
+    assert(!reminderIsDue(item,{state:"dismissed"},item.endMs));
+    assert(!reminderIsDue(item,{state:"snoozed",until:new Date(item.endMs+60000).toISOString()},item.endMs));
+    assert(reminderIsDue(item,{state:"snoozed",until:new Date(item.endMs).toISOString()},item.endMs));
+  });
+  await check("both resize edges preserve the opposite edge and five-minute minimum", () => {
+    const {resizedEventTime} = require("../lib/modules/planning/calendar-tasks.ts");
+    const item={startMs:1000000,endMs:4600000};
+    assert.deepEqual(resizedEventTime(item,"start",400000),{startMs:400000,endMs:4600000});
+    assert.deepEqual(resizedEventTime(item,"end",5200000),{startMs:1000000,endMs:5200000});
+    assert.deepEqual(resizedEventTime(item,"start",4600000),{startMs:4300000,endMs:4600000});
+    assert.deepEqual(resizedEventTime(item,"end",1000000),{startMs:1000000,endMs:1300000});
+  });
   console.log(
     `${passed} planning behavior checks passed. Isolated fixture: ${fixture}`,
   );

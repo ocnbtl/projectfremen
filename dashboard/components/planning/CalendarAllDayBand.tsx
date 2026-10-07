@@ -1,4 +1,5 @@
 "use client";
+import TaskEventCard from "./TaskEventCard";
 import { motion } from "motion/react";
 import Link from "next/link";
 import type { CSSProperties } from "react";
@@ -16,9 +17,9 @@ import EventContinuation from "./EventContinuation";
 import EventObjects from "./EventObjects";
 import styles from "./CalendarWorkspace.module.css";
 
-export default function CalendarAllDayBand({ days, events, calendars, refs, dated, zone, columns, today, onOpen }: {
+export default function CalendarAllDayBand({ days, events, calendars, refs, dated, zone, columns, today, onOpen, onComplete }: {
   days: string[]; events: EventOccurrence[]; calendars: Calendar[]; refs: PlanningSnapshot["refs"]; dated: PlanningSnapshot["dated"];
-  zone: string; columns: string; today: string; onOpen: (event: EventOccurrence) => void;
+  zone: string; columns: string; today: string; onOpen: (event: EventOccurrence) => void; onComplete: (event: EventOccurrence) => void;
 }) {
   const { layoutTransition } = useCalendarMotion();
   const { segments } = monthWeekLayout(days, events.filter(e => e.allDay), zone, Infinity);
@@ -33,7 +34,7 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
     {segments.map(({ event, first, last, lane, continuesBefore, continuesAfter }) => {
       const calendar = calendars.find(c => c.id === event.calendarId), group = eventGroup(calendar, event.groupId);
       const title = `${event.title}${continuesBefore ? " · Continues from earlier dates" : ""}${continuesAfter ? " · Continues on later dates" : ""}`;
-      return <motion.button layout transition={{ layout: layoutTransition }} key={event.id} type="button" className={styles.allDayItem}
+      return <TaskEventCard event={event} onComplete={onComplete} layout transition={{ layout: layoutTransition }} key={event.id} className={styles.allDayItem}
         style={{ ...eventColors(event, calendar), gridColumn: `${first + 2} / ${last + 3}`, gridRow: lane + 1 } as CSSProperties}
         data-morph-event={event.id} data-span-event={event.id} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
         aria-label={title} title={title} onClick={() => onOpen(event)}>
@@ -41,7 +42,7 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
         <EventGlyph event={event} icon={group?.icon} />
         <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventPeople refs={event.linkedRefs} available={refs} /><EventObjects event={event} available={refs} />
 
-      </motion.button>;
+      </TaskEventCard>;
     })}
     {links.map(({ item, first, last }, i) => <Link key={item.id} className={styles.allDayItem} style={{ gridColumn: `${first + 2} / ${last + 3}`, gridRow: lanes + i + 1, "--event-color": "var(--module-secondary-500)" } as CSSProperties} href={item.ownerRef?.route || "/admin/personal"}>
       {item.start < days[first] && <UnigentamosIcon role="chevron-right" size={12} style={{ transform: "rotate(180deg)" }} />}

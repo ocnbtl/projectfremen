@@ -46,6 +46,8 @@ export type EventFields = {
   end: string;
   timeZone: string;
   allDay: boolean;
+  isTask?: boolean;
+  completed?: boolean;
   calendarId: string;
   groupId?: string;
   placeId?: string;

@@ -2586,5 +2586,30 @@
 
 .dateNavigator .navigatorMonthStrip button { padding-block:5px; }
 
+/* A single shade continues through the header, all-day lane and timeline. */
+.fittedDayHeader[data-today="true"],.allDayColumn[data-today="true"],.fittedColumn[data-today="true"] { background:#faf9fd; }
+.calendarCard {border-color:color-mix(in srgb,var(--calendar-card-color,var(--module-icon)) 42%,white);box-shadow:0 0 0 1px color-mix(in srgb,var(--calendar-card-color,var(--module-icon)) 9%,transparent),0 3px 14px color-mix(in srgb,var(--calendar-card-color,var(--module-icon)) 13%,transparent);}
+.fittedEvent .fittedResize {height:min(8px,20%);min-height:0;width:100%;padding:0;z-index:5;background:transparent;touch-action:none;border:0;left:0;}
+.fittedResize[data-edge="start"] {top:0;bottom:auto;}
+.fittedResize[data-edge="end"] {bottom:0;top:auto;}
+.fittedResize::after {content:"";position:absolute;left:calc(50% - 10px);width:20px;height:1px;top:3px;border-radius:2px;background:currentColor;opacity:0;transition:opacity .15s;}
+.fittedEvent:hover .fittedResize::after,.fittedResize:focus-visible::after {opacity:.65;}
+.fittedEvent .fittedResize:hover,.fittedEvent .fittedResize:focus-visible {background:transparent;outline:0;}
+.fittedResize:focus-visible::after {height:2px;opacity:1;}
+.dateNavigator .navigatorBody[data-mode] {height:var(--navigator-height,290px);max-height:none;flex:0 0 auto;transition:height .32s cubic-bezier(.22,1,.36,1);padding:0;}
+.dateNavigator {gap:4px;}
+.dateNavigator .pickerHeading {min-height:28px;}
+.dateNavigator .pickerArrow {height:28px;min-height:28px;}
+.dateNavigator .navigatorBody[data-mode="month"],.dateNavigator .navigatorBody[data-mode="year"] {height:148px;}
+.dateNavigator .navigatorPane {inset:0;padding:5px;overflow:visible;box-sizing:border-box;}
+.dateNavigator .navigatorBody .monthChoices {padding:0;gap:5px;align-content:start;grid-auto-rows:30px;flex:0 0 auto;}
+.dateNavigator .navigatorBody .monthChoices button {min-height:30px;padding:4px;}
+.dateNavigator .weekChoices {gap:2px;padding:2px;}
+.dateNavigator .weekChoices button {min-height:32px;height:32px;padding:2px 0;}
+.dateNavigator .navigatorDayChoices {gap:5px;}
+.dateNavigator .navigatorDayChoices .miniMonth {min-height:0;height:auto;padding:3px;gap:4px;}
+.dateNavigator .navigatorDayChoices .miniDays {grid-template-rows:18px repeat(6,26px);gap:2px;}
+@media(prefers-reduced-motion:reduce) {.dateNavigator .navigatorBody[data-mode] {transition:none;}}
+
 .timedEventContent > .eventPeople { --avatar-size:calc(var(--event-avatar-size,24px) - 2px); }
 @media(max-width:760px) { .timedEventContent > .eventPeople { --avatar-size:18px; } }

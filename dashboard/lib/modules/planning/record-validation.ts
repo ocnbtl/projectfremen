@@ -92,6 +92,8 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       end: string(raw.end, "End", 40, true),
       timeZone: string(raw.timeZone, "Time zone", 100, true),
       allDay: raw.allDay === true,
+      isTask: raw.isTask === true,
+      completed: raw.completed === true,
       calendarId: string(raw.calendarId, "Calendar", 300, true),
       groupId: string(raw.groupId, "Color group", 100),
       placeId: string(raw.placeId, "Place", 300),

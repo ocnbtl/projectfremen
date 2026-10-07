@@ -1,0 +1,8 @@
+.card { position:relative; }
+.card .open { position:absolute; inset:0; z-index:1; width:100%; height:100%; margin:0; padding:0; border:0; border-radius:inherit; background:transparent; cursor:pointer; }
+.card .open:focus-visible { outline:2px solid var(--module-icon,#59518b); outline-offset:-3px; }
+.check { position:relative; z-index:3; flex:none; display:inline-flex; align-items:center; justify-content:center; width:19px; height:19px; min-height:19px; padding:0; margin:0; border:1.5px solid var(--module-icon,#59518b); border-radius:50%; color:var(--module-icon,#59518b); background:transparent; cursor:pointer; transition:background .18s,color .18s,box-shadow .18s; }
+.check:hover,.check:focus-visible { box-shadow:0 0 0 3px #59518b25; }
+.check[aria-pressed="true"] { background:var(--module-icon,#59518b); color:white; }
+.card[data-completed="true"] { opacity:.65; }
+.card[data-completed="true"] strong { text-decoration:line-through; }

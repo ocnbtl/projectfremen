@@ -1,3 +1,4 @@
+import { reminderIsDue } from "../../../../lib/modules/planning/calendar-tasks";
 import { readPersonalRecords } from "../../../../lib/personal-records-store";
 import { repeatBirthdays } from "../../../../lib/modules/planning/repeat-birthdays";
 import { NextResponse } from "next/server";
@@ -20,19 +21,24 @@ export async function GET(request: Request) {
       now = Date.now();
     const today = localDate(new Date(now), zone),
       state = await readPlanningState();
-    const events = eventOccurrences(
+    const birthdays = await repeatBirthdays(state.events);
+    const recent = eventOccurrences(
       state.events,
       addDays(today, -30),
       addDays(today, 31),
       zone,
-      await repeatBirthdays(state.events),
+      birthdays,
     );
+    // An unfinished task does not expire when it leaves the ordinary reminder window.
+    const taskRecords = state.events.filter(event => event.isTask || event.overrides?.isTask || Object.values(event.exceptions || {}).some(value => value.isTask) || Object.values(event.sourceExceptions || {}).some(value => value.isTask));
+    const firstTaskDate = taskRecords.flatMap(event => [event.start, event.overrides?.start, ...Object.values(event.exceptions || {}).map(value => value.start)]).filter((value): value is string => Boolean(value)).map(value => value.slice(0,10)).sort()[0];
+    const olderTasks = firstTaskDate && firstTaskDate < addDays(today,-30) ? eventOccurrences(taskRecords,firstTaskDate,addDays(today,-30),zone,birthdays).filter(event => event.isTask) : [];
+    const events = [...new Map([...olderTasks,...recent].map(event => [event.id,event])).values()];
     const records = events.some(e => e.linkedRefs.length) ? await readPersonalRecords().catch(() => []) : [];
     const reminders = events
       .filter(
         (e) =>
-          e.reminderMinutes !== null &&
-          e.startMs - e.reminderMinutes * 60000 <= now,
+          reminderIsDue(e, state.reminders.find(r => r.occurrenceId === e.id), now),
       )
       .flatMap((e) => {
         const receipt = state.reminders.find((r) => r.occurrenceId === e.id);
@@ -54,6 +60,8 @@ export async function GET(request: Request) {
                 place: (() => { const p=state.places.find(p => p.id === e.placeId); return p ? {id:p.id,name:p.name} : undefined; })(),
                 location: e.location,
                 allDay: e.allDay,
+                isTask: Boolean(e.isTask),
+                eventUpdatedAt: state.events.find(event => event.id === e.eventId)?.updatedAt,
                 receipt,
               },
             ];

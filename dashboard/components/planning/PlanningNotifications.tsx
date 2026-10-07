@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { taskReminderStatus } from "../../lib/modules/planning/calendar-tasks";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import { EventObjectIdentity } from "./EventObjects";
@@ -22,6 +24,8 @@ type Reminder = {
   place?: {id:string;name:string};
   location?: string;
   allDay: boolean;
+  isTask?: boolean;
+  eventUpdatedAt?: string;
   receipt?: ReminderReceipt;
 };
 /** In-app delivery surface. Native notification delivery can consume the same bounded endpoint. */
@@ -32,6 +36,10 @@ export default function PlanningNotifications() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(""),
     [loaded, setLoaded] = useState(false);
+  const reduced = useReducedMotion();
+  const [now,setNow] = useState(Date.now());
+  useEffect(() => { if (!open) return; setNow(Date.now()); const timer=setInterval(() => setNow(Date.now()),1000); return () => clearInterval(timer); },[open]);
+  const mutationVersion = useRef(0);
   const running = useRef(false),
     mounted = useRef(false);
   const poll = useCallback(async () => {
@@ -43,6 +51,7 @@ export default function PlanningNotifications() {
       return;
     }
     running.current = true;
+    const version=mutationVersion.current;
     try {
       const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       const response = await fetch(
@@ -56,7 +65,7 @@ export default function PlanningNotifications() {
           "Reminders could not refresh. Your saved reminders are unchanged.",
         );
       const data = await response.json();
-      if (mounted.current) {
+      if (mounted.current && version === mutationVersion.current) {
         setItems(data.reminders);
         setTotal(data.total);
         setLoaded(true);
@@ -100,14 +109,15 @@ export default function PlanningNotifications() {
       window.removeEventListener("unigentamos-planning-changed", poll);
     };
   }, [poll]);
-  async function acknowledge(item: Reminder, state: "snoozed" | "dismissed") {
+  async function acknowledge(item: Reminder, state: "snoozed" | "dismissed" | "completed") {
+    mutationVersion.current += 1;
     setBusy(item.id);
     setError("");
     try {
       const response = await fetch("/api/planning", {
         method: "POST",
         headers: buildJsonHeadersWithCsrf(),
-        body: JSON.stringify({
+        body: JSON.stringify(state === "completed" ? {operation:"complete-task",eventId:item.eventId,occurrenceKey:item.occurrenceKey,completed:true,expectedUpdatedAt:item.eventUpdatedAt} : {
           operation: "save",
           collection: "reminders",
           input: {
@@ -131,6 +141,7 @@ export default function PlanningNotifications() {
     } catch (e) {
       setError((e as Error).message);
     } finally {
+      mutationVersion.current += 1;
       setBusy("");
     }
   }
@@ -144,12 +155,12 @@ export default function PlanningNotifications() {
       {error && <div className={styles.error} role="alert"><p>{error}</p><WorkspaceButton onClick={() => void poll()}>Try again</WorkspaceButton></div>}
       {!loaded && !error && <div className={styles.empty} role="status"><UnigentamosIcon role="clock" size={28} /><strong>Checking reminders…</strong></div>}
       {loaded && !error && !items.length && <div className={styles.empty}><span><UnigentamosIcon role="check" size={24} /></span><strong>You’re all caught up</strong><p>Your event reminders will appear here.</p></div>}
-      {items.length > 0 && <div className={styles.items}>{error && <p className={styles.note}>Showing the last successful check.</p>}{items.map(item => {
+      {items.length > 0 && <div className={styles.items}>{error && <p className={styles.note}>Showing the last successful check.</p>}{<AnimatePresence initial={false}>{items.map(item => {
         const date=new Date(item.startMs);
         const time=(ms:number) => new Date(ms).toLocaleTimeString("en-US",{timeZone:item.timeZone,hour:"numeric",minute:"2-digit",hour12:true}).toLowerCase().replace(/:00(?=\s)/, "").replace(/\s/g, "");
         const links=[...(item.linkedRefs || [])];
         if(item.place && !links.some(r => r.module === "map" && r.objectId === item.place!.id)) links.push({module:"map",objectType:"place",objectId:item.place.id,label:item.place.name,route:"/admin/map"});
-        return <article key={item.id} className={styles.item} data-busy={busy === item.id || undefined}>
+        return <motion.article layout initial={reduced ? false : {opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:reduced ? 1 : .98}} transition={{duration:reduced ? 0 : .22}} key={item.id} className={styles.item} data-busy={busy === item.id || undefined}>
           <div className={styles.summary}><Link className={styles.event} onClick={() => setOpen(false)} href={`/admin/calendar?selected=${encodeURIComponent(item.eventId)}&occurrence=${encodeURIComponent(item.occurrenceKey)}&date=${encodeURIComponent(item.date)}`}>
             <span className={styles.date}><small>{date.toLocaleDateString("en-US",{month:"short"})}</small><b>{date.getDate()}</b></span>
             <span className={styles.copy}><strong>{item.title}</strong><time dateTime={date.toISOString()}><UnigentamosIcon role="clock" size={13} />{item.allDay ? "All day" : `${time(item.startMs)} to ${time(item.endMs)}` }</time></span>
@@ -157,9 +168,9 @@ export default function PlanningNotifications() {
           </Link>
           {links.length > 0 && <div className={styles.links}>{links.map(ref => <Link key={`${ref.module}:${ref.objectType}:${ref.objectId}`} href={ref.route} onClick={() => setOpen(false)}><EventObjectIdentity record={ref} /><span>{ref.label}</span></Link>)}</div>}
           {!links.some(r => r.module === "map") && item.location && <div className={styles.location}><UnigentamosIcon role="location" size={14}/>{item.location}</div>}
-          </div><div className={styles.actions}><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"snoozed")} aria-label={`Snooze ${item.title} for 15 minutes`}><UnigentamosIcon role="clock" size={15} />Snooze 15 min</button><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"dismissed")} aria-label={`Dismiss ${item.title}`}><UnigentamosIcon role="check" size={15} />Dismiss</button></div>
-        </article>;
-      })}{total > items.length && <p className={styles.note}>{items.length} of {total} reminders. More appear as you clear these.</p>}</div>}
+          </div>{item.isTask && <div className={styles.taskStatus}><AnimatePresence initial={false} mode="popLayout"><motion.span key={taskReminderStatus(item.startMs,item.endMs,now)} initial={reduced ? false : {opacity:0,y:4}} animate={{opacity:1,y:0}} exit={{opacity:0,y:reduced ? 0 : -4}} transition={{duration:reduced ? 0 : .22}}>{taskReminderStatus(item.startMs,item.endMs,now)}</motion.span></AnimatePresence></div>}<div className={styles.actions}><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"snoozed")} aria-label={`Snooze ${item.title} for 15 minutes`}><UnigentamosIcon role="clock" size={15} />Snooze 15 min</button><button type="button" disabled={Boolean(busy)} onClick={() => void acknowledge(item,"dismissed")} aria-label={`Dismiss ${item.title}`}><UnigentamosIcon role="close" size={15} />Dismiss</button>{item.isTask && <button type="button" className={styles.complete} disabled={Boolean(busy)} onClick={() => void acknowledge(item,"completed")} aria-label={`Complete ${item.title}`}><UnigentamosIcon role="check" size={15}/>Complete</button>}</div>
+        </motion.article>;
+      })}</AnimatePresence>}{total > items.length && <p className={styles.note}>{items.length} of {total} reminders. More appear as you clear these.</p>}</div>}
     </Popover.Content></Popover.Portal>
   </Popover.Root>;
 }
