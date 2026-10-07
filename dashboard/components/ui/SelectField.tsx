@@ -2,7 +2,8 @@
 import { Children, isValidElement, useId, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactNode, type SelectHTMLAttributes } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-type OptionProps = { value?: string | number; disabled?: boolean; children?: ReactNode };
+import { matchesChoiceSearch } from "../../lib/ui/choice-search";
+type OptionProps = { value?: string | number; disabled?: boolean; children?: ReactNode; title?: string; "data-search"?: string };
 type Props = SelectHTMLAttributes<HTMLSelectElement> & { searchable?: boolean; autoFocusSearch?: boolean; contained?: boolean; columns?: number; triggerContent?: ReactNode; menuClassName?: string; onCreate?: () => void; createLabel?: string };
 /** Nonmodal choice menus keep nested dismissals local to their owning control. */
 export default function SelectField({ value, defaultValue, onChange, children, className, disabled, required, name, id, searchable = false, autoFocusSearch = true, contained = false, columns = 1, triggerContent, menuClassName = "", onCreate, createLabel = "Create organization", ...attributes }: Props) {
@@ -11,11 +12,11 @@ export default function SelectField({ value, defaultValue, onChange, children, c
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [internal, setInternal] = useState(String(defaultValue ?? "")), [fieldLabel, setFieldLabel] = useState<string>();
   const chosen = String(value ?? internal);
   useLayoutEffect(() => { const label = trigger.current?.closest("label")?.cloneNode(true) as HTMLElement | undefined; label?.querySelectorAll("button, select, input, textarea").forEach(node => node.remove()); setFieldLabel(label?.getAttribute("aria-label") || label?.textContent?.trim() || undefined); }, []);
-  const options: {value:string; label:ReactNode; text:string; disabled?:boolean}[] = [];
+  const options: {value:string; label:ReactNode; text:string; disabled?:boolean; title?:string; keywords?:string}[] = [];
   const plain = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<OptionProps>(child) ? plain(child.props.children) : String(child)).join("");
-  const collect = (nodes: ReactNode) => Children.forEach(nodes, node => { if (!isValidElement<OptionProps>(node)) return; if (node.type !== "option") { collect(node.props.children); return; } options.push({value:String(node.props.value ?? plain(node.props.children)),label:node.props.children,text:plain(node.props.children),disabled:node.props.disabled}); });
+  const collect = (nodes: ReactNode) => Children.forEach(nodes, node => { if (!isValidElement<OptionProps>(node)) return; if (node.type !== "option") { collect(node.props.children); return; } options.push({value:String(node.props.value ?? plain(node.props.children)),label:node.props.children,text:plain(node.props.children),disabled:node.props.disabled,title:node.props.title,keywords:node.props["data-search"]}); });
   collect(children);
-  const filtered = options.filter(option => !query || `${option.text} ${option.value}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
+  const filtered = options.filter(option => matchesChoiceSearch(query, option.text, option.value, option.keywords));
   const label = attributes["aria-label"] || fieldLabel || "Select an option";
   const select = (next:string) => {setInternal(next); onChange?.({target:{value:next},currentTarget:{value:next}} as ChangeEvent<HTMLSelectElement>); setOpen(false); setQuery("");};
   return <Popover.Root open={open} onOpenChange={next => {setOpen(next); if (!next) setQuery("");}}>
@@ -36,7 +37,7 @@ export default function SelectField({ value, defaultValue, onChange, children, c
         else if (!inSearch && event.key.length === 1 && !event.ctrlKey && !event.metaKey && event.key !== " ") items.find(item => item.textContent?.toLowerCase().startsWith(event.key.toLowerCase()))?.focus();
       }}>
       {searchable && <div className="app-choice-search"><input ref={search} aria-label={`Search ${label}`} placeholder="Search…" value={query} onChange={event => setQuery(event.target.value)} />{onCreate && <button type="button" aria-label={createLabel} title={createLabel} onClick={() => {setOpen(false); onCreate();}}><UnigentamosIcon role="plus" size={18} /></button>}</div>}
-      <div id={listId} role="listbox" aria-label={label} className="app-choice-options" style={{gridTemplateColumns:`repeat(${columns}, minmax(0, 1fr))`}}>{filtered.map(option => <button type="button" role="option" tabIndex={option.value === chosen ? 0 : -1} aria-selected={option.value === chosen} data-select-value={option.value} disabled={option.disabled} className="app-select-item" key={option.value} onClick={() => select(option.value)}>{option.label}{option.value === chosen && <UnigentamosIcon role="check" size={14} />}</button>)}</div>
+      <div id={listId} role="listbox" aria-label={label} className="app-choice-options" style={{gridTemplateColumns:`repeat(${columns}, minmax(0, 1fr))`}}>{filtered.map(option => <button type="button" role="option" tabIndex={option.value === chosen ? 0 : -1} aria-selected={option.value === chosen} data-select-value={option.value} title={option.title} disabled={option.disabled} className="app-select-item" key={option.value} onClick={() => select(option.value)}>{option.label}{option.value === chosen && <UnigentamosIcon role="check" size={14} />}</button>)}</div>
       {!filtered.length && <p className="app-choice-empty">No matches</p>}
     </Popover.Content></Popover.Portal>
   </Popover.Root>;

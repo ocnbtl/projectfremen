@@ -3,7 +3,7 @@
 import useCalendarAutosave from "./useCalendarAutosave";
 import { useState } from "react";
 import type { Calendar, EventGroup } from "../../lib/modules/planning/types";
-import { calendarGroups, GROUP_ICONS } from "../../lib/modules/planning/calendar-groups";
+import { calendarGroups, GROUP_ICON_CATALOG } from "../../lib/modules/planning/calendar-groups";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -40,7 +40,7 @@ function GroupEditor({ calendar, onSave }: { calendar: Calendar; onSave: (calend
       {groups.map((group, index) => <div className={styles.groupSettingsRow} key={group.id}>
         <label aria-label="Group icon">
           <SelectField aria-label={`Group ${index + 1} icon`} searchable autoFocusSearch={false} contained columns={6} triggerContent={<UnigentamosIcon role={group.icon} size={18} />} value={group.icon} menuClassName={`${styles.calendarChoiceMenu} ${styles.groupIconMenu}`} onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, icon: event.target.value } : item))}>
-            {[...new Set([...GROUP_ICONS, group.icon])].map(icon => <option key={icon} value={icon}><span className={styles.viewChoice}><UnigentamosIcon role={icon} size={16} /><span className="sr-only">{getIconEntry(icon).label}</span></span></option>)}
+            {[...GROUP_ICON_CATALOG, ...(!GROUP_ICON_CATALOG.some(icon => icon.role === group.icon) ? [{ role: group.icon, label: getIconEntry(group.icon).label, keywords: "" }] : [])].map(icon => <option key={icon.role} value={icon.role} title={icon.label} data-search={icon.keywords}><span className={styles.viewChoice}><UnigentamosIcon role={icon.role} size={16} /><span className="sr-only">{icon.label}</span></span></option>)}
           </SelectField>
         </label>
         <label aria-label="Group name">

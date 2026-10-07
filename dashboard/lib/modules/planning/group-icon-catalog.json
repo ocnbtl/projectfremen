@@ -1,0 +1,1117 @@
+[
+  {
+    "role": "briefcase",
+    "label": "Occupation",
+    "keywords": "business development prospecting"
+  },
+  {
+    "role": "university",
+    "label": "School and learning",
+    "keywords": "customer training enablement lectures class lecture school"
+  },
+  {
+    "role": "person",
+    "label": "Person",
+    "keywords": ""
+  },
+  {
+    "role": "routine",
+    "label": "Recurring routines",
+    "keywords": "subscription reviews recurring review"
+  },
+  {
+    "role": "travel",
+    "label": "World and time zones",
+    "keywords": "time zone coordination timezone international travel"
+  },
+  {
+    "role": "star",
+    "label": "Star",
+    "keywords": ""
+  },
+  {
+    "role": "goal",
+    "label": "Goal",
+    "keywords": ""
+  },
+  {
+    "role": "users",
+    "label": "People group",
+    "keywords": "group projects project collaboration"
+  },
+  {
+    "role": "reminder",
+    "label": "Reminder",
+    "keywords": ""
+  },
+  {
+    "role": "module-projects",
+    "label": "Projects",
+    "keywords": ""
+  },
+  {
+    "role": "module-notes",
+    "label": "Notes",
+    "keywords": ""
+  },
+  {
+    "role": "module-media",
+    "label": "Media",
+    "keywords": "portfolio updates showcase"
+  },
+  {
+    "role": "module-resources",
+    "label": "Resources",
+    "keywords": "library visits reading books"
+  },
+  {
+    "role": "module-finance",
+    "label": "Finance",
+    "keywords": "investment reviews investments portfolio stocks"
+  },
+  {
+    "role": "birthday",
+    "label": "Birthday",
+    "keywords": "birthdays birthday party celebration"
+  },
+  {
+    "role": "location",
+    "label": "Location",
+    "keywords": "site visits visit inspection location"
+  },
+  {
+    "role": "organization",
+    "label": "Organization",
+    "keywords": "community meetings neighborhood meeting"
+  },
+  {
+    "role": "clock",
+    "label": "Time",
+    "keywords": ""
+  },
+  {
+    "role": "interaction-milestone",
+    "label": "Milestone interaction",
+    "keywords": ""
+  },
+  {
+    "role": "hometown",
+    "label": "Hometown",
+    "keywords": ""
+  },
+  {
+    "role": "partner",
+    "label": "Partnership and care",
+    "keywords": "partnership calls partner alliance caregiver shifts respite coverage"
+  },
+  {
+    "role": "active",
+    "label": "Active",
+    "keywords": ""
+  },
+  {
+    "role": "dormant",
+    "label": "Dormant",
+    "keywords": "night shifts shift overnight roster"
+  },
+  {
+    "role": "dog",
+    "label": "Pets and animals",
+    "keywords": "animal care pet vet"
+  },
+  {
+    "role": "walk",
+    "label": "Walk",
+    "keywords": ""
+  },
+  {
+    "role": "feed",
+    "label": "Meals",
+    "keywords": ""
+  },
+  {
+    "role": "droplet",
+    "label": "Water",
+    "keywords": ""
+  },
+  {
+    "role": "car",
+    "label": "Car",
+    "keywords": "road trips trip driving car"
+  },
+  {
+    "role": "travel-van",
+    "label": "Travel by van",
+    "keywords": "camper trips van rv trip"
+  },
+  {
+    "role": "travel-plane",
+    "label": "Travel by plane",
+    "keywords": "flights flight airport plane"
+  },
+  {
+    "role": "travel-train",
+    "label": "Travel by train",
+    "keywords": "train journeys railway rail"
+  },
+  {
+    "role": "travel-boat",
+    "label": "Travel by boat",
+    "keywords": "boat travel ferry cruise sailing"
+  },
+  {
+    "role": "travel-bus",
+    "label": "Travel by bus",
+    "keywords": "school trips field trip excursion"
+  },
+  {
+    "role": "travel-bike",
+    "label": "Travel by bike",
+    "keywords": "cycling rides bicycle ride"
+  },
+  {
+    "role": "module-map",
+    "label": "Map",
+    "keywords": ""
+  },
+  {
+    "role": "module-personal",
+    "label": "Personal",
+    "keywords": "social checkins checkin companion loneliness"
+  },
+  {
+    "role": "module-reviews",
+    "label": "Reviews",
+    "keywords": ""
+  },
+  {
+    "role": "module-vault",
+    "label": "Vault",
+    "keywords": ""
+  },
+  {
+    "role": "build",
+    "label": "Personal build",
+    "keywords": ""
+  },
+  {
+    "role": "palette",
+    "label": "Art and design",
+    "keywords": "design reviews visual art review"
+  },
+  {
+    "role": "component",
+    "label": "Component",
+    "keywords": ""
+  },
+  {
+    "role": "motion",
+    "label": "Motion",
+    "keywords": ""
+  },
+  {
+    "role": "photo-camera",
+    "label": "Photography",
+    "keywords": "local sightseeing tourism photos photo shoots photography shoot"
+  },
+  {
+    "role": "interaction-memory",
+    "label": "Memory interaction",
+    "keywords": ""
+  },
+  {
+    "role": "interaction-note",
+    "label": "Note interaction",
+    "keywords": "writing sessions script copy drafting"
+  },
+  {
+    "role": "interaction-catch-up",
+    "label": "Catch-up interaction",
+    "keywords": " cafe coffee catchup"
+  },
+  {
+    "role": "interaction-meeting",
+    "label": "Meeting interaction",
+    "keywords": "team meetings standup sync meeting colleagues"
+  },
+  {
+    "role": "interaction-call",
+    "label": "Call interaction",
+    "keywords": "discovery calls client call"
+  },
+  {
+    "role": "interaction-message",
+    "label": "Message interaction",
+    "keywords": "audience engagement comments community"
+  },
+  {
+    "role": "email",
+    "label": "Email",
+    "keywords": "email catchup inbox correspondence"
+  },
+  {
+    "role": "website",
+    "label": "Website",
+    "keywords": ""
+  },
+  {
+    "role": "relationship-map",
+    "label": "Relationships",
+    "keywords": "professional networking connections referrals"
+  },
+  {
+    "role": "industry",
+    "label": "Industry",
+    "keywords": ""
+  },
+  {
+    "role": "wallet",
+    "label": "Wallet",
+    "keywords": "budget reviews spending review"
+  },
+  {
+    "role": "piggy-bank",
+    "label": "Savings",
+    "keywords": "savings planning saving emergency fund"
+  },
+  {
+    "role": "credit-card",
+    "label": "Credit card",
+    "keywords": "bill payments bills payment utilities"
+  },
+  {
+    "role": "banknote",
+    "label": "Banknote",
+    "keywords": ""
+  },
+  {
+    "role": "life-dream",
+    "label": "Life dream",
+    "keywords": ""
+  },
+  {
+    "role": "sparkles",
+    "label": "Enhance",
+    "keywords": ""
+  },
+  {
+    "role": "resource",
+    "label": "Resource",
+    "keywords": "documentation writing docs"
+  },
+  {
+    "role": "object",
+    "label": "Object",
+    "keywords": ""
+  },
+  {
+    "role": "password",
+    "label": "Password",
+    "keywords": ""
+  },
+  {
+    "role": "review",
+    "label": "Review",
+    "keywords": ""
+  },
+  {
+    "role": "timeline",
+    "label": "Timeline",
+    "keywords": ""
+  },
+  {
+    "role": "follow-up",
+    "label": "Follow-up",
+    "keywords": ""
+  },
+  {
+    "role": "decision",
+    "label": "Decision",
+    "keywords": ""
+  },
+  {
+    "role": "calendar-group-focus-2",
+    "label": "Deep work",
+    "keywords": "deep work focus concentration quiet block"
+  },
+  {
+    "role": "interaction-history",
+    "label": "Interaction history",
+    "keywords": "one to ones 1:1 manager check in"
+  },
+  {
+    "role": "calendar-group-presentation",
+    "label": "Presentations",
+    "keywords": "presentations slides demo speaking"
+  },
+  {
+    "role": "calendar-group-calendar-stats",
+    "label": "Planning sessions",
+    "keywords": "planning sessions priorities roadmap"
+  },
+  {
+    "role": "calendar-group-microscope",
+    "label": "Research blocks",
+    "keywords": "research blocks investigation discovery"
+  },
+  {
+    "role": "calendar-group-git-branch",
+    "label": "Decision reviews",
+    "keywords": "decision reviews choices options"
+  },
+  {
+    "role": "calendar-group-tools-kitchen-2",
+    "label": "Lunch breaks",
+    "keywords": "lunch breaks break meal restaurant reservations dining reservation"
+  },
+  {
+    "role": "calendar-group-chess",
+    "label": "Strategy planning",
+    "keywords": "strategy planning vision business"
+  },
+  {
+    "role": "calendar-group-building-bank",
+    "label": "Banking and institutions",
+    "keywords": "investor meetings fundraising capital government appointments dmv municipal appointment"
+  },
+  {
+    "role": "calendar-group-user-search",
+    "label": "Hiring interviews",
+    "keywords": "hiring interviews interview recruitment"
+  },
+  {
+    "role": "calendar-group-rocket",
+    "label": "Product launches",
+    "keywords": "product launches launch release startup"
+  },
+  {
+    "role": "calendar-group-settings",
+    "label": "Operations reviews",
+    "keywords": "operations reviews process systems"
+  },
+  {
+    "role": "calendar-group-ear",
+    "label": "Customer discovery",
+    "keywords": "customer discovery listen research"
+  },
+  {
+    "role": "calendar-group-building-skyscraper",
+    "label": "Board meetings",
+    "keywords": "board meetings executive leadership"
+  },
+  {
+    "role": "calendar-group-chart-pie",
+    "label": "Runway reviews",
+    "keywords": "runway reviews budget allocation"
+  },
+  {
+    "role": "calendar-group-compass",
+    "label": "Company offsites",
+    "keywords": "company offsites offsite retreat direction"
+  },
+  {
+    "role": "calendar-group-file-pencil",
+    "label": "Proposal writing",
+    "keywords": "proposal writing scope quote"
+  },
+  {
+    "role": "calendar-group-chalkboard",
+    "label": "Client workshops",
+    "keywords": "client workshops workshop facilitation"
+  },
+  {
+    "role": "calendar-group-hourglass",
+    "label": "Billable work",
+    "keywords": "billable work timesheet hours"
+  },
+  {
+    "role": "calendar-group-package-export",
+    "label": "Client delivery",
+    "keywords": "client delivery deliverable handoff"
+  },
+  {
+    "role": "calendar-group-receipt",
+    "label": "Invoice followups",
+    "keywords": "invoice followups billing payment"
+  },
+  {
+    "role": "calendar-group-signature",
+    "label": "Contract renewals",
+    "keywords": "contract renewals signing renewal"
+  },
+  {
+    "role": "send",
+    "label": "Send",
+    "keywords": "prospect outreach sales"
+  },
+  {
+    "role": "calendar-group-device-desktop",
+    "label": "Sales demos",
+    "keywords": "sales demos demo walkthrough product"
+  },
+  {
+    "role": "filter",
+    "label": "Filter",
+    "keywords": "pipeline reviews funnel leads"
+  },
+  {
+    "role": "calendar-group-arrows-exchange",
+    "label": "Negotiations",
+    "keywords": "negotiations negotiate negotiation exchange"
+  },
+  {
+    "role": "calendar-group-door-enter",
+    "label": "Customer onboarding",
+    "keywords": "customer onboarding welcome kickoff"
+  },
+  {
+    "role": "calendar-group-user-check",
+    "label": "Account reviews",
+    "keywords": "account reviews customer review"
+  },
+  {
+    "role": "calendar-group-refresh",
+    "label": "Renewal conversations",
+    "keywords": "renewal conversations retention renew"
+  },
+  {
+    "role": "calendar-group-headset",
+    "label": "Support coverage",
+    "keywords": "support coverage helpdesk customer service"
+  },
+  {
+    "role": "alert",
+    "label": "Alert",
+    "keywords": "escalation handling urgent incident"
+  },
+  {
+    "role": "calendar-group-book-2",
+    "label": "Study sessions",
+    "keywords": "study sessions studying homework"
+  },
+  {
+    "role": "calendar-group-pencil-question",
+    "label": "Exams",
+    "keywords": "exams exam test quiz"
+  },
+  {
+    "role": "calendar-group-file-check",
+    "label": "Assignment deadlines",
+    "keywords": "assignment deadlines deadline submission"
+  },
+  {
+    "role": "calendar-group-flask",
+    "label": "Lab sessions",
+    "keywords": "lab sessions experiment laboratory"
+  },
+  {
+    "role": "calendar-group-door",
+    "label": "Office hours",
+    "keywords": "office hours professor"
+  },
+  {
+    "role": "calendar-group-language",
+    "label": "Language practice",
+    "keywords": "language practice vocabulary conversation"
+  },
+  {
+    "role": "calendar-group-certificate",
+    "label": "Graduation milestones",
+    "keywords": "graduation milestones diploma certification"
+  },
+  {
+    "role": "calendar-group-notebook",
+    "label": "Lesson preparation",
+    "keywords": "lesson preparation planning"
+  },
+  {
+    "role": "calendar-group-chalkboard-teacher",
+    "label": "Classroom teaching",
+    "keywords": "classroom teaching instruction"
+  },
+  {
+    "role": "calendar-group-checks",
+    "label": "Grading time",
+    "keywords": "grading time marking assessment"
+  },
+  {
+    "role": "calendar-group-friends",
+    "label": "Parent conferences",
+    "keywords": "parent conferences conference teacher meeting"
+  },
+  {
+    "role": "calendar-group-message-question",
+    "label": "Student advising",
+    "keywords": "student advising mentoring guidance"
+  },
+  {
+    "role": "calendar-group-presentation-analytics",
+    "label": "Staff development",
+    "keywords": "staff development pedagogy"
+  },
+  {
+    "role": "calendar-group-building-pavilion",
+    "label": "Venues and assemblies",
+    "keywords": "school assemblies assembly auditorium event venue bookings booking"
+  },
+  {
+    "role": "calendar-group-mood-kid",
+    "label": "Recess supervision",
+    "keywords": "recess supervision playground"
+  },
+  {
+    "role": "calendar-group-masks-theater",
+    "label": "Student performances",
+    "keywords": "student performances school play performance theatre"
+  },
+  {
+    "role": "calendar-group-backpack",
+    "label": "School dropoff",
+    "keywords": "school dropoff pickup backpack"
+  },
+  {
+    "role": "calendar-group-baby-carriage",
+    "label": "Childcare handoffs",
+    "keywords": "childcare handoffs daycare babysitter nanny"
+  },
+  {
+    "role": "calendar-group-soup",
+    "label": "Family meals",
+    "keywords": "family meals dinner meal"
+  },
+  {
+    "role": "calendar-group-balloon",
+    "label": "Children activities",
+    "keywords": "children activities kids activity playdate"
+  },
+  {
+    "role": "calendar-group-calendar-heart",
+    "label": "Family appointments",
+    "keywords": "family appointments appointment care"
+  },
+  {
+    "role": "calendar-group-arrows-left-right",
+    "label": "Custody exchanges",
+    "keywords": "custody exchanges co parenting exchange handoff"
+  },
+  {
+    "role": "calendar-group-home-heart",
+    "label": "Family visits",
+    "keywords": "family visits visit relatives"
+  },
+  {
+    "role": "calendar-group-list-check",
+    "label": "Household planning",
+    "keywords": "household planning chores family"
+  },
+  {
+    "role": "calendar-group-hearts",
+    "label": "Date nights",
+    "keywords": "date nights night anniversary couple"
+  },
+  {
+    "role": "calendar-group-stethoscope",
+    "label": "Doctor visits",
+    "keywords": "doctor visits physician medical appointment"
+  },
+  {
+    "role": "calendar-group-pill",
+    "label": "Medication routines",
+    "keywords": "medication routines medicine prescription"
+  },
+  {
+    "role": "calendar-group-first-aid-kit",
+    "label": "Pharmacy pickups",
+    "keywords": "pharmacy pickups prescription pickup"
+  },
+  {
+    "role": "calendar-group-physiotherapist",
+    "label": "Physical therapy",
+    "keywords": "physical therapy rehab rehabilitation"
+  },
+  {
+    "role": "calendar-group-nurse",
+    "label": "Home nurse visits",
+    "keywords": "home nurse visits nursing visit"
+  },
+  {
+    "role": "calendar-group-wheelchair",
+    "label": "Mobility transport",
+    "keywords": "mobility transport accessible"
+  },
+  {
+    "role": "calendar-group-clipboard-heart",
+    "label": "Care paperwork",
+    "keywords": "care paperwork plan health records"
+  },
+  {
+    "role": "calendar-group-bed",
+    "label": "Rest and lodging",
+    "keywords": "rest periods recovery nap hotel stays accommodation lodging"
+  },
+  {
+    "role": "calendar-group-dental",
+    "label": "Dental visits",
+    "keywords": "dental visits dentist teeth cleaning"
+  },
+  {
+    "role": "calendar-group-eyeglass",
+    "label": "Eye exams",
+    "keywords": "eye exams optometrist vision glasses"
+  },
+  {
+    "role": "calendar-group-brain",
+    "label": "Therapy appointments",
+    "keywords": "therapy appointments counseling mental health"
+  },
+  {
+    "role": "calendar-group-yoga",
+    "label": "Meditation",
+    "keywords": "meditation mindfulness breathwork yoga classes stretching pilates"
+  },
+  {
+    "role": "calendar-group-scan",
+    "label": "Preventive screenings",
+    "keywords": "preventive screenings screening scan checkup"
+  },
+  {
+    "role": "calendar-group-vaccine",
+    "label": "Vaccinations",
+    "keywords": "vaccinations vaccine vaccination immunization"
+  },
+  {
+    "role": "calendar-group-test-pipe",
+    "label": "Blood tests",
+    "keywords": "blood tests test lab draw"
+  },
+  {
+    "role": "calendar-group-apple",
+    "label": "Nutrition coaching",
+    "keywords": "nutrition coaching diet dietitian"
+  },
+  {
+    "role": "calendar-group-moon-stars",
+    "label": "Sleep routines",
+    "keywords": "sleep routines bedtime night"
+  },
+  {
+    "role": "calendar-group-writing",
+    "label": "Wellness journaling",
+    "keywords": "wellness journaling journal reflection gratitude"
+  },
+  {
+    "role": "calendar-group-barbell",
+    "label": "Gym workouts",
+    "keywords": "gym workouts strength lifting workout"
+  },
+  {
+    "role": "calendar-group-run",
+    "label": "Running training",
+    "keywords": "running training jogging marathon"
+  },
+  {
+    "role": "calendar-group-swimming",
+    "label": "Swimming practice",
+    "keywords": "swimming practice swim pool"
+  },
+  {
+    "role": "calendar-group-ball-american-football",
+    "label": "Football practice",
+    "keywords": "football practice gridiron"
+  },
+  {
+    "role": "calendar-group-ball-football",
+    "label": "Soccer matches",
+    "keywords": "soccer matches football match"
+  },
+  {
+    "role": "calendar-group-ball-basketball",
+    "label": "Basketball games",
+    "keywords": "basketball games hoops game"
+  },
+  {
+    "role": "calendar-group-ball-tennis",
+    "label": "Tennis sessions",
+    "keywords": "tennis sessions racket session"
+  },
+  {
+    "role": "calendar-group-flag-check",
+    "label": "Race events",
+    "keywords": "race events competition finish"
+  },
+  {
+    "role": "calendar-group-sun",
+    "label": "Day shifts",
+    "keywords": "day shifts shift daytime roster"
+  },
+  {
+    "role": "calendar-group-phone-incoming",
+    "label": "On call coverage",
+    "keywords": "on call coverage pager"
+  },
+  {
+    "role": "calendar-group-arrows-transfer-up",
+    "label": "Shift handovers",
+    "keywords": "shift handovers handover change"
+  },
+  {
+    "role": "calendar-group-clipboard-plus",
+    "label": "Patient rounds",
+    "keywords": "patient rounds clinical ward"
+  },
+  {
+    "role": "calendar-group-medical-cross",
+    "label": "Procedures",
+    "keywords": "procedures procedure clinical treatment"
+  },
+  {
+    "role": "calendar-group-ambulance",
+    "label": "Emergency duty",
+    "keywords": "emergency duty ambulance urgent"
+  },
+  {
+    "role": "calendar-group-report-medical",
+    "label": "Case conferences",
+    "keywords": "case conferences conference clinical review"
+  },
+  {
+    "role": "calendar-group-id-badge",
+    "label": "Certification renewal",
+    "keywords": "certification renewal credential license"
+  },
+  {
+    "role": "calendar-group-battery-charging",
+    "label": "Recovery days",
+    "keywords": "recovery days recharge rest day"
+  },
+  {
+    "role": "calendar-group-e-passport",
+    "label": "Travel paperwork",
+    "keywords": "travel paperwork passport visa documents"
+  },
+  {
+    "role": "calendar-group-device-laptop",
+    "label": "Coworking bookings",
+    "keywords": "coworking bookings remote laptop desk"
+  },
+  {
+    "role": "calendar-group-video",
+    "label": "Video shoots",
+    "keywords": "video shoots filming shoot"
+  },
+  {
+    "role": "calendar-group-cut",
+    "label": "Editing sessions",
+    "keywords": "editing sessions edit postproduction"
+  },
+  {
+    "role": "calendar-group-microphone",
+    "label": "Podcast recording",
+    "keywords": "podcast recording voice"
+  },
+  {
+    "role": "calendar-group-music",
+    "label": "Music recording",
+    "keywords": "music recording rehearsal"
+  },
+  {
+    "role": "calendar-group-broadcast",
+    "label": "Livestreams",
+    "keywords": "livestreams live stream streaming broadcast"
+  },
+  {
+    "role": "export",
+    "label": "Export",
+    "keywords": "content publishing publish upload"
+  },
+  {
+    "role": "calendar-group-code",
+    "label": "Coding sessions",
+    "keywords": "coding sessions programming developer"
+  },
+  {
+    "role": "calendar-group-git-pull-request",
+    "label": "Code reviews",
+    "keywords": "code reviews review pull request"
+  },
+  {
+    "role": "calendar-group-cloud-upload",
+    "label": "Deployments",
+    "keywords": "deployments deployment deploy release production"
+  },
+  {
+    "role": "calendar-group-bug",
+    "label": "Bug triage",
+    "keywords": "bug triage debugging"
+  },
+  {
+    "role": "calendar-group-fire-extinguisher",
+    "label": "Incident response",
+    "keywords": "incident response outage"
+  },
+  {
+    "role": "calendar-group-sitemap",
+    "label": "Design sprints",
+    "keywords": "design sprints sprint architecture"
+  },
+  {
+    "role": "calendar-group-click",
+    "label": "User testing",
+    "keywords": "user testing usability prototype"
+  },
+  {
+    "role": "calendar-group-shield-check",
+    "label": "Security reviews",
+    "keywords": "security reviews audit vulnerability"
+  },
+  {
+    "role": "calendar-group-chart-dots",
+    "label": "Data analysis",
+    "keywords": "data analysis analytics"
+  },
+  {
+    "role": "calendar-group-server",
+    "label": "Maintenance windows",
+    "keywords": "maintenance windows server infrastructure"
+  },
+  {
+    "role": "calendar-group-tool",
+    "label": "Repair jobs",
+    "keywords": "repair jobs fix service job"
+  },
+  {
+    "role": "calendar-group-hammer",
+    "label": "Installations",
+    "keywords": "installations installation install construction"
+  },
+  {
+    "role": "calendar-group-bolt",
+    "label": "Electrical work",
+    "keywords": "electrical work electrician wiring"
+  },
+  {
+    "role": "calendar-group-pipeline",
+    "label": "Plumbing work",
+    "keywords": "plumbing work plumber water"
+  },
+  {
+    "role": "calendar-group-air-conditioning",
+    "label": "HVAC service",
+    "keywords": "hvac service air conditioning cooling"
+  },
+  {
+    "role": "calendar-group-forklift",
+    "label": "Material pickups",
+    "keywords": "material pickups materials supply pickup"
+  },
+  {
+    "role": "calendar-group-helmet",
+    "label": "Safety briefings",
+    "keywords": "safety briefings ppe toolbox briefing"
+  },
+  {
+    "role": "calendar-group-engine",
+    "label": "Equipment servicing",
+    "keywords": "equipment servicing engine service"
+  },
+  {
+    "role": "calendar-group-clipboard-search",
+    "label": "Inspections",
+    "keywords": "inspections inspection checklist compliance"
+  },
+  {
+    "role": "calendar-group-vacuum-cleaner",
+    "label": "House cleaning",
+    "keywords": "house cleaning vacuum housework"
+  },
+  {
+    "role": "calendar-group-wash-machine",
+    "label": "Laundry days",
+    "keywords": "laundry days washing clothes"
+  },
+  {
+    "role": "calendar-group-shopping-cart",
+    "label": "Grocery shopping",
+    "keywords": "grocery shopping groceries supermarket"
+  },
+  {
+    "role": "calendar-group-home-cog",
+    "label": "Home maintenance",
+    "keywords": "home maintenance upkeep"
+  },
+  {
+    "role": "calendar-group-plant",
+    "label": "Garden care",
+    "keywords": "garden care gardening plants"
+  },
+  {
+    "role": "delete",
+    "label": "Delete",
+    "keywords": "waste collection trash rubbish garbage"
+  },
+  {
+    "role": "calendar-group-recycle",
+    "label": "Recycling pickups",
+    "keywords": "recycling pickups recycle collection"
+  },
+  {
+    "role": "calendar-group-home-search",
+    "label": "Property viewings",
+    "keywords": "property viewings viewing open house"
+  },
+  {
+    "role": "calendar-group-file-certificate",
+    "label": "Lease renewals",
+    "keywords": "lease renewals rental renewal"
+  },
+  {
+    "role": "calendar-group-truck-delivery",
+    "label": "Moving days",
+    "keywords": "moving days movers relocation delivery"
+  },
+  {
+    "role": "calendar-group-calculator",
+    "label": "Tax preparation",
+    "keywords": "tax preparation taxes accounting"
+  },
+  {
+    "role": "calendar-group-shield",
+    "label": "Insurance reviews",
+    "keywords": "insurance reviews coverage policy"
+  },
+  {
+    "role": "calendar-group-scale",
+    "label": "Legal appointments",
+    "keywords": "legal appointments lawyer court"
+  },
+  {
+    "role": "calendar-group-id",
+    "label": "Document renewals",
+    "keywords": "document renewals id identity renewal documents"
+  },
+  {
+    "role": "calendar-group-heart",
+    "label": "Volunteer shifts",
+    "keywords": "volunteer shifts service giving"
+  },
+  {
+    "role": "calendar-group-gift",
+    "label": "Fundraising events",
+    "keywords": "fundraising events donation charity"
+  },
+  {
+    "role": "calendar-group-basket",
+    "label": "Food drives",
+    "keywords": "food drives drive pantry donations"
+  },
+  {
+    "role": "calendar-group-pray",
+    "label": "Faith gatherings",
+    "keywords": "faith gatherings worship prayer religious"
+  },
+  {
+    "role": "calendar-group-truck",
+    "label": "Mutual aid deliveries",
+    "keywords": "mutual aid deliveries supply delivery"
+  },
+  {
+    "role": "calendar-group-building-monument",
+    "label": "Civic participation",
+    "keywords": "civic participation council voting town hall"
+  },
+  {
+    "role": "calendar-group-speakerphone",
+    "label": "Announcements and sound",
+    "keywords": "public outreach campaigning advocacy equipment rentals audio rental"
+  },
+  {
+    "role": "calendar-group-leaf",
+    "label": "Environmental cleanup",
+    "keywords": "environmental cleanup environment conservation"
+  },
+  {
+    "role": "calendar-group-accessible",
+    "label": "Accessibility support",
+    "keywords": "accessibility support inclusion"
+  },
+  {
+    "role": "calendar-group-chef-hat",
+    "label": "Catering preparation",
+    "keywords": "catering preparation cooking chef"
+  },
+  {
+    "role": "calendar-group-tent",
+    "label": "Event setup",
+    "keywords": "event setup tents staging"
+  },
+  {
+    "role": "calendar-group-luggage",
+    "label": "Guest arrivals",
+    "keywords": "guest arrivals arrival checkin luggage"
+  },
+  {
+    "role": "calendar-group-ticket",
+    "label": "Entertainment bookings",
+    "keywords": "entertainment bookings concert ticket booking"
+  },
+  {
+    "role": "calendar-group-rings",
+    "label": "Wedding coordination",
+    "keywords": "wedding coordination marriage ceremony"
+  },
+  {
+    "role": "calendar-group-calendar-user",
+    "label": "Staff scheduling",
+    "keywords": "staff scheduling roster"
+  },
+  {
+    "role": "calendar-group-box",
+    "label": "Postevent teardown",
+    "keywords": "postevent teardown packing storage"
+  },
+  {
+    "role": "calendar-group-trekking",
+    "label": "Hiking trips",
+    "keywords": "hiking trips trail trek"
+  },
+  {
+    "role": "calendar-group-campfire",
+    "label": "Camping weekends",
+    "keywords": "camping weekends campfire outdoors"
+  },
+  {
+    "role": "calendar-group-fish-hook",
+    "label": "Fishing outings",
+    "keywords": "fishing outings angling tide"
+  },
+  {
+    "role": "calendar-group-horse",
+    "label": "Horse riding",
+    "keywords": "horse riding equestrian"
+  },
+  {
+    "role": "calendar-group-tractor",
+    "label": "Farm chores",
+    "keywords": "farm chores farming agriculture"
+  },
+  {
+    "role": "calendar-group-wheat",
+    "label": "Harvest schedules",
+    "keywords": "harvest schedules crop growing"
+  },
+  {
+    "role": "calendar-group-cloud",
+    "label": "Weather windows",
+    "keywords": "weather windows forecast outdoor window"
+  },
+  {
+    "role": "calendar-group-telescope",
+    "label": "Stargazing nights",
+    "keywords": "stargazing nights astronomy telescope"
+  },
+  {
+    "role": "calendar-group-device-gamepad-2",
+    "label": "Gaming sessions",
+    "keywords": "gaming sessions video game board"
+  }
+]

@@ -1126,6 +1126,23 @@ async function check(label, run) {
     const { GROUP_ICONS } = require("../lib/modules/planning/calendar-groups.ts");
     for (const icon of GROUP_ICONS) assert.equal(normalizePlanningRecord("calendars",{id:"qa",name:"QA",createdAt:"2026-10-07T00:00:00Z",updatedAt:"2026-10-07T00:00:00Z",groups:[{id:icon,name:icon,color:"#59518b",icon}]}).groups[0].icon,icon);
   });
+  await check("calendar icon synonyms stay searchable without changing ordinary selectors", () => {
+    const { GROUP_ICON_CATALOG } = require("../lib/modules/planning/calendar-groups.ts");
+    const registry = require("../lib/icons/icon-registry.json");
+    const { matchesChoiceSearch } = require("../lib/ui/choice-search.ts");
+    const roles = new Set();
+    for (const icon of GROUP_ICON_CATALOG) {
+      assert(!roles.has(icon.role)); roles.add(icon.role);
+      assert(registry.some(entry => entry.id === icon.role), `Missing role ${icon.role}`);
+      assert(matchesChoiceSearch(icon.label, icon.label, icon.role, icon.keywords));
+    }
+    for (const query of ["dentist", "school pickup", "night shift", "taxes", "pilates", "camper", "visa", "DMV", "caregiver", "podcast", "harvest", "usability", "recycling", "café", "1:1"])
+      assert(GROUP_ICON_CATALOG.some(icon => matchesChoiceSearch(query, icon.label, icon.role, icon.keywords)), `No icon for ${query}`);
+    assert(matchesChoiceSearch("tax preparation", "Tax preparation", "tax", "taxes accounting"));
+    assert(!matchesChoiceSearch("tax swimming", "Tax preparation", "tax", "taxes accounting"));
+    assert(!matchesChoiceSearch("York New", "New York", "ny")); // Legacy selectors retain contiguous matching.
+    assert(matchesChoiceSearch("york", "New York", "ny"));
+  });
   await check("country holidays retain calendar dates, observed dates and individual visibility", () => {
     const { holidayCatalog } = require("../lib/modules/planning/holiday-catalog.ts");
     const { calendarObservances, defaultObservances } = require("../lib/modules/planning/observances.ts");
