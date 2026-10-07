@@ -6,6 +6,13 @@ export type MonthSegment = {
   continuesBefore: boolean; continuesAfter: boolean;
 };
 
+/** Reserve the overflow button only when the available rows cannot hold everything. */
+export function monthLaneCapacity(rowHeight: number, needed: number, eventHeight: number, headingHeight = 28) {
+  const available = Math.max(0, rowHeight - headingHeight - 5);
+  const full = Math.max(0, Math.floor(available / (eventHeight + 3)));
+  return needed <= full ? full : Math.max(0, Math.floor((available - 26) / (eventHeight + 3)));
+}
+
 /** Pack a visible week into shared lanes so spanning events never overlap. */
 export function monthWeekLayout(days: string[], events: EventOccurrence[], zone: string, laneLimit = 2) {
   const candidates: Omit<MonthSegment, "lane">[] = [];

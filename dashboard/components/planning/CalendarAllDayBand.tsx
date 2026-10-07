@@ -12,6 +12,7 @@ import { useCalendarMotion } from "./CalendarMotion";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import EventPeople from "./EventPeople";
 import EventGlyph from "./EventGlyph";
+import EventContinuation from "./EventContinuation";
 import EventObjects from "./EventObjects";
 import styles from "./CalendarWorkspace.module.css";
 
@@ -36,10 +37,10 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
         style={{ ...eventColors(event, calendar), gridColumn: `${first + 2} / ${last + 3}`, gridRow: lane + 1 } as CSSProperties}
         data-morph-event={event.id} data-span-event={event.id} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
         aria-label={title} title={title} onClick={() => onOpen(event)}>
-        {continuesBefore && <UnigentamosIcon role="chevron-right" size={12} style={{ transform: "rotate(180deg)" }} />}
+        {(continuesBefore || continuesAfter) && <EventContinuation before={continuesBefore} after={continuesAfter} />}
         <EventGlyph event={event} icon={group?.icon} />
         <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventPeople refs={event.linkedRefs} available={refs} /><EventObjects event={event} available={refs} />
-        {continuesAfter && <UnigentamosIcon role="chevron-right" size={12} />}
+
       </motion.button>;
     })}
     {links.map(({ item, first, last }, i) => <Link key={item.id} className={styles.allDayItem} style={{ gridColumn: `${first + 2} / ${last + 3}`, gridRow: lanes + i + 1, "--event-color": "var(--module-secondary-500)" } as CSSProperties} href={item.ownerRef?.route || "/admin/personal"}>

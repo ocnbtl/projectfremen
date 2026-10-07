@@ -54,7 +54,7 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
         <button type="button" className={styles.pickerArrow} disabled={year >= 2200} aria-label={mode === "year" ? "Next years" : "Next year"} onClick={() => move(1)}><UnigentamosIcon role="chevron-right" size={18} /></button>
       </header>
       <div ref={body} className={styles.navigatorBody} data-mode={mode} data-month-collection id="calendar-date-choices" role="tabpanel" aria-label={`${mode} choices`}>
-        <AnimatePresence initial={false} mode="popLayout" custom={direction}><NavigatorPane key={`${mode}:${year}`} direction={direction} reduced={reduced}>
+        <AnimatePresence initial={false} mode="sync" custom={direction}><NavigatorPane key={`${mode}:${year}`} direction={direction} reduced={reduced}>
           {mode === "month" ? <div className={styles.monthChoices}>{Array.from({ length: 12 }, (_, i) => {
             const day = `${year}-${String(i + 1).padStart(2, "0")}-01`;
             return <button type="button" key={day} aria-pressed={value.slice(0, 7) === day.slice(0, 7)} onClick={() => choose(day)}>{label(day, { month: "long" })}</button>;

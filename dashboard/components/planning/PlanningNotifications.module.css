@@ -41,3 +41,13 @@
 .links a > span:last-child {overflow-wrap:anywhere;}
 .location {display:flex;align-items:center;gap:5px;padding:7px 0 0 51px;font-size:11px;color:var(--text-secondary);}
 .copy time { flex-wrap:wrap; }
+
+/* Timing and related objects share a row; actions remain below both. */
+.panel { width:min(480px,calc(100vw - 24px)); }
+.summary { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr); align-items:center; gap:12px; }
+.summary:not(:has(.links,.location)) { grid-template-columns:1fr; }
+.summary .event > svg:last-child { display:none; }
+.summary .links { display:flex; flex-direction:column; align-items:flex-start; gap:6px; padding:0; --linked-object-size:20px; }
+.summary .location { padding:0; }
+.summary .copy time { font-size:10px; }
+@media(max-width:480px) { .summary { gap:8px; grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); } .event {gap:5px;} .date {width:28px;} .summary .links a {font-size:10px;} }

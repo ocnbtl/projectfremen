@@ -1116,7 +1116,12 @@ async function check(label, run) {
     const { planningWritableKeys } = require("../lib/modules/planning/ownership.ts"); assert(planningWritableKeys("calendars").includes("observances"));
   });
   await check("month event spans pack without overlap and retain continuations and overflow counts", () => {
-    const { monthWeekLayout } = require("../lib/modules/planning/month-layout.ts");
+    const { monthWeekLayout, monthLaneCapacity } = require("../lib/modules/planning/month-layout.ts");
+    assert.equal(monthLaneCapacity(250, 5, 36), 5);
+    assert.equal(monthLaneCapacity(250, 8, 36), 4);
+    assert.equal(monthLaneCapacity(130, 2, 30), 2);
+    assert.equal(monthLaneCapacity(130, 4, 30), 2);
+    assert.equal(monthLaneCapacity(50, 4, 30), 0);
     const { instantFor } = require("../lib/modules/planning/calendar-model.ts");
     const zone = "America/New_York";
     const event = (id, start, end, allDay = true) => ({ id, startMs: instantFor(start, zone), endMs: instantFor(end, zone), allDay });

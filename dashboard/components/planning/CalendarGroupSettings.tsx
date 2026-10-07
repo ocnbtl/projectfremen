@@ -39,7 +39,7 @@ function GroupEditor({ calendar, onSave }: { calendar: Calendar; onSave: (calend
     <div className={styles.groupSettingsRows}>
       {groups.map((group, index) => <div className={styles.groupSettingsRow} key={group.id}>
         <label aria-label="Group icon">
-          <SelectField aria-label={`Group ${index + 1} icon`} columns={6} triggerContent={<UnigentamosIcon role={group.icon} size={18} />} value={group.icon} menuClassName={`${styles.calendarChoiceMenu} ${styles.groupIconMenu}`} onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, icon: event.target.value } : item))}>
+          <SelectField aria-label={`Group ${index + 1} icon`} contained columns={6} triggerContent={<UnigentamosIcon role={group.icon} size={18} />} value={group.icon} menuClassName={`${styles.calendarChoiceMenu} ${styles.groupIconMenu}`} onChange={event => updateGroups(items => items.map(item => item.id === group.id ? { ...item, icon: event.target.value } : item))}>
             {[...new Set([...GROUP_ICONS, group.icon])].map(icon => <option key={icon} value={icon}><span className={styles.viewChoice}><UnigentamosIcon role={icon} size={16} /><span className="sr-only">{iconNames[icon] || icon}</span></span></option>)}
           </SelectField>
         </label>

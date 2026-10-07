@@ -9,12 +9,12 @@
 .objects[data-icon-only] .label { display:none; }
 
 .objects .chip { background:transparent; padding:0; }
-.objects[data-object-list] { display:flex; flex-direction:column; align-items:stretch; gap:7px; width:100%; --linked-object-size:32px; }
+.objects[data-object-list] { display:flex; flex-direction:column; align-items:stretch; gap:7px; width:100%; --linked-object-size:30px; }
 .objects[data-object-list] .chip { width:100%; display:flex; gap:8px; }
 .objects[data-object-list] .chip::before { content:"•"; color:var(--event-color); flex:none; }
 .objects[data-object-list] .label { flex:1; white-space:normal; overflow-wrap:break-word; font-size:12px; }
 .objects[data-object-list] .visual { order:2; margin-left:auto; }
-@container timed-event (max-width:160px) { .objects[data-object-list] { --linked-object-size:22px; gap:5px; } .objects[data-object-list] .label { font-size:10px; } }
+@container timed-event (max-width:160px) { .objects[data-object-list] { --linked-object-size:20px; gap:5px; } .objects[data-object-list] .label { font-size:10px; } }
 @container timed-event (max-width:80px) { .objects[data-object-list] .chip { flex-wrap:wrap; gap:2px; } .objects[data-object-list] .visual { margin-left:0; } .objects[data-object-list] .label { flex-basis:calc(100% - 8px); } }
 
 @container timed-event (max-width:80px) {

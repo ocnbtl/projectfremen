@@ -51,3 +51,12 @@
 .event[data-continues-after] > svg:last-child {margin-left:auto;}
 
 .event > svg,.event > [data-event-objects] { color:var(--text-strong); }
+
+.event:is([data-continues-before],[data-continues-after]) { position:relative; isolation:isolate; border-color:transparent; background:transparent; overflow:visible; }
+.event[data-continues-before] { padding-left:16px; }
+.event[data-continues-after] { padding-right:16px; }
+
+/* Row capacity is measured from the available viewport, never a fixed count. */
+.week { row-gap:3px; overflow:hidden; }
+.event { max-height:none; }
+.more { min-height:24px; padding:3px 7px; line-height:18px; }
