@@ -1788,10 +1788,6 @@
   .toolbar .toolbarHours button { padding-inline: 2px; }
 }
 @media (max-width: 760px) {
-  .toolbar .calendarSearch:focus-within { grid-area: auto; position: absolute; z-index: 15; top: 10px; left: 10px; right: 10px; width: auto; background: white; box-shadow: 0 0 0 2px var(--module-focus); }
-  .toolbar .calendarSearch:focus-within .search { padding-inline: 5px; }
-}
-@media (max-width: 760px) {
   .toolbarHours button { position: relative; }
   .toolbarHours b { position: absolute; top: -3px; right: -2px; min-width: 10px; border-radius: 999px; background: var(--module-primary-100); color: var(--module-icon); }
   .content { padding-bottom: max(8px, env(safe-area-inset-bottom)); }
@@ -2617,3 +2613,27 @@
 /* All event projections share one title treatment. */
 .content { --calendar-event-title-font:600 13px/1.35 var(--font-body); }
 @media(max-width:760px) { .content { --calendar-event-title-font:600 11px/1.35 var(--font-body); } }
+
+/* Keep phone navigation and search in stable rows, including while typing. */
+@media(max-width:760px) {
+ .shell > .toolbar { grid-template-columns:minmax(0,1fr) 36px 26px 26px 78px 48px; }
+ .toolbar .toolbarTools { display:contents; }
+ .toolbar .todayButton { width:36px; min-width:36px; }
+ .toolbar .periodButton:nth-of-type(2),.toolbar .periodButton:nth-of-type(3) { width:26px; min-width:26px; padding:0; }
+ .toolbar[data-timeline] .toolbarTools > .viewDropdown { grid-area:1 / 5; width:78px; min-width:0; padding-inline:5px; }
+ .toolbar[data-timeline] .addEventButton { grid-area:1 / 6; width:48px; }
+ .toolbar .toolbarHours { grid-area:2 / 1 / 3 / -1; justify-self:start; }
+ .toolbar[data-timeline] .calendarSearch { grid-area:2 / 1 / 3 / -1; width:auto; margin:0 40px 0 106px; min-width:0; }
+ .toolbar[data-timeline] .optionsButton { grid-area:2 / 6; justify-self:end; }
+ .toolbarHours button > b { top:-5px; }
+}
+@media(max-width:380px) {
+ .toolbar .headingMonthFull { display:none; }
+ .toolbar .headingMonthShort { display:inline; }
+}
+
+.allDayBand .allDayItem { container:all-day-event / inline-size; }
+@container all-day-event (max-width:340px) {
+ .allDayBand .allDayItem .eventTitle { flex:1 1 auto; }
+ .allDayBand .allDayItem > [data-event-objects] { flex:none; max-width:54px; }
+}

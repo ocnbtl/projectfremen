@@ -37,3 +37,9 @@
 .objects[data-object-list][data-object-align="start"] .visual { order:0; }
 .objects[data-object-list][data-object-align="start"] .label { flex:0 1 auto; text-align:left; }
 @container timed-event (max-width:160px) { .objects[data-object-list] .label {font-size:9px;} }
+
+/* Compact all-day cards reserve their text budget for the event title. */
+@container all-day-event (max-width:340px) {
+ .objects:not([data-object-list]) { width:max-content!important; }
+ .objects:not([data-object-list]) .label { display:none; }
+}

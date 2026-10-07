@@ -18,7 +18,12 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void; onDragEnd: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null), [width,setWidth] = useState(300);
-  useLayoutEffect(() => { if (!root.current) return; const observer = new ResizeObserver(([entry]) => setWidth(entry.contentRect.width)); observer.observe(root.current); return () => observer.disconnect(); }, []);
+  useLayoutEffect(() => {
+    const element = root.current; if (!element) return;
+    // Measure the outside width: narrow-mode padding must not change its own breakpoint.
+    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
+    observer.observe(element); return () => observer.disconnect();
+  }, []);
   const place = available.find(r => r.module === "map" && r.objectId === event.placeId)?.label || event.linkedRefs.find(r => r.module === "map")?.label || event.location;
   const title = eventPreviewTitle(event);
   const vertical = height >= 82;
