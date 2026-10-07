@@ -66,7 +66,7 @@ export default function EventEditorFields({ fields, update, snapshot }: {
           <button type="button" aria-pressed={!fields.groupId} onClick={() => update("groupId","")}>None</button>{groups.map(g => <button type="button" key={g.id} title={g.name} aria-pressed={fields.groupId === g.id} style={{"--group-color":g.color} as CSSProperties} onClick={() => update("groupId",g.id)}><UnigentamosIcon role={g.icon} size={16} /><span>{g.name}</span></button>)}
         </div></motion.div>}</AnimatePresence></div>
       </section>
-      <EventLocationField fields={fields} update={update} snapshot={snapshot} />
+      <div className={styles.locationSlot}><EventLocationField fields={fields} update={update} snapshot={snapshot} /></div>
       <section className={styles.links} aria-label="Linked objects"><RecordLinks objectPicker pickerLabel="Link an object" refs={linked} available={snapshot?.refs} onChange={refs => {
         update("linkedRefs",refs); const place=refs.find(r => r.module === "map" && r.objectType === "place"); update("placeId",place?.objectId || "");
         if (place && place.objectId !== fields.placeId) update("location",snapshot?.state.places.find(p => p.id === place.objectId)?.address || place.label);
@@ -75,5 +75,5 @@ export default function EventEditorFields({ fields, update, snapshot }: {
   </div>;
 }
 export function EventCheckbox({ label, checked, onChange, icon }: { label: string; checked: boolean; onChange: (checked: boolean) => void; icon?: string }) {
-  return <label className={`${base.quietToggle} ${base.eventCheckbox}`}><input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} /><span className={base.checkboxMark} aria-hidden="true"><UnigentamosIcon role="check" size={13} /></span>{icon && <UnigentamosIcon role={icon} size={16} />}<span>{label}</span></label>;
+  return <label className={`${base.quietToggle} ${base.eventCheckbox} ${styles.checkbox}`}><input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} /><span className={base.checkboxMark} aria-hidden="true"><UnigentamosIcon role="check" size={13} /></span>{icon && <UnigentamosIcon role={icon} size={16} />}<span>{label}</span></label>;
 }

@@ -83,6 +83,37 @@ async function check(label, run) {
   console.log(`PASS ${label}`);
 }
 (async () => {
+  await check("conversational repeat wording expands into exact calendar dates", () => {
+    const {parseRepeatLanguage:parse}=require("../lib/modules/planning/repeat-language.ts");
+    const cases=[
+      ["Please repeat this event every seventeen days.","FREQ=DAILY;INTERVAL=17"],
+      ["I'd like this event to repeat every other week", "FREQ=WEEKLY;INTERVAL=2"],
+      ["monthly on the 1st and 15th", "FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=1,15"],
+      ["on the last day of every month", "FREQ=MONTHLY;INTERVAL=1;BYMONTHDAY=-1"],
+      ["Every two weeks on Mondays and Wednesdays", "FREQ=WEEKLY;INTERVAL=2;BYDAY=MO,WE"],
+      ["Monday through Friday", "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR"],
+      ["Daily except weekends", "FREQ=DAILY;INTERVAL=1;BYDAY=MO,TU,WE,TH,FR"],
+      ["Every last business day of the month", "FREQ=MONTHLY;BYDAY=MO,TU,WE,TH,FR;BYSETPOS=-1"],
+      ["Every fourth Thursday of November", "FREQ=YEARLY;BYMONTH=11;BYDAY=4TH"],
+      ["Every month on the second Tuesday", "FREQ=MONTHLY;BYDAY=2TU"],
+      ["weekly on Mon & Fri for six occurrences", "FREQ=WEEKLY;INTERVAL=1;BYDAY=MO,FR;COUNT=6"],
+      ["quarterly", "FREQ=MONTHLY;INTERVAL=3"],
+      ["every first and third Monday", "FREQ=MONTHLY;BYDAY=1MO,3MO"],
+      ["once every 17days", "FREQ=DAILY;INTERVAL=17"],
+      ["daily until March 3rd, 2026", "FREQ=DAILY;INTERVAL=1;UNTIL=20260303T235959"],
+      ["daily through 2026-03-03", "FREQ=DAILY;INTERVAL=1;UNTIL=20260303T235959"],
+    ];
+    for(const [text,rrule]of cases)assert.equal(parse(text).recurrence,rrule,text);
+    assert.equal(parse("the day before Halloween every year").recurrenceAnchor.offsetDays,-1);
+    assert.equal(parse("annually on 31st October").recurrenceAnchor.day,31);
+    const dates=(text,from,to)=>eventOccurrences([event({...parse(text),start:"2026-01-01T09:00",end:"2026-01-01T10:00"})],from,to,"America/New_York").map(e=>e.start.slice(0,10));
+    assert.deepEqual(dates("monthly on the 1st and 15th","2026-02-01","2026-04-01"),["2026-02-01","2026-02-15","2026-03-01","2026-03-15"]);
+    assert.deepEqual(dates("every last business day of the month","2026-02-01","2026-04-01"),["2026-02-27","2026-03-31"]);
+    assert.deepEqual(dates("every fourth Thursday of November","2026-01-01","2028-01-01"),["2026-11-26","2027-11-25"]);
+    const until=event({...parse("daily through 2026-03-03"),start:"2026-03-01T09:00",end:"2026-03-01T10:00"});
+    assert.deepEqual(eventOccurrences([until],"2026-03-01","2026-03-10","America/New_York").map(e=>e.start.slice(0,10)),["2026-03-01","2026-03-02","2026-03-03"]);
+    for(const text of ["every day except every day","twice a week","daily except holidays","every month on the 32nd","every 0 weeks on Monday","daily through 2026-02-30","every Monday at 9am and Friday at 3pm"] ) assert.throws(()=>parse(text),undefined,text);
+  });
   await check("custom repeat interpretation, persistence, leap years and current birthdays", () => {
     const {parseRepeatLanguage,anchoredDay}=require("../lib/modules/planning/repeat-language.ts");
     const people=[{ref:{module:"people",objectType:"person",objectId:"jon",label:"Jonathan Marshall",route:"/admin/people/jon"},birthday:"--03-01"}];

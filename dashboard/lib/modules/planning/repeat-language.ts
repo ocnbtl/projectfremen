@@ -1,6 +1,7 @@
 import { Temporal } from "@js-temporal/polyfill";
 import { parseBirthday } from "../people/birthday";
 import type { BirthdaySource } from "./observances";
+import { normalizeRepeatPhrasing, repeatWeekdays } from "./repeat-phrasing";
 
 /** Annual anchors preserve offsets across leap years and year boundaries. */
 export type RepeatAnchor = { month: number; day: number; offsetDays: number; label: string; personId?: string };
@@ -40,18 +41,38 @@ export function anchoredDay(anchor: RepeatAnchor, year: number, birthdays?: Birt
 
 /** Deliberately bounded grammar: reject uncertain meaning instead of guessing a schedule. */
 export function parseRepeatLanguage(input: string, birthdays: BirthdaySource[] = []): RepeatRule {
-  let text=normalize(input).replace(/^(?:i (?:want|would like)(?: to)?\s+)?repeat\s+/,""), suffix="";
+  let text=normalizeRepeatPhrasing(input), suffix="";
+  text=text.replace(/ (until|through|ending on) ([a-z]+) (\d{1,2})(?:st|nd|rd|th)?,? (\d{4})$/, (all,word,month,day,year)=>{const m=months.findIndex(name=>name===month||name.slice(0,3)===month)+1;return m?` ${word} ${year}-${String(m).padStart(2,"0")}-${day.padStart(2,"0")}`:all;});
+  const until=text.match(/ (?:until|through|ending on) (\d{4}-\d{2}-\d{2})$/);
+  if(until) {Temporal.PlainDate.from(until[1],{overflow:"reject"});suffix=`;UNTIL=${until[1].replaceAll("-","")}T235959`;text=text.slice(0,until.index);}
   const count=text.match(/ for (\d+) (?:times|occurrences)$/);
-  if(count) { if (+count[1]<1 || +count[1]>5000) throw new Error("Choose between 1 and 5,000 occurrences"); suffix=`;COUNT=${+count[1]}`;text=text.slice(0,count.index); }
-  const rule=(recurrence:string,label:string):RepeatRule=>({recurrence:recurrence+suffix,recurrenceAnchor:null,label:label+(count?` · ${count[1]} occurrences`:"")});
+  if(count) { if (until)throw new Error("Choose either an end date or an occurrence count");if (+count[1]<1 || +count[1]>5000) throw new Error("Choose between 1 and 5,000 occurrences"); suffix=`;COUNT=${+count[1]}`;text=text.slice(0,count.index); }
+  const rule=(recurrence:string,label:string):RepeatRule=>({recurrence:recurrence+suffix,recurrenceAnchor:null,label:label+(count?` · ${count[1]} occurrences`:until?` · through ${until[1]}`:"")});
+  const label=()=>text[0].toUpperCase()+text.slice(1);
+  const interval=(value:string|undefined)=>{const n=Number(value||1);if(n<1||n>365)throw new Error("Choose an interval between 1 and 365");return n;};
+  const excluded=text.match(/^(every (?:\d+ )?(?:day|week)s?)(?: except | excluding )(.+)$/);
+  if(excluded){const omit=repeatWeekdays(excluded[2]);if(!omit)throw new Error("Name the weekdays to exclude");const keep=codes.filter(d=>!omit.includes(d));if(!keep.length)throw new Error("Keep at least one weekday");const base=excluded[1].match(/^every (?:(\d+) )?(day|week)s?$/)!;return rule(`FREQ=${base[2]==="day"?"DAILY":"WEEKLY"};INTERVAL=${interval(base[1])};BYDAY=${keep.join(",")}`,label());}
+  const weekly=text.match(/^every (?:(\d+) )?weeks?(?: on)? (.+)$/);
+  if(weekly){const chosen=repeatWeekdays(weekly[2]);if(chosen)return rule(`FREQ=WEEKLY;INTERVAL=${interval(weekly[1])};BYDAY=${chosen.join(",")}`,label());}
+  // Ordinal weekdays and month dates can be expressed in either natural word order.
+  text=text.replace(/^every (?:(\d+) )?months? on (?:the )?(.+)$/,(_,n,days)=>`every ${days} of every ${n||1} month`)
+    .replace(/^on (?:the )?(.+?) (?:of )?every month$/, "every $1 of every 1 month")
+    .replace(/^the (.+) of every month$/, "every $1 of every 1 month")
+    .replace(/^every the /,"every ");
+  const positions:Record<string,number>={first:1,second:2,third:3,fourth:4,fifth:5,last:-1,"second to last":-2};
+  const sharedOrdinal=text.match(/^every (first|second|third|fourth|fifth|last) and (first|second|third|fourth|fifth|last) (sunday|monday|tuesday|wednesday|thursday|friday|saturday)(?: of (?:the |every )?month)?$/);
+  if(sharedOrdinal) return rule(`FREQ=MONTHLY;BYDAY=${positions[sharedOrdinal[1]]}${codes[weekdays.indexOf(sharedOrdinal[3])]},${positions[sharedOrdinal[2]]}${codes[weekdays.indexOf(sharedOrdinal[3])]}`,label());
+  const ord=text.match(/^every (first|second|third|fourth|fifth|last|second to last|[1-5](?:st|nd|rd|th)) (sunday|monday|tuesday|wednesday|thursday|friday|saturday|weekday|weekend day)(?: (?:of|in) (?:the |each |every )?(?:(\d+) )?(month|january|february|march|april|may|june|july|august|september|october|november|december))?$/);
+  if(ord){const pos=positions[ord[1]]||parseInt(ord[1]),month=ord[4]&&ord[4]!=="month"?months.indexOf(ord[4])+1:0;const by=ord[2]==="weekday"?"MO,TU,WE,TH,FR":ord[2]==="weekend day"?"SA,SU":codes[weekdays.indexOf(ord[2])];return rule(`FREQ=${month?"YEARLY":"MONTHLY"}${month?`;BYMONTH=${month}`:ord[3]&&+ord[3]!==1?`;INTERVAL=${interval(ord[3])}`:""};BYDAY=${by.includes(",")?by:pos+by}${by.includes(",")?`;BYSETPOS=${pos}`:""}`,label());}
+  const monthDays=text.match(/^every (.+?)(?: (?:of|in) (?:the |each |every )?(?:(\d+) )?month)$/);
+  if(monthDays){const dates=monthDays[1].replace(/\b(?:the|day)\b/g,"").trim().split(/\s*(?:,\s*(?:and )?| and | & )\s*/).map(d=>d==="last"?-1:/^\d{1,2}(?:st|nd|rd|th)?$/.test(d)?parseInt(d):NaN);if(dates.length&&dates.every(d=>Number.isInteger(d)&&(d===-1||d>=1&&d<=31)))return rule(`FREQ=MONTHLY;INTERVAL=${interval(monthDays[2])};BYMONTHDAY=${[...new Set(dates)].join(",")}`,`${label()}${dates.some(d=>d>28)?" · skips months without that date":""}`);}
   const simple=text.match(/^every (?:(\d+) )?(day|week|month|year)s?$/);
   if(simple) { const n=Number(simple[1]||1);if(n<1||n>365)throw new Error("Choose an interval between 1 and 365");return rule(`FREQ=${({day:"DAILY",week:"WEEKLY",month:"MONTHLY",year:"YEARLY"})[simple[2]]};INTERVAL=${n}`,`Every ${n===1?"":n+" "}${simple[2]}${n===1?"":"s"}`); }
   if (/^every weekdays?$/.test(text)) return rule("FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR","Every weekday");
   if (/^every weekends?$/.test(text)) return rule("FREQ=WEEKLY;BYDAY=SA,SU","Every weekend");
-  const ordinal=text.match(/^every (first|second|third|fourth|last) (sunday|monday|tuesday|wednesday|thursday|friday|saturday)(?: (?:of|in) (?:the |each |every )?month)?$/);
-  if(ordinal) return rule(`FREQ=MONTHLY;BYDAY=${({first:1,second:2,third:3,fourth:4,last:-1})[ordinal[1]]}${codes[weekdays.indexOf(ordinal[2])]}`,text[0].toUpperCase()+text.slice(1));
-  const namedDays=text.replace(/^every /,"").split(/\s*(?:,| and )\s*/).filter(Boolean);
-  if(text.startsWith("every ") && namedDays.every(d=>weekdays.includes(d))) return rule(`FREQ=WEEKLY;BYDAY=${[...new Set(namedDays.map(d=>codes[weekdays.indexOf(d)]))].join(",")}`,text[0].toUpperCase()+text.slice(1));
+  const namedDays=repeatWeekdays(text.replace(/^every /,""));
+  if(namedDays) return rule(`FREQ=WEEKLY;BYDAY=${namedDays.join(",")}`,label());
+  text=text.replace(/ (?:every year|annually|yearly)$/, "").replace(/^every year on /,"");
   text=text.replace(/^every year(?: on)? /,"").replace(/^every /,"");
   let offset=0;
   const relative=text.match(/^(\d+|one|two|three|four|five|six|seven|eight|nine|ten) (days?|weeks?) (before|after) (.+)$/);
@@ -65,12 +86,13 @@ export function parseRepeatLanguage(input: string, birthdays: BirthdaySource[] =
     anchor={month:parts.month,day:parts.day,offsetDays:offset,label:`${matches[0].ref.label}'s birthday`,personId:matches[0].ref.objectId};
   } else if(fixedHolidays[text]) { const [month,day,label]=fixedHolidays[text];anchor={month,day,label,offsetDays:offset}; }
   else {
+    text=text.replace(/^on /,"").replace(/^(\d{1,2})(?:st|nd|rd|th)? (?:of )?([a-z]+)$/,"$2 $1");
     const date=text.match(/^(\d{1,2})[\/-](\d{1,2})$/), named=text.match(/^([a-z]+) (\d{1,2})(?:st|nd|rd|th)?$/);
-    const month=date?+date[1]:named?months.indexOf(named[1])+1:0, day=date?+date[2]:named?+named[2]:0;
+    const month=date?+date[1]:named?months.findIndex(m=>m===named[1]||m.slice(0,3)===named[1])+1:0, day=date?+date[2]:named?+named[2]:0;
     if(month&&day)anchor={month,day,offsetDays:offset,label:`${months[month-1]} ${day}`};
   }
   if(!anchor) throw new Error("Try “every 17 days”, “every last Friday”, or “10 days before Halloween”. Use a saved person's name for birthdays. This wording isn't supported yet.");
-  if(suffix)throw new Error("A count with a holiday or birthday rule isn't supported yet. Remove the occurrence count.");
+  if(suffix)throw new Error("End dates and counts for birthday or holiday references aren't supported yet. Use the annual rule without that limit.");
   validateRepeatAnchor(anchor);
   return {recurrence:"FREQ=YEARLY",recurrenceAnchor:anchor,label:`Every year${offset?` ${Math.abs(offset)} days ${offset<0?"before":"after"}`:" on"} ${anchor.label}${anchor.month===2&&anchor.day===29?" (leap years)":""}`};
 }
