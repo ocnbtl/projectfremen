@@ -1,300 +1,89 @@
 "use client";
-import { calendarDisplayColor } from "./calendar-presentation";
-import { useState } from "react";
+import { useState, type CSSProperties } from "react";
+import { AnimatePresence, motion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 import RecordLinks from "./RecordLinks";
 import EventLocationField from "./EventLocationField";
-import EventDateTimePicker from "./EventDateTimePicker";
-import type {
-  EventFields,
-} from "../../lib/modules/planning/types";
+import EventDateSegments from "./EventDateSegments";
+import type { EventFields } from "../../lib/modules/planning/types";
 import type { PlanningSnapshot } from "../../lib/modules/planning/repository";
-import {
-  calendarGroups,
-} from "../../lib/modules/planning/calendar-groups";
+import { calendarGroups } from "../../lib/modules/planning/calendar-groups";
 import { addDays } from "../../lib/modules/planning/calendar-model";
-import styles from "./CalendarWorkspace.module.css";
+import { calendarDisplayColor } from "./calendar-presentation";
+import { useCalendarMotion } from "./CalendarMotion";
+import base from "./CalendarWorkspace.module.css";
+import styles from "./EventEditorFields.module.css";
 
-export default function EventEditorFields({
-  fields,
-  update,
-  snapshot,
-}: {
+export default function EventEditorFields({ fields, update, snapshot }: {
   fields: EventFields;
   update: <K extends keyof EventFields>(key: K, value: EventFields[K]) => void;
   snapshot?: PlanningSnapshot;
 }) {
   const [recurrenceDraft, setRecurrenceDraft] = useState(fields.recurrence || "FREQ=WEEKLY;INTERVAL=1");
   const [reminderDraft, setReminderDraft] = useState(fields.reminderMinutes ?? 15);
-  const [reminderUnit, setReminderUnit] = useState(() =>
-    fields.reminderMinutes && fields.reminderMinutes % 1440 === 0
-      ? 1440
-      : fields.reminderMinutes && fields.reminderMinutes % 60 === 0
-        ? 60
-        : 1,
-  );
-  const calendar = snapshot?.state.calendars.find(
-    (c) => c.id === fields.calendarId,
-  );
-  const rule = Object.fromEntries(
-    recurrenceDraft
-      .split(";")
-      .filter(Boolean)
-      .map((x) => x.split("=")),
-  );
-  const simpleRule = Object.keys(rule).every((k) =>
-    ["FREQ", "INTERVAL"].includes(k),
-  );
-  function changeRecurrence(value: string) {
-    setRecurrenceDraft(value);
-    if (fields.recurrence) update("recurrence", value);
-  }
-  function changeReminder(value: number) {
-    setReminderDraft(value);
-    if (fields.reminderMinutes !== null) update("reminderMinutes", value);
-  }
-  const placeRef = snapshot?.refs.find(
-    (r) =>
-      r.module === "map" &&
-      r.objectType === "place" &&
-      r.objectId === fields.placeId,
-  );
-  const linked =
-    placeRef &&
-    !fields.linkedRefs.some(
-      (r) => r.module === "map" && r.objectId === placeRef.objectId,
-    )
-      ? [...fields.linkedRefs, placeRef]
-      : fields.linkedRefs;
-  return (
-    <>
-      <label className={styles.eventDescription}>
-        Description
-        <textarea
-          rows={2}
-          placeholder="What is this time for?"
-          value={fields.description}
-          onChange={(e) => update("description", e.target.value)}
-        />
-      </label>
-      <section className={styles.groupField} aria-label="Calendar and color groups">
-          <label className={styles.editorCalendar} style={{ "--selected-calendar": calendarDisplayColor(calendar?.color) } as React.CSSProperties}>
-            <SelectField aria-label="Calendar"
-              value={fields.calendarId}
-              onChange={(e) => {
-                update("calendarId", e.target.value);
-                update("groupId", "");
-              }}
-            >
-              {snapshot?.state.calendars
-                .filter((c) => !c.archivedAt)
-                .map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-            </SelectField>
-          </label>
-
-        <UnigentamosIcon role="palette" size={18} />
-        <div className={styles.groupChoices}>
-          <button
-            type="button"
-            aria-pressed={!fields.groupId}
-            onClick={() => update("groupId", "")}
-          >
-            None
-          </button>
-          {calendarGroups(calendar).map((g) => (
-            <button
-              type="button"
-              key={g.id}
-              aria-pressed={g.id === fields.groupId}
-              style={{ "--group-color": g.color } as React.CSSProperties}
-              onClick={() => update("groupId", g.id)}
-            >
-              <UnigentamosIcon role={g.icon} size={16} />
-              {g.name}
-            </button>
-          ))}
+  const [reminderUnit, setReminderUnit] = useState(fields.reminderMinutes && fields.reminderMinutes % 1440 === 0 ? 1440 : fields.reminderMinutes && fields.reminderMinutes % 60 === 0 ? 60 : 1);
+  const [groupsOpen, setGroupsOpen] = useState(false);
+  const { reduced, layoutTransition } = useCalendarMotion();
+  const calendar = snapshot?.state.calendars.find(c => c.id === fields.calendarId);
+  const groups = calendarGroups(calendar), selectedGroup = groups.find(g => g.id === fields.groupId);
+  const rule = Object.fromEntries(recurrenceDraft.split(";").filter(Boolean).map(x => x.split("=")));
+  const simpleRule = Object.keys(rule).every(k => ["FREQ", "INTERVAL"].includes(k));
+  function repeat(value: string) { setRecurrenceDraft(value); update("recurrence", value); }
+  function reminder(value: number) { setReminderDraft(value); if (fields.reminderMinutes !== null) update("reminderMinutes", value); }
+  const placeRef = snapshot?.refs.find(r => r.module === "map" && r.objectType === "place" && r.objectId === fields.placeId);
+  const linked = placeRef && !fields.linkedRefs.some(r => r.module === "map" && r.objectId === placeRef.objectId) ? [...fields.linkedRefs, placeRef] : fields.linkedRefs;
+  return <div className={styles.editor}>
+    <div className={styles.left}>
+      <label className={styles.title}>Title<input required autoFocus maxLength={240} value={fields.title} onChange={e => update("title",e.target.value)} /></label>
+      <label className={styles.description}>Description<textarea rows={3} placeholder="What is this time for?" value={fields.description} onChange={e => update("description",e.target.value)} /></label>
+      <section className={styles.schedule} aria-label="Event schedule">
+        <div className={styles.scheduleHeader}>
+          <EventCheckbox label="All day" checked={fields.allDay} onChange={checked => {
+            const start=fields.start.slice(0,10), end=fields.end.slice(0,10);
+            update("allDay",checked);
+            update("start",checked ? start : `${start}T09:00`);
+            update("end",checked ? (fields.end.endsWith("T00:00") && end > start ? end : addDays(end,1)) : `${addDays(end,-1)}T10:00`);
+          }} />
+          <SelectField searchable autoFocusSearch={false} aria-label="Event time zone" value={fields.timeZone} onChange={e => update("timeZone",e.target.value)} triggerContent={<span className={styles.zone}><UnigentamosIcon role="clock" size={15} />{fields.timeZone.split("/").pop()?.replaceAll("_"," ")}<UnigentamosIcon role="chevron-down" size={12} /></span>}>
+            {[...new Set([fields.timeZone,"UTC",...Intl.supportedValuesOf("timeZone")])].map(zone => <option key={zone} value={zone}>{zone.replaceAll("_"," ")}</option>)}
+          </SelectField>
         </div>
+        <div className={styles.optionRow} data-enabled={fields.reminderMinutes !== null}>
+          <EventCheckbox label="Reminder" checked={fields.reminderMinutes !== null} onChange={checked => update("reminderMinutes",checked ? reminderDraft : null)} />
+          <input aria-label="Reminder amount" type="number" min={0} max={43200/reminderUnit} step="any" disabled={fields.reminderMinutes === null} value={Number((reminderDraft/reminderUnit).toFixed(5))} onChange={e => reminder(Math.round(Number(e.target.value)*reminderUnit))} />
+          <SelectField aria-label="Reminder unit" value={String(reminderUnit)} disabled={fields.reminderMinutes === null} onChange={e => { const next=Number(e.target.value); reminder(Math.min(43200,Math.round(reminderDraft/reminderUnit*next))); setReminderUnit(next); }}><option value="1">minutes before</option><option value="60">hours before</option><option value="1440">days before</option></SelectField>
+        </div>
+        <EventDateSegments label="Starts" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.start} onChange={value => update("start",value)} />
+        <EventDateSegments label="Ends" allDay={fields.allDay} timeZone={fields.timeZone} value={fields.allDay ? addDays(fields.end,-1) : fields.end} onChange={value => update("end",fields.allDay ? addDays(value,1) : value)} />
+        <div className={styles.optionRow}>
+          <span className={styles.repeatLabel}><UnigentamosIcon role="routine" size={18} />Repeat</span>
+          <input aria-label="Repeat interval" type="number" min={1} max={365} required={Boolean(fields.recurrence)} value={rule.INTERVAL || 1} disabled={!simpleRule} onChange={e => repeat(`FREQ=${rule.FREQ || "WEEKLY"};INTERVAL=${e.target.value}`)} />
+          <SelectField aria-label="Repeat unit" value={!fields.recurrence ? "none" : simpleRule ? rule.FREQ : "custom"} onChange={e => { if (e.target.value === "none") update("recurrence",""); else if (e.target.value === "custom") update("recurrence",recurrenceDraft); else repeat(`FREQ=${e.target.value};INTERVAL=${rule.INTERVAL || 1}`); }}>
+            <option value="none">Does not repeat</option><option value="DAILY">days</option><option value="WEEKLY">weeks</option><option value="MONTHLY">months</option><option value="YEARLY">years</option>{!simpleRule && <option value="custom">Custom schedule</option>}
+          </SelectField>
+        </div>
+        {!simpleRule && fields.recurrence && <label>Custom recurrence<input value={recurrenceDraft} onChange={e => repeat(e.target.value)} /><small>Includes the imported schedule and end date.</small></label>}
+      </section>
+    </div>
+    <div className={styles.right}>
+      <section className={styles.calendar} aria-label="Calendar and color groups">
+        <label>Calendar<SelectField aria-label="Calendar" value={fields.calendarId} onChange={e => { update("calendarId",e.target.value); update("groupId",""); }} triggerContent={<span className={styles.calendarValue}><span style={{background:calendarDisplayColor(calendar?.color)}} /><UnigentamosIcon role="calendar" size={18} />{calendar?.name || "Choose calendar"}<UnigentamosIcon role="chevron-down" size={14} /></span>}>
+          {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </SelectField></label>
+        <button className={styles.groupTrigger} type="button" aria-expanded={groupsOpen} onClick={() => setGroupsOpen(!groupsOpen)}><UnigentamosIcon role={selectedGroup?.icon || "palette"} size={16} /><span>{selectedGroup?.name || "Color group"}</span><UnigentamosIcon role="chevron-down" size={13} /></button>
+        <AnimatePresence initial={false}>{groupsOpen && <motion.div className={styles.groupPanel} initial={reduced ? false : {height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} transition={layoutTransition}><div className={styles.groups}>
+          <button type="button" aria-pressed={!fields.groupId} onClick={() => update("groupId","")}>None</button>{groups.map(g => <button type="button" key={g.id} aria-pressed={fields.groupId === g.id} style={{"--group-color":g.color} as CSSProperties} onClick={() => update("groupId",g.id)}><UnigentamosIcon role={g.icon} size={16} />{g.name}</button>)}
+        </div></motion.div>}</AnimatePresence>
       </section>
       <EventLocationField fields={fields} update={update} snapshot={snapshot} />
-      <section className={`${styles.editorSection} ${styles.eventSchedule}`} aria-label="Event schedule">
-        <div className={styles.editorSectionTitle}>
-          <span className={styles.editorTimeZone}><SelectField searchable autoFocusSearch={false} aria-label="Event time zone" menuClassName={styles.calendarChoiceMenu} value={fields.timeZone} onChange={event => update("timeZone", event.target.value)} triggerContent={<span><UnigentamosIcon role="clock" size={14} />{fields.timeZone.split("/").pop()?.replaceAll("_", " ")}</span>}>{[...new Set([fields.timeZone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(zone => <option key={zone} value={zone}>{zone.replaceAll("_", " ")}</option>)}</SelectField></span>
-          <EventCheckbox label="All day" checked={fields.allDay} onChange={(checked) => {
-                update("allDay", checked);
-                update(
-                  "start",
-                  checked
-                    ? fields.start.slice(0, 10)
-                    : `${fields.start.slice(0, 10)}T09:00`,
-                );
-                update(
-                  "end",
-                  checked
-                    ? addDays(fields.start.slice(0, 10), 1)
-                    : `${fields.start.slice(0, 10)}T10:00`,
-                );
-              }} />
-        </div>
-        <div className="work-form-pair">
-          {(["start", "end"] as const).map((key) => (
-            <EventDateTimePicker
-              key={key}
-              label={key === "start" ? "Start" : "End"}
-              allDay={fields.allDay}
-              timeZone={fields.timeZone}
-              value={
-                fields.allDay
-                  ? key === "end"
-                    ? addDays(fields.end, -1)
-                    : fields.start
-                  : fields[key].slice(0, 16)
-              }
-              onChange={(value) => update(
-                key,
-                fields.allDay && key === "end" ? addDays(value, 1) : value,
-              )}
-            />
-          ))}
-        </div>
-      </section>
-      <section
-        className={`${styles.editorSection} ${styles.eventReminders}`}
-        aria-label="Repeat and reminder"
-      >
-        <div className={styles.scheduleOption} data-enabled={Boolean(fields.recurrence)}>
-          <EventCheckbox icon="routine" label="Repeat" checked={Boolean(fields.recurrence)} onChange={(checked) => update("recurrence", checked ? recurrenceDraft : "")} />
-          {simpleRule ? (
-            <div className={styles.scheduleOptionFields}>
-              <input
-                aria-label="Repeat interval"
-                type="number"
-                min={fields.recurrence ? 1 : undefined}
-                max={fields.recurrence ? 365 : undefined}
-                required={Boolean(fields.recurrence)}
-                value={rule.INTERVAL ?? 1}
-                onChange={(e) =>
-                  changeRecurrence(
-                    `FREQ=${rule.FREQ || "WEEKLY"};INTERVAL=${e.target.value}`,
-                  )
-                }
-              />
-              <SelectField
-                aria-label="Repeat unit"
-                value={rule.FREQ}
-                onChange={(e) =>
-                  changeRecurrence(
-                    `FREQ=${e.target.value};INTERVAL=${rule.INTERVAL || 1}`,
-                  )
-                }
-              >
-                {[
-                  ["DAILY", "days"],
-                  ["WEEKLY", "weeks"],
-                  ["MONTHLY", "months"],
-                  ["YEARLY", "years"],
-                ].map(([v, l]) => (
-                  <option key={v} value={v}>
-                    {l}
-                  </option>
-                ))}
-              </SelectField>
-            </div>
-          ) : (
-          <label className={styles.customRecurrence}>
-            Custom recurrence
-            <input
-              value={recurrenceDraft}
-              onChange={(e) => changeRecurrence(e.target.value)}
-            />
-            <small>
-              Imported recurrence is preserved, including its end date and
-              exceptions.
-            </small>
-          </label>)}
-        </div>
-        <div className={styles.scheduleOption} data-enabled={fields.reminderMinutes !== null}>
-          <EventCheckbox icon="clock" label="Reminder" checked={fields.reminderMinutes !== null} onChange={(checked) => update("reminderMinutes", checked ? reminderDraft : null)} />
-          <div className={styles.scheduleOptionFields}>
-              <input
-                aria-label="Reminder amount"
-                type="number"
-                min={fields.reminderMinutes !== null ? 0 : undefined}
-                max={fields.reminderMinutes !== null ? 43200 / reminderUnit : undefined}
-                step="any"
-                value={Number(
-                  (reminderDraft / reminderUnit).toFixed(5),
-                )}
-                onChange={(e) =>
-                  changeReminder(
-                    Math.round(Number(e.target.value) * reminderUnit),
-                  )
-                }
-              />
-              <SelectField
-                aria-label="Reminder unit"
-                value={String(reminderUnit)}
-                onChange={(e) => {
-                  const next = Number(e.target.value);
-                  changeReminder(
-                    Math.min(
-                      43200,
-                      Math.round(
-                        (reminderDraft / reminderUnit) * next,
-                      ),
-                    ),
-                  );
-                  setReminderUnit(next);
-                }}
-              >
-                <option value="1">minutes before</option>
-                <option value="60">hours before</option>
-                <option value="1440">days before</option>
-              </SelectField>
-          </div>
-        </div>
-      </section>
-      <section className={`${styles.editorSection} ${styles.linkedObjects}`} aria-label="Linked objects">
-        <RecordLinks
-          objectPicker
-          refs={linked}
-          available={snapshot?.refs}
-          onChange={(refs) => {
-            update("linkedRefs", refs);
-            const place = refs.find(
-              (r) => r.module === "map" && r.objectType === "place",
-            );
-            update("placeId", place?.objectId || "");
-            if (place && place.objectId !== fields.placeId)
-              update(
-                "location",
-                snapshot?.state.places.find((p) => p.id === place.objectId)
-                  ?.address || place.label,
-              );
-          }}
-        />
-        {!!fields.participants?.length && (
-          <div>
-            <small className="work-muted">Imported participants</small>
-            <p>
-              {fields.participants.map((p) => p.name || p.email).join(", ")}
-            </p>
-          </div>
-        )}
-      </section>
-    </>
-  );
+      <section className={styles.links} aria-label="Linked objects"><RecordLinks objectPicker pickerLabel="Link an object" refs={linked} available={snapshot?.refs} onChange={refs => {
+        update("linkedRefs",refs); const place=refs.find(r => r.module === "map" && r.objectType === "place"); update("placeId",place?.objectId || "");
+        if (place && place.objectId !== fields.placeId) update("location",snapshot?.state.places.find(p => p.id === place.objectId)?.address || place.label);
+      }} />{Boolean(fields.participants?.length) && <p className={styles.participants}>Imported participants: {fields.participants?.map(p => p.name || p.email).join(", ")}</p>}</section>
+    </div>
+  </div>;
 }
-
 export function EventCheckbox({ label, checked, onChange, icon }: { label: string; checked: boolean; onChange: (checked: boolean) => void; icon?: string }) {
-  return <label className={`${styles.quietToggle} ${styles.eventCheckbox}`}>
-    <input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} />
-    <span className={styles.checkboxMark} aria-hidden="true"><UnigentamosIcon role="check" size={13} /></span>
-    {icon && <UnigentamosIcon role={icon} size={16} />}
-    <span>{label}</span>
-  </label>;
+  return <label className={`${base.quietToggle} ${base.eventCheckbox}`}><input type="checkbox" checked={checked} onChange={e => onChange(e.target.checked)} /><span className={base.checkboxMark} aria-hidden="true"><UnigentamosIcon role="check" size={13} /></span>{icon && <UnigentamosIcon role={icon} size={16} />}<span>{label}</span></label>;
 }

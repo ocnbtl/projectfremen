@@ -14,7 +14,8 @@ const dateLabel = (day: string, options: Intl.DateTimeFormatOptions) => new Date
 const pad = (number: number) => String(number).padStart(2, "0");
 
 /** Values stay in the event's wall-clock time; the repository owns zone conversion. */
-export default function EventDateTimePicker({ label, value, allDay, timeZone, onChange, dateOnly = false }: {
+export default function EventDateTimePicker({ label, value, allDay, timeZone, onChange, dateOnly = false, iconOnly = false }: {
+  iconOnly?: boolean;
   dateOnly?: boolean;
   label: string;
   value: string;
@@ -72,18 +73,18 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
   }
 
   return <div className={styles.field}>
-    <span className={styles.label}>{label}</span>
+    {!iconOnly && <span className={styles.label}>{label}</span>}
     <Popover.Root open={open} onOpenChange={next => {
       if (next) { setPage(day); setFocused(day); setMode("days"); setPane("date"); }
       setOpen(next);
     }}>
-      <Popover.Trigger asChild><button ref={trigger} type="button" className={styles.trigger} aria-label={label}
+      <Popover.Trigger asChild><button ref={trigger} type="button" className={iconOnly ? styles.iconTrigger : styles.trigger} aria-label={iconOnly ? `Choose ${label.toLowerCase()} date` : label}
         aria-description={`${dateLabel(day, { dateStyle: "full" })}${allDay ? dateOnly ? "" : ", all day" : `, ${clockHour}:${pad(minute)} ${period}, ${timeZone}`}`}
         data-value={value}>
         <UnigentamosIcon role="interaction-date" size={18} />
-        <span className={styles.value}><span>{dateLabel(day, { month: "short", day: "numeric", year: "numeric" })}</span>
+        {!iconOnly && <><span className={styles.value}><span>{dateLabel(day, { month: "short", day: "numeric", year: "numeric" })}</span>
           {!dateOnly && <small className={styles.timeValue}><AnimatePresence initial={false} mode="popLayout"><motion.span key={allDay ? "all-day" : "timed"} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -4 }} transition={{ duration: reduced ? 0 : .22 }}>{allDay ? "All day" : `${clockHour}:${pad(minute)} ${period}`}</motion.span></AnimatePresence></small>}</span>
-        <UnigentamosIcon role="chevron-down" size={14} />
+        <UnigentamosIcon role="chevron-down" size={14} /></>}
       </button></Popover.Trigger>
       <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={styles.popover} style={moduleThemeVariables("calendar") as CSSProperties}
         data-reduced-motion={reduced} sideOffset={8} collisionPadding={12} collisionBoundary={trigger.current?.closest<HTMLElement>('[role="dialog"]')} align="start" aria-label={`${label} date${allDay ? "" : " and time"}`}

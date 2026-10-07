@@ -27,7 +27,8 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
   return <motion.div layout transition={{ layout: layoutTransition }} className={styles.allDayBand} style={{ gridTemplateColumns: columns }} role="group" aria-label="All-day and linked events">
     {days.map((day, index) => <motion.span key={day} layout transition={{ layout: layoutTransition }} aria-hidden="true"
       className={styles.allDayColumn} data-today={day === today} data-all-day-column={day}
-      style={{ gridColumn: index + 2, gridRow: `1 / ${lanes + links.length + 1}` }} />)}
+      style={{ gridColumn: index + 2, gridRow: `1 / ${lanes + links.length + 2}` }} />)}
+    <span aria-hidden="true" className={styles.allDaySpacer} style={{gridColumn:"1 / -1",gridRow:lanes + links.length + 1}} />
     {segments.map(({ event, first, last, lane, continuesBefore, continuesAfter }) => {
       const calendar = calendars.find(c => c.id === event.calendarId), group = eventGroup(calendar, event.groupId);
       const title = `${event.title}${continuesBefore ? " · Continues from earlier dates" : ""}${continuesAfter ? " · Continues on later dates" : ""}`;

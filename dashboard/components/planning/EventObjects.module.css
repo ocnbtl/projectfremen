@@ -22,3 +22,9 @@
  .objects[data-object-list] .chip { width:auto; flex:none; }
  .objects[data-object-list] .chip::before,.objects[data-object-list] .label { display:none; }
 }
+/* Linked identities form a quiet, right-aligned list beneath the event. */
+.objects[data-object-list] .chip::before {content:none;}
+.objects[data-object-list] .label {text-align:right;}
+.objects[data-object-list] .visual {margin-left:0;}
+.objects .visual {color:inherit;}
+@container timed-event (max-width:80px) {.objects[data-object-list] .visual {margin-left:0;}}

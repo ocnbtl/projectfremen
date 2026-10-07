@@ -1,20 +1,25 @@
-.location { display: grid; gap: 9px; min-width: 0; }
-.modes { display: flex; gap: 4px; padding: 3px; border-radius: 9px; background: var(--module-quiet); }
-.modes button { flex: 1; width: auto; padding: 7px 5px; min-width: 0; border: 0; border-radius: 6px; font: 500 11px/1.3 var(--font-body); background: transparent; color: var(--text-secondary); cursor: pointer; }
-.modes button[aria-pressed="true"] { background: white; color: var(--module-primary-700); box-shadow: 0 1px 4px #10202614; }
-.address, .saved { display: grid; grid-template-columns: 18px minmax(0,1fr); align-items: center; gap: 8px; }
-.saved small { grid-column: 2; font-size: 11px; color: var(--text-secondary); }
-.address input, .create input { width: 100%; min-width: 0; box-sizing: border-box; font-size: 12px; }
-.create { min-width: 0; display: grid; gap: 10px; border: 1px solid var(--module-border); border-radius: 10px; padding: 12px; margin: 0; }
-.create > label { display: grid; gap: 5px; font-size: 12px; }
-.create > small { font-size: 11px; color: var(--text-secondary); }
-.location > p { font-size: 12px; color: var(--color-danger, #a33b42); }
-.address input,.saved :global(.app-select-trigger) { font:400 13px/1.5 var(--font-body); color:var(--text-strong); min-height:40px; }
-.address input::placeholder,.saved :global(.app-select-trigger) { color:var(--text-secondary); font-size:13px; }
-.create { grid-template-columns:auto minmax(0,1fr); align-items:start; gap:10px 14px; padding:10px; }
-.create > div { grid-column:1 / -1; }
-.create > button { justify-self:start; align-self:end; }
-.create > button { min-height:34px; padding-block:5px; }
-.create > small { align-self:center; }
-@media (max-width:600px) { .create { grid-template-columns:minmax(0,1fr); } }
-@media (max-width: 760px) { .location.location input { font-size: 16px; } }
+.location {display:grid;gap:6px;min-width:0;}
+.label {font:500 12px/1.5 var(--font-body);color:var(--text-strong);}
+.address {display:flex;align-items:center;gap:5px;border:1px solid var(--module-border);border-radius:9px;background:white;padding:2px 5px 2px 10px;min-width:0;}
+.address > svg {flex:none;color:var(--text-secondary);}
+.location .address input {border:0!important;background:transparent;box-shadow:none!important;outline:none!important;min-width:0;width:100%;padding:8px 4px;font:400 13px/1.5 var(--font-body);}
+.address button,.popover header button {display:inline-flex;align-items:center;justify-content:center;flex:none;border:0;background:transparent;color:var(--text-secondary);border-radius:6px;width:30px;height:32px;cursor:pointer;transition:background .2s,color .2s;}
+.address button:hover,.address button[data-state="open"] {background:var(--module-quiet);color:var(--module-action);}
+.popover {width:min(440px,calc(100vw - 32px));max-height:min(600px,var(--radix-popover-content-available-height));overflow:auto;padding:16px;border:1px solid var(--module-border);border-radius:14px;background:white;box-shadow:0 12px 40px #10202624;z-index:190;transform-origin:var(--radix-popover-content-transform-origin);font:400 13px/1.5 var(--font-body);}
+.popover[data-state="open"] {animation:place-in .24s cubic-bezier(.2,.8,.2,1);}
+.popover[data-state="closed"] {animation:place-out .18s ease-in;}
+.popover header {display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:10px;}
+.popover header strong {display:flex;align-items:center;gap:8px;font-size:14px;}
+.places {display:grid;gap:4px;max-height:300px;overflow:auto;}
+.places > button {display:flex;align-items:center;gap:10px;width:100%;border:0;border-radius:8px;background:transparent;padding:10px;text-align:left;color:var(--text-strong);font:inherit;cursor:pointer;}
+.places > button:hover,.places > button[aria-pressed="true"] {background:var(--module-quiet);}
+.places > button > svg {flex:none;}
+.places > button > span {display:grid;gap:2px;min-width:0;flex:1;}
+.places small {font-size:12px;color:var(--text-secondary);overflow-wrap:anywhere;}
+.create {border:0;padding:0;margin:0;display:grid;gap:12px;min-width:0;}
+.create footer {display:flex;gap:12px;align-items:center;justify-content:space-between;}
+.create footer small {max-width:180px;}
+@keyframes place-in {from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}
+@keyframes place-out {to{opacity:0;transform:translateY(-4px) scale(.98)}}
+@media(prefers-reduced-motion:reduce){.popover[data-state]{animation:none;}}
+@media(max-width:700px){.location .address input {font-size:16px;} .popover {padding:12px;} .create footer {flex-wrap:wrap;}}

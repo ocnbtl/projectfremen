@@ -17,7 +17,7 @@ export default function CalendarHourControls({ days, events, zone, early, late, 
         aria-label={(expanded ? "Hide " : "Show ") + relation + " " + time + (n ? " · " + n + (n === 1 ? " event" : " events") : "")}
         onClick={event => { if (!available) { event.currentTarget.animate([{ borderColor: "#b54d58" }, { borderColor: "transparent" }], { duration: 600 }); return; } before ? setEarly(!early) : setLate(!late); }}>
         <UnigentamosIcon role="chevron-down" size={13} style={{ transform: before !== expanded ? "rotate(180deg)" : undefined }} />
-        <span className={styles.hourVerb}>{expanded ? "Hide" : "Show"} </span><span className={styles.hourRelation}>{before ? "Before" : "After"} </span><span>{time}</span>
+        <span className={styles.hourRelation}>{before ? "Before" : "After"} </span><span>{time}</span>
         {available && !!n && <b aria-hidden="true">{n}</b>}
       </button>;
     })}

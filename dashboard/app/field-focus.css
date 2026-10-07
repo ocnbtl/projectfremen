@@ -1,0 +1,18 @@
+/* One focus treatment, colored by the active module. Compound fields own their glow. */
+html[data-active-module] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),textarea,select,[contenteditable="true"],.app-select-trigger),
+html[data-active-module] [data-field-shell] {
+  transition:border-color .2s ease,box-shadow .24s ease,background-color .2s ease;
+}
+html[data-active-module] :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="hidden"]),textarea,select,[contenteditable="true"],.app-select-trigger):is(:focus,:focus-visible):not([data-field-shell] *) {
+  outline:none!important;
+  border-color:var(--module-focus)!important;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--module-focus) 24%,transparent),0 0 12px color-mix(in srgb,var(--module-focus) 10%,transparent)!important;
+}
+html[data-active-module] [data-field-shell]:focus-within {
+  outline:none!important;
+  border-color:var(--module-focus)!important;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--module-focus) 24%,transparent),0 0 12px color-mix(in srgb,var(--module-focus) 10%,transparent)!important;
+}
+html[data-active-module] [data-field-shell] :is(input,textarea):focus {outline:none!important;box-shadow:none!important;}
+html[data-active-module] [aria-invalid="true"]:focus {border-color:var(--danger,#b42318)!important;}
+@media(prefers-reduced-motion:reduce){html[data-active-module] :is(input,textarea,select,[contenteditable="true"],.app-select-trigger,[data-field-shell]){transition:none;}}

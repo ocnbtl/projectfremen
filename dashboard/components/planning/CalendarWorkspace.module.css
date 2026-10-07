@@ -2476,3 +2476,24 @@
  .calendarCard:has(.holidayList) { grid-column:1 / -1; }
  .calendarCard .holidayList { grid-template-columns:repeat(3,minmax(0,1fr)); }
 }
+/* Event editing: two deliberate columns, with shared actions beneath. */
+.eventForm { display:flex; flex-direction:column; gap:18px; }
+.eventForm > * { width:100%; min-width:0; }
+.eventForm > :global(.work-form-footer) { display:flex; justify-content:flex-end; gap:10px; position:static; margin:0; padding:6px 0 0; }
+.personAvatar {box-shadow:none;}
+.allDayBand:not(:empty) {padding-bottom:0;}
+.allDayBand .allDaySpacer {height:4px;min-height:4px;pointer-events:none;}
+.allDayBand {grid-auto-rows:auto;}
+.allDayBand .allDayItem {color:var(--text-strong);}
+.allDayBand .allDayItem > svg {color:var(--text-strong);}
+.allDayBand .allDayItem .eventPeople {padding:0;}
+.allDayBand .allDayItem > [data-event-objects] {color:var(--text-strong);}
+.fittedEvent > button:not(.fittedResize) {text-align:left;}
+.fittedEvent[data-roomy="true"] .timedEventCopy {align-self:stretch;width:100%;}
+.fittedEvent .timedEventTitle {justify-content:flex-start;text-align:left;}
+.fittedEvent .timedEventCopy > .timedEventRange {justify-content:flex-start;text-align:left;font-weight:500;}
+.fittedEvent .timedEventRange > svg {width:18px;height:18px;}
+.toolbarHours button > b {display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:20px;width:20px;height:20px;padding:0;border-radius:50%;background:var(--module-action);color:#fff;font:650 11px/1 var(--font-body);}
+@media(min-width:761px){.fittedEvent > button:not(.fittedResize){padding-inline:8px;}}
+
+@media(min-width:761px){.fittedEvent[data-roomy="true"] > button:first-child {padding-inline:8px;}}

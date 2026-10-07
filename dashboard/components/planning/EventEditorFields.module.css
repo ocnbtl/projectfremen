@@ -1,0 +1,53 @@
+.editor { display:grid; grid-template-columns:minmax(0,1.12fr) minmax(0,1fr); gap:32px; min-width:0; color:var(--text-strong); font:400 13px/1.5 var(--font-body); }
+.left,.right { display:flex; flex-direction:column; gap:18px; min-width:0; }
+.editor label { color:var(--text-strong); font-size:12px; font-weight:500; gap:6px; }
+.editor input,.editor textarea,.editor :global(.app-select-trigger) { font:400 13px/1.5 var(--font-body); color:var(--text-strong); }
+.editor .title { width:94%; }
+.editor .description textarea { min-height:94px; height:94px; resize:vertical; text-align:left; padding:10px 12px; }
+.schedule { display:grid; gap:10px; }
+.scheduleHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.scheduleHeader > :global(.app-select-trigger) { width:auto; max-width:60%; }
+.scheduleHeader :global(.app-select-trigger),.optionRow :global(.app-select-trigger) { background:transparent; border-color:transparent; min-height:32px; padding:4px 6px; box-shadow:none; }
+.zone { display:flex; gap:6px; align-items:center; }
+.schedule label { color:var(--text-strong); }
+.optionRow { display:grid; grid-template-columns:110px 42px minmax(0,1fr); align-items:center; gap:6px; }
+.editor .optionRow > input { width:42px; min-height:32px; padding:4px; border-color:transparent; background:transparent; text-align:center; appearance:textfield; }
+.optionRow input::-webkit-inner-spin-button { appearance:none; }
+.optionRow[data-enabled="false"] > input,.optionRow[data-enabled="false"] > button { opacity:.45; }
+.repeatLabel { display:flex; align-items:center; gap:12px; padding-left:6px; font-size:13px; }
+.dateRow { display:flex; align-items:center; gap:6px; min-height:36px; min-width:0; }
+.dateLabel { flex:none; width:50px; font-weight:500; }
+.segments { display:flex; align-items:center; gap:0; min-width:0; white-space:nowrap; font-variant-numeric:tabular-nums; }
+.editor .segment { border:1px solid transparent; border-radius:5px; box-shadow:none; outline:none; background:transparent; width:2.45ch; min-width:0; padding:4px 1px; min-height:30px; text-align:center; font:500 13px/1.5 var(--font-body); }
+.editor .segment[data-segment="year"] { width:4.7ch; }
+.editor .segment[data-segment="period"] { width:3ch; margin-left:1px; }
+.editor .segment:focus { background:var(--module-quiet); }
+.segment::selection { background:var(--module-action); color:white; }
+.comma { margin-right:5px; }
+.calendar { display:grid; gap:6px; }
+.calendarValue { display:flex; align-items:center; gap:8px; width:100%; }
+.calendarValue > span { width:9px; height:9px; border-radius:50%; flex:none; }
+.calendarValue > svg:last-child { margin-left:auto; }
+.groupTrigger { display:flex; align-items:center; gap:7px; width:fit-content; border:0; padding:5px 2px; border-radius:6px; background:transparent; color:var(--text-secondary); font:500 12px/1.5 var(--font-body); cursor:pointer; }
+.groupTrigger svg:last-child { transition:transform .25s; }
+.groupTrigger[aria-expanded="true"] svg:last-child { transform:rotate(180deg); }
+.groupPanel { overflow:hidden; }
+.groups { display:flex; flex-wrap:wrap; gap:6px; padding:4px; }
+.groups button { display:flex; align-items:center; gap:5px; padding:6px 9px; border-radius:7px; border:1px solid transparent; background:var(--module-quiet); color:var(--group-color,var(--text-strong)); font:500 12px/1.4 var(--font-body); cursor:pointer; }
+.groups button[aria-pressed="true"] { border-color:var(--group-color,var(--module-action)); }
+.links { min-width:0; }
+.links :global(.work-object-links) { display:flex; flex-direction:column; gap:10px; }
+.links :global(.work-object-link-trigger) { justify-content:flex-start; gap:8px; }
+.links :global(.work-object-link-trigger) button { border:0; background:transparent; box-shadow:none; }
+.links :global(.work-links) { display:flex; flex-wrap:wrap; gap:8px 14px; }
+.links :global(.work-links) > span { background:transparent; border:0; padding:0; gap:3px; }
+.links :global(.work-links) a { font-size:13px; gap:6px; }
+.links :global(.work-links) > span > button { min-width:24px; width:24px; min-height:26px; padding:3px; }
+.participants { font-size:12px; color:var(--text-secondary); }
+@media(max-width:700px) { .editor {grid-template-columns:minmax(0,1fr);gap:22px;} .left,.right {gap:14px;} .editor .title {width:100%;} .editor input,.editor textarea {font-size:16px;} .editor .segment {font-size:14px;} .optionRow {grid-template-columns:100px 40px minmax(0,1fr);} }
+
+.editor .schedule label {font-size:13px;color:var(--text-strong);}
+.editor .schedule label > span:last-child {font-size:13px;color:var(--text-strong);}
+
+.links :global(.work-links) a {padding:2px 0;min-height:30px;--linked-object-size:24px;}
+.links :global(.work-links) > span > button {flex:0 0 24px;margin:0;}
