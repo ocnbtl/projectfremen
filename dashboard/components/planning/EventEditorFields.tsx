@@ -22,6 +22,7 @@ export default function EventEditorFields({ fields, update, snapshot }: {
   snapshot?: PlanningSnapshot;
 }) {
   const [reminderDraft, setReminderDraft] = useState(fields.reminderMinutes ?? 15);
+  const [reminderEmpty, setReminderEmpty] = useState(false);
   const [reminderUnit, setReminderUnit] = useState(fields.reminderMinutes && fields.reminderMinutes % 10080 === 0 ? 10080 : fields.reminderMinutes && fields.reminderMinutes % 1440 === 0 ? 1440 : fields.reminderMinutes && fields.reminderMinutes % 60 === 0 ? 60 : 1);
   const [groupsOpen, setGroupsOpen] = useState(false);
   const { reduced, layoutTransition } = useCalendarMotion();
@@ -44,7 +45,7 @@ export default function EventEditorFields({ fields, update, snapshot }: {
           }} />
           <EventCheckbox label="Task" checked={Boolean(fields.isTask)} onChange={checked => {
             update("isTask",checked);
-            if (checked) { update("reminderMinutes",60); setReminderDraft(60); setReminderUnit(60); }
+            if (checked) { update("reminderMinutes",60); setReminderDraft(60); setReminderUnit(60); setReminderEmpty(false); }
             else update("completed",false);
           }} />
           <SelectField searchable autoFocusSearch={false} aria-label="Event time zone" value={fields.timeZone} onChange={e => update("timeZone",e.target.value)} triggerContent={<span className={styles.zone}><UnigentamosIcon role="clock" size={15} />{fields.timeZone.split("/").pop()?.replaceAll("_"," ")}<UnigentamosIcon role="chevron-down" size={12} /></span>}>
@@ -52,8 +53,13 @@ export default function EventEditorFields({ fields, update, snapshot }: {
           </SelectField>
         </div>
         <div className={styles.optionRow} data-enabled={fields.reminderMinutes !== null}>
-          <EventCheckbox label="Reminder" checked={fields.reminderMinutes !== null} onChange={checked => update("reminderMinutes",checked ? reminderDraft : null)} />
-          <input aria-label="Reminder amount" type="number" min={0} max={43200/reminderUnit} step="any" disabled={fields.reminderMinutes === null} value={Number((reminderDraft/reminderUnit).toFixed(5))} onChange={e => reminder(Math.round(Number(e.target.value)*reminderUnit))} />
+          <EventCheckbox label="Reminder" checked={fields.reminderMinutes !== null} onChange={checked => { setReminderEmpty(false); update("reminderMinutes",checked ? reminderDraft : null); }} />
+          <input aria-label="Reminder amount" type="number" min={0} max={43200/reminderUnit} step="any" required={fields.reminderMinutes !== null} disabled={fields.reminderMinutes === null} value={reminderEmpty ? "" : Number((reminderDraft/reminderUnit).toFixed(5))} onChange={e => {
+            const empty = e.target.value === "";
+            setReminderEmpty(empty);
+            // Keep deletion editable; an empty enabled reminder must be filled before saving.
+            if (!empty) reminder(Math.round(Number(e.target.value)*reminderUnit));
+          }} />
           <SelectField aria-label="Reminder unit" value={String(reminderUnit)} disabled={fields.reminderMinutes === null} onChange={e => { const next=Number(e.target.value); reminder(Math.min(43200,Math.round(reminderDraft/reminderUnit*next))); setReminderUnit(next); }}><option value="1">minutes before</option><option value="60">hours before</option><option value="1440">days before</option><option value="10080">weeks before</option></SelectField>
         </div>
         <EventRepeatField fields={fields} update={update} birthdays={snapshot?.birthdays} />
