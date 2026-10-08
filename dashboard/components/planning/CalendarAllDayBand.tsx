@@ -11,10 +11,11 @@ import { eventGroup } from "../../lib/modules/planning/calendar-groups";
 import { eventColors, eventPreviewTitle } from "./calendar-presentation";
 import { useCalendarMotion } from "./CalendarMotion";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import EventPeople from "./EventPeople";
+import EventLinksPreview from "./EventLinksPreview";
+import EventDetail from "./EventDetail";
 import EventGlyph from "./EventGlyph";
 import EventContinuation from "./EventContinuation";
-import EventObjects from "./EventObjects";
+import { eventObjectRefs } from "./EventObjects";
 import styles from "./CalendarWorkspace.module.css";
 
 export default function CalendarAllDayBand({ days, events, calendars, refs, dated, zone, columns, today, onOpen, onComplete }: {
@@ -34,13 +35,14 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
     {segments.map(({ event, first, last, lane, continuesBefore, continuesAfter }) => {
       const calendar = calendars.find(c => c.id === event.calendarId), group = eventGroup(calendar, event.groupId);
       const title = `${event.title}${continuesBefore ? " · Continues from earlier dates" : ""}${continuesAfter ? " · Continues on later dates" : ""}`;
+      const place = eventObjectRefs(event,refs).find(ref => ref.module === "map")?.label;
       return <TaskEventCard event={event} onComplete={onComplete} layout transition={{ layout: layoutTransition }} key={event.id} className={styles.allDayItem}
         style={{ ...eventColors(event, calendar), gridColumn: `${first + 2} / ${last + 3}`, gridRow: lane + 1 } as CSSProperties}
         data-morph-event={event.id} data-span-event={event.id} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
         aria-label={title} title={title} onClick={() => onOpen(event)}>
         {(continuesBefore || continuesAfter) && <EventContinuation before={continuesBefore} after={continuesAfter} />}
         <EventGlyph event={event} icon={group?.icon} />
-        <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventPeople refs={event.linkedRefs} available={refs} /><EventObjects event={event} available={refs} />
+        <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventLinksPreview event={event} available={refs}/>{place && <EventDetail kind="place" text={place} eventTitle={event.title} compact={false}/>}
 
       </TaskEventCard>;
     })}

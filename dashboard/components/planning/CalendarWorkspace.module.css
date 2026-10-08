@@ -2649,3 +2649,23 @@
 .draftNotice :global(.work-button) { flex:none; height:28px; min-height:28px; padding:4px 7px; }
 .draftNotice :global(.work-button):last-child { display:grid; place-items:center; width:28px; height:28px; padding:0; }
 .draftNotice :global(.work-button):last-child:hover { background:var(--module-quiet); }
+
+/* Title-first metadata adapts to the card, not to the width of its label. */
+.allDayBand .allDayItem > [data-event-links] { margin:0; max-width:34%; }
+.allDayBand .allDayItem > [data-event-detail] { max-width:35%; }
+@container all-day-event (max-width:340px) {
+ .allDayBand .allDayItem > [data-event-detail] span { display:none; }
+ .allDayBand .allDayItem > [data-event-links] { --avatar-size:18px; --linked-object-size:18px; }
+}
+@container all-day-event (max-width:120px) {
+ .allDayBand .allDayItem > [data-event-links],.allDayBand .allDayItem > [data-event-detail] { display:none; }
+ .allDayBand .allDayItem .eventTitle { font-size:10px; }
+}
+@media(max-width:760px) {
+ .content { padding-left:3px; padding-right:3px; }
+ .content .fittedGrid { --calendar-time-gutter:42px; }
+ .content[data-view="week"] .fittedGrid { --calendar-time-gutter:30px; }
+ .content[data-view="week"] .allDayBand .allDayItem { gap:3px; padding-inline:3px; }
+ .content[data-view="week"] .allDayBand .allDayItem > svg:not([data-continuation-outline]) { display:block; width:11px; height:13px; flex:none; }
+ .content[data-view="week"] .allDayBand .allDayItem > svg[data-continuation-outline] { display:block; }
+}

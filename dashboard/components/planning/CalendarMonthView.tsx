@@ -9,6 +9,8 @@ import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-prese
 import { calendarDateLabel as label } from "./CalendarMiniMonth";
 import { useCalendarMotion } from "./CalendarMotion";
 import EventLinksPreview from "./EventLinksPreview";
+import EventDetail from "./EventDetail";
+import { eventObjectRefs } from "./EventObjects";
 import EventGlyph from "./EventGlyph";
 import EventContinuation from "./EventContinuation";
 import styles from "./CalendarMonthView.module.css";
@@ -46,6 +48,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
           const calendar = calendars.find(item => item.id === event.calendarId), group = eventGroup(calendar, event.groupId);
           const continuation = `${continuesBefore ? ", continues from earlier dates" : ""}${continuesAfter ? ", continues on later dates" : ""}`;
           const timing = event.allDay ? "" : eventTimeRange(event.startMs, event.endMs, zone);
+          const place = eventObjectRefs(event,refs).find(ref => ref.module === "map")?.label;
           const span = last - first + 1;
           const compactContinuation = continuesBefore && detailedEvents.has(event.id) && (span === 1 || size.width / columns * span < 300);
           if (!compactContinuation) detailedEvents.add(event.id);
@@ -57,6 +60,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
             <EventGlyph event={event} icon={group?.icon} size={16} />
             <span className={styles.copy}><strong>{eventPreviewTitle(event)}</strong>{timing && !compactContinuation && <small>{timing}</small>}</span>
             {!compactContinuation && <EventLinksPreview event={event} available={refs} />}
+            {!compactContinuation && place && <EventDetail kind="place" text={place} eventTitle={event.title}/>}
 
           </TaskEventCard>;
         })}

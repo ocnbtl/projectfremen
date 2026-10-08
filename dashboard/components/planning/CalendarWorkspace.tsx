@@ -2,7 +2,7 @@
 import PlaceSync from "./PlaceSync";
 import LogoLoader from "../operational/LogoLoader";
 import * as Popover from "@radix-ui/react-popover";
-import { calendarDisplayColor, eventColors, eventPreviewTitle, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
+import { calendarDisplayColor, eventColors, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
 import CalendarMobileView from "./CalendarMobileView";
 import CalendarMonthView from "./CalendarMonthView";
 import { monthWeekLayout } from "../../lib/modules/planning/month-layout";
@@ -12,11 +12,10 @@ import CalendarYearView from "./CalendarYearView";
 import CalendarAgenda from "./CalendarAgenda";
 import { calendarRange, shiftCalendar, viewIcons, type CalendarView as View } from "../../lib/modules/planning/calendar-navigation";
 import EventPeople from "./EventPeople";
-import EventGlyph from "./EventGlyph";
-import EventObjects from "./EventObjects";
+import EventRowContent from "./EventRowContent";
+import eventRowStyles from "./EventRowContent.module.css";
 import TaskEventCard from "./TaskEventCard";
 import { taskCompletionPatch, resizedEventTime } from "../../lib/modules/planning/calendar-tasks";
-import EventTiming from "./EventTiming";
 import { timeChange, timeChangePatch, canUndoTimeChange, type EventTimeChange } from "../../lib/modules/planning/event-time-history";
 import { calendarDateLabel } from "./CalendarMiniMonth";
 import CalendarObservanceSettings, { CalendarCountryFlag } from "./CalendarObservanceSettings";
@@ -557,7 +556,7 @@ export default function CalendarWorkspace() {
     const update = () => setDate(current => shiftCalendar(current, view, direction, agendaDays));
     if (view === "month") morph(update); else update();
   };
-  function eventButton(item: EventOccurrence, detail = false) {
+  function eventButton(item: EventOccurrence) {
     const event = snapshot?.state.events.find((x) => x.id === item.eventId);
     const calendar = snapshot?.state.calendars.find(
       (x) => x.id === item.calendarId,
@@ -566,7 +565,7 @@ export default function CalendarWorkspace() {
     return (
       <TaskEventCard event={item} onComplete={item => void completeTask(item)}
         key={item.id}
-        className={`${styles.agendaEvent} ${detail ? styles.dayDetailEvent : ""}`}
+        className={eventRowStyles.card}
         data-morph-event={item.id}
         data-birthday={item.system?.kind === "birthday" || undefined}
         data-month-all-day={view === "month" && item.allDay || undefined}
@@ -574,12 +573,7 @@ export default function CalendarWorkspace() {
         onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
         title={item.title}
       >
-        <span className={detail ? styles.detailTime : styles.agendaTime}><EventTiming event={item} zone={zone} /></span>
-        <span className={styles.eventIcon}><EventGlyph event={item} icon={group?.icon} size={18} /></span>
-        <span className={styles.eventCopy}><strong>{eventPreviewTitle(item)}</strong>
-        </span>
-        <EventPeople refs={item.linkedRefs} available={snapshot?.refs} />
-        <EventObjects event={item} available={snapshot?.refs} />
+        <EventRowContent event={item} available={snapshot?.refs || []} icon={group?.icon} zone={zone}/>
       </TaskEventCard>
     );
   }
@@ -793,7 +787,7 @@ export default function CalendarWorkspace() {
               const column = week.indexOf(dayDetail);
               return monthWeekLayout(week, occurrences, zone, Number.MAX_SAFE_INTEGER).segments
                 .filter(segment => segment.first <= column && segment.last >= column)
-                .map(segment => eventButton(segment.event, true));
+                .map(segment => eventButton(segment.event));
             })()}
             {dated
               .filter((x) => x.start <= dayDetail && x.end > dayDetail)

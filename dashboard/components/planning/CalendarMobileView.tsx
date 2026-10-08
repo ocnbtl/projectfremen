@@ -18,7 +18,7 @@ export default function CalendarMobileView({ view, date, today, days, events, li
 }) {
   const { reduced } = useCalendarMotion();
   const list = useRef<HTMLDivElement>(null);
-  const eventsOn = (day: string) => events.filter(event => localFor(event.startMs, zone).slice(0, 10) <= day && localFor(event.endMs - 1, zone).slice(0, 10) >= day);
+  const eventsOn = (day: string) => events.filter(event => localFor(event.startMs, zone).slice(0, 10) <= day && localFor(event.endMs - 1, zone).slice(0, 10) >= day).sort((a,b) => Number(b.allDay)-Number(a.allDay) || a.startMs-b.startMs || a.title.localeCompare(b.title));
   const linksOn = (day: string) => linked.filter(item => item.start <= day && item.end > day);
   const choose = (day: string) => {
     onDate(day);

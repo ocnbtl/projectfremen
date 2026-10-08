@@ -1,14 +1,12 @@
 "use client";
 import { useLayoutEffect, useRef, useState, type DragEvent } from "react";
-import * as Popover from "@radix-ui/react-popover";
 import type { EventOccurrence } from "../../lib/modules/planning/types";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import EventGlyph from "./EventGlyph";
-import EventObjects from "./EventObjects";
 import EventLinksPreview from "./EventLinksPreview";
+import EventDetail from "./EventDetail";
 import { eventObjectRefs } from "./EventObjects";
 import { TaskCheck } from "./TaskEventCard";
-import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { eventPreviewTitle } from "./calendar-presentation";
 import styles from "./TimedEventContent.module.css";
 
@@ -17,51 +15,39 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   onOpen: () => void; onComplete: (event: EventOccurrence) => void;
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void; onDragEnd: () => void;
 }) {
-  const root = useRef<HTMLDivElement>(null), [width,setWidth] = useState(300);
-  const [objectLimit, setObjectLimit] = useState(0);
+  const root = useRef<HTMLDivElement>(null), heading = useRef<HTMLDivElement>(null);
+  const [width,setWidth] = useState(300), [headingHeight,setHeadingHeight] = useState(0);
   useLayoutEffect(() => {
-    const element = root.current; if (!element) return;
-    // Measure the outside width: narrow-mode padding must not change its own breakpoint.
-    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
-    observer.observe(element); return () => observer.disconnect();
-  }, []);
-  const place = available.find(r => r.module === "map" && r.objectId === event.placeId)?.label || event.linkedRefs.find(r => r.module === "map")?.label || event.location;
-  const title = eventPreviewTitle(event);
-  const vertical = height >= 82;
-  const hasObjects = eventObjectRefs(event,available).some(ref => ref.module !== "map");
-  const requiredWidth = title.length * 6.5 + timing.length * 5.5 + (place ? place.length * 6 + 24 : 0) + (event.isTask ? 82 : 58) + (hasObjects ? 38 : 0);
-  const collapsed = !vertical && width < requiredWidth;
-  // In tall but narrow columns, use the available height before collapsing metadata.
-  const narrow = vertical && width < 82;
-  useLayoutEffect(() => {
-    const element = root.current;
-    if (!element || !vertical) return;
-    const headers = Array.from(element.querySelectorAll<HTMLElement>("[data-event-heading]"));
-    const measure = () => {
-      const padding = getComputedStyle(element);
-      // Layout heights stay constant while the event's entrance transform animates.
-      const headerHeight = headers.reduce((sum, header) => sum + header.offsetHeight, 0);
-      const rowHeight = element.clientWidth <= 160 ? 20 : 30;
-      const gap = element.clientWidth <= 160 ? 5 : 7;
-      const room = element.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom) - headerHeight - headers.length * 6 - 6;
-      setObjectLimit(Math.max(0, Math.floor((room + gap) / (rowHeight + gap))));
-    };
+    const element = root.current, header = heading.current; if (!element || !header) return;
+    // Outside layout dimensions do not change with padding or entrance transforms.
+    const measure = () => { setWidth(element.clientWidth); setHeadingHeight(header.offsetHeight); };
     const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    headers.forEach(header => observer.observe(header));
-    measure();
+    observer.observe(element); observer.observe(header); measure();
     return () => observer.disconnect();
-  }, [vertical, narrow, event.title, timing, place]);
-  const popup = (role: string, text: string, label: string) => <Popover.Root><Popover.Trigger asChild><button type="button" className={styles.detailButton} aria-label={`${label} for ${event.title}`} onPointerDown={e => e.stopPropagation()}><UnigentamosIcon role={role} size={14}/></button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.detail} side="right" sideOffset={6} collisionPadding={8} aria-label={label}><UnigentamosIcon role={role} size={15}/><span>{text}</span><Popover.Close aria-label={`Close ${label.toLowerCase()}`}><UnigentamosIcon role="close" size={14}/></Popover.Close></Popover.Content></Popover.Portal></Popover.Root>;
-  return <div ref={root} className={styles.content} data-vertical={vertical} data-tiny={height < 26} data-slim={width < 120} data-completed={event.completed || undefined} data-narrow={narrow}>
-    <TaskCheck event={event} onComplete={onComplete} />
-    <button className={styles.open} type="button" draggable={!event.system} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onOpen} aria-label={`${event.title} · ${timing}${place ? ` · ${place}` : ""}`}>
-      <span className={styles.title} data-event-heading><EventGlyph event={event} icon={icon} size={16}/><strong>{title}</strong></span>
-      {!collapsed && !narrow && <span className={styles.time} data-event-heading><UnigentamosIcon role="clock" size={14}/><span>{timing}</span></span>}
-      {place && !collapsed && !narrow && <span className={styles.place} data-event-heading><UnigentamosIcon role="location" size={14}/><span>{place}</span></span>}
-      {vertical && objectLimit > 0 && <EventObjects event={event} available={available} excludePlaces list align={singleDay ? "start" : "end"} maxItems={objectLimit} />}
-    </button>
-    {(collapsed || narrow) && <span className={styles.details}>{popup("clock",timing,"Time")}{place && popup("location",place,"Place")}</span>}
-    {!vertical && <EventLinksPreview event={event} available={available} excludePlaces />}
+  }, []);
+  const place = eventObjectRefs(event,available).find(ref => ref.module === "map")?.label;
+  const title = eventPreviewTitle(event), vertical = height >= 58, narrow = width < 90;
+  const hasObjects = eventObjectRefs(event,available).some(ref => ref.module !== "map");
+  const inlineFits = width >= title.length * 6.5 + timing.length * 5.4 + (place ? place.length * 5.4 + 24 : 0) + 82 + (hasObjects ? 30 : 0);
+  const compactTime = vertical ? width < timing.length * 5.4 + 26 : !inlineFits;
+  const compactPlace = vertical ? width < (place?.length || 0) * 5.4 + 26 : !inlineFits;
+  const compact = compactTime && (!place || compactPlace);
+  // Reserve the title first, then independent time/place controls, then people/objects.
+  const detailRoom = vertical ? height - headingHeight - 14 >= 22 : width >= 140;
+  const objectRoom = vertical ? height - headingHeight - (detailRoom ? (compact ? 28 : place ? 50 : 28) : 0) - 18 : 0;
+  const objectLimit = Math.max(0,Math.floor((objectRoom + 5) / 27));
+  const showObjects = hasObjects && (vertical ? objectRoom >= 22 : width >= 210);
+  return <div ref={root} className={styles.content} data-vertical={vertical} data-tiny={height < 26} data-narrow={narrow} data-completed={event.completed || undefined}>
+    <div ref={heading} className={styles.heading}>
+      <TaskCheck event={event} onComplete={onComplete}/>
+      <button className={styles.open} type="button" draggable={!event.system} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onOpen} aria-label={`${event.title} · ${timing}${place ? ` · ${place}` : ""}`} title={title}>
+        <EventGlyph event={event} icon={icon} size={14}/><strong>{vertical && narrow ? title.split(/\s+/).map((word,index) => <span key={index}>{word}</span>) : title}</strong>
+      </button>
+    </div>
+    {detailRoom && <div className={styles.details} data-compact={compact}>
+      <EventDetail kind="time" text={timing} eventTitle={event.title} compact={compactTime}/>
+      {place && <EventDetail kind="place" text={place} eventTitle={event.title} compact={compactPlace}/>}
+    </div>}
+    {showObjects && <EventLinksPreview event={event} available={available} list={vertical && !narrow} align={singleDay ? "start" : "end"} limit={vertical ? narrow ? 0 : objectLimit : 1}/>}
   </div>;
 }
