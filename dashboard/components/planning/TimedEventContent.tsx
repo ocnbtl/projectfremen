@@ -18,6 +18,7 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void; onDragEnd: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null), [width,setWidth] = useState(300);
+  const [objectLimit, setObjectLimit] = useState(0);
   useLayoutEffect(() => {
     const element = root.current; if (!element) return;
     // Measure the outside width: narrow-mode padding must not change its own breakpoint.
@@ -32,14 +33,33 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   const collapsed = !vertical && width < requiredWidth;
   // In tall but narrow columns, use the available height before collapsing metadata.
   const narrow = vertical && width < 82;
+  useLayoutEffect(() => {
+    const element = root.current;
+    if (!element || !vertical) return;
+    const headers = Array.from(element.querySelectorAll<HTMLElement>("[data-event-heading]"));
+    const measure = () => {
+      const padding = getComputedStyle(element);
+      // Layout heights stay constant while the event's entrance transform animates.
+      const headerHeight = headers.reduce((sum, header) => sum + header.offsetHeight, 0);
+      const rowHeight = element.clientWidth <= 160 ? 20 : 30;
+      const gap = element.clientWidth <= 160 ? 5 : 7;
+      const room = element.clientHeight - parseFloat(padding.paddingTop) - parseFloat(padding.paddingBottom) - headerHeight - headers.length * 6 - 6;
+      setObjectLimit(Math.max(0, Math.floor((room + gap) / (rowHeight + gap))));
+    };
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    headers.forEach(header => observer.observe(header));
+    measure();
+    return () => observer.disconnect();
+  }, [vertical, narrow, event.title, timing, place]);
   const popup = (role: string, text: string, label: string) => <Popover.Root><Popover.Trigger asChild><button type="button" className={styles.detailButton} aria-label={`${label} for ${event.title}`} onPointerDown={e => e.stopPropagation()}><UnigentamosIcon role={role} size={14}/></button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.detail} side="right" sideOffset={6} collisionPadding={8} aria-label={label}><UnigentamosIcon role={role} size={15}/><span>{text}</span><Popover.Close aria-label={`Close ${label.toLowerCase()}`}><UnigentamosIcon role="close" size={14}/></Popover.Close></Popover.Content></Popover.Portal></Popover.Root>;
   return <div ref={root} className={styles.content} data-vertical={vertical} data-tiny={height < 26} data-slim={width < 120} data-completed={event.completed || undefined} data-narrow={narrow}>
     <TaskCheck event={event} onComplete={onComplete} />
     <button className={styles.open} type="button" draggable={!event.system} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onOpen} aria-label={`${event.title} · ${timing}${place ? ` · ${place}` : ""}`}>
-      <span className={styles.title}><EventGlyph event={event} icon={icon} size={16}/><strong>{title}</strong></span>
-      {!collapsed && !narrow && <span className={styles.time}><UnigentamosIcon role="clock" size={14}/><span>{timing}</span></span>}
-      {place && !collapsed && !narrow && <span className={styles.place}><UnigentamosIcon role="location" size={14}/><span>{place}</span></span>}
-      {vertical && height >= 140 && <EventObjects event={event} available={available} excludePlaces list align={singleDay ? "start" : "end"} maxItems={Math.max(1,Math.floor((height - 100) / 36))} />}
+      <span className={styles.title} data-event-heading><EventGlyph event={event} icon={icon} size={16}/><strong>{title}</strong></span>
+      {!collapsed && !narrow && <span className={styles.time} data-event-heading><UnigentamosIcon role="clock" size={14}/><span>{timing}</span></span>}
+      {place && !collapsed && !narrow && <span className={styles.place} data-event-heading><UnigentamosIcon role="location" size={14}/><span>{place}</span></span>}
+      {vertical && objectLimit > 0 && <EventObjects event={event} available={available} excludePlaces list align={singleDay ? "start" : "end"} maxItems={objectLimit} />}
     </button>
     {(collapsed || narrow) && <span className={styles.details}>{popup("clock",timing,"Time")}{place && popup("location",place,"Place")}</span>}
     {!vertical && <EventLinksPreview event={event} available={available} excludePlaces />}

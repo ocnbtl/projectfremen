@@ -2616,11 +2616,13 @@
 
 /* Keep phone navigation and search in stable rows, including while typing. */
 @media(max-width:760px) {
- .shell > .toolbar { grid-template-columns:minmax(0,1fr) 36px 26px 26px 78px 48px; }
+ .shell > .toolbar { grid-template-columns:minmax(0,1fr) 40px 29px 29px 78px 48px; }
  .toolbar .toolbarTools { display:contents; }
- .toolbar .todayButton { width:36px; min-width:36px; }
- .toolbar .periodButton:nth-of-type(2),.toolbar .periodButton:nth-of-type(3) { width:26px; min-width:26px; padding:0; }
+ .toolbar .todayButton { width:40px; min-width:40px; }
+ .toolbar .periodButton:nth-of-type(2),.toolbar .periodButton:nth-of-type(3) { width:29px; min-width:29px; padding:0; }
+ .toolbar .monthTrigger { margin-right:3px; }
  .toolbar[data-timeline] .toolbarTools > .viewDropdown { grid-area:1 / 5; width:78px; min-width:0; padding-inline:5px; }
+ .toolbarTools > .viewDropdown > span,.toolbar .viewDropdown .viewChoice { justify-content:center; width:100%; }
  .toolbar[data-timeline] .addEventButton { grid-area:1 / 6; width:48px; }
  .toolbar .toolbarHours { grid-area:2 / 1 / 3 / -1; justify-self:start; }
  .toolbar[data-timeline] .calendarSearch { grid-area:2 / 1 / 3 / -1; width:auto; margin:0 40px 0 106px; min-width:0; }
@@ -2637,3 +2639,13 @@
  .allDayBand .allDayItem .eventTitle { flex:1 1 auto; }
  .allDayBand .allDayItem > [data-event-objects] { flex:none; max-width:54px; }
 }
+
+/* Draft recovery stays beside calendar tools, with quiet, compact actions. */
+.draftNotice,.mobileToolActions .draftNotice { height:auto; min-height:44px; padding:8px; gap:8px; justify-content:flex-start; white-space:normal; }
+.draftNotice > svg { flex:none; }
+.draftNotice > .draftCopy { display:flex; flex:1; min-width:0; flex-direction:column; gap:2px; }
+.draftCopy strong { font:600 11px/1.3 var(--font-body); color:var(--text-strong); }
+.draftCopy small { font:400 10px/1.3 var(--font-body); color:var(--text-secondary); }
+.draftNotice :global(.work-button) { flex:none; height:28px; min-height:28px; padding:4px 7px; }
+.draftNotice :global(.work-button):last-child { display:grid; place-items:center; width:28px; height:28px; padding:0; }
+.draftNotice :global(.work-button):last-child:hover { background:var(--module-quiet); }

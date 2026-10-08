@@ -106,6 +106,14 @@ type EventDraft = {
 };
 // Session memory only: private drafts are never written to unencrypted browser storage.
 let retainedDraft: EventDraft | undefined;
+function DraftNotice({ onResume, onDiscard }: { onResume: () => void; onDiscard: () => void }) {
+  return <div className={styles.draftNotice}>
+    <UnigentamosIcon role="edit" size={16} />
+    <span className={styles.draftCopy}><strong>Changes not saved</strong><small>Resume before leaving this page.</small></span>
+    <Button onClick={onResume} aria-label="Resume draft">Resume</Button>
+    <Button onClick={onDiscard} aria-label="Discard draft" title="Discard draft"><UnigentamosIcon role="delete" size={16}/></Button>
+  </div>;
+}
 const labelDate = (
   date: string,
   options: Intl.DateTimeFormatOptions = { month: "long", day: "numeric" },
@@ -620,11 +628,7 @@ export default function CalendarWorkspace() {
           <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => changeView(next, day)} />
         </div>
         <div className={styles.draftSlot} data-active={Boolean(draft && !editor)}>
-          {draft && !editor && <div className={styles.draftNotice}>
-            <UnigentamosIcon role="edit" size={14} /><span>Unsaved draft</span>
-            <Button onClick={() => setEditor(draft)} aria-label="Resume draft">Resume</Button>
-            <Button onClick={() => finishEditing()} aria-label="Discard draft" title="Discard draft">Discard</Button>
-          </div>}
+          {draft && !editor && <DraftNotice onResume={() => setEditor(draft)} onDiscard={() => finishEditing()} />}
         </div>
         <div className={styles.toolbarTools}>
           <CalendarHourControls available={timeline} days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />
@@ -639,7 +643,7 @@ export default function CalendarWorkspace() {
               {compact && <div className={styles.mobileToolActions}>
                 <Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Settings</Button>
 
-                {draft && !editor && <div className={styles.draftNotice}><span>Unsaved draft</span><Button aria-label="Resume draft" onClick={() => { setFilters(false); setEditor(draft); }}>Resume</Button><Button aria-label="Discard draft" onClick={() => finishEditing()}>Discard</Button></div>}
+                {draft && !editor && <DraftNotice onResume={() => { setFilters(false); setEditor(draft); }} onDiscard={() => finishEditing()} />}
               </div>}
               <div className={styles.viewOptionSection}>
                 <ViewToggle label="Widen today" icon="today" checked={widenToday} onChange={next => morph(() => setWidenToday(next))} />

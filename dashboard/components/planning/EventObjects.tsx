@@ -49,9 +49,10 @@ export default function EventObjects({ event, available = [], list = false, alig
   const limit = list ? maxItems : Math.max(1, Math.floor(width / 120));
   const shown = items.slice(0, limit), remaining = items.slice(limit);
   return <span ref={element} className={styles.objects} style={list ? undefined : {width:Math.min(count * 150,900)}} data-event-objects data-object-list={list || undefined} data-object-align={align} data-icon-only={!list && width < 65 || undefined} title={items.map(ref => ref.label).join(" · ")} aria-label={"Linked objects: " + items.map(ref => ref.label).join(", ")}>
-    {shown.map(ref => <span className={styles.chip} key={ref.module + ":" + ref.objectType + ":" + ref.objectId} title={ref.label}>
+    {shown.map((ref, index) => <span className={styles.chip} key={ref.module + ":" + ref.objectType + ":" + ref.objectId} title={ref.label}>
       <EventObjectIdentity record={ref} /><span className={styles.label}>{ref.label}</span>
+      {list && index === shown.length - 1 && !!remaining.length && <span className={styles.more} title={remaining.map(ref => ref.label).join(" · ")} aria-label={remaining.length + " more linked objects: " + remaining.map(ref => ref.label).join(", ")}><UnigentamosIcon role="object" size={12}/>+{remaining.length}</span>}
     </span>)}
-    {!!remaining.length && <span className={styles.more} title={remaining.map(ref => ref.label).join(" · ")} aria-label={remaining.length + " more linked objects: " + remaining.map(ref => ref.label).join(", ")}>+{remaining.length}</span>}
+    {!list && !!remaining.length && <span className={styles.more} title={remaining.map(ref => ref.label).join(" · ")} aria-label={remaining.length + " more linked objects: " + remaining.map(ref => ref.label).join(", ")}>+{remaining.length}</span>}
   </span>;
 }
