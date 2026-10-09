@@ -1,0 +1,7 @@
+.timing {display:inline-flex;align-items:center;flex-wrap:wrap;gap:6px 14px;min-height:22px;vertical-align:middle;font:500 11px/1.4 var(--font-body);}
+.timing:empty {display:none;}
+.line {display:inline-flex;align-items:center;gap:5px;white-space:nowrap;min-height:22px;}
+.line svg,.range > svg {display:block;flex:none;align-self:center;}
+.range {display:inline-grid;grid-template-columns:14px max-content 16px max-content;align-items:center;gap:3px 5px;font:500 11px/1.4 var(--font-body);vertical-align:middle;}
+.range > span {white-space:nowrap;}
+.separator {text-align:center;color:var(--text-secondary,#716b80);font-weight:400;}

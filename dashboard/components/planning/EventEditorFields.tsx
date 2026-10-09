@@ -33,7 +33,7 @@ export default function EventEditorFields({ fields, update, snapshot }: {
   const linked = placeRef && !fields.linkedRefs.some(r => r.module === "map" && r.objectId === placeRef.objectId) ? [...fields.linkedRefs, placeRef] : fields.linkedRefs;
   return <div className={styles.editor}>
     <div className={styles.left}>
-      <label className={styles.title}>Title<input required autoFocus maxLength={240} value={fields.title} onChange={e => update("title",e.target.value)} /></label>
+      <label className={styles.title}>Title<input required maxLength={240} value={fields.title} onChange={e => update("title",e.target.value)} /></label>
       <label className={styles.description}>Description<textarea rows={3} placeholder="What is this time for?" value={fields.description} onChange={e => update("description",e.target.value)} /></label>
       <section className={styles.schedule} aria-label="Event schedule">
         <div className={styles.scheduleHeader}>

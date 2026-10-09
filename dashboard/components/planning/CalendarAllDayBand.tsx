@@ -18,9 +18,10 @@ import EventContinuation from "./EventContinuation";
 import { eventObjectRefs } from "./EventObjects";
 import styles from "./CalendarWorkspace.module.css";
 
-export default function CalendarAllDayBand({ days, events, calendars, refs, dated, zone, columns, today, onOpen, onComplete }: {
+export default function CalendarAllDayBand({ days, events, calendars, refs, dated, zone, columns, today, highlightDay, onOpen, onComplete }: {
   days: string[]; events: EventOccurrence[]; calendars: Calendar[]; refs: PlanningSnapshot["refs"]; dated: PlanningSnapshot["dated"];
   zone: string; columns: string; today: string; onOpen: (event: EventOccurrence) => void; onComplete: (event: EventOccurrence) => void;
+  highlightDay?: string;
 }) {
   const { layoutTransition } = useCalendarMotion();
   const { segments } = monthWeekLayout(days, events.filter(e => e.allDay), zone, Infinity);
@@ -29,7 +30,7 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
   if (!segments.length && !links.length) return <div className={styles.allDayBand} aria-hidden="true" />;
   return <motion.div layout transition={{ layout: layoutTransition }} className={styles.allDayBand} style={{ gridTemplateColumns: columns }} role="group" aria-label="All-day and linked events">
     {days.map((day, index) => <motion.span key={day} layout transition={{ layout: layoutTransition }} aria-hidden="true"
-      className={styles.allDayColumn} data-today={day === today} data-all-day-column={day}
+      className={styles.allDayColumn} data-today={day === today} data-highlighted={highlightDay === day || undefined} data-all-day-column={day}
       style={{ gridColumn: index + 2, gridRow: `1 / ${lanes + links.length + 2}` }} />)}
     <span aria-hidden="true" className={styles.allDaySpacer} style={{gridColumn:"1 / -1",gridRow:lanes + links.length + 1}} />
     {segments.map(({ event, first, last, lane, continuesBefore, continuesAfter }) => {

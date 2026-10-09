@@ -12,6 +12,6 @@ export default function EventRowContent({ event, available, icon, zone }: { even
   const place = eventObjectRefs(event,available).find(ref => ref.module === "map")?.label;
   return <div className={styles.content}>
     <div className={styles.heading}><EventGlyph event={event} icon={icon} size={16}/><strong>{eventPreviewTitle(event)}</strong><EventLinksPreview event={event} available={available}/></div>
-    <div className={styles.metadata}><span className={styles.timing}><EventTiming event={event} zone={zone}/></span>{place && <EventDetail kind="place" text={place} eventTitle={event.title} compact={false}/>}</div>
+    <div className={styles.metadata}><span className={styles.timing}><EventTiming event={event} zone={zone} showDate/></span>{place && <EventDetail kind="place" text={place} eventTitle={event.title} compact={false}/>}</div>
   </div>;
 }

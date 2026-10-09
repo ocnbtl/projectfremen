@@ -157,6 +157,7 @@ export function WorkspaceSheet({
   titleIcon,
   anchorWidth = 620,
   headerActions,
+  focusInput = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -169,6 +170,7 @@ export function WorkspaceSheet({
   titleIcon?: string;
   anchorWidth?: number;
   headerActions?: ReactNode;
+  focusInput?: boolean;
 }) {
   const [anchorStyle, setAnchorStyle] = useState<CSSProperties>();
   useLayoutEffect(() => {
@@ -185,6 +187,7 @@ export function WorkspaceSheet({
     return () => window.removeEventListener("resize", place);
   }, [open, anchorSelector, anchorWidth]);
   const descriptionId = useId();
+  const sheetContent = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLElement | null>(null);
   useEffect(() => {
     const remember = (event: FocusEvent) => {
@@ -204,8 +207,9 @@ export function WorkspaceSheet({
     >
       <Dialog.Portal>
         <Dialog.Overlay className="work-scrim" />
-        <Dialog.Content
-          onOpenAutoFocus={() => {
+        <Dialog.Content ref={sheetContent}
+          onOpenAutoFocus={(event) => {
+            if (!focusInput) { event.preventDefault(); requestAnimationFrame(() => sheetContent.current?.querySelector<HTMLElement>('[aria-label="Close details"]')?.focus({preventScroll:true})); }
             const active = document.activeElement;
             if (
               active instanceof HTMLElement &&

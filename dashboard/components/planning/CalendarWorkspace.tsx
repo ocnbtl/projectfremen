@@ -13,6 +13,8 @@ import CalendarAgenda from "./CalendarAgenda";
 import { calendarRange, shiftCalendar, viewIcons, type CalendarView as View } from "../../lib/modules/planning/calendar-navigation";
 import EventPeople from "./EventPeople";
 import EventRowContent from "./EventRowContent";
+import CalendarZoom from "./CalendarZoom";
+import EventQuickView from "./EventQuickView";
 import eventRowStyles from "./EventRowContent.module.css";
 import TaskEventCard from "./TaskEventCard";
 import { taskCompletionPatch, resizedEventTime } from "../../lib/modules/planning/calendar-tasks";
@@ -162,7 +164,10 @@ export default function CalendarWorkspace() {
     [calendarColor, setCalendarColor] = useState(
       MODULE_COLOR_SYSTEM.calendar.tokens.icon,
     );
-  const [observance, setObservance] = useState<EventOccurrence>();
+  const [preview,setPreview] = useState<{event:EventOccurrence;anchor:DOMRect}>();
+  const [previewOpen,setPreviewOpen] = useState(false);
+  const previewAnchor = useRef<DOMRect | undefined>(undefined);
+  const showPreview = (event:EventOccurrence) => {setDayDetail(undefined);setPreview({event,anchor:previewAnchor.current || new DOMRect(innerWidth/2,160,1,1)});setPreviewOpen(true);};
   const [addingCalendar, setAddingCalendar] = useState(false);
   const [feedName, setFeedName] = useState("");
   const [importFile, setImportFile] = useState<File>();
@@ -570,7 +575,7 @@ export default function CalendarWorkspace() {
         data-birthday={item.system?.kind === "birthday" || undefined}
         data-month-all-day={view === "month" && item.allDay || undefined}
         style={eventColors(item, calendar) as CSSProperties}
-        onClick={() => item.system ? setObservance(item) : event && openEvent(event, item)}
+        onClick={() => showPreview(item)}
         title={item.title}
       >
         <EventRowContent event={item} available={snapshot?.refs || []} icon={group?.icon} zone={zone}/>
@@ -610,6 +615,7 @@ export default function CalendarWorkspace() {
   return (
     <div
       className={`work-surface ${styles.shell}`}
+      onClickCapture={e=>{const card=(e.target as HTMLElement).closest<HTMLElement>('[data-morph-event]');if(card){const box=card.getBoundingClientRect();previewAnchor.current=new DOMRect(e.clientX || box.x+box.width/2,e.clientY || box.y,1,1);}}}
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
       <PlaceSync onComplete={refresh} />
@@ -628,7 +634,7 @@ export default function CalendarWorkspace() {
           <CalendarHourControls available={timeline} days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />
           <label className={styles.calendarSearch} data-field-shell><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search"} value={query} onChange={e => setQuery(e.target.value)} /></label>
           <CalendarViewToggle view={view} onChange={next => changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined)} />
-          <SelectField className={styles.viewDropdown} triggerContent={compact ? <span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[view]} size={16} />{view === "3-day" ? "3 days" : view[0].toUpperCase() + view.slice(1)}</span> : undefined} aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
+          <SelectField pressSlide className={styles.viewDropdown} triggerContent={compact ? <span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[view]} size={16} />{view === "3-day" ? "3 days" : view[0].toUpperCase() + view.slice(1)}</span> : undefined} aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
             {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
@@ -729,11 +735,11 @@ export default function CalendarWorkspace() {
             if (event.cancelable) event.preventDefault();
             changePeriod(dx < 0 ? 1 : -1);
           }}>
-          <CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
+          <CalendarZoom resetKey={`${view}:${range.start}`} enabled={view !== "agenda"}><CalendarScene id={`${view}:${range.start}`} direction={date < previousDate.current ? -1 : 1}>
           {compact && view === "month" ? <CalendarMobileView view={view} date={date} today={localDate(new Date(now), zone)} days={days} events={occurrences} linked={dated} zone={zone} onDate={setDate} renderEvent={item => eventButton(item)} /> : view === "year" ? <CalendarYearView compact={compact} date={date} today={localDate(new Date(now), zone)} zone={zone} events={occurrences} calendars={snapshot.state.calendars} linked={dated} showWeekends={showWeekends} onDay={day => changeView("day", day)} onMonth={day => changeView("month", day)} /> : view === "month" ? (
             <CalendarMonthView onComplete={item => void completeTask(item)} days={days} date={date} today={localDate(new Date(now), zone)} events={occurrences} calendars={snapshot.state.calendars} refs={snapshot.refs} zone={zone} showWeekends={showWeekends}
               onDay={day => changeView("day", day)} onMore={day => setDayDetail(day)}
-              onOpen={item => { if (item.system) setObservance(item); else { const event = snapshot.state.events.find(e => e.id === item.eventId); if (event) openEvent(event, item); } }} />
+              onOpen={showPreview} />
           ) : view === "agenda" ? (
             <CalendarAgenda rangeDays={agendaDays} onRangeDays={setAgendaDays} events={occurrences} linked={dated} zone={zone} start={range.start} today={localDate(new Date(now), zone)} renderEvent={item => eventButton(item)} onDay={day => changeView("day", day)} />
           ) : (
@@ -750,18 +756,12 @@ export default function CalendarWorkspace() {
               early={early}
               late={late}
               onDay={setDayDetail}
-              onOpen={(item) => {
-                if (item.system) { setObservance(item); return; }
-                const event = snapshot.state.events.find(
-                  (e) => e.id === item.eventId,
-                );
-                if (event) openEvent(event, item);
-              }}
+              onOpen={showPreview}
               onMove={(...args) => void move(...args)}
               onResize={(...args) => void resizeEvent(...args)}
             />
           )}
-          </CalendarScene>
+          </CalendarScene></CalendarZoom>
         </div>
       )}
       <WorkspaceSheet
@@ -806,6 +806,7 @@ export default function CalendarWorkspace() {
       </WorkspaceSheet>
       <WorkspaceSheet
         anchorSelector="[data-calendar-event-trigger]"
+        focusInput={false}
         className={styles.eventSheet}
         anchorWidth={940}
         open={Boolean(editor)}
@@ -914,18 +915,7 @@ export default function CalendarWorkspace() {
           </form>
         )}
       </WorkspaceSheet>
-      <WorkspaceSheet
-        open={Boolean(observance)} onClose={() => setObservance(undefined)} title={observance?.title || "Calendar date"}
-      >
-        {observance && <div className={styles.observanceDetail}>
-          <EventPeople refs={observance.linkedRefs} available={snapshot?.refs} limit={100} />
-          <p><UnigentamosIcon role={observance.system?.kind === "birthday" ? "birthday" : "star"} size={18} />{labelDate(localFor(observance.startMs, zone).slice(0, 10), { weekday: "long", month: "long", day: "numeric", year: "numeric" })}</p>
-          {!observance.allDay && <p><UnigentamosIcon role="clock" size={18} />{eventTimeRange(observance.startMs, observance.endMs, zone)} · {zone.replaceAll("_", " ")}</p>}
-          <p>{observance.system?.detail}</p>
-          {observance.ownerRef && <Link className="work-button" href={observance.ownerRef.route}>Open {observance.ownerRef.label}’s profile</Link>}
-          <Button icon="sliders" onClick={() => { setObservance(undefined); setConnections(true); }}>Manage {observance.system?.kind === "birthday" ? "birthdays" : "holidays & dates"}</Button>
-        </div>}
-      </WorkspaceSheet>
+      {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onEdit={()=>{const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
       <WorkspaceSheet
         open={connections}
         onClose={() => setConnections(false)}

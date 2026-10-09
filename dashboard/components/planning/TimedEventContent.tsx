@@ -1,5 +1,7 @@
 "use client";
 import { useLayoutEffect, useRef, useState, type DragEvent } from "react";
+import { motion } from "motion/react";
+import { useCalendarMotion } from "./CalendarMotion";
 import type { EventOccurrence } from "../../lib/modules/planning/types";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import EventGlyph from "./EventGlyph";
@@ -16,6 +18,7 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   onDragStart: (event: DragEvent<HTMLButtonElement>) => void; onDragEnd: () => void;
 }) {
   const root = useRef<HTMLDivElement>(null), heading = useRef<HTMLDivElement>(null);
+  const {reduced,layoutTransition}=useCalendarMotion();
   const [width,setWidth] = useState(300), [headingHeight,setHeadingHeight] = useState(0);
   useLayoutEffect(() => {
     const element = root.current, header = heading.current; if (!element || !header) return;
@@ -34,20 +37,22 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   const compact = compactTime && (!place || compactPlace);
   // Reserve the title first, then independent time/place controls, then people/objects.
   const detailRoom = vertical ? height - headingHeight - 14 >= 22 : width >= 140;
-  const objectRoom = vertical ? height - headingHeight - (detailRoom ? (compact ? 28 : place ? 50 : 28) : 0) - 18 : 0;
+  const objectRoom = vertical ? height - headingHeight - (detailRoom ? (compact ? 25 : place ? 47 : 25) : 0) - 12 : 0;
   const objectLimit = Math.max(0,Math.floor((objectRoom + 5) / 27));
-  const showObjects = hasObjects && (vertical ? objectRoom >= 22 : width >= 210);
+  const inlineObjects = vertical && narrow && compact && detailRoom && hasObjects && width >= (place ? 64 : 47);
+  const showObjects = !inlineObjects && hasObjects && (vertical ? objectRoom >= 22 : width >= 210);
   return <div ref={root} className={styles.content} data-vertical={vertical} data-tiny={height < 26} data-narrow={narrow} data-completed={event.completed || undefined}>
-    <div ref={heading} className={styles.heading}>
+    <motion.div layout="position" transition={{layout:layoutTransition}} ref={heading} className={styles.heading}>
       <TaskCheck event={event} onComplete={onComplete}/>
       <button className={styles.open} type="button" draggable={!event.system} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onOpen} aria-label={`${event.title} · ${timing}${place ? ` · ${place}` : ""}`} title={title}>
         <EventGlyph event={event} icon={icon} size={14}/><strong>{vertical && narrow ? title.split(/\s+/).map((word,index) => <span key={index}>{word}</span>) : title}</strong>
       </button>
-    </div>
-    {detailRoom && <div className={styles.details} data-compact={compact}>
+    </motion.div>
+    {detailRoom && <motion.div layout="position" initial={reduced?false:{opacity:0,y:-3}} animate={{opacity:1,y:0}} transition={{layout:layoutTransition,duration:.18}} className={styles.details} data-compact={compact}>
       <EventDetail kind="time" text={timing} eventTitle={event.title} compact={compactTime}/>
       {place && <EventDetail kind="place" text={place} eventTitle={event.title} compact={compactPlace}/>}
-    </div>}
-    {showObjects && <EventLinksPreview event={event} available={available} list={vertical && !narrow} align={singleDay ? "start" : "end"} limit={vertical ? narrow ? 0 : objectLimit : 1}/>}
+      {inlineObjects && <EventLinksPreview event={event} available={available} limit={0}/>}
+    </motion.div>}
+    {showObjects && <motion.div layout="position" className={styles.objects} initial={reduced?false:{opacity:0,y:-3}} animate={{opacity:1,y:0}} transition={{layout:layoutTransition,duration:.18}}><EventLinksPreview event={event} available={available} list={vertical && !narrow} align={singleDay ? "start" : "end"} limit={vertical ? narrow ? 0 : objectLimit : 1}/></motion.div>}
   </div>;
 }

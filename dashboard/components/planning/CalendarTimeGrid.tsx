@@ -69,6 +69,7 @@ export default function CalendarTimeGrid({
   const { reduced, layoutTransition } = useCalendarMotion();
   const [height, setHeight] = useState(400),
     hours = useRef<HTMLDivElement>(null);
+  const [hoverDay,setHoverDay] = useState<string>();
   const [resizing, setResizing] = useState<{ id: string; startMs: number; endMs: number }>();
   const dragging = useRef<{ item: EventOccurrence; offset: number } | undefined>(undefined);
   const [dragPreview, setDragPreview] = useState<{ item: EventOccurrence; day: string; minute: number; x: number; y: number; width: number; height: number }>();
@@ -138,6 +139,11 @@ export default function CalendarTimeGrid({
               layout
               transition={{ layout: layoutTransition }}
               data-today={day === today}
+              data-highlighted={hoverDay === day || undefined}
+              onPointerEnter={() => setHoverDay(day)}
+              onPointerLeave={() => setHoverDay(undefined)}
+              onFocus={() => setHoverDay(day)}
+              onBlur={() => setHoverDay(undefined)}
               key={day}
             >
               <motion.button
@@ -159,17 +165,16 @@ export default function CalendarTimeGrid({
                 </span>
                 <span className={styles.dateLine}>
                   <strong>{Number(day.slice(-2))}</strong>
-                  {day === today && <small>Today</small>}
                 </span>
                 </span>
               </motion.button>
             </motion.div>
           );
         })}
-        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} onOpen={onOpen} onComplete={onComplete} />
+        <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} highlightDay={hoverDay} onOpen={onOpen} onComplete={onComplete} />
         <div className={styles.fittedHours} ref={hours}>
           {Array.from({ length: 24 }, (_, i) => (
-            <span key={i} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span>{hourName(i)}</span></span>
+            <span key={i} aria-label={hourName(i)} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span className={styles.hourFull}>{hourName(i)}</span><span className={styles.hourNumber} aria-hidden="true">{i % 12 || 12}</span></span>
           ))}
         </div>
         {days.map((day) => {
