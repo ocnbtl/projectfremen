@@ -640,6 +640,7 @@ export default function CalendarWorkspace() {
           <Popover.Root open={filters} onOpenChange={setFilters}>
             <Popover.Trigger asChild><Button icon={compact ? undefined : "sliders"} aria-label={compact ? "Calendar tools" : "Options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? <UnigentamosIcon role="sliders" candidate="settings" size={18} /> : "Options"}</Button></Popover.Trigger>
             <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar view options">
+              <div className={styles.mobileToolActions}><Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button></div>
               <div className={styles.optionsHeading}><UnigentamosIcon role="sliders" candidate="settings" size={16}/><strong>Settings</strong></div>
               <div className={styles.viewOptionSection}>
                 <ViewToggle label="Widen today" icon="today" checked={widenToday} onChange={next => morph(() => setWidenToday(next))} />
@@ -654,7 +655,7 @@ export default function CalendarWorkspace() {
                   {[...new Set([zone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(z => <option key={z} value={z}>{z.replaceAll("_", " ").replaceAll("/", " / ")}</option>)}
                 </SelectField>
               </label>
-              <div className={styles.mobileToolActions}><Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button>{draft && !editor && <DraftNotice onResume={() => { setFilters(false); setEditor(draft); }} onDiscard={() => finishEditing()} />}</div>
+              {draft && !editor && <div className={styles.mobileToolActions}><DraftNotice onResume={() => { setFilters(false); setEditor(draft); }} onDiscard={() => finishEditing()} /></div>}
             </Popover.Content></Popover.Portal>
           </Popover.Root>
           <button type="button" data-calendar-settings-trigger aria-label="Calendars" title="Calendars" className={`work-button work-button--secondary ${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}><UnigentamosIcon role="calendar" size={20} /><span>Calendars</span></button>
