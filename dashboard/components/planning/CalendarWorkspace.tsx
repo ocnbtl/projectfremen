@@ -640,8 +640,7 @@ export default function CalendarWorkspace() {
           <Popover.Root open={filters} onOpenChange={setFilters}>
             <Popover.Trigger asChild><Button icon={compact ? undefined : "sliders"} aria-label={compact ? "Calendar tools" : "Options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? <UnigentamosIcon role="sliders" candidate="settings" size={18} /> : "Options"}</Button></Popover.Trigger>
             <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar view options">
-              <div className={styles.mobileToolActions}><Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button></div>
-              <div className={styles.optionsHeading}><UnigentamosIcon role="sliders" candidate="settings" size={16}/><strong>Settings</strong></div>
+              <div className={styles.optionsHeading}><UnigentamosIcon role="sliders" candidate="settings" size={16}/><strong>Settings</strong><Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button></div>
               <div className={styles.viewOptionSection}>
                 <ViewToggle label="Widen today" icon="today" checked={widenToday} onChange={next => morph(() => setWidenToday(next))} />
                 <ViewToggle label="Show weekends" icon="week" checked={showWeekends} onChange={next => morph(() => setShowWeekends(next))} />

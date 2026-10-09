@@ -4,7 +4,7 @@
 .heading { display:flex; align-items:center; gap:7px; min-width:0; }
 .heading > svg { flex:none; color:inherit; }
 .heading strong { flex:1; min-width:0; font:600 13px/1.35 var(--font-body); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.metadata { display:flex; align-items:center; flex-wrap:wrap; column-gap:14px; row-gap:3px; padding-left:23px; min-width:0; font:500 11px/1.4 var(--font-body); }
+.metadata { display:flex; align-items:flex-end; flex-wrap:wrap; column-gap:14px; row-gap:3px; padding-left:23px; min-width:0; font:500 11px/1.4 var(--font-body); }
 .metadata:not(:has(.timing > *,button)) { display:none; }
 .timing:empty { display:none; }
 .timing { max-width:100%; }
