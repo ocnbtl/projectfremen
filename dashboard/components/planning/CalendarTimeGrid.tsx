@@ -107,7 +107,7 @@ export default function CalendarTimeGrid({
         endHour * 60 - 5,
         startHour * 60 +
           Math.floor(
-            (e.clientY - e.currentTarget.getBoundingClientRect().top) / px / 5,
+            (e.clientY - e.currentTarget.getBoundingClientRect().top) / (e.currentTarget.getBoundingClientRect().height / minutes) / 5,
           ) *
             5,
       ),
@@ -174,7 +174,7 @@ export default function CalendarTimeGrid({
         <CalendarAllDayBand days={days} events={events} calendars={calendars} refs={refs} dated={dated} zone={zone} columns={columns} today={today} highlightDay={hoverDay} onOpen={onOpen} onComplete={onComplete} />
         <div className={styles.fittedHours} ref={hours}>
           {Array.from({ length: 24 }, (_, i) => (
-            <span key={i} aria-label={hourName(i)} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span className={styles.hourFull}>{hourName(i)}</span><span className={styles.hourNumber} aria-hidden="true">{i % 12 || 12}</span></span>
+            <span key={i} aria-label={hourName(i)} aria-hidden={i < startHour || i >= endHour} style={{ position: "absolute", top: topAt(i * 60), height: heightFor(60), width: "100%" }}><span className={styles.hourFull}>{hourName(i)}</span><span className={styles.hourNumber} aria-hidden="true">{i % 12 || 12}{(i===0 || i===12) && <small className={styles.periodMarker}>{i===0?"am":"pm"}</small>}</span></span>
           ))}
         </div>
         {days.map((day) => {
@@ -203,10 +203,10 @@ export default function CalendarTimeGrid({
                   e.dataTransfer.dropEffect = "move";
                   const drag = dragging.current;
                   if (drag && grid.current) {
-                    const column = e.currentTarget.getBoundingClientRect(), surface = grid.current.getBoundingClientRect();
+                    const column = e.currentTarget.getBoundingClientRect(), surface = grid.current.getBoundingClientRect(), scale = surface.width / grid.current.offsetWidth;
                     const duration = (drag.item.endMs - drag.item.startMs) / 60000;
                     const minute = Math.max(startHour * 60, Math.min(endHour * 60 - Math.min(duration, minutes), atPointer(e) - drag.offset));
-                    setDragPreview({ item: drag.item, day, minute, x: column.left - surface.left + 2, y: column.top - surface.top + position(minute), width: column.width - 4, height: Math.min(duration, minutes) * px - 1 });
+                    setDragPreview({ item: drag.item, day, minute, x: (column.left - surface.left) / scale + 2, y: (column.top - surface.top) / scale + position(minute), width: column.width / scale - 4, height: Math.min(duration, minutes) * px - 1 });
                   }
                 }
               }}
@@ -273,8 +273,8 @@ export default function CalendarTimeGrid({
                           item.id,
                         );
                         e.dataTransfer.effectAllowed = "move";
-                        const rect = e.currentTarget.closest("[data-morph-event]")!.getBoundingClientRect();
-                        dragging.current = { item, offset: Math.round((e.clientY - rect.top) / px / 5) * 5 };
+                        const card = e.currentTarget.closest<HTMLElement>("[data-morph-event]")!, rect = card.getBoundingClientRect(), scale = rect.height / card.offsetHeight;
+                        dragging.current = { item, offset: Math.round((e.clientY - rect.top) / (px * scale) / 5) * 5 };
                         // The custom spring preview replaces the browser's offset drag image.
                         const image = document.createElement("canvas"); image.width = 1; image.height = 1;
                         e.dataTransfer.setDragImage(image, 0, 0);

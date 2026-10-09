@@ -1,0 +1,13 @@
+.identity {display:flex;align-items:center;gap:3px;min-width:0;max-width:100%;font:var(--calendar-event-title-font,600 13px/1.35 var(--font-body));--avatar-size:20px;}
+.first,.last {display:flex;align-items:center;gap:4px;min-width:0;}
+.first svg {flex:none;display:block;}
+.first > span,.last > span:first-child {overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.last {flex:1;}
+.last > span:last-child:not(:first-child) {flex:none;}
+@container all-day-event (max-width:180px) {
+ .identity {display:grid;grid-template-columns:minmax(0,1fr);gap:1px;width:100%;font-size:clamp(7px,14cqi,11px);line-height:14px;--avatar-size:10px;}
+ .first {gap:1px;height:14px;}
+ .first svg {width:8px;height:10px;}
+ .last {padding-left:9px;gap:1px;height:14px;}
+ .last > [role="img"] {font-size:5px;white-space:nowrap;}
+}

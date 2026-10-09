@@ -2702,3 +2702,50 @@
  .content .allDayBand .allDayItem .eventTitle {font-size:clamp(10px,calc(11px * var(--calendar-zoom,1)),15px);}
  .content .fittedHours .hourNumber {font-size:clamp(9px,calc(9px * var(--calendar-zoom,1)),13px);}
 }
+.fittedHours .hourNumber {font-weight:650;} .fittedHours .periodMarker {display:block;font-size:7px;line-height:9px;font-weight:500;letter-spacing:.02em;color:var(--text-secondary);}
+.optionsHeading {display:flex;align-items:center;gap:7px;padding:0 1px 8px;font-size:12px;color:var(--text-strong);}
+.viewOptions .mobileToolActions {display:flex;flex-direction:column;align-items:stretch;gap:8px;margin-top:9px;}
+.viewOptions .mobileToolActions > button {justify-content:flex-start;min-height:32px;font-size:12px;}
+.draftNotice,.mobileToolActions .draftNotice {min-height:34px;padding:5px;gap:5px;flex-wrap:nowrap;}
+.draftNotice > .draftCopy {flex-direction:row;align-items:center;gap:4px;white-space:nowrap;}
+.draftCopy strong {font-size:10px;font-weight:600;}
+.draftCopy small {font-size:9px;}
+.draftNotice > svg {width:12px;}
+.draftNotice :global(.work-button) {min-height:24px;height:24px;padding:2px 4px;font-size:10px;}
+.draftNotice :global(.work-button):last-child {width:22px;min-height:24px;height:24px;}
+.calendarSettingsForm > .settingsHeading {margin-bottom:0;}
+.settingsActions {display:flex;flex-wrap:nowrap;width:100%;justify-content:flex-end;gap:6px;}
+@media(max-width:700px) {
+ .eventSheet:global(.work-sheet) {top:calc(var(--app-header-height,60px) + 4px)!important;left:8px!important;right:auto;bottom:auto;width:calc(100vw - 16px)!important;height:auto;max-height:calc(100dvh - var(--app-header-height,60px) - 12px)!important;border-radius:13px;}
+ .eventSheet :global(.work-sheet-header) {padding:8px 12px;min-height:42px;}
+ .eventSheet :global(.work-sheet-header) h2 {font-size:15px;}
+ .eventSheet :global(.work-sheet-header) button {min-height:28px;height:28px;padding:4px 7px;font-size:11px;}
+ .eventSheet :global(.work-sheet-body) {padding:9px 12px;}
+ .eventForm {gap:8px;}
+ .eventForm > :global(.work-form-footer) {padding-top:3px;gap:7px;}
+ .eventForm :global(.work-form-footer) button {min-height:32px;padding:5px 9px;font-size:12px;}
+ .viewOptions {width:min(340px,calc(100vw - 24px));}
+ .settingsActions {gap:4px;justify-content:stretch;}
+ .settingsActions > button {flex:1;min-width:0;min-height:32px;padding:4px 5px;gap:4px;font-size:10px;white-space:nowrap;}
+ .settingsActions > button svg {width:12px;height:12px;flex:none;}
+ .settingsActions > button:last-child {flex:.9;}
+ .calendarCard .calendarNameRow input,.importMethod input {font-size:14px;min-height:32px;padding-block:5px;}
+ .calendarSettingsForm .importSection p {font-size:11px;line-height:1.45;}
+ .calendarSettingsForm .importMethod label {font-size:11px;}
+ .calendarSettingsForm .importProviders button {font-size:10px;min-height:30px;padding:4px 6px;}
+}
+.viewOptions {gap:10px;}
+.viewOptions .optionsHeading {padding-bottom:0;}
+.viewOptions .mobileToolActions {display:flex!important;flex-direction:column!important;flex-wrap:nowrap;grid-template-columns:none;align-items:stretch;gap:7px;}
+.viewOptions .mobileToolActions > :global(.work-button) {width:100%;min-height:32px;height:32px;flex:none;}
+.viewOptions .mobileToolActions .draftNotice {width:100%;display:flex!important;flex-basis:auto;flex-shrink:0;min-width:0;min-height:32px;height:32px;box-sizing:border-box;}
+.viewOptions .draftNotice .draftCopy {min-width:0;flex:1;}
+.viewOptions .draftNotice .draftCopy small {font-size:8px;}
+.viewOptions .draftNotice :global(.work-button) {width:auto!important;flex:none;}
+.viewOptions .draftNotice :global(.work-button):last-child {width:22px!important;}
+.allDayBand .allDayItem:has([data-birthday-label]) {padding-inline:1px;margin-inline:1px;}
+@media(max-width:700px) {
+ .calendarCard .calendarNameRow .calendarNameInput input,.importMethod input:not([type="file"]) {font-size:16px!important;zoom:.875;width:100%;min-height:36px;height:36px;}
+ .calendarSettingsForm .importSection h3 {font-size:15px;}
+ .settingsSheet :global(.work-sheet-header) h2 {font-size:18px;}
+}

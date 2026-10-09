@@ -110,7 +110,7 @@ let retainedDraft: EventDraft | undefined;
 function DraftNotice({ onResume, onDiscard }: { onResume: () => void; onDiscard: () => void }) {
   return <div className={styles.draftNotice}>
     <UnigentamosIcon role="edit" size={16} />
-    <span className={styles.draftCopy}><strong>Changes not saved</strong><small>Resume before leaving this page.</small></span>
+    <span className={styles.draftCopy}><strong>Changes not saved</strong><small>Resume before leaving</small></span>
     <Button onClick={onResume} aria-label="Resume draft">Resume</Button>
     <Button onClick={onDiscard} aria-label="Discard draft" title="Discard draft"><UnigentamosIcon role="delete" size={16}/></Button>
   </div>;
@@ -640,11 +640,7 @@ export default function CalendarWorkspace() {
           <Popover.Root open={filters} onOpenChange={setFilters}>
             <Popover.Trigger asChild><Button icon={compact ? undefined : "sliders"} aria-label={compact ? "Calendar tools" : "Options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? <UnigentamosIcon role="sliders" candidate="settings" size={18} /> : "Options"}</Button></Popover.Trigger>
             <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar view options">
-              {compact && <div className={styles.mobileToolActions}>
-                <Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Settings</Button>
-
-                {draft && !editor && <DraftNotice onResume={() => { setFilters(false); setEditor(draft); }} onDiscard={() => finishEditing()} />}
-              </div>}
+              <div className={styles.optionsHeading}><UnigentamosIcon role="sliders" candidate="settings" size={16}/><strong>Settings</strong></div>
               <div className={styles.viewOptionSection}>
                 <ViewToggle label="Widen today" icon="today" checked={widenToday} onChange={next => morph(() => setWidenToday(next))} />
                 <ViewToggle label="Show weekends" icon="week" checked={showWeekends} onChange={next => morph(() => setShowWeekends(next))} />
@@ -658,9 +654,10 @@ export default function CalendarWorkspace() {
                   {[...new Set([zone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(z => <option key={z} value={z}>{z.replaceAll("_", " ").replaceAll("/", " / ")}</option>)}
                 </SelectField>
               </label>
+              <div className={styles.mobileToolActions}><Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button>{draft && !editor && <DraftNotice onResume={() => { setFilters(false); setEditor(draft); }} onDiscard={() => finishEditing()} />}</div>
             </Popover.Content></Popover.Portal>
           </Popover.Root>
-          <button type="button" data-calendar-settings-trigger aria-label="Settings" title="Calendar settings" className={`work-button work-button--secondary ${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}><UnigentamosIcon role="sliders" candidate="settings" size={20} /><span>Settings</span></button>
+          <button type="button" data-calendar-settings-trigger aria-label="Calendars" title="Calendars" className={`work-button work-button--secondary ${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}><UnigentamosIcon role="calendar" size={20} /><span>Calendars</span></button>
 
         </div>
           <Button data-calendar-event-trigger intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>{compact ? "Add" : "Add event"}</Button>
@@ -920,11 +917,11 @@ export default function CalendarWorkspace() {
         open={connections}
         onClose={() => setConnections(false)}
         presentation="page"
-        title="Settings" titleIcon="sliders" className={styles.settingsSheet}
+        title="Calendar" titleIcon="calendar" className={styles.settingsSheet}
       >
         <div className={`work-form ${styles.calendarSettingsForm}`}>
           <WorkspaceFeedback error={error} message={notice} />
-          <div className={styles.settingsHeading}><h3>Your calendars</h3><div className={styles.settingsActions}>
+          <div className={styles.settingsHeading}><div className={styles.settingsActions}>
 
             {(["holidays", "custom"] as const).map(section => <SettingsPopover key={section} label={section === "custom" ? "Custom dates" : "Holiday calendars"} icon={section === "custom" ? "star" : "interaction-milestone"}>
               <CalendarObservanceSettings section={section} footer={section === "custom" ? <Popover.Close asChild><Button>Done</Button></Popover.Close> : undefined} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />

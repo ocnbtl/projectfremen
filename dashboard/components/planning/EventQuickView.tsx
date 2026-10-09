@@ -16,11 +16,11 @@ export default function EventQuickView({open,event,anchor,available,zone,icon,on
  const virtual=useMemo(()=>({current:{getBoundingClientRect:()=>anchor}}),[anchor]);
  const objects=eventObjectRefs(event,available), place=objects.find(r=>r.module==='map');
  return <Popover.Root open={open} onOpenChange={open=>{if(!open)onClose();}}><Popover.Anchor virtualRef={virtual}/><Popover.Portal><Popover.Content className={styles.panel} sideOffset={8} collisionPadding={10} aria-label={event.title} onOpenAutoFocus={e=>{e.preventDefault();opener.current=document.activeElement as HTMLElement;closeButton.current?.focus({preventScroll:true});}} onCloseAutoFocus={e=>{e.preventDefault();if(!document.querySelector('[role="dialog"][data-state="open"]'))opener.current?.focus({preventScroll:true});}}>
-  <header><EventGlyph event={event} icon={icon} size={19}/><h2>{event.title}</h2><Popover.Close ref={closeButton} aria-label="Close event preview"><UnigentamosIcon role="close" size={17}/></Popover.Close></header>
+  <header><span className={styles.glyph}><EventGlyph event={event} icon={icon} size={18}/></span><h2>{event.title}</h2><Popover.Close ref={closeButton} aria-label="Close event preview"><UnigentamosIcon role="close" size={17}/></Popover.Close></header>
   <EventTiming event={event} zone={zone} showDate/>
   {place && <p className={styles.place}><UnigentamosIcon role="location" size={14}/><span>{place.label}</span></p>}
-  {(event.system?.detail || event.description) && <p className={styles.description}>{event.system?.detail || event.description}</p>}
-  {objects.some(r=>r.module!=='map') && <div className={styles.objects}>{objects.filter(r=>r.module!=='map').map(ref=><span key={ref.module+ref.objectId}>{ref.objectType==='person'?<PersonAvatar person={ref}/>:<EventObjectIdentity record={ref}/>}<span>{ref.label}</span></span>)}</div>}
+  {event.system?.kind !== "birthday" && (event.system?.detail || event.description) && <p className={styles.description}>{event.system?.detail || event.description}</p>}
+  {objects.some(r=>r.module!=='map') && <div className={styles.objects}>{objects.filter(r=>r.module!=='map').map(ref=><Link href={ref.route} key={ref.module+ref.objectId}>{ref.objectType==='person'?<PersonAvatar person={ref}/>:<EventObjectIdentity record={ref}/>}<span>{ref.label}</span></Link>)}</div>}
   <footer>{event.system ? <>{event.ownerRef && <Link href={event.ownerRef.route}>Open profile</Link>}<button type="button" onClick={onManage}><UnigentamosIcon role="sliders" size={14}/>Manage {event.system.kind==='birthday'?'birthdays':'dates'}</button></> : <button type="button" onClick={onEdit}><UnigentamosIcon role="edit" size={14}/>Edit event</button>}</footer>
  </Popover.Content></Popover.Portal></Popover.Root>;
 }

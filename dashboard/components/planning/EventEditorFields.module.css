@@ -137,3 +137,43 @@
   .groups {grid-template-columns:repeat(3,minmax(0,1fr));}
   .editor .repeatInput input {font-size:16px;}
 }
+/* Mobile editing uses the space below the system navigation, without reserving an empty group pane. */
+@media(max-width:700px) {
+ .editor {display:flex;flex-direction:column;gap:8px;font-size:12px;}
+ .left,.right {display:contents;}
+ .editor .title {order:0;width:100%;gap:3px;}
+ .editor .description {order:1;gap:3px;}
+ .editor .title input {min-height:34px;height:34px;padding:5px 9px;}
+ .editor .description textarea {height:48px;min-height:48px;padding:5px 9px;}
+ .editor label {font-size:11px;}
+ .calendar {order:2;height:36px;min-height:36px;align-items:center;gap:12px;}
+ .editor .calendarSelect {display:flex;flex-direction:row;align-items:center;align-self:center;gap:7px;max-width:56%;min-width:0;}
+ .editor .calendarSelect > button {min-height:32px;height:32px;padding:4px 7px;}
+ .editor .calendarValue {font-size:12px;line-height:18px;}
+ .groupArea {height:auto;padding:0;justify-content:flex-end;}
+ .editor .groupTrigger {min-height:32px;margin:0;padding:3px 0;}
+ .groupPanel {top:38px;left:auto;right:0;width:min(300px,calc(100vw - 48px));max-height:116px;background:white;border:1px solid var(--module-border);border-radius:10px;padding:7px;box-shadow:0 8px 22px #29243b20;z-index:8;}
+ .groups {grid-template-columns:repeat(3,minmax(0,1fr));}
+ .locationSlot {order:3;}
+ .schedule {order:4;gap:2px;}
+ .scheduleHeader {gap:6px;}
+ .editor .schedule label,.editor .schedule label > span:last-child {font-size:11px;}
+ .editor .checkbox,.editor .scheduleHeader > button {min-height:28px;}
+ .editor .optionRow > label {flex-basis:80px;}
+ .editor .optionRow > button {font-size:11px;min-height:28px;}
+ .editor .optionRow > input {min-height:28px;}
+ .dateRow {min-height:29px;gap:4px;}
+ .dateLabel {width:39px;font-size:11px;}
+ .editor .segment {min-height:28px;padding-block:2px;font-size:13px;}
+ .links {order:5;}
+ .links :global(.work-object-links) {gap:4px;}
+ .links :global(.work-links) {max-height:56px;overflow:auto;gap:3px 9px;}
+ .links :global(.work-links) a {font-size:11px;}
+ .customRepeat {margin-left:84px;}
+}
+@media(max-width:700px) {
+ .editor {gap:6px;}
+ .editor .segment {font-size:16px!important;zoom:.8125;}
+ .editor .optionRow > input {font-size:16px!important;zoom:.8125;}
+ .locationSlot input {font-size:16px!important;zoom:.875;}
+}

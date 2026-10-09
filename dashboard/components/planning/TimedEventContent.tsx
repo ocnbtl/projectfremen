@@ -36,7 +36,7 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   const compactPlace = vertical ? width < (place?.length || 0) * 5.4 + 26 : !inlineFits;
   const compact = compactTime && (!place || compactPlace);
   // Reserve the title first, then independent time/place controls, then people/objects.
-  const detailRoom = vertical ? height - headingHeight - 14 >= 22 : width >= 140;
+  const detailRoom = vertical ? height - headingHeight - 14 >= 22 : width >= 72;
   const objectRoom = vertical ? height - headingHeight - (detailRoom ? (compact ? 25 : place ? 47 : 25) : 0) - 12 : 0;
   const objectLimit = Math.max(0,Math.floor((objectRoom + 5) / 27));
   const inlineObjects = vertical && narrow && compact && detailRoom && hasObjects && width >= (place ? 64 : 47);

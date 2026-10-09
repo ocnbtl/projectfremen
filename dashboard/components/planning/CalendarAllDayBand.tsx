@@ -1,4 +1,5 @@
 "use client";
+import BirthdayEventLabel from "./BirthdayEventLabel";
 import TaskEventCard from "./TaskEventCard";
 import { motion } from "motion/react";
 import Link from "next/link";
@@ -42,8 +43,8 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
         data-morph-event={event.id} data-span-event={event.id} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
         aria-label={title} title={title} onClick={() => onOpen(event)}>
         {(continuesBefore || continuesAfter) && <EventContinuation before={continuesBefore} after={continuesAfter} />}
-        <EventGlyph event={event} icon={group?.icon} />
-        <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventLinksPreview event={event} available={refs}/>{place && <EventDetail kind="place" text={place} eventTitle={event.title} compact={false}/>}
+        {event.system?.kind === "birthday" ? <BirthdayEventLabel event={event} available={refs}/> : <><EventGlyph event={event} icon={group?.icon} />
+        <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventLinksPreview event={event} available={refs}/>{place && <EventDetail kind="place" text={place} eventTitle={event.title} compact={false}/>}</>}
 
       </TaskEventCard>;
     })}

@@ -1,5 +1,5 @@
 "use client";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
@@ -25,6 +25,15 @@ export default function EventEditorFields({ fields, update, snapshot }: {
   const [reminderEmpty, setReminderEmpty] = useState(false);
   const [reminderUnit, setReminderUnit] = useState(fields.reminderMinutes && fields.reminderMinutes % 10080 === 0 ? 10080 : fields.reminderMinutes && fields.reminderMinutes % 1440 === 0 ? 1440 : fields.reminderMinutes && fields.reminderMinutes % 60 === 0 ? 60 : 1);
   const [groupsOpen, setGroupsOpen] = useState(false);
+  const groupArea = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!groupsOpen) return;
+    const outside = (event: PointerEvent) => { if (!groupArea.current?.contains(event.target as Node)) setGroupsOpen(false); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.stopPropagation(); setGroupsOpen(false); groupArea.current?.querySelector("button")?.focus(); } };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape, true);
+    return () => { document.removeEventListener("pointerdown", outside); document.removeEventListener("keydown", escape, true); };
+  }, [groupsOpen]);
   const { reduced, layoutTransition } = useCalendarMotion();
   const calendar = snapshot?.state.calendars.find(c => c.id === fields.calendarId);
   const groups = calendarGroups(calendar), selectedGroup = groups.find(g => g.id === fields.groupId);
@@ -72,9 +81,9 @@ export default function EventEditorFields({ fields, update, snapshot }: {
         <label className={styles.calendarSelect}>Calendar<SelectField aria-label="Calendar" value={fields.calendarId} onChange={e => { update("calendarId",e.target.value); update("groupId",""); }} triggerContent={<span className={styles.calendarValue}><span style={{background:calendarDisplayColor(calendar?.color)}} />{calendar?.name || "Choose calendar"}<UnigentamosIcon role="chevron-down" size={14} /></span>}>
           {snapshot?.state.calendars.filter(c => !c.archivedAt).map(c => <option key={c.id} value={c.id}><span className={styles.calendarOption}><span style={{background:calendarDisplayColor(c.color)}} />{c.name}</span></option>)}
         </SelectField></label>
-        <div className={styles.groupArea}><button className={styles.groupTrigger} type="button" aria-expanded={groupsOpen} onClick={() => setGroupsOpen(!groupsOpen)}><UnigentamosIcon role={selectedGroup?.icon || "palette"} size={16} /><span>{selectedGroup?.name || "Color group"}</span><UnigentamosIcon role="chevron-right" size={13} /></button>
+        <div ref={groupArea} className={styles.groupArea}><button className={styles.groupTrigger} type="button" aria-expanded={groupsOpen} onClick={() => setGroupsOpen(!groupsOpen)}><UnigentamosIcon role={selectedGroup?.icon || "palette"} size={16} /><span>{selectedGroup?.name || "Color group"}</span><UnigentamosIcon role="chevron-right" size={13} /></button>
         <AnimatePresence initial={false}>{groupsOpen && <motion.div className={styles.groupPanel} initial={reduced ? false : {x:-8,opacity:0}} animate={{x:0,opacity:1}} exit={{x:-8,opacity:0}} transition={layoutTransition}><div className={styles.groups}>
-          <button type="button" aria-pressed={!fields.groupId} onClick={() => update("groupId","")}>None</button>{groups.map(g => <button type="button" key={g.id} title={g.name} aria-pressed={fields.groupId === g.id} style={{"--group-color":g.color} as CSSProperties} onClick={() => update("groupId",g.id)}><UnigentamosIcon role={g.icon} size={16} /><span>{g.name}</span></button>)}
+          <button type="button" aria-pressed={!fields.groupId} onClick={() => {update("groupId","");setGroupsOpen(false);}}>None</button>{groups.map(g => <button type="button" key={g.id} title={g.name} aria-pressed={fields.groupId === g.id} style={{"--group-color":g.color} as CSSProperties} onClick={() => {update("groupId",g.id);setGroupsOpen(false);}}><UnigentamosIcon role={g.icon} size={16} /><span>{g.name}</span></button>)}
         </div></motion.div>}</AnimatePresence></div>
       </section>
       <div className={styles.locationSlot}><EventLocationField fields={fields} update={update} snapshot={snapshot} /></div>
