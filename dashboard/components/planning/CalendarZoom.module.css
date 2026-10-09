@@ -4,4 +4,3 @@
 .surface { position:absolute; left:0; top:0; width:100%; height:100%; display:flex; flex-direction:column; transform-origin:0 0; }
 .shell .reset { position:absolute; z-index:12; left:8px; bottom:8px; width:auto; min-height:28px; border:1px solid var(--module-accent,#60548d); border-radius:20px; background:var(--surface,#fff); color:var(--module-accent,#60548d); padding:7px 12px; font:500 11px var(--font-body); box-shadow:0 2px 12px #0001; cursor:pointer; }
  .viewport::-webkit-scrollbar {display:none;}
- .viewport[data-pinching] .surface {will-change:transform;}

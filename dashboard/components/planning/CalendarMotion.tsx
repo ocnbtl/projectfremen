@@ -1,7 +1,7 @@
 "use client";
 
 import { animate, motion, useMotionValue, type AnimationPlaybackControls } from "motion/react";
-import { useLayoutEffect, useRef, useSyncExternalStore, type RefObject, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useRef, useSyncExternalStore, type RefObject, type ReactNode } from "react";
 import { useMotionPreference } from "../admin-shell/ExperienceProvider";
 import { flushSync } from "react-dom";
 import styles from "./CalendarWorkspace.module.css";
@@ -15,15 +15,18 @@ const subscribeMotion = (notify: () => void) => {
 };
 const readMotion = () => window.matchMedia(reducedQuery).matches;
 const serverMotion = () => true;
+// A pinch already supplies continuous geometry; nested springs must not chase it.
+export const CalendarGestureContext = createContext(false);
 
 export function useCalendarMotion() {
+  const directGesture = useContext(CalendarGestureContext);
   const systemReduced = useSyncExternalStore(subscribeMotion, readMotion, serverMotion);
   const { preference } = useMotionPreference();
   const reduced = !!systemReduced || preference === "reduce";
   // Native snapshots already interpolate geometry. A second layout animation
   // would capture transformed text and then jump when the snapshots disappear.
   const snapshotting = typeof document !== "undefined" && !!document.documentElement.dataset.calendarMorph;
-  return { reduced, layoutTransition: reduced || snapshotting ? { duration: 0 } : calendarSpring };
+  return { reduced, directGesture, layoutTransition: reduced || snapshotting || directGesture ? { duration: 0 } : calendarSpring };
 }
 
 export function CalendarScene({ id, direction = 1, children }: { id: string; direction?: number; children: ReactNode }) {

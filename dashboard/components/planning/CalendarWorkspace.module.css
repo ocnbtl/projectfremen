@@ -2699,7 +2699,7 @@
  .content .fittedDayHeader,.content[data-view="week"] .fittedDayHeader {min-height:calc(48px * var(--calendar-zoom,1));}
  .content .allDayBand {max-height:calc(112px * var(--calendar-zoom,1));grid-auto-rows:auto;}
  .content .allDayBand .allDayItem {min-height:calc(28px * var(--calendar-zoom,1));}
- .content .allDayBand .allDayItem .eventTitle {font-size:clamp(10px,calc(11px * var(--calendar-zoom,1)),15px);}
+ .content .allDayBand .allDayItem .eventTitle {font-size:clamp(10px,calc(7px + 4cqi),13px);}
  .content .fittedHours .hourNumber {font-size:clamp(9px,calc(9px * var(--calendar-zoom,1)),13px);}
 }
 .fittedHours .hourNumber {font-weight:650;} .fittedHours .periodMarker {display:block;font-size:7px;line-height:9px;font-weight:500;letter-spacing:.02em;color:var(--text-secondary);}

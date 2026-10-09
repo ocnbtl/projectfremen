@@ -34,3 +34,6 @@
 .details { position:relative; z-index:3; }
 .objects { flex:none; min-width:0; position:relative; z-index:3; } .content[data-narrow="true"] .details [data-event-links] button { padding-inline:1px; font-size:10px; }
 .content .details {min-width:0;} .content[data-vertical="false"] .details {flex-shrink:0;}
+
+/* Type grows continuously with the card instead of jumping at its compact breakpoint. */
+.content .open strong {font-size:clamp(10px,calc(7px + 4cqi),13px);}

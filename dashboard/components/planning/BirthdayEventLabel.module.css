@@ -5,7 +5,7 @@
 .last {flex:1;}
 .last > span:last-child:not(:first-child) {flex:none;}
 @container all-day-event (max-width:180px) {
- .identity {display:grid;grid-template-columns:minmax(0,1fr);gap:1px;width:100%;font-size:clamp(7px,14cqi,11px);line-height:14px;--avatar-size:10px;}
+ .identity {display:grid;grid-template-columns:minmax(0,1fr);gap:1px;width:100%;font-size:clamp(7px,calc(3px + 8cqi),13px);line-height:14px;--avatar-size:10px;}
  .first {gap:1px;height:14px;}
  .first svg {width:8px;height:10px;}
  .last {padding-left:9px;gap:1px;height:14px;}
