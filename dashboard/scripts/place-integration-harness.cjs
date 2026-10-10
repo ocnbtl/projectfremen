@@ -8,6 +8,7 @@ const { savePlanningRecord: save, readPlanningState: read, mutatePlanningState }
 const { reconcilePlaces: sync } = require('../lib/modules/planning/place-reconciliation.ts');
 const { hasPlaceCoordinates, isPhysicalLocation, addressIdentity } = require('../lib/modules/planning/place-identity.ts');
 const { effectiveEvent } = require('../lib/modules/planning/types.ts');
+const { placeWriteInput } = require('../lib/modules/planning/place-address.ts');
 const person = async (title, profile, className = 'person') => (await personal.createPersonalRecord({ domain: 'notes-docs', className, title, profile })).find(row => row.title === title);
 const event = (title, location, extra = {}) => save('events', { title, location, start: '2026-10-05T09:00', end: '2026-10-05T10:00', timeZone: 'America/New_York', calendarId: 'native', linkedRefs: [], ...extra });
 (async () => {
@@ -74,5 +75,13 @@ const event = (title, location, extra = {}) => save('events', { title, location,
   const canonical = (await read()).places.find(row => row.id === place.id);
   await save('places', { id: canonical.id, address: 'New canonical address', name: 'Renamed studio' }, canonical.updatedAt);
   assert.equal((await personal.readPersonalRecords()).find(row => row.id === org.id).profile.locations[0].address, 'New canonical address');
+  const pin = await save('places', { name: 'Pin edit fixture', address: '1 Test Lane', latitude: 39, longitude: -84 });
+  const renamed = await save('places', placeWriteInput({ id: pin.id, name: 'Renamed pin' }), pin.updatedAt);
+  assert.equal(renamed.latitude, 39); assert.equal(renamed.longitude, -84);
+  const clear = JSON.parse(JSON.stringify(placeWriteInput({ id: pin.id, address: '2 Test Lane', latitude: undefined, longitude: undefined })));
+  assert.equal(clear.latitude, null); assert.equal(clear.longitude, null);
+  const cleared = await save('places', clear, renamed.updatedAt);
+  assert.equal(cleared.latitude, undefined); assert.equal(cleared.longitude, undefined);
+  assert.equal((await read()).places.find(row => row.id === pin.id).latitude, undefined);
   console.log('Place integration passed: dry run, address reuse, canonical links, repeat safety, optional pins, enrichment, concurrency, edits, stale-version protection, imported overrides, ambiguous matches, explicit selection, bounded batches, virtual-location exclusions.');
 })().catch(error => { console.error(error); process.exitCode = 1; });

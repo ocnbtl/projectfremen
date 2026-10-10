@@ -21,6 +21,7 @@ import {
 import type { PersonalTrip } from "../personal-life/types";
 import { planningOwner, planningWritableKeys } from "./ownership";
 import { normalizePlanningRecord } from "./record-validation";
+import { placeWriteInput } from "./place-address";
 import {
   PLANNING_COLLECTIONS,
   type PlanningCollection,
@@ -159,11 +160,12 @@ export async function savePlanning<K extends PlanningCollection>(
   options: Record<string, unknown> = {},
   normalize: typeof normalizePlanningRecord = normalizePlanningRecord,
 ): Promise<PlanningCollections[K]> {
+  const writableInput = collection === "places" ? placeWriteInput(input) : input;
   try {
     const item = await planningRequest<PlanningCollections[K]>({
       operation: "save",
       collection,
-      input,
+      input: writableInput,
       expectedUpdatedAt,
       ...options,
     });
@@ -211,7 +213,7 @@ export async function savePlanning<K extends PlanningCollection>(
     const keys = planningWritableKeys(collection),
       base = previous as unknown as Record<string, VaultFieldValue> | undefined;
     const patch = Object.fromEntries(
-      Object.entries(input).filter(
+      Object.entries(writableInput).filter(
         ([key, value]) => keys.includes(key) && value !== undefined,
       ),
     ) as Record<string, VaultFieldValue>;

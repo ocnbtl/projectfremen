@@ -73,3 +73,10 @@ export function normalizeAddressParts(value: unknown): AddressParts | undefined 
     return [field, text];
   })) as AddressParts;
 }
+
+/** JSON must carry an explicit clear, not omit a removed coordinate on updates. */
+export function placeWriteInput(input: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...input };
+  for (const axis of ["latitude", "longitude"]) if (Object.hasOwn(result, axis) && result[axis] === undefined) result[axis] = null;
+  return result;
+}

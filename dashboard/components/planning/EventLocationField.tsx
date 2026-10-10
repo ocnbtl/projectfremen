@@ -16,6 +16,7 @@ export default function EventLocationField({ fields, update, snapshot }: {
   const [placeSide,setPlaceSide]=useState<"left" | "bottom">("bottom");
   const [panel, setPanel] = useState<"saved" | "create" | null>(null), [query,setQuery]=useState("");
   const [draft, setDraft] = useState<PlaceLocation>({ name: "", address: fields.location });
+  const draftSource = useRef(fields.location);
   const [busy, setBusy] = useState(false), [error, setError] = useState(""), [created, setCreated] = useState<Place>();
   const root=useRef<HTMLElement>(null);
   const places = [...(snapshot?.state.places || []).filter(p => !p.archivedAt), ...(created && !snapshot?.state.places.some(p => p.id === created.id) ? [created] : [])];
@@ -39,7 +40,7 @@ export default function EventLocationField({ fields, update, snapshot }: {
         update("location",e.target.value);
         if(fields.placeId) {update("linkedRefs",fields.linkedRefs.filter(r => !(r.module === "map" && r.objectId === fields.placeId))); update("placeId","");}
       }} />
-      {(["saved","create"] as const).map(mode => <Popover.Root key={mode} open={panel === mode} onOpenChange={open => { if(busy) return; if(open) setPlaceSide(window.matchMedia("(min-width:761px)").matches ? "left" : "bottom"); setPanel(open ? mode : null); setError(""); if(open && mode === "create") setDraft(current => ({...current,address:fields.location})); }}>
+      {(["saved","create"] as const).map(mode => <Popover.Root key={mode} open={panel === mode} onOpenChange={open => { if(busy) return; if(open) setPlaceSide(window.matchMedia("(min-width:761px)").matches ? "left" : "bottom"); setPanel(open ? mode : null); setError(""); if(open && mode === "create" && draftSource.current !== fields.location) { draftSource.current = fields.location; setDraft(current => ({name:current.name,countryCode:current.countryCode,address:fields.location})); } }}>
         <Popover.Trigger asChild><button type="button" aria-label={mode === "saved" ? "Choose saved place" : "Create place"} title={mode === "saved" ? "Choose saved place" : "Create place"} disabled={busy}><UnigentamosIcon role={mode === "saved" ? "resource" : "plus"} candidate={mode === "saved" ? "bookmark" : undefined} size={18} /></button></Popover.Trigger>
         <Popover.Portal container={root.current?.closest<HTMLElement>('[role="dialog"]') || undefined}>
           <Popover.Content className={`${styles.popover} work-form`} side={mode === "create" ? placeSide : "bottom"} align={mode === "create" && placeSide === "left" ? "start" : "end"} sideOffset={8} collisionPadding={14} collisionBoundary={root.current?.closest<HTMLElement>('[role="dialog"]')} aria-label={mode === "saved" ? "Saved places" : "Create place"} onEscapeKeyDown={e => e.stopImmediatePropagation()} onOpenAutoFocus={e => e.preventDefault()}>
