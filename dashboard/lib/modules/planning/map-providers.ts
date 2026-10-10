@@ -36,11 +36,11 @@ export function validCoordinate(value: unknown, max: number) {
     throw new Error("Invalid map coordinates");
   return n;
 }
-export async function searchPlaces(query: string) {
+export async function searchPlaces(query: string, countryCode?: string) {
   if (query.trim().length < 3 || query.length > 500)
     throw new Error("Enter between 3 and 500 characters");
   const data = await publicJson(
-    `https://photon.komoot.io/api/?${new URLSearchParams({ q: query, limit: "8" })}`,
+    `https://photon.komoot.io/api/?${new URLSearchParams({ q: query, limit: "8", ...(countryCode ? { countrycode: countryCode } : {}) })}`,
   );
   return parsePlaceSearch(data, query);
 }

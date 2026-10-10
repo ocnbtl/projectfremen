@@ -4,6 +4,28 @@ export type AddressParts = { street: string; city: string; region: string; posta
 type CountryFormat = { name: string; format: string; region: string; city: string; postal: string };
 export const ADDRESS_COUNTRIES: Record<string, CountryFormat> = metadata;
 export const addressCountries = Object.entries(ADDRESS_COUNTRIES).sort((a, b) => a[1].name.localeCompare(b[1].name));
+
+const usRegions = "AL:Alabama|AK:Alaska|AZ:Arizona|AR:Arkansas|CA:California|CO:Colorado|CT:Connecticut|DE:Delaware|DC:District of Columbia|FL:Florida|GA:Georgia|HI:Hawaii|ID:Idaho|IL:Illinois|IN:Indiana|IA:Iowa|KS:Kansas|KY:Kentucky|LA:Louisiana|ME:Maine|MD:Maryland|MA:Massachusetts|MI:Michigan|MN:Minnesota|MS:Mississippi|MO:Missouri|MT:Montana|NE:Nebraska|NV:Nevada|NH:New Hampshire|NJ:New Jersey|NM:New Mexico|NY:New York|NC:North Carolina|ND:North Dakota|OH:Ohio|OK:Oklahoma|OR:Oregon|PA:Pennsylvania|RI:Rhode Island|SC:South Carolina|SD:South Dakota|TN:Tennessee|TX:Texas|UT:Utah|VT:Vermont|VA:Virginia|WA:Washington|WV:West Virginia|WI:Wisconsin|WY:Wyoming|PR:Puerto Rico|VI:Virgin Islands|GU:Guam|AS:American Samoa|MP:Northern Mariana Islands".split("|").map(row => row.split(":"));
+
+/** Split only recognizable US postal addresses. Ambiguous/international text stays intact. */
+export function splitPastedAddress(text: string, country = "US"): AddressParts | undefined {
+  if (country !== "US" || /^https?:\/\//i.test(text.trim())) return;
+  const clean = text.trim().replace(/(?:,|\s)+(?:USA|US|U\.S\.A\.?|United States(?: of America)?)\.?$/i, "").trim();
+  const postal = clean.match(/(?:\s|,)\s*(\d{5}(?:-\d{4})?)$/);
+  if (!postal || postal.index === undefined) return;
+  const beforeZip = clean.slice(0, postal.index).replace(/[\s,]+$/, "");
+  const region = usRegions.flatMap(([code, name]) => [code, name].map(label => ({ code, label })))
+    .sort((a, b) => b.label.length - a.label.length)
+    .find(({ label }) => beforeZip.toLowerCase().endsWith(` ${label.toLowerCase()}`) || beforeZip.toLowerCase().endsWith(`,${label.toLowerCase()}`));
+  if (!region) return;
+  const beforeRegion = beforeZip.slice(0, -region.label.length).replace(/[\s,]+$/, "");
+  const lines = beforeRegion.split(/\s*[,\n\r]+\s*/).filter(Boolean);
+  // A delimiter between street and city is required; never guess where a street name ends.
+  if (lines.length < 2 || !/\d/.test(lines[0])) return;
+  const city = lines.pop()!;
+  if (/\d/.test(city)) return;
+  return { street: lines.join(", "), city, region: region.code, postalCode: postal[1], district: "" };
+}
 export function normalizeAddressCountry(value: unknown): string | undefined {
   if (value == null || value === "") return undefined;
   if (typeof value !== "string" || !Object.hasOwn(ADDRESS_COUNTRIES, value.trim().toUpperCase())) throw new Error("Choose a valid address country");
