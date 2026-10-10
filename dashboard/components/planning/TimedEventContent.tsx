@@ -45,7 +45,7 @@ export default function TimedEventContent({ event, timing, icon, height, availab
     <motion.div layout="position" transition={{layout:layoutTransition}} ref={heading} className={styles.heading}>
       <TaskCheck event={event} onComplete={onComplete}/>
       <button className={styles.open} type="button" draggable={!event.system} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onOpen} aria-label={`${event.title} · ${timing}${place ? ` · ${place}` : ""}`} title={title}>
-        <EventGlyph event={event} icon={icon} size={14}/><strong>{vertical && narrow ? title.split(/\s+/).map((word,index) => <span key={index}>{word}</span>) : title}</strong>
+        <span className={styles.glyph}><EventGlyph event={event} icon={icon} size={14}/></span><strong>{vertical && narrow ? title.split(/\s+/).map((word,index) => <span key={index}>{word}</span>) : title}</strong>
       </button>
     </motion.div>
     {detailRoom && <motion.div layout="position" initial={reduced?false:{opacity:0,y:-3}} animate={{opacity:1,y:0}} transition={{layout:layoutTransition,duration:.18}} className={styles.details} data-compact={compact}>

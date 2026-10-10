@@ -2,13 +2,12 @@
 import type { ReactNode } from "react";
 import { motion, type HTMLMotionProps } from "motion/react";
 import type { EventOccurrence } from "../../lib/modules/planning/types";
-import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./TaskEventCard.module.css";
 
 export function TaskCheck({ event, onComplete }: { event: EventOccurrence; onComplete: (event: EventOccurrence) => void }) {
   if (!event.isTask) return null;
-  return <button type="button" className={styles.check} aria-label={`${event.completed ? "Reopen" : "Complete"} ${event.title}`} aria-pressed={Boolean(event.completed)} onClick={e => { e.stopPropagation(); onComplete(event); }} onPointerDown={e => e.stopPropagation()}>
-    {event.completed && <UnigentamosIcon role="check" size={13} />}
+  return <button type="button" className={styles.check} data-task-check aria-label={`${event.completed ? "Reopen" : "Complete"} ${event.title}`} aria-pressed={Boolean(event.completed)} onClick={e => { e.stopPropagation(); onComplete(event); }} onPointerDown={e => e.stopPropagation()}>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9" />{event.completed && <path d="m8 12 3 3 5-6" />}</svg>
   </button>;
 }
 

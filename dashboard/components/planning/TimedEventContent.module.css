@@ -1,7 +1,8 @@
 .content { display:flex; align-items:center; gap:5px; width:100%; height:100%; min-width:0; padding:4px 6px; box-sizing:border-box; color:var(--text-strong,#23383f); font:500 11px/1.35 var(--font-body); }
 .heading { display:flex; align-items:center; gap:4px; flex:1; min-width:0; }
 .content .open { display:flex; align-items:center; gap:4px; flex:1; min-width:0; padding:0; margin:0; border:0; background:transparent; color:inherit; text-align:left; font:inherit; cursor:pointer; }
-.open > svg { flex:none; }
+.glyph { display:flex; align-items:center; justify-content:center; flex:none; height:1lh; }
+.glyph > svg { display:block; flex:none; width:var(--event-icon-size); height:var(--event-icon-size); }
 .content .open strong { min-width:0; max-width:100%; font:var(--calendar-event-title-font,600 13px/1.35 var(--font-body)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .details { display:flex; align-items:center; gap:3px; flex:none; min-width:0; }
 .content[data-vertical="true"] { flex-direction:column; align-items:stretch; justify-content:flex-start; padding-top:8px; gap:5px; }
@@ -12,7 +13,7 @@
 .content[data-vertical="true"] > [data-event-links] { flex:none; margin-top:2px; }
 .content[data-narrow="true"] { padding-inline:2px; gap:3px; }
 .content[data-narrow="true"] .open { gap:2px; }
-.content[data-narrow="true"] .open > svg { width:11px; height:13px; }
+.content[data-narrow="true"] { --event-icon-size:11px; }
 .content[data-narrow="true"] .open strong { font-size:10px; line-height:1.25; }
 .content[data-narrow="true"][data-vertical="true"] .open { flex-direction:column; gap:3px; }
 .content[data-narrow="true"] .open strong > span { display:block; max-width:100%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -22,9 +23,9 @@
 .content[data-tiny="true"] { padding-block:0; gap:3px; }
 .content[data-tiny="true"] [data-event-links] { --avatar-size:10px; --linked-object-size:10px; }
 .content[data-tiny="true"] [data-event-detail] { height:10px; font-size:9px; line-height:10px; }
-.content[data-tiny="true"] [data-event-detail] svg,.content[data-tiny="true"] .open > svg { width:10px; height:10px; }
+.content[data-tiny="true"] { --event-icon-size:10px; }
+.content[data-tiny="true"] [data-event-detail] svg { width:10px; height:10px; }
 .content[data-tiny="true"] .open strong { font-size:10px; line-height:10px; }
-.content[data-tiny="true"] .heading > button { width:10px; height:10px; min-height:10px; }
 .content[data-completed="true"] .open strong { text-decoration:line-through; opacity:.65; }
 @media(max-width:760px) { .content [data-object-list] { font-size:10px; --avatar-size:20px; --linked-object-size:20px; } }
 
@@ -36,4 +37,9 @@
 .content .details {min-width:0;} .content[data-vertical="false"] .details {flex-shrink:0;}
 
 /* Type grows continuously with the card instead of jumping at its compact breakpoint. */
-.content .open strong {font-size:clamp(10px,calc(7px + 4cqi),13px);}
+.content { --event-icon-size:14px; }
+.heading { font:var(--calendar-event-title-font,600 13px/1.35 var(--font-body)); font-size:clamp(10px,calc(7px + 4cqi),13px); }
+.content .open strong {font:inherit;}
+.content[data-vertical="true"] .heading > [data-task-check] { margin-top:calc((1lh - var(--event-icon-size)) / 2); }
+.content[data-narrow="true"] .heading { font-size:10px; line-height:1.25; }
+.content[data-tiny="true"] .heading { font-size:10px; line-height:10px; }

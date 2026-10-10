@@ -2738,6 +2738,8 @@
 .viewOptions .optionsHeading {padding-bottom:0;}
 .viewOptions .optionsHeading > button {margin-left:auto;width:auto;flex:none;min-height:30px;height:30px;padding:4px 8px;font-size:11px;}
 .content[data-view="week"] .allDayBand .allDayItem .eventTitle {font-size:12px;}
+.allDayBand .allDayItem { --event-icon-size:18px; }
+@media(max-width:760px) { .content[data-view="week"] .allDayBand .allDayItem { --event-icon-size:11px; } }
 @media(max-width:760px) {.content[data-view="week"] .allDayBand .allDayItem .eventTitle {font-size:11px;}}
 .viewOptions .mobileToolActions {display:flex!important;flex-direction:column!important;flex-wrap:nowrap;grid-template-columns:none;align-items:stretch;gap:7px;}
 .viewOptions .mobileToolActions > :global(.work-button) {width:100%;min-height:32px;height:32px;flex:none;}
