@@ -15,6 +15,7 @@ function CountryFlag({ code }: { code: string }) {
 }
 export default function PlaceLocationFields({ value, onChange, compact = false, leading }: { value: PlaceLocation; onChange: (patch: PlaceLocation) => void; compact?: boolean; leading?: ReactNode }) {
   const [matches, setMatches] = useState<PlaceLocation[]>([]), [busy, setBusy] = useState(false), [message, setMessage] = useState("");
+  const [pastedAddress, setPastedAddress] = useState<{ address: string; country: string }>();
   const request = useRef<AbortController | null>(null), trigger = useRef<HTMLDivElement>(null), addressId = useId();
   const address = value.address || "", country = value.countryCode || "US";
   const pinAddress = useRef(address);
@@ -25,19 +26,34 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
     const parsed = splitPastedAddress(value.addressParts?.street || address, country);
     if (parsed) onChange({ addressParts: parsed, countryCode: country, address: formatPlaceAddress(parsed, country) });
   }, [address, country, value.addressParts, onChange]);
+  useEffect(() => {
+    if (!pastedAddress) return;
+    if (pastedAddress.address !== address || pastedAddress.country !== country) { setPastedAddress(undefined); return; }
+    // Wait for the split fields to settle, and cancel if the user edits again.
+    const timer = window.setTimeout(() => { setPastedAddress(undefined); void lookup(); }, 250);
+    return () => window.clearTimeout(timer);
+  }, [pastedAddress, address, country, value.name]);
+  function cancelLookup() {
+    request.current?.abort(); setPastedAddress(undefined); setMatches([]); setMessage(""); setBusy(false);
+  }
   function changeAddress(next: AddressParts, nextCountry = country) {
+    cancelLookup();
     const changed = nextCountry !== country || formatPlaceAddress(next, nextCountry) !== formatPlaceAddress(parts, country);
     onChange({ addressParts: next, countryCode: nextCountry, address: formatPlaceAddress(next, nextCountry),
       // A pin chosen on an empty map form is intentional; an old address's pin is not.
       ...(changed && pinAddress.current.trim() ? { latitude: undefined, longitude: undefined } : {}) });
   }
-  function updatePart(field: keyof AddressParts, text: string) {
+  function updatePart(field: keyof AddressParts, text: string, pasted = false) {
     const parsed = field === "street" ? splitPastedAddress(text, country) : undefined;
-    if (parsed) { changeAddress(parsed); return; }
-    const next = { ...parts, [field]: text };
+    const next = parsed || { ...parts, [field]: text };
     changeAddress(next);
+    if (pasted && text.trim().length >= 3 && !/^https?:\/\//i.test(text.trim())) setPastedAddress({ address: formatPlaceAddress(next, country), country });
+  }
+  function selectMatch(match: PlaceLocation) {
+    pinAddress.current = address; onChange({ latitude: match.latitude, longitude: match.longitude }); setMatches([]); setMessage("Coordinates filled.");
   }
   async function lookup() {
+    setPastedAddress(undefined);
     request.current?.abort(); const controller = new AbortController(); request.current = controller;
     setBusy(true); setMessage(""); setMatches([]);
     try {
@@ -46,7 +62,8 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
       const response = await fetch("/api/map", { method: "POST", headers: buildJsonHeadersWithCsrf(), signal: controller.signal, body: JSON.stringify({ operation: "geocode", address: query, name: value.name, countryCode: country, addressParts: parts }) });
       const body = await response.json(); if (!response.ok || !body.ok) throw new Error(body.error || "Address lookup is unavailable.");
       if (controller.signal.aborted) return;
-      setMatches(body.data); setMessage(body.data.length ? "" : "No matches. Add a city or postal code, or enter coordinates.");
+      if (body.data.length === 1) selectMatch(body.data[0]);
+      else { setMatches(body.data); setMessage(body.data.length ? "" : "No matches. Add a city or postal code, or enter coordinates."); }
     } catch (error) { if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : "Address lookup is unavailable."); }
     finally { if (!controller.signal.aborted) setBusy(false); }
   }
@@ -58,14 +75,14 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
     }}>{addressCountries.map(([code, info]) => <option key={code} value={code}><span className={styles.countryOption}><CountryFlag code={code} />{info.name}</span></option>)}</SelectField></div>
     <input id={addressId} autoComplete="street-address" aria-label="Address" value={parts.street} maxLength={240} placeholder="Street address or paste a full address" onChange={e => updatePart("street", e.target.value)} onPaste={e => {
       const input = e.currentTarget;
-      const text = input.value.slice(0, input.selectionStart ?? 0) + e.clipboardData.getData("text") + input.value.slice(input.selectionEnd ?? input.value.length);
-      if (splitPastedAddress(text, country)) { e.preventDefault(); updatePart("street", text); }
+      const text = (input.value.slice(0, input.selectionStart ?? 0) + e.clipboardData.getData("text") + input.value.slice(input.selectionEnd ?? input.value.length)).slice(0, input.maxLength);
+      e.preventDefault(); updatePart("street", text, true);
     }} />
     <div className={styles.locality} style={{ gridTemplateColumns: `repeat(${Math.min(localFields.length, 3)}, minmax(0, 1fr))` }}>{localFields.map(field => <label key={field}>{addressFieldLabel(field, country)}<input value={parts[field]} maxLength={240} autoComplete={field === "postalCode" ? "postal-code" : field === "region" ? "address-level1" : field === "city" ? "address-level2" : "address-level3"} onChange={e => updatePart(field, e.target.value)} /></label>)}</div>
     <div className={styles.coordinates}>
-      {(["latitude", "longitude"] as const).map(axis => <label key={axis}>{axis === "latitude" ? "Latitude" : "Longitude"}<input aria-label={axis === "latitude" ? "Latitude" : "Longitude"} type="number" step="any" min={axis === "latitude" ? -90 : -180} max={axis === "latitude" ? 90 : 180} value={value[axis] ?? ""} onChange={e => { pinAddress.current = address; onChange({ [axis]: e.target.value === "" ? undefined : Number(e.target.value) }); }} /></label>)}
+      {(["latitude", "longitude"] as const).map(axis => <label key={axis}>{axis === "latitude" ? "Latitude" : "Longitude"}<input aria-label={axis === "latitude" ? "Latitude" : "Longitude"} type="number" step="any" min={axis === "latitude" ? -90 : -180} max={axis === "latitude" ? 90 : 180} value={value[axis] ?? ""} onChange={e => { cancelLookup(); pinAddress.current = address; onChange({ [axis]: e.target.value === "" ? undefined : Number(e.target.value) }); }} /></label>)}
       <div ref={trigger}><Popover.Root open={!!matches.length} onOpenChange={open => { if (!open) setMatches([]); }}><Popover.Anchor asChild><Button className={styles.autofill} aria-label="Autofill coordinates" icon="search" type="button" busy={busy} disabled={busy || address.trim().length < 3 || /^https?:\/\//i.test(address)} onClick={() => void lookup()}>Autofill<span className={styles.fullLabel}> coordinates</span></Button></Popover.Anchor>
-      <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={styles.matches} align="end" sideOffset={8} collisionPadding={12} aria-label="Matching addresses" onFocusOutside={e => e.preventDefault()}><strong>Choose the matching place</strong>{matches.map((match, index) => <button key={index} type="button" onClick={() => { pinAddress.current = address; onChange({ latitude: match.latitude, longitude: match.longitude }); setMatches([]); setMessage("Coordinates filled."); }}><strong>{match.name}</strong><span>{match.address}</span><small>{match.latitude?.toFixed(5)}, {match.longitude?.toFixed(5)}</small></button>)}</Popover.Content></Popover.Portal></Popover.Root></div>
+      <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={styles.matches} align="end" sideOffset={8} collisionPadding={12} aria-label="Matching addresses" onFocusOutside={e => e.preventDefault()}><strong>Choose the matching place</strong>{matches.map((match, index) => <button key={index} type="button" onClick={() => selectMatch(match)}><strong>{match.name}</strong><span>{match.address}</span><small>{match.latitude?.toFixed(5)}, {match.longitude?.toFixed(5)}</small></button>)}</Popover.Content></Popover.Portal></Popover.Root></div>
     </div>
     {message && <p role="status" className={styles.message}>{message}</p>}
   </div>;
