@@ -12,11 +12,11 @@ export function TaskCheck({ event, onComplete }: { event: EventOccurrence; onCom
 }
 
 /** The opening target and completion control are siblings, including for keyboard users. */
-export default function TaskEventCard({ event, onComplete, onClick, children, className, ...props }: Omit<HTMLMotionProps<"div">, "onClick" | "children"> & {
-  children?: ReactNode; event: EventOccurrence; onComplete: (event: EventOccurrence) => void; onClick: () => void;
+export default function TaskEventCard({ event, onComplete, onClick, children, className, inlineTaskCheck = false, ...props }: Omit<HTMLMotionProps<"div">, "onClick" | "children"> & {
+  children?: ReactNode; event: EventOccurrence; onComplete: (event: EventOccurrence) => void; onClick: () => void; inlineTaskCheck?: boolean;
 }) {
   return <motion.div {...props} className={`${className || ""} ${styles.card}`} data-completed={event.isTask && event.completed || undefined}>
     <button className={styles.open} type="button" onClick={onClick} aria-label={String(props["aria-label"] || event.title)} />
-    <TaskCheck event={event} onComplete={onComplete} />{children}
+    {!inlineTaskCheck && <TaskCheck event={event} onComplete={onComplete} />}{children}
   </motion.div>;
 }

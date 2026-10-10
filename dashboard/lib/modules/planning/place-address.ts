@@ -19,8 +19,13 @@ export function splitPastedAddress(text: string, country = "US"): AddressParts |
     .find(({ label }) => beforeZip.toLowerCase().endsWith(` ${label.toLowerCase()}`) || beforeZip.toLowerCase().endsWith(`,${label.toLowerCase()}`));
   if (!region) return;
   const beforeRegion = beforeZip.slice(0, -region.label.length).replace(/[\s,]+$/, "");
-  const lines = beforeRegion.split(/\s*[,\n\r]+\s*/).filter(Boolean);
-  // A delimiter between street and city is required; never guess where a street name ends.
+  let lines = beforeRegion.split(/\s*[,\n\r]+\s*/).filter(Boolean);
+  // Copied map addresses often omit the comma after the street. Only split at a
+  // recognizable street suffix, keeping directional and unit information attached.
+  if (lines.length === 1) {
+    const streetCity = lines[0].match(/^(\d[\w-]*\s+.+\s(?:street|st|avenue|ave|boulevard|blvd|drive|dr|road|rd|lane|ln|court|ct|circle|cir|parkway|pkwy|highway|hwy|way|place|pl|terrace|ter)\.?(?:\s+(?:NE|NW|SE|SW|N|S|E|W))?(?:\s+(?:apt|suite|ste|unit|#)\.?\s*[\w-]+)?)\s+([A-Za-z][A-Za-z .'-]+)$/i);
+    if (streetCity) lines = [streetCity[1], streetCity[2]];
+  }
   if (lines.length < 2 || !/\d/.test(lines[0])) return;
   const city = lines.pop()!;
   if (/\d/.test(city)) return;

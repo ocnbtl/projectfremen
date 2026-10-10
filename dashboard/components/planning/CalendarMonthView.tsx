@@ -1,5 +1,5 @@
 "use client";
-import TaskEventCard from "./TaskEventCard";
+import TaskEventCard, { TaskCheck } from "./TaskEventCard";
 import { useLayoutEffect, useRef, useState, type CSSProperties } from "react";
 import type { Calendar, EventOccurrence } from "../../lib/modules/planning/types";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
@@ -52,13 +52,12 @@ export default function CalendarMonthView({ days, date, today, events, calendars
           const span = last - first + 1;
           const compactContinuation = continuesBefore && detailedEvents.has(event.id) && (span === 1 || size.width / columns * span < 300);
           if (!compactContinuation) detailedEvents.add(event.id);
-          return <TaskEventCard event={event} onComplete={onComplete} key={`${event.id}:${first}`} layout transition={{ layout: layoutTransition }} className={styles.event}
+          return <TaskEventCard event={event} onComplete={onComplete} inlineTaskCheck key={`${event.id}:${first}`} layout transition={{ layout: layoutTransition }} className={styles.event}
             style={{ ...eventColors(event, calendar), gridColumn: `${first + 1} / ${last + 2}`, gridRow: lane + 2 } as CSSProperties}
             data-morph-event={event.id} data-month-event={event.id} data-compact-continuation={compactContinuation || undefined} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
             aria-label={`${event.title}${timing ? `, ${timing}` : ""}${continuation}`} title={`${event.title}${timing ? ` · ${timing}` : ""}${continuation}`} onClick={() => onOpen(event)}>
             {(continuesBefore || continuesAfter) && <EventContinuation before={continuesBefore} after={continuesAfter} />}
-            <EventGlyph event={event} icon={group?.icon} size={16} />
-            <span className={styles.copy}><strong>{eventPreviewTitle(event)}</strong>{timing && !compactContinuation && <small>{timing}</small>}</span>
+            <div className={styles.copy} data-task={event.isTask || undefined}><div className={styles.heading}><TaskCheck event={event} onComplete={onComplete}/><EventGlyph event={event} icon={group?.icon} size={16} /><strong>{eventPreviewTitle(event)}</strong></div>{timing && !compactContinuation && <small>{timing}</small>}</div>
             {!compactContinuation && <EventLinksPreview event={event} available={refs} />}
             {!compactContinuation && place && <EventDetail kind="place" text={place} eventTitle={event.title}/>}
 

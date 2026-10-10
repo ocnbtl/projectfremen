@@ -568,7 +568,7 @@ export default function CalendarWorkspace() {
     );
     const group = eventGroup(calendar, item.groupId);
     return (
-      <TaskEventCard event={item} onComplete={item => void completeTask(item)}
+      <TaskEventCard event={item} onComplete={item => void completeTask(item)} inlineTaskCheck
         key={item.id}
         className={eventRowStyles.card}
         data-morph-event={item.id}
@@ -578,7 +578,7 @@ export default function CalendarWorkspace() {
         onClick={() => showPreview(item)}
         title={item.title}
       >
-        <EventRowContent event={item} available={snapshot?.refs || []} icon={group?.icon} zone={zone}/>
+        <EventRowContent event={item} available={snapshot?.refs || []} icon={group?.icon} zone={zone} onComplete={item => void completeTask(item)}/>
       </TaskEventCard>
     );
   }

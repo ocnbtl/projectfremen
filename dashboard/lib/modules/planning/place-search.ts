@@ -6,12 +6,22 @@ export type CoordinateSearchOptions = { name?: string; countryCode?: string; add
 export async function searchPlaceCoordinates(address: string, options: CoordinateSearchOptions, search: (query: string, country?: string) => Promise<PlaceSearchResult[]>): Promise<PlaceSearchResult[]> {
   if (address.trim().length < 3 || address.length > 500) throw new Error("Enter between 3 and 500 address characters");
   const country = options.countryCode;
-  const parts = options.addressParts || splitPastedAddress(address, country);
+  const parsed = splitPastedAddress(options.addressParts?.street || address, country) || splitPastedAddress(address, country);
+  const parts = options.addressParts ? { ...options.addressParts, city: options.addressParts.city || parsed?.city || "", region: options.addressParts.region || parsed?.region || "", postalCode: options.addressParts.postalCode || parsed?.postalCode || "" } : parsed;
   const locality = parts && (parts.city || parts.region || parts.postalCode) ? [parts.city, parts.region, parts.postalCode, country ? ADDRESS_COUNTRIES[country]?.name : ""].filter(Boolean).join(", ") : "";
   const name = options.name?.trim().slice(0, 240);
   const namedQuery = name && locality ? `${name}, ${locality}` : "";
   const queries = [...new Set([namedQuery, address.trim()].filter(Boolean))];
   const results = await Promise.allSettled(queries.map(query => search(query, country)));
+  // If an address cannot be split locally, use the provider's locality to look up
+  // the venue rather than silently dropping the name and returning only tenants.
+  if (name && !namedQuery) {
+    const match = results.flatMap(result => result.status === "fulfilled" ? result.value : []).find(row => row.addressParts?.city && (!country || row.countryCode === country));
+    if (match?.addressParts) {
+      const area = [match.addressParts.city, match.addressParts.region, match.addressParts.postalCode, country ? ADDRESS_COUNTRIES[country]?.name : ""].filter(Boolean).join(", ");
+      results.unshift(...await Promise.allSettled([search(`${name}, ${area}`, country)]));
+    }
+  }
   if (results.every(result => result.status === "rejected")) throw (results[0] as PromiseRejectedResult).reason;
   const seen = new Set<string>();
   return results.flatMap(result => result.status === "fulfilled" ? result.value : []).filter(row => {

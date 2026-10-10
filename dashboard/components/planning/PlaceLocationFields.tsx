@@ -21,8 +21,7 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
   const localFields = [...new Set([...addressFields(country), ...(["city", "region", "postalCode", "district"] as const).filter(field => parts[field])])];
   useEffect(() => { request.current?.abort(); setMatches([]); setMessage(""); setBusy(false); return () => request.current?.abort(); }, [address, country, value.name]);
   useEffect(() => {
-    if (value.addressParts) return;
-    const parsed = splitPastedAddress(address, country);
+    const parsed = splitPastedAddress(value.addressParts?.street || address, country);
     if (parsed) onChange({ addressParts: parsed, countryCode: country, address: formatPlaceAddress(parsed, country) });
   }, [address, country, value.addressParts, onChange]);
   function updatePart(field: keyof AddressParts, text: string) {

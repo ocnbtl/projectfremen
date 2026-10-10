@@ -40,6 +40,11 @@
 .week { grid-template-rows:30px repeat(2,minmax(0,38px)) minmax(24px,1fr); row-gap:3px; }
 .event { max-height:38px; height:100%; margin-block:0; --avatar-size:26px; gap:7px; }
 .copy { flex:1; }
+.heading { display:flex; align-items:center; gap:5px; min-width:0; --event-icon-size:16px; }
+.heading > svg { display:block; flex:none; }
+.heading strong { min-width:0; }
+.copy > small { padding-left:21px; }
+.copy[data-task] > small { padding-left:42px; }
 .copy strong { font:var(--calendar-event-title-font,600 13px/1.35 var(--font-body)); }
 .event > [data-event-people] { margin:0; flex:none; }
 .event > [data-event-objects] { flex:0 1 auto; width:auto; max-width:45%; }

@@ -9,5 +9,7 @@
 .timing:empty { display:none; }
 .timing { max-width:100%; }
 .timing > span { font-size:11px; }
+.content { --event-icon-size:16px; }
+.content[data-task] .metadata { padding-left:46px; }
 .metadata button { justify-content:flex-start; }
 @media(max-width:760px) { .card {padding:9px 8px;} .heading strong {font-size:12px;} .heading [data-event-links] {--avatar-size:23px;--linked-object-size:23px;} }
