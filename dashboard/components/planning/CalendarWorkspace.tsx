@@ -925,7 +925,7 @@ export default function CalendarWorkspace() {
           <WorkspaceFeedback error={error} message={notice} />
           <div className={styles.settingsHeading}><div className={styles.settingsActions}>
 
-            {(["holidays", "custom"] as const).map(section => <SettingsPopover key={section} label={section === "custom" ? "Custom dates" : "Holiday calendars"} icon={section === "custom" ? "star" : "interaction-milestone"}>
+            {(["holidays", "custom"] as const).map(section => <SettingsPopover key={section} label={section === "custom" ? "Custom dates" : "Holiday calendars"} mobileLabel={section === "custom" ? "Custom" : "Holiday"} icon={section === "custom" ? "star" : "interaction-milestone"}>
               <CalendarObservanceSettings section={section} footer={section === "custom" ? <Popover.Close asChild><Button>Done</Button></Popover.Close> : undefined} settings={observanceSettings} catalog={holidayData} loading={holidayLoading} error={holidayError} busy={busy} year={date.slice(0, 4)} date={date} zone={zone} onSave={settings => saveCalendarPreference("native", { observances: settings })} />
             </SettingsPopover>)}
             <Button icon="plus" intent="primary" aria-expanded={addingCalendar} onClick={() => setAddingCalendar(value => !value)}>Add a calendar</Button>
@@ -1197,9 +1197,9 @@ function ViewToggle({ label, icon, checked, onChange }: { label: string; icon: s
   return <label className={styles.calendarToggle}><UnigentamosIcon role={icon} size={17} /><span>{label}</span><input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} /></label>;
 }
 
-function SettingsPopover({ label, icon, children }: { label: string; icon: string; children: ReactNode }) {
+function SettingsPopover({ label, mobileLabel, icon, children }: { label: string; mobileLabel: string; icon: string; children: ReactNode }) {
   const trigger = useRef<HTMLButtonElement>(null);
-  return <Popover.Root><Popover.Trigger asChild><button ref={trigger} type="button" className={`work-button ${styles.settingsPopoverTrigger}`}><UnigentamosIcon role={icon} size={16} /><span>{label}</span><UnigentamosIcon role="chevron-down" size={13} /></button></Popover.Trigger>
+  return <Popover.Root><Popover.Trigger asChild><button ref={trigger} type="button" aria-label={label} className={`work-button ${styles.settingsPopoverTrigger}`}><UnigentamosIcon role={icon} size={16} /><span className={styles.settingsPopoverFullLabel}>{label}</span><span className={styles.settingsPopoverMobileLabel}>{mobileLabel}</span><UnigentamosIcon role="chevron-down" size={13} /></button></Popover.Trigger>
     <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={`${styles.calendarPopover} ${styles.settingsPopover}`} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={16} collisionBoundary={trigger.current?.closest<HTMLElement>('[role="dialog"]')} sticky="always" align="end" aria-label={label} onOpenAutoFocus={event => event.preventDefault()} onFocusOutside={event => event.preventDefault()} onEscapeKeyDown={event => event.stopImmediatePropagation()}>
       {children}{label !== "Custom dates" && <Popover.Close asChild><button type="button" className="work-button">Done</button></Popover.Close>}
     </Popover.Content></Popover.Portal>
