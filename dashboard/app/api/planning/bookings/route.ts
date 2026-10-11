@@ -3,12 +3,13 @@ import { hasAdminSession } from "../../../../lib/admin-session";
 import { isCsrfRequestValid } from "../../../../lib/csrf";
 import { readPlanningState } from "../../../../lib/modules/planning/store";
 import { bookingLinkView, changeBookingLink, BookingError } from "../../../../lib/modules/planning/calendar-booking";
+import { bookingEmailSummary } from "../../../../lib/modules/planning/booking-email";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: { "Cache-Control": "private, no-store", Vary: "Cookie" } });
 export async function GET() {
   if (!(await hasAdminSession())) return json({ error: "Unauthorized" }, 401);
-  try { const state = await readPlanningState(); return json({ links: (state.bookingData?.links || []).map(link => bookingLinkView(link, state)) }); }
+  try { const state = await readPlanningState(); return json({ links: (state.bookingData?.links || []).map(link => bookingLinkView(link, state)), emails: bookingEmailSummary(state) }); }
   catch { return json({ error: "Booking links could not be loaded. Please try again." }, 503); }
 }
 export async function POST(request: Request) {

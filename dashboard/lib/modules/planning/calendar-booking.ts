@@ -6,6 +6,7 @@ import { repeatBirthdays } from "./repeat-birthdays";
 import { effectiveEvent, type PlanningState } from "./types";
 import type { BirthdaySource } from "./observances";
 import type { BookingLink, BookingLinkView, BookingSlot, PublicBooking } from "./booking-types";
+import { bookingEmailConfig, queueBookingEmails } from "./booking-email";
 
 export class BookingError extends Error { constructor(message: string, public status = 400) { super(message); } }
 const fail = (message: string, status = 400): never => { throw new BookingError(message, status); };
@@ -131,7 +132,7 @@ export async function publicBooking(token: string): Promise<PublicBooking> {
   if (!/^[a-f0-9-]{36}\.[a-f0-9]{64}$/.test(token)) return fail("This booking link is unavailable.",404);
   const state = await readPlanningState(), link = resolve(token, state);
   const birthdays = await repeatBirthdays(state.events);
-  return { name: link.name, description: link.description, location: link.location, timeZone: link.timeZone, durationMinutes: link.durationMinutes, slots: availableBookingSlots(link, state, birthdays) };
+  return { name: link.name, description: link.description, location: link.location, timeZone: link.timeZone, durationMinutes: link.durationMinutes, slots: availableBookingSlots(link, state, birthdays), confirmationEmail: bookingEmailConfig().ready };
 }
 export async function reserveBooking(token: string, input: Record<string, unknown>, ip: string) {
   const name = text(input.name, "name", 120, true), email = text(input.email, "email", 254, true).toLowerCase(), note = text(input.note ?? "", "note", 1500);
@@ -149,7 +150,7 @@ export async function reserveBooking(token: string, input: Record<string, unknow
       if (previous.fingerprint !== fingerprint || previous.linkId !== link.id) return fail("This request has already been used. Refresh before booking.", 409);
       const event = state.events.find(event => event.id === previous.eventId && !event.archivedAt);
       if (!event || event.source?.cancelled || event.overrides?.cancelled) return fail("This booking is no longer active. Contact the organizer.", 409);
-      return { state, result: { name: link.name, start: previous.start, end: previous.end, timeZone: link.timeZone, location: link.location } };
+      return { state, result: { name: link.name, start: previous.start, end: previous.end, timeZone: link.timeZone, location: link.location, confirmationEmail: Boolean(previous.emails) } };
     }
     const recent = data.receipts.filter(receipt => now - Date.parse(receipt.createdAt) < 86400000);
     if (recent.filter(receipt => receipt.emailHash === emailHash).length >= 5 || recent.filter(receipt => receipt.ipHash === ipHash && now - Date.parse(receipt.createdAt) < 3600000).length >= 10 || recent.filter(receipt => receipt.linkId === link.id && now - Date.parse(receipt.createdAt) < 3600000).length >= 60) return fail("Too many bookings. Please try again later or contact the organizer.", 429);
@@ -158,7 +159,8 @@ export async function reserveBooking(token: string, input: Record<string, unknow
     if (!slot) return fail("That time is no longer available. Please choose another time.", 409);
     const stamp = new Date(now).toISOString();
     const event = normalizePlanningRecord("events", { id: randomUUID(), title: `${link.name} — ${name}`, description: note, start: localFor(Date.parse(slot.start), link.timeZone), end: localFor(Date.parse(slot.end), link.timeZone), timeZone: link.timeZone, allDay: false, calendarId: link.calendarId, location: link.location, linkedRefs: [], participants: [{ name, email }], recurrence: "", exceptions: {}, reminderMinutes: 15, kind: "event", createdAt: stamp, updatedAt: stamp });
-    const receipt = { id: requestId, linkId: link.id, eventId: event.id, fingerprint, ipHash, emailHash, createdAt: stamp, bufferMinutes: link.bufferMinutes, ...slot };
-    return { state: { ...state, events: [...state.events, event], bookingData: { ...data, receipts: [...data.receipts, receipt] } }, result: { name: link.name, ...slot, timeZone: link.timeZone, location: link.location } };
+    const emails = queueBookingEmails({ title: link.name, guestName: name, guestEmail: email, note, location: link.location, timeZone: link.timeZone });
+    const receipt = { id: requestId, linkId: link.id, eventId: event.id, fingerprint, ipHash, emailHash, createdAt: stamp, bufferMinutes: link.bufferMinutes, ...slot, emails };
+    return { state: { ...state, events: [...state.events, event], bookingData: { ...data, receipts: [...data.receipts, receipt] } }, result: { name: link.name, ...slot, timeZone: link.timeZone, location: link.location, confirmationEmail: Boolean(emails) } };
   });
 }

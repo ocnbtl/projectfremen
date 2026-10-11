@@ -1,8 +1,10 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { dispatchBookingEmails } from "../../../../lib/modules/planning/booking-email";
 import { BookingError, publicBooking, reserveBooking } from "../../../../lib/modules/planning/calendar-booking";
 import { getRequestIp } from "../../../../lib/audit-log";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
 const headers = { "Cache-Control": "private, no-store", "X-Robots-Tag": "noindex, nofollow, noarchive", "Referrer-Policy": "no-referrer" };
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers });
 const failure = (error: unknown) => error instanceof BookingError ? json({ error: error.message }, error.status) : json({ error: "Bookings are temporarily unavailable. Please try again." }, 503);
@@ -21,6 +23,8 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     let input: Record<string, unknown>;
     try { input = JSON.parse(body); } catch { return json({ error: "Invalid submission." }, 400); }
     if (!input || typeof input !== "object" || Array.isArray(input)) return json({ error: "Invalid submission." }, 400);
-    return json({ booking: await reserveBooking((await context.params).token, input, getRequestIp(request)) });
+    const booking = await reserveBooking((await context.params).token, input, getRequestIp(request));
+    if (booking.confirmationEmail) after(async () => { try { await dispatchBookingEmails(String(input.requestId)); } catch { console.error("Booking email delivery is pending; reservation is confirmed."); } });
+    return json({ booking });
   } catch (error) { return failure(error); }
 }

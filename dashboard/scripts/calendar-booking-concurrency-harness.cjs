@@ -1,5 +1,6 @@
 /* Simulated Supabase compare-and-set conflict. No network or provider writes. */
 const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript'),{randomUUID}=require('node:crypto');
+process.env.RESEND_API_KEY = '';
 Object.assign(process.env,{SUPABASE_URL:'https://booking-store.example.test',SUPABASE_SERVICE_ROLE_KEY:'synthetic-test-key',FREMEN_REQUIRE_SUPABASE:'true',ADMIN_SESSION_SECRET:'synthetic-booking-key'});
 require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,filename);
 const {emptyPlanningState}=require('../lib/modules/planning/types.ts');

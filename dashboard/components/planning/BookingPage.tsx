@@ -11,7 +11,7 @@ export default function BookingPage({ token }: { token: string }) {
   const [data, setData] = useState<PublicBooking | null>(null), [loading, setLoading] = useState(true), [error, setError] = useState("");
   const [zone, setZone] = useState("UTC"), [day, setDay] = useState(""), [selected, setSelected] = useState<BookingSlot | null>(null);
   const [name, setName] = useState(""), [email, setEmail] = useState(""), [note, setNote] = useState(""), [website, setWebsite] = useState("");
-  const [busy, setBusy] = useState(false), [confirmed, setConfirmed] = useState<(BookingSlot & { name: string; location: string }) | null>(null);
+  const [busy, setBusy] = useState(false), [confirmed, setConfirmed] = useState<(BookingSlot & { name: string; location: string; confirmationEmail: boolean }) | null>(null);
   const attempt = useRef<{ fingerprint: string; id: string } | null>(null), form = useRef<HTMLFormElement>(null);
   const load = useCallback(async () => {
     setLoading(true);
@@ -48,7 +48,7 @@ export default function BookingPage({ token }: { token: string }) {
   return <main className={styles.page}>
     <a className={styles.brand} href="/" aria-label="Unigentamos home"><img src="/unigentamos-logo.svg" width="28" height="28" alt="" />Unigentamos</a>
     <section className={styles.card} aria-label="Book an appointment">
-      {confirmed ? <div className={styles.confirmation}><span aria-hidden="true" className={styles.check}>✓</span><h1>You’re booked</h1><h2>{confirmed.name}</h2><p>{date(confirmed.start)}</p><p>{time(confirmed.start)} – {time(confirmed.end)}</p>{confirmed.location && <p>{confirmed.location}</p>}<p className={styles.muted}>Your appointment has been added to the organizer’s calendar. Keep this page or take a screenshot for your records. Contact the organizer if you need to change or cancel it.</p><p className={styles.muted}>No confirmation email is sent.</p></div> : <>
+      {confirmed ? <div className={styles.confirmation}><span aria-hidden="true" className={styles.check}>✓</span><h1>You’re booked</h1><h2>{confirmed.name}</h2><p>{date(confirmed.start)}</p><p>{time(confirmed.start)} – {time(confirmed.end)}</p>{confirmed.location && <p>{confirmed.location}</p>}<p className={styles.muted}>Your appointment has been added to the organizer’s calendar. Contact the organizer if you need to change or cancel it.</p><p className={styles.muted}>{confirmed.confirmationEmail ? "Your confirmation email is on its way. Keep these details until it arrives, and check your spam folder if needed." : "Keep this page or take a screenshot for your records. Email confirmation is currently unavailable."}</p></div> : <>
         <header className={styles.header}><span className={styles.eyebrow}>BOOK A TIME</span><h1>{data?.name || "Choose a time to meet"}</h1>{data && <><p className={styles.duration}>{data.durationMinutes} minute appointment · Confirmed immediately</p>{data.description && <p className={styles.description}>{data.description}</p>}{data.location && <p className={styles.location}>Location · {data.location}</p>}</>}</header>
         {error && <div role="alert" className={styles.error}>{error} {!busy && <button type="button" onClick={() => void load()}>Refresh available times</button>}</div>}
         {loading && <p role="status">Finding available times…</p>}
@@ -62,7 +62,7 @@ export default function BookingPage({ token }: { token: string }) {
             <div className={styles.fields}><label>Name<input required autoComplete="name" maxLength={120} value={name} disabled={busy} onChange={event => setName(event.target.value)} /></label><label>Email<input required type="email" autoComplete="email" maxLength={254} value={email} disabled={busy} onChange={event => setEmail(event.target.value)} /></label></div>
             <label>Note <span className={styles.muted}>(optional)</span><textarea rows={3} maxLength={1500} value={note} disabled={busy} onChange={event => setNote(event.target.value)} /></label>
             <label className={styles.trap} aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" value={website} onChange={event => setWebsite(event.target.value)} /></label>
-            <p className={styles.muted}>Your details go to the organizer with your appointment. Confirmation appears here; no email is sent.</p><button className={styles.primary} disabled={busy} type="submit">{busy ? "Confirming…" : "Confirm booking"}</button>
+            <p className={styles.muted}>Your details go to the organizer with your appointment. {data.confirmationEmail ? "We’ll also email you the date, time, and location." : "Your confirmation will appear here."}</p><button className={styles.primary} disabled={busy} type="submit">{busy ? "Confirming…" : "Confirm booking"}</button>
           </form>}
         </>}
       </>}

@@ -1,0 +1,56 @@
+/* Synthetic storage and mocked Resend only. Never sends real email. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),ts=require('typescript'),{randomUUID}=require('node:crypto');
+const directory=fs.mkdtempSync(path.join(os.tmpdir(),'booking-email-test-'));
+Object.assign(process.env,{FREMEN_DATA_DIR:directory,FREMEN_REQUIRE_SUPABASE:'false',FREMEN_REQUIRE_PERSISTENT_DATA:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',ADMIN_SESSION_SECRET:'synthetic-booking-secret',RESEND_API_KEY:'synthetic-never-live',BOOKING_EMAIL_FROM:'Unigentamos <bookings@alerts.example.test>',BOOKING_NOTIFY_EMAIL:'owner@example.test'});
+require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,filename);
+const {changeBookingLink,publicBooking,reserveBooking}=require('../lib/modules/planning/calendar-booking.ts');
+const {readPlanningState,mutatePlanningState}=require('../lib/modules/planning/store.ts');
+const {bookingEmailConfig,bookingEmailPayload,bookingEmailSummary,deliverBookingEmail}=require('../lib/modules/planning/booking-email.ts');
+const calls=[];let behavior='ok';const accepted=new Map();
+global.fetch=async(url,init)=>{
+  assert.equal(url,'https://api.resend.com/emails','No unexpected network calls');assert.equal(init.headers.Authorization,'Bearer synthetic-never-live');
+  const key=init.headers['Idempotency-Key'],body=JSON.parse(init.body);calls.push({key,body,raw:init.body});
+  if(behavior==='fail')return new Response('{}',{status:503});
+  if(behavior==='reject')return new Response('{}',{status:403});
+  if(accepted.has(key))assert.equal(accepted.get(key).raw,init.body,'Retries preserve the exact payload');
+  else accepted.set(key,{raw:init.body,id:randomUUID()});
+  if(behavior==='lost-ack')throw new Error('Connection lost after provider acceptance');
+  return Response.json({id:accepted.get(key).id});
+};
+const getReceipt=async id=>(await readPlanningState()).bookingData.receipts.find(r=>r.id===id);
+async function update(id,fn){await mutatePlanningState(state=>{fn(state.bookingData.receipts.find(r=>r.id===id),state);return {state,result:null};});}
+(async()=>{
+  const link=await changeBookingLink({operation:'create',name:'Meet <Ocean>',description:'',location:'CVG, 3087 Terminal Dr, Hebron, KY 41048',calendarId:'native',conflictCalendarIds:['native'],timeZone:'America/New_York',durationMinutes:30,bufferMinutes:0,noticeHours:0,mode:'automatic',from:'2030-01-07',through:'2030-01-07',weekdays:[1],dayStart:'09:00',dayEnd:'17:00',manualStarts:[]});
+  const token=link.path.split('/').pop(),pub=await publicBooking(token);
+  assert.equal(pub.confirmationEmail,true);assert.ok(!JSON.stringify(pub).includes('owner@example.test'));
+  const input={requestId:randomUUID(),start:pub.slots[0].start,name:'Guest <script>',email:'guest@example.test',note:'A & B <img src=x>'};
+  assert.equal((await reserveBooking(token,input,'192.0.2.1')).confirmationEmail,true);
+  await reserveBooking(token,input,'192.0.2.1');
+  let receipt=await getReceipt(input.requestId);assert.equal(receipt.emails.guest.status,'pending');assert.equal(receipt.emails.organizer.status,'pending');
+  assert.equal((await readPlanningState()).bookingData.receipts.length,1);assert.equal((await readPlanningState()).events.length,1);
+  const payload=bookingEmailPayload(receipt,'guest');assert.deepEqual(payload.to,['guest@example.test']);assert.equal(payload.reply_to,'owner@example.test');
+  assert.ok(payload.text.includes('January 7, 2030 at 9:00 AM EST'));assert.ok(payload.text.includes('9:30 AM EST'));assert.ok(payload.text.includes('America/New_York'));assert.ok(payload.text.includes('3087 Terminal Dr'));
+  assert.ok(payload.html.includes('&lt;script&gt;'));assert.ok(!payload.html.includes('<img src=x>'));assert.ok(payload.html.includes('A &amp; B &lt;img src=x&gt;'));
+  const organizer=bookingEmailPayload(receipt,'organizer');assert.equal(organizer.reply_to,'guest@example.test');assert.deepEqual(organizer.to,['owner@example.test']);assert.ok(organizer.text.includes('Guest <script> (guest@example.test)'));
+  const midnight=structuredClone(receipt);midnight.start='2030-01-08T04:30:00Z';midnight.end='2030-01-08T05:00:00Z';midnight.emails.location='';
+  assert.ok(bookingEmailPayload(midnight,'guest').text.includes('January 7, 2030 at 11:30 PM EST'));assert.ok(bookingEmailPayload(midnight,'guest').text.includes('January 8, 2030 at 12:00 AM EST'));assert.ok(bookingEmailPayload(midnight,'guest').text.includes('Not specified'));
+  await Promise.all([deliverBookingEmail(input.requestId,'guest'),deliverBookingEmail(input.requestId,'guest')]);
+  assert.equal(calls.length,1,'Concurrent claims send once');assert.equal((await getReceipt(input.requestId)).emails.guest.status,'accepted');
+  await deliverBookingEmail(input.requestId,'guest');assert.equal(calls.length,1);
+  behavior='fail';await deliverBookingEmail(input.requestId,'organizer');assert.equal((await getReceipt(input.requestId)).emails.organizer.status,'pending');
+  assert.equal((await readPlanningState()).events.length,1,'Email failure cannot lose the booking');
+  const failedCall=calls.at(-1);behavior='lost-ack';await deliverBookingEmail(input.requestId,'organizer',true);assert.equal((await getReceipt(input.requestId)).emails.organizer.status,'pending');
+  behavior='ok';await deliverBookingEmail(input.requestId,'organizer',true);assert.equal(calls.at(-1).raw,failedCall.raw);assert.equal(calls.at(-1).key,failedCall.key);assert.equal(accepted.size,2);assert.equal((await getReceipt(input.requestId)).emails.organizer.status,'accepted');
+  const second={...input,requestId:randomUUID(),start:pub.slots[1].start,email:'second@example.test'};await reserveBooking(token,second,'192.0.2.2');
+  behavior='reject';await deliverBookingEmail(second.requestId,'guest');assert.equal((await getReceipt(second.requestId)).emails.guest.status,'failed');
+  behavior='ok';await deliverBookingEmail(second.requestId,'organizer');assert.equal((await getReceipt(second.requestId)).emails.organizer.status,'accepted','One recipient failure does not block the other');
+  await deliverBookingEmail(second.requestId,'guest',true);assert.equal((await getReceipt(second.requestId)).emails.guest.status,'accepted');
+  await update(second.requestId,r=>{r.emails.guest={status:'sending',attempts:1,firstAttemptAt:new Date(Date.now()-25*3600000).toISOString(),lease:'old',leaseUntil:new Date(Date.now()-1000).toISOString()};});
+  const before=calls.length;await deliverBookingEmail(second.requestId,'guest',true);assert.equal((await getReceipt(second.requestId)).emails.guest.status,'review');assert.equal(calls.length,before,'Expired uncertain send requires review');
+  await update(second.requestId,(r,state)=>{r.emails.organizer={status:'pending',attempts:0};state.events.find(e=>e.id===r.eventId).location='Changed place';});
+  await deliverBookingEmail(second.requestId,'organizer');assert.equal((await getReceipt(second.requestId)).emails.organizer.status,'cancelled');assert.equal(calls.length,before);
+  process.env.RESEND_API_KEY='';assert.equal(bookingEmailConfig().ready,false);assert.equal((await publicBooking(token)).confirmationEmail,false);
+  const third={...input,requestId:randomUUID(),start:pub.slots[2].start,email:'third@example.test'};assert.equal((await reserveBooking(token,third,'192.0.2.3')).confirmationEmail,false);assert.equal((await getReceipt(third.requestId)).emails,undefined);
+  assert.ok(bookingEmailSummary(await readPlanningState()).missing.includes('RESEND_API_KEY'));
+  console.log('PASS: atomic email queue, guest/owner templates, time zones, midnight, HTML escaping, concurrent claims, independent failures, stable idempotent retries, missing setup and stale appointment suppression. No external emails sent.');
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>fs.rmSync(directory,{recursive:true,force:true}));

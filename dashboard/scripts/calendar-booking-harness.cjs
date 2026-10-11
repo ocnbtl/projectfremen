@@ -1,6 +1,7 @@
 /* Synthetic bookings only. Real public submissions and production stores are never used. */
 const assert = require('node:assert/strict'), fs = require('node:fs'), os = require('node:os'), path = require('node:path'), ts = require('typescript'), {randomUUID} = require('node:crypto');
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'calendar-booking-test-'));
+process.env.RESEND_API_KEY = '';
 Object.assign(process.env,{FREMEN_DATA_DIR:directory,FREMEN_REQUIRE_SUPABASE:'false',FREMEN_REQUIRE_PERSISTENT_DATA:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',ADMIN_SESSION_SECRET:'synthetic-booking-secret'});
 require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,filename);
 const {changeBookingLink,availableBookingSlots,publicBooking,reserveBooking}=require('../lib/modules/planning/calendar-booking.ts');
@@ -40,7 +41,8 @@ const guest=(start,extra={})=>({requestId:randomUUID(),start,name:'Test Guest',e
   await assert.rejects(()=>publicBooking('invalid'),error=>error.status===404);
   await assert.rejects(()=>publicBooking(token(link).slice(0,-1)+(token(link).endsWith('0')?'1':'0')),error=>error.status===404);
   let publicData=await publicBooking(token(link));
-  assert.deepEqual(Object.keys(publicData).sort(),['description','durationMinutes','location','name','slots','timeZone']);
+  assert.deepEqual(Object.keys(publicData).sort(),['confirmationEmail','description','durationMinutes','location','name','slots','timeZone']);
+  assert.equal(publicData.confirmationEmail,false);
   assert.ok(!JSON.stringify(publicData).includes('keyVersion'));
   const request=guest(publicData.slots[0].start);
   const outcomes=await Promise.allSettled([reserveBooking(token(link),request,'192.0.2.1'),reserveBooking(token(link),guest(request.start,{email:'other@example.test'}),'192.0.2.2')]);

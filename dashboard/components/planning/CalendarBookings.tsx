@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import type { Calendar } from "../../lib/modules/planning/types";
-import type { BookingLinkView } from "../../lib/modules/planning/booking-types";
+import type { BookingLinkView, BookingEmailSummary } from "../../lib/modules/planning/booking-types";
 import { addDays, localDate } from "../../lib/modules/planning/calendar-model";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
@@ -14,10 +14,11 @@ export default function CalendarBookings({ calendars }: { calendars: Calendar[] 
   const [links, setLinks] = useState<BookingLinkView[]>([]), [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [origin, setOrigin] = useState(""), [manual, setManual] = useState("");
+  const [emails, setEmails] = useState<BookingEmailSummary | null>(null);
   const [confirm, setConfirm] = useState<{ id: string; operation: "revoke" | "regenerate" } | null>(null);
   async function load() {
     setLoading(true);
-    try { const response = await fetch("/api/planning/bookings", { cache: "no-store" }); const body = await response.json(); if (!response.ok) throw new Error(body.error); setLinks(body.links); setError(""); }
+    try { const response = await fetch("/api/planning/bookings", { cache: "no-store" }); const body = await response.json(); if (!response.ok) throw new Error(body.error); setLinks(body.links); setEmails(body.emails || null); setError(""); }
     catch (error) { setError(error instanceof Error ? error.message : "Booking links could not be loaded."); }
     finally { setLoading(false); }
   }
@@ -41,9 +42,19 @@ export default function CalendarBookings({ calendars }: { calendars: Calendar[] 
     try { await navigator.clipboard.writeText(origin + link.path); setNotice("Booking link copied."); }
     catch { setNotice("Select and copy the booking URL from the field."); }
   }
+  async function retryEmails() {
+    setBusy(true); setError(""); setNotice("");
+    try {
+      const response = await fetch("/api/planning/booking-emails", { method: "POST", headers: buildJsonHeadersWithCsrf() });
+      const body = await response.json(); if (!response.ok) throw new Error(body.error || "Email delivery could not be checked.");
+      setEmails(body.emails); setNotice("Email delivery status refreshed. Confirmed appointments stay on your calendar.");
+    } catch (error) { setError(error instanceof Error ? error.message : "Email delivery could not be checked."); }
+    finally { setBusy(false); }
+  }
   return <section className={shared.panel} aria-label="Booking links">
     <div className={shared.heading}><div><h3><UnigentamosIcon role="calendar" size={18} />Take bookings</h3><p>Let people choose a time and book directly into your calendar.</p></div><Button icon="plus" intent="primary" disabled={loading || busy || !active.length} onClick={create}>Create booking link</Button></div>
     <p className={shared.note}>Choose specific times or automatically offer free time. Bookings confirm immediately; guests provide a name, email, and optional note. Your other events stay private.</p>
+    {emails && <div className={styles.emailStatus} aria-label="Booking emails"><div><strong>{emails.ready ? "Confirmation emails on" : "Email setup needed"}</strong><p className={shared.note}>{emails.ready ? `Guests receive their booking details. Your notifications go to ${emails.organizerEmail}.` : "Connect a verified sender to email guests and receive booking notifications. Bookings still confirm on screen."}</p>{!!(emails.pending + emails.failed + emails.review) && <p className={shared.note}>{emails.pending} pending · {emails.failed} need attention{emails.review ? ` · ${emails.review} need delivery review` : ""}. Confirmed bookings are safe.</p>}{emails.review > 0 && <p className={shared.note}>Check these messages in Resend before sending again to avoid duplicates.</p>}</div>{emails.ready && !!(emails.pending + emails.failed) && <Button disabled={busy} onClick={() => void retryEmails()}>Retry emails</Button>}</div>}
     {error && <div role="alert" className={shared.feedback}>{error} <Button disabled={busy} onClick={() => void load()}>Refresh booking links</Button></div>}
     {notice && <p role="status" className={shared.feedback}>{notice}</p>}{loading && <p role="status">Loading booking links…</p>}
     {draft && <form className={`${shared.form} ${styles.form}`} onSubmit={event => { event.preventDefault(); void save({ ...draft, operation: draft.id ? "update" : "create" }); }}>
@@ -57,7 +68,7 @@ export default function CalendarBookings({ calendars }: { calendars: Calendar[] 
       {draft.mode === "automatic" ? <><fieldset><legend>Days to offer</legend><div className={styles.weekdays}>{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day,index) => <label key={day}><input type="checkbox" checked={draft.weekdays.includes(index+1)} onChange={event => setDraft({ ...draft, weekdays: event.target.checked ? [...draft.weekdays,index+1] : draft.weekdays.filter(day => day !== index+1) })} />{day}</label>)}</div></fieldset><div className={styles.grid}><label>Available from<input required type="time" value={draft.dayStart} onChange={event => setDraft({ ...draft, dayStart: event.target.value })} /></label><label>Available until<input required type="time" value={draft.dayEnd} onChange={event => setDraft({ ...draft, dayEnd: event.target.value })} /></label></div><p className={shared.note}>Times are spaced by the appointment length and buffer. Busy times are removed automatically as your calendar changes.</p></> : <div className={styles.manual}><label>Available start time<input type="datetime-local" min={draft.from+"T00:00"} max={draft.through+"T23:59"} value={manual} onChange={event => setManual(event.target.value)} /></label><Button disabled={!manual || draft.manualStarts.length >= 200} onClick={() => { setDraft({ ...draft, manualStarts: [...new Set([...draft.manualStarts, manual])].sort() }); setManual(""); }}>Add time</Button><ul>{draft.manualStarts.map(start => <li key={start}><span>{start.replace("T", " · ")}</span><Button aria-label={`Remove ${start}`} icon="close" onClick={() => setDraft({ ...draft, manualStarts: draft.manualStarts.filter(value => value !== start) })}>Remove</Button></li>)}</ul><p className={shared.note}>Each time lasts {draft.durationMinutes} minutes. Times that conflict with your calendar will not be offered.</p></div>}
       <fieldset><legend>Check these calendars for conflicts</legend><div className={shared.choices}>{active.map(calendar => <label className={shared.choice} key={calendar.id}><input type="checkbox" disabled={calendar.id === draft.calendarId} checked={calendar.id === draft.calendarId || draft.conflictCalendarIds.includes(calendar.id)} onChange={event => setDraft({ ...draft, conflictCalendarIds: event.target.checked ? [...draft.conflictCalendarIds, calendar.id] : draft.conflictCalendarIds.filter(id => id !== calendar.id) })} /><span className={shared.dot} style={{ backgroundColor: calendar.color }} />{calendar.name}</label>)}</div><p className={shared.note}>The destination calendar is always checked, including hidden and all-day events. Imported calendars use their latest saved data; keep them refreshed.</p></fieldset>
       <div className={styles.grid}><label>Buffer between appointments<select aria-label="Buffer between appointments" value={draft.bufferMinutes} onChange={event => setDraft({ ...draft, bufferMinutes: Number(event.target.value) })}>{[0,5,10,15,30,60].map(minutes => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</select></label><label>Minimum advance notice<select aria-label="Minimum advance notice" value={draft.noticeHours} onChange={event => setDraft({ ...draft, noticeHours: Number(event.target.value) })}>{[0,1,2,4,12,24,48,72].map(hours => <option key={hours} value={hours}>{hours} hours</option>)}</select></label></div>
-      <p className={shared.note}>Guests see confirmation on the booking page. No emails are sent. You can edit or remove appointments in Calendar.</p>
+      <p className={shared.note}>Guests see confirmation on the booking page{emails?.ready ? " and receive an email with their appointment details" : ""}. You can edit or remove appointments in Calendar; contact the guest directly about later changes.</p>
       <div className={shared.actions}><Button intent="primary" type="submit" busy={busy} disabled={draft.mode === "manual" && !draft.manualStarts.length}>{draft.id ? "Save booking link" : "Create link"}</Button><Button disabled={busy} onClick={() => setDraft(null)}>Cancel</Button></div>
     </form>}
     <div className={shared.links}>{links.map(link => <article className={shared.card} key={link.id} aria-label={`${link.name} booking link`}>
