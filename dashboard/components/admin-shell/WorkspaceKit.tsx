@@ -36,7 +36,7 @@ export function WorkspaceButton({
       aria-busy={busy || undefined}
     >
       {icon && <UnigentamosIcon role={icon} size={20} />}
-      <span>{children}</span>
+      {children != null && <span>{children}</span>}
       {busy && <span className="work-progress" aria-hidden="true" />}
     </button>
   );
