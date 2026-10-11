@@ -28,7 +28,7 @@ export default function CalendarSharePanel({ open, onClose, calendars }: { open:
   }
   return <WorkspaceSheet open={open} onClose={onClose} title="Share" titleIcon="share" presentation="center" focusInput={false} returnFocusSelector="[data-calendar-options-trigger]" className={styles.sheet}>
     <div className={styles.content}>
-      <p className={styles.intro}>Manage what you share and when people can book.</p>
+      <p className={styles.intro}>Manage what you share and when people can book time with you.</p>
       <div className={styles.tabs} role="tablist" aria-label="Calendar sharing">
         <motion.div className={styles.slider} aria-hidden="true" initial={false} animate={{x:section === "subscriptions" ? "0%" : "100%"}} transition={{duration:reduced ? 0 : .3,ease:[.22,.78,.18,1]}} />
         {sections.map((item, index) => <button key={item.id} type="button" role="tab" id={`${id}-${item.id}-tab`} aria-controls={`${id}-${item.id}-panel`} aria-selected={section === item.id} tabIndex={section === item.id ? 0 : -1} onClick={() => setSection(item.id)} onKeyDown={event => navigate(event, index)}>

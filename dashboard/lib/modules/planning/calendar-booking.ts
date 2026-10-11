@@ -5,7 +5,7 @@ import { mutatePlanningState, readPlanningState, normalizePlanningRecord } from 
 import { repeatBirthdays } from "./repeat-birthdays";
 import { effectiveEvent, type PlanningState } from "./types";
 import type { BirthdaySource } from "./observances";
-import type { BookingLink, BookingLinkView, BookingSlot, PublicBooking } from "./booking-types";
+import type { BookingLink, BookingLinkView, BookingSlot, PublicBooking, BookingEmailPreferences } from "./booking-types";
 import { bookingEmailConfig, queueBookingEmails } from "./booking-email";
 
 export class BookingError extends Error { constructor(message: string, public status = 400) { super(message); } }
@@ -40,6 +40,14 @@ function strictInstant(local: string, zone: string) {
   return Number(Temporal.PlainDateTime.from(local).toZonedDateTime(zone, { disambiguation: "reject" }).epochMilliseconds);
 }
 function fields(input: Record<string, unknown>, state: PlanningState) {
+  let emailPreferences: BookingEmailPreferences | undefined;
+  if (input.emailPreferences !== undefined) {
+    const value = input.emailPreferences as BookingEmailPreferences;
+    if (!value || typeof value !== "object" || typeof value.guestConfirmation !== "boolean" || typeof value.organizerNotification !== "boolean" || !Array.isArray(value.organizerEmails) || value.organizerEmails.length > 5) return fail("Choose valid email confirmation settings.");
+    const organizerEmails = [...new Set(value.organizerEmails.map(email => text(email, "notification email address", 254, true).toLowerCase()))];
+    if (organizerEmails.some(email => !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(email))) return fail("Enter valid notification email addresses.");
+    emailPreferences = { guestConfirmation: value.guestConfirmation, organizerNotification: value.organizerNotification, organizerEmails, guestMessage: text(value.guestMessage ?? "", "guest message", 1500) };
+  }
   const name = text(input.name, "booking title", 120, true), description = text(input.description ?? "", "description", 1500), location = text(input.location ?? "", "location", 500);
   const calendarId = text(input.calendarId, "destination calendar", 120, true);
   const active = new Set(state.calendars.filter(calendar => !calendar.archivedAt).map(calendar => calendar.id));
@@ -73,7 +81,7 @@ function fields(input: Record<string, unknown>, state: PlanningState) {
       if (strictInstant(end,timeZone) !== endMs) throw Error();
     } catch (error) { if (error instanceof BookingError) throw error; return fail("One of these times is ambiguous or skipped by daylight saving. Choose another time."); }
   }
-  return { name, description, location, calendarId, conflictCalendarIds, timeZone, durationMinutes, bufferMinutes, noticeHours, mode, from, through, weekdays, dayStart, dayEnd, manualStarts };
+  return { name, description, location, calendarId, conflictCalendarIds, timeZone, durationMinutes, bufferMinutes, noticeHours, mode, from, through, weekdays, dayStart, dayEnd, manualStarts, ...(emailPreferences ? { emailPreferences } : {}) };
 }
 export async function changeBookingLink(input: Record<string, unknown>) {
   signingSecret();
@@ -132,7 +140,7 @@ export async function publicBooking(token: string): Promise<PublicBooking> {
   if (!/^[a-f0-9-]{36}\.[a-f0-9]{64}$/.test(token)) return fail("This booking link is unavailable.",404);
   const state = await readPlanningState(), link = resolve(token, state);
   const birthdays = await repeatBirthdays(state.events);
-  return { name: link.name, description: link.description, location: link.location, timeZone: link.timeZone, durationMinutes: link.durationMinutes, slots: availableBookingSlots(link, state, birthdays), confirmationEmail: bookingEmailConfig().ready };
+  return { name: link.name, description: link.description, location: link.location, timeZone: link.timeZone, durationMinutes: link.durationMinutes, slots: availableBookingSlots(link, state, birthdays), confirmationEmail: bookingEmailConfig().ready && (link.emailPreferences?.guestConfirmation ?? true) };
 }
 export async function reserveBooking(token: string, input: Record<string, unknown>, ip: string) {
   const name = text(input.name, "name", 120, true), email = text(input.email, "email", 254, true).toLowerCase(), note = text(input.note ?? "", "note", 1500);
@@ -150,7 +158,7 @@ export async function reserveBooking(token: string, input: Record<string, unknow
       if (previous.fingerprint !== fingerprint || previous.linkId !== link.id) return fail("This request has already been used. Refresh before booking.", 409);
       const event = state.events.find(event => event.id === previous.eventId && !event.archivedAt);
       if (!event || event.source?.cancelled || event.overrides?.cancelled) return fail("This booking is no longer active. Contact the organizer.", 409);
-      return { state, result: { name: link.name, start: previous.start, end: previous.end, timeZone: link.timeZone, location: link.location, confirmationEmail: Boolean(previous.emails) } };
+      return { state, result: { name: link.name, start: previous.start, end: previous.end, timeZone: link.timeZone, location: link.location, confirmationEmail: Boolean(previous.emails && previous.emails.guest.status !== "cancelled") } };
     }
     const recent = data.receipts.filter(receipt => now - Date.parse(receipt.createdAt) < 86400000);
     if (recent.filter(receipt => receipt.emailHash === emailHash).length >= 5 || recent.filter(receipt => receipt.ipHash === ipHash && now - Date.parse(receipt.createdAt) < 3600000).length >= 10 || recent.filter(receipt => receipt.linkId === link.id && now - Date.parse(receipt.createdAt) < 3600000).length >= 60) return fail("Too many bookings. Please try again later or contact the organizer.", 429);
@@ -159,8 +167,8 @@ export async function reserveBooking(token: string, input: Record<string, unknow
     if (!slot) return fail("That time is no longer available. Please choose another time.", 409);
     const stamp = new Date(now).toISOString();
     const event = normalizePlanningRecord("events", { id: randomUUID(), title: `${link.name} — ${name}`, description: note, start: localFor(Date.parse(slot.start), link.timeZone), end: localFor(Date.parse(slot.end), link.timeZone), timeZone: link.timeZone, allDay: false, calendarId: link.calendarId, location: link.location, linkedRefs: [], participants: [{ name, email }], recurrence: "", exceptions: {}, reminderMinutes: 15, kind: "event", createdAt: stamp, updatedAt: stamp });
-    const emails = queueBookingEmails({ title: link.name, guestName: name, guestEmail: email, note, location: link.location, timeZone: link.timeZone });
+    const emails = queueBookingEmails({ title: link.name, guestName: name, guestEmail: email, note, location: link.location, timeZone: link.timeZone }, link.emailPreferences);
     const receipt = { id: requestId, linkId: link.id, eventId: event.id, fingerprint, ipHash, emailHash, createdAt: stamp, bufferMinutes: link.bufferMinutes, ...slot, emails };
-    return { state: { ...state, events: [...state.events, event], bookingData: { ...data, receipts: [...data.receipts, receipt] } }, result: { name: link.name, ...slot, timeZone: link.timeZone, location: link.location, confirmationEmail: Boolean(emails) } };
+    return { state: { ...state, events: [...state.events, event], bookingData: { ...data, receipts: [...data.receipts, receipt] } }, result: { name: link.name, ...slot, timeZone: link.timeZone, location: link.location, confirmationEmail: Boolean(emails && emails.guest.status !== "cancelled") } };
   });
 }

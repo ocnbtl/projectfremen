@@ -44,3 +44,52 @@
 @media(max-width:380px) {.grid {gap:6px;}.form .modes label {font-size:10px;padding:7px 5px;}.fieldLabel {font-size:11px;}}
 @media(prefers-reduced-motion:reduce) {.weekdays button {transition:none;}}
 .form input,.form textarea,.form :global(.app-select-trigger) {margin:0;}
+.disclosure {background:var(--surface,#fff);border-radius:10px;min-width:0;}
+.disclosure > button {display:flex;align-items:center;gap:8px;width:100%;min-height:42px;padding:10px;border:0;background:none;color:var(--text-primary);font:500 12px/1.4 var(--font-body);text-align:left;cursor:pointer;}
+.disclosure > button small {margin-left:auto;font-size:11px;color:var(--text-muted);}
+.disclosure > button svg {flex:none;transition:transform .28s cubic-bezier(.22,.78,.18,1);}
+.rotated {transform:rotate(180deg);}
+.disclosureBody {padding:2px 12px 12px;display:grid;gap:14px;}
+.disclosure button:focus-visible,.slotPlanner button:focus-visible {outline:2px solid var(--module-action);outline-offset:2px;}
+.slotPlanner {display:grid;gap:8px;min-width:0;background:var(--surface,#fff);padding:10px;border-radius:10px;}
+.monthHeading {display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.monthHeading strong {font-size:12px;}
+.monthHeading button {width:30px;min-height:30px;padding:0;}
+.slotCalendar {display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:3px;}
+.slotCalendar > span {text-align:center;font-size:10px;color:var(--text-muted);padding:2px;}
+.slotCalendar button {position:relative;min-height:30px;border:0;border-radius:7px;background:transparent;color:var(--text-primary);font:500 12px/1.3 var(--font-body);cursor:pointer;padding:4px 0 7px;}
+.slotCalendar button:disabled {opacity:.35;cursor:default;}
+.slotCalendar button[data-outside=true] {visibility:hidden;}
+.slotCalendar button[aria-pressed=true] {background:var(--module-action);color:white;opacity:1;}
+.slotCalendar i {position:absolute;bottom:3px;left:calc(50% - 2px);width:4px;height:4px;border-radius:50%;background:transparent;}
+.slotCalendar i[data-selected=true] {background:currentColor;}
+.slotHeading {display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;}
+.slotHeading span {color:var(--text-muted);font-size:10px;}
+.timeChoices {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:5px;max-height:160px;overflow:auto;padding:2px;}
+.timeChoices button {min-height:32px;padding:5px 2px;border:1px solid var(--module-border);border-radius:7px;background:var(--surface,#fff);color:var(--text-primary);font:500 11px/1.3 var(--font-body);cursor:pointer;transition:background .16s,color .16s;}
+.timeChoices button[aria-pressed=true] {background:var(--module-action);border-color:var(--module-action);color:white;}
+.timeChoices button:disabled {opacity:.4;cursor:default;}
+.customTime {display:flex;align-items:flex-end;gap:8px;}
+.customTime > div {flex:1;min-width:0;}
+.customTime > button {min-height:32px;padding:5px 9px;}
+.selectedTimes {display:flex;flex-wrap:wrap;gap:4px;max-height:90px;overflow:auto;}
+.selectedTimes button {min-height:26px;padding:3px 6px;font-size:10px;border:0;background:var(--module-quiet);gap:4px;}
+.selectedTimes button svg {width:12px;height:12px;}
+.slotNote {margin:0;font-size:11px!important;line-height:1.5;color:var(--text-muted);}
+.emailColumns {display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+.emailSection {display:flex;flex-direction:column;gap:9px;min-width:0;}
+.emailSection > button {align-self:flex-start;min-height:28px;padding:4px 7px;font-size:11px;}
+.form .emailToggle {display:flex;align-items:flex-start;gap:8px;font-size:13px;cursor:pointer;}
+.emailToggle input {width:16px;height:16px;margin:2px 0 0;flex:none;accent-color:var(--module-action);}
+.form .emailToggle > span {color:var(--text-primary);font-weight:600;}
+.emailToggle small {display:block;font-size:11px;line-height:1.5;font-weight:400;color:var(--text-muted);margin-top:3px;}
+.messageLabel {display:flex;flex-wrap:wrap;align-items:baseline;gap:4px;}
+.messageLabel small {color:var(--text-muted);font-size:10px;}
+.messageLabel textarea {flex-basis:100%;}
+.recipients {display:grid;gap:6px;}
+.recipients > div {display:flex;align-items:center;gap:5px;min-width:0;}
+.recipients input {flex:1;width:0;}
+.recipients button {width:30px;min-height:30px;padding:0;flex:none;}
+.timeChoices {max-height:200px;}
+@media(max-width:760px) {.emailColumns {grid-template-columns:1fr;gap:16px;}.slotCalendar button {min-height:34px;}.timeChoices button {min-height:36px;}}
+@media(prefers-reduced-motion:reduce) {.disclosure > button svg,.timeChoices button {transition:none;}}

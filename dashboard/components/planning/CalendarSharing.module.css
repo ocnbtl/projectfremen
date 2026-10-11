@@ -39,3 +39,17 @@
 .card {padding:12px;gap:6px;}
 .calendarList svg {flex:none;color:var(--module-icon);}
 .card .url input {width:100%;}
+.links[hidden],.links:empty {display:none;}
+.heading {align-items:flex-start;flex-wrap:nowrap;min-height:52px;}
+.heading > div {flex:1;min-width:0;}
+.heading > button {flex:none;}
+.heading p {max-width:540px;}
+.actions button {display:inline-flex;align-items:center;justify-content:center;gap:5px;line-height:1.3;margin:0;}
+.manage .actions {gap:6px;}
+.manage .actions button {min-height:30px;padding:5px 7px;font-size:11px;}
+.manage .actions button svg {width:14px;height:14px;flex:none;}
+.detailsColumns {display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+.detailChoices {display:grid;gap:5px;}
+.choice input[type=radio] {width:16px;height:16px;margin:0;accent-color:var(--module-action);flex:none;}
+.panel:has(form) .heading {min-height:0;}
+@media(max-width:600px) {.detailsColumns {grid-template-columns:1fr;gap:16px;}.heading {min-height:62px;}}

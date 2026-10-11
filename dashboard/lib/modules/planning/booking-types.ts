@@ -1,3 +1,7 @@
+export type BookingEmailPreferences = {
+  guestConfirmation: boolean; organizerNotification: boolean;
+  organizerEmails: string[]; guestMessage: string;
+};
 export type BookingLink = {
   id: string; keyVersion: string; name: string; description: string; location: string;
   calendarId: string; conflictCalendarIds: string[]; timeZone: string;
@@ -5,6 +9,7 @@ export type BookingLink = {
   mode: "manual" | "automatic"; from: string; through: string;
   weekdays: number[]; dayStart: string; dayEnd: string; manualStarts: string[];
   createdAt: string; updatedAt: string; revokedAt?: string;
+  emailPreferences?: BookingEmailPreferences;
 };
 export type BookingLinkView = Omit<BookingLink, "keyVersion"> & { path: string | null; bookingCount: number };
 export type BookingReceipt = {
@@ -18,7 +23,8 @@ export type BookingEmailJob = {
   lease?: string; leaseUntil?: string; providerId?: string; error?: string;
 };
 export type BookingEmails = {
-  version: 1; from: string; organizerEmail: string; title: string; guestName: string;
+  version: 1 | 2; from: string; organizerEmail: string; title: string; guestName: string;
+  organizerEmails?: string[]; guestMessage?: string;
   guestEmail: string; note: string; location: string; timeZone: string;
   guest: BookingEmailJob; organizer: BookingEmailJob;
 };

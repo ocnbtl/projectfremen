@@ -44,4 +44,7 @@
 .tabs button {transition:color .2s;}
 @media(max-width:600px) {.sheet:global(.work-sheet.work-sheet--center) {width:calc(100vw - 16px);}}
 .sheet :global(.work-sheet-header) {padding:12px 16px;}
-.content:has(form) .intro {display:none;}
+.sheet :global(.work-sheet-header) {border-bottom:0;}
+.pane {min-height:275px;}
+.pane > section {align-content:start;}
+.pane:has(form) {min-height:0;}

@@ -5,7 +5,7 @@ Object.assign(process.env,{FREMEN_DATA_DIR:directory,FREMEN_REQUIRE_SUPABASE:'fa
 require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,filename);
 const {changeBookingLink,publicBooking,reserveBooking}=require('../lib/modules/planning/calendar-booking.ts');
 const {readPlanningState,mutatePlanningState}=require('../lib/modules/planning/store.ts');
-const {bookingEmailConfig,bookingEmailPayload,bookingEmailSummary,deliverBookingEmail}=require('../lib/modules/planning/booking-email.ts');
+const {bookingEmailConfig,bookingEmailPayload,bookingEmailSummary,deliverBookingEmail,dispatchBookingEmails}=require('../lib/modules/planning/booking-email.ts');
 const calls=[];let behavior='ok';const accepted=new Map();
 global.fetch=async(url,init)=>{
   assert.equal(url,'https://api.resend.com/emails','No unexpected network calls');assert.equal(init.headers.Authorization,'Bearer synthetic-never-live');
@@ -49,6 +49,30 @@ async function update(id,fn){await mutatePlanningState(state=>{fn(state.bookingD
   const before=calls.length;await deliverBookingEmail(second.requestId,'guest',true);assert.equal((await getReceipt(second.requestId)).emails.guest.status,'review');assert.equal(calls.length,before,'Expired uncertain send requires review');
   await update(second.requestId,(r,state)=>{r.emails.organizer={status:'pending',attempts:0};state.events.find(e=>e.id===r.eventId).location='Changed place';});
   await deliverBookingEmail(second.requestId,'organizer');assert.equal((await getReceipt(second.requestId)).emails.organizer.status,'cancelled');assert.equal(calls.length,before);
+  // Per-link preferences are validated, private, and snapshotted for stable retries.
+  const prefs={guestConfirmation:false,organizerNotification:true,organizerEmails:['service@example.test','second-owner@example.test'],guestMessage:'Bring <ID> & arrive early.'};
+  for(const invalid of [{...prefs,organizerEmails:['bad\r\nBcc: other@example.test']},{...prefs,guestConfirmation:'yes'},{...prefs,organizerEmails:Array(6).fill('a@example.test')},{...prefs,guestMessage:'x'.repeat(1501)}]) {
+    await assert.rejects(changeBookingLink({...link,operation:'update',expectedUpdatedAt:link.updatedAt,emailPreferences:invalid}));
+  }
+  let configured=await changeBookingLink({...link,operation:'update',expectedUpdatedAt:link.updatedAt,emailPreferences:prefs});
+  assert.deepEqual(configured.emailPreferences,prefs);
+  const privatePub=await publicBooking(token);assert.equal(privatePub.confirmationEmail,false);assert.ok(!JSON.stringify(privatePub).includes('service@example.test'));assert.ok(!JSON.stringify(privatePub).includes('Bring'));
+  const fourth={...input,requestId:randomUUID(),start:pub.slots[3].start,email:'fourth@example.test'};
+  assert.equal((await reserveBooking(token,fourth,'192.0.2.4')).confirmationEmail,false);
+  assert.equal((await reserveBooking(token,fourth,'192.0.2.4')).confirmationEmail,false);
+  const four=await getReceipt(fourth.requestId);assert.equal(four.emails.version,2);assert.equal(four.emails.guest.status,'cancelled');
+  const callCount=calls.length;await dispatchBookingEmails(fourth.requestId);assert.equal(calls.length,callCount+1,'Organizer-only dispatch still sends, guest remains disabled');assert.deepEqual(calls.at(-1).body.to,prefs.organizerEmails);
+  configured=await changeBookingLink({...configured,operation:'update',expectedUpdatedAt:configured.updatedAt,emailPreferences:{...prefs,guestConfirmation:true,organizerNotification:false}});
+  const fifth={...input,requestId:randomUUID(),start:pub.slots[4].start,email:'fifth@example.test'};assert.equal((await reserveBooking(token,fifth,'192.0.2.5')).confirmationEmail,true);
+  const five=await getReceipt(fifth.requestId),customPayload=bookingEmailPayload(five,'guest');assert.equal(five.emails.organizer.status,'cancelled');assert.equal(customPayload.reply_to,'service@example.test');assert.ok(customPayload.html.includes('Bring &lt;ID&gt; &amp; arrive early.'));assert.ok(customPayload.text.includes('Starts:'));assert.ok(!customPayload.text.includes('second-owner@example.test'));
+  await dispatchBookingEmails(fifth.requestId);assert.equal(calls.length,callCount+2,'Guest-only sends exactly one message');
+  configured=await changeBookingLink({...configured,operation:'update',expectedUpdatedAt:configured.updatedAt,emailPreferences:{...prefs,guestConfirmation:false,organizerNotification:false,guestMessage:'Changed'}});
+  assert.deepEqual(bookingEmailPayload(await getReceipt(fifth.requestId),'guest'),customPayload,'Later edits do not change queued payload');
+  const sixth={...input,requestId:randomUUID(),start:pub.slots[5].start,email:'sixth@example.test'};assert.equal((await reserveBooking(token,sixth,'192.0.2.6')).confirmationEmail,false);assert.equal((await getReceipt(sixth.requestId)).emails,undefined);
+  await dispatchBookingEmails(sixth.requestId);assert.equal(calls.length,callCount+2);
+  const legacyUpdate={...configured,operation:'update',expectedUpdatedAt:configured.updatedAt};delete legacyUpdate.emailPreferences;
+  configured=await changeBookingLink(legacyUpdate);assert.equal(configured.emailPreferences.guestMessage,'Changed','Older clients preserve preferences');
+  const legacy=structuredClone(receipt);legacy.emails.version=1;const legacyPayload=bookingEmailPayload(legacy,'guest');legacy.emails.guestMessage='Ignored on v1';legacy.emails.organizerEmails=['ignored@example.test'];assert.deepEqual(bookingEmailPayload(legacy,'guest'),legacyPayload,'Version 1 retry payload stays unchanged');
   process.env.RESEND_API_KEY='';assert.equal(bookingEmailConfig().ready,false);assert.equal((await publicBooking(token)).confirmationEmail,false);
   const third={...input,requestId:randomUUID(),start:pub.slots[2].start,email:'third@example.test'};assert.equal((await reserveBooking(token,third,'192.0.2.3')).confirmationEmail,false);assert.equal((await getReceipt(third.requestId)).emails,undefined);
   assert.ok(bookingEmailSummary(await readPlanningState()).missing.includes('RESEND_API_KEY'));

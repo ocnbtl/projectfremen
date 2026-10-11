@@ -24,7 +24,7 @@ export async function POST(request: Request, context: { params: Promise<{ token:
     try { input = JSON.parse(body); } catch { return json({ error: "Invalid submission." }, 400); }
     if (!input || typeof input !== "object" || Array.isArray(input)) return json({ error: "Invalid submission." }, 400);
     const booking = await reserveBooking((await context.params).token, input, getRequestIp(request));
-    if (booking.confirmationEmail) after(async () => { try { await dispatchBookingEmails(String(input.requestId)); } catch { console.error("Booking email delivery is pending; reservation is confirmed."); } });
+    after(async () => { try { await dispatchBookingEmails(String(input.requestId)); } catch { console.error("Booking email delivery is pending; reservation is confirmed."); } });
     return json({ booking });
   } catch (error) { return failure(error); }
 }
