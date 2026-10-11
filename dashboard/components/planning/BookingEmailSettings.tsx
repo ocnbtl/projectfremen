@@ -2,9 +2,11 @@
 import type { BookingEmailPreferences } from "../../lib/modules/planning/booking-types";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import BookingDisclosure from "./BookingDisclosure";
+import BookingEmailPreview from "./BookingEmailPreview";
+import type { BookingEmailPreviewDetails } from "../../lib/modules/planning/booking-email-preview";
 import styles from "./CalendarBookings.module.css";
 
-export default function BookingEmailSettings({ value, onChange, ready }: { value: BookingEmailPreferences; onChange: (value: BookingEmailPreferences) => void; ready: boolean }) {
+export default function BookingEmailSettings({ value, onChange, ready, details, sender, defaultRecipient }: { value: BookingEmailPreferences; onChange: (value: BookingEmailPreferences) => void; ready: boolean; details: BookingEmailPreviewDetails; sender?: string; defaultRecipient?: string }) {
   const summary = [value.guestConfirmation && "Guests", value.organizerNotification && "You"].filter(Boolean).join(" + ") || "Off";
   return <BookingDisclosure title="Confirmation emails" summary={summary} icon="email">
     {!ready && <p className={styles.slotNote}>Email delivery needs setup. These preferences will apply once a sender is connected.</p>}
@@ -21,5 +23,6 @@ export default function BookingEmailSettings({ value, onChange, ready }: { value
         <p className={styles.slotNote}>Up to 5 recipients. The first is also your reply address, even when notifications are off. Changes apply to new bookings only.</p>
       </div>
     </div>
+    <BookingEmailPreview details={details} preferences={value} sender={sender} defaultRecipient={defaultRecipient} ready={ready} />
   </BookingDisclosure>;
 }

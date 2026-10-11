@@ -6,6 +6,8 @@ require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(
 const {changeBookingLink,publicBooking,reserveBooking}=require('../lib/modules/planning/calendar-booking.ts');
 const {readPlanningState,mutatePlanningState}=require('../lib/modules/planning/store.ts');
 const {bookingEmailConfig,bookingEmailPayload,bookingEmailSummary,deliverBookingEmail,dispatchBookingEmails}=require('../lib/modules/planning/booking-email.ts');
+const {previewBookingEmail}=require('../lib/modules/planning/booking-email-preview.ts');
+assert.equal(bookingEmailPayload,require('../lib/modules/planning/booking-email-template.ts').bookingEmailPayload,'Preview and delivery share one renderer');
 const calls=[];let behavior='ok';const accepted=new Map();
 global.fetch=async(url,init)=>{
   assert.equal(url,'https://api.resend.com/emails','No unexpected network calls');assert.equal(init.headers.Authorization,'Bearer synthetic-never-live');
@@ -51,6 +53,14 @@ async function update(id,fn){await mutatePlanningState(state=>{fn(state.bookingD
   await deliverBookingEmail(second.requestId,'organizer');assert.equal((await getReceipt(second.requestId)).emails.organizer.status,'cancelled');assert.equal(calls.length,before);
   // Per-link preferences are validated, private, and snapshotted for stable retries.
   const prefs={guestConfirmation:false,organizerNotification:true,organizerEmails:['service@example.test','second-owner@example.test'],guestMessage:'Bring <ID> & arrive early.'};
+  const previewGuest=previewBookingEmail(link,prefs,'guest','Unigentamos <bookings@alerts.example.test>');
+  const sample=structuredClone(receipt);Object.assign(sample.emails,{version:2,guestName:'Alex Morgan',guestEmail:'alex@example.com',note:'Looking forward to our appointment.',organizerEmail:prefs.organizerEmails[0],organizerEmails:prefs.organizerEmails,guestMessage:prefs.guestMessage});
+  assert.deepEqual(previewGuest,bookingEmailPayload(sample,'guest'),'Preview HTML, subject and envelope exactly match a delivered sample');
+  const previewOwner=previewBookingEmail(link,prefs,'organizer','Unigentamos <bookings@alerts.example.test>');assert.deepEqual(previewOwner,bookingEmailPayload(sample,'organizer'));assert.ok(!previewOwner.text.includes('Bring <ID>'));assert.deepEqual(previewOwner.to,prefs.organizerEmails);
+  assert.ok(previewGuest.html.includes('Bring &lt;ID&gt; &amp; arrive early.'));assert.ok(!previewGuest.html.includes('<ID>'));
+  const editedPreview=previewBookingEmail({...link,name:'New title',location:'Online',mode:'manual',manualStarts:['2030-01-07T23:45'],durationMinutes:30},{...prefs,guestMessage:'Updated message'},'guest');assert.ok(editedPreview.subject.endsWith('New title'));assert.ok(editedPreview.text.includes('Online'));assert.ok(editedPreview.text.includes('Updated message'));assert.ok(editedPreview.text.includes('January 8, 2030 at 12:15 AM EST'));
+  assert.equal(previewBookingEmail({...link,from:'invalid'},prefs,'guest'),null);assert.equal(previewBookingEmail({...link,timeZone:'invalid'},prefs,'guest'),null);
+  assert.equal(calls.length,before,'Generating previews never sends email');
   for(const invalid of [{...prefs,organizerEmails:['bad\r\nBcc: other@example.test']},{...prefs,guestConfirmation:'yes'},{...prefs,organizerEmails:Array(6).fill('a@example.test')},{...prefs,guestMessage:'x'.repeat(1501)}]) {
     await assert.rejects(changeBookingLink({...link,operation:'update',expectedUpdatedAt:link.updatedAt,emailPreferences:invalid}));
   }

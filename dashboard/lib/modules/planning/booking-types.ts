@@ -29,7 +29,7 @@ export type BookingEmails = {
   guest: BookingEmailJob; organizer: BookingEmailJob;
 };
 export type BookingEmailSummary = {
-  ready: boolean; organizerEmail?: string; missing: string[]; pending: number;
+  ready: boolean; from?: string; organizerEmail?: string; missing: string[]; pending: number;
   accepted: number; failed: number; review: number;
 };
 export type BookingData = { links: BookingLink[]; receipts: BookingReceipt[] };
