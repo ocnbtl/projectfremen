@@ -9,13 +9,15 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import shared from "./CalendarSharing.module.css";
 import styles from "./CalendarBookings.module.css";
 type Draft = Omit<BookingLinkView, "id" | "path" | "createdAt" | "updatedAt" | "bookingCount"> & { id?: string; expectedUpdatedAt?: string };
-export default function CalendarBookings({ calendars }: { calendars: Calendar[] }) {
+export default function CalendarBookings({ calendars, onSummary }: { calendars: Calendar[]; onSummary?: (summary: {active:number;total:number}) => void }) {
   const active = calendars.filter(calendar => !calendar.archivedAt);
   const [links, setLinks] = useState<BookingLinkView[]>([]), [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
   const [origin, setOrigin] = useState(""), [manual, setManual] = useState("");
   const [emails, setEmails] = useState<BookingEmailSummary | null>(null);
   const [confirm, setConfirm] = useState<{ id: string; operation: "revoke" | "regenerate" } | null>(null);
+  const status = (link: BookingLinkView) => link.revokedAt ? "Closed" : link.through < localDate(new Date(), link.timeZone) ? "Ended" : "Active";
+  useEffect(() => { if (!loading && !error) onSummary?.({active:links.filter(link => !link.revokedAt && link.through >= localDate(new Date(), link.timeZone)).length,total:links.length}); }, [links, loading, error, onSummary]);
   async function load() {
     setLoading(true);
     try { const response = await fetch("/api/planning/bookings", { cache: "no-store" }); const body = await response.json(); if (!response.ok) throw new Error(body.error); setLinks(body.links); setEmails(body.emails || null); setError(""); }
@@ -52,9 +54,9 @@ export default function CalendarBookings({ calendars }: { calendars: Calendar[] 
     finally { setBusy(false); }
   }
   return <section className={shared.panel} aria-label="Booking links">
-    <div className={shared.heading}><div><h3><UnigentamosIcon role="calendar" size={18} />Take bookings</h3><p>Let people choose a time and book directly into your calendar.</p></div><Button icon="plus" intent="primary" disabled={loading || busy || !active.length} onClick={create}>Create booking link</Button></div>
-    <p className={shared.note}>Choose specific times or automatically offer free time. Bookings confirm immediately; guests provide a name, email, and optional note. Your other events stay private.</p>
-    {emails && <div className={styles.emailStatus} aria-label="Booking emails"><div><strong>{emails.ready ? "Confirmation emails on" : "Email setup needed"}</strong><p className={shared.note}>{emails.ready ? `Guests receive their booking details. Your notifications go to ${emails.organizerEmail}.` : "Connect a verified sender to email guests and receive booking notifications. Bookings still confirm on screen."}</p>{!!(emails.pending + emails.failed + emails.review) && <p className={shared.note}>{emails.pending} pending · {emails.failed} need attention{emails.review ? ` · ${emails.review} need delivery review` : ""}. Confirmed bookings are safe.</p>}{emails.review > 0 && <p className={shared.note}>Check these messages in Resend before sending again to avoid duplicates.</p>}</div>{emails.ready && !!(emails.pending + emails.failed) && <Button disabled={busy} onClick={() => void retryEmails()}>Retry emails</Button>}</div>}
+    <div className={shared.heading}><div><h3><UnigentamosIcon role="calendar" size={18} />Take bookings</h3><p>Offer available times, with instant confirmation.</p></div><Button icon="plus" intent="primary" disabled={loading || busy || !active.length} onClick={create} aria-label="Create booking link">New link</Button></div>
+
+
     {error && <div role="alert" className={shared.feedback}>{error} <Button disabled={busy} onClick={() => void load()}>Refresh booking links</Button></div>}
     {notice && <p role="status" className={shared.feedback}>{notice}</p>}{loading && <p role="status">Loading booking links…</p>}
     {draft && <form className={`${shared.form} ${styles.form}`} onSubmit={event => { event.preventDefault(); void save({ ...draft, operation: draft.id ? "update" : "create" }); }}>
@@ -71,11 +73,15 @@ export default function CalendarBookings({ calendars }: { calendars: Calendar[] 
       <p className={shared.note}>Guests see confirmation on the booking page{emails?.ready ? " and receive an email with their appointment details" : ""}. You can edit or remove appointments in Calendar; contact the guest directly about later changes.</p>
       <div className={shared.actions}><Button intent="primary" type="submit" busy={busy} disabled={draft.mode === "manual" && !draft.manualStarts.length}>{draft.id ? "Save booking link" : "Create link"}</Button><Button disabled={busy} onClick={() => setDraft(null)}>Cancel</Button></div>
     </form>}
-    <div className={shared.links}>{links.map(link => <article className={shared.card} key={link.id} aria-label={`${link.name} booking link`}>
-      <div className={shared.cardHeading}><strong>{link.name}</strong><span className={shared.badge}>{link.revokedAt ? "Closed" : "Active"}</span></div><p className={shared.note}>{link.mode === "manual" ? "Specific times" : "Open time"} · {link.durationMinutes} min · {calendars.find(calendar => calendar.id === link.calendarId)?.name || "Removed calendar"}<br />{link.from} – {link.through} · {link.timeZone}<br />{link.bookingCount} booking{link.bookingCount === 1 ? "" : "s"} received</p>
-      {link.path && <><div className={shared.url}><input aria-label={`${link.name} booking URL`} readOnly value={origin+link.path} onFocus={event => event.target.select()} /><Button icon="copy" onClick={() => void copy(link)}>Copy link</Button></div><a className={styles.preview} href={link.path} target="_blank" rel="noreferrer">Preview booking page ↗</a></>}
+    {!loading && !error && !links.length && !draft && <p className={shared.empty}>No booking links yet. Offer your open time or choose specific slots.</p>}
+    <div className={shared.links}>{[...links].sort((a,b) => Number(status(a) !== "Active") - Number(status(b) !== "Active")).map(link => <article className={shared.card} key={link.id} aria-label={`${link.name} booking link`}>
+      <div className={shared.cardHeading}><strong>{link.name}</strong><span className={shared.badge} data-inactive={status(link) !== "Active"}>{status(link)}</span>{link.path && <Button icon="copy" onClick={() => void copy(link)}>Copy link</Button>}</div><div className={shared.calendarList}><span><i className={shared.dot} style={{backgroundColor:calendars.find(calendar => calendar.id === link.calendarId)?.color || "#999"}} />{calendars.find(calendar => calendar.id === link.calendarId)?.name || "Removed calendar"}</span><span>{link.durationMinutes} min · {link.mode === "manual" ? "Specific times" : "Open time"}</span><span>{link.bookingCount} booked</span></div><p className={shared.note}>{link.from} – {link.through} · {link.timeZone.replaceAll("_", " ")}</p>
+      <details className={shared.manage}><summary>Availability &amp; link settings</summary>
+      {link.path && <><div className={shared.url}><input aria-label={`${link.name} booking URL`} readOnly value={origin+link.path} onFocus={event => event.target.select()} /><Button icon="copy" onClick={() => void copy(link)}>Copy link</Button></div><a className={styles.preview} href={link.path} target="_blank" rel="noreferrer"><UnigentamosIcon role="open" size={14} /> Preview booking page</a></>}
       <div className={shared.actions}><Button disabled={busy} onClick={() => { setDraft({ ...link, expectedUpdatedAt: link.updatedAt, conflictCalendarIds: link.conflictCalendarIds.filter(id => active.some(calendar => calendar.id === id)) }); setConfirm(null); }}>Edit availability</Button><Button disabled={busy} onClick={() => setConfirm({ id: link.id, operation: "regenerate" })}>Replace link</Button>{!link.revokedAt && <Button disabled={busy} onClick={() => setConfirm({ id: link.id, operation: "revoke" })}>Close bookings</Button>}</div>
       {confirm?.id === link.id && <div className={shared.confirm}><p>{confirm.operation === "revoke" ? "Close this booking link?" : "Replace this booking URL?"} The old URL will stop accepting bookings. Existing appointments will stay on your calendar.</p><div className={shared.actions}><Button busy={busy} onClick={() => void save({ ...confirm, expectedUpdatedAt: link.updatedAt })}>Confirm</Button><Button disabled={busy} onClick={() => setConfirm(null)}>Cancel</Button></div></div>}
+    </details>
     </article>)}</div>
+    {emails && <div className={styles.emailStatus} aria-label="Booking emails"><div><strong>{emails.ready ? "Confirmation emails on" : "Email setup needed"}</strong><p className={shared.note}>{emails.ready ? `Guests receive their booking details. Your notifications go to ${emails.organizerEmail}.` : "Connect a verified sender to email guests and receive booking notifications. Bookings still confirm on screen."}</p>{!!(emails.pending + emails.failed + emails.review) && <p className={shared.note}>{emails.pending} pending · {emails.failed} need attention{emails.review ? ` · ${emails.review} need delivery review` : ""}. Confirmed bookings are safe.</p>}{emails.review > 0 && <p className={shared.note}>Check these messages in Resend before sending again to avoid duplicates.</p>}</div>{emails.ready && !!(emails.pending + emails.failed) && <Button disabled={busy} onClick={() => void retryEmails()}>Retry emails</Button>}</div>}
   </section>;
 }

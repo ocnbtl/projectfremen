@@ -31,3 +31,9 @@
 @media(prefers-reduced-motion:reduce) {.sheet:global(.work-sheet.work-sheet--center),.pane:not([hidden]) {animation:none;}.tabs button {transition:none;}}
 :global(html[data-product-motion="reduce"]) .pane:not([hidden]) {animation:none;}
 :global(html[data-product-motion="reduce"]) .tabs button {transition:none;}
+.sheet :global(.work-sheet-body) {padding:16px 18px;}
+.content {gap:14px;}
+.tabs button {padding:10px 12px;gap:9px;}
+.pane > section {gap:12px;}
+.pane h3 {font-size:15px;}
+@media(max-width:600px) {.sheet :global(.work-sheet-body) {padding:12px;}.tabs button {padding:9px 7px;}.content {gap:12px;}}

@@ -2759,3 +2759,13 @@
  .calendarSettingsForm .importSection h3 {font-size:15px;}
  .settingsSheet :global(.work-sheet-header) h2 {font-size:18px;}
 }
+/* A single geometry transition keeps glyphs crisp while the selected label opens. */
+@media (min-width:761px) {
+ .viewToggle {position:relative;}
+ .viewToggle button {box-sizing:border-box;flex:none;gap:0;justify-content:flex-start;overflow:hidden;}
+ .viewToggle button > svg {flex:none;}
+ .viewToggleLabel {display:block;flex:none;overflow:hidden;}
+ .viewToggleLabel > span {display:block;width:max-content;}
+ .viewToggleIndicator {inset:3px auto 3px 0;pointer-events:none;}
+}
+@media (min-width:761px) and (max-width:1599px) {.viewToggleIndicator {top:2px;bottom:2px;}}

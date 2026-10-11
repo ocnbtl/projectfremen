@@ -110,7 +110,9 @@ export default function LandingPointer({ active }: { active: boolean }) {
       nodes.forEach((node, index) => {
         copyStyle(getComputedStyle(sources[index]), node);
         node.removeAttribute('id');
-        node.removeAttribute('href');
+        // SVG <use> needs its sprite reference to remain visible in the
+        // inverted cursor copy. Only links lose their navigation target.
+        if (!(node instanceof SVGUseElement)) node.removeAttribute('href');
         node.removeAttribute('name');
         node.setAttribute('tabindex', '-1');
       });

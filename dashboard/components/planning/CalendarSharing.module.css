@@ -19,3 +19,19 @@
 @keyframes appear{from{opacity:0;transform:translateY(-3px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:600px){.panel{padding:12px;gap:10px}.form,.card{padding:10px}.heading{align-items:flex-start}.choices{gap:8px 12px}.choice{font-size:12px}.url{gap:5px}.url button{padding:6px 8px}}
 @media(prefers-reduced-motion:reduce){.form{animation:none}}
+/* Links lead; management stays one deliberate step away. */
+.cardHeading {flex-wrap:nowrap;justify-content:flex-start;gap:8px;}
+.cardHeading > strong {min-width:0;flex:1;font-size:14px;overflow-wrap:anywhere;}
+.cardHeading button {min-height:32px;padding:5px 8px;font-size:12px;flex:none;}
+.cardHeading button svg {width:16px;height:16px;}
+.badge {white-space:nowrap;display:inline-flex;align-items:center;gap:5px;}
+.badge::before {content:"";width:5px;height:5px;border-radius:50%;background:currentColor;}
+.badge[data-inactive=true] {color:var(--text-muted);background:var(--surface-subtle,#f3f3f5);}
+.calendarList {display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--text-secondary);}
+.calendarList > span {display:inline-flex;align-items:center;gap:6px;}
+.card .note {margin:0;}
+.manage {font-size:12px;color:var(--text-secondary);}
+.manage > summary {cursor:pointer;width:fit-content;padding:4px 0;color:var(--module-icon);}
+.manage > :not(summary) {margin-top:10px;}
+.empty {margin:0;padding:20px 14px;background:var(--module-quiet);border-radius:12px;font-size:13px;color:var(--text-secondary);line-height:1.5;}
+@media(max-width:600px) {.cardHeading > strong {font-size:13px;}.cardHeading {gap:6px;}.badge {font-size:10px;padding:3px 6px;}.heading {gap:10px;}.heading > div {flex:1;min-width:140px;}.card {gap:8px;padding:12px;}}

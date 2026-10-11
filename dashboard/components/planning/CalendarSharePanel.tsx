@@ -15,6 +15,8 @@ const sections = [
 export default function CalendarSharePanel({ open, onClose, calendars }: { open: boolean; onClose: () => void; calendars: Calendar[] }) {
   const [section, setSection] = useState<(typeof sections)[number]["id"]>("subscriptions");
   const id = useId();
+  const [subscriptions, setSubscriptions] = useState<{active:number;total:number} | null>(null);
+  const [bookings, setBookings] = useState<{active:number;total:number} | null>(null);
   function navigate(event: KeyboardEvent<HTMLButtonElement>, index: number) {
     const next = event.key === "ArrowRight" ? (index + 1) % sections.length : event.key === "ArrowLeft" ? (index + sections.length - 1) % sections.length : event.key === "Home" ? 0 : event.key === "End" ? sections.length - 1 : undefined;
     if (next === undefined) return;
@@ -23,14 +25,14 @@ export default function CalendarSharePanel({ open, onClose, calendars }: { open:
   }
   return <WorkspaceSheet open={open} onClose={onClose} title="Share" titleIcon="share" presentation="center" focusInput={false} returnFocusSelector="[data-calendar-options-trigger]" className={styles.sheet}>
     <div className={styles.content}>
-      <p className={styles.intro}>Keep another calendar in sync, or let people book a time with you.</p>
+      <p className={styles.intro}>Manage what you share and when people can book.</p>
       <div className={styles.tabs} role="tablist" aria-label="Calendar sharing">
         {sections.map((item, index) => <button key={item.id} type="button" role="tab" id={`${id}-${item.id}-tab`} aria-controls={`${id}-${item.id}-panel`} aria-selected={section === item.id} tabIndex={section === item.id ? 0 : -1} onClick={() => setSection(item.id)} onKeyDown={event => navigate(event, index)}>
-          <UnigentamosIcon role={item.icon} size={20} /><span><strong>{item.label}</strong><small>{item.detail}</small></span>
+          <UnigentamosIcon role={item.icon} size={20} /><span><strong>{item.label}</strong><small>{(item.id === "subscriptions" ? subscriptions : bookings) ? `${(item.id === "subscriptions" ? subscriptions : bookings)!.active} active` : item.detail}</small></span>
         </button>)}
       </div>
-      <div role="tabpanel" id={`${id}-subscriptions-panel`} aria-labelledby={`${id}-subscriptions-tab`} hidden={section !== "subscriptions"} className={styles.pane}><CalendarSharing calendars={calendars} /></div>
-      <div role="tabpanel" id={`${id}-bookings-panel`} aria-labelledby={`${id}-bookings-tab`} hidden={section !== "bookings"} className={styles.pane}><CalendarBookings calendars={calendars} /></div>
+      <div role="tabpanel" id={`${id}-subscriptions-panel`} aria-labelledby={`${id}-subscriptions-tab`} hidden={section !== "subscriptions"} className={styles.pane}><CalendarSharing calendars={calendars} onSummary={setSubscriptions} /></div>
+      <div role="tabpanel" id={`${id}-bookings-panel`} aria-labelledby={`${id}-bookings-tab`} hidden={section !== "bookings"} className={styles.pane}><CalendarBookings calendars={calendars} onSummary={setBookings} /></div>
     </div>
   </WorkspaceSheet>;
 }

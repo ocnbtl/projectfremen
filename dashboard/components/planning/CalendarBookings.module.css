@@ -5,3 +5,6 @@
 .emailStatus strong { font-size: 13px; }
 .emailStatus p { overflow-wrap: anywhere; margin: 5px 0 0; }
 @media (max-width: 480px) { .emailStatus { align-items: flex-start; flex-direction: column; } }
+.preview {display:inline-flex;align-items:center;gap:5px;}
+.emailStatus {padding:10px 12px;background:var(--module-quiet);border:0;}
+.emailStatus strong {font-size:12px;}
