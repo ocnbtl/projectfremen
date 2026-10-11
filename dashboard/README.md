@@ -111,6 +111,18 @@ Notes:
 
 ## Notes
 
+### Calendar subscription sharing
+
+Calendar → Calendars → Share calendars creates a read-only HTTPS iCalendar feed for one or more explicitly selected calendars. Event titles are shared by default; locations/addresses and descriptions are opt-in. Unchecking titles switches to Busy only and clears the other detail permissions. Linked records, attendees, and reminder alarms are never exported. Calendar visibility on the user's screen does not grant or remove sharing access.
+
+- Management: authenticated, CSRF-protected `GET/POST /api/planning/shares`, with optimistic concurrency on updates. Definitions persist through the existing atomic file-store in `calendar-shares.json` (Supabase `app_state` in production).
+- Subscription: `GET /api/calendar-feeds/<signed-token>.ics`. The URL is a bearer credential. Do not paste it into logs, issue trackers, or public analytics. Signatures use a domain-separated HMAC with `ADMIN_SESSION_SECRET`, falling back to `ADMIN_PASSWORD`; keep that secret stable across deployments. Changing the signing secret invalidates existing links. Never expose the stored key version through management responses.
+- Revocation is checked on every request; responses are not cached at the origin/CDN. Regeneration changes the token and invalidates the previous URL. Subscribers may retain previously downloaded events after revocation.
+- Feeds publish the previous 366 days and next 732 days as individual VEVENT occurrences, using the same recurrence/exception and birthday-anchor calculations as the calendar. Timed events use UTC; all-day events use exclusive end dates. Stable UIDs preserve updates to individual events and moved recurrence exceptions. Cancelled/archived events disappear from the next feed snapshot. A receiving app controls when it refreshes and reconciles that snapshot.
+- Only stored events in the selected calendars are included. Separate birthday, holiday, and custom-date overlays are excluded. Imported calendars expose their latest saved state; this endpoint does not trigger provider refreshes. A feed over 10,000 occurrences or 5 MB fails rather than silently truncating.
+- In Apolosign: phone app menu → My Family → calendar section + → Subscribe via URL. This is one-way subscription; Apolosign changes do not write back. See the [official subscription instructions](https://support.apolosign.com/hc/en-us/articles/54620280289817-How-to-Sync-Refresh-External-Calendars-in-Apolosign).
+- Regression checks: `npm run test:calendar-sharing` uses synthetic data and a temporary store to cover scope/privacy, token rotation/revocation, stale writes, UTF-8 folding/escaping, UTC/DST, recurring exceptions, all-day dates, and stable event identity. Browser/API checks should additionally exercise unauthorized management, CSRF rejection, mobile geometry, copy, anonymous feed fetches, and persistence after reload. Do not use production events as test fixtures.
+
 1. `GITHUB_TOKEN` is optional but recommended to avoid rate limits during docs sync.
 2. Without Supabase config, local development falls back to filesystem persistence.
 3. Sentry KPI sync currently targets `pngwn` and `Diyesu Decor` and requires the `SENTRY_*` env vars.
