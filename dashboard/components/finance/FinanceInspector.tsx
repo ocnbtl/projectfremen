@@ -114,7 +114,7 @@ function financeDecisionSource(
 }
 
 function CloseButton({ onClose }: { onClose: () => void }) {
-  return <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance inspector"><Icon name="X" /></button>;
+  return <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance inspector" data-icon-button="standard"><Icon name="X" /></button>;
 }
 
 type OperationSelection = { kind: FinanceRecordKind; id: string };
@@ -317,7 +317,7 @@ export default function FinanceInspector({
         activeTab={safeTab}
         onTabChange={(tab) => onTabChange(tab as FinanceTab)}
         ariaLabel={`${objectTitle} details`}
-      />{accountSelection && <div className="finance-account-tab-actions">{[{op:"edit" as const,icon:"edit",label:"Edit account properties"},{op:"transaction" as const,icon:"plus",label:"Add transaction"},{op:"archive" as const,icon:"archive",label:"Archive account"}].map(action=><button key={action.op} type="button" title={action.label} aria-label={action.label} onClick={()=>onOperation(action.op,accountSelection)}><UnigentamosIcon role={action.icon} size={18}/></button>)}</div>}</div>
+      />{accountSelection && <div className="finance-account-tab-actions">{[{op:"edit" as const,icon:"edit",label:"Edit account properties"},{op:"transaction" as const,icon:"plus",label:"Add transaction"},{op:"archive" as const,icon:"archive",label:"Archive account"}].map(action=><button key={action.op} type="button" title={action.label} aria-label={action.label} onClick={()=>onOperation(action.op,accountSelection)} data-icon-button="standard"><UnigentamosIcon role={action.icon} size={18}/></button>)}</div>}</div>
 
       {transaction && (
         <div className={styles.inspectorPanel}>

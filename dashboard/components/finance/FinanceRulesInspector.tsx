@@ -105,7 +105,7 @@ export default function FinanceRulesInspector({
           metadata={`${rule.conditions.length} conditions · ${rule.actions.length} actions · ${rule.tests.length} deterministic tests`}
         />
       )}
-      actions={<button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance rule inspector"><Icon name="X" /></button>}
+      actions={<button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance rule inspector" data-icon-button="standard"><Icon name="X" /></button>}
       footer={(
         <div className={styles.inspectorFooter}>
           <QuickActionBar

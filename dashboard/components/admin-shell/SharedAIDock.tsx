@@ -367,7 +367,7 @@ function SharedAIDockSurface({
                 <span className="shared-ai-dock__connection-state"><i aria-hidden="true" />Not connected</span>
               </div>
             </div>
-            <button ref={closeRef} type="button" onClick={() => onOpenChange(false)} aria-label="Close AI assistant">
+            <button ref={closeRef} type="button" onClick={() => onOpenChange(false)} aria-label="Close AI assistant" data-icon-button="standard">
               <UnigentamosIcon role="close" size={20} />
             </button>
           </header>
@@ -410,7 +410,7 @@ function SharedAIDockSurface({
             <label htmlFor={promptId}>Ask about this workspace</label>
             <div>
               <textarea id={promptId} rows={2} value={draft} onChange={(event) => setDraft(event.target.value)} placeholder="Draft a prompt while disconnected…" />
-              <button type="button" disabled title="AI assistant is disconnected" aria-label="Send message">
+              <button type="button" disabled title="AI assistant is disconnected" aria-label="Send message" data-icon-button="standard">
                 <UnigentamosIcon role="send" size={20} />
               </button>
             </div>

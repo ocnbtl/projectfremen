@@ -338,7 +338,7 @@ export default function PeopleProfilePhotoDialog({
             <span>Profile picture</span>
             <h2 id="people-photo-dialog-title">{personName}</h2>
           </div>
-          <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving}><UnigentamosIcon role="close" size={18} /></button>
+          <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving} data-icon-button="standard"><UnigentamosIcon role="close" size={18} /></button>
         </header>
         <p>{photoDraft ? "Drag and zoom to adjust the picture." : "Choose a picture to crop before it is saved to this private profile."}</p>
         {!photoDraft && <div className="people-photo-options">
@@ -409,9 +409,9 @@ export default function PeopleProfilePhotoDialog({
             <label>
               <span>Zoom</span>
               <div className="people-photo-zoom-control">
-                <button type="button" aria-label="Zoom out" disabled={photoDraft.zoom <= 1} onClick={() => setPhotoDraft((current) => current ? zoomPhotoCrop(current, current.zoom - .1) : current)}>−</button>
+                <button type="button" aria-label="Zoom out" disabled={photoDraft.zoom <= 1} onClick={() => setPhotoDraft((current) => current ? zoomPhotoCrop(current, current.zoom - .1) : current)} data-icon-button="compact"><UnigentamosIcon role="minus" size={16} /></button>
                 <input aria-label="Zoom" type="range" min="1" max="3" step="0.01" value={photoDraft.zoom} onChange={(event) => setPhotoDraft((current) => current ? zoomPhotoCrop(current, Number(event.target.value)) : current)} />
-                <button type="button" aria-label="Zoom in" disabled={photoDraft.zoom >= 3} onClick={() => setPhotoDraft((current) => current ? zoomPhotoCrop(current, current.zoom + .1) : current)}><UnigentamosIcon role="plus" size={14} /></button>
+                <button type="button" aria-label="Zoom in" disabled={photoDraft.zoom >= 3} onClick={() => setPhotoDraft((current) => current ? zoomPhotoCrop(current, current.zoom + .1) : current)} data-icon-button="compact"><UnigentamosIcon role="plus" size={14} /></button>
               </div>
             </label>
             <label><span>Horizontal crop</span><input aria-label="Horizontal crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panX} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panX: Number(event.target.value) } : current)} /></label>

@@ -540,7 +540,7 @@ export default function PersonalLifeWorkspace({
     const cell = row.cells[columnId] || { value: "" };
     if (type === "rating") {
       const rating = Number(cell.value) || 0;
-      return <div className={styles.ratingInput} aria-label={`${label} rating`}>{[1, 2, 3, 4, 5].map((value) => <button type="button" aria-label={`Set ${label} to ${value} stars`} aria-pressed={rating === value} data-active={value <= rating || undefined} onClick={() => updateListCell(row.id, columnId, { value: String(value) })} key={value}>★</button>)}</div>;
+      return <div className={styles.ratingInput} aria-label={`${label} rating`}>{[1, 2, 3, 4, 5].map((value) => <button type="button" aria-label={`Set ${label} to ${value} stars`} aria-pressed={rating === value} data-active={value <= rating || undefined} onClick={() => updateListCell(row.id, columnId, { value: String(value) })} key={value} data-icon-button="standard"><PersonalOpsIcon name="star" /></button>)}</div>;
     }
     if (type === "person" || type === "object") {
       const options = initialLinkOptions.filter((option) => option.kind === type);
@@ -555,7 +555,7 @@ export default function PersonalLifeWorkspace({
           {cell.ref && !options.some((option) => linkKey(option.ref) === selectedKey) && <option value={selectedKey}>{cell.ref.label}</option>}
           {options.map((option) => <option value={linkKey(option.ref)} key={linkKey(option.ref)}>{option.ref.label}</option>)}
         </select>
-        {cell.ref && <a href={cell.ref.route} aria-label={`Open ${cell.ref.label}`} title={`Open ${cell.ref.label}`}><PersonalOpsIcon name="open" /></a>}
+        {cell.ref && <a href={cell.ref.route} aria-label={`Open ${cell.ref.label}`} title={`Open ${cell.ref.label}`} data-icon-button="standard"><PersonalOpsIcon name="open" /></a>}
       </div>;
     }
     return <input
@@ -584,7 +584,7 @@ export default function PersonalLifeWorkspace({
           <div className={`${baseStyles.searchControl} ${styles.credentialSearch}`}>
             <PersonalOpsIcon name="search" />
             <input ref={credentialSearchRef} type="search" aria-label="Search credentials" placeholder="Search credentials…" autoComplete="off" spellCheck={false} value={credentialQuery} onChange={(event) => setCredentialQuery(event.target.value)} />
-            {credentialQuery && <button type="button" aria-label="Clear credential search" onClick={() => { setCredentialQuery(""); credentialSearchRef.current?.focus(); }}><PersonalOpsIcon name="close" /></button>}
+            {credentialQuery && <button type="button" aria-label="Clear credential search" onClick={() => { setCredentialQuery(""); credentialSearchRef.current?.focus(); }} data-icon-button="standard"><PersonalOpsIcon name="close" /></button>}
           </div>
         </div>
         <div className={styles.credentialLedger} role="table" aria-label="Credentials">
@@ -612,12 +612,12 @@ export default function PersonalLifeWorkspace({
                       aria-expanded={!passwordsMasked && item.website ? expandedWebsiteId === item.id : undefined}
                       onClick={() => void copyCredentialWebsite(item)}
                       disabled={passwordsMasked || !item.website}
-                    ><PersonalOpsIcon name="link" /></button>
+                     data-icon-button="standard"><PersonalOpsIcon name="link" /></button>
                     <span className={`${styles.credentialIdentityText} ${styles.credentialPrivate}`}>
                       <strong>{passwordsMasked ? "Hidden account" : item.title || "Untitled credential"}</strong>
                       {!passwordsMasked && item.website && <span className={styles.credentialWebsiteReveal} id={`credential-website-${item.id}`}>
                         <span>{credentialWebsiteDomain(item.website)}</span>
-                        <a href={credentialWebsiteHref(item.website)} target="_blank" rel="noreferrer" aria-label={`Open website for ${item.title}`} title="Open website"><PersonalOpsIcon name="open" /></a>
+                        <a href={credentialWebsiteHref(item.website)} target="_blank" rel="noreferrer" aria-label={`Open website for ${item.title}`} title="Open website" data-icon-button="standard"><PersonalOpsIcon name="open" /></a>
                       </span>}
                     </span>
                   </div>
@@ -627,9 +627,9 @@ export default function PersonalLifeWorkspace({
                   <span className={styles.credentialCell} role="cell" data-field="password" data-label="Password" aria-label={!item.hasSecret ? "No password" : passwordsMasked ? "Hidden password" : "Revealed password"}>{item.hasSecret && <code className={styles.credentialPrivate}>{passwordsMasked ? "••••••••" : credentialSecrets[item.id]?.secret || ""}</code>}</span>
                   <span className={styles.credentialCell} role="cell" data-field="pin" data-label="PIN" aria-label={!item.hasPin ? "No PIN" : passwordsMasked ? "Hidden PIN" : "Revealed PIN"}>{item.hasPin && <code className={styles.credentialPrivate}>{passwordsMasked ? "••••" : credentialSecrets[item.id]?.pin || ""}</code>}</span>
                   <div className={styles.iconActions} role="cell" aria-label={`${label} actions`}>
-                    <button type="button" aria-label={`${copyLabel} for ${label}`} title={copyLabel} disabled={!item.hasSecret && !item.hasPin} onClick={() => void copyCredential(item)}><PersonalOpsIcon name="copy" /></button>
-                    <button type="button" aria-label={`Edit ${label}`} title="Edit" onClick={() => void editCredential(item)}><PersonalOpsIcon name="edit" /></button>
-                    <button type="button" className={styles.dangerAction} aria-label={`Delete ${label}`} title="Delete" onClick={() => void deleteCredential(item)}><PersonalOpsIcon name="delete" /></button>
+                    <button type="button" aria-label={`${copyLabel} for ${label}`} title={copyLabel} disabled={!item.hasSecret && !item.hasPin} onClick={() => void copyCredential(item)} data-icon-button="standard"><PersonalOpsIcon name="copy" /></button>
+                    <button type="button" aria-label={`Edit ${label}`} title="Edit" onClick={() => void editCredential(item)} data-icon-button="standard"><PersonalOpsIcon name="edit" /></button>
+                    <button type="button" className={styles.dangerAction} aria-label={`Delete ${label}`} title="Delete" onClick={() => void deleteCredential(item)} data-icon-button="standard"><PersonalOpsIcon name="delete" /></button>
                   </div>
                 </article>
               );
@@ -656,16 +656,16 @@ export default function PersonalLifeWorkspace({
             </div>
             <div className={styles.listHeaderActions}>
               <button type="button" className={styles.primaryButton} disabled={busy || !workingList.title.trim()} onClick={() => void saveListDraft()}>{busy ? "Saving…" : "Save list"}</button>
-              <button type="button" className={styles.squareAction} aria-label={`Delete ${workingList.title}`} title="Delete list" onClick={() => { setListDraft(null); void removeObject("lists", selectedList); }}><PersonalOpsIcon name="delete" /></button>
+              <button type="button" className={styles.squareAction} aria-label={`Delete ${workingList.title}`} title="Delete list" onClick={() => { setListDraft(null); void removeObject("lists", selectedList); }} data-icon-button="standard"><PersonalOpsIcon name="delete" /></button>
             </div>
           </header>
           <div className={styles.listTableScroller}>
             <table className={styles.listTable}>
-              <thead><tr><th className={styles.completeColumn}><span className={styles.visuallyHidden}>Complete</span></th>{workingList.columns.map((column) => <th key={column.id}><div className={styles.columnHeading}><input aria-label={`${column.label} column name`} value={column.label} onChange={(event) => updateListDraft((current) => ({ ...current, columns: current.columns.map((candidate) => candidate.id === column.id ? { ...candidate, label: event.target.value } : candidate) }))} /><span>{LIST_COLUMN_LABELS[column.type]}</span>{workingList.columns.length > 1 && <button type="button" aria-label={`Remove ${column.label} column`} title="Remove column" onClick={() => updateListDraft((current) => ({ ...current, columns: current.columns.filter((candidate) => candidate.id !== column.id), rows: current.rows.map((row) => { const cells = { ...row.cells }; delete cells[column.id]; return { ...row, cells }; }) }))}><PersonalOpsIcon name="delete" /></button>}</div></th>)}<th className={styles.rowActionColumn}><span className={styles.visuallyHidden}>Row actions</span></th></tr></thead>
+              <thead><tr><th className={styles.completeColumn}><span className={styles.visuallyHidden}>Complete</span></th>{workingList.columns.map((column) => <th key={column.id}><div className={styles.columnHeading}><input aria-label={`${column.label} column name`} value={column.label} onChange={(event) => updateListDraft((current) => ({ ...current, columns: current.columns.map((candidate) => candidate.id === column.id ? { ...candidate, label: event.target.value } : candidate) }))} /><span>{LIST_COLUMN_LABELS[column.type]}</span>{workingList.columns.length > 1 && <button type="button" aria-label={`Remove ${column.label} column`} title="Remove column" onClick={() => updateListDraft((current) => ({ ...current, columns: current.columns.filter((candidate) => candidate.id !== column.id), rows: current.rows.map((row) => { const cells = { ...row.cells }; delete cells[column.id]; return { ...row, cells }; }) }))} data-icon-button="standard"><PersonalOpsIcon name="delete" /></button>}</div></th>)}<th className={styles.rowActionColumn}><span className={styles.visuallyHidden}>Row actions</span></th></tr></thead>
               <tbody>{workingList.rows.map((row, rowIndex) => <tr data-complete={row.completed || undefined} key={row.id}>
                 <td className={styles.completeColumn}><button type="button" className={styles.checkmark} aria-label={row.completed ? `Reopen row ${rowIndex + 1}` : `Complete row ${rowIndex + 1}`} onClick={() => updateListDraft((current) => ({ ...current, rows: current.rows.map((candidate) => candidate.id === row.id ? { ...candidate, completed: !candidate.completed } : candidate) }))}>{row.completed && <PersonalOpsIcon name="check" />}</button></td>
                 {workingList.columns.map((column) => <td key={column.id}>{renderListCell(row, column.id, column.type, column.label)}</td>)}
-                <td className={styles.rowActionColumn}><button type="button" className={styles.squareAction} aria-label={`Delete row ${rowIndex + 1}`} title="Delete row" onClick={() => updateListDraft((current) => ({ ...current, rows: current.rows.filter((candidate) => candidate.id !== row.id) }))}><PersonalOpsIcon name="delete" /></button></td>
+                <td className={styles.rowActionColumn}><button type="button" className={styles.squareAction} aria-label={`Delete row ${rowIndex + 1}`} title="Delete row" onClick={() => updateListDraft((current) => ({ ...current, rows: current.rows.filter((candidate) => candidate.id !== row.id) }))} data-icon-button="standard"><PersonalOpsIcon name="delete" /></button></td>
               </tr>)}</tbody>
             </table>
           </div>
@@ -714,7 +714,7 @@ export default function PersonalLifeWorkspace({
       {selectedVehicle ? <>
         <header className={styles.vehicleHero}><div><span>{selectedVehicle.status} vehicle</span><h2>{selectedVehicle.name}</h2><p>{[selectedVehicle.year, selectedVehicle.make, selectedVehicle.model, selectedVehicle.trim].filter(Boolean).join(" ") || "Build profile"}</p></div><div className={styles.rowActions}><button type="button" onClick={() => openEdit("vehicles", selectedVehicle)}>Edit vehicle</button><button type="button" onClick={() => void removeObject("vehicles", selectedVehicle)}>Delete</button></div></header>
         <div className={styles.modComposer}><input value={modDraft} onChange={(event) => setModDraft(event.target.value)} placeholder="Add modification…" aria-label="Modification name" /><select aria-label="Modification status" value={modStatus} onChange={(event) => setModStatus(event.target.value as VehicleModificationStatus)}>{modLanes.map((status) => <option value={status} key={status}>{MOD_LABELS[status]}</option>)}</select><button type="button" onClick={() => void addModification(selectedVehicle)}>Add</button></div>
-        <div className={styles.modLanes}>{modLanes.map((status) => <section key={status}><header><h3>{MOD_LABELS[status]}</h3><span>{selectedVehicle.modifications.filter((item) => item.status === status).length}</span></header>{selectedVehicle.modifications.filter((item) => item.status === status).map((mod) => <article key={mod.id}><strong>{mod.name}</strong>{mod.category && <small>{mod.category}</small>}<button type="button" aria-label={`Delete ${mod.name}`} onClick={() => void saveObject("vehicles", { modifications: selectedVehicle.modifications.filter((item) => item.id !== mod.id) }, selectedVehicle)}><PersonalOpsIcon name="close" /></button></article>)}</section>)}</div>
+        <div className={styles.modLanes}>{modLanes.map((status) => <section key={status}><header><h3>{MOD_LABELS[status]}</h3><span>{selectedVehicle.modifications.filter((item) => item.status === status).length}</span></header>{selectedVehicle.modifications.filter((item) => item.status === status).map((mod) => <article key={mod.id}><strong>{mod.name}</strong>{mod.category && <small>{mod.category}</small>}<button type="button" aria-label={`Delete ${mod.name}`} onClick={() => void saveObject("vehicles", { modifications: selectedVehicle.modifications.filter((item) => item.id !== mod.id) }, selectedVehicle)} data-icon-button="standard"><PersonalOpsIcon name="close" /></button></article>)}</section>)}</div>
       </> : <div className={styles.empty}><strong>No vehicle profile yet</strong><span>Add a current car or start the build sheet for a future one.</span></div>}
     </div>;
   }
@@ -749,7 +749,7 @@ export default function PersonalLifeWorkspace({
       <div className={styles.scroll}>
         <header className={styles.pageHeader}><div>{initialView !== "passwords" && <span>Personal / Command</span>}<h1>{copy.title}</h1>{copy.description && <p>{copy.description}</p>}</div><div className={styles.headerActions}>{initialView === "passwords" && <button type="button" className={styles.privacyToggle} aria-label={passwordsMasked ? "Unblur password page" : "Blur password page"} aria-pressed={!passwordsMasked} onClick={() => void togglePasswordPrivacy()} disabled={busy} title={passwordsMasked ? "Unblur page" : "Blur page"}>{passwordsMasked ? <PersonalOpsIcon name="show" /> : <PersonalOpsIcon name="hide" />}<span>{passwordsMasked ? "Unblur" : "Blur"}</span></button>}<button type="button" className={`${styles.primaryButton} ${initialView === "passwords" ? styles.addAction : ""}`} onClick={() => openCreate()}><PersonalOpsIcon name="plus" /><span>{copy.action}</span></button></div></header>
         {error && <p className={styles.error} role="alert">{error}</p>}
-        {notice && <div className={styles.notice} role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" title="Dismiss" onClick={() => setNotice("")}><PersonalOpsIcon name="close" /></button></div>}
+        {notice && <div className={styles.notice} role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" title="Dismiss" onClick={() => setNotice("")} data-icon-button="standard"><PersonalOpsIcon name="close" /></button></div>}
         <div className={styles.workspace} data-view={initialView}>
           {initialView === "passwords" && renderPasswords()}
           {initialView === "lists" && renderLists()}
@@ -764,7 +764,7 @@ export default function PersonalLifeWorkspace({
       <form className={styles.editor} data-credential-editor onSubmit={saveCredential}>
         <header>
           <div><h2>{credentialDraft.id ? "Edit password" : "Add password"}</h2></div>
-          <button type="button" className={styles.editorClose} aria-label="Close password editor" title="Close" onClick={closeCredentialEditor}><PersonalOpsIcon name="close" /></button>
+          <button type="button" className={styles.editorClose} aria-label="Close password editor" title="Close" onClick={closeCredentialEditor} data-icon-button="standard"><PersonalOpsIcon name="close" /></button>
         </header>
         {input("Account", "title", credentialDraft.title, (value) => setCredentialDraft((current) => current ? { ...current, title: value } : current), { required: true, placeholder: "Service or account" })}
         <label>
@@ -839,14 +839,14 @@ export default function PersonalLifeWorkspace({
           <label htmlFor="credential-secret">Password</label>
           <div className={styles.secretControl}>
             <input id="credential-secret" name="secret" type={passwordFieldVisible ? "text" : "password"} autoComplete="new-password" placeholder="Optional" value={credentialDraft.secret} onChange={(event) => setCredentialDraft((current) => current ? { ...current, secret: event.target.value } : current)} />
-            <button type="button" aria-label={passwordFieldVisible ? "Hide password" : "Show password"} title={passwordFieldVisible ? "Hide password" : "Show password"} aria-pressed={passwordFieldVisible} onClick={() => setPasswordFieldVisible((current) => !current)}>{passwordFieldVisible ? <PersonalOpsIcon name="hide" /> : <PersonalOpsIcon name="show" />}</button>
+            <button type="button" aria-label={passwordFieldVisible ? "Hide password" : "Show password"} title={passwordFieldVisible ? "Hide password" : "Show password"} aria-pressed={passwordFieldVisible} onClick={() => setPasswordFieldVisible((current) => !current)} data-icon-button="standard">{passwordFieldVisible ? <PersonalOpsIcon name="hide" /> : <PersonalOpsIcon name="show" />}</button>
           </div>
         </div>
         <div className={styles.editorField}>
           <label htmlFor="credential-pin">PIN</label>
           <div className={styles.secretControl}>
             <input id="credential-pin" name="pin" type={pinFieldVisible ? "text" : "password"} inputMode="numeric" autoComplete="off" value={credentialDraft.pin} onChange={(event) => setCredentialDraft((current) => current ? { ...current, pin: event.target.value } : current)} placeholder="Optional" />
-            <button type="button" aria-label={pinFieldVisible ? "Hide PIN" : "Show PIN"} title={pinFieldVisible ? "Hide PIN" : "Show PIN"} aria-pressed={pinFieldVisible} onClick={() => setPinFieldVisible((current) => !current)}>{pinFieldVisible ? <PersonalOpsIcon name="hide" /> : <PersonalOpsIcon name="show" />}</button>
+            <button type="button" aria-label={pinFieldVisible ? "Hide PIN" : "Show PIN"} title={pinFieldVisible ? "Hide PIN" : "Show PIN"} aria-pressed={pinFieldVisible} onClick={() => setPinFieldVisible((current) => !current)} data-icon-button="standard">{pinFieldVisible ? <PersonalOpsIcon name="hide" /> : <PersonalOpsIcon name="show" />}</button>
           </div>
         </div>
         <label className={styles.full}><span>Notes</span><textarea value={credentialDraft.notes} onChange={(event) => setCredentialDraft((current) => current ? { ...current, notes: event.target.value } : current)} rows={4} /></label>
@@ -854,7 +854,7 @@ export default function PersonalLifeWorkspace({
       </form>
     </div>}
 
-    {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} data-trip-editor={editor.collection === "trips" || undefined} onSubmit={submitEditor}><header><div>{editor.collection !== "trips" && <span>Personal record</span>}<h2>{editor.collection === "trips" ? tripEditorTitle : `${editor.id ? "Edit" : "Add"} ${editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}`}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)}><PersonalOpsIcon name="close" /></button></header>
+    {editor && <div className={styles.overlay} role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setEditor(null); }}><form className={styles.editor} data-trip-editor={editor.collection === "trips" || undefined} onSubmit={submitEditor}><header><div>{editor.collection !== "trips" && <span>Personal record</span>}<h2>{editor.collection === "trips" ? tripEditorTitle : `${editor.id ? "Edit" : "Add"} ${editor.collection === "buildItems" ? "personal build item" : editor.collection === "vehicles" ? "vehicle" : editor.collection.slice(0, -1)}`}</h2></div><button type="button" aria-label="Close editor" onClick={() => setEditor(null)} data-icon-button="standard"><PersonalOpsIcon name="close" /></button></header>
       {editor.collection === "lists" && <>{input("Title", "title", editorValue("title"), (value) => setEditorValue("title", value), { required: true })}<label><span>Type</span><select value={editorValue("kind")} onChange={(event) => setEditorValue("kind", event.target.value)}><option value="shopping">Things to buy</option><option value="watchlist">Watchlist</option><option value="favorites">Favorites</option><option value="packing">Packing</option><option value="custom">Custom</option></select></label><label className={styles.full}><span>Description</span><textarea value={editorValue("description")} onChange={(event) => setEditorValue("description", event.target.value)} rows={3} /></label></>}
       {editor.collection === "trips" && <>
         <label className={styles.full}><span>Status</span><select value={editorValue("status")} onChange={(event) => setEditorValue("status", event.target.value)}>{Object.entries(TRIP_LABELS).map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>

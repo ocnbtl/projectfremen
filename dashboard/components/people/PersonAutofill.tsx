@@ -79,7 +79,7 @@ export default function PersonAutofill({ name, values, onApply, organizations = 
   return <>
     <button type="button" className="people-organization-autofill-button" aria-label="Autofill person from links" aria-busy={busy}
       title={name.trim() && urls.length ? "Autofill person from links" : "Enter a name and a public profile link to enable autofill"}
-      disabled={disabled || busy || !name.trim() || !urls.length} onClick={() => void autofill()}><UnigentamosIcon role="sparkles" size={17} /></button>
+      disabled={disabled || busy || !name.trim() || !urls.length} onClick={() => void autofill()} data-icon-button="standard"><UnigentamosIcon role="sparkles" size={17} /></button>
     {(busy || notice || result || linkedinUrl) && <div className="people-autofill-feedback">
       {(busy || notice) && <p role="status" aria-live="polite">{busy ? progress || "Finding public profile details, employers, and schools…" : notice}</p>}
       {result && result.sources.length > 0 && <details className="people-autofill-sources"><summary>Autofill sources</summary><p>{result.message}</p>

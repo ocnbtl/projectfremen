@@ -290,6 +290,7 @@ export default function ProjectAssociationSheet({
                 aria-label="Close Project association"
                 onClick={requestClose}
                 disabled={busy}
+                data-icon-button="standard"
               >
                 <UnigentamosIcon role="close" size={18} />
               </button>

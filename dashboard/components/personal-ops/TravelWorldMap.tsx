@@ -7,6 +7,7 @@ import { useMemo, useRef, useState, type PointerEvent, type WheelEvent } from "r
 import type { Feature, FeatureCollection, GeoJsonProperties, Geometry } from "geojson";
 import type { GeometryCollection, Topology } from "topojson-specification";
 import type { PersonalTrip, TripStatus } from "../../lib/modules/personal-life/types";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./PersonalLifeWorkspace.module.css";
 
 const MAP_WIDTH = 1000;
@@ -147,8 +148,8 @@ export default function TravelWorldMap({
   return (
     <div className={styles.worldMapShell}>
       <div className={styles.mapControls} aria-label="Map controls">
-        <button type="button" onClick={() => zoomAt(transform.scale * 1.35)} aria-label="Zoom in">+</button>
-        <button type="button" onClick={() => zoomAt(transform.scale / 1.35)} aria-label="Zoom out">−</button>
+        <button type="button" onClick={() => zoomAt(transform.scale * 1.35)} aria-label="Zoom in" data-icon-button="standard"><UnigentamosIcon role="plus" size={20} /></button>
+        <button type="button" onClick={() => zoomAt(transform.scale / 1.35)} aria-label="Zoom out" data-icon-button="standard"><UnigentamosIcon role="minus" size={20} /></button>
         <button type="button" onClick={() => setTransform({ scale: 1, x: 0, y: 0 })}>World</button>
       </div>
       <svg

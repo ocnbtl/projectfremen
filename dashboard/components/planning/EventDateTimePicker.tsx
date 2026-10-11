@@ -80,7 +80,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
     }}>
       <Popover.Trigger asChild><button ref={trigger} type="button" className={iconOnly ? styles.iconTrigger : styles.trigger} aria-label={iconOnly ? `Choose ${label.toLowerCase()} date` : label}
         aria-description={`${dateLabel(day, { dateStyle: "full" })}${allDay ? dateOnly ? "" : ", all day" : `, ${clockHour}:${pad(minute)} ${period}, ${timeZone}`}`}
-        data-value={value}>
+        data-value={value} data-icon-button={iconOnly ? "compact" : undefined}>
         <UnigentamosIcon role="interaction-date" size={18} />
         {!iconOnly && <><span className={styles.value}><span>{dateLabel(day, { month: "short", day: "numeric", year: "numeric" })}</span>
           {!dateOnly && <small className={styles.timeValue}><AnimatePresence initial={false} mode="popLayout"><motion.span key={allDay ? "all-day" : "timed"} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -4 }} transition={{ duration: reduced ? 0 : .22 }}>{allDay ? "All day" : `${clockHour}:${pad(minute)} ${period}`}</motion.span></AnimatePresence></small>}</span>
@@ -112,12 +112,12 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
           <CalendarScene id={pane} direction={pane === "date" ? -1 : 1}>
           {pane === "date" ? <div className={styles.datePanel} role={allDay ? undefined : "tabpanel"} id={`${id}-date-panel`} aria-labelledby={allDay ? undefined : `${id}-date-tab`}>
           <header className={styles.heading}>
-            <button type="button" className={styles.arrow} aria-label={`Previous ${mode === "days" ? "month" : "year"}`} onClick={() => move(-1)}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></button>
+            <button type="button" className={styles.arrow} aria-label={`Previous ${mode === "days" ? "month" : "year"}`} onClick={() => move(-1)} data-icon-button="standard"><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></button>
             <button type="button" className={styles.month} aria-label={mode === "days" ? "Choose month" : "Choose day"} onClick={() => setMode(mode === "days" ? "months" : "days")}>
               <span aria-live="polite">{mode === "days" ? dateLabel(page, { month: "long", year: "numeric" }) : year}</span>
               <UnigentamosIcon role="chevron-down" size={14} style={{ transform: mode === "months" ? "rotate(180deg)" : undefined }} />
             </button>
-            <button type="button" className={styles.arrow} aria-label={`Next ${mode === "days" ? "month" : "year"}`} onClick={() => move(1)}><UnigentamosIcon role="chevron-right" size={18} /></button>
+            <button type="button" className={styles.arrow} aria-label={`Next ${mode === "days" ? "month" : "year"}`} onClick={() => move(1)} data-icon-button="standard"><UnigentamosIcon role="chevron-right" size={18} /></button>
           </header>
           <div className={styles.dateArea}>
             <AnimatePresence initial={false} custom={direction}>

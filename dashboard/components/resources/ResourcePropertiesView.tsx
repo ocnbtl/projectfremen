@@ -184,7 +184,7 @@ export default function ResourcePropertiesView({ resource, editRequest = 0, onSa
               {form.gradient.colors.map((color, index) => <div className={styles.colorRow} key={`${index}-${color}`}>
                 <input aria-label={`Color ${index + 1}`} type="color" value={color} disabled={!editing} onChange={(event) => updateColor(index, event.target.value)} />
                 <input aria-label={`Color ${index + 1} hex`} type="text" defaultValue={color} disabled={!editing} onBlur={(event) => updateColor(index, event.target.value)} />
-                <button type="button" aria-label={`Remove color ${index + 1}`} disabled={!editing || form.gradient.colors.length <= 2} onClick={() => update("gradient", { ...form.gradient, colors: form.gradient.colors.filter((_, itemIndex) => itemIndex !== index) })}><PersonalOpsIcon name="delete" /></button>
+                <button type="button" aria-label={`Remove color ${index + 1}`} disabled={!editing || form.gradient.colors.length <= 2} onClick={() => update("gradient", { ...form.gradient, colors: form.gradient.colors.filter((_, itemIndex) => itemIndex !== index) })} data-icon-button="standard"><PersonalOpsIcon name="delete" /></button>
               </div>)}
             </div>
             <button type="button" className={styles.addColor} disabled={!editing || form.gradient.colors.length >= 7} onClick={() => update("gradient", { ...form.gradient, colors: [...form.gradient.colors, "#D9CABD"] })}><PersonalOpsIcon name="plus" /> Color</button>

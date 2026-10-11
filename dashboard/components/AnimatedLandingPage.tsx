@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { IconArrowRight, IconLogin2 } from "@tabler/icons-react";
+import UnigentamosIcon from "./icons/UnigentamosIcon";
 import LandingPointer from "./LandingPointer";
 
 type LandingProps = {
@@ -152,7 +152,7 @@ export default function AnimatedLandingPage({
     {hasError && <p className="landing-error" role="alert">Invalid password. Try again.</p>}
     <input id="password" name="password" type="password" aria-label="Password" placeholder="password"
       className="landing-input" autoComplete="current-password" required />
-    <button type="submit" className="landing-submit" aria-label="Enter" title="Enter"><IconArrowRight size={20} stroke={1.7} aria-hidden="true" /></button>
+    <button type="submit" className="landing-submit" aria-label="Enter" title="Enter" data-icon-button="standard"><UnigentamosIcon role="arrow-right" size={20} /></button>
   </form>;
 
   return (
@@ -267,8 +267,8 @@ export default function AnimatedLandingPage({
             animate={{ width: loginOpen ? signInWidth : 44, height: loginOpen && hasError ? 96 : 44 }}
             transition={reducedMotion ? { duration: 0 } : { type: "spring", stiffness: 150, damping: 24, mass: .9 }}>
             <button ref={loginToggle} type="button" className="landing-signin-toggle" aria-label={loginOpen ? "Close sign in" : "Sign in"}
-              aria-expanded={loginOpen} aria-controls="landing-signin-panel" onClick={() => setLoginOpen(!loginOpen)}>
-              <IconLogin2 size={23} stroke={1.6} />
+              aria-expanded={loginOpen} aria-controls="landing-signin-panel" onClick={() => setLoginOpen(!loginOpen)} data-icon-button="standard">
+              <UnigentamosIcon role="sign-in" size={20} />
             </button>
             <motion.div id="landing-signin-panel" className="landing-signin-panel"
               initial={false} animate={{ opacity: ready && loginOpen ? 1 : 0, x: loginOpen ? 0 : -20, scale: loginOpen ? 1 : .95 }}

@@ -254,6 +254,7 @@ export default function NoteReviewScheduleEditorSheet({
                 onClick={requestClose}
                 disabled={busy}
                 aria-label="Close review schedule editor"
+                data-icon-button="standard"
               >
                 <UnigentamosIcon role="close" size={20} />
               </button>

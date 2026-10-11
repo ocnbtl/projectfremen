@@ -215,6 +215,7 @@ export default function NotePropertiesEditorSheet({
                 onClick={requestClose}
                 disabled={busy}
                 aria-label="Close Note properties editor"
+                data-icon-button="standard"
               >
                 <UnigentamosIcon role="close" size={20} />
               </button>

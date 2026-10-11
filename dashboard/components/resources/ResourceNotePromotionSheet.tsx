@@ -276,6 +276,7 @@ export default function ResourceNotePromotionSheet({
                 onClick={requestClose}
                 disabled={busy}
                 aria-label="Close Note draft workflow"
+                data-icon-button="standard"
               >
                 <UnigentamosIcon role="close" size={20} />
               </button>

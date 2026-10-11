@@ -23,7 +23,7 @@ export default function FinanceOverviewInspector({ model, selection, mobileOpen,
   const topMerchants = [...merchants].sort((a, b) => b[1] - a[1]).slice(0, 4);
   return <InspectorRail id="finance-inspector" className={`finance-right-rail finance-overview-inspector ${mobileOpen ? "is-mobile-open" : ""}`} ariaLabel="Finance overview details" overlay={mobile} overlayOpen={mobileOpen} onRequestClose={onClose}
     title={<div className="finance-detail-title"><IconTile hue="green" icon={transaction ? "Banknote" : category ? "PiggyBank" : "LineChart"} /><div><p>{transaction ? "Transaction" : category ? "Spending category" : period ? "Cash flow" : "Overview"}</p><h2>{title}</h2></div></div>}
-    actions={<button type="button" className="finance-rail-close" aria-label="Return to Finance list" onClick={onClose}><Icon name="X" /></button>}>
+    actions={<button type="button" className="finance-rail-close" aria-label="Return to Finance list" onClick={onClose} data-icon-button="standard"><Icon name="X" /></button>}>
     <div className="finance-overview-detail-body">
       {emptyView ? <div className="finance-detail-empty"><IconTile hue="green" icon="Check" /><h3>No records in this view</h3><p>Choose another filter or search to see a record here.</p></div> : <>
         {selection.kind !== "summary" && <button type="button" className="finance-text-action" onClick={() => onSelect({ kind: "summary", id: "" })}>← Back to range summary</button>}

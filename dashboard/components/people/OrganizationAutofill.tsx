@@ -79,7 +79,7 @@ export default function OrganizationAutofill({ name, values, onApply, onPhoto, o
   return <>
     <button type="button" className="people-organization-autofill-button" aria-label="Autofill organization from links" aria-busy={busy}
       title={urls.length ? "Autofill organization from links" : "Enter a website or social link to enable autofill"}
-      disabled={disabled || busy || !urls.length} onClick={() => void autofill()}>
+      disabled={disabled || busy || !urls.length} onClick={() => void autofill()} data-icon-button="standard">
       <UnigentamosIcon role="sparkles" size={17} />
     </button>
     {(busy || notice || result) && <div className="people-autofill-feedback">

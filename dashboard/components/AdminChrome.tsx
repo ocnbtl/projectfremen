@@ -83,6 +83,7 @@ function AdminPageSidebar({
         onClick={toggleSidebar}
         aria-label={collapsed ? "Expand page sidebar" : "Collapse page sidebar"}
         title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        data-icon-button="compact"
       >
         <UnigentamosIcon role="menu" size={16} />
       </button>

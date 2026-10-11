@@ -220,7 +220,7 @@ function FinanceSidebar({ smartCounts, view, smartFilter, onSmart, onUtility, on
       { id: "finance-smart-views", label: "Smart views", items: SMART_VIEWS.map(item => ({ id: item.id, label: item.label, icon: <UnigentamosIcon role={item.icon} />, count: smartCounts[item.id] || 0, active: smartFilter === item.id, onSelect: () => onSmart(item.id) })) }
     ]}
     footer={<div className="finance-sidebar-utilities" aria-label="Finance data tools">
-      {[{ id: "data", label: "Accounts data", icon: "contact-file" }, { id: "categories", label: "Categories", icon: "list" }, { id: "import", label: "Import", icon: "import" }, { id: "settings", label: "Settings", icon: "sliders" }].map(item => <button key={item.id} type="button" aria-label={item.label} title={item.label} onClick={() => { onClose(); if (item.id === "import") onImport(); else onUtility(item.id as FinanceUtility); }}><UnigentamosIcon role={item.icon} /><span className="finance-utility-tooltip">{item.label}</span></button>)}
+      {[{ id: "data", label: "Accounts data", icon: "contact-file" }, { id: "categories", label: "Categories", icon: "list" }, { id: "import", label: "Import", icon: "import" }, { id: "settings", label: "Settings", icon: "sliders" }].map(item => <button key={item.id} type="button" aria-label={item.label} title={item.label} data-icon-button="standard" onClick={() => { onClose(); if (item.id === "import") onImport(); else onUtility(item.id as FinanceUtility); }}><UnigentamosIcon role={item.icon} /><span className="finance-utility-tooltip">{item.label}</span></button>)}
     </div>}
   />;
 }
@@ -328,7 +328,7 @@ function ModalShell({ modal, onClose }: { modal: ModalKind; onClose: () => void 
   return (
     <div className="finance-modal-backdrop" role="presentation">
       <section ref={modalRef} className="finance-modal" role="dialog" aria-modal="true" aria-label={item.title}>
-        <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close modal"><Icon name="X" /></button>
+        <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close modal" data-icon-button="standard"><Icon name="X" /></button>
         <h2>{item.title}</h2>
         <p>{item.body}</p>
         <div>
@@ -940,7 +940,7 @@ export default function FinanceWorkspace({
       {mobileDetail && (showContext || inspectorOpen) && <button type="button" className="finance-inspector-scrim" onClick={closeInspector} aria-label="Close Finance panel" />}
       <div className="finance-main-workspace">
         <header className="finance-page-header">
-          <div className="finance-page-title"><button type="button" className="finance-mobile-menu" onClick={() => setMobileSidebarOpen(true)} aria-label="Open Finance sidebar" aria-expanded={mobileSidebarOpen} aria-controls="finance-module-sidebar"><UnigentamosIcon role="menu" /></button><h1>{activeSmart?.label || activeView.label}</h1></div>
+          <div className="finance-page-title"><button type="button" className="finance-mobile-menu" onClick={() => setMobileSidebarOpen(true)} aria-label="Open Finance sidebar" aria-expanded={mobileSidebarOpen} aria-controls="finance-module-sidebar" data-icon-button="standard"><UnigentamosIcon role="menu" /></button><h1>{activeSmart?.label || activeView.label}</h1></div>
           <div className="finance-page-actions"><button type="button" className="finance-action" onClick={()=>setArchiveOpen(true)}>Archive</button>{["overview", "budgets", "bills"].includes(view) && <button type="button" aria-label="Plan from history" title="Plan from history" className="finance-action finance-plan-trigger" onClick={() => setPlanning("plan")}><Icon name="Sliders" /><span>Plan from history</span></button>}{view === "transactions" && smartCounts.unreviewed > 0 && <button type="button" aria-label="Approve all transactions" title="Approve all transactions" className="finance-action finance-review-trigger" onClick={() => setPlanning("review")}><Icon name="Check" /><span>Approve all</span></button>}<NativeActionBar
           view={view}
           hasSelection={hasRouteSelection}

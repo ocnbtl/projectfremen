@@ -397,7 +397,7 @@ export default function FinanceMutationDialog({ operation, state, selection, clo
   const needsAccount = ["transaction", "import", "transfer", "savings", "bill"].includes(operation);
   return <div className="finance-modal-backdrop" role="presentation">
     <section ref={dialogRef} className="finance-modal" role="dialog" aria-modal="true" aria-labelledby="finance-mutation-title">
-      <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance operation" disabled={busy}><Icon name="X" /></button>
+      <button type="button" className="finance-rail-close" onClick={onClose} aria-label="Close Finance operation" disabled={busy} data-icon-button="standard"><Icon name="X" /></button>
       <h2 id="finance-mutation-title">{TITLES[operation]}</h2>
       {error && <p className="finance-form-error" role="alert">{error}</p>}
       {preview ? <div className="finance-import-preview">

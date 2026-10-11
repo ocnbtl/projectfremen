@@ -55,6 +55,7 @@ export function ResourceIconButton({
     <button
       type="button"
       className={styles.iconButton}
+      data-icon-button={children == null ? "standard" : undefined}
       data-active={active || undefined}
       data-destructive={destructive || undefined}
       aria-label={label}

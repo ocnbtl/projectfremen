@@ -42,10 +42,10 @@ export default function DateField({ label, value, onChange, required = true, com
       onEscapeKeyDown={event => event.stopImmediatePropagation()} onOpenAutoFocus={event => { event.preventDefault(); grid.current?.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus(); }}>
       <h3 id={titleId} className="people-visually-hidden">Choose {label.toLowerCase()}</h3>
       <label className="work-picker-entry">Enter date<input type="date" value={value} onChange={e=>{const next=parse(e.target.value);if(next){onChange(e.target.value);setMonth(next);setFocusDate(next);}}} aria-label={`Type ${label.toLowerCase()}`}/></label>
-      <header><button type="button" aria-label="Previous month" onClick={() => moveMonth(-1)}><UnigentamosIcon role="chevron-right" size={18} /></button>
+      <header><button type="button" aria-label="Previous month" onClick={() => moveMonth(-1)} data-icon-button="standard"><UnigentamosIcon role="chevron-right" size={18} /></button>
         <SelectField aria-label="Calendar month" value={String(monthIndex)} columns={3} onChange={event => { const next = dateAt(year, Number(event.target.value), 1); setMonth(next); setFocusDate(next); }}>{Array.from({ length: 12 }, (_, m) => <option key={m} value={m}>{dateAt(2000, m, 1).toLocaleDateString("en-US", { month: "long" })}</option>)}</SelectField>
         <input aria-label="Calendar year" type="number" min="1" max="9999" value={year} onChange={event => { const y = Number(event.target.value); if (y >= 1 && y <= 9999) { const next = dateAt(y, monthIndex, 1); setMonth(next); setFocusDate(next); } }} />
-        <button type="button" aria-label="Next month" onClick={() => moveMonth(1)}><UnigentamosIcon role="chevron-right" size={18} /></button></header>
+        <button type="button" aria-label="Next month" onClick={() => moveMonth(1)} data-icon-button="standard"><UnigentamosIcon role="chevron-right" size={18} /></button></header>
       <p className="people-visually-hidden" aria-live="polite">{month.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</p>
       <table ref={grid} role="grid" aria-label={label === "Date" ? "Choose interaction date" : `Choose ${label.toLowerCase()}`}><thead><tr>{["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"].map(day => <th key={day} scope="col" abbr={day}>{day.slice(0, 2)}</th>)}</tr></thead>
         <tbody>{Array.from({ length: Math.ceil((first.getDay() + days) / 7) }, (_, week) => <tr key={week}>{Array.from({ length: 7 }, (_, weekday) => {

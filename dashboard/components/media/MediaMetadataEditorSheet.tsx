@@ -189,6 +189,7 @@ export default function MediaMetadataEditorSheet({
                 onClick={requestClose}
                 disabled={busy}
                 aria-label="Close Media metadata editor"
+                data-icon-button="standard"
               >
                 <UnigentamosIcon role="close" size={20} />
               </button>

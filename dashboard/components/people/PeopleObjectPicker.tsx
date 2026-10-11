@@ -85,7 +85,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
 
   return <Popover.Root open={open} onOpenChange={next => { setOpen(next); if (next) { setQuery(""); setKind("all"); setLimit(60); } }}>
     <Popover.Trigger asChild>
-      <button type="button" className="people-object-picker-trigger" data-icon-only={iconOnly && !showTriggerLabel || undefined} aria-label={iconOnly ? triggerLabel : "Object to link"} title={iconOnly ? triggerLabel : undefined} aria-description={selected ? `${selected.label} · ${objectTargetTypeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
+      <button type="button" className="people-object-picker-trigger" data-icon-only={iconOnly && !showTriggerLabel || undefined} data-icon-button={iconOnly && !showTriggerLabel ? "standard" : undefined} aria-label={iconOnly ? triggerLabel : "Object to link"} title={iconOnly ? triggerLabel : undefined} aria-description={selected ? `${selected.label} · ${objectTargetTypeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
         <UnigentamosIcon role={iconOnly ? triggerIcon : kinds.find(item => item.id === (selected ? kindOf(selected) : "all"))!.icon} size={20} />
         {iconOnly && showTriggerLabel && <span>{triggerLabel}</span>}
         {!iconOnly && <><span><strong>{selected?.label || "Link an Object"}</strong>{selected && <small>{objectTargetTypeLabel(selected)}</small>}</span>
@@ -110,7 +110,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
               if (event.key === "ArrowDown") { event.preventDefault(); results.current?.querySelector<HTMLButtonElement>('[role="option"]')?.focus(); }
               if (event.key === "Enter") { event.preventDefault(); if (filtered.length === 1) select(filtered[0]); else results.current?.querySelector<HTMLButtonElement>('[role="option"]')?.focus(); }
             }} />
-          {query && <button type="button" aria-label="Clear object search" onClick={() => { setQuery(""); setLimit(60); search.current?.focus(); }}><UnigentamosIcon role="close" size={16} /></button>}
+          {query && <button type="button" aria-label="Clear object search" onClick={() => { setQuery(""); setLimit(60); search.current?.focus(); }} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}
         </div>
         <p className="people-object-picker-count" role="status">{filtered.length} {filtered.length === 1 ? "object" : "objects"}{kind !== "all" ? ` · ${currentKind.label}` : ""}</p>
         <div className="people-object-picker-scroll">

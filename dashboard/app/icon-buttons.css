@@ -1,0 +1,95 @@
+/* Shared functional controls. Mark icon-only content explicitly: a :has(svg)
+   selector would also catch labelled buttons and remove their text spacing. */
+:root {
+  --control-icon-size: 20px;
+  --control-icon-compact-size: 16px;
+}
+:where([data-icon-button]) {
+  display: inline-flex;
+}
+[data-icon-button] {
+  --button-icon-size: var(--control-icon-size);
+  align-items: center !important;
+  justify-content: center !important;
+  place-items: center;
+  gap: 0 !important;
+  padding: 0 !important;
+  line-height: 1;
+  text-align: center;
+  vertical-align: middle;
+}
+[data-icon-button="compact"] { --button-icon-size: var(--control-icon-compact-size); }
+[data-icon-button="event"] { --button-icon-size: var(--event-icon-size, 16px); }
+/* A named layer gives these invariants precedence over legacy module !important sizes. */
+@layer icon-controls {
+[data-icon-button] > .unigentamos-icon {
+  display: block;
+  flex: none;
+  width: var(--button-icon-size) !important;
+  height: var(--button-icon-size) !important;
+  min-width: var(--button-icon-size) !important;
+  max-width: var(--button-icon-size) !important;
+  min-height: var(--button-icon-size) !important;
+  max-height: var(--button-icon-size) !important;
+  margin: 0 !important;
+}
+}
+/* Loading and notification adornments must not push the primary icon aside. */
+.work-button[data-icon-button] { position: relative; }
+.work-button[data-icon-button] > .work-progress {
+  position: absolute;
+  inset: auto 2px 2px auto;
+  width: 8px;
+  height: 8px;
+  margin: 0;
+}
+summary[data-icon-button] { list-style: none; }
+summary[data-icon-button]::-webkit-details-marker { display: none; }
+/* Keep the selected star legible without switching to a different icon font. */
+[data-icon-button][aria-pressed="true"] > [data-icon-role="star"],
+[data-icon-button][data-active="true"] > [data-icon-role="star"] {
+  fill: currentColor !important;
+}
+/* Responsive text-to-icon actions keep the same regular control size. */
+@media (max-width: 760px) {
+  .finance-module-shell .finance-action > .unigentamos-icon,
+  .people-header-actions > button > .unigentamos-icon {
+    width: var(--control-icon-size) !important;
+    height: var(--control-icon-size) !important;
+  }
+}
+/* Counts stay separate from the centered operational action. */
+.people-operational-row [data-icon-button] { position: relative; }
+.people-operational-row [data-icon-button] > strong {
+  position: absolute;
+  top: 0;
+  right: 0;
+  margin: 0;
+  min-width: 14px;
+  font-size: 9px;
+  line-height: 14px;
+  text-align: center;
+  border-radius: 50%;
+  background: var(--panel-bg, white);
+}
+.maplibregl-ctrl-attrib-button[data-icon-button] {
+  display: flex;
+  background-image: none;
+}
+.maplibregl-ctrl-group [data-icon-button] { display: flex; }
+@media (max-width: 1180px) {
+  .people-redesign-shell .people-header-actions > button {
+    padding: 0 !important;
+    gap: 0 !important;
+    align-items: center;
+    justify-content: center;
+  }
+  .people-redesign-shell .people-header-actions > button > .unigentamos-icon {
+    width: var(--control-icon-size) !important;
+    height: var(--control-icon-size) !important;
+  }
+}
+.maplibregl-ctrl-attrib.maplibregl-compact > .maplibregl-ctrl-attrib-button[data-icon-button] {
+  display: flex;
+  background-image: none !important;
+}

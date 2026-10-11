@@ -12,7 +12,7 @@ export default function ProfilePlaceField({ placeId, places, index, onSelect, on
       <option value="">Choose a saved place</option>
       {places.map(place => <option key={place.id} value={place.id}>{place.name}{place.address && place.address !== place.name ? ` · ${place.address}` : ""}</option>)}
     </SelectField>
-    {placeId && <><a className={styles.open} href={`/admin/map?selected=${encodeURIComponent(placeId)}`} aria-label={`Open ${selected?.name || "place"} in Map`}><UnigentamosIcon role="chevron-right" size={16} /></a><button type="button" className={styles.edit} aria-label="Change address" title="Change address" onClick={onEdit}><UnigentamosIcon role="edit" size={16} /></button></>}
+    {placeId && <><a className={styles.open} href={`/admin/map?selected=${encodeURIComponent(placeId)}`} aria-label={`Open ${selected?.name || "place"} in Map`} data-icon-button="compact"><UnigentamosIcon role="chevron-right" size={16} /></a><button type="button" className={styles.edit} aria-label="Change address" title="Change address" onClick={onEdit} data-icon-button="compact"><UnigentamosIcon role="edit" size={16} /></button></>}
     {selected?.address && <small>{selected.address}</small>}
   </div>;
 }

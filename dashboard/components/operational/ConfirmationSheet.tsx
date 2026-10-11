@@ -145,6 +145,7 @@ export default function ConfirmationSheet({
               onClick={() => onOpenChange(false)}
               disabled={busy}
               aria-label="Close confirmation"
+              data-icon-button="standard"
             >
               <UnigentamosIcon role="close" size={20} />
             </button>

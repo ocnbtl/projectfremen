@@ -772,7 +772,7 @@ function ObjectForm({
             <h2 id={titleId}>{editing ? `Edit ${familyLabel}` : `New ${familyLabel}`}</h2>
             <p>{form.sourceLabel ? `Source: ${form.sourceLabel}` : "Saved in Personal."}</p>
           </div>
-          <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close form">
+          <button type="button" className={styles.closeButton} onClick={onClose} aria-label="Close form" data-icon-button="standard">
             <PersonalOpsIcon name="close" />
           </button>
         </header>
@@ -1653,7 +1653,7 @@ export default function PersonalOpsWorkspace({
                   <h2>{selectedItem.title}</h2>
                   <p>{typeLabel(selectedItem)} · {selectedItem.source === "legacy-goal" ? selectedItem.projectLabel : selectedItem.domain}</p>
                 </div>
-                <button type="button" className={styles.closeButton} onClick={() => { updateUrl({ selected: "" }); setMobileInspectorOpen(false); }} aria-label="Close inspector"><PersonalOpsIcon name="close" /></button>
+                <button type="button" className={styles.closeButton} onClick={() => { updateUrl({ selected: "" }); setMobileInspectorOpen(false); }} aria-label="Close inspector" data-icon-button="standard"><PersonalOpsIcon name="close" /></button>
               </div>
               <div className={styles.chipRow}>
                 <PersonalOpsStatusChip tone={toneForState(stateLabel(selectedItem))}>{cleanLabel(stateLabel(selectedItem))}</PersonalOpsStatusChip>

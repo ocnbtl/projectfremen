@@ -324,7 +324,7 @@ function RowActionIcons({
         onClick={onInspect}
         aria-label={inspectLabel}
         title={inspectLabel}
-      ><InspectIcon /></button>}
+       data-icon-button="compact"><InspectIcon /></button>}
       {openHref ? (
         <Link className={styles.rowActionIcon} href={openHref} aria-label={openLabel} title={openLabel}><OpenIcon /></Link>
       ) : null}
@@ -802,7 +802,7 @@ function EditorSurface({
             <h2 id="projects-editor-title">{title}</h2>
             <p id="projects-editor-description">{description}</p>
           </div>
-          <button type="button" className={styles.iconButton} onClick={onRequestClose} disabled={busy} aria-label={`Close ${title}`}>
+          <button type="button" className={styles.iconButton} onClick={onRequestClose} disabled={busy} aria-label={`Close ${title}`} data-icon-button="standard">
             <UnigentamosIcon role="close" size={18} />
           </button>
         </header>
@@ -917,7 +917,7 @@ function ProjectObjectivesEditor({
                   disabled={busy}
                   aria-label={`Delete ${objective.text || "objective"}`}
                   title="Delete objective"
-                ><ObjectiveDeleteIcon /></button>
+                 data-icon-button="compact"><ObjectiveDeleteIcon /></button>
               )}
             </li>
           ))}
@@ -2145,12 +2145,12 @@ export default function ProjectsWorkspace({
         <Heading>{item.project.name}</Heading>
         <div className={styles.projectHeroActions}>
         {item.project.editable && (
-          <button type="button" className={styles.iconButton} onClick={() => void toggleStar(item)} disabled={mutationBusy || ["complete", "archived"].includes(item.project.lifecycle)} title={item.project.starred ? "Remove star" : "Star project"} aria-label={item.project.starred ? "Remove star" : "Star project"}>
-            {item.project.starred ? "★" : "☆"}
+          <button type="button" className={styles.iconButton} onClick={() => void toggleStar(item)} disabled={mutationBusy || ["complete", "archived"].includes(item.project.lifecycle)} title={item.project.starred ? "Remove star" : "Star project"} aria-label={item.project.starred ? "Remove star" : "Star project"} aria-pressed={item.project.starred} data-icon-button="standard">
+            <UnigentamosIcon role="star" size={20} />
           </button>
         )}
         <details className={styles.projectMenu}>
-          <summary className={styles.iconButton} aria-label="More project options">•••</summary>
+          <summary className={styles.iconButton} aria-label="More project options" data-icon-button="standard"><UnigentamosIcon role="more" size={20} /></summary>
           <div className={styles.projectMenuPanel} role="menu">
             {item.project.editable ? <>
               <button type="button" role="menuitem" onClick={() => openEditor("project-edit", item)} disabled={["complete", "archived"].includes(item.project.lifecycle)}>Edit project</button>
@@ -2871,7 +2871,7 @@ export default function ProjectsWorkspace({
                 <button type="button" className={styles.removeObjectiveButton} onClick={() => {
                   setEditor((current) => current ? { ...current, objectives: current.objectives?.filter((item) => item.id !== objective.id) } : current);
                   setEditorDirty(true);
-                }} aria-label={`Delete objective ${index + 1}`} title="Delete objective"><ObjectiveDeleteIcon /></button>
+                }} aria-label={`Delete objective ${index + 1}`} title="Delete objective" data-icon-button="compact"><ObjectiveDeleteIcon /></button>
               </li>)}
             </ul>
             <button type="button" className={styles.addRowButton} onClick={() => {
@@ -2892,7 +2892,7 @@ export default function ProjectsWorkspace({
                 <button type="button" className={styles.iconButton} onClick={() => {
                   setEditor((current) => current ? { ...current, people: current.people?.filter((item) => item.id !== person.id) } : current);
                   setEditorDirty(true);
-                }} aria-label={`Remove person ${index + 1}`}><UnigentamosIcon role="close" size={14} /></button>
+                }} aria-label={`Remove person ${index + 1}`} data-icon-button="compact"><UnigentamosIcon role="close" size={14} /></button>
               </div>)}
             </div>
             <button type="button" className={styles.addRowButton} onClick={() => {
@@ -3250,7 +3250,7 @@ export default function ProjectsWorkspace({
           }}
         />}
       >
-        {initialDetail && <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation"><UnigentamosIcon role="menu" size={18} /></button>}
+        {initialDetail && <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation" data-icon-button="standard"><UnigentamosIcon role="menu" size={18} /></button>}
         {initialDetail && isInspectorOverlay && selectedItem && <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => setInspectorOpen(true)}>{initialDetail ? "Completion" : "Details"}</button>}
         {initialDetail ? (
           <div className={styles.mainScroll}>

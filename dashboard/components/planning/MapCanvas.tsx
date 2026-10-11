@@ -1,4 +1,5 @@
 "use client";
+import { getIconEntry } from "../../lib/icons/icon-registry";
 import LogoLoader from "../operational/LogoLoader";
 import { motionTokens } from "../../lib/design-system/motion";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
@@ -77,6 +78,19 @@ export default function MapCanvas(props: Props) {
       new maplibregl.NavigationControl({ showCompass: false }),
       "bottom-right",
     );
+    // Keep the map library's interactions, but use our shared functional icons.
+    for (const [selector, role] of [[".maplibregl-ctrl-zoom-in", "plus"], [".maplibregl-ctrl-zoom-out", "minus"], [".maplibregl-ctrl-attrib-button", "information"]]) {
+      const button = instance.getContainer().querySelector(selector);
+      if (!button) continue;
+      const entry = getIconEntry(role);
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      for (const [name, value] of Object.entries({ class: "unigentamos-icon", viewBox: "0 0 24 24", width: "20", height: "20", fill: "none", stroke: "currentColor", "stroke-width": "2", "stroke-linecap": "round", "stroke-linejoin": "round", "aria-hidden": "true", focusable: "false", "data-icon-role": role })) svg.setAttribute(name, value);
+      const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+      use.setAttribute("href", `/tabler-line-sprite.svg#tabler-${entry.defaultCandidate}`);
+      svg.append(use);
+      button.replaceChildren(svg);
+      button.setAttribute("data-icon-button", "standard");
+    }
     instance.on("error", () =>
       setError(
         "Some map content could not load. Your saved places and itinerary remain available.",

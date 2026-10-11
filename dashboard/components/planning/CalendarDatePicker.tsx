@@ -51,9 +51,9 @@ export default function CalendarDatePicker({ value, today, view, onChange }: { v
           }}>{mode === scale && <motion.span aria-hidden="true" className={styles.navigatorHighlight} layoutId={sliderId} transition={reduced ? {duration:0} : {type:"spring", stiffness:360, damping:32}} />}<UnigentamosIcon role={viewIcons[scale]} size={15} /><span>{scale[0].toUpperCase() + scale.slice(1)}</span></button>)}
       </div>
       <header className={styles.pickerHeading}>
-        <button type="button" className={styles.pickerArrow} disabled={year <= 1900} aria-label={mode === "year" ? "Previous years" : "Previous year"} onClick={() => move(-1)}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></button>
+        <button type="button" className={styles.pickerArrow} disabled={year <= 1900} aria-label={mode === "year" ? "Previous years" : "Previous year"} onClick={() => move(-1)} data-icon-button="standard"><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></button>
         <strong aria-live="polite">{mode === "year" ? `${firstYear}–${firstYear + 11}` : year}</strong>
-        <button type="button" className={styles.pickerArrow} disabled={year >= 2200} aria-label={mode === "year" ? "Next years" : "Next year"} onClick={() => move(1)}><UnigentamosIcon role="chevron-right" size={18} /></button>
+        <button type="button" className={styles.pickerArrow} disabled={year >= 2200} aria-label={mode === "year" ? "Next years" : "Next year"} onClick={() => move(1)} data-icon-button="standard"><UnigentamosIcon role="chevron-right" size={18} /></button>
       </header>
       <div ref={body} style={{"--navigator-height":`${mode === "day" ? 104 + dayWeeks * 28 : 282}px`} as CSSProperties} className={styles.navigatorBody} data-mode={mode} data-month-collection id="calendar-date-choices" role="tabpanel" aria-label={`${mode} choices`}>
         <AnimatePresence initial={false} mode="sync" custom={direction}><NavigatorPane key={`${mode}:${year}`} direction={direction} reduced={reduced}>

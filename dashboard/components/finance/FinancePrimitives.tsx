@@ -251,6 +251,7 @@ export function HeaderAction({
       aria-disabled={disabled || undefined}
       aria-describedby={descriptionId}
       data-unavailable={disabled ? "true" : undefined}
+      data-icon-button={children == null ? "standard" : undefined}
       style={disabled ? UNAVAILABLE_ACTION_STYLE : undefined}
     >
       <Icon name={icon} />

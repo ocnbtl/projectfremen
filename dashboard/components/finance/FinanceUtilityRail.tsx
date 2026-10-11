@@ -27,7 +27,7 @@ export default function FinanceUtilityRail({ utility, state, onClose, onView, on
     ...state.importBatches.map(item => [item.id, item.sourceFilename] as const)
   ]);
   return <InspectorRail id="finance-inspector" title={titles[utility]} className="finance-utility-rail is-mobile-open" ariaLabel={titles[utility]} overlay={mobile} overlayOpen onRequestClose={onClose}
-    actions={<button className="finance-rail-close" onClick={onClose} aria-label={`Close ${titles[utility]}`}><Icon name="X" /></button>}>
+    actions={<button className="finance-rail-close" onClick={onClose} aria-label={`Close ${titles[utility]}`} data-icon-button="standard"><Icon name="X" /></button>}>
     {utility === "activity" && <>
       <div className="finance-activity-summary"><strong>{unreviewed.length} awaiting review</strong><span>{transactions.length} transactions · {state.importBatches.length} imports</span><button className="finance-text-action" onClick={() => onView("transactions")}>Open transactions ↗</button></div>
       <h3 className="finance-utility-heading">Latest changes</h3>

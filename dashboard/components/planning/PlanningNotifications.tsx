@@ -146,12 +146,12 @@ export default function PlanningNotifications() {
     }
   }
   return <Popover.Root open={open} onOpenChange={next => {setOpen(next); if(next) void poll();}}>
-    <Popover.Trigger asChild><button type="button" className="work-button work-button--quiet work-reminder-trigger" aria-label={`Reminders${total ? `, ${total} due` : ""}`}>
+    <Popover.Trigger asChild><button type="button" className="work-button work-button--quiet work-reminder-trigger" data-icon-button="standard" aria-label={`Reminders${total ? `, ${total} due` : ""}`}>
       <UnigentamosIcon role="reminder" size={20} />{total > 0 && <span aria-hidden="true">{total > 99 ? "99+" : total}</span>}
     </button></Popover.Trigger>
     <span className="sr-only" role="status">{total ? `${total} calendar reminders need attention` : ""}</span>
     <Popover.Portal><Popover.Content className={styles.panel} align="end" sideOffset={10} collisionPadding={12} aria-label="Reminders" onOpenAutoFocus={e => e.preventDefault()}>
-      <header className={styles.header}><span><UnigentamosIcon role="reminder" size={20} /><strong>Reminders</strong>{total > 0 && <b>{total}</b>}</span><Popover.Close asChild><button type="button" aria-label="Close reminders"><UnigentamosIcon role="close" size={18} /></button></Popover.Close></header>
+      <header className={styles.header}><span><UnigentamosIcon role="reminder" size={20} /><strong>Reminders</strong>{total > 0 && <b>{total}</b>}</span><Popover.Close asChild><button type="button" aria-label="Close reminders" data-icon-button="standard"><UnigentamosIcon role="close" size={18} /></button></Popover.Close></header>
       {error && <div className={styles.error} role="alert"><p>{error}</p><WorkspaceButton onClick={() => void poll()}>Try again</WorkspaceButton></div>}
       {!loaded && !error && <div className={styles.empty} role="status"><UnigentamosIcon role="clock" size={28} /><strong>Checking reminders…</strong></div>}
       {loaded && !error && !items.length && <div className={styles.empty}><span><UnigentamosIcon role="check" size={24} /></span><strong>You’re all caught up</strong><p>Your event reminders will appear here.</p></div>}

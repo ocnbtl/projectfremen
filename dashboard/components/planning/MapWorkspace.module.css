@@ -409,7 +409,7 @@
   .shell > :global(.work-toolbar) :global(.work-button) > span { display: none; }
   .shell > :global(.work-toolbar) .listToggle > span { display: inline; }
   .shell > :global(.work-toolbar) .listToggle > svg { display: none; }
-  .shell :global(.work-toolbar) :global(.work-button) svg { width: 18px; }
+  .shell :global(.work-toolbar) :global(.work-button) svg { width: 20px; height: 20px; }
 }
 
 /* Data exploration lives beside search and map actions, leaving the map unobstructed. */

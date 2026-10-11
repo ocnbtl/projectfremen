@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  isValidElement,
   useEffect,
   useLayoutEffect,
   type CSSProperties,
@@ -25,6 +26,8 @@ export function WorkspaceButton({
   intent?: "primary" | "secondary" | "quiet" | "danger";
   busy?: boolean;
 }) {
+  const childIsIcon = isValidElement(children) && children.type === UnigentamosIcon;
+  const iconOnly = (Boolean(icon) && children == null) || childIsIcon;
   return (
     <button
       type="button"
@@ -34,9 +37,10 @@ export function WorkspaceButton({
         .join(" ")}
       disabled={props.disabled || busy}
       aria-busy={busy || undefined}
+      data-icon-button={iconOnly ? "standard" : undefined}
     >
       {icon && <UnigentamosIcon role={icon} size={20} />}
-      {children != null && <span>{children}</span>}
+      {childIsIcon ? children : children != null && <span>{children}</span>}
       {busy && <span className="work-progress" aria-hidden="true" />}
     </button>
   );

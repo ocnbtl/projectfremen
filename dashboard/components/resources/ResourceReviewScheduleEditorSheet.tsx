@@ -248,6 +248,7 @@ export default function ResourceReviewScheduleEditorSheet({
                 onClick={requestClose}
                 disabled={busy}
                 aria-label="Close Resource review schedule editor"
+                data-icon-button="standard"
               >
                 <UnigentamosIcon role="close" size={20} />
               </button>

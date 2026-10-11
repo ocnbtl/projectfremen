@@ -247,6 +247,7 @@ export default function MediaReviewScheduleEditorSheet({
                 onClick={requestClose}
                 disabled={busy}
                 aria-label="Close Media review timing editor"
+                data-icon-button="standard"
               >
                 <UnigentamosIcon role="close" size={20} />
               </button>

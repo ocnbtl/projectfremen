@@ -339,6 +339,7 @@ function RemoveIconButton({ label, onClick, className = "" }: { label: string; o
       onClick={onClick}
       aria-label={label}
       title={label}
+      data-icon-button="standard"
     >
       <PeopleIcon name="delete" />
     </button>
@@ -366,6 +367,7 @@ function PeopleAddButton({
     <button
       type="button"
       className={`people-add-action${iconOnly ? " is-icon-only" : ""} ${className}`.trim()}
+      data-icon-button={iconOnly ? "standard" : undefined}
       onClick={onClick}
       disabled={disabled}
       aria-label={ariaLabel || `Add ${label.toLowerCase()}`}
@@ -1927,7 +1929,7 @@ function PeopleNotesEditor({
             />
             <div className="people-note-actions">
               <RemoveIconButton className="people-note-remove" label={`Remove note ${index + 1}`} onClick={() => removeNote(index)} />
-              <button className="people-note-add" type="button" aria-label={`Add note after note ${index + 1}`} title="Add note" onClick={() => addNote(index)}><PeopleIcon name="plus" /></button>
+              <button className="people-note-add" type="button" aria-label={`Add note after note ${index + 1}`} title="Add note" onClick={() => addNote(index)} data-icon-button="standard"><PeopleIcon name="plus" /></button>
             </div>
           </div>
         ))}
@@ -4077,7 +4079,7 @@ export default function PeopleWorkspace({
         aria-hidden={!mobileMenuOpen}
         inert={!mobileMenuOpen}
       >
-        <button type="button" aria-label="Close people menu" onClick={() => setMobileMenuOpen(false)}>
+        <button type="button" aria-label="Close people menu" onClick={() => setMobileMenuOpen(false)} data-icon-button="standard">
           <PeopleIcon name="close" />
         </button>
         {PEOPLE_SIDEBAR_SECTIONS.map((section) => (
@@ -4094,6 +4096,7 @@ export default function PeopleWorkspace({
                   title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} Possible ${count === 1 ? "Duplicate" : "Duplicates"}` : "No Duplicates Detected" : item.label) : undefined}
                   aria-current={activeSidebarView === item.id ? "page" : undefined}
                   data-utility={section.title === "Operational" ? item.id : undefined}
+                  data-icon-button={section.title === "Operational" ? "standard" : undefined}
                   data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
                   key={item.id}
                 >
@@ -4122,6 +4125,7 @@ export default function PeopleWorkspace({
                   title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} Possible ${count === 1 ? "Duplicate" : "Duplicates"}` : "No Duplicates Detected" : item.label) : undefined}
                   aria-current={activeSidebarView === item.id ? "page" : undefined}
                   data-utility={section.title === "Operational" ? item.id : undefined}
+                  data-icon-button={section.title === "Operational" ? "standard" : undefined}
                   data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
                   key={item.id}
                 >
@@ -4138,7 +4142,7 @@ export default function PeopleWorkspace({
       <main className="people-directory-panel" data-total-records={totalRecords}>
         <header className="people-directory-header">
           <div className="people-directory-heading">
-            <button type="button" className="people-mobile-nav-trigger" aria-label="Open people navigation" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)}><UnigentamosIcon role="menu" size={20} /></button>
+            <button type="button" className="people-mobile-nav-trigger" aria-label="Open people navigation" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)} data-icon-button="standard"><UnigentamosIcon role="menu" size={20} /></button>
             <h1>{activeViewLabel}</h1>
           </div>
           <div className="people-header-actions">
@@ -4183,7 +4187,7 @@ export default function PeopleWorkspace({
               placeholder="Search people..."
             />
             {query && (
-              <button type="button" className="people-search-clear" aria-label="Clear search" onClick={() => { setQuery(""); updatePeopleUrl({ query: "" }, { native: true }); }}>
+              <button type="button" className="people-search-clear" aria-label="Clear search" onClick={() => { setQuery(""); updatePeopleUrl({ query: "" }, { native: true }); }} data-icon-button="standard">
                 <PeopleIcon name="close" />
               </button>
             )}
@@ -4514,6 +4518,7 @@ export default function PeopleWorkspace({
                   onClick={() => void toggleStar(selectedPerson)}
                   disabled={Boolean(lifecycleSaving)}
                   title={selectedPerson.starred ? "Remove from Starred" : "Add to Starred"}
+                  data-icon-button="standard"
                 >
                   <PeopleIcon name="star" />
                 </button>
@@ -4527,7 +4532,7 @@ export default function PeopleWorkspace({
                     setStatusMenuOpen(false);
                     setProfileMenuOpen((current) => !current);
                   }}
-                ><PeopleIcon name="more" /></button>
+                 data-icon-button="standard"><PeopleIcon name="more" /></button>
               </div>
               {profileMenuOpen && (
                 <div id="people-profile-action-menu" className="people-action-menu" role="menu" aria-label="Profile actions">
@@ -4929,7 +4934,7 @@ export default function PeopleWorkspace({
                             {person ? <span className="people-linked-person-avatar"><PeopleProfileAvatar label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /></span> : <span className="people-object-glyph"><UnigentamosIcon role={objectTargetIcon(object)} size={20} /></span>}
                             <span><strong>{object.label}</strong><small>{labelize(object.objectType)} · {labelize(link.relationship)}</small></span>
                           </a>
-                          <button type="button" onClick={() => void removeObjectLink(link)} disabled={objectLinkSaving} aria-label={`Remove link to ${object.label}`}><PeopleIcon name="close" /></button>
+                          <button type="button" onClick={() => void removeObjectLink(link)} disabled={objectLinkSaving} aria-label={`Remove link to ${object.label}`} data-icon-button="standard"><PeopleIcon name="close" /></button>
                         </div>
                       ); }) : <p>No objects yet.</p>}
                     </div>
@@ -4964,6 +4969,7 @@ export default function PeopleWorkspace({
                         aria-expanded={method.available ? expandedContactMethod === method.id : undefined}
                         title={method.available ? method.label : `${method.label} not added`}
                         disabled={!method.available}
+                        data-icon-button="standard"
                       >
                         <ContactMethodIcon id={method.id} />
                       </button>
@@ -5007,7 +5013,7 @@ export default function PeopleWorkspace({
                         aria-label={`Add note for ${selectedPerson.title}`}
                         aria-expanded={quickNoteOpen}
                         title="Add note"
-                      ><PeopleIcon name="plus" /></button>
+                       data-icon-button="standard"><PeopleIcon name="plus" /></button>
                     </header>
                     {quickNoteOpen && (
                       <form className="people-quick-note-form" onSubmit={saveQuickNote}>
@@ -5132,7 +5138,7 @@ export default function PeopleWorkspace({
                 <h2 id="log-interaction-title">Log interaction</h2>
 
               </div>
-              <button className="people-dialog-close" type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}><UnigentamosIcon role="close" size={18} /></button>
+              <button className="people-dialog-close" type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving} data-icon-button="standard"><UnigentamosIcon role="close" size={18} /></button>
             </header>
             <div className="people-interaction-fields">
               <div className="people-interaction-settings is-wide"><InteractionApproach value={interactionApproach} onChange={setInteractionApproach} /><InteractionCheckbox checked={interactionMeaningful} onChange={setInteractionMeaningful} /></div>
@@ -5207,7 +5213,7 @@ export default function PeopleWorkspace({
                 <h2 id="people-object-link-title">Add {selectedPerson.title} to an object</h2>
                 <p>Find a person, project, resource, or another object to connect.</p>
               </div>
-              <button className="people-dialog-close" type="button" aria-label="Close object picker" onClick={() => setObjectLinkOpen(false)} disabled={objectLinkSaving}><PeopleIcon name="close" /></button>
+              <button className="people-dialog-close" type="button" aria-label="Close object picker" onClick={() => setObjectLinkOpen(false)} disabled={objectLinkSaving} data-icon-button="standard"><PeopleIcon name="close" /></button>
             </header>
             <div className="people-object-link-fields">
               <PeopleObjectPicker targets={availableObjectTargets} value={objectLinkTargetId} onChange={setObjectLinkTargetId} disabled={objectLinkSaving} />

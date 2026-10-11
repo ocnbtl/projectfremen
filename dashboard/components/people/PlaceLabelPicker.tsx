@@ -18,7 +18,7 @@ export default function PlaceLabelPicker({ value, index, onChange }: { value: st
     || (/^(?:office|headquarters|hq)$/i.test(value) ? choices.find(choice => choice.label === "Work") : undefined);
   function choose(label: string) { onChange(label); setOpen(false); }
   return <Popover.Root open={open} onOpenChange={next => { setOpen(next); if (next) setCustom(selected ? "" : value); }}>
-    <Popover.Trigger asChild><button type="button" className="people-place-label-trigger" role="combobox" aria-label={`Place ${index + 1} label`} aria-description={value || "Choose a place label"} title={value || "Place label"} data-value={value} aria-haspopup="dialog">
+    <Popover.Trigger asChild><button type="button" className="people-place-label-trigger" role="combobox" aria-label={`Place ${index + 1} label`} aria-description={value || "Choose a place label"} title={value || "Place label"} data-value={value} aria-haspopup="dialog" data-icon-button="standard">
       <UnigentamosIcon role={selected?.icon || "location"} size={18} />
     </button></Popover.Trigger>
     <Popover.Portal><Popover.Content className="app-select-menu people-place-label-menu" sideOffset={6} collisionPadding={12} aria-label="Place label" onEscapeKeyDown={event => event.stopImmediatePropagation()}>

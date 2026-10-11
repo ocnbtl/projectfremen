@@ -172,7 +172,7 @@ export default function ModuleSidebar({
           {description && <p>{description}</p>}
         </div>
         {onClose && (
-          <button type="button" className="module-sidebar__close" onClick={onClose} aria-label={`Close ${title} navigation`}>
+          <button type="button" className="module-sidebar__close" onClick={onClose} aria-label={`Close ${title} navigation`} data-icon-button="standard">
             <UnigentamosIcon role="close" size={20} />
           </button>
         )}

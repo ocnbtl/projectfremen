@@ -731,6 +731,7 @@ export default function ResourcesWorkspace({
               rel="noreferrer"
               aria-label="Open source"
               title="Open source"
+              data-icon-button="standard"
             >
               <PersonalOpsIcon name="open" />
             </a>
@@ -738,7 +739,7 @@ export default function ResourcesWorkspace({
           <ResourceIconButton icon="review" label="Mark reviewed" disabled={headerBusy} onClick={() => void updateHeaderResource({ action: "review" })} />
           <ResourceIconButton icon="star" label={selectedResource.pinned ? "Unpin resource" : "Pin resource"} active={selectedResource.pinned === true} disabled={headerBusy} onClick={() => void updateHeaderResource({ starred: !selectedResource.pinned })} />
           <details className={resourceStyles.menu}>
-            <summary className={resourceStyles.iconButton} aria-label="More resource actions" title="More resource actions"><PersonalOpsIcon name="more" /></summary>
+            <summary className={resourceStyles.iconButton} aria-label="More resource actions" title="More resource actions" data-icon-button="standard"><PersonalOpsIcon name="more" /></summary>
             <div className={resourceStyles.menuPanel}>
               <button type="button" onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); openInlineEditor(); }}><PersonalOpsIcon name="edit" />Edit</button>
               <button type="button" disabled={headerBusy} onClick={(event) => { event.currentTarget.closest("details")?.removeAttribute("open"); if (window.confirm("Archive this resource? Its links and history will stay intact.")) void updateHeaderResource({ action: "archive", archiveReason: "Archived from Resources" }); }}><PersonalOpsIcon name="archive" />Archive</button>

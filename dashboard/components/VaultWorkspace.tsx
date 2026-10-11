@@ -1186,7 +1186,7 @@ export default function VaultWorkspace({
               <span>Saved searches</span>
               {savedSearches.map((search) => <span className={styles.savedSearch} key={search.id}>
                 <button type="button" onClick={() => { setActiveKind(search.kind); setRecordQuery(search.query); }}>{search.label}</button>
-                <button type="button" aria-label={`Delete saved search ${search.label}`} onClick={() => void persistSavedSearches(savedSearches.filter((item) => item.id !== search.id))}><UnigentamosIcon role="close" size={14} /></button>
+                <button type="button" aria-label={`Delete saved search ${search.label}`} onClick={() => void persistSavedSearches(savedSearches.filter((item) => item.id !== search.id))} data-icon-button="compact"><UnigentamosIcon role="close" size={14} /></button>
               </span>)}
             </div>}
             <div className={styles.kindTabs} role="tablist" aria-label="Vault object kinds">

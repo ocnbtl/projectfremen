@@ -52,6 +52,7 @@ export default function RecordLinks({
                   onChange(refs.filter((x) => key(x) !== key(ref)))
                 }
                 aria-label={`Unlink ${ref.label}`}
+                data-icon-button="compact"
               >
                 <UnigentamosIcon role="close" size={14} />
               </button>

@@ -366,7 +366,7 @@ export default function MapWorkspace() {
         </Button>
       </WorkspaceHeader>
       <div className="work-toolbar">
-        <label className="work-search"><UnigentamosIcon role="search" size={20} /><input type="search" aria-label="Search places or addresses" placeholder="Search places or addresses" value={query} onChange={e => setQuery(e.target.value)} /><button type="button" className={styles.addressSearch} aria-label="Find address on map" disabled={query.trim().length < 3 || busy} onClick={() => void search()}><UnigentamosIcon role="chevron-right" size={16} /></button></label>
+        <label className="work-search"><UnigentamosIcon role="search" size={20} /><input type="search" aria-label="Search places or addresses" placeholder="Search places or addresses" value={query} onChange={e => setQuery(e.target.value)} /><button type="button" className={styles.addressSearch} aria-label="Find address on map" disabled={query.trim().length < 3 || busy} onClick={() => void search()} data-icon-button="compact"><UnigentamosIcon role="chevron-right" size={16} /></button></label>
         <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!tag}>Filter{tag ? " (1)" : ""}</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
           <>
             <label>
@@ -619,11 +619,10 @@ export default function MapWorkspace() {
                 <h2>{selected.name}</h2>
                 <Button
                   intent="quiet"
+                  icon="close"
                   aria-label="Close place preview"
                   onClick={() => setSelectedId("")}
-                >
-                  ×
-                </Button>
+                />
               </div>
               <p>{selected.address}</p>{!hasPlaceCoordinates(selected) && <p className="work-muted">Address saved. Add coordinates to show its pin on the map.</p>}
               {selected.notes && <p>{selected.notes}</p>}
