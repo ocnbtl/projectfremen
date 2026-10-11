@@ -114,7 +114,7 @@ export type PlanningCollections = {
   reminders: ReminderReceipt;
 };
 export type PlanningCollection = keyof PlanningCollections;
-export type PlanningState = { schemaVersion: 1 } & {
+export type PlanningState = { schemaVersion: 1; bookingData?: import("./booking-types").BookingData } & {
   [K in PlanningCollection]: PlanningCollections[K][];
 };
 export type EventOccurrence = EventFields & {

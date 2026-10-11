@@ -1,6 +1,7 @@
 "use client";
 import PlaceSync from "./PlaceSync";
 import CalendarSharing from "./CalendarSharing";
+import CalendarBookings from "./CalendarBookings";
 import LogoLoader from "../operational/LogoLoader";
 import * as Popover from "@radix-ui/react-popover";
 import { calendarDisplayColor, eventColors, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
@@ -989,6 +990,7 @@ export default function CalendarWorkspace() {
             })}
           </div>
           <CalendarSharing calendars={snapshot?.state.calendars || []} />
+          <CalendarBookings calendars={snapshot?.state.calendars || []} />
           <section className={styles.importSection} aria-label="Import calendars">
             <div className={styles.settingsHeading}><div><h3><UnigentamosIcon role="import" size={18} />Import another calendar</h3><p>Upload a file once, or subscribe to a feed that refreshes automatically while Unigentamos is open.</p></div></div>
             <div className={styles.importProviders} role="group" aria-label="Calendar provider">{["Google Calendar", "Apple Calendar", "Outlook", "Other"].map(provider => <Button key={provider} aria-pressed={importProvider === provider} onClick={() => setImportProvider(provider)}>{provider === "Apple Calendar" ? <img src="/contact-sources/apple.svg" width={18} height={18} alt="" /> : provider === "Google Calendar" ? <img src="/contact-sources/google-calendar.png" width={18} height={18} alt="" /> : provider === "Outlook" ? <img src="/contact-sources/outlook.svg" width={18} height={18} alt="" /> : <UnigentamosIcon role="calendar" size={18} />}{provider}</Button>)}</div>

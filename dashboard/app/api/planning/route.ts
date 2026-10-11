@@ -184,7 +184,7 @@ export async function GET() {
     }
     return json({
       ok: true,
-      state,
+      state: { ...state, bookingData: undefined },
       refs,
       birthdays: records.filter(record => record.className === "person" && !record.archivedAt && record.profile?.birthday).map(record => ({ ref: refs.find(ref => ref.module === "people" && ref.objectId === record.id)!, birthday: record.profile!.birthday! })),
       trips: life?.trips || [],

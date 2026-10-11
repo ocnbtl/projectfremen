@@ -123,6 +123,17 @@ Calendar → Calendars → Share calendars creates a read-only HTTPS iCalendar f
 - In Apolosign: phone app menu → My Family → calendar section + → Subscribe via URL. This is one-way subscription; Apolosign changes do not write back. See the [official subscription instructions](https://support.apolosign.com/hc/en-us/articles/54620280289817-How-to-Sync-Refresh-External-Calendars-in-Apolosign).
 - Regression checks: `npm run test:calendar-sharing` uses synthetic data and a temporary store to cover scope/privacy, token rotation/revocation, stale writes, UTF-8 folding/escaping, UTC/DST, recurring exceptions, all-day dates, and stable event identity. Browser/API checks should additionally exercise unauthorized management, CSRF rejection, mobile geometry, copy, anonymous feed fetches, and persistence after reload. Do not use production events as test fixtures.
 
+### Calendar booking links
+
+Calendar → Calendars → Take bookings creates an external booking page. Choose automatic availability (date range, weekdays and daily hours) or specific start times each time a link is created. Set the destination calendar, calendars checked for conflicts, appointment length, time zone, buffer and advance notice. Hidden selected calendars still block time.
+
+- Guests provide a name, email and optional note. Confirmation is immediate on the page and creates an ordinary event in the destination calendar, with guest contact details visible privately. No confirmation email is sent; guests contact the organizer for changes or cancellation.
+- Management uses authenticated, CSRF-protected `GET/POST /api/planning/bookings`; guests use `/book/<signed-token>` and `/api/book/<signed-token>`. Links can be edited, closed or replaced. Closing a link preserves existing bookings. Treat URLs as bearer credentials; booking paths are excluded from analytics and use no-referrer/noindex headers.
+- Link definitions, booking receipts and events share the existing atomic `planning-records.json` state (Supabase `app_state` in production). Each reservation rechecks current availability inside the write transaction, including after a compare-and-swap retry. Request identifiers prevent duplicate submissions. Ordinary calendar snapshots exclude booking administration data.
+- Availability includes stored recurring events, exceptions and all-day events. Imported calendars use their latest saved state; separate birthday/holiday/custom-date overlays are not blockers. Ambiguous or nonexistent local times are not offered. Date ranges are limited to 91 days, manual selections to 200 starts and booking links to 100.
+- Durable booking limits apply per guest email, IP and link. Contact information stays in event participants and is excluded from calendar subscription feeds. Signing uses a separate HMAC domain with the existing admin signing secret; rotating that secret invalidates links.
+- `npm run test:calendar-booking` exercises availability, daylight saving, concurrency, idempotency, privacy, link controls and abuse limits using synthetic data, including a simulated Supabase compare-and-swap collision. Browser checks should cover guest confirmation, stale slots, host controls and responsive layouts without making production test bookings.
+
 1. `GITHUB_TOKEN` is optional but recommended to avoid rate limits during docs sync.
 2. Without Supabase config, local development falls back to filesystem persistence.
 3. Sentry KPI sync currently targets `pngwn` and `Diyesu Decor` and requires the `SENTRY_*` env vars.

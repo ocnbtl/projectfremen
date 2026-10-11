@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
-import { Analytics } from "@vercel/analytics/next";
+import PrivateRouteAnalytics from "../components/PrivateRouteAnalytics";
 import "@fontsource-variable/plus-jakarta-sans/wght.css";
 import "@fontsource-variable/inter/wght.css";
 import "@fontsource-variable/inconsolata/wght.css";
@@ -59,7 +59,7 @@ export default function RootLayout({
       <body>
         <LoadingHost><PersistentSharedAIDockProvider><NavigationHost>{children}</NavigationHost></PersistentSharedAIDockProvider></LoadingHost>
         <ServiceWorkerRegistration />
-        {process.env.VERCEL === "1" ? <Analytics /> : null}
+        {process.env.VERCEL === "1" ? <PrivateRouteAnalytics /> : null}
       </body>
     </html>
   );

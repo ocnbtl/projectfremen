@@ -27,6 +27,12 @@ export function planningState(value: unknown): PlanningState {
   if (raw.schemaVersion !== 1)
     throw new Error("This planning data needs a newer application version");
   const result = emptyPlanningState();
+  // Booking definitions and receipts share the event transaction, but are not
+  // writable through generic planning collections or offline record commands.
+  if (raw.bookingData) {
+    if (!Array.isArray(raw.bookingData.links) || !Array.isArray(raw.bookingData.receipts)) throw new Error("Invalid booking storage");
+    result.bookingData = raw.bookingData;
+  }
   for (const key of PLANNING_COLLECTIONS)
     if (Array.isArray(raw[key])) (result[key] as unknown[]) = raw[key];
   return result;

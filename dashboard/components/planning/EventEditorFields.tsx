@@ -90,7 +90,7 @@ export default function EventEditorFields({ fields, update, snapshot }: {
       <section className={styles.links} aria-label="Linked objects"><RecordLinks objectPicker pickerLabel="Link an object" refs={linked} available={snapshot?.refs} onChange={refs => {
         update("linkedRefs",refs); const place=refs.find(r => r.module === "map" && r.objectType === "place"); update("placeId",place?.objectId || "");
         if (place && place.objectId !== fields.placeId) update("location",snapshot?.state.places.find(p => p.id === place.objectId)?.address || place.label);
-      }} />{Boolean(fields.participants?.length) && <p className={styles.participants}>Imported participants: {fields.participants?.map(p => p.name || p.email).join(", ")}</p>}</section>
+      }} />{Boolean(fields.participants?.length) && <p className={styles.participants}>Participants: {fields.participants?.map(p => p.email ? `${p.name} (${p.email})` : p.name).join(", ")}</p>}</section>
     </div>
   </div>;
 }
