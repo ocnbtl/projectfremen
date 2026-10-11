@@ -1,4 +1,11 @@
 [
+  {
+    "id": "share",
+    "label": "Share",
+    "defaultCandidate": "share-3",
+    "candidates": ["share-3", "link", "upload", "external-link", "affiliate"],
+    "usages": [{ "module": "Calendar", "breadcrumb": "Options > Share" }]
+  },
   { "id": "reminder", "label": "Reminder", "defaultCandidate": "bell", "candidates": ["bell", "bell-ringing", "bell-check", "alarm", "calendar-clock"], "usages": [{ "module": "Calendar", "breadcrumb": "Top navigation > Reminders" }] },
   { "id": "module-projects", "label": "Projects", "defaultCandidate": "layout-kanban", "candidates": ["layout-kanban", "folders", "clipboard-list", "road", "stack-2"], "usages": [{ "module": "Projects", "breadcrumb": "Top navigation › Projects" }] },
   { "id": "module-notes", "label": "Notes", "defaultCandidate": "note", "candidates": ["note", "notes", "file-description", "notebook", "writing"], "usages": [{ "module": "Notes", "breadcrumb": "Top navigation › Notes" }] },

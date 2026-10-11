@@ -1,0 +1,33 @@
+.sheet:global(.work-sheet.work-sheet--center) {width:min(800px,calc(100vw - 32px));max-height:calc(100dvh - 48px);}
+.sheet :global(.work-sheet-header) h2 {display:flex;align-items:center;gap:10px;font-size:20px;}
+.sheet :global(.work-sheet-body) {padding:22px;}
+.content {display:grid;gap:20px;min-width:0;}
+.intro {margin:0;color:var(--text-secondary);font-size:13px;line-height:1.6;}
+.tabs {display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;padding:5px;border:1px solid var(--module-border,#ded9eb);border-radius:15px;background:var(--module-quiet,#f6f4fa);}
+.tabs button {display:flex;align-items:center;gap:12px;padding:13px 16px;min-width:0;text-align:left;border:1px solid transparent;border-radius:11px;background:transparent;color:var(--text-secondary);cursor:pointer;transition:background .18s,border-color .18s,box-shadow .18s;}
+.tabs button[aria-selected=true] {background:var(--surface,#fff);border-color:var(--module-border,#ded9eb);color:var(--module-icon,#62568f);box-shadow:0 2px 7px #30234c0a;}
+.tabs button:hover {background:var(--surface,#fff);}
+.tabs button:focus-visible {outline:2px solid var(--module-action,#62568f);outline-offset:2px;}
+.tabs svg {flex:none;}
+.tabs span {display:grid;gap:3px;min-width:0;}
+.tabs strong {font:600 13px/1.4 var(--font-body);}
+.tabs small {font:400 11px/1.4 var(--font-body);color:var(--text-muted);}
+.pane[hidden] {display:none;}
+.pane:not([hidden]) {animation:appear .18s ease-out;}
+.pane>section {padding:0;border:0;background:transparent;gap:16px;}
+.pane h3 {font-size:17px;line-height:1.4;}
+.pane h3 svg {color:var(--module-icon,#62568f);}
+@keyframes appear {from {opacity:0;transform:translateY(3px);} to {opacity:1;transform:translateY(0);}}
+@media(max-width:600px) {
+ .sheet:global(.work-sheet.work-sheet--center) {inset:calc(var(--app-header-height,60px) + 8px) auto auto 8px;transform:none;width:calc(100vw - 16px);height:auto;max-height:calc(100dvh - var(--app-header-height,60px) - 16px);border-radius:16px;animation:appear .18s ease-out;}
+ .sheet :global(.work-sheet-header) {padding:12px 14px;}
+ .sheet :global(.work-sheet-header) h2 {font-size:18px;}
+ .sheet :global(.work-sheet-body) {padding:16px 14px;}
+ .content {gap:16px;}
+ .tabs button {gap:8px;padding:10px 8px;}
+ .tabs strong {font-size:12px;}
+ .tabs small {font-size:10px;}
+}
+@media(prefers-reduced-motion:reduce) {.sheet:global(.work-sheet.work-sheet--center),.pane:not([hidden]) {animation:none;}.tabs button {transition:none;}}
+:global(html[data-product-motion="reduce"]) .pane:not([hidden]) {animation:none;}
+:global(html[data-product-motion="reduce"]) .tabs button {transition:none;}

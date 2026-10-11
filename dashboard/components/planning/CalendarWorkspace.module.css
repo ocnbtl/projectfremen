@@ -2739,7 +2739,9 @@
 }
 .viewOptions {gap:10px;}
 .viewOptions .optionsHeading {padding-bottom:0;}
-.viewOptions .optionsHeading > button {margin-left:auto;width:auto;flex:none;min-height:30px;height:30px;padding:4px 8px;font-size:11px;}
+.viewOptions .optionsActions {margin-left:auto;display:flex;align-items:center;gap:5px;}
+.viewOptions .optionsActions > button {width:auto;flex:none;min-height:32px;height:32px;padding:4px 8px;font-size:11px;}
+.viewOptions .optionsActions > button:last-child {width:32px;padding:0;justify-content:center;}
 .content[data-view="week"] .allDayBand .allDayItem .eventTitle {font-size:12px;}
 .allDayBand .allDayItem { --event-icon-size:18px; }
 @media(max-width:760px) { .content[data-view="week"] .allDayBand .allDayItem { --event-icon-size:11px; } }

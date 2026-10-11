@@ -158,6 +158,7 @@ export function WorkspaceSheet({
   anchorWidth = 620,
   headerActions,
   focusInput = true,
+  returnFocusSelector,
 }: {
   open: boolean;
   onClose: () => void;
@@ -171,6 +172,7 @@ export function WorkspaceSheet({
   anchorWidth?: number;
   headerActions?: ReactNode;
   focusInput?: boolean;
+  returnFocusSelector?: string;
 }) {
   const [anchorStyle, setAnchorStyle] = useState<CSSProperties>();
   useLayoutEffect(() => {
@@ -223,7 +225,7 @@ export function WorkspaceSheet({
             // Do not let the old sheet restore focus behind the new modal.
             if (document.querySelector('[role="dialog"][data-state="open"]'))
               return;
-            const target = opener.current;
+            const target = (returnFocusSelector ? document.querySelector<HTMLElement>(returnFocusSelector) : null) || opener.current;
             if (target?.isConnected) target.focus({ preventScroll: true });
           }}
           className={`work-sheet${anchorSelector ? " work-sheet--anchored" : ""}${presentation ? ` work-sheet--${presentation}` : ""}${className ? ` ${className}` : ""}`}

@@ -50,7 +50,7 @@ export default function CalendarSharing({ calendars }: { calendars: Calendar[] }
   }
   return <section className={styles.panel} aria-label="Share calendars">
     <div className={styles.heading}><div><h3><UnigentamosIcon role="link" size={18} />Share calendars</h3><p>Subscribe in Apolosign, Apple Calendar, or another calendar app.</p></div>
-      <Button icon="plus" onClick={create} disabled={loading || busy || !available.length}>Create sharing link</Button></div>
+      <Button icon="plus" intent="primary" onClick={create} disabled={loading || busy || !available.length}>Create sharing link</Button></div>
     <p className={styles.note}>Anyone with a link can read the details you select. Changes sync when the receiving app refreshes; edits there do not change Unigentamos.</p>
     {error && <div role="alert" className={styles.feedback}>{error} <Button disabled={busy} onClick={() => { setDraft(null); setConfirm(null); void load(); }}>Refresh links</Button></div>}
     {notice && <p role="status" className={styles.feedback}>{notice}</p>}

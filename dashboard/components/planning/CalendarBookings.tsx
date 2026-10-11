@@ -42,7 +42,7 @@ export default function CalendarBookings({ calendars }: { calendars: Calendar[] 
     catch { setNotice("Select and copy the booking URL from the field."); }
   }
   return <section className={shared.panel} aria-label="Booking links">
-    <div className={shared.heading}><div><h3><UnigentamosIcon role="calendar" size={18} />Take bookings</h3><p>Let people choose a time and book directly into your calendar.</p></div><Button icon="plus" disabled={loading || busy || !active.length} onClick={create}>Create booking link</Button></div>
+    <div className={shared.heading}><div><h3><UnigentamosIcon role="calendar" size={18} />Take bookings</h3><p>Let people choose a time and book directly into your calendar.</p></div><Button icon="plus" intent="primary" disabled={loading || busy || !active.length} onClick={create}>Create booking link</Button></div>
     <p className={shared.note}>Choose specific times or automatically offer free time. Bookings confirm immediately; guests provide a name, email, and optional note. Your other events stay private.</p>
     {error && <div role="alert" className={shared.feedback}>{error} <Button disabled={busy} onClick={() => void load()}>Refresh booking links</Button></div>}
     {notice && <p role="status" className={shared.feedback}>{notice}</p>}{loading && <p role="status">Loading booking links…</p>}

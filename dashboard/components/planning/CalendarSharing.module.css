@@ -5,7 +5,9 @@
 .heading button,.actions button,.url button,.feedback button{font-size:12px;min-height:34px;padding:6px 10px;white-space:normal}
 .form{display:grid;gap:14px;padding:16px;border-radius:12px;background:color-mix(in srgb,var(--module-accent,#62568f) 5%,transparent);animation:appear 180ms ease-out}
 .form h4{margin:0;font-size:14px}.field{display:grid;gap:6px;font-size:12px}
-.form input:not([type=checkbox]),.url input{min-width:0;width:100%;box-sizing:border-box;font-size:13px;min-height:36px}
+.panel :is(input:not([type=checkbox]):not([type=radio]),select,textarea){min-width:0;box-sizing:border-box;font:400 13px/1.4 var(--font-body);color:var(--text-primary,#243c44);background:var(--surface,#fff);border:1px solid var(--module-border,#d8d5e4);border-radius:8px;padding:8px 10px;transition:border-color .18s,box-shadow .18s;}
+.panel :is(input,select,textarea):focus-visible{outline:none;border-color:var(--module-action,#62568f);box-shadow:0 0 0 3px color-mix(in srgb,var(--module-action,#62568f) 16%,transparent);}
+.form input:not([type=checkbox]):not([type=radio]),.url input{min-width:0;width:100%;box-sizing:border-box;font-size:13px;min-height:36px}
 .form fieldset{margin:0;padding:0;border:0;min-width:0}.form legend{font-size:12px;font-weight:600;margin-bottom:8px}
 .choices{display:flex;flex-wrap:wrap;gap:10px 18px}
 .choice{display:inline-flex!important;flex-direction:row!important;align-items:center!important;gap:7px!important;font-size:13px;min-height:28px;cursor:pointer}

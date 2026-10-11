@@ -1,7 +1,6 @@
 "use client";
 import PlaceSync from "./PlaceSync";
-import CalendarSharing from "./CalendarSharing";
-import CalendarBookings from "./CalendarBookings";
+import CalendarSharePanel from "./CalendarSharePanel";
 import LogoLoader from "../operational/LogoLoader";
 import * as Popover from "@radix-ui/react-popover";
 import { calendarDisplayColor, eventColors, eventTimeLabel, eventTimeRange } from "./calendar-presentation";
@@ -157,6 +156,7 @@ export default function CalendarWorkspace() {
       scope: "series" | "occurrence";
     }>(),
     [connections, setConnections] = useState(false),
+    [sharing, setSharing] = useState(false),
     [filters, setFilters] = useState(false),
     [ai, setAi] = useState(false),
     [now, setNow] = useState(Date.now()),
@@ -641,9 +641,9 @@ export default function CalendarWorkspace() {
             {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
-            <Popover.Trigger asChild><Button icon={compact ? undefined : "sliders"} aria-label={compact ? "Calendar tools" : "Options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? <UnigentamosIcon role="sliders" candidate="settings" size={18} /> : "Options"}</Button></Popover.Trigger>
+            <Popover.Trigger asChild><Button data-calendar-options-trigger icon={compact ? undefined : "sliders"} aria-label={compact ? "Calendar tools" : "Options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? <UnigentamosIcon role="sliders" candidate="settings" size={18} /> : "Options"}</Button></Popover.Trigger>
             <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar view options">
-              <div className={styles.optionsHeading}><UnigentamosIcon role="sliders" candidate="settings" size={16}/><strong>Settings</strong><Button icon="calendar" onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button></div>
+              <div className={styles.optionsHeading}><UnigentamosIcon role="sliders" candidate="settings" size={16}/><strong>Settings</strong><div className={styles.optionsActions}><Button icon="calendar" data-calendar-settings-trigger onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button><Button icon="share" aria-label="Share calendar" title="Share calendars and take bookings" onClick={() => { setFilters(false); setSharing(true); }} /></div></div>
               <div className={styles.viewOptionSection}>
                 <ViewToggle label="Widen today" icon="today" checked={widenToday} onChange={next => morph(() => setWidenToday(next))} />
                 <ViewToggle label="Show weekends" icon="week" checked={showWeekends} onChange={next => morph(() => setShowWeekends(next))} />
@@ -660,7 +660,6 @@ export default function CalendarWorkspace() {
               {draft && !editor && <div className={styles.mobileToolActions}><DraftNotice onResume={() => { setFilters(false); setEditor(draft); }} onDiscard={() => finishEditing()} /></div>}
             </Popover.Content></Popover.Portal>
           </Popover.Root>
-          <button type="button" data-calendar-settings-trigger aria-label="Calendars" title="Calendars" className={`work-button work-button--secondary ${styles.toolbarUtility} ${styles.calendarsButton}`} onClick={() => setConnections(true)}><UnigentamosIcon role="calendar" size={20} /><span>Calendars</span></button>
 
         </div>
           <Button data-calendar-event-trigger intent="primary" icon="plus" aria-label="Add event" className={styles.addEventButton} onClick={() => create()}>{compact ? "Add" : "Add event"}</Button>
@@ -916,11 +915,13 @@ export default function CalendarWorkspace() {
         )}
       </WorkspaceSheet>
       {preview && <EventQuickView open={previewOpen} event={preview.event} anchor={preview.anchor} available={snapshot?.refs || []} zone={zone} icon={eventGroup(snapshot?.state.calendars.find(c=>c.id===preview.event.calendarId),preview.event.groupId)?.icon} onClose={()=>setPreviewOpen(false)} onManage={()=>{setPreviewOpen(false);setConnections(true);}} onEdit={()=>{const event=snapshot?.state.events.find(e=>e.id===preview.event.eventId);if(event)openEvent(event,preview.event);setPreviewOpen(false);}}/>}
+      <CalendarSharePanel open={sharing} onClose={() => setSharing(false)} calendars={snapshot?.state.calendars || []} />
       <WorkspaceSheet
         open={connections}
         onClose={() => setConnections(false)}
         presentation="page"
         title="Calendar" titleIcon="calendar" className={styles.settingsSheet}
+        returnFocusSelector="[data-calendar-options-trigger]"
       >
         <div className={`work-form ${styles.calendarSettingsForm}`}>
           <WorkspaceFeedback error={error} message={notice} />
@@ -989,8 +990,6 @@ export default function CalendarWorkspace() {
               </section>;
             })}
           </div>
-          <CalendarSharing calendars={snapshot?.state.calendars || []} />
-          <CalendarBookings calendars={snapshot?.state.calendars || []} />
           <section className={styles.importSection} aria-label="Import calendars">
             <div className={styles.settingsHeading}><div><h3><UnigentamosIcon role="import" size={18} />Import another calendar</h3><p>Upload a file once, or subscribe to a feed that refreshes automatically while Unigentamos is open.</p></div></div>
             <div className={styles.importProviders} role="group" aria-label="Calendar provider">{["Google Calendar", "Apple Calendar", "Outlook", "Other"].map(provider => <Button key={provider} aria-pressed={importProvider === provider} onClick={() => setImportProvider(provider)}>{provider === "Apple Calendar" ? <img src="/contact-sources/apple.svg" width={18} height={18} alt="" /> : provider === "Google Calendar" ? <img src="/contact-sources/google-calendar.png" width={18} height={18} alt="" /> : provider === "Outlook" ? <img src="/contact-sources/outlook.svg" width={18} height={18} alt="" /> : <UnigentamosIcon role="calendar" size={18} />}{provider}</Button>)}</div>

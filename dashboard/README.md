@@ -113,7 +113,7 @@ Notes:
 
 ### Calendar subscription sharing
 
-Calendar → Calendars → Share calendars creates a read-only HTTPS iCalendar feed for one or more explicitly selected calendars. Event titles are shared by default; locations/addresses and descriptions are opt-in. Unchecking titles switches to Busy only and clears the other detail permissions. Linked records, attendees, and reminder alarms are never exported. Calendar visibility on the user's screen does not grant or remove sharing access.
+Calendar → Options → Share → Subscriptions creates a read-only HTTPS iCalendar feed for one or more explicitly selected calendars. Event titles are shared by default; locations/addresses and descriptions are opt-in. Unchecking titles switches to Busy only and clears the other detail permissions. Linked records, attendees, and reminder alarms are never exported. Calendar visibility on the user's screen does not grant or remove sharing access.
 
 - Management: authenticated, CSRF-protected `GET/POST /api/planning/shares`, with optimistic concurrency on updates. Definitions persist through the existing atomic file-store in `calendar-shares.json` (Supabase `app_state` in production).
 - Subscription: `GET /api/calendar-feeds/<signed-token>.ics`. The URL is a bearer credential. Do not paste it into logs, issue trackers, or public analytics. Signatures use a domain-separated HMAC with `ADMIN_SESSION_SECRET`, falling back to `ADMIN_PASSWORD`; keep that secret stable across deployments. Changing the signing secret invalidates existing links. Never expose the stored key version through management responses.
@@ -125,7 +125,7 @@ Calendar → Calendars → Share calendars creates a read-only HTTPS iCalendar f
 
 ### Calendar booking links
 
-Calendar → Calendars → Take bookings creates an external booking page. Choose automatic availability (date range, weekdays and daily hours) or specific start times each time a link is created. Set the destination calendar, calendars checked for conflicts, appointment length, time zone, buffer and advance notice. Hidden selected calendars still block time.
+Calendar → Options → Share → Bookings creates an external booking page. Choose automatic availability (date range, weekdays and daily hours) or specific start times each time a link is created. Set the destination calendar, calendars checked for conflicts, appointment length, time zone, buffer and advance notice. Hidden selected calendars still block time.
 
 - Guests provide a name, email and optional note. Confirmation is immediate on the page and creates an ordinary event in the destination calendar, with guest contact details visible privately. No confirmation email is sent; guests contact the organizer for changes or cancellation.
 - Management uses authenticated, CSRF-protected `GET/POST /api/planning/bookings`; guests use `/book/<signed-token>` and `/api/book/<signed-token>`. Links can be edited, closed or replaced. Closing a link preserves existing bookings. Treat URLs as bearer credentials; booking paths are excluded from analytics and use no-referrer/noindex headers.
