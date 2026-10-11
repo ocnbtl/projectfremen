@@ -14,7 +14,11 @@ const dateLabel = (day: string, options: Intl.DateTimeFormatOptions) => new Date
 const pad = (number: number) => String(number).padStart(2, "0");
 
 /** Values stay in the event's wall-clock time; the repository owns zone conversion. */
-export default function EventDateTimePicker({ label, value, allDay, timeZone, onChange, dateOnly = false, iconOnly = false }: {
+export default function EventDateTimePicker({ label, value, allDay, timeZone, onChange, dateOnly = false, iconOnly = false, compact = false, timeOnly = false, min, max }: {
+  compact?: boolean;
+  timeOnly?: boolean;
+  min?: string;
+  max?: string;
   iconOnly?: boolean;
   dateOnly?: boolean;
   label: string;
@@ -36,7 +40,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
   try { today = localDate(new Date(), timeZone); } catch { /* Keep the picker usable while a zone is being edited. */ }
   const first = weekStart(monthStart(page)), year = page.slice(0, 4);
   // Imported minute precision is retained until the user explicitly changes it.
-  const minutes = Array.from(new Set([...Array.from({ length: 12 }, (_, i) => i * 5), minute])).sort((a, b) => a - b);
+  const minutes = Array.from(new Set([...Array.from({ length: timeOnly ? 60 : 12 }, (_, i) => i * (timeOnly ? 1 : 5)), minute])).sort((a, b) => a - b);
   const columns = [
     { name: "Hour", values: Array.from({ length: 12 }, (_, i) => String(i + 1)), current: String(clockHour) },
     { name: "Minute", values: minutes.map(pad), current: pad(minute) },
@@ -52,15 +56,21 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
 
   useLayoutEffect(() => {
     if (pane !== "time") return;
+    centerTimeSelection();
+  }, [pane, open]);
+
+  function centerTimeSelection() {
     timeControls.current?.querySelectorAll<HTMLButtonElement>('[aria-pressed="true"]').forEach(button => {
       const list = button.parentElement!;
       list.scrollTop = button.offsetTop - (list.clientHeight - button.offsetHeight) / 2;
     });
-  }, [pane]);
+  }
 
   function chooseDay(next: string) {
+    if ((min && next < min) || (max && next > max)) return;
     onChange(allDay ? next : `${next}T${time}`);
     setDirection(next > day ? 1 : -1); setPage(next); setFocused(next);
+    if (compact && dateOnly) setOpen(false);
   }
   function move(amount: number) {
     const next = shiftMonth(page, amount * (mode === "months" ? 12 : 1));
@@ -72,29 +82,30 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
     onChange(`${day}T${pad(nextHour)}:${column === "Minute" ? next : pad(minute)}`);
   }
 
-  return <div className={styles.field}>
+  return <div className={styles.field} data-compact={compact || undefined}>
     {!iconOnly && <span className={styles.label}>{label}</span>}
     <Popover.Root open={open} onOpenChange={next => {
-      if (next) { setPage(day); setFocused(day); setMode("days"); setPane("date"); }
+      if (next) { setPage(day); setFocused(day); setMode("days"); setPane(timeOnly ? "time" : "date"); }
       setOpen(next);
     }}>
       <Popover.Trigger asChild><button ref={trigger} type="button" className={iconOnly ? styles.iconTrigger : styles.trigger} aria-label={iconOnly ? `Choose ${label.toLowerCase()} date` : label}
         aria-description={`${dateLabel(day, { dateStyle: "full" })}${allDay ? dateOnly ? "" : ", all day" : `, ${clockHour}:${pad(minute)} ${period}, ${timeZone}`}`}
         data-value={value} data-icon-button={iconOnly ? "compact" : undefined}>
-        <UnigentamosIcon role="interaction-date" size={18} />
-        {!iconOnly && <><span className={styles.value}><span>{dateLabel(day, { month: "short", day: "numeric", year: "numeric" })}</span>
-          {!dateOnly && <small className={styles.timeValue}><AnimatePresence initial={false} mode="popLayout"><motion.span key={allDay ? "all-day" : "timed"} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -4 }} transition={{ duration: reduced ? 0 : .22 }}>{allDay ? "All day" : `${clockHour}:${pad(minute)} ${period}`}</motion.span></AnimatePresence></small>}</span>
+        <UnigentamosIcon role={timeOnly ? "clock" : "interaction-date"} size={18} />
+        {!iconOnly && <><span className={styles.value}><span>{timeOnly ? `${clockHour}:${pad(minute)} ${period.toLowerCase()}` : dateLabel(day, { month: "short", day: "numeric", year: "numeric" })}</span>
+          {!dateOnly && !timeOnly && <small className={styles.timeValue}><AnimatePresence initial={false} mode="popLayout"><motion.span key={allDay ? "all-day" : "timed"} initial={reduced ? false : { opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={reduced ? undefined : { opacity: 0, y: -4 }} transition={{ duration: reduced ? 0 : .22 }}>{allDay ? "All day" : `${clockHour}:${pad(minute)} ${period}`}</motion.span></AnimatePresence></small>}</span>
         <UnigentamosIcon role="chevron-down" size={14} /></>}
       </button></Popover.Trigger>
       <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={styles.popover} style={moduleThemeVariables("calendar") as CSSProperties}
-        data-reduced-motion={reduced} sideOffset={8} collisionPadding={12} collisionBoundary={trigger.current?.closest<HTMLElement>('[role="dialog"]')} align="start" aria-label={`${label} date${allDay ? "" : " and time"}`}
+        data-reduced-motion={reduced} sideOffset={8} collisionPadding={12} collisionBoundary={trigger.current?.closest<HTMLElement>('[role="dialog"]')} align="start" aria-label={`${label}${timeOnly ? " time" : ` date${allDay ? "" : " and time"}`}`}
         onEscapeKeyDown={event => event.stopImmediatePropagation()}
         onOpenAutoFocus={event => {
           event.preventDefault();
-          grid.current?.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus({ preventScroll: true });
+          if (timeOnly) centerTimeSelection();
+          (timeOnly ? timeControls.current : grid.current)?.querySelector<HTMLButtonElement>('[tabindex="0"]')?.focus({ preventScroll: true });
         }}>
         <LayoutGroup id={id}>
-          {!allDay && <div className={styles.tabs} role="tablist" aria-label={`${label} date or time`}>
+          {!allDay && !timeOnly && <div className={styles.tabs} role="tablist" aria-label={`${label} date or time`}>
             {(["date", "time"] as const).map(tab => <button type="button" role="tab" key={tab} id={`${id}-${tab}-tab`}
               aria-label={tab === "date" ? "Date" : "Time"} aria-selected={pane === tab} aria-controls={`${id}-${tab}-panel`} tabIndex={pane === tab ? 0 : -1}
               onClick={() => setPane(tab)} onKeyDown={event => {
@@ -134,7 +145,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
                 {Array.from({ length: 6 }, (_, row) => <div role="row" key={row}>
                   {Array.from({ length: 7 }, (_, column) => {
                     const date = addDays(first, row * 7 + column), selected = date === day;
-                    return <div role="gridcell" key={date} aria-selected={selected}><button type="button" data-date={date}
+                    return <div role="gridcell" key={date} aria-selected={selected}><button type="button" data-date={date} disabled={!!((min && date < min) || (max && date > max))}
                       data-outside={date.slice(0, 7) !== page.slice(0, 7)} aria-label={dateLabel(date, { dateStyle: "full" })}
                       aria-current={date === today ? "date" : undefined} tabIndex={date === focused ? 0 : -1}
                       onClick={() => chooseDay(date)} onKeyDown={event => {
@@ -143,7 +154,8 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
                         event.preventDefault();
                         const next = offset === undefined ? shiftMonth(date, (event.key === "PageDown" ? 1 : -1) * (event.shiftKey ? 12 : 1)) : addDays(date, offset);
                         if (next.length !== 10 || next < "0001-01-01" || next > "9999-12-31") return;
-                        setDirection(next > date ? 1 : -1); pendingFocus.current = true; setPage(next); setFocused(next);
+                        const bounded = min && next < min ? min : max && next > max ? max : next;
+                        setDirection(bounded > date ? 1 : -1); pendingFocus.current = true; setPage(bounded); setFocused(bounded);
                       }}>
                       {selected && <span className={styles.selection} />}
                       <span className={styles.dayNumber}>{Number(date.slice(-2))}</span>
@@ -153,7 +165,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
               </div>}
             </PickerSlide></AnimatePresence>
           </div>
-          </div> : <section className={styles.timeArea} role="tabpanel" id={`${id}-time-panel`} aria-labelledby={`${id}-time-tab`}>
+          </div> : <section className={styles.timeArea} role={timeOnly ? "group" : "tabpanel"} id={`${id}-time-panel`} aria-label={timeOnly ? `${label} time` : undefined} aria-labelledby={timeOnly ? undefined : `${id}-time-tab`}>
             <div className={styles.timeHeading}><span><UnigentamosIcon role="clock" size={15} />Time</span><small title={timeZone}>{timeZone.split("/").at(-1)?.replaceAll("_", " ")}</small></div>
             <div ref={timeControls} className={styles.timeColumns}>{columns.map(column => <div key={column.name}>
               <span className={styles.columnLabel}>{column.name === "Period" ? "AM / PM" : column.name}</span>
@@ -173,7 +185,7 @@ export default function EventDateTimePicker({ label, value, allDay, timeZone, on
           </CalendarScene>
           </div>
           <footer className={styles.footer}>
-            <button type="button" onClick={() => { chooseDay(today); setMode("days"); setPane("date"); }}>Today</button>
+            {!timeOnly && <button type="button" disabled={!!((min && today < min) || (max && today > max))} onClick={() => { chooseDay(today); setMode("days"); setPane("date"); }}>Today</button>}
             <button type="button" className={styles.done} onClick={() => setOpen(false)}>Done<UnigentamosIcon role="check" size={16} /></button>
           </footer>
         </LayoutGroup>

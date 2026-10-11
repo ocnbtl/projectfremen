@@ -1,4 +1,6 @@
 "use client";
+import { motion } from "motion/react";
+import { useCalendarMotion } from "./CalendarMotion";
 import { useId, useState, type KeyboardEvent } from "react";
 import type { Calendar } from "../../lib/modules/planning/types";
 import { WorkspaceSheet } from "../admin-shell/WorkspaceKit";
@@ -15,6 +17,7 @@ const sections = [
 export default function CalendarSharePanel({ open, onClose, calendars }: { open: boolean; onClose: () => void; calendars: Calendar[] }) {
   const [section, setSection] = useState<(typeof sections)[number]["id"]>("subscriptions");
   const id = useId();
+  const { reduced } = useCalendarMotion();
   const [subscriptions, setSubscriptions] = useState<{active:number;total:number} | null>(null);
   const [bookings, setBookings] = useState<{active:number;total:number} | null>(null);
   function navigate(event: KeyboardEvent<HTMLButtonElement>, index: number) {
@@ -27,6 +30,7 @@ export default function CalendarSharePanel({ open, onClose, calendars }: { open:
     <div className={styles.content}>
       <p className={styles.intro}>Manage what you share and when people can book.</p>
       <div className={styles.tabs} role="tablist" aria-label="Calendar sharing">
+        <motion.div className={styles.slider} aria-hidden="true" initial={false} animate={{x:section === "subscriptions" ? "0%" : "100%"}} transition={{duration:reduced ? 0 : .3,ease:[.22,.78,.18,1]}} />
         {sections.map((item, index) => <button key={item.id} type="button" role="tab" id={`${id}-${item.id}-tab`} aria-controls={`${id}-${item.id}-panel`} aria-selected={section === item.id} tabIndex={section === item.id ? 0 : -1} onClick={() => setSection(item.id)} onKeyDown={event => navigate(event, index)}>
           <UnigentamosIcon role={item.icon} size={20} /><span><strong>{item.label}</strong><small>{(item.id === "subscriptions" ? subscriptions : bookings) ? `${(item.id === "subscriptions" ? subscriptions : bookings)!.active} active` : item.detail}</small></span>
         </button>)}

@@ -77,3 +77,10 @@
 .iconTrigger { width:18px; min-width:18px; padding:0; }
 .dateArea { position:relative; overflow:hidden; }
 .dateSlide { position:absolute; inset:3px; min-height:0!important; }
+/* Compact shared date/time triggers retain the same accessible picker. */
+.field[data-compact] {gap:5px;}
+.field[data-compact] .label {font-size:12px;}
+.field[data-compact] .trigger {min-height:36px;padding:7px 9px;gap:6px;background:var(--surface,#fff);border-radius:8px;}
+.field[data-compact] .trigger > svg:first-child {width:15px;height:15px;}
+.field[data-compact] .value {font-size:12px;white-space:nowrap;}
+.popover button:disabled {opacity:.35;cursor:not-allowed;}

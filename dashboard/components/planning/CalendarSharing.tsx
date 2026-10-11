@@ -50,9 +50,9 @@ export default function CalendarSharing({ calendars, onSummary }: { calendars: C
     catch { setNotice("Select the subscription URL, then copy it from your device’s menu."); }
   }
   return <section className={styles.panel} aria-label="Share calendars">
-    <div className={styles.heading}><div><h3><UnigentamosIcon role="link" size={18} />Shared calendars</h3><p>Keep Apolosign or another calendar app in sync.</p></div>
+    <div className={styles.heading}><div><h3><UnigentamosIcon role="link" size={18} />Shared calendars</h3></div>
       <Button icon="plus" intent="primary" onClick={create} disabled={loading || busy || !available.length} aria-label="Create sharing link">New link</Button></div>
-    <p className={styles.note}>Read-only links. Anyone with the URL can see the details you choose.</p>
+    <p className={styles.note}>Read-only links. Anyone with the URL can see the details you’ve chosen.</p>
     {error && <div role="alert" className={styles.feedback}>{error} <Button disabled={busy} onClick={() => { setDraft(null); setConfirm(null); void load(); }}>Refresh links</Button></div>}
     {notice && <p role="status" className={styles.feedback}>{notice}</p>}
     {loading && <p role="status">Loading sharing links…</p>}
@@ -70,10 +70,10 @@ export default function CalendarSharing({ calendars, onSummary }: { calendars: C
     {!loading && !error && !shares.length && !draft && <p className={styles.empty}>No calendars shared yet. Create a link to choose what to share.</p>}
     <div className={styles.links}>{[...shares].sort((a,b) => Number(!!a.revokedAt) - Number(!!b.revokedAt)).map(share => <article key={share.id} className={styles.card} aria-label={`${share.name} sharing link`}>
       <div className={styles.cardHeading}><strong>{share.name}</strong><span className={styles.badge} data-inactive={!!share.revokedAt}>{share.revokedAt ? "Revoked" : "Active"}</span>{share.path && <Button onClick={() => void copy(share)} icon="copy">Copy link</Button>}</div>
-      <div className={styles.calendarList}>{share.calendarIds.map(id => { const calendar = calendars.find(item => item.id === id); return <span key={id}><i className={styles.dot} style={{backgroundColor:calendar?.color || "#999"}} />{calendar?.name || "Removed calendar"}</span>; })}</div>
+      <div className={styles.calendarList}>{share.calendarIds.map(id => { const calendar = calendars.find(item => item.id === id); return <span key={id}><UnigentamosIcon role="calendar" size={14} /><i className={styles.dot} style={{backgroundColor:calendar?.color || "#999"}} />{calendar?.name || "Removed calendar"}</span>; })}</div>
       <p className={styles.note}>{share.details.titles ? ["Titles", share.details.locations && "locations", share.details.descriptions && "descriptions"].filter(Boolean).join(", ") : "Busy only"}</p>
       <details className={styles.manage}><summary>Link settings</summary>
-      {share.path && <div className={styles.url}><input aria-label={`${share.name} subscription URL`} readOnly value={origin + share.path} onFocus={event => event.target.select()} /><Button onClick={() => void copy(share)} icon="copy">Copy link</Button></div>}
+      {share.path && <div className={styles.url}><input aria-label={`${share.name} subscription URL`} readOnly value={origin + share.path} onFocus={event => event.target.select()} /></div>}
       <div className={styles.actions}><Button disabled={busy} onClick={() => { setDraft({ id: share.id, expectedUpdatedAt: share.updatedAt, name: share.name, calendarIds: share.calendarIds.filter(id => available.some(calendar => calendar.id === id)), details: share.details }); setConfirm(null); }}>Edit details</Button>
         <Button disabled={busy} onClick={() => setConfirm({ id: share.id, operation: "regenerate" })}>{share.revokedAt ? "Create replacement link" : "Regenerate link"}</Button>
         {!share.revokedAt && <Button disabled={busy} onClick={() => setConfirm({ id: share.id, operation: "revoke" })}>Revoke link</Button>}</div>
@@ -83,6 +83,5 @@ export default function CalendarSharing({ calendars, onSummary }: { calendars: C
       </div>}
     </details>
     </article>)}</div>
-    <details className={styles.help}><summary>Connect to Apolosign</summary><p>In the Apolosign phone app, open the menu → My Family → + in Calendars → Subscribe via URL. Paste your link and choose the name and participants.</p><p>Updates appear when the receiving app refreshes. Edits there do not change Unigentamos. Feeds include the previous year and next two years, refreshed as time moves forward. Only events stored in your selected calendars are shared; the separate birthday, holiday, and custom-date overlays are not included. Imported calendars use their latest saved events in Unigentamos.</p></details>
   </section>;
 }

@@ -35,3 +35,7 @@
 .manage > :not(summary) {margin-top:10px;}
 .empty {margin:0;padding:20px 14px;background:var(--module-quiet);border-radius:12px;font-size:13px;color:var(--text-secondary);line-height:1.5;}
 @media(max-width:600px) {.cardHeading > strong {font-size:13px;}.cardHeading {gap:6px;}.badge {font-size:10px;padding:3px 6px;}.heading {gap:10px;}.heading > div {flex:1;min-width:140px;}.card {gap:8px;padding:12px;}}
+.links {grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));align-items:start;}
+.card {padding:12px;gap:6px;}
+.calendarList svg {flex:none;color:var(--module-icon);}
+.card .url input {width:100%;}
