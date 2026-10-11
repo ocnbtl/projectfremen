@@ -45,20 +45,24 @@ const guest=(start,extra={})=>({requestId:randomUUID(),start,name:'Test Guest',e
   assert.equal(publicData.confirmationEmail,false);
   assert.ok(!JSON.stringify(publicData).includes('keyVersion'));
   const request=guest(publicData.slots[0].start);
-  const outcomes=await Promise.allSettled([reserveBooking(token(link),request,'192.0.2.1'),reserveBooking(token(link),guest(request.start,{email:'other@example.test'}),'192.0.2.2')]);
+  const otherRequest=guest(request.start,{email:'other@example.test'});
+  const outcomes=await Promise.allSettled([reserveBooking(token(link),request,'192.0.2.1'),reserveBooking(token(link),otherRequest,'192.0.2.2')]);
   assert.equal(outcomes.filter(result=>result.status==='fulfilled').length,1);
   assert.equal(outcomes.find(result=>result.status==='rejected').reason.status,409);
   state=await readPlanningState();assert.equal(state.events.length,1);assert.equal(state.bookingData.receipts.length,1);
-  const winner=state.events[0].participants[0].email==='guest@example.test';
-  assert.ok(winner,'First queued writer wins deterministic local transaction');
-  await reserveBooking(token(link),request,'192.0.2.1');
+  // Either asynchronous request may reach the transaction first. Exactly one
+  // must win, and replaying that winner must return the same appointment.
+  const winner=outcomes[0].status==='fulfilled' ? request : otherRequest;
+  const winnerIp=outcomes[0].status==='fulfilled' ? '192.0.2.1' : '192.0.2.2';
+  assert.equal(state.events[0].participants[0].email,winner.email);
+  await reserveBooking(token(link),winner,winnerIp);
   assert.equal((await readPlanningState()).events.length,1,'A repeated submission is idempotent');
-  await assert.rejects(()=>reserveBooking(token(link),{...request,name:'Different'},'192.0.2.1'),error=>error.status===409);
+  await assert.rejects(()=>reserveBooking(token(link),{...winner,name:'Different'},winnerIp),error=>error.status===409);
   await assert.rejects(()=>reserveBooking(token(link),guest(publicData.slots[1].start,{email:'bad'}),'192.0.2.1'),error=>error.status===400);
   await assert.rejects(()=>reserveBooking(token(link),guest(publicData.slots[1].start,{website:'bot'}),'192.0.2.1'),error=>error.status===400);
-  assert.equal(state.events[0].participants[0].email,'guest@example.test');
+  assert.equal(state.events[0].participants[0].email,winner.email);
   const feed=serializeCalendarShare({id:'test',name:'test',calendarIds:['native'],details:{titles:true,descriptions:true,locations:true},updatedAt:stamp},state,undefined,new Date('2030-01-07T00:00:00Z'));
-  assert.ok(!feed.includes('guest@example.test'),'Guest email is not copied into descriptions or sharing feeds');
+  assert.ok(!feed.includes(winner.email),'Guest email is not copied into descriptions or sharing feeds');
   await savePlanningRecord('events',{id:state.events[0].id,title:'Edited appointment'},state.events[0].updatedAt);
   assert.equal((await readPlanningState()).bookingData.receipts.length,1,'Ordinary calendar edits preserve booking state');
   const second=await changeBookingLink({...base,name:'Another link'});
