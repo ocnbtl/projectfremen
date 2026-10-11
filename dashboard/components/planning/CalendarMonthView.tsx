@@ -9,7 +9,7 @@ import { eventColors, eventPreviewTitle, eventTimeRange } from "./calendar-prese
 import { calendarDateLabel as label } from "./CalendarMiniMonth";
 import { useCalendarMotion } from "./CalendarMotion";
 import EventLinksPreview from "./EventLinksPreview";
-import EventDetail from "./EventDetail";
+import EventPlaceDetail from "./EventPlaceDetail";
 import { eventObjectRefs } from "./EventObjects";
 import EventGlyph from "./EventGlyph";
 import EventContinuation from "./EventContinuation";
@@ -59,7 +59,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
             {(continuesBefore || continuesAfter) && <EventContinuation before={continuesBefore} after={continuesAfter} />}
             <div className={styles.copy} data-task={event.isTask || undefined}><div className={styles.heading}><TaskCheck event={event} onComplete={onComplete}/><EventGlyph event={event} icon={group?.icon} size={16} /><strong>{eventPreviewTitle(event)}</strong></div>{timing && !compactContinuation && <small>{timing}</small>}</div>
             {!compactContinuation && <EventLinksPreview event={event} available={refs} />}
-            {!compactContinuation && place && <EventDetail kind="place" text={place} eventTitle={event.title}/>}
+            {!compactContinuation && place && <EventPlaceDetail event={event} available={refs}/>}
 
           </TaskEventCard>;
         })}

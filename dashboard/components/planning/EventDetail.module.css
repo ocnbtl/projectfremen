@@ -7,6 +7,11 @@
 .panel { z-index:220; display:flex; align-items:center; gap:8px; max-width:min(320px,calc(100vw - 20px)); padding:12px; border:1px solid #dcd8e9; border-radius:10px; background:white; color:#23383f; box-shadow:0 8px 28px #29243b25; font:500 12px/1.4 var(--font-body); transform-origin:var(--radix-popover-content-transform-origin); animation:unfurl .2s cubic-bezier(.22,1,.36,1); }
 .panel > svg { flex:none; }
 .panel > span { min-width:0; overflow-wrap:anywhere; }
+.copy { display:grid; gap:3px; }
+.copy small { font:400 12px/1.45 var(--font-body); color:#626072; white-space:pre-line; }
+.panel:has(.copy small) { align-items:flex-start; }
+.copy:has(small) > span { font-weight:600; }
+.panel:has(.copy small) > button { margin-top:-3px; }
 .panel button { display:grid; place-items:center; flex:none; width:24px; height:24px; padding:0; border:0; border-radius:5px; background:transparent; color:inherit; cursor:pointer; }
 .panel button:hover { background:#59518b18; }
 .panel[data-state="closed"] { animation:fold .14s ease-in; }

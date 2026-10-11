@@ -13,7 +13,7 @@ import { eventColors, eventPreviewTitle } from "./calendar-presentation";
 import { useCalendarMotion } from "./CalendarMotion";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import EventLinksPreview from "./EventLinksPreview";
-import EventDetail from "./EventDetail";
+import EventPlaceDetail from "./EventPlaceDetail";
 import EventGlyph from "./EventGlyph";
 import EventContinuation from "./EventContinuation";
 import { eventObjectRefs } from "./EventObjects";
@@ -44,7 +44,7 @@ export default function CalendarAllDayBand({ days, events, calendars, refs, date
         aria-label={title} title={title} onClick={() => onOpen(event)}>
         {(continuesBefore || continuesAfter) && <EventContinuation before={continuesBefore} after={continuesAfter} />}
         {event.system?.kind === "birthday" ? <BirthdayEventLabel event={event} available={refs}/> : <><EventGlyph event={event} icon={group?.icon} />
-        <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventLinksPreview event={event} available={refs}/>{place && <EventDetail kind="place" text={place} eventTitle={event.title} compact={false}/>}</>}
+        <span className={styles.eventTitle}>{eventPreviewTitle(event)}</span><EventLinksPreview event={event} available={refs}/>{place && <EventPlaceDetail event={event} available={refs} compact={false}/>}</>}
 
       </TaskEventCard>;
     })}

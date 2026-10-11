@@ -7,6 +7,7 @@ import type { NativeObjectRef } from "../../lib/native-objects/types";
 import EventGlyph from "./EventGlyph";
 import EventLinksPreview from "./EventLinksPreview";
 import EventDetail from "./EventDetail";
+import EventPlaceDetail from "./EventPlaceDetail";
 import { eventObjectRefs } from "./EventObjects";
 import { TaskCheck } from "./TaskEventCard";
 import { eventPreviewTitle } from "./calendar-presentation";
@@ -50,7 +51,7 @@ export default function TimedEventContent({ event, timing, icon, height, availab
     </motion.div>
     {detailRoom && <motion.div layout="position" initial={reduced?false:{opacity:0,y:-3}} animate={{opacity:1,y:0}} transition={{layout:layoutTransition,duration:.18}} className={styles.details} data-compact={compact}>
       <EventDetail kind="time" text={timing} eventTitle={event.title} compact={compactTime}/>
-      {place && <EventDetail kind="place" text={place} eventTitle={event.title} compact={compactPlace}/>}
+      {place && <EventPlaceDetail event={event} available={available} compact={compactPlace}/>}
       {inlineObjects && <EventLinksPreview event={event} available={available} limit={0}/>}
     </motion.div>}
     {showObjects && <motion.div layout="position" className={styles.objects} initial={reduced?false:{opacity:0,y:-3}} animate={{opacity:1,y:0}} transition={{layout:layoutTransition,duration:.18}}><EventLinksPreview event={event} available={available} list={vertical && !narrow} align={singleDay ? "start" : "end"} limit={vertical ? narrow ? 0 : objectLimit : 1}/></motion.div>}

@@ -6,6 +6,10 @@
 .panel button:hover {background:#59518b15;}
 .place {display:flex;align-items:center;gap:5px;margin:8px 0;}
 .place svg {flex:none;}
+.place {align-items:flex-start;}
+.place svg {margin-top:2px;}
+.place > span {min-width:0;overflow-wrap:anywhere;}
+.place small {display:block;margin-top:3px;font:400 12px/1.45 var(--font-body);color:#626072;white-space:pre-line;}
 .description {font-weight:400;white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0;color:#626072;}
 .objects {display:flex;flex-wrap:wrap;gap:8px 14px;margin-top:10px;--avatar-size:24px;--linked-object-size:24px;}
 .objects > span {display:flex;align-items:center;gap:6px;min-width:0;}

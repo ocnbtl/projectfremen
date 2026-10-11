@@ -15,6 +15,7 @@ import EventPeople from "./EventPeople";
 import EventRowContent from "./EventRowContent";
 import CalendarZoom from "./CalendarZoom";
 import EventQuickView from "./EventQuickView";
+import { CalendarPlacesContext } from "./EventPlaceDetail";
 import eventRowStyles from "./EventRowContent.module.css";
 import TaskEventCard from "./TaskEventCard";
 import { taskCompletionPatch, resizedEventTime } from "../../lib/modules/planning/calendar-tasks";
@@ -613,7 +614,7 @@ export default function CalendarWorkspace() {
   if (!snapshot && !error) return <LogoLoader label="Loading calendar" viewport />;
 
   return (
-    <div
+    <CalendarPlacesContext.Provider value={snapshot?.state.places || []}><div
       className={`work-surface ${styles.shell}`}
       onClickCapture={e=>{const card=(e.target as HTMLElement).closest<HTMLElement>('[data-morph-event]');if(card){const box=card.getBoundingClientRect();previewAnchor.current=new DOMRect(e.clientX || box.x+box.width/2,e.clientY || box.y,1,1);}}}
       style={moduleThemeVariables("calendar") as CSSProperties}
@@ -1120,7 +1121,7 @@ export default function CalendarWorkspace() {
           ],
         }}
       />
-    </div>
+    </div></CalendarPlacesContext.Provider>
   );
 }
 
