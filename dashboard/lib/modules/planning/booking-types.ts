@@ -24,7 +24,7 @@ export type BookingEmailJob = {
   lease?: string; leaseUntil?: string; providerId?: string; error?: string;
 };
 export type BookingEmails = {
-  version: 1 | 2 | 3; from: string; organizerEmail: string; title: string; guestName: string;
+  version: 1 | 2 | 3 | 4; from: string; organizerEmail: string; title: string; guestName: string;
   organizerEmails?: string[]; guestMessage?: string; guestDetails?: BookingEmailDetails;
   guestEmail: string; note: string; location: string; timeZone: string;
   guest: BookingEmailJob; organizer: BookingEmailJob;
@@ -33,6 +33,6 @@ export type BookingEmailSummary = {
   ready: boolean; from?: string; organizerEmail?: string; missing: string[]; pending: number;
   accepted: number; failed: number; review: number;
 };
-export type BookingData = { links: BookingLink[]; receipts: BookingReceipt[] };
+export type BookingData = { links: BookingLink[]; receipts: BookingReceipt[]; emailTests?: { id: string; hash: string; createdAt: number; lastAttemptAt: number; attempts: number; accepted?: boolean }[] };
 export type BookingSlot = { start: string; end: string };
 export type PublicBooking = { name: string; description: string; location: string; timeZone: string; durationMinutes: number; slots: BookingSlot[]; confirmationEmail: boolean };

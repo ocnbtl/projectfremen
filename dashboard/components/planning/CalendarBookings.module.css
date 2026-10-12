@@ -111,3 +111,20 @@
 .form .emailDetails label,.form .schedulingTimes > label {width:auto;max-width:100%;}
 
 .form .schedulingCompact fieldset label {width:auto;}
+
+.disclosureHeading {display:flex;align-items:center;gap:8px;padding-right:10px;}
+.disclosureHeading > button:first-child {display:flex;align-items:center;gap:8px;flex:1;min-width:0;min-height:42px;padding:10px;border:0;background:none;color:var(--text-primary);font:500 12px/1.4 var(--font-body);text-align:left;cursor:pointer;}
+.disclosureHeading > button:first-child small {margin-left:auto;}
+.disclosureHeading > button:first-child svg {flex:none;transition:transform .28s;}
+.disclosureHeading > button:last-child {flex:none;min-height:32px;padding:5px 8px;font-size:11px;gap:5px;}
+.disclosureHeading > button:last-child svg {width:14px;height:14px;}
+.schedulingSummary {display:flex;flex-wrap:wrap;justify-content:flex-end;gap:4px;}
+.schedulingSummary > span {padding:3px 7px;border-radius:6px;background:var(--module-quiet);color:var(--module-icon);font-weight:600;white-space:nowrap;}
+.form .emailToggle {width:auto;padding:9px 10px;border-radius:8px;background:var(--module-quiet);min-height:38px;box-sizing:border-box;}
+.emailToggle input {width:18px;height:18px;}
+.form .emailToggle > span {color:var(--module-icon);font-size:12px;}
+.emailDetails {padding:0 3px;}
+.form .emailDetails label {font-size:11px;color:var(--text-secondary);font-weight:400;}
+.formFooter {justify-content:flex-end;}
+@media(max-width:420px) {.disclosureHeading {gap:3px;padding-right:5px;}.disclosureHeading > button:first-child {gap:5px;padding:9px 7px;font-size:11px;}.disclosureHeading > button:last-child {padding:5px;font-size:10px;}.schedulingSummary > span {padding:3px 4px;font-size:10px;}}
+@media(prefers-reduced-motion:reduce) {.disclosureHeading > button:first-child svg {transition:none;}}

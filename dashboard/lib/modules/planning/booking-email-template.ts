@@ -22,7 +22,7 @@ function legacyBookingEmailPayload(receipt: Pick<BookingReceipt, "start" | "end"
   };
 }
 
-export function bookingEmailPayload(receipt: Pick<BookingReceipt, "start" | "end" | "emails">, role: Role) {
+function versionThreeBookingEmailPayload(receipt: Pick<BookingReceipt, "start" | "end" | "emails">, role: Role) {
   const mail = receipt.emails!;
   if (mail.version !== 3) return legacyBookingEmailPayload(receipt, role);
   const details = role === "guest" ? mail.guestDetails ?? { date:true, time:true, timeZone:true, location:true } : { date:true, time:true, timeZone:true, location:true };
@@ -46,5 +46,31 @@ export function bookingEmailPayload(receipt: Pick<BookingReceipt, "start" | "end
     subject:role === "guest" ? "Booking Confirmed" : "New Booking",
     text:`${heading}\n\n${detail}\n\n${rows.map(([label,value])=>`${label}: ${value}`).join("\n\n")}\n\n${footer}\n\nUnigentamos`,
     html:`<!doctype html><html><body style="margin:0;background:#f7f7fa;font-family:Arial,sans-serif;color:#243c44"><table role="presentation" style="width:100%;padding:20px 10px"><tr><td align="center"><table role="presentation" style="width:100%;max-width:560px;background:#fff;border:1px solid #e0ddec;border-radius:16px"><tr><td style="padding:20px"><p style="font-size:13px;color:#62568f;font-weight:bold;margin:0 0 18px">Unigentamos</p><h1 style="font-size:24px;line-height:1.3;margin:0 0 12px">${heading}</h1><p style="font-size:14px;line-height:1.5">${escape(detail)}</p><table role="presentation" style="width:100%;border-collapse:collapse;margin:18px 0">${rows.map(([label,value])=>`<tr><td style="padding:6px 12px 6px 0;vertical-align:top;font-size:14px;line-height:1.5;color:#767581;width:82px">${label}</td><td style="padding:6px 0;vertical-align:top;font-size:14px;line-height:1.5;word-break:break-word;white-space:pre-wrap">${escape(value)}</td></tr>`).join("")}</table><p style="font-size:12px;line-height:1.5;color:#767581">${footer}</p></td></tr></table></td></tr></table></body></html>`,
+  };
+}
+
+// New layouts get a new version so queued retries keep their original payload.
+export function bookingEmailPayload(receipt: Pick<BookingReceipt, "start" | "end" | "emails">, role: Role) {
+  const mail = receipt.emails!;
+  if (mail.version !== 4) return versionThreeBookingEmailPayload(receipt, role);
+  const details = role === "guest" ? mail.guestDetails ?? { date:true, time:true, timeZone:true, location:true } : { date:true, time:true, timeZone:true, location:true };
+  const date = (value: string) => new Intl.DateTimeFormat("en-US", { timeZone:mail.timeZone, year:"numeric", month:"long", day:"numeric" }).format(new Date(value));
+  const time = (value: string) => new Intl.DateTimeFormat("en-US", { timeZone:mail.timeZone, hour:"numeric", minute:"2-digit", ...(details.timeZone ? { timeZoneName:"short" } as const : {}) }).format(new Date(value));
+  const rows = [["Appointment",mail.title]], firstDate = date(receipt.start), lastDate = date(receipt.end);
+  if (details.date) rows.push(["Date", firstDate === lastDate ? firstDate : firstDate + " – " + lastDate]);
+  if (details.time) rows.push(["Time", time(receipt.start) + " – " + time(receipt.end) + (firstDate !== lastDate && !details.date ? " (next day)" : "")]);
+  if (details.timeZone) rows.push(["Time zone",mail.timeZone.replaceAll("_"," ")]);
+  if (details.location) rows.push(["Location",mail.location || "Not specified — contact me for details."]);
+  if (role === "organizer") rows.push(["Guest",`${mail.guestName} (${mail.guestEmail})`]);
+  if (mail.note.trim()) rows.push(["Guest note",mail.note]);
+  if (role === "guest" && mail.guestMessage) rows.push(["From your host",mail.guestMessage]);
+  const heading = role === "guest" ? "Your booking is confirmed" : "You have a new booking";
+  const detail = role === "guest" ? `Hi ${mail.guestName}, here are your appointment details.` : `${mail.guestName} booked a time with you.`;
+  const footer = role === "guest" ? "Need to change or cancel? Reply to this email to contact me." : "The appointment is on your Unigentamos calendar. Reply to this email to contact your guest.";
+  return {
+    from:mail.from, to:role === "guest" ? [mail.guestEmail] : mail.organizerEmails || [mail.organizerEmail], reply_to:role === "guest" ? mail.organizerEmail : mail.guestEmail,
+    subject:role === "guest" ? "Booking Confirmed" : "New Booking",
+    text:`${heading}\n\n${detail}\n\n${rows.map(([label,value])=>`${label}: ${value}`).join("\n\n")}\n\n${footer}\n\nUnigentamos`,
+    html:`<!doctype html><html><body style="margin:0;background:#f7f7fa;font-family:Arial,sans-serif;color:#243c44"><table role="presentation" style="width:100%;padding:20px 10px"><tr><td align="center"><table role="presentation" style="width:100%;max-width:560px;background:#fff;border:1px solid #e0ddec;border-radius:16px"><tr><td style="padding:20px"><table role="presentation" style="margin:0 0 18px;border-collapse:collapse"><tr><td style="vertical-align:middle;padding:0 9px 0 0"><img src="https://unigentamos.com/apple-touch-icon.png" alt="" width="28" height="28" style="display:block;border:0" /></td><td style="vertical-align:middle;padding:0;font-size:15px;line-height:28px;color:#133c5e;font-weight:bold">Unigentamos</td></tr></table><h1 style="font-size:24px;line-height:1.3;margin:0 0 12px">${heading}</h1><p style="font-size:14px;line-height:1.5">${escape(detail)}</p><table role="presentation" style="width:100%;border-collapse:collapse;margin:18px 0">${rows.map(([label,value])=>`<tr><td style="padding:6px 12px 6px 0;vertical-align:top;font-size:14px;line-height:1.5;color:#767581;width:82px">${label}</td><td style="padding:6px 0;vertical-align:top;font-size:14px;line-height:1.5;word-break:break-word;white-space:pre-wrap">${escape(value)}</td></tr>`).join("")}</table><p style="font-size:12px;line-height:1.5;color:#767581">${footer}</p></td></tr></table></td></tr></table></body></html>`,
   };
 }

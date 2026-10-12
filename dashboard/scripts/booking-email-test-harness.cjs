@@ -1,0 +1,41 @@
+/* Real storage, mocked provider and synthetic addresses only. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path'),ts=require('typescript'),{randomUUID}=require('node:crypto');
+const directory=fs.mkdtempSync(path.join(os.tmpdir(),'booking-sample-test-'));
+Object.assign(process.env,{FREMEN_DATA_DIR:directory,FREMEN_REQUIRE_SUPABASE:'false',FREMEN_REQUIRE_PERSISTENT_DATA:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',RESEND_API_KEY:'synthetic',BOOKING_EMAIL_FROM:'Unigentamos <bookings@alerts.example.test>',BOOKING_NOTIFY_EMAIL:'owner@example.test'});
+require.extensions['.ts']=(module,filename)=>module._compile(ts.transpileModule(fs.readFileSync(filename,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText,filename);
+const {sendBookingEmailTest}=require('../lib/modules/planning/booking-email-test.ts');
+const {readPlanningState,mutatePlanningState}=require('../lib/modules/planning/store.ts');
+let calls=[],lost=false;
+global.fetch=async(url,init)=>{assert.equal(url,'https://api.resend.com/emails/batch');assert.equal(init.headers.Authorization,'Bearer synthetic');calls.push(init);if(lost)throw Error('Lost provider response');return Response.json({data:[{id:'guest-id'},{id:'host-id'}]});};
+const sample=()=>({requestId:randomUUID(),details:{name:'Meet <me>',location:'Online',timeZone:'America/New_York',durationMinutes:30,from:'2030-01-07',dayStart:'09:00',mode:'automatic',manualStarts:[]},preferences:{guestConfirmation:false,organizerNotification:false,organizerEmails:['arbitrary@example.test'],guestMessage:'Bring <ID>',guestDetails:{date:true,time:true,timeZone:true,location:true}}});
+(async()=>{
+  const first=sample(), before=await readPlanningState();
+  const result=await sendBookingEmailTest(first);assert.equal(result.recipient,'owner@example.test');assert.equal(calls.length,1);
+  const messages=JSON.parse(calls[0].body);assert.equal(messages.length,2);
+  for(const message of messages){assert.deepEqual(message.to,['owner@example.test']);assert.equal(message.reply_to,'owner@example.test');assert.ok(!JSON.stringify(message).includes('arbitrary@example.test'));assert.ok(message.html.includes('color:#133c5e'));assert.ok(message.html.includes('apple-touch-icon.png'));assert.ok(!message.text.includes('your time is reserved'));assert.ok(message.text.includes('Date: January 7, 2030'));assert.ok(message.text.includes('Time: 9:00 AM EST – 9:30 AM EST'));}
+  assert.equal(messages[0].subject,'[Test] Booking Confirmed');assert.equal(messages[1].subject,'[Test] New Booking');assert.ok(messages[0].html.includes('Bring &lt;ID&gt;'));
+  await sendBookingEmailTest(first);assert.equal(calls.length,1,'Accepted requests never send twice');
+  await assert.rejects(sendBookingEmailTest({...first,details:{...first.details,name:'Changed'}}),e=>e.status===409);
+  const retry=sample();lost=true;await assert.rejects(sendBookingEmailTest(retry),e=>e.status===503);
+  await assert.rejects(sendBookingEmailTest(retry),e=>e.status===429,'Rapid retries are blocked');
+  await mutatePlanningState(state=>{state.bookingData.emailTests.find(item=>item.id===retry.requestId).lastAttemptAt-=3000;return {state,result:null};});
+  lost=false;await sendBookingEmailTest(retry);assert.equal(calls[1].body,calls[2].body);assert.equal(calls[1].headers['Idempotency-Key'],calls[2].headers['Idempotency-Key']);
+  const invalid=[null,{}, {...sample(),details:{...sample().details,durationMinutes:999}}, {...sample(),details:{...sample().details,timeZone:'bad'}}, {...sample(),preferences:{...sample().preferences,guestMessage:'a'.repeat(1501)}}, {...sample(),preferences:{...sample().preferences,guestDetails:{date:'yes'}}}];
+  for(const input of invalid)await assert.rejects(sendBookingEmailTest(input),e=>e.status===400);
+  for(let i=0;i<3;i++)await sendBookingEmailTest(sample());
+  await assert.rejects(sendBookingEmailTest(sample()),e=>e.status===429,'Rate limit is durable across requests');
+  const after=await readPlanningState();assert.deepEqual(after.events,before.events);assert.deepEqual(after.bookingData.links,before.bookingData?.links||[]);assert.deepEqual(after.bookingData.receipts,before.bookingData?.receipts||[]);
+  let authenticated=false;
+  const authPath=require.resolve('../lib/admin-session.ts');require.cache[authPath]={id:authPath,filename:authPath,loaded:true,exports:{hasAdminSession:async()=>authenticated}};
+  const {POST}=require('../app/api/planning/booking-emails/test/route.ts');
+  const request=(body,headers={})=>new Request('http://localhost/api/planning/booking-emails/test',{method:'POST',headers,body});
+  assert.equal((await POST(request('{}'))).status,401);authenticated=true;
+  assert.equal((await POST(request('{}'))).status,403);
+  const secure={cookie:'admin_csrf=synthetic','x-csrf-token':'synthetic','content-type':'application/json'};
+  assert.equal((await POST(request('null',secure))).status,400);
+  assert.equal((await POST(request('{',secure))).status,400);
+  assert.equal((await POST(request('a'.repeat(20001),secure))).status,413);
+  assert.equal((await POST(request('{}',{...secure,'content-type':'text/plain'}))).status,415);
+  process.env.RESEND_API_KEY='';await assert.rejects(sendBookingEmailTest(sample()),e=>e.status===503);
+  console.log('PASS: two sample emails, owner-only recipients, escaped content, lost-response retry idempotency, rate limits, invalid input, no events/links/receipts created. No real emails sent.');
+})().catch(error=>{console.error(error);process.exitCode=1;}).finally(()=>fs.rmSync(directory,{recursive:true,force:true}));

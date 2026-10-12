@@ -31,11 +31,11 @@ async function update(id,fn){await mutatePlanningState(state=>{fn(state.bookingD
   let receipt=await getReceipt(input.requestId);assert.equal(receipt.emails.guest.status,'pending');assert.equal(receipt.emails.organizer.status,'pending');
   assert.equal((await readPlanningState()).bookingData.receipts.length,1);assert.equal((await readPlanningState()).events.length,1);
   const payload=bookingEmailPayload(receipt,'guest');assert.deepEqual(payload.to,['guest@example.test']);assert.equal(payload.reply_to,'owner@example.test');
-  assert.ok(payload.text.includes('January 7, 2030 at 9:00 AM EST'));assert.ok(payload.text.includes('9:30 AM EST'));assert.ok(payload.text.includes('America/New York'));assert.ok(payload.text.includes('3087 Terminal Dr'));
+  assert.ok(payload.text.includes('9:00 AM EST – 9:30 AM EST'));assert.ok(payload.text.includes('9:30 AM EST'));assert.ok(payload.text.includes('America/New York'));assert.ok(payload.text.includes('3087 Terminal Dr'));
   assert.ok(payload.html.includes('&lt;script&gt;'));assert.ok(!payload.html.includes('<img src=x>'));assert.ok(payload.html.includes('A &amp; B &lt;img src=x&gt;'));
   const organizer=bookingEmailPayload(receipt,'organizer');assert.equal(organizer.reply_to,'guest@example.test');assert.deepEqual(organizer.to,['owner@example.test']);assert.ok(organizer.text.includes('Guest <script> (guest@example.test)'));
   const midnight=structuredClone(receipt);midnight.start='2030-01-08T04:30:00Z';midnight.end='2030-01-08T05:00:00Z';midnight.emails.location='';
-  assert.ok(bookingEmailPayload(midnight,'guest').text.includes('January 7, 2030 at 11:30 PM EST'));assert.ok(bookingEmailPayload(midnight,'guest').text.includes('January 8, 2030 at 12:00 AM EST'));assert.ok(bookingEmailPayload(midnight,'guest').text.includes('Not specified'));
+  assert.ok(bookingEmailPayload(midnight,'guest').text.includes('January 7, 2030 – January 8, 2030'));assert.ok(bookingEmailPayload(midnight,'guest').text.includes('11:30 PM EST – 12:00 AM EST'));assert.ok(bookingEmailPayload(midnight,'guest').text.includes('Not specified'));
   await Promise.all([deliverBookingEmail(input.requestId,'guest'),deliverBookingEmail(input.requestId,'guest')]);
   assert.equal(calls.length,1,'Concurrent claims send once');assert.equal((await getReceipt(input.requestId)).emails.guest.status,'accepted');
   await deliverBookingEmail(input.requestId,'guest');assert.equal(calls.length,1);
@@ -54,11 +54,11 @@ async function update(id,fn){await mutatePlanningState(state=>{fn(state.bookingD
   // Per-link preferences are validated, private, and snapshotted for stable retries.
   const prefs={guestConfirmation:false,organizerNotification:true,organizerEmails:['service@example.test','second-owner@example.test'],guestMessage:'Bring <ID> & arrive early.'};
   const previewGuest=previewBookingEmail(link,prefs,'guest','Unigentamos <bookings@alerts.example.test>');
-  const sample=structuredClone(receipt);Object.assign(sample.emails,{version:3,guestName:'Alex Morgan',guestEmail:'alex@example.com',note:'',organizerEmail:prefs.organizerEmails[0],organizerEmails:prefs.organizerEmails,guestMessage:prefs.guestMessage});
+  const sample=structuredClone(receipt);Object.assign(sample.emails,{version:4,guestName:'Alex Morgan',guestEmail:'alex@example.com',note:'',organizerEmail:prefs.organizerEmails[0],organizerEmails:prefs.organizerEmails,guestMessage:prefs.guestMessage});
   assert.deepEqual(previewGuest,bookingEmailPayload(sample,'guest'),'Preview HTML, subject and envelope exactly match a delivered sample');
   const previewOwner=previewBookingEmail(link,prefs,'organizer','Unigentamos <bookings@alerts.example.test>');assert.deepEqual(previewOwner,bookingEmailPayload(sample,'organizer'));assert.ok(!previewOwner.text.includes('Bring <ID>'));assert.deepEqual(previewOwner.to,prefs.organizerEmails);
   assert.ok(previewGuest.html.includes('Bring &lt;ID&gt; &amp; arrive early.'));assert.ok(!previewGuest.html.includes('<ID>'));
-  const editedPreview=previewBookingEmail({...link,name:'New title',location:'Online',mode:'manual',manualStarts:['2030-01-07T23:45'],durationMinutes:30},{...prefs,guestMessage:'Updated message'},'guest');assert.equal(editedPreview.subject,'Booking Confirmed');assert.ok(editedPreview.text.includes('New title'));assert.ok(editedPreview.text.includes('Online'));assert.ok(editedPreview.text.includes('Updated message'));assert.ok(editedPreview.text.includes('January 8, 2030 at 12:15 AM EST'));
+  const editedPreview=previewBookingEmail({...link,name:'New title',location:'Online',mode:'manual',manualStarts:['2030-01-07T23:45'],durationMinutes:30},{...prefs,guestMessage:'Updated message'},'guest');assert.equal(editedPreview.subject,'Booking Confirmed');assert.ok(editedPreview.text.includes('New title'));assert.ok(editedPreview.text.includes('Online'));assert.ok(editedPreview.text.includes('Updated message'));assert.ok(editedPreview.text.includes('11:45 PM EST – 12:15 AM EST'));
   assert.equal(previewBookingEmail({...link,from:'invalid'},prefs,'guest'),null);assert.equal(previewBookingEmail({...link,timeZone:'invalid'},prefs,'guest'),null);
   assert.equal(calls.length,before,'Generating previews never sends email');
   assert.equal(previewGuest.subject,'Booking Confirmed');assert.equal(previewOwner.subject,'New Booking');
@@ -67,7 +67,7 @@ async function update(id,fn){await mutatePlanningState(state=>{fn(state.bookingD
   for (let mask=0;mask<16;mask++) {
     const guestDetails={date:!!(mask&1),time:!!(mask&2),timeZone:!!(mask&4),location:!!(mask&8)};
     const filtered=previewBookingEmail(link,{...prefs,guestDetails},'guest');
-    assert.equal(filtered.text.includes('Starts:'),guestDetails.date || guestDetails.time);
+    assert.equal(filtered.text.includes('Date:'),guestDetails.date); assert.equal(filtered.text.includes('Time:'),guestDetails.time);
     assert.equal(filtered.text.includes('January'),guestDetails.date);
     assert.equal(filtered.text.includes('9:00'),guestDetails.time);
     assert.equal(filtered.text.includes('Time zone:'),guestDetails.timeZone);
@@ -86,11 +86,11 @@ async function update(id,fn){await mutatePlanningState(state=>{fn(state.bookingD
   const fourth={...input,requestId:randomUUID(),start:pub.slots[3].start,email:'fourth@example.test'};
   assert.equal((await reserveBooking(token,fourth,'192.0.2.4')).confirmationEmail,false);
   assert.equal((await reserveBooking(token,fourth,'192.0.2.4')).confirmationEmail,false);
-  const four=await getReceipt(fourth.requestId);assert.equal(four.emails.version,3);assert.equal(four.emails.guest.status,'cancelled');assert.deepEqual(four.emails.guestDetails,detailsPrefs.guestDetails,'Detail choices are snapshotted for delivery');
+  const four=await getReceipt(fourth.requestId);assert.equal(four.emails.version,4);assert.equal(four.emails.guest.status,'cancelled');assert.deepEqual(four.emails.guestDetails,detailsPrefs.guestDetails,'Detail choices are snapshotted for delivery');
   const callCount=calls.length;await dispatchBookingEmails(fourth.requestId);assert.equal(calls.length,callCount+1,'Organizer-only dispatch still sends, guest remains disabled');assert.deepEqual(calls.at(-1).body.to,prefs.organizerEmails);
   configured=await changeBookingLink({...configured,operation:'update',expectedUpdatedAt:configured.updatedAt,emailPreferences:{...prefs,guestConfirmation:true,organizerNotification:false}});
   const fifth={...input,requestId:randomUUID(),start:pub.slots[4].start,email:'fifth@example.test'};assert.equal((await reserveBooking(token,fifth,'192.0.2.5')).confirmationEmail,true);
-  const five=await getReceipt(fifth.requestId),customPayload=bookingEmailPayload(five,'guest');assert.equal(five.emails.organizer.status,'cancelled');assert.equal(customPayload.reply_to,'service@example.test');assert.ok(customPayload.html.includes('Bring &lt;ID&gt; &amp; arrive early.'));assert.ok(customPayload.text.includes('Starts:'));assert.ok(!customPayload.text.includes('second-owner@example.test'));
+  const five=await getReceipt(fifth.requestId),customPayload=bookingEmailPayload(five,'guest');assert.equal(five.emails.organizer.status,'cancelled');assert.equal(customPayload.reply_to,'service@example.test');assert.ok(customPayload.html.includes('Bring &lt;ID&gt; &amp; arrive early.'));assert.ok(customPayload.text.includes('Date:'));assert.ok(!customPayload.text.includes('second-owner@example.test'));
   await dispatchBookingEmails(fifth.requestId);assert.equal(calls.length,callCount+2,'Guest-only sends exactly one message');
   configured=await changeBookingLink({...configured,operation:'update',expectedUpdatedAt:configured.updatedAt,emailPreferences:{...prefs,guestConfirmation:false,organizerNotification:false,guestMessage:'Changed'}});
   assert.deepEqual(bookingEmailPayload(await getReceipt(fifth.requestId),'guest'),customPayload,'Later edits do not change queued payload');

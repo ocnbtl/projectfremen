@@ -66,3 +66,20 @@
 .menuActions button:hover {background:var(--module-quiet);}
 .menuActions button svg {width:14px;height:14px;flex:none;}
 .feedback {overflow-wrap:anywhere;}
+
+.links {grid-template-columns:repeat(auto-fill,minmax(min(100%,420px),1fr));}
+.subscriptionCard {grid-template-columns:minmax(0,1fr) minmax(55px,.6fr) 126px;align-items:start;gap:12px;}
+.cardIdentity {display:grid;gap:7px;min-width:0;}
+.card .shareStatus {flex-direction:column;align-items:flex-start;gap:5px;min-width:0;}
+.cardControls {flex-direction:column;align-items:stretch;gap:2px;margin:0;min-width:0;}
+.cardControls > button {justify-content:flex-start;min-height:30px;padding:5px 8px;}
+.linkMenu {flex:none;}
+.linkMenu > button {min-height:30px;padding:5px 8px;font-size:11px;}
+.linkMenu > button small:empty {display:none;}
+.linkMenu > button > svg:last-child {margin-left:auto;}
+.calendarList > span {display:grid;grid-template-columns:14px 10px minmax(0,1fr);align-items:start;gap:5px;}
+.calendarList > span > :is(svg,i) {margin-top:2px;}
+.calendarList > span > span {min-width:0;overflow-wrap:anywhere;}
+@media(max-width:600px) {.subscriptionCard {grid-template-columns:minmax(0,1fr) minmax(47px,.6fr) 112px;gap:7px;padding:10px;}.cardControls > button {font-size:11px;}.card .note,.calendarList {font-size:11px!important;}.linkMenu > button {font-size:10px;padding:5px;gap:4px;}.cardHeading > strong {font-size:12px;}}
+
+.subscriptionCard > .confirm {grid-column:1/-1;}

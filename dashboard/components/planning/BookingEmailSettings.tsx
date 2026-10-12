@@ -12,7 +12,7 @@ export default function BookingEmailSettings({ value, onChange, ready, details, 
     {!ready && <p className={styles.slotNote}>Email delivery needs setup. These preferences will apply once a sender is connected.</p>}
     <div className={styles.emailColumns}>
       <div className={styles.emailSection}>
-        <label className={styles.emailToggle}><input type="checkbox" checked={value.guestConfirmation} onChange={event => onChange({ ...value, guestConfirmation: event.target.checked })} /><span>Email guests</span></label>
+        <label className={styles.emailToggle}><input type="checkbox" checked={value.guestConfirmation} onChange={event => onChange({ ...value, guestConfirmation: event.target.checked })} /><span>Email guests a confirmation</span></label>
         <div className={styles.emailDetails} role="group" aria-label="Include in guest confirmation">{([['date','Date'],['time','Time'],['timeZone','Time zone'],['location','Location']] as const).map(([key,label]) => <label key={key}><input type="checkbox" disabled={!value.guestConfirmation} checked={value.guestDetails?.[key] ?? true} onChange={event => onChange({ ...value, guestDetails:{date:true,time:true,timeZone:true,location:true,...value.guestDetails,[key]:event.target.checked} })} />{label}</label>)}</div>
         <label className={styles.messageLabel}>Message from you <small>(optional, for this link)</small><textarea disabled={!value.guestConfirmation} rows={3} maxLength={1500} placeholder="Anything guests should know before your appointment…" value={value.guestMessage} onChange={event => onChange({ ...value, guestMessage: event.target.value })} /></label>
       </div>
