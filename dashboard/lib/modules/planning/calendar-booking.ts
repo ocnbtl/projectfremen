@@ -46,7 +46,8 @@ function fields(input: Record<string, unknown>, state: PlanningState) {
     if (!value || typeof value !== "object" || typeof value.guestConfirmation !== "boolean" || typeof value.organizerNotification !== "boolean" || !Array.isArray(value.organizerEmails) || value.organizerEmails.length > 5) return fail("Choose valid email confirmation settings.");
     const organizerEmails = [...new Set(value.organizerEmails.map(email => text(email, "notification email address", 254, true).toLowerCase()))];
     if (organizerEmails.some(email => !/^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/.test(email))) return fail("Enter valid notification email addresses.");
-    emailPreferences = { guestConfirmation: value.guestConfirmation, organizerNotification: value.organizerNotification, organizerEmails, guestMessage: text(value.guestMessage ?? "", "guest message", 1500) };
+    if (value.guestDetails !== undefined && (!value.guestDetails || typeof value.guestDetails !== "object" || ["date", "time", "timeZone", "location"].some(key => typeof value.guestDetails![key as keyof typeof value.guestDetails] !== "boolean"))) return fail("Choose valid guest email details.");
+    emailPreferences = { guestConfirmation: value.guestConfirmation, organizerNotification: value.organizerNotification, organizerEmails, guestMessage: text(value.guestMessage ?? "", "guest message", 1500), ...(value.guestDetails ? { guestDetails: { date:value.guestDetails.date, time:value.guestDetails.time, timeZone:value.guestDetails.timeZone, location:value.guestDetails.location } } : {}) };
   }
   const name = text(input.name, "booking title", 120, true), description = text(input.description ?? "", "description", 1500), location = text(input.location ?? "", "location", 500);
   const calendarId = text(input.calendarId, "destination calendar", 120, true);

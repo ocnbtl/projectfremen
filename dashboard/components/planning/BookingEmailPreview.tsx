@@ -27,7 +27,7 @@ export default function BookingEmailPreview({ details, preferences, sender, defa
         <motion.span aria-hidden="true" className={styles.slider} initial={false} animate={{x:role === "guest" ? "0%" : "100%"}} transition={{duration:reduced ? 0 : .24,ease:[.22,.78,.18,1]}} />
         {roles.map(item => <button key={item} id={`${id}-${item}`} type="button" role="tab" aria-controls={`${id}-message`} aria-selected={role === item} tabIndex={role === item ? 0 : -1} onKeyDown={navigate} onClick={() => setRole(item)}><UnigentamosIcon role="email" size={16} />{item === "guest" ? "Guest" : "You"}</button>)}
       </div>
-      <p className={styles.note}>Sample booking · Guest, note and appointment time are examples. Your draft settings update this preview. Nothing is sent.</p>
+      <p className={styles.note}>Sample guest and appointment. Updates as you edit. Nothing is sent.</p>
       {(!enabled || !ready) && <p className={styles.status} role="status">{!enabled ? `Emails to ${role === "guest" ? "guests are" : "you are"} turned off for this link. This is a preview only.` : "Email delivery needs setup. You can still review the message."}</p>}
       <div id={`${id}-message`} role="tabpanel" aria-labelledby={`${id}-${role}`}>
         {payload ? <><dl className={styles.envelope}>
@@ -37,7 +37,6 @@ export default function BookingEmailPreview({ details, preferences, sender, defa
           <div><dt>Reply to</dt><dd>{payload.reply_to}</dd></div>
         </dl><iframe className={styles.message} title={role === "guest" ? "Guest confirmation email preview" : "Organizer notification email preview"} srcDoc={srcDoc} sandbox="" referrerPolicy="no-referrer" /></> : <p className={styles.status}>Choose a valid date, start time and time zone to preview this appointment.</p>}
       </div>
-      <p className={styles.note}>Uses the email sent for this link. Fonts and spacing can vary slightly between email apps.</p>
     </div>
   </BookingDisclosure>;
 }

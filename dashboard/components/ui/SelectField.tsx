@@ -4,9 +4,9 @@ import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { matchesChoiceSearch } from "../../lib/ui/choice-search";
 type OptionProps = { value?: string | number; disabled?: boolean; children?: ReactNode; title?: string; "data-search"?: string };
-type Props = SelectHTMLAttributes<HTMLSelectElement> & { pressSlide?: boolean; searchable?: boolean; autoFocusSearch?: boolean; contained?: boolean; columns?: number; triggerContent?: ReactNode; menuClassName?: string; onCreate?: () => void; createLabel?: string };
+type Props = SelectHTMLAttributes<HTMLSelectElement> & { optionColors?: Record<string,string>; pressSlide?: boolean; searchable?: boolean; autoFocusSearch?: boolean; contained?: boolean; columns?: number; triggerContent?: ReactNode; menuClassName?: string; onCreate?: () => void; createLabel?: string };
 /** Nonmodal choice menus keep nested dismissals local to their owning control. */
-export default function SelectField({ value, defaultValue, onChange, children, className, disabled, required, name, id, pressSlide = false, searchable = false, autoFocusSearch = true, contained = false, columns = 1, triggerContent, menuClassName = "", onCreate, createLabel = "Create organization", ...attributes }: Props) {
+export default function SelectField({ value, defaultValue, onChange, children, className, disabled, required, name, id, optionColors, pressSlide = false, searchable = false, autoFocusSearch = true, contained = false, columns = 1, triggerContent, menuClassName = "", onCreate, createLabel = "Create organization", ...attributes }: Props) {
   const trigger = useRef<HTMLButtonElement>(null), menu = useRef<HTMLDivElement>(null), search = useRef<HTMLInputElement>(null);
   const listId = useId();
   const [open, setOpen] = useState(false), [query, setQuery] = useState(""), [internal, setInternal] = useState(String(defaultValue ?? "")), [fieldLabel, setFieldLabel] = useState<string>();
@@ -20,6 +20,7 @@ export default function SelectField({ value, defaultValue, onChange, children, c
   const plain = (node: ReactNode): string => Children.toArray(node).map(child => isValidElement<OptionProps>(child) ? plain(child.props.children) : String(child)).join("");
   const collect = (nodes: ReactNode) => Children.forEach(nodes, node => { if (!isValidElement<OptionProps>(node)) return; if (node.type !== "option") { collect(node.props.children); return; } options.push({value:String(node.props.value ?? plain(node.props.children)),label:node.props.children,text:plain(node.props.children),disabled:node.props.disabled,title:node.props.title,keywords:node.props["data-search"]}); });
   collect(children);
+  if (optionColors) options.forEach(option => { if (optionColors[option.value]) option.label = <span style={{display:"inline-flex",alignItems:"center",gap:7,minWidth:0}}><i aria-hidden="true" style={{width:10,height:10,borderRadius:"50%",flex:"none",background:optionColors[option.value]}} />{option.label}</span>; });
   const filtered = options.filter(option => matchesChoiceSearch(query, option.text, option.value, option.keywords));
   const label = attributes["aria-label"] || fieldLabel || "Select an option";
   const select = (next:string) => {setInternal(next); onChange?.({target:{value:next},currentTarget:{value:next}} as ChangeEvent<HTMLSelectElement>); setOpen(false); setQuery("");};

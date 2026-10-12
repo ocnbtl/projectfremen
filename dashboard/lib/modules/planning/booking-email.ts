@@ -21,11 +21,11 @@ export function queueBookingEmails(input: Pick<BookingEmails, "title" | "guestNa
   if (preferences) {
     if (!preferences.guestConfirmation && !preferences.organizerNotification) return;
     const recipients = preferences.organizerEmails.length ? [...preferences.organizerEmails] : [config.organizerEmail];
-    return { ...input, version: 2, from: config.from, organizerEmail: recipients[0], organizerEmails: recipients, guestMessage: preferences.guestMessage,
+    return { ...input, version: 3, from: config.from, organizerEmail: recipients[0], organizerEmails: recipients, guestMessage: preferences.guestMessage, guestDetails: preferences.guestDetails ? { ...preferences.guestDetails } : undefined,
       guest: { status: preferences.guestConfirmation ? "pending" : "cancelled", attempts: 0 },
       organizer: { status: preferences.organizerNotification ? "pending" : "cancelled", attempts: 0 } };
   }
-  return { ...input, version: 1, from: config.from, organizerEmail: config.organizerEmail, guest: { status: "pending", attempts: 0 }, organizer: { status: "pending", attempts: 0 } };
+  return { ...input, version: 3, from: config.from, organizerEmail: config.organizerEmail, guest: { status: "pending", attempts: 0 }, organizer: { status: "pending", attempts: 0 } };
 }
 export function bookingEmailSummary(state: PlanningState): BookingEmailSummary {
   const config = bookingEmailConfig(), jobs = (state.bookingData?.receipts || []).flatMap(receipt => receipt.emails ? roles.map(role => receipt.emails![role]) : []);

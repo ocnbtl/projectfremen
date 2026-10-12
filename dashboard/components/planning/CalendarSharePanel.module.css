@@ -48,3 +48,6 @@
 .pane {min-height:275px;}
 .pane > section {align-content:start;}
 .pane:has(form) {min-height:0;}
+
+.sheet :global(.work-sheet-body) {padding-top:4px;}
+.sheet :global(.work-sheet-header) {padding-bottom:8px;}

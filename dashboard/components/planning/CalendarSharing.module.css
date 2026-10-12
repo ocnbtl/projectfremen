@@ -53,3 +53,16 @@
 .choice input[type=radio] {width:16px;height:16px;margin:0;accent-color:var(--module-action);flex:none;}
 .panel:has(form) .heading {min-height:0;}
 @media(max-width:600px) {.detailsColumns {grid-template-columns:1fr;gap:16px;}.heading {min-height:62px;}}
+
+.shareStatus {display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.badge[data-inactive=false] {color:#286647;background:#eaf5ee;}
+.cardControls {display:flex;gap:8px;align-items:flex-start;margin-top:3px;}
+.cardControls > button {min-height:32px;padding:6px 9px;font-size:12px;flex:none;}
+.linkMenu {flex:1;min-width:0;background:transparent;}
+.linkMenu > button {min-height:32px;padding:6px 8px;gap:5px;}
+.linkMenu > div > div {padding:6px 0 0;gap:8px;}
+.menuActions {display:grid;gap:3px;}
+.menuActions button {justify-content:flex-start;min-height:32px;width:100%;padding:6px 8px;font-size:11px;background:transparent;border-color:transparent;gap:6px;}
+.menuActions button:hover {background:var(--module-quiet);}
+.menuActions button svg {width:14px;height:14px;flex:none;}
+.feedback {overflow-wrap:anywhere;}

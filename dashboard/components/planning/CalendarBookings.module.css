@@ -93,3 +93,19 @@
 .timeChoices {max-height:200px;}
 @media(max-width:760px) {.emailColumns {grid-template-columns:1fr;gap:16px;}.slotCalendar button {min-height:34px;}.timeChoices button {min-height:36px;}}
 @media(prefers-reduced-motion:reduce) {.disclosure > button svg,.timeChoices button {transition:none;}}
+
+.emailDetails {display:flex;flex-wrap:wrap;gap:6px 12px;}
+.emailDetails label {display:inline-flex;align-items:center;gap:5px;cursor:pointer;}
+.emailDetails input {width:14px;height:14px;margin:0;accent-color:var(--module-action);}
+.form .emailToggle {align-items:center;}
+.emailToggle input {margin:0;}
+.availabilityMode {display:grid;gap:10px;min-width:0;}
+.schedulingCompact {display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap;}
+.schedulingCompact > fieldset {flex:1 1 240px;}
+.schedulingTimes {display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.schedulingTimes > label {display:flex;align-items:center;gap:6px;font-size:11px;white-space:nowrap;}
+.schedulingTimes :global(.app-select-trigger) {width:auto;min-width:78px;min-height:30px;padding:5px 7px;font-size:11px;}
+.modes label {transition:background .24s,border-color .24s;}
+@media(prefers-reduced-motion:reduce) {.modes label {transition:none;}}
+
+.form .emailDetails label,.form .schedulingTimes > label {width:auto;max-width:100%;}

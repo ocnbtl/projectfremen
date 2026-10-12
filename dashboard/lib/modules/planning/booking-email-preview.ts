@@ -11,9 +11,9 @@ export function previewBookingEmail(details: BookingEmailPreviewDetails, prefere
     const end = start.add({ minutes: details.durationMinutes });
     const recipients = preferences.organizerEmails.length ? [...new Set(preferences.organizerEmails.map(email => email.trim().toLowerCase()))] : [defaultRecipient || "Your notification email"];
     const emails: BookingEmails = {
-      version: 2, from: sender || "Sender not configured", organizerEmail: recipients[0] || "Your notification email", organizerEmails: recipients,
+      version: 3, from: sender || "Sender not configured", organizerEmail: recipients[0] || "Your notification email", organizerEmails: recipients, guestDetails: preferences.guestDetails,
       title: details.name.trim() || "Appointment title", location: details.location.trim(), timeZone: details.timeZone,
-      guestName: "Alex Morgan", guestEmail: "alex@example.com", note: "Looking forward to our appointment.", guestMessage: preferences.guestMessage.trim(),
+      guestName: "Alex Morgan", guestEmail: "alex@example.com", note: "", guestMessage: preferences.guestMessage.trim(),
       guest: { status: "pending", attempts: 0 }, organizer: { status: "pending", attempts: 0 },
     };
     return bookingEmailPayload({ start: start.toString(), end: end.toString(), emails }, role);

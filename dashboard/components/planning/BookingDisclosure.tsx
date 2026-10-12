@@ -5,10 +5,10 @@ import { useCalendarMotion } from "./CalendarMotion";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./CalendarBookings.module.css";
 
-export default function BookingDisclosure({ title, summary, icon = "sliders", children }: { title: string; summary: string; icon?: string; children: ReactNode }) {
+export default function BookingDisclosure({ title, summary = "", icon = "sliders", children, className = "" }: { title: string; summary?: string; icon?: string; children: ReactNode; className?: string }) {
   const [open, setOpen] = useState(false), id = useId();
   const { reduced } = useCalendarMotion();
-  return <section className={styles.disclosure} onInvalidCapture={event => {
+  return <section className={`${styles.disclosure} ${className}`} onInvalidCapture={event => {
     if (open) return;
     event.preventDefault(); setOpen(true);
     const input = event.target as HTMLInputElement;

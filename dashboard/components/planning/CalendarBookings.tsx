@@ -1,5 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useCalendarMotion } from "./CalendarMotion";
 import type { Calendar } from "../../lib/modules/planning/types";
 import type { BookingLinkView, BookingEmailSummary } from "../../lib/modules/planning/booking-types";
 import { addDays, localDate } from "../../lib/modules/planning/calendar-model";
@@ -15,6 +17,7 @@ import shared from "./CalendarSharing.module.css";
 import styles from "./CalendarBookings.module.css";
 type Draft = Omit<BookingLinkView, "id" | "path" | "createdAt" | "updatedAt" | "bookingCount"> & { id?: string; expectedUpdatedAt?: string };
 export default function CalendarBookings({ calendars, onSummary }: { calendars: Calendar[]; onSummary?: (summary: {active:number;total:number}) => void }) {
+  const { reduced } = useCalendarMotion();
   const active = calendars.filter(calendar => !calendar.archivedAt);
   const [links, setLinks] = useState<BookingLinkView[]>([]), [draft, setDraft] = useState<Draft | null>(null);
   const [loading, setLoading] = useState(true), [busy, setBusy] = useState(false), [error, setError] = useState(""), [notice, setNotice] = useState("");
@@ -73,7 +76,7 @@ export default function CalendarBookings({ calendars, onSummary }: { calendars: 
           <h5><UnigentamosIcon role="calendar" size={16} />Booking details</h5>
           <label>Booking title<input required maxLength={120} value={draft.name} onChange={event => setDraft({ ...draft, name: event.target.value })} /></label>
           <div className={styles.grid}>
-            <label>Add bookings to<SelectField aria-label="Add bookings to" value={draft.calendarId} onChange={event => setDraft({ ...draft, calendarId: event.target.value, conflictCalendarIds: [...new Set([...draft.conflictCalendarIds, event.target.value])] })}>{active.map(calendar => <option key={calendar.id} value={calendar.id}>{calendar.name}</option>)}</SelectField></label>
+            <label>Add bookings to<SelectField optionColors={Object.fromEntries(active.map(calendar => [calendar.id,calendar.color]))} aria-label="Add bookings to" value={draft.calendarId} onChange={event => setDraft({ ...draft, calendarId: event.target.value, conflictCalendarIds: [...new Set([...draft.conflictCalendarIds, event.target.value])] })}>{active.map(calendar => <option key={calendar.id} value={calendar.id}>{calendar.name}</option>)}</SelectField></label>
             <label>Appointment length<SelectField aria-label="Appointment length" value={draft.durationMinutes} onChange={event => setDraft({ ...draft, durationMinutes: Number(event.target.value) })}>{[15,20,30,45,60,90,120].map(minutes => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</SelectField></label>
           </div>
           <label><span className={styles.fieldLabel}>Description for guests <small>(optional)</small></span><textarea rows={2} maxLength={1500} value={draft.description} onChange={event => setDraft({ ...draft, description: event.target.value })} /></label>
@@ -87,6 +90,7 @@ export default function CalendarBookings({ calendars, onSummary }: { calendars: 
             <EventDateTimePicker compact dateOnly allDay label="First date" value={draft.from} timeZone={draft.timeZone} onChange={from => {setDraft({ ...draft, from, manualStarts:draft.manualStarts.filter(value => value.slice(0,10) >= from && value.slice(0,10) <= addDays(from,90)), through:draft.through < from ? from : draft.through > addDays(from,90) ? addDays(from,90) : draft.through });}} />
             <EventDateTimePicker compact dateOnly allDay label="Last date" value={draft.through} min={draft.from} max={addDays(draft.from,90)} timeZone={draft.timeZone} onChange={through => {setDraft({ ...draft, through, manualStarts:draft.manualStarts.filter(value => value.slice(0,10) <= through) });}} />
           </div>
+          <AnimatePresence initial={false} mode="wait"><motion.div key={draft.mode} className={styles.availabilityMode} initial={{height:0,opacity:0}} animate={{height:"auto",opacity:1}} exit={{height:0,opacity:0}} transition={{duration:reduced ? 0 : .24,ease:[.22,.78,.18,1]}} style={{overflow:"hidden"}}>
           {draft.mode === "automatic" ? <>
             <fieldset><legend>Days to offer</legend><div className={styles.weekdays}>{["Mon","Tue","Wed","Thu","Fri","Sat","Sun"].map((day,index) => <button type="button" key={day} aria-label={day} aria-pressed={draft.weekdays.includes(index+1)} onClick={() => setDraft({ ...draft, weekdays:draft.weekdays.includes(index+1) ? draft.weekdays.filter(day => day !== index+1) : [...draft.weekdays,index+1] })}>{day}</button>)}</div></fieldset>
             <div className={styles.grid}>
@@ -95,11 +99,12 @@ export default function CalendarBookings({ calendars, onSummary }: { calendars: 
             </div>
             <p className={shared.note}>Busy times are removed automatically. Offer up to 90 days at a time.</p>
           </> : <ManualBookingSlots from={draft.from} through={draft.through} duration={draft.durationMinutes} timeZone={draft.timeZone} values={draft.manualStarts} onChange={manualStarts => setDraft({ ...draft, manualStarts })} />}
+          </motion.div></AnimatePresence>
         </section>
       </div>
       <BookingDisclosure title="Scheduling settings" summary={`${draft.bufferMinutes} min buffer · ${draft.noticeHours}h notice`}>
-        <fieldset><legend>Check calendars for conflicts</legend><div className={shared.choices}>{active.map(calendar => <label className={shared.choice} key={calendar.id}><input type="checkbox" disabled={calendar.id === draft.calendarId} checked={calendar.id === draft.calendarId || draft.conflictCalendarIds.includes(calendar.id)} onChange={event => setDraft({ ...draft, conflictCalendarIds:event.target.checked ? [...draft.conflictCalendarIds,calendar.id] : draft.conflictCalendarIds.filter(id => id !== calendar.id) })} /><span className={shared.dot} style={{backgroundColor:calendar.color}} />{calendar.name}</label>)}</div><p className={shared.note}>Your destination calendar is always checked, including hidden and all-day events. Keep imported calendars refreshed.</p></fieldset>
-        <div className={styles.grid}><label>Buffer between appointments<SelectField aria-label="Buffer between appointments" value={draft.bufferMinutes} onChange={event => setDraft({ ...draft, bufferMinutes:Number(event.target.value) })}>{[0,5,10,15,30,60].map(minutes => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</SelectField></label><label>Minimum advance notice<SelectField aria-label="Minimum advance notice" value={draft.noticeHours} onChange={event => setDraft({ ...draft, noticeHours:Number(event.target.value) })}>{[0,1,2,4,12,24,48,72].map(hours => <option key={hours} value={hours}>{hours} hours</option>)}</SelectField></label></div>
+        <div className={styles.schedulingCompact}><fieldset><legend>Check calendars</legend><div className={shared.choices}>{active.map(calendar => <label className={shared.choice} key={calendar.id}><input type="checkbox" disabled={calendar.id === draft.calendarId} checked={calendar.id === draft.calendarId || draft.conflictCalendarIds.includes(calendar.id)} onChange={event => setDraft({ ...draft, conflictCalendarIds:event.target.checked ? [...draft.conflictCalendarIds,calendar.id] : draft.conflictCalendarIds.filter(id => id !== calendar.id) })} /><span className={shared.dot} style={{backgroundColor:calendar.color}} />{calendar.name}</label>)}</div></fieldset>
+        <div className={styles.schedulingTimes}><label>Buffer<SelectField aria-label="Buffer between appointments" value={draft.bufferMinutes} onChange={event => setDraft({ ...draft, bufferMinutes:Number(event.target.value) })}>{[0,5,10,15,30,60].map(minutes => <option key={minutes} value={minutes}>{minutes} minutes</option>)}</SelectField></label><label>Advance notice<SelectField aria-label="Minimum advance notice" value={draft.noticeHours} onChange={event => setDraft({ ...draft, noticeHours:Number(event.target.value) })}>{[0,1,2,4,12,24,48,72].map(hours => <option key={hours} value={hours}>{hours} hours</option>)}</SelectField></label></div></div>
       </BookingDisclosure>
       <BookingEmailSettings details={draft} sender={emails?.from} defaultRecipient={emails?.organizerEmail} value={draft.emailPreferences || emailDefaults} onChange={emailPreferences => setDraft({ ...draft, emailPreferences })} ready={!!emails?.ready} />
       <div className={styles.formFooter}><p className={shared.note}>Bookings confirm immediately{emails?.ready && (draft.emailPreferences?.guestConfirmation ?? true) ? " with a confirmation email for your guest" : " on screen"}. Your other events stay private.</p><div className={shared.actions}><Button disabled={busy} onClick={() => setDraft(null)}>Cancel</Button><Button intent="primary" type="submit" busy={busy} disabled={draft.mode === "manual" ? !draft.manualStarts.length : !draft.weekdays.length}>{draft.id ? "Save changes" : "Create link"}</Button></div></div>
