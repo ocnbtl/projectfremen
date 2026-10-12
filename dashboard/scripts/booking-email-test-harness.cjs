@@ -18,7 +18,9 @@ const sample=()=>({requestId:randomUUID(),details:{name:'Meet <me>',location:'On
   await assert.rejects(sendBookingEmailTest({...first,details:{...first.details,name:'Changed'}}),e=>e.status===409);
   const retry=sample();lost=true;await assert.rejects(sendBookingEmailTest(retry),e=>e.status===503);
   await assert.rejects(sendBookingEmailTest(retry),e=>e.status===429,'Rapid retries are blocked');
-  await mutatePlanningState(state=>{state.bookingData.emailTests.find(item=>item.id===retry.requestId).lastAttemptAt-=3000;return {state,result:null};});
+  await mutatePlanningState(state=>{const test=state.bookingData.emailTests.find(item=>item.id===retry.requestId);test.attempts=5;test.lastAttemptAt-=3000;return {state,result:null};});
+  await assert.rejects(sendBookingEmailTest(retry),e=>e.status===429);
+  await mutatePlanningState(state=>{state.bookingData.emailTests.find(item=>item.id===retry.requestId).lastAttemptAt-=600000;return {state,result:null};});
   lost=false;await sendBookingEmailTest(retry);assert.equal(calls[1].body,calls[2].body);assert.equal(calls[1].headers['Idempotency-Key'],calls[2].headers['Idempotency-Key']);
   const invalid=[null,{}, {...sample(),details:{...sample().details,durationMinutes:999}}, {...sample(),details:{...sample().details,timeZone:'bad'}}, {...sample(),preferences:{...sample().preferences,guestMessage:'a'.repeat(1501)}}, {...sample(),preferences:{...sample().preferences,guestDetails:{date:'yes'}}}];
   for(const input of invalid)await assert.rejects(sendBookingEmailTest(input),e=>e.status===400);

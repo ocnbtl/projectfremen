@@ -30,7 +30,9 @@ export async function sendBookingEmailTest(input: unknown) {
     if (existing) {
       if (existing.hash !== hash || now - existing.createdAt >= 23*3600000) throw new EmailTestError("This test has changed or expired. Close and reopen the editor to send a new test.",409);
       if (existing.accepted) return { state, result:true };
-      if (existing.attempts >= 5 || now - existing.lastAttemptAt < 2000) throw new EmailTestError("Please wait before retrying this test.",429);
+      if (now - existing.lastAttemptAt >= 600000) existing.attempts = 0;
+      if (existing.attempts >= 5) throw new EmailTestError("Please wait ten minutes before retrying this test.",429);
+      if (now - existing.lastAttemptAt < 2000) throw new EmailTestError("Please wait a moment before retrying this test.",429);
       existing.attempts++; existing.lastAttemptAt = now;
     } else {
       if (tests.filter(test => now - test.createdAt < 600000).length >= 5) throw new EmailTestError("You’ve sent five test pairs. Try again in ten minutes.",429);
