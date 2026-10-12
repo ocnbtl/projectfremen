@@ -11,7 +11,7 @@ import MapDataExplorer, {
   type AnalysisResult,
 } from "./MapDataExplorer";
 import type { MapAnalysisSettings } from "../../lib/modules/planning/map-analysis";
-import RelatedRecords from "./RelatedRecords";
+import MapPlaceProfile from "./MapPlaceProfile";
 import { browserVault } from "../../lib/local-first/browser-engine";
 import { smallPreview } from "../../lib/modules/media/thumbnail";
 import type { MediaProfile } from "../../lib/modules/media/profile";
@@ -24,7 +24,7 @@ import {
   type FormEvent,
 } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
+
 import type { FeatureCollection } from "geojson";
 import {
   WorkspaceButton as Button,
@@ -198,7 +198,10 @@ export default function MapWorkspace() {
     const existing = snapshot?.trips.find((t) => t.id === id);
     if (existing) startTrip(existing);
   }, [params, Boolean(snapshot)]);
-  const selected = snapshot?.state.places.find((p) => p.id === selectedId);
+  const requestedPlace = snapshot?.state.places.find((p) => p.id === selectedId);
+  const selected = requestedPlace?.mergedIntoId
+    ? snapshot?.state.places.find((p) => p.id === requestedPlace.mergedIntoId && !p.archivedAt)
+    : requestedPlace?.archivedAt ? undefined : requestedPlace;
   const places = useMemo(
     () =>
       (snapshot?.state.places || [])
@@ -613,32 +616,7 @@ export default function MapWorkspace() {
             regionGeography={analysisResult?.data[0].geography}
           />
           {analysisResult && <MapDataLegend result={analysisResult} />}
-          {selected && (
-            <section className={styles.placeCard}>
-              <div className={styles.placeHeading}>
-                <h2>{selected.name}</h2>
-                <Button
-                  intent="quiet"
-                  icon="close"
-                  aria-label="Close place preview"
-                  onClick={() => setSelectedId("")}
-                />
-              </div>
-              <p>{selected.address}</p>{!hasPlaceCoordinates(selected) && <p className="work-muted">Address saved. Add coordinates to show its pin on the map.</p>}
-              {selected.notes && <p>{selected.notes}</p>}
-              <RecordLinks refs={selected.linkedRefs} />
-              <RelatedRecords module="map" type="place" id={selected.id} />
-              <div className="work-actions">
-                <Button onClick={() => setEditor(selected)}>Edit place</Button>
-                <Link
-                  className="work-button"
-                  href={`/admin/calendar?place=${encodeURIComponent(selected.id)}`}
-                >
-                  Open Calendar
-                </Link>
-              </div>
-            </section>
-          )}
+          {selected && <MapPlaceProfile key={selected.id} place={selected} onEdit={() => setEditor(selected)} onClose={() => setSelectedId("")} />}
         </div>
       </div>
       <WorkspaceSheet

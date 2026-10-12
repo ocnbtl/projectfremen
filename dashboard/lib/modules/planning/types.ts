@@ -7,12 +7,19 @@ export type PlanningBase = {
   archivedAt?: string;
 };
 export type Place = PlanningBase & {
+  mergedIntoId?: string;
   name: string;
   address: string;
   countryCode?: string;
   addressParts?: import("./place-address").AddressParts;
   latitude?: number;
   longitude?: number;
+  locationVerification?: {
+    precision: "address" | "approximate" | "area" | "unverified";
+    checkedAt: string;
+    summary: string;
+    sourceUrls: string[];
+  };
   notes: string;
   tags: string[];
   linkedRefs: NativeObjectRef[];

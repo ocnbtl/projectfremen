@@ -199,6 +199,9 @@ export async function savePlanning<K extends PlanningCollection>(
     const item = normalize(collection, {
       ...previous,
       ...input,
+      ...(collection === "places" && previous && (!Object.hasOwn(input, "locationVerification") || JSON.stringify((input as unknown as Record<string, unknown>).locationVerification) === JSON.stringify((previous as unknown as Record<string, unknown>).locationVerification)) &&
+        ["address", "countryCode", "addressParts", "latitude", "longitude"].some(key => Object.hasOwn(input, key) && JSON.stringify((input as unknown as Record<string, unknown>)[key]) !== JSON.stringify((previous as unknown as Record<string, unknown>)[key]))
+        ? { locationVerification: undefined } : {}),
       id,
       createdAt: previous?.createdAt || stamp,
       updatedAt: stamp,

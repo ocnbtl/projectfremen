@@ -29,6 +29,19 @@ function coordinate(value: unknown, max: number) {
     throw new Error("Choose valid map coordinates");
   return n;
 }
+function normalizePlaceVerification(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Invalid location verification");
+  const v = value as Record<string, unknown>;
+  if (!["address", "approximate", "area", "unverified"].includes(String(v.precision))) throw new Error("Invalid location precision");
+  const checkedAt = string(v.checkedAt, "Location review date", 40, true);
+  if (!Number.isFinite(Date.parse(checkedAt))) throw new Error("Invalid location review date");
+  const sourceUrls = Array.isArray(v.sourceUrls) ? v.sourceUrls.slice(0, 8).map(source => {
+    const url = new URL(string(source, "Location source", 1600, true));
+    if (url.protocol !== "https:" || url.username || url.password) throw new Error("Use secure location source links");
+    return url.href;
+  }) : [];
+  return { precision: v.precision, checkedAt, summary: string(v.summary, "Location review", 1600), sourceUrls };
+}
 function refs(value: unknown): NativeObjectRef[] {
   if (!Array.isArray(value)) return [];
   if (value.length > 100)
@@ -67,9 +80,11 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
   if (collection === "places")
     fields = {
       name: string(raw.name, "Place name", 240, true),
+      ...(raw.mergedIntoId ? { mergedIntoId: string(raw.mergedIntoId, "Merged place", 300, true) } : {}),
       address: string(raw.address, "Address", 1400),
       ...(raw.countryCode ? { countryCode: normalizeAddressCountry(raw.countryCode) } : {}),
       ...(raw.addressParts != null ? { addressParts: normalizeAddressParts(raw.addressParts) } : {}),
+      ...(raw.locationVerification ? { locationVerification: normalizePlaceVerification(raw.locationVerification) } : {}),
       ...((raw.latitude == null || raw.latitude === "") && (raw.longitude == null || raw.longitude === "")
         ? { latitude: undefined, longitude: undefined }
         : { latitude: coordinate(raw.latitude, 90), longitude: coordinate(raw.longitude, 180) }),

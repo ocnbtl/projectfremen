@@ -3,7 +3,8 @@ import { createNativeObjectRef } from "../../native-objects/routes";
 import type { NativeObjectRef } from "../../native-objects/types";
 import { readPlanningState, savePlanningRecord } from "./store";
 import { effectiveEvent, type Place } from "./types";
-import { addressIdentity, isPhysicalLocation, profilePlaceAddress } from "./place-identity";
+import { addressIdentity, isPhysicalLocation, profilePlaceAddress, profilePlaceName } from "./place-identity";
+import { splitPastedAddress } from "./place-address";
 
 export type PlaceReconciliation = { scanned: number; created: number; linked: number; unchanged: number; conflicts: number; remaining: boolean; dryRun: boolean };
 const key = (ref: NativeObjectRef) => `${ref.module}:${ref.objectType}:${ref.objectId}`;
@@ -11,13 +12,14 @@ export async function reconcilePlaces({ dryRun = false, recordIds, eventIds, lim
   const [records, state] = await Promise.all([readPersonalRecords(), readPlanningState()]);
   const result: PlaceReconciliation = { scanned: 0, created: 0, linked: 0, unchanged: 0, conflicts: 0, remaining: false, dryRun };
   let places = state.places, attempted = 0;
-  async function resolve(address: string, placeId: string | undefined) {
+  async function resolve(address: string, placeId: string | undefined, name = address.slice(0, 240)) {
     const matches = placeId ? places.filter(place => place.id === placeId && !place.archivedAt) : places.filter(place => !place.archivedAt && addressIdentity(place.address) === addressIdentity(address));
     if (matches.length > 1 || (placeId && !matches.length)) throw new Error("Place needs review");
     let place = matches[0];
     if (!place) {
-      if (dryRun) { result.created++; const preview: Place = { id: `preview-${addressIdentity(address)}`, name: address.slice(0, 240), address, linkedRefs: [], notes: "", tags: [], createdAt: "preview", updatedAt: "preview" }; places = [...places, preview]; return preview; }
-      place = await savePlanningRecord("places", { name: address.slice(0, 240), address, notes: "", tags: [], linkedRefs: [] });
+      if (dryRun) { result.created++; const preview: Place = { id: `preview-${addressIdentity(address)}`, name, address, linkedRefs: [], notes: "", tags: [], createdAt: "preview", updatedAt: "preview" }; places = [...places, preview]; return preview; }
+      const addressParts = splitPastedAddress(address);
+      place = await savePlanningRecord("places", { name, address, ...(addressParts ? { addressParts, countryCode: "US" } : {}), notes: "", tags: [], linkedRefs: [] });
       if (!places.some(row => row.id === place.id)) { result.created++; places = [...places, place]; }
     }
     return place;
@@ -35,7 +37,7 @@ export async function reconcilePlaces({ dryRun = false, recordIds, eventIds, lim
       if (attempted >= limit) { result.remaining = true; continue; }
       attempted++;
       try {
-        const linked = await resolve(address, entry.placeId);
+        const linked = await resolve(address, entry.placeId, profilePlaceName(record.title, entry.label || "", address, record.className === "org"));
         if (entry.placeId !== linked.id) { locations[index] = { ...entry, placeId: linked.id }; changed = true; }
         if (dryRun) result.linked++;
       } catch { result.conflicts++; attempted--; }

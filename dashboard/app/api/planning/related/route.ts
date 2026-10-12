@@ -31,6 +31,10 @@ export async function GET(request: Request) {
       readPersonalLifeState(),
     ]);
     const items: { ref: NativeObjectRef; detail: string }[] = [];
+    if (module === "map" && type === "place") {
+      const place = planning.places.find(row => row.id === id && !row.archivedAt);
+      for (const ref of place?.linkedRefs || []) items.push({ ref, detail: "Linked to this place" });
+    }
     const matches = (refs: NativeObjectRef[]) =>
       refs.some(
         (r) =>
@@ -94,8 +98,9 @@ export async function GET(request: Request) {
           }),
           detail: `${t.stops.length} stops${t.startDate ? ` · ${t.startDate.slice(0, 10)}` : ""}`,
         });
+    const unique = [...new Map(items.map(item => [`${item.ref.module}:${item.ref.objectType}:${item.ref.objectId}`, item])).values()];
     return NextResponse.json(
-      { items: items.slice(0, 100), total: items.length },
+      { items: unique.slice(0, 100), total: unique.length },
       { headers },
     );
   } catch {
