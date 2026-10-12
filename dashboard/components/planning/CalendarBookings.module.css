@@ -109,3 +109,5 @@
 @media(prefers-reduced-motion:reduce) {.modes label {transition:none;}}
 
 .form .emailDetails label,.form .schedulingTimes > label {width:auto;max-width:100%;}
+
+.form .schedulingCompact fieldset label {width:auto;}
