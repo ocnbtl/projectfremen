@@ -77,3 +77,5 @@
 }
 
 .sectionHeading>button{flex:none;white-space:nowrap}.statuses button:disabled{cursor:default}.statuses button[title]{opacity:1}
+
+.cards>.card[data-expanded=true]{grid-column:1/-1}.datePair>*{min-width:0}.visitForm .datePair button{min-width:0;width:100%}
