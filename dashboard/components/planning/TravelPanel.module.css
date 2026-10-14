@@ -119,3 +119,10 @@
  .sheet .travelFilters .countryFilter{flex:0 1 100%;max-width:100%}
  .filterLabel{gap:4px}
 }
+
+.sheet :global(.work-sheet-body){scrollbar-gutter:stable}
+.sheet :global(.work-sheet-header){flex-shrink:0}
+.saveState{display:inline-flex;align-items:center;justify-content:flex-end;gap:5px;min-width:76px;flex:none;color:var(--text-secondary);font-size:11px;white-space:nowrap;margin-left:auto}
+.sectionHeading>div:first-child{min-width:0;flex:1}
+.saveControls{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex:none}.saveControls>button{white-space:nowrap}
+@media(max-width:760px){.saveState{min-width:64px}.saveControls>button{padding:8px 10px!important;font-size:12px!important}}
