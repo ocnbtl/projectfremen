@@ -1,3 +1,4 @@
+import usParks from "./travel-us-parks.json";
 import heritage from "./travel-heritage.json";
 import entities from "./travel-country-entities.json";
 import { travelCountries, type TravelDestination, type TravelKind } from "./travel";
@@ -13,6 +14,7 @@ export function travelCatalogQuery(kind: TravelKind, country: string, search: st
 }
 export async function travelCatalog(kind:TravelKind,country:string,search:string,page:number) {
   if(!travelCountries.some(c=>c.code===country))throw new Error("Choose a country");
+  if(kind==="park"&&country==="US"){const items=usParks.items.filter(d=>d.name.toLowerCase().includes(search.trim().toLowerCase())) as TravelDestination[];return {items:items.slice(page*100,page*100+100),hasMore:items.length>(page+1)*100};}
   if(kind==="city")return searchTravelPlaces(country,search,"city");
   if(kind==="landmark"){
     const saved=heritage.items.filter(d=>d.country===country&&d.name.toLowerCase().includes(search.trim().toLowerCase())) as TravelDestination[];

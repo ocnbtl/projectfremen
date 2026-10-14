@@ -1,3 +1,4 @@
+import usParks from "./travel-us-parks.json";
 import countries from "./address-countries.json";
 
 export const travelKinds = ["country", "state", "city", "landmark", "park"] as const;
@@ -19,14 +20,14 @@ export function normalizeTravelRecord(input: unknown): Omit<TravelRecord,"update
   const country = typeof v.country === "string" ? v.country.toUpperCase() : "";
   if (!travelCountries.some(c => c.code === country)) throw new Error("Choose a country");
   const id = typeof v.id === "string" ? v.id : "";
-  if (!/^(country:[A-Z]{2}|state:US-[A-Z]{2}|(city|landmark|park):Q[1-9][0-9]*|(city|landmark):osm:[NWR][1-9][0-9]*|landmark:unesco:[1-9][0-9]*-[A-Z]{2}|(city|landmark|park):custom:[0-9a-f-]{36})$/.test(id) || !id.startsWith(`${kind}:`)) throw new Error("Invalid destination identifier");
+  if (!/^(country:[A-Z]{2}|state:US-[A-Z]{2}|park:nps:[a-z0-9-]+|(city|landmark|park):Q[1-9][0-9]*|(city|landmark):osm:[NWR][1-9][0-9]*|landmark:unesco:[1-9][0-9]*-[A-Z]{2}|(city|landmark|park):custom:[0-9a-f-]{36})$/.test(id) || !id.startsWith(`${kind}:`)) throw new Error("Invalid destination identifier");
   const name = typeof v.name === "string" ? v.name.trim() : "";
   if (!name || name.length > 240) throw new Error("A destination name of up to 240 characters is required");
   if (!Array.isArray(v.statuses) || v.statuses.some(s => !travelStatuses.includes(s as TravelStatus))) throw new Error("Choose valid travel statuses");
   const statuses = [...new Set(v.statuses)] as TravelStatus[];
   if ((kind === "park" || kind === "landmark") && statuses.includes("lived")) throw new Error("Lived is available for countries, states and cities");
-  const fixed = kind === "country" ? countryDestinations.find(d=>d.id===id) : kind === "state" ? stateDestinations.find(d=>d.id===id) : undefined;
-  if ((kind === "country" || kind === "state") && (!fixed || fixed.country !== country)) throw new Error("Invalid destination");
+  const fixed = kind === "country" ? countryDestinations.find(d=>d.id===id) : kind === "state" ? stateDestinations.find(d=>d.id===id) : id.startsWith("park:nps:") ? usParks.items.find(d=>d.id===id) as TravelDestination | undefined : undefined;
+  if ((kind === "country" || kind === "state" || id.startsWith("park:nps:")) && (!fixed || fixed.country !== country)) throw new Error("Invalid destination");
   const result: Omit<TravelRecord,"updatedAt"> = {...(fixed || {id,name,kind,country}),statuses};
   if (typeof v.description === "string") result.description = v.description.trim().slice(0,500);
   if(id.startsWith("landmark:unesco:")){if(!id.endsWith(`-${country}`))throw new Error("Invalid heritage country");result.source=`https://whc.unesco.org/en/list/${id.split(":")[2].split("-")[0]}/`;}

@@ -1,0 +1,570 @@
+{
+  "source": "https://www.nps.gov/aboutus/national-park-system.htm",
+  "retrievedAt": "2026-10-14T03:07:33.382Z",
+  "coordinateSource": "Wikidata",
+  "items": [
+    {
+      "id": "park:nps:acadia-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Acadia National Park",
+      "source": "https://www.nps.gov/acad/siteindex.htm",
+      "latitude": 44.35,
+      "longitude": -68.216666666
+    },
+    {
+      "id": "park:nps:arches-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Arches National Park",
+      "source": "https://www.nps.gov/arch/index.htm",
+      "latitude": 38.728055555,
+      "longitude": -109.54
+    },
+    {
+      "id": "park:nps:badlands-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Badlands National Park",
+      "source": "https://www.nps.gov/badl/index.htm",
+      "latitude": 43.75,
+      "longitude": -102.5
+    },
+    {
+      "id": "park:nps:big-bend-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Big Bend National Park",
+      "source": "https://www.nps.gov/bibe/index.htm",
+      "latitude": 29.25,
+      "longitude": -103.25
+    },
+    {
+      "id": "park:nps:biscayne-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Biscayne National Park",
+      "source": "https://www.nps.gov/bisc/index.htm",
+      "latitude": 25.50185493,
+      "longitude": -80.18096924
+    },
+    {
+      "id": "park:nps:black-canyon-of-the-gunnison-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Black Canyon of the Gunnison National Park",
+      "source": "https://www.nps.gov/blca/index.htm",
+      "latitude": 38.58,
+      "longitude": -107.7275
+    },
+    {
+      "id": "park:nps:bryce-canyon-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Bryce Canyon National Park",
+      "source": "https://www.nps.gov/brca/index.htm",
+      "latitude": 37.64,
+      "longitude": -112.17
+    },
+    {
+      "id": "park:nps:canyonlands-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Canyonlands National Park",
+      "source": "https://www.nps.gov/cany/index.htm",
+      "latitude": 38.1669,
+      "longitude": -109.76
+    },
+    {
+      "id": "park:nps:capitol-reef-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Capitol Reef National Park",
+      "source": "https://www.nps.gov/care/index.htm",
+      "latitude": 38.2,
+      "longitude": -111.167
+    },
+    {
+      "id": "park:nps:carlsbad-caverns-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Carlsbad Caverns National Park",
+      "source": "https://www.nps.gov/cave/index.htm",
+      "latitude": 32.175277777,
+      "longitude": -104.443888888
+    },
+    {
+      "id": "park:nps:channel-islands-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Channel Islands National Park",
+      "source": "https://www.nps.gov/chis/index.htm",
+      "latitude": 33.66,
+      "longitude": -119.64
+    },
+    {
+      "id": "park:nps:congaree-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Congaree National Park",
+      "source": "https://www.nps.gov/cong/index.htm",
+      "latitude": 33.783333333,
+      "longitude": -80.783333333
+    },
+    {
+      "id": "park:nps:crater-lake-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Crater Lake National Park",
+      "source": "https://www.nps.gov/crla/index.htm",
+      "latitude": 42.911944444,
+      "longitude": -122.148055555
+    },
+    {
+      "id": "park:nps:cuyahoga-valley-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Cuyahoga Valley National Park",
+      "source": "https://www.nps.gov/cuva/index.htm",
+      "latitude": 41.241666666,
+      "longitude": -81.549722222
+    },
+    {
+      "id": "park:nps:death-valley-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Death Valley National Park",
+      "source": "https://www.nps.gov/deva/index.htm",
+      "latitude": 36.45,
+      "longitude": -116.85
+    },
+    {
+      "id": "park:nps:denali-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Denali National Park",
+      "source": "https://www.nps.gov/dena/index.htm",
+      "latitude": 63.34111,
+      "longitude": -150.73414
+    },
+    {
+      "id": "park:nps:dry-tortugas-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Dry Tortugas National Park",
+      "source": "https://www.nps.gov/drto/index.htm",
+      "latitude": 24.628611111,
+      "longitude": -82.873333333
+    },
+    {
+      "id": "park:nps:everglades-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Everglades National Park",
+      "source": "https://www.nps.gov/ever/index.htm",
+      "latitude": 25.3125,
+      "longitude": -80.6875
+    },
+    {
+      "id": "park:nps:gates-of-the-arctic-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Gates of the Arctic National Park",
+      "source": "https://www.nps.gov/gaar/index.htm",
+      "latitude": 67.7833,
+      "longitude": -153.3
+    },
+    {
+      "id": "park:nps:gateway-arch-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Gateway Arch National Park",
+      "source": "https://www.nps.gov/jeff/index.htm",
+      "latitude": 38.6246,
+      "longitude": -90.185
+    },
+    {
+      "id": "park:nps:glacier-bay-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Glacier Bay National Park",
+      "source": "https://www.nps.gov/glba/index.htm",
+      "latitude": 58.7,
+      "longitude": -137
+    },
+    {
+      "id": "park:nps:glacier-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Glacier National Park",
+      "source": "https://www.nps.gov/glac/index.htm",
+      "latitude": 48.755,
+      "longitude": -113.8
+    },
+    {
+      "id": "park:nps:grand-canyon-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Grand Canyon National Park",
+      "source": "https://www.nps.gov/grca/index.htm",
+      "latitude": 36.0553,
+      "longitude": -112.122
+    },
+    {
+      "id": "park:nps:grand-teton-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Grand Teton National Park",
+      "source": "https://www.nps.gov/grte/index.htm",
+      "latitude": 43.833333333,
+      "longitude": -110.700833333
+    },
+    {
+      "id": "park:nps:great-basin-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Great Basin National Park",
+      "source": "https://www.nps.gov/grba/index.htm",
+      "latitude": 39.0058,
+      "longitude": -114.2197
+    },
+    {
+      "id": "park:nps:great-sand-dunes-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Great Sand Dunes National Park",
+      "source": "https://www.nps.gov/grsa/index.htm",
+      "latitude": 37.77654,
+      "longitude": -105.62886
+    },
+    {
+      "id": "park:nps:great-smoky-mountains-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Great Smoky Mountains National Park",
+      "source": "https://www.nps.gov/grsm/index.htm",
+      "latitude": 35.611111111,
+      "longitude": -83.425
+    },
+    {
+      "id": "park:nps:guadalupe-mountains-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Guadalupe Mountains National Park",
+      "source": "https://www.nps.gov/gumo/index.htm",
+      "latitude": 31.916666666,
+      "longitude": -104.866666666
+    },
+    {
+      "id": "park:nps:haleakala-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Haleakalā National Park",
+      "source": "https://www.nps.gov/hale/index.htm",
+      "latitude": 20.7204,
+      "longitude": -156.15515
+    },
+    {
+      "id": "park:nps:hawai-i-volcanoes-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Hawai'i Volcanoes National Park",
+      "source": "https://www.nps.gov/havo/index.htm",
+      "latitude": 19.40083,
+      "longitude": -155.12361
+    },
+    {
+      "id": "park:nps:hot-springs-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Hot Springs National Park",
+      "source": "https://www.nps.gov/hosp/index.htm",
+      "latitude": 34.513611111,
+      "longitude": -93.053611111
+    },
+    {
+      "id": "park:nps:indiana-dunes-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Indiana Dunes National Park",
+      "source": "https://www.nps.gov/indu/index.htm",
+      "latitude": 41.648055555,
+      "longitude": -87.108055555
+    },
+    {
+      "id": "park:nps:isle-royale-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Isle Royale National Park",
+      "source": "https://www.nps.gov/isro/index.htm",
+      "latitude": 47.9958654,
+      "longitude": -88.9092899
+    },
+    {
+      "id": "park:nps:joshua-tree-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Joshua Tree National Park",
+      "source": "https://www.nps.gov/jotr/index.htm",
+      "latitude": 33.87343,
+      "longitude": -115.90099
+    },
+    {
+      "id": "park:nps:katmai-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Katmai National Park",
+      "source": "https://www.nps.gov/katm/index.htm",
+      "latitude": 58.5,
+      "longitude": -155
+    },
+    {
+      "id": "park:nps:kenai-fjords-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Kenai Fjords National Park",
+      "source": "https://www.nps.gov/kefj/index.htm",
+      "latitude": 59.917777777,
+      "longitude": -149.9875
+    },
+    {
+      "id": "park:nps:kings-canyon-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Kings Canyon National Park",
+      "source": "https://www.nps.gov/seki/index.htm",
+      "latitude": 36.789280555,
+      "longitude": -118.672861111
+    },
+    {
+      "id": "park:nps:kobuk-valley-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Kobuk Valley National Park",
+      "source": "https://www.nps.gov/kova/index.htm",
+      "latitude": 67.55,
+      "longitude": -159.283333333
+    },
+    {
+      "id": "park:nps:lake-clark-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Lake Clark National Park",
+      "source": "https://www.nps.gov/lacl/index.htm"
+    },
+    {
+      "id": "park:nps:lassen-volcanic-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Lassen Volcanic National Park",
+      "source": "https://www.nps.gov/lavo/index.htm",
+      "latitude": 40.498055555,
+      "longitude": -121.4275
+    },
+    {
+      "id": "park:nps:mammoth-cave-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Mammoth Cave National Park",
+      "source": "https://www.nps.gov/maca/index.htm",
+      "latitude": 37.186944444,
+      "longitude": -86.101111111
+    },
+    {
+      "id": "park:nps:mesa-verde-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Mesa Verde National Park",
+      "source": "https://www.nps.gov/meve/index.htm",
+      "latitude": 37.260375,
+      "longitude": -108.494444
+    },
+    {
+      "id": "park:nps:mount-rainier-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Mount Rainier National Park",
+      "source": "https://www.nps.gov/mora/index.htm",
+      "latitude": 46.85,
+      "longitude": -121.75
+    },
+    {
+      "id": "park:nps:national-park-of-american-samoa",
+      "kind": "park",
+      "country": "US",
+      "name": "National Park of American Samoa",
+      "source": "https://www.nps.gov/npsa/index.htm",
+      "latitude": -14.25833333,
+      "longitude": -170.68333333
+    },
+    {
+      "id": "park:nps:new-river-gorge-national-park-and-preserve",
+      "kind": "park",
+      "country": "US",
+      "name": "New River Gorge National Park and Preserve",
+      "source": "https://www.nps.gov/neri/index.htm"
+    },
+    {
+      "id": "park:nps:north-cascades-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "North Cascades National Park",
+      "source": "https://www.nps.gov/noca/index.htm",
+      "latitude": 48.483055555,
+      "longitude": -120.911388888
+    },
+    {
+      "id": "park:nps:olympic-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Olympic National Park",
+      "source": "https://www.nps.gov/olym/index.htm",
+      "latitude": 47.7,
+      "longitude": -123.75
+    },
+    {
+      "id": "park:nps:petrified-forest-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Petrified Forest National Park",
+      "source": "https://www.nps.gov/pefo/index.htm",
+      "latitude": 35.0881,
+      "longitude": -109.806
+    },
+    {
+      "id": "park:nps:pinnacles-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Pinnacles National Park",
+      "source": "https://www.nps.gov/pinn/index.htm",
+      "latitude": 36.4869,
+      "longitude": -121.167
+    },
+    {
+      "id": "park:nps:redwood-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Redwood National Park",
+      "source": "https://www.nps.gov/redw/index.htm",
+      "latitude": 41.529167,
+      "longitude": -124.058333
+    },
+    {
+      "id": "park:nps:rocky-mountain-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Rocky Mountain National Park",
+      "source": "https://www.nps.gov/romo/index.htm",
+      "latitude": 40.35,
+      "longitude": -105.6833
+    },
+    {
+      "id": "park:nps:saguaro-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Saguaro National Park",
+      "source": "https://www.nps.gov/sagu/index.htm",
+      "latitude": 32.202166666,
+      "longitude": -110.610944444
+    },
+    {
+      "id": "park:nps:sequoia-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Sequoia National Park",
+      "source": "https://www.nps.gov/seki/index.htm",
+      "latitude": 36.564722222,
+      "longitude": -118.772777777
+    },
+    {
+      "id": "park:nps:shenandoah-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Shenandoah National Park",
+      "source": "https://www.nps.gov/shen/index.htm",
+      "latitude": 38.5333,
+      "longitude": -78.35
+    },
+    {
+      "id": "park:nps:theodore-roosevelt-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Theodore Roosevelt National Park",
+      "source": "https://www.nps.gov/thro/index.htm",
+      "latitude": 46.966666666,
+      "longitude": -103.45
+    },
+    {
+      "id": "park:nps:virgin-islands-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Virgin Islands National Park",
+      "source": "https://www.nps.gov/viis/index.htm",
+      "latitude": 18.338055555,
+      "longitude": -64.733333333
+    },
+    {
+      "id": "park:nps:voyageurs-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Voyageurs National Park",
+      "source": "https://www.nps.gov/voya/index.htm",
+      "latitude": 48.5,
+      "longitude": -92.883333333
+    },
+    {
+      "id": "park:nps:white-sands-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "White Sands National Park",
+      "source": "https://www.nps.gov/whsa/index.htm",
+      "latitude": 32.779722,
+      "longitude": -106.171667
+    },
+    {
+      "id": "park:nps:wind-cave-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Wind Cave National Park",
+      "source": "https://www.nps.gov/wica/index.htm",
+      "latitude": 43.55635,
+      "longitude": -103.47865
+    },
+    {
+      "id": "park:nps:wrangell-st-elias-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Wrangell-St. Elias National Park",
+      "source": "https://www.nps.gov/wrst/index.htm",
+      "latitude": 61.435,
+      "longitude": -142.953611111
+    },
+    {
+      "id": "park:nps:yellowstone-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Yellowstone National Park",
+      "source": "https://www.nps.gov/yell/index.htm",
+      "latitude": 44.6,
+      "longitude": -110.5
+    },
+    {
+      "id": "park:nps:yosemite-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Yosemite National Park",
+      "source": "https://www.nps.gov/yose/index.htm",
+      "latitude": 37.7425,
+      "longitude": -119.5375
+    },
+    {
+      "id": "park:nps:zion-national-park",
+      "kind": "park",
+      "country": "US",
+      "name": "Zion National Park",
+      "source": "https://www.nps.gov/zion/index.htm",
+      "latitude": 37.202619444,
+      "longitude": -112.98785
+    }
+  ]
+}

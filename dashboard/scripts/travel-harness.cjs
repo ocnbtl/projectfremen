@@ -27,5 +27,6 @@ const {travelCatalogQuery,travelCatalog}=require('../lib/modules/planning/travel
  global.fetch=original;
  const heritage=await travelCatalog('landmark','FR','',0);assert.ok(heritage.items.length>40);assert.ok(heritage.items.every(d=>d.country==='FR'&&d.id.startsWith('landmark:unesco:')));
  assert.ok(normalizeTravelRecord({...heritage.items[0],statuses:['visited']}).source.startsWith('https://whc.unesco.org/'));
+ const usParks=await travelCatalog('park','US','',0);assert.equal(usParks.items.length,63);assert.equal(new Set(usParks.items.map(d=>d.id)).size,63);assert.ok(usParks.items.some(d=>d.name.startsWith('Lake Clark')));assert.ok(usParks.items.some(d=>d.name.startsWith('New River Gorge')));assert.ok(!usParks.items.some(d=>d.name.includes('Fort Dupont')));assert.ok(normalizeTravelRecord({...usParks.items[0],statuses:['visited']}).source.startsWith('https://www.nps.gov/'));
  console.log('Travel checks passed: country/state catalogues, multiple statuses, persistence, stale writes, concurrent updates, clearing, validation, safe queries, provider parsing.');
 })().catch(e=>{console.error(e);process.exitCode=1});
