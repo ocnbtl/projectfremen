@@ -624,7 +624,7 @@ export default function CalendarWorkspace() {
       <PlaceSync onComplete={refresh} />
       <header className={`${styles.toolbar} ${styles.navigationBar}`} data-timeline={timeline} aria-label="Calendar controls">
         <h1>Calendar</h1>
-          <label className={styles.calendarSearch} data-field-shell><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search"} value={query} onChange={e => setQuery(e.target.value)} /></label>
+          <label className={styles.calendarSearch} data-field-shell><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder="Search" value={query} onChange={e => setQuery(e.target.value)} /></label>
         <div className={styles.dateNavigation}>
           <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => changeView(next, day)} />
           <Button className={styles.todayButton} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>

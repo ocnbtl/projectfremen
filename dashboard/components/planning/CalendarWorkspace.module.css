@@ -2804,3 +2804,8 @@
 }
 
 @media(max-width:760px){.toolbar.navigationBar .monthTrigger>span{font-size:12px}}
+
+/* Keep the placeholder and entered text on the same centered baseline. */
+.toolbar.navigationBar .calendarSearch .search{height:20px;min-height:0;line-height:20px;font-size:13px;appearance:none;-webkit-appearance:none}
+.toolbar.navigationBar .calendarSearch .search::placeholder{font-size:inherit;line-height:inherit}
+@media(max-width:760px){.toolbar.navigationBar .calendarSearch .search{font-size:16px}}
