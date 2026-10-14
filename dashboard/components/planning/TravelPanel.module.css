@@ -92,7 +92,7 @@
 .search{position:relative;padding:0;min-height:40px}
 .search>svg{position:absolute;left:12px;pointer-events:none}
 .search input{height:40px;line-height:24px;padding:8px 36px!important;margin:0!important;box-sizing:border-box}
-.search input:placeholder-shown{text-align:center}
+.search input{text-align:left}
 .search input::-webkit-search-cancel-button{appearance:none}
 .card[data-quick=true]{position:relative;padding:12px}
 .card[data-quick=true]>header{margin:0 0 0 32px;min-height:36px}
@@ -105,3 +105,17 @@
 .categories button:focus-visible{outline:2px solid var(--module-icon);outline-offset:1px}
 @media(max-width:760px){.statusPicker{gap:5px}.statusPicker label>span{padding:8px 10px;min-height:42px}.categories button{min-height:40px;flex:1!important}.categories{gap:2px}.sheet .card[data-quick=true]{padding:10px 8px}.card[data-quick=true]>header{gap:7px;margin-left:34px}}
 @media(prefers-reduced-motion:reduce){.statusPicker label>span,.quickChoice>span{transition:none}}
+
+/* Keep the search and category filter together, with a compact desktop width. */
+.travelFilters{flex-wrap:wrap}
+.sheet .travelFilters .search{flex:1 1 180px;max-width:300px;width:auto}
+.sheet .travelFilters .kindFilter{flex:0 0 auto;max-width:none;min-height:42px;padding:8px 10px}
+.filterLabel{display:flex;align-items:center;justify-content:center;gap:6px;white-space:nowrap}
+.filterLabel>svg{flex:none}
+.sheet .travelFilters .countryFilter{flex:0 1 180px;min-height:42px}
+@media(max-width:760px){
+ .sheet .travelFilters .search{flex:1 1 0;max-width:none;min-width:0}
+ .sheet .travelFilters .kindFilter{font-size:11px;padding:8px;max-width:160px}
+ .sheet .travelFilters .countryFilter{flex:0 1 100%;max-width:100%}
+ .filterLabel{gap:4px}
+}
