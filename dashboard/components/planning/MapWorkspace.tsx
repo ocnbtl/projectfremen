@@ -2,6 +2,8 @@
 import PlaceSync from "./PlaceSync";
 import TravelPanel from "./TravelPanel";
 import PlaceTags from "./PlaceTags";
+import PlaceTagLabel from "./PlaceTagLabel";
+import { placeTagIconRole } from "../../lib/modules/planning/place-tags";
 import LogoLoader from "../operational/LogoLoader";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import * as Popover from "@radix-ui/react-popover";
@@ -373,14 +375,14 @@ export default function MapWorkspace() {
           <>
             <label>
               Tag
-              <SelectField value={tag} onChange={(e) => setTag(e.target.value)}>
+              <SelectField value={tag} optionIcons={Object.fromEntries((snapshot?.state.places.flatMap(p=>p.tags)||[]).map(t=>[t,placeTagIconRole(t)]))} onChange={(e) => setTag(e.target.value)}>
                 <option value="">All tags</option>
                 {[
                   ...new Set(
                     snapshot?.state.places.flatMap((p) => p.tags) || [],
                   ),
                 ].map((t) => (
-                  <option key={t}>{t}</option>
+                  <option key={t} value={t}>{t}</option>
                 ))}
               </SelectField>
             </label>
@@ -545,7 +547,7 @@ export default function MapWorkspace() {
                     (hasPlaceCoordinates(p) ? `${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}` : "Address saved · pin not set")}
                 </small>
                 {!hasPlaceCoordinates(p) && p.address && <small>Pin not set</small>}
-                {p.tags.length > 0 && <small>{p.tags.join(" · ")}</small>}
+                {p.tags.length > 0 && <small className={styles.placeTagList}>{p.tags.map(t=><PlaceTagLabel key={t} tag={t}/>)}</small>}
               </div>
             </button>
           ))}

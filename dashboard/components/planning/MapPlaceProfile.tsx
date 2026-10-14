@@ -3,6 +3,7 @@ import Link from "next/link";
 import { motion, useReducedMotion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
+import PlaceTagLabel from "./PlaceTagLabel";
 import RelatedRecords from "./RelatedRecords";
 import { hasPlaceCoordinates } from "../../lib/modules/planning/place-identity";
 import type { Place } from "../../lib/modules/planning/types";
@@ -20,7 +21,7 @@ export default function MapPlaceProfile({ place, onEdit, onClose }: { place: Pla
     </header>
     <div className={styles.body}>
       <p className={styles.address}>{place.address || "No address added"}</p>
-      <div className={styles.tags}><span className={styles.status} data-pinned={pinned}>{status}</span>{place.tags.map(tag => <span key={tag}>{tag}</span>)}</div>
+      <div className={styles.tags}><span className={styles.status} data-pinned={pinned}>{status}</span>{place.tags.map(tag => <PlaceTagLabel key={tag} tag={tag}/>)}</div>
       {!pinned && <p className={styles.hint}>The address is saved. Add a confirmed pin to show this place on the map.</p>}
       {verification?.precision === "area" && <p className={styles.hint}>This pin represents the area, not a specific home or business.</p>}
       {place.notes && <p className={styles.notes}>{place.notes}</p>}

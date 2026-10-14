@@ -8,7 +8,7 @@
 .body { padding:0 16px 12px; overflow:auto; overscroll-behavior:contain; min-height:0; }
 .address { margin:0 0 10px; font-size:.875rem; line-height:1.5; overflow-wrap:anywhere; }
 .tags { display:flex; flex-wrap:wrap; gap:6px; }
-.tags span { padding:4px 8px; border-radius:7px; font-size:.6875rem; background:#f1f4f5; }
+.tags > span { padding:4px 8px; border-radius:7px; font-size:.6875rem; background:#f1f4f5; }
 .tags .status[data-pinned="true"] { background:var(--module-quiet,#f3f8ed); color:var(--module-accent,#597342); }
 .hint { color:#63767c; font-size:.75rem; line-height:1.5; margin:10px 0 0; }
 .notes { font-size:.8125rem; line-height:1.5; white-space:pre-wrap; margin:14px 0; }

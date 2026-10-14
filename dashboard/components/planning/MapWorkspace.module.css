@@ -543,3 +543,5 @@
 @media(max-width:1050px){.mapToolbar .moduleSearch{flex:1}.toolbarSpacer{display:none}.mapToolbar{gap:6px}.mapToolbar :global(.work-button){padding:8px}.mapToolbar>button{flex:none}}
 @media(max-width:760px){.mapToolbar{padding:8px 10px;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.moduleTitle{grid-area:1/1/2/2;font-size:18px}.mapToolbar .moduleSearch{grid-area:1/2/2/-1;min-width:0;width:100%;height:40px}.mapToolbar .moduleSearch input{font-size:16px}.mapToolbar .moduleSearch input::placeholder{font-size:inherit;line-height:inherit}.mapToolbar :global(.work-button){width:100%;height:44px;min-height:44px;display:flex;flex-direction:column;gap:2px;padding:4px 1px;font-size:10px}.mapToolbar :global(.work-button)>svg{width:17px;height:17px}.placeCards{grid-template-columns:repeat(2,minmax(0,1fr))}.placeCards :global(.work-row){padding:9px}.directorySearch input,.tagMenu input{font-size:16px}.tagsTrigger{font-size:13px}}
 @media(prefers-reduced-motion:reduce){.mapToolbar .moduleSearch{transition:none}}
+
+.placeTagList{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px}
