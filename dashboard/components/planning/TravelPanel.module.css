@@ -10,9 +10,9 @@
 .summary button[aria-pressed=true]{background:var(--module-quiet);border-color:var(--module-icon)}
 .summary strong{font:600 24px/1.2 var(--font-heading);color:var(--module-icon)}
 .summary span{font-size:12px;color:var(--text-secondary)}
-.categories{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;border-bottom:1px solid var(--module-border);padding-bottom:8px}
+.categories{display:flex;gap:4px;flex-wrap:wrap;margin-bottom:12px;border:0;padding:4px;background:var(--module-quiet);border-radius:10px}
 .categories button{background:none;border:0;border-radius:7px;padding:8px 10px;color:var(--text-secondary);font:500 12px var(--font-body);cursor:pointer}
-.categories button[aria-selected=true]{background:var(--module-quiet);color:var(--module-icon)}
+.categories button[aria-pressed=true]{background:white;color:var(--module-icon);box-shadow:0 1px 4px #10202615}
 .filters{display:flex;gap:8px;align-items:center}.filters>*{min-width:0}.filters>button{max-width:180px;font-size:12px}
 .search{flex:1;display:flex;gap:8px;align-items:center;min-height:38px;border:1px solid var(--module-border);border-radius:8px;background:white;padding:0 10px}
 .search input{border:0!important;outline:0!important;box-shadow:none!important;background:transparent;min-width:0;width:100%;font:400 13px var(--font-body);padding:8px 0}
@@ -79,3 +79,29 @@
 .sectionHeading>button{flex:none;white-space:nowrap}.statuses button:disabled{cursor:default}.statuses button[title]{opacity:1}
 
 .cards>.card[data-expanded=true]{grid-column:1/-1}.datePair>*{min-width:0}.visitForm .datePair button{min-width:0;width:100%}
+
+/* Travel uses spacing for sections and explicit controls for selection. */
+.sheet :global(.work-sheet-header){border-bottom:0;box-shadow:none;padding-bottom:8px}
+.statusPicker{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+.sheet .statusPicker label{position:relative;cursor:pointer;min-width:0;width:auto;flex:0 0 auto;margin:0}
+.statusPicker input{position:absolute;opacity:0;width:1px;height:1px}
+.statusPicker label>span{display:flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:8px 12px;border-radius:9px;background:var(--module-quiet);color:var(--text-secondary);font-size:12px;font-weight:500;transition:background-color .18s,color .18s}
+.statusPicker label[data-selected=true]>span{background:var(--module-icon);color:white}
+.statusPicker small{font-size:11px;line-height:1.4;border-radius:5px;padding:0 4px;background:#1020260c;color:inherit}
+.statusPicker input:focus-visible+span,.quickChoice input:focus-visible+span{outline:2px solid var(--module-icon);outline-offset:3px}
+.search{position:relative;padding:0;min-height:40px}
+.search>svg{position:absolute;left:12px;pointer-events:none}
+.search input{height:40px;line-height:24px;padding:8px 36px!important;margin:0!important;box-sizing:border-box}
+.search input:placeholder-shown{text-align:center}
+.search input::-webkit-search-cancel-button{appearance:none}
+.card[data-quick=true]{position:relative;padding:12px}
+.card[data-quick=true]>header{margin:0 0 0 32px;min-height:36px}
+.quickChoice{position:absolute;top:8px;left:4px;width:40px;height:44px;display:grid;place-items:center;cursor:pointer}
+.quickChoice input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:inherit;margin:0}
+.quickChoice>span{display:grid;place-items:center;width:20px;height:20px;border:1.5px solid var(--module-border);border-radius:6px;color:transparent;background:white;pointer-events:none;transition:background-color .16s,color .16s}
+.quickChoice input:checked+span{background:var(--module-icon);border-color:var(--module-icon);color:white}
+.quickChoice:has(input:disabled){cursor:default}
+.quickChoice:has(input:disabled)>span{opacity:.65}
+.categories button:focus-visible{outline:2px solid var(--module-icon);outline-offset:1px}
+@media(max-width:760px){.statusPicker{gap:5px}.statusPicker label>span{padding:8px 10px;min-height:42px}.categories button{min-height:40px;flex:1!important}.categories{gap:2px}.sheet .card[data-quick=true]{padding:10px 8px}.card[data-quick=true]>header{gap:7px;margin-left:34px}}
+@media(prefers-reduced-motion:reduce){.statusPicker label>span,.quickChoice>span{transition:none}}
