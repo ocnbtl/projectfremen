@@ -24,6 +24,8 @@ import { readPersonalOpsState } from "../../../lib/modules/personal-ops/store";
 import { readProjectsState } from "../../../lib/modules/projects/store";
 import { createNativeObjectRef } from "../../../lib/native-objects/routes";
 import { addDays } from "../../../lib/modules/planning/calendar-model";
+import { readTravelRecords } from "../../../lib/modules/planning/travel-store";
+import { travelCalendarEntries } from "../../../lib/modules/planning/travel-sync";
 import type {
   Calendar,
   CalendarEvent,
@@ -44,6 +46,7 @@ export async function GET() {
       readPersonalLifeState(),
       readPersonalOpsState(),
       readProjectsState(),
+      readTravelRecords(),
     ]);
     const records = sources[0].status === "fulfilled" ? sources[0].value : [],
       life = sources[1].status === "fulfilled" ? sources[1].value : null,
@@ -161,9 +164,11 @@ export async function GET() {
           title: trip.name,
           start: trip.startDate.slice(0, 10),
           end: addDays((trip.endDate || trip.startDate).slice(0, 10), 1),
-          completed: trip.status === "been" || trip.status === "lived",
+          // A completed trip is history, not a completed task to hide.
+          completed: false,
           ownerRef: refs.find((x) => x.objectId === trip.id),
         });
+    if (sources[4].status === "fulfilled") dated.push(...travelCalendarEntries(sources[4].value));
     for (const milestone of projects?.milestones || []) {
       if (!milestone.dueAt || milestone.archivedAt)
         continue;
@@ -191,7 +196,7 @@ export async function GET() {
       dated,
       sourceErrors: sources.flatMap((x, i) =>
         x.status === "rejected"
-          ? [["Records", "Personal", "Work", "Projects"][i]]
+          ? [["Records", "Personal", "Work", "Projects", "Travel"][i]]
           : [],
       ),
       capabilities: {

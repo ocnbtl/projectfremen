@@ -7,6 +7,7 @@ export async function saveTravelRecord(input: unknown, expectedUpdatedAt: unknow
   const next=normalizeTravelRecord(input);
   return mutateJsonFile<State,TravelRecord>(FILE,{records:[]},current=>{
     const existing=current.records.find(r=>r.id===next.id);
+    if (input && typeof input === "object" && !("visits" in input)) next.visits = existing?.visits || [];
     if ((existing?.updatedAt || null) !== (expectedUpdatedAt || null)) throw new Error("This record changed. Refresh Travel and try again.");
     const record={...next,updatedAt:new Date(Math.max(Date.now(),Date.parse(existing?.updatedAt || "")+1 || 0)).toISOString()};
     const records=current.records.filter(r=>r.id!==next.id);

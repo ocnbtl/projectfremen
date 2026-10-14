@@ -10,6 +10,8 @@ import { WorkspaceButton as Button, WorkspaceFeedback } from "../admin-shell/Wor
 import DateField from "../people/DateField";
 import SelectField from "../ui/SelectField";
 import TravelModeField from "./TravelModeField";
+import TravelDestinationPicker from "./TravelDestinationPicker";
+import { tripDestinations } from "../../lib/modules/planning/travel-sync";
 import styles from "./TripPlanner.module.css";
 
 type Draft = Partial<PersonalTrip>;
@@ -27,6 +29,7 @@ export default function TripPlanner({trip,places,busy,error,notice,onChange,onSa
       <label>Trip name<input required value={trip.name||""} placeholder="A weekend by the lake" onChange={e=>onChange({...trip,name:e.target.value})}/></label>
       <div className={styles.pair}><label>Destination<input value={trip.place||""} placeholder="City or region" onChange={e=>onChange({...trip,place:e.target.value})}/></label><label>Status<SelectField value={trip.status||"planned"} onChange={e=>onChange({...trip,status:e.target.value as PersonalTrip["status"]})}><option value="want">Considering</option><option value="planned">Planned</option><option value="been">Completed</option><option value="lived">Lived here</option></SelectField></label></div>
       <div className={styles.pair}><DateField label="Departure" required={false} value={trip.startDate?.slice(0,10)||""} onChange={startDate=>onChange({...trip,startDate})}/><DateField label="Return" required={false} value={trip.endDate?.slice(0,10)||""} onChange={endDate=>onChange({...trip,endDate})}/></div>
+      <div><span className={styles.secondary}>Travel record</span><TravelDestinationPicker value={tripDestinations({place:trip.place||"",travelDestinations:trip.travelDestinations})} onChange={travelDestinations=>onChange({...trip,travelDestinations,place:trip.place||travelDestinations[0]?.name||""})}/><p className={styles.secondary}>Linked destinations follow this trip’s dates and status. Mark the trip Completed to record a visit. Dated trips also appear in Calendar.</p></div>
       <label>Travel mode<TravelModeField value={mode} onChange={travelMode=>onChange({...trip,travelMode,route:undefined})}/></label>
     </section>
     <section className={styles.section}>

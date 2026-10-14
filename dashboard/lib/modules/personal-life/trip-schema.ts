@@ -1,5 +1,6 @@
 import { TRAVEL_MODE_VALUES } from "./travel-modes";
 import type { PersonalTrip } from "./types";
+import { normalizeTravelRecord } from "../planning/travel";
 export const TRIP_WRITABLE_KEYS = [
   "name",
   "place",
@@ -13,6 +14,7 @@ export const TRIP_WRITABLE_KEYS = [
   "notes",
   "stops",
   "route",
+  "travelDestinations",
 ];
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
@@ -114,8 +116,17 @@ export function normalizeTrip(
   raw: Record<string, unknown>,
   now: string,
 ): PersonalTrip {
+  const startDate = iso(raw.startDate, "Start date"), endDate = iso(raw.endDate, "End date");
+  if (startDate && endDate && endDate.slice(0,10) < startDate.slice(0,10)) throw new Error("Return must be on or after departure");
+  if (raw.travelDestinations !== undefined && (!Array.isArray(raw.travelDestinations) || raw.travelDestinations.length > 50)) throw new Error("Choose up to 50 travel destinations");
   return {
     ...base(raw, now),
+    travelDestinations: Array.isArray(raw.travelDestinations) ? [...new Map(raw.travelDestinations.map(value => {
+      if (!isRecord(value)) throw new Error("Choose a valid travel destination");
+      const { statuses, visits, ...destination } = normalizeTravelRecord({...value,statuses:[],visits:[]});
+      void statuses; void visits;
+      return [destination.id,destination] as const;
+    })).values()] : undefined,
     stops: Array.isArray(raw.stops)
       ? raw.stops.slice(0, 50).map((value, index) => {
           if (!isRecord(value)) throw new Error("Invalid trip stop");
@@ -147,8 +158,8 @@ export function normalizeTrip(
     ),
     latitude: coordinate(raw.latitude, -90, 90),
     longitude: coordinate(raw.longitude, -180, 180),
-    startDate: iso(raw.startDate, "Start date"),
-    endDate: iso(raw.endDate, "End date"),
+    startDate,
+    endDate,
     notes: text(raw.notes, "Trip notes", 4_000),
   };
 }

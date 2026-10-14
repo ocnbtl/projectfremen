@@ -194,6 +194,7 @@ export default function MapWorkspace() {
       setView({ center: [lon, lat], zoom: 13 });
     }
     if (params.get("selected")) setSelectedId(params.get("selected")!);
+    if (params.get("travel")) setTravelOpen(true);
   }, [params]);
   useEffect(() => {
     const id = params.get("trip");
@@ -675,7 +676,7 @@ export default function MapWorkspace() {
           </form>
         )}
       </WorkspaceSheet>
-      <TravelPanel open={travelOpen} onClose={()=>setTravelOpen(false)} trips={snapshot?.trips || []} onPlan={existing=>{setTravelOpen(false);startTrip(existing)}} onShow={destination=>{if(destination.latitude!==undefined&&destination.longitude!==undefined){setView({center:[destination.longitude,destination.latitude],zoom:9});setTravelOpen(false)}}}/>
+      <TravelPanel selectedId={params.get("travel")||undefined} onPlanDestination={destination=>{setTravelOpen(false);setTrip({name:`Trip to ${destination.name}`,place:destination.name,region:destination.country,status:"planned",travelMode:"plane",latitude:destination.latitude||0,longitude:destination.longitude||0,startDate:"",endDate:"",notes:"",stops:[],travelDestinations:[destination]});setRoute(undefined)}} open={travelOpen} onClose={()=>setTravelOpen(false)} trips={snapshot?.trips || []} onPlan={existing=>{setTravelOpen(false);startTrip(existing)}} onShow={destination=>{if(destination.latitude!==undefined&&destination.longitude!==undefined){setView({center:[destination.longitude,destination.latitude],zoom:9});setTravelOpen(false)}}}/>
       <WorkspaceSheet
         open={Boolean(trip)}
         onClose={() => setTrip(undefined)}

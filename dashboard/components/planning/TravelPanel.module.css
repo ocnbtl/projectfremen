@@ -36,3 +36,44 @@
 @media(prefers-reduced-motion:reduce){.card,.statuses button{transition:none}}
 
 .sheet .panel button{width:auto}.sheet .tabs>button{white-space:nowrap}.sheet .categories>button,.sheet .statuses>button{flex:none}
+
+/* The saved record is a compact directory; the catalogue is an explicit add flow. */
+.summary{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 16px}
+.summary button{display:flex;align-items:center;gap:6px;padding:7px 10px;border-radius:8px}
+.summary strong{font:600 13px/1.3 var(--font-body)}.summary span{font-size:12px}
+.placeList{display:grid;gap:8px;margin-bottom:12px}
+.placeList .card{padding:12px 14px;background:white}
+.placeList .card header{margin:0;gap:12px;min-height:40px}.card header{gap:8px}
+.sheet .panel .placeIdentity{flex:1;min-width:0;text-align:left;padding:0;color:inherit;display:block;border:0;background:none;cursor:pointer}
+.placeIdentity small{display:block;margin-top:3px;font-weight:400}.placeIdentity h3{font-size:14px}
+.placeList .statuses{margin-top:12px}.lastVisit{font-size:12px;color:var(--text-secondary);flex:none}
+.details{overflow:hidden}.hint{color:var(--text-secondary);font-size:12px;line-height:1.5;margin:8px 0}
+.visitEditor{padding:4px 0}.visitEditor .resultHeading strong{margin-right:auto;color:var(--text-strong);font-weight:600}
+.visitRow,.tripVisit{display:flex;align-items:center;gap:8px;padding:10px 0;color:inherit;width:100%}
+.visitRow>div,.tripVisit>span{flex:1;min-width:0;display:grid;gap:3px}
+.visitRow strong,.tripVisit strong{font-size:12px;font-weight:500}
+.visitRow small,.tripVisit small{font-size:12px;color:var(--text-secondary);overflow-wrap:anywhere}
+.sheet .panel .tripVisit{width:100%;text-align:left;border:0;background:transparent;cursor:pointer}.tripVisit:hover{color:var(--module-icon)}
+.visitForm{padding:12px;border-radius:10px;background:var(--module-quiet);display:grid;gap:10px;margin:8px 0}
+.datePair{display:grid;grid-template-columns:1fr 1fr;gap:12px}.visitForm label{display:block;font-size:12px}
+.visitForm input{display:block;width:100%;border:1px solid var(--module-border);background:white;border-radius:8px;padding:9px 10px;margin-top:4px;font:400 13px var(--font-body);color:inherit}
+.formActions{display:flex;gap:8px}
+.textAction{display:inline-flex;align-items:center;justify-content:center;gap:6px;border:0;background:none;color:var(--module-icon);font:500 12px var(--font-body);padding:8px;cursor:pointer}
+.textAction:hover{background:var(--module-quiet);border-radius:6px}
+.destinationPicker{font:400 13px/1.4 var(--font-body)}.linkedDestinations{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin:8px 0}
+.linkedDestinations>span{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--module-border);border-radius:8px;padding:5px 8px}
+.linkedDestinations>span>button{display:grid;place-items:center;padding:4px;border:0;background:none;cursor:pointer;color:var(--text-secondary)}
+.pickerSearch{display:grid;gap:8px;padding:12px;border:1px solid var(--module-border);border-radius:10px}
+.pickerSearch>p{font-size:12px;margin:4px 0;color:var(--text-secondary)}
+.pickerResults{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}
+.pickerResults>button{display:flex;align-items:center;gap:8px;border:0;border-radius:6px;background:transparent;text-align:left;padding:9px;color:inherit;cursor:pointer;font:400 13px var(--font-body);min-width:0}
+.pickerResults>button:hover{background:var(--module-quiet)}.pickerResults>button>span{flex:1;min-width:0;overflow-wrap:anywhere}.pickerResults small{display:block;color:var(--text-secondary);font-size:11px}
+@media(max-width:760px){
+ .sheet .sectionHeading h2{font-size:17px}.sectionHeading{margin:12px 0 16px}.sheet .cards{grid-template-columns:1fr}
+ .summary{gap:4px}.summary button{padding:7px 8px}.summary strong{font-size:13px}.summary span{font-size:11px}
+ .placeList .card{padding:10px}.placeList .card header{gap:8px}.lastVisit{display:none}.placeIdentity h3{font-size:13px}
+ .visitForm input{font-size:16px}.datePair{gap:8px}.pickerResults{grid-template-columns:1fr}
+ .textAction,.resultHeading button{min-height:40px}.filters{gap:8px}.filters .search{flex-basis:100%}
+}
+
+.sectionHeading>button{flex:none;white-space:nowrap}.statuses button:disabled{cursor:default}.statuses button[title]{opacity:1}

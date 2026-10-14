@@ -168,6 +168,7 @@ export function getNativeObjectRoute({
   mode = "view"
 }: NativeObjectRouteInput): string {
   const encodedId = encodeURIComponent(objectId);
+  if (module === "map" && objectType === "travel_destination") return `/admin/map?travel=${encodedId}`;
   if (module === "map" || module === "calendar") return selectedObjectRoute(MODULE_ROUTES[module], objectId, mode);
   const encodedContainerId = containerObjectId
     ? encodeURIComponent(containerObjectId)
