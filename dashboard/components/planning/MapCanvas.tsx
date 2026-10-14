@@ -1,5 +1,8 @@
 "use client";
 import { getIconEntry } from "../../lib/icons/icon-registry";
+import { useIconSelections } from "../icons/IconSystemProvider";
+import { placePinIconRole } from "../../lib/modules/planning/place-tags";
+import { placePinImages } from "./place-pin-images";
 import LogoLoader from "../operational/LogoLoader";
 import { motionTokens } from "../../lib/design-system/motion";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
@@ -36,6 +39,7 @@ type Props = {
 const empty: FeatureCollection = { type: "FeatureCollection", features: [] };
 export default function MapCanvas(props: Props) {
   const router = useRouter();
+  const iconSelections = useIconSelections();
   const container = useRef<HTMLDivElement>(null),
     map = useRef<MapInstance | null>(null),
     current = useRef(props);
@@ -149,7 +153,7 @@ export default function MapCanvas(props: Props) {
         filter: ["!", ["has", "point_count"]],
         paint: {
           "circle-color": MODULE_COLOR_SYSTEM.map.primary[500],
-          "circle-radius": 7,
+          "circle-radius": 16,
           "circle-stroke-color": "white",
           "circle-stroke-width": 2,
         },
@@ -164,7 +168,7 @@ export default function MapCanvas(props: Props) {
           "text-field": ["get", "name"],
           "text-font": ["Noto Sans Regular"],
           "text-size": 12,
-          "text-offset": [0, 1.5],
+          "text-offset": [0, 2.2],
         },
         paint: {
           "text-color": "#23383f",
@@ -179,7 +183,7 @@ export default function MapCanvas(props: Props) {
         source: "selected",
         paint: {
           "circle-color": MODULE_COLOR_SYSTEM.map.primary[700],
-          "circle-radius": 10,
+          "circle-radius": 18,
           "circle-stroke-color": "white",
           "circle-stroke-width": 3,
         },
@@ -361,6 +365,30 @@ export default function MapCanvas(props: Props) {
     };
   }, []);
   useEffect(() => {
+    if (!ready || !map.current) return;
+    const instance = map.current, controller = new AbortController();
+    void placePinImages(iconSelections, controller.signal).then(images => {
+      if (controller.signal.aborted) return;
+      for (const { id, image } of images) {
+        if (instance.hasImage(id)) instance.updateImage(id, image);
+        else instance.addImage(id, image, { pixelRatio: 3 });
+      }
+      for (const selected of [false, true]) {
+        const id = selected ? "selected-place-icon" : "place-tag-icons";
+        if (!instance.getLayer(id)) instance.addLayer({
+          id, type: "symbol", source: selected ? "selected" : "places",
+          filter: ["!", ["has", "point_count"]],
+          layout: {
+            "icon-image": ["concat", "pin-", ["get", "iconRole"], selected ? "-selected" : ""],
+            "icon-anchor": "center", "icon-allow-overlap": true, "icon-ignore-placement": true,
+          },
+          paint: { "icon-opacity-transition": { duration: 0 } },
+        }, selected ? "trip-route" : "place-labels");
+      }
+    }).catch(() => { /* Keep the usable circle pins if icon loading fails. */ });
+    return () => controller.abort();
+  }, [ready, iconSelections]);
+  useEffect(() => {
     if (!ready) return;
     if (
       !fitted.current &&
@@ -377,7 +405,7 @@ export default function MapCanvas(props: Props) {
       type: "FeatureCollection",
       features: props.places.map((p) => ({
         type: "Feature",
-        properties: { id: p.id, name: p.name },
+        properties: { id: p.id, name: p.name, iconRole: placePinIconRole(p.tags) },
         geometry: { type: "Point", coordinates: [p.longitude, p.latitude] },
       })),
     });
@@ -392,7 +420,7 @@ export default function MapCanvas(props: Props) {
             features: [
               {
                 type: "Feature",
-                properties: {},
+                properties: { iconRole: placePinIconRole(p.tags) },
                 geometry: {
                   type: "Point",
                   coordinates: [p.longitude, p.latitude],
@@ -412,7 +440,7 @@ export default function MapCanvas(props: Props) {
             ? 0
             : motionTokens.map * 1000,
       });
-  }, [ready, props.selected?.id, preference]);
+  }, [ready, props.selected?.id, props.selected?.tags.join("|"), preference]);
   useEffect(() => {
     if (ready)
       (map.current?.getSource("stops") as GeoJSONSource)?.setData({
