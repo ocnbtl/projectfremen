@@ -622,20 +622,22 @@ export default function CalendarWorkspace() {
       style={moduleThemeVariables("calendar") as CSSProperties}
     >
       <PlaceSync onComplete={refresh} />
-      <header className={styles.toolbar} data-timeline={timeline} aria-label="Calendar controls">
+      <header className={`${styles.toolbar} ${styles.navigationBar}`} data-timeline={timeline} aria-label="Calendar controls">
         <h1>Calendar</h1>
+          <label className={styles.calendarSearch} data-field-shell><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search"} value={query} onChange={e => setQuery(e.target.value)} /></label>
         <div className={styles.dateNavigation}>
+          <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => changeView(next, day)} />
           <Button className={styles.todayButton} onClick={() => setDate(localDate(new Date(), zone))}>Today</Button>
           <Button aria-label="Previous period" className={styles.periodButton} onClick={() => changePeriod(-1)}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} /></Button>
           <Button aria-label="Next period" className={styles.periodButton} onClick={() => changePeriod(1)}><UnigentamosIcon role="chevron-right" size={18} /></Button>
-          <CalendarDatePicker value={date} today={localDate(new Date(now), zone)} view={view} onChange={(day, next) => changeView(next, day)} />
+
         </div>
         <div className={styles.draftSlot} data-active={Boolean(draft && !editor)}>
           {draft && !editor && <DraftNotice onResume={() => setEditor(draft)} onDiscard={() => finishEditing()} />}
         </div>
         <div className={styles.toolbarTools}>
           <CalendarHourControls available={timeline} days={days} events={occurrences} zone={zone} early={early} late={late} setEarly={setEarly} setLate={setLate} />
-          <label className={styles.calendarSearch} data-field-shell><UnigentamosIcon role="search" size={16} /><input className={styles.search} type="search" aria-label="Search events" onKeyDown={e => { if (compact && (e.key === "Enter" || e.key === "Escape")) e.currentTarget.blur(); }} placeholder={compact ? "" : "Search"} value={query} onChange={e => setQuery(e.target.value)} /></label>
+
           <CalendarViewToggle view={view} onChange={next => changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined)} />
           <SelectField pressSlide className={styles.viewDropdown} triggerContent={compact ? <span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[view]} size={16} />{view === "3-day" ? "3 days" : view[0].toUpperCase() + view.slice(1)}</span> : undefined} aria-label="Calendar view" menuClassName={styles.calendarChoiceMenu} value={view} onChange={e => { const next = e.target.value as View; changeView(next, next === "3-day" ? localDate(new Date(), zone) : undefined); }}>
             {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}

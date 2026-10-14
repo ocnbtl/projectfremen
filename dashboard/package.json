@@ -33,6 +33,7 @@
     "test:calendar-sharing": "node ./scripts/calendar-sharing-harness.cjs",
     "test:calendar-booking": "node ./scripts/calendar-booking-harness.cjs && node ./scripts/calendar-booking-concurrency-harness.cjs",
     "test:booking-email": "node ./scripts/booking-email-harness.cjs && node ./scripts/booking-email-test-harness.cjs",
+    "test:travel": "node ./scripts/travel-harness.cjs",
     "test:places": "node ./scripts/place-integration-harness.cjs",
     "test:place-search": "node ./scripts/place-search-harness.cjs"
   },

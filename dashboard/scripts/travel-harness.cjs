@@ -1,0 +1,31 @@
+/* Isolated synthetic store; never writes production travel history. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),ts=require('typescript');
+const data=fs.mkdtempSync(path.join(os.tmpdir(),'fremen-travel-'));
+Object.assign(process.env,{FREMEN_DATA_DIR:data,SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',FREMEN_REQUIRE_SUPABASE:'false'});
+require.extensions['.ts']=(module,file)=>module._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true,resolveJsonModule:true}}).outputText,file);
+const {normalizeTravelRecord,countryDestinations,stateDestinations}=require('../lib/modules/planning/travel.ts');
+const {saveTravelRecord,readTravelRecords}=require('../lib/modules/planning/travel-store.ts');
+const {travelCatalogQuery,travelCatalog}=require('../lib/modules/planning/travel-catalog.ts');
+(async()=>{
+ assert.equal(stateDestinations.length,50);assert.equal(new Set(stateDestinations.map(d=>d.id)).size,50);assert.ok(countryDestinations.length>190);
+ const france=countryDestinations.find(d=>d.country==='FR');
+ let saved=await saveTravelRecord({...france,statuses:['visited','lived']},null);
+ assert.deepEqual(saved.statuses,['visited','lived']);assert.equal((await readTravelRecords()).length,1);
+ await assert.rejects(()=>saveTravelRecord({...france,statuses:['want']},null),/changed/);
+ const results=await Promise.allSettled(['going','want'].map(s=>saveTravelRecord({...france,statuses:[s]},saved.updatedAt)));
+ assert.equal(results.filter(r=>r.status==='fulfilled').length,1);assert.equal(results.filter(r=>r.status==='rejected').length,1);
+ saved=(await readTravelRecords())[0];await saveTravelRecord({...france,statuses:[]},saved.updatedAt);assert.equal((await readTravelRecords())[0].statuses.length,0);
+ await assert.rejects(()=>saveTravelRecord({...france,statuses:['visited']},saved.updatedAt),/changed/);
+ assert.throws(()=>normalizeTravelRecord({...france,country:'US',statuses:[]}),/Invalid destination/);
+ assert.throws(()=>normalizeTravelRecord({...france,statuses:['invalid']}),/valid travel/);
+ assert.throws(()=>normalizeTravelRecord({id:'park:Q123',name:'Park',kind:'park',country:'US',statuses:['lived']}),/Lived/);
+ assert.throws(()=>travelCatalogQuery('park','US". ?s ?p ?o','',0),/catalogue/);
+ const query=travelCatalogQuery('park','FR','" } UNION {',1);assert.ok(query.includes('OFFSET 100'));assert.ok(query.includes('\\" } union {'));
+ const original=global.fetch;
+ global.fetch=async()=>({ok:true,json:async()=>({results:{bindings:[{item:{value:'http://www.wikidata.org/entity/Q90'},itemLabel:{value:'Paris'},coord:{value:'Point(2.35 48.85)'}}]}})});
+ const catalog=await travelCatalog('park','FR','Paris',0);assert.equal(catalog.items[0].latitude,48.85);assert.equal(catalog.items[0].id,'park:Q90');assert.equal(catalog.hasMore,false);
+ global.fetch=original;
+ const heritage=await travelCatalog('landmark','FR','',0);assert.ok(heritage.items.length>40);assert.ok(heritage.items.every(d=>d.country==='FR'&&d.id.startsWith('landmark:unesco:')));
+ assert.ok(normalizeTravelRecord({...heritage.items[0],statuses:['visited']}).source.startsWith('https://whc.unesco.org/'));
+ console.log('Travel checks passed: country/state catalogues, multiple statuses, persistence, stale writes, concurrent updates, clearing, validation, safe queries, provider parsing.');
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -2769,3 +2769,38 @@
  .viewToggleIndicator {inset:3px auto 3px 0;pointer-events:none;}
 }
 @media (min-width:761px) and (max-width:1599px) {.viewToggleIndicator {top:2px;bottom:2px;}}
+
+/* Search lives beside the module title at every breakpoint. */
+.shell>.toolbar.navigationBar{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:8px;padding:10px 14px;grid-template-columns:none}
+.toolbar.navigationBar h1{display:block;order:0;flex:none;font:600 20px/1.2 var(--font-heading);margin:0 4px 0 0}
+.toolbar.navigationBar[data-timeline]>.calendarSearch{display:flex;order:1;flex:0 1 220px;min-width:100px;max-width:240px;width:220px;height:38px;margin:0;grid-area:auto;justify-self:auto;background:white}
+.toolbar.navigationBar .dateNavigation{display:flex;order:2;align-items:center;gap:5px;grid-area:auto;flex:none}
+.toolbar.navigationBar .dateNavigation>*{order:initial;grid-area:auto;margin:0}
+.toolbar.navigationBar .dateNavigation .monthTrigger{order:0;margin:0 4px 0 0}
+.toolbar.navigationBar .todayButton{display:inline-flex;width:auto;min-width:48px}
+.toolbar.navigationBar .periodButton{width:32px;min-width:32px}
+.toolbar.navigationBar .toolbarTools{display:contents}
+.toolbar.navigationBar .viewToggle,.toolbar.navigationBar .toolbarTools>.viewDropdown{order:3;margin-left:auto;grid-area:auto}
+.toolbar.navigationBar .toolbarHours{order:4;grid-area:auto}
+.toolbar.navigationBar .optionsButton{order:5;grid-area:auto}
+.toolbar.navigationBar .addEventButton{order:6;grid-area:auto}
+.toolbar.navigationBar .draftSlot{order:7}
+@media(max-width:1100px) and (min-width:761px){.toolbar.navigationBar[data-timeline]>.calendarSearch{flex:1;max-width:none}.toolbar.navigationBar .toolbarHours{margin-left:auto}.toolbar.navigationBar .viewToggle{margin-left:0}}
+@media(max-width:760px){
+ .shell>.toolbar.navigationBar{display:grid;grid-template-columns:minmax(0,1fr) 48px 32px 32px 82px 48px;gap:6px;padding:8px 10px}
+ .toolbar.navigationBar h1{grid-area:1/1/2/2;font-size:18px}
+ .toolbar.navigationBar[data-timeline]>.calendarSearch{grid-area:1/2/2/-1;min-width:0;width:100%;max-width:none;height:40px;margin:0}
+ .toolbar.navigationBar .dateNavigation{display:contents}
+ .toolbar.navigationBar .dateNavigation .monthTrigger{grid-area:2/1;margin:0;min-width:0;font-size:13px;padding:0}
+ .toolbar.navigationBar .dateNavigation .todayButton{grid-area:2/2;width:48px;min-width:48px;font-size:11px}
+ .toolbar.navigationBar .dateNavigation .periodButton[aria-label="Previous period"]{grid-area:2/3;width:32px;min-width:32px}
+ .toolbar.navigationBar .dateNavigation .periodButton[aria-label="Next period"]{grid-area:2/4;width:32px;min-width:32px}
+ .toolbar.navigationBar .toolbarTools>.viewDropdown{grid-area:2/5;width:82px;min-width:0;margin:0}
+ .toolbar.navigationBar .addEventButton{grid-area:2/6;width:48px;margin:0}
+ .toolbar.navigationBar .viewToggle{display:none}
+ .toolbar.navigationBar .toolbarHours{grid-area:3/1/4/6;justify-self:end;margin:0}
+ .toolbar.navigationBar .optionsButton{grid-area:3/6;justify-self:end;margin:0}
+ .toolbar.navigationBar .draftSlot{grid-area:4/1/5/-1}
+}
+
+@media(max-width:760px){.toolbar.navigationBar .monthTrigger>span{font-size:12px}}

@@ -1,5 +1,7 @@
 "use client";
 import PlaceSync from "./PlaceSync";
+import TravelPanel from "./TravelPanel";
+import PlaceTags from "./PlaceTags";
 import LogoLoader from "../operational/LogoLoader";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import * as Popover from "@radix-ui/react-popover";
@@ -28,7 +30,6 @@ import { useSearchParams } from "next/navigation";
 import type { FeatureCollection } from "geojson";
 import {
   WorkspaceButton as Button,
-  WorkspaceHeader,
   WorkspaceSheet,
   WorkspaceFeedback,
   WorkspaceEmpty,
@@ -61,6 +62,7 @@ const STATES =
 type SearchPlace = PlaceSearchResult;
 export default function MapWorkspace() {
   const params = useSearchParams();
+  const [travelOpen,setTravelOpen]=useState(false), [directoryQuery,setDirectoryQuery]=useState(""), [directoryPage,setDirectoryPage]=useState(0);
   const [showPhotos, setShowPhotos] = useState(false),
     [photos, setPhotos] = useState<
       Array<{
@@ -220,6 +222,8 @@ export default function MapWorkspace() {
         ),
     [snapshot, query, tag, sort],
   );
+  const directoryPlaces = useMemo(()=>places.filter(p=>`${p.name} ${p.address} ${p.tags.join(" ")}`.toLowerCase().includes(directoryQuery.toLowerCase())),[places,directoryQuery]);
+  useEffect(()=>setDirectoryPage(0),[directoryQuery,query,tag,sort]);
   async function action(work: () => Promise<unknown>, message: string) {
     setBusy(true);
     setError("");
@@ -362,14 +366,8 @@ export default function MapWorkspace() {
       <div className={styles.mapToolbar} aria-label="Map controls" onKeyDown={e => {
         if (e.key === "Enter" && e.target instanceof HTMLInputElement && e.target.closest(".work-search") && query.trim().length >= 3 && !busy) { e.preventDefault(); void search(); }
       }}>
-      <WorkspaceHeader title="Map">
-        <Button icon="travel" onClick={() => startTrip()}>Plan trip</Button>
-        <Button intent="primary" icon="plus" aria-label="Save place" onClick={() => newPlace()}>
-          Save place
-        </Button>
-      </WorkspaceHeader>
-      <div className="work-toolbar">
-        <label className="work-search"><UnigentamosIcon role="search" size={20} /><input type="search" aria-label="Search places or addresses" placeholder="Search places or addresses" value={query} onChange={e => setQuery(e.target.value)} /><button type="button" className={styles.addressSearch} aria-label="Find address on map" disabled={query.trim().length < 3 || busy} onClick={() => void search()} data-icon-button="compact"><UnigentamosIcon role="chevron-right" size={16} /></button></label>
+      <h1 className={styles.moduleTitle}>Map</h1>
+      <label className={`work-search ${styles.moduleSearch}`} data-field-shell><UnigentamosIcon role="search" size={16}/><input type="search" aria-label="Search places or addresses" placeholder="Search places or addresses" value={query} onChange={e=>setQuery(e.target.value)}/></label>
         <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!tag}>Filter{tag ? " (1)" : ""}</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
           <>
             <label>
@@ -405,10 +403,41 @@ export default function MapWorkspace() {
             </Button>
           </>
         </Popover.Content></Popover.Portal></Popover.Root>
+        <Popover.Root><Popover.Trigger asChild><Button icon="build" aria-label="Explore data">Explore data{analysis.metrics.length ? ' (' + analysis.metrics.length + ')' : ''}</Button></Popover.Trigger>
+          <Popover.Portal forceMount><Popover.Content forceMount className={styles.dataPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="end" aria-label="Explore map data" onOpenAutoFocus={e => e.preventDefault()}>
+            <header className={styles.explorerHeader}><div><strong>Explore data</strong><small>Compare places through geographic data</small></div><Popover.Close asChild><Button aria-label="Close data explorer" icon="close">Close</Button></Popover.Close></header>
+          <MapDataExplorer
+            level={level}
+            state={stateCode}
+            states={STATES}
+            settings={analysis}
+            onLevel={(next) => {
+              setLevel(next);
+              setView(undefined);
+            }}
+            onState={(next) => {
+              setStateCode(next);
+              setView(undefined);
+            }}
+            onSettings={(next) => {
+              setAnalysis(next);
+              setView(undefined);
+            }}
+            onResult={setAnalysisResult}
+            loadKey={analysisLoadKey}
+          />
+
+          </Popover.Content></Popover.Portal>
+        </Popover.Root>
         <Button icon="location" aria-label={pinning ? "Cancel pin" : "Drop pin"} aria-pressed={pinning} onClick={() => setPinning(!pinning)}>
           {pinning ? "Cancel pin" : "Drop pin"}
         </Button>
-        <Popover.Root open={mobileList} onOpenChange={setMobileList}><Popover.Trigger asChild><Button icon="list" aria-label="Saved places" className={styles.listToggle} aria-pressed={mobileList}>Saved places</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.placesPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Saved places and trips" onOpenAutoFocus={e => e.preventDefault()}><header className={styles.explorerHeader}><strong>Saved places</strong><Popover.Close asChild><Button icon="close" aria-label="Close saved places">Close</Button></Popover.Close></header>        <div className={styles.placesDirectory}>
+        <span className={styles.toolbarSpacer}/>
+        <Button icon="travel" onClick={()=>setTravelOpen(true)}>Travel</Button>
+        <Popover.Root open={mobileList} onOpenChange={setMobileList}><Popover.Trigger asChild><Button icon="list" aria-label="Saved places" className={styles.listToggle} aria-pressed={mobileList}>Places</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.placesPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Saved places" onOpenAutoFocus={e => e.preventDefault()}><header className={styles.explorerHeader}><strong>Saved places</strong><Popover.Close asChild><Button icon="close" aria-label="Close saved places">Close</Button></Popover.Close></header>        <div className={styles.placesDirectory}>
+          <label className={styles.directorySearch} data-field-shell><UnigentamosIcon role="search" size={16}/><input type="search" placeholder="Find a saved place" aria-label="Find a saved place" value={directoryQuery} onChange={e=>setDirectoryQuery(e.target.value)}/></label>
+          <p className={styles.directoryCount}>{directoryPlaces.length} {directoryPlaces.length===1?"place":"places"}</p>
+
           <details className={styles.savedViews}>
             <summary>Saved views</summary>
             <div className="work-form">
@@ -498,7 +527,7 @@ export default function MapWorkspace() {
               </Button>
             </section>
           )}
-          {places.map((p) => (
+          <div className={styles.placeCards}>{directoryPlaces.slice(directoryPage*12,directoryPage*12+12).map((p) => (
             <button
               className="work-row"
               key={p.id}
@@ -519,31 +548,13 @@ export default function MapWorkspace() {
               </div>
             </button>
           ))}
-          {!places.length && (
+          </div><div className={styles.directoryPaging}><Button disabled={directoryPage===0} onClick={()=>setDirectoryPage(p=>p-1)} aria-label="Previous places">Previous</Button><span>Page {directoryPage+1}</span><Button disabled={(directoryPage+1)*12>=directoryPlaces.length} onClick={()=>setDirectoryPage(p=>p+1)} aria-label="Next places">Next</Button></div>
+          {!directoryPlaces.length && (
             <WorkspaceEmpty
               title={snapshot ? "No saved places" : "Places unavailable"}
             >
               Search for a place, drop a pin, or enter coordinates.
             </WorkspaceEmpty>
-          )}
-          {(snapshot?.trips.length || 0) > 0 && (
-            <section className={styles.trips}>
-              <h2>Trips</h2>
-              {snapshot?.trips.map((t) => (
-                <button
-                  className="work-row"
-                  key={t.id}
-                  onClick={() => startTrip(t)}
-                >
-                  <div>
-                    <strong>{t.name}</strong>
-                    <small>
-                      {t.stops?.length || 1} stops · {t.status}
-                    </small>
-                  </div>
-                </button>
-              ))}
-            </section>
           )}
           <label className={styles.photoToggle}>
             <input
@@ -554,33 +565,7 @@ export default function MapWorkspace() {
             Photo locations
           </label>
         </div></Popover.Content></Popover.Portal></Popover.Root>
-        <Popover.Root><Popover.Trigger asChild><Button icon="build" aria-label="Explore data">Explore data{analysis.metrics.length ? ' (' + analysis.metrics.length + ')' : ''}</Button></Popover.Trigger>
-          <Popover.Portal forceMount><Popover.Content forceMount className={styles.dataPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="end" aria-label="Explore map data" onOpenAutoFocus={e => e.preventDefault()}>
-            <header className={styles.explorerHeader}><div><strong>Explore data</strong><small>Compare places through geographic data</small></div><Popover.Close asChild><Button aria-label="Close data explorer" icon="close">Close</Button></Popover.Close></header>
-          <MapDataExplorer
-            level={level}
-            state={stateCode}
-            states={STATES}
-            settings={analysis}
-            onLevel={(next) => {
-              setLevel(next);
-              setView(undefined);
-            }}
-            onState={(next) => {
-              setStateCode(next);
-              setView(undefined);
-            }}
-            onSettings={(next) => {
-              setAnalysis(next);
-              setView(undefined);
-            }}
-            onResult={setAnalysisResult}
-            loadKey={analysisLoadKey}
-          />
-
-          </Popover.Content></Popover.Portal>
-        </Popover.Root>
-      </div>
+        <Button intent="primary" icon="plus" aria-label="Save place" onClick={()=>newPlace()}>Save place</Button>
       </div>
       <WorkspaceFeedback error={error} message={notice} />
       {pinning && (
@@ -640,18 +625,7 @@ export default function MapWorkspace() {
               />
             </label>
             <PlaceLocationFields value={editor} onChange={patch => setEditor(current => current ? { ...current, ...patch } : current)} />
-            <div className={styles.placeDetails}><label>
-              Tags
-              <input
-                value={editor.tags?.join(", ") || ""}
-                onChange={(e) =>
-                  setEditor({
-                    ...editor,
-                    tags: e.target.value.split(",").map((x) => x.trim()),
-                  })
-                }
-              />
-            </label>
+            <div className={styles.placeDetails}><PlaceTags value={editor.tags || []} available={[...new Set(snapshot?.state.places.flatMap(p=>p.tags) || [])]} onChange={tags=>setEditor({...editor,tags})}/>
             <label>
               Notes
               <textarea
@@ -701,6 +675,7 @@ export default function MapWorkspace() {
           </form>
         )}
       </WorkspaceSheet>
+      <TravelPanel open={travelOpen} onClose={()=>setTravelOpen(false)} trips={snapshot?.trips || []} onPlan={existing=>{setTravelOpen(false);startTrip(existing)}} onShow={destination=>{if(destination.latitude!==undefined&&destination.longitude!==undefined){setView({center:[destination.longitude,destination.latitude],zoom:9});setTravelOpen(false)}}}/>
       <WorkspaceSheet
         open={Boolean(trip)}
         onClose={() => setTrip(undefined)}

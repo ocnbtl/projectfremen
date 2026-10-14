@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { moduleThemeVariables } from "../../lib/design-system/color-system";
+import type { CSSProperties } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { taskReminderStatus } from "../../lib/modules/planning/calendar-tasks";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -160,7 +162,7 @@ export default function PlanningNotifications() {
         const time=(ms:number) => new Date(ms).toLocaleTimeString("en-US",{timeZone:item.timeZone,hour:"numeric",minute:"2-digit",hour12:true}).toLowerCase().replace(/:00(?=\s)/, "").replace(/\s/g, "");
         const links=[...(item.linkedRefs || [])];
         if(item.place && !links.some(r => r.module === "map" && r.objectId === item.place!.id)) links.push({module:"map",objectType:"place",objectId:item.place.id,label:item.place.name,route:"/admin/map"});
-        return <motion.article layout initial={reduced ? false : {opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:reduced ? 1 : .98}} transition={{duration:reduced ? 0 : .22}} key={item.id} className={styles.item} data-busy={busy === item.id || undefined}>
+        return <motion.article layout initial={reduced ? false : {opacity:0,y:5}} animate={{opacity:1,y:0}} exit={{opacity:0,scale:reduced ? 1 : .98}} transition={{duration:reduced ? 0 : .22}} key={item.id} className={styles.item} style={moduleThemeVariables("calendar") as CSSProperties} data-busy={busy === item.id || undefined}>
           <div className={styles.summary}><Link className={styles.event} onClick={() => setOpen(false)} href={`/admin/calendar?selected=${encodeURIComponent(item.eventId)}&occurrence=${encodeURIComponent(item.occurrenceKey)}&date=${encodeURIComponent(item.date)}`}>
             <span className={styles.date}><small>{date.toLocaleDateString("en-US",{month:"short"})}</small><b>{date.getDate()}</b></span>
             <span className={styles.copy}><strong>{item.title}</strong><time dateTime={date.toISOString()}><UnigentamosIcon role="clock" size={13} />{item.allDay ? "All day" : `${time(item.startMs)} to ${time(item.endMs)}` }</time></span>

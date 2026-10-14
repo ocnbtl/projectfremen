@@ -1,0 +1,12 @@
+"use client";
+import { useRef, useState } from "react";
+import * as Popover from "@radix-ui/react-popover";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
+import styles from "./MapWorkspace.module.css";
+export default function PlaceTags({value,available,onChange}:{value:string[];available:string[];onChange:(tags:string[])=>void}){
+  const trigger=useRef<HTMLButtonElement>(null);
+  const [query,setQuery]=useState(""),[open,setOpen]=useState(false);
+  const all=[...new Map([...available,...value].filter(Boolean).map(t=>[t.toLowerCase(),t])).values()].sort((a,b)=>a.localeCompare(b));
+  const toggle=(tag:string)=>onChange(value.includes(tag)?value.filter(v=>v!==tag):[...value,tag]);
+  return <div className={styles.tagsField}><span>Tags</span><Popover.Root open={open} onOpenChange={next=>{setOpen(next);setQuery("")}}><Popover.Trigger asChild><button type="button" ref={trigger} className={styles.tagsTrigger} aria-label="Choose place tags"><span>{value.length?value.map(t=><span key={t} className={styles.tagChip}>{t}</span>):<span className={styles.tagPlaceholder}>Choose or create tags</span>}</span><UnigentamosIcon role="chevron-down" size={16}/></button></Popover.Trigger><Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content onEscapeKeyDown={e=>e.stopImmediatePropagation()} className={styles.tagMenu} sideOffset={6} collisionPadding={12} aria-label="Place tags"><input type="search" aria-label="Find or create tag" placeholder="Find or create a tag" value={query} maxLength={60} onChange={e=>setQuery(e.target.value)}/><div>{all.filter(t=>t.toLowerCase().includes(query.toLowerCase())).map(t=><button type="button" key={t} aria-pressed={value.includes(t)} onClick={()=>toggle(t)}><span>{t}</span>{value.includes(t)&&<UnigentamosIcon role="check" size={16}/>}</button>)}</div>{query.trim()&&!all.some(t=>t.toLowerCase()===query.trim().toLowerCase())&&<button type="button" onClick={()=>{toggle(query.trim());setQuery("")}}><UnigentamosIcon role="plus" size={16}/>Create “{query.trim()}”</button>}{!all.length&&!query&&<small>Type a name to create your first tag.</small>}</Popover.Content></Popover.Portal></Popover.Root></div>;
+}

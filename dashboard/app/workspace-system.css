@@ -1212,3 +1212,7 @@ html[data-product-motion="reduce"] :is(.work-sheet.work-sheet--center, .work-she
 .work-links > span { display: inline-flex; align-items: center; min-width: 0; max-width: 100%; border-radius: 10px; background: #f4f7f5; }
 .work-links > span > a { background: transparent; min-width: 0; overflow-wrap: anywhere; }
 .work-links > span > .work-button { display: inline-grid; place-items: center; flex: 0 0 32px; width: 32px; min-width: 32px; height: 32px; min-height: 32px; padding: 0; margin: 0 4px 0 0; border: 0; border-radius: 7px; }
+
+/* The count follows navigation; reminder content carries its own source theme. */
+.work-reminder-trigger > span{background:var(--module-icon,#133c5e);transition:background-color 240ms ease,color 240ms ease}
+@media(prefers-reduced-motion:reduce){.work-reminder-trigger > span{transition:none}}
