@@ -77,7 +77,10 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       : {}),
   };
   let fields: Record<string, unknown>;
-  if (collection === "places")
+  if (collection === "places") {
+    const tags = Array.isArray(raw.tags) ? raw.tags.slice(0, 30).map(x => string(x, "Tag", 80)).filter(Boolean) : [];
+    const requestedPrimary = string(raw.primaryTag, "Primary tag", 80);
+    const primaryTag = tags.find(tag => tag.toLowerCase() === requestedPrimary.toLowerCase());
     fields = {
       name: string(raw.name, "Place name", 240, true),
       ...(raw.mergedIntoId ? { mergedIntoId: string(raw.mergedIntoId, "Merged place", 300, true) } : {}),
@@ -89,15 +92,11 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
         ? { latitude: undefined, longitude: undefined }
         : { latitude: coordinate(raw.latitude, 90), longitude: coordinate(raw.longitude, 180) }),
       notes: string(raw.notes, "Notes", 10000),
-      tags: Array.isArray(raw.tags)
-        ? raw.tags
-            .slice(0, 30)
-            .map((x) => string(x, "Tag", 80))
-            .filter(Boolean)
-        : [],
+      tags,
+      ...(primaryTag ? { primaryTag } : {}),
       linkedRefs: refs(raw.linkedRefs),
     };
-  else if (collection === "events") {
+  } else if (collection === "events") {
     if (!eventTime) throw new Error("Open Calendar to edit events offline.");
     const { instantFor, validateEventTime } = eventTime;
     fields = {

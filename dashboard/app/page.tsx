@@ -12,8 +12,9 @@ export const viewport: Viewport = {
 export default async function HomePage({
   searchParams
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; next?: string }>;
 }) {
   const params = await searchParams;
-  return <AnimatedLandingPage hasError={params.error === "1"} errorPath="/" />;
+  const returnToVault = params.next === "/vault";
+  return <AnimatedLandingPage hasError={params.error === "1"} errorPath={returnToVault ? "/?next=%2Fvault" : "/"} successPath={returnToVault ? "/vault" : "/admin?welcome=1"} />;
 }

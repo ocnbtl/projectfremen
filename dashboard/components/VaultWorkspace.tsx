@@ -1002,7 +1002,7 @@ export default function VaultWorkspace({
       <header className={styles.header}>
         <div><h1>Vault</h1></div>
         {status?.configured && <div className={styles.headerControls}>
-          {status.unlocked ? <a className={styles.headerSync} href={onlineAuthorizationRequired ? "/admin/login?next=%2Fvault" : "#vault-sync-details"} aria-label={`Synchronization: ${networkLabel}`}><span role="status">{networkLabel}</span><UnigentamosIcon role="chevron-down" size={16} /></a> : <span className={styles.headerSync} role="status">Locked</span>}
+          {status.unlocked ? <a className={styles.headerSync} href={onlineAuthorizationRequired ? "/?next=%2Fvault" : "#vault-sync-details"} aria-label={`Synchronization: ${networkLabel}`}><span role="status">{networkLabel}</span><UnigentamosIcon role="chevron-down" size={16} /></a> : <span className={styles.headerSync} role="status">Locked</span>}
           {status.unlocked && <QuickActionBar maxVisible={0} ariaLabel="Vault sections" actions={[
             { id: "records", label: "Records", href: "#vault-records" },
             ...(!onlineAuthorizationRequired ? [{ id: "devices", label: "Devices", href: "#vault-devices" }] : []),
@@ -1037,7 +1037,7 @@ export default function VaultWorkspace({
           <div className={styles.syncNote}>
             <span aria-hidden="true">↻</span>
             <div><strong>Stay signed in to sync</strong><small>Your work stays on this device when you are offline and syncs when you are back online.</small></div>
-            <Link href="/admin/login?next=%2Fvault">Sign in to sync</Link>
+            <Link href="/?next=%2Fvault">Sign in to sync</Link>
           </div>
 
           {setupTarget === "windows" ? (
@@ -1163,7 +1163,7 @@ export default function VaultWorkspace({
               <p>Your Vault is open and your local work is safe. Use your normal Unigentamos sign-in password, then return here and unlock the Vault once more.</p>
               <small>Brave, Dia, Safari, and Home Screen apps each keep their own sign-in. Sign in in every browser or app you want to sync. The Vault will tell you if a secure session needs to be renewed.</small>
             </div>
-            <Link className={styles.signInButton} href="/admin/login?next=%2Fvault">Sign in to sync</Link>
+            <Link className={styles.signInButton} href="/?next=%2Fvault">Sign in to sync</Link>
           </section>}
 
           {!onlineAuthorizationRequired && syncIssues.length > 0 && <section className={styles.syncRecovery} role="status" aria-labelledby="vault-sync-recovery-title">

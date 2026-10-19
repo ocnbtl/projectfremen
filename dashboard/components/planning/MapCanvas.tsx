@@ -405,7 +405,7 @@ export default function MapCanvas(props: Props) {
       type: "FeatureCollection",
       features: props.places.map((p) => ({
         type: "Feature",
-        properties: { id: p.id, name: p.name, iconRole: placePinIconRole(p.tags) },
+        properties: { id: p.id, name: p.name, iconRole: placePinIconRole(p.tags, p.primaryTag) },
         geometry: { type: "Point", coordinates: [p.longitude, p.latitude] },
       })),
     });
@@ -420,7 +420,7 @@ export default function MapCanvas(props: Props) {
             features: [
               {
                 type: "Feature",
-                properties: { iconRole: placePinIconRole(p.tags) },
+                properties: { iconRole: placePinIconRole(p.tags, p.primaryTag) },
                 geometry: {
                   type: "Point",
                   coordinates: [p.longitude, p.latitude],
@@ -440,7 +440,7 @@ export default function MapCanvas(props: Props) {
             ? 0
             : motionTokens.map * 1000,
       });
-  }, [ready, props.selected?.id, props.selected?.tags.join("|"), preference]);
+  }, [ready, props.selected?.id, props.selected?.tags.join("|"), props.selected?.primaryTag, preference]);
   useEffect(() => {
     if (ready)
       (map.current?.getSource("stops") as GeoJSONSource)?.setData({

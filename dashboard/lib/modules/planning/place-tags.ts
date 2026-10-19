@@ -7,7 +7,13 @@ export function placeTagIconRole(tag: string): string {
 }
 
 /** Prefer a known category over custom tags; preserve the owner's tag order. */
-export function placePinIconRole(tags: readonly string[]): string {
-  const category = tags.find(tag => placeTagIconRole(tag) !== "place-tag-custom");
+export function primaryPlaceTag(tags: readonly string[], primaryTag?: string): string | undefined {
+  return tags.find(tag => primaryTag && tag.trim().toLowerCase() === primaryTag.trim().toLowerCase())
+    || tags.find(tag => placeTagIconRole(tag) !== "place-tag-custom")
+    || tags.find(tag => tag.trim());
+}
+
+export function placePinIconRole(tags: readonly string[], primaryTag?: string): string {
+  const category = primaryPlaceTag(tags, primaryTag);
   return category ? placeTagIconRole(category) : tags.some(tag => tag.trim()) ? "place-tag-custom" : "location";
 }

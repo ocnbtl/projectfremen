@@ -545,3 +545,7 @@
 @media(prefers-reduced-motion:reduce){.mapToolbar .moduleSearch{transition:none}}
 
 .placeTagList{display:flex;align-items:center;flex-wrap:wrap;gap:6px 10px}
+
+.placeForm .primaryTagControl{display:flex;align-items:center;gap:6px;min-width:0;font-size:11px;color:var(--text-secondary)}
+.primaryTagControl>span{flex:none}
+.primaryTagControl :global(.app-select-trigger){min-width:0;flex:1;min-height:32px;padding:4px 6px;font-size:12px}

@@ -47,7 +47,7 @@ function isSameOriginRequest(request: Request): boolean {
 export async function POST(request: Request) {
   const formData = await request.formData();
   const password = String(formData.get("password") ?? "");
-  const errorPath = sanitizePath(String(formData.get("errorPath") ?? ""), "/admin/login");
+  const errorPath = sanitizePath(String(formData.get("errorPath") ?? ""), "/");
   const successPath = sanitizePath(String(formData.get("successPath") ?? ""), "/admin");
   const adminPassword = process.env.ADMIN_PASSWORD;
   const ip = getRequestIp(request);

@@ -628,7 +628,7 @@ export default function MapWorkspace() {
               />
             </label>
             <PlaceLocationFields value={editor} onChange={patch => setEditor(current => current ? { ...current, ...patch } : current)} />
-            <div className={styles.placeDetails}><PlaceTags value={editor.tags || []} available={[...new Set(snapshot?.state.places.flatMap(p=>p.tags) || [])]} onChange={tags=>setEditor({...editor,tags})}/>
+            <div className={styles.placeDetails}><PlaceTags primaryTag={editor.primaryTag} onPrimaryChange={primaryTag=>setEditor({...editor,primaryTag})} value={editor.tags || []} available={[...new Set(snapshot?.state.places.flatMap(p=>p.tags) || [])]} onChange={tags=>setEditor({...editor,tags,primaryTag:tags.includes(editor.primaryTag || "")?editor.primaryTag:undefined})}/>
             <label>
               Notes
               <textarea
