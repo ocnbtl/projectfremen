@@ -1028,7 +1028,7 @@ export default function PeopleTransfer({
                     checked={selected.has(person.id)}
                     onChange={() => toggle(person.id)}
                   />
-                  <PeopleProfileAvatar
+                  <PeopleProfileAvatar organization={person?.className === "org"}
                     label={person.title}
                     initials={person.title.slice(0, 1)}
                     photoUrl={person.profile?.photoUrl}

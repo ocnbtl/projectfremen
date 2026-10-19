@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import { organizationLogoStyle } from "./organization-logo";
 import { movePhotoCrop, photoCrop, zoomPhotoCrop } from "../../lib/modules/people/photo-crop";
 
 type PhotoMetadata = {
@@ -37,6 +38,7 @@ export function PeopleProfileAvatar({
   photoUrl,
   photoUpdatedAt,
   compact = false,
+  organization = false,
   onSelect
 }: {
   label: string;
@@ -44,6 +46,7 @@ export function PeopleProfileAvatar({
   photoUrl?: string;
   photoUpdatedAt?: string;
   compact?: boolean;
+  organization?: boolean;
   onSelect?: () => void;
 }) {
   const source = photoUrl ? `${photoUrl}${photoUpdatedAt ? `${photoUrl.includes("?") ? "&" : "?"}v=${encodeURIComponent(photoUpdatedAt)}` : ""}` : "";
@@ -62,7 +65,8 @@ export function PeopleProfileAvatar({
           else setFailedSource(source);
         }
       }}
-      style={{ visibility: photoState === "ready" ? "visible" : "hidden" }}
+      data-organization-logo={organization || undefined}
+      style={{ ...(organization ? organizationLogoStyle : {}), visibility: photoState === "ready" ? "visible" : "hidden" }}
       onLoad={() => setLoadedSource(source)}
       onError={() => setFailedSource(source)}
     />

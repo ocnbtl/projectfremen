@@ -1682,7 +1682,7 @@ function EducationEntriesEditor({
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.institution || "Unavailable organization"} · unavailable</option>
                 )}
-                {organizations.map((organization) => <option value={organization.id} key={organization.id}><span className="people-organization-choice"><PeopleProfileAvatar label={organization.title} initials={organization.title.slice(0, 1)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt} compact /><span>{organization.title}</span></span></option>)}
+                {organizations.map((organization) => <option value={organization.id} key={organization.id}><span className="people-organization-choice"><PeopleProfileAvatar organization={true} label={organization.title} initials={organization.title.slice(0, 1)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt} compact /><span>{organization.title}</span></span></option>)}
               </SelectField>
             </label>
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>Degree</span><input aria-label={`Education ${index + 1} degree`} value={entry.degree || ""} onChange={(event) => onChange(entry.id, { degree: event.target.value })} placeholder="Bachelor’s, Master’s, PhD..." /></label>
@@ -1735,7 +1735,7 @@ function OccupationEntriesEditor({
                 {entry.organizationId && !organizations.some((organization) => organization.id === entry.organizationId) && (
                   <option value={entry.organizationId}>{entry.employer || "Unavailable organization"} · unavailable</option>
                 )}
-                {organizations.map((organization) => <option value={organization.id} key={organization.id}><span className="people-organization-choice"><PeopleProfileAvatar label={organization.title} initials={organization.title.slice(0, 1)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt} compact /><span>{organization.title}</span></span></option>)}
+                {organizations.map((organization) => <option value={organization.id} key={organization.id}><span className="people-organization-choice"><PeopleProfileAvatar organization={true} label={organization.title} initials={organization.title.slice(0, 1)} photoUrl={organization.profile?.photoUrl} photoUpdatedAt={organization.profile?.photoUpdatedAt} compact /><span>{organization.title}</span></span></option>)}
               </SelectField>
             </label>
             <label><span className={index === 0 ? "people-field-label" : "people-visually-hidden"}>When</span><SelectField aria-label={`Occupation ${index + 1} timing`} value={entry.status} onChange={(event) => onChange(entry.id, { status: event.target.value as PersonalOccupationEntry["status"] })}><option value="current">Current</option><option value="past">Past</option></SelectField></label>
@@ -2658,7 +2658,7 @@ export default function PeopleWorkspace({
       return [objectTargetKey(object), { object, detail: "Project connection" }] as [string, OrganizationObjectRow];
     })
   ]).values()).map(row => {
-    const person = row.object.module === "people" && row.object.objectType === "person" ? people.find(record => record.id === row.object.objectId && record.className === "person") : undefined;
+    const person = row.object.module === "people" && ["person", "organization"].includes(row.object.objectType) ? people.find(record => record.id === row.object.objectId) : undefined;
     return person ? { ...row, object: { ...row.object, label: person.title }, photoUrl: person.profile?.photoUrl, photoUpdatedAt: person.profile?.photoUpdatedAt } : row;
   }).sort((a, b) => objectTargetTypeLabel(a.object).localeCompare(objectTargetTypeLabel(b.object)) || a.object.label.localeCompare(b.object.label));
   const timelineItems = selectedInteractionItems.slice(0, 20);
@@ -3864,7 +3864,7 @@ export default function PeopleWorkspace({
           </div>
         </fieldset>
         <div className="people-create-photo">
-          <PeopleProfileAvatar label={name || (className === "org" ? "new organization" : "new person")} initials={name.slice(0, 2).toUpperCase() || "+"} photoUrl={quickPhoto} onSelect={() => setQuickPhotoDialogOpen(true)} />
+          <PeopleProfileAvatar organization={className === "org"} label={name || (className === "org" ? "new organization" : "new person")} initials={name.slice(0, 2).toUpperCase() || "+"} photoUrl={quickPhoto} onSelect={() => setQuickPhotoDialogOpen(true)} />
           <span>{quickPhoto ? "Profile picture ready" : "Add a profile picture"}<small>Saved when you save this profile.</small></span>
         </div>
         <PeopleProfilePhotoDialog open={quickPhotoDialogOpen} personId="" personName={name || "New profile"} hasPhoto={Boolean(quickPhoto)} onClose={() => setQuickPhotoDialogOpen(false)} onPrepared={setQuickPhoto} onSaved={async () => true} onRemoved={async () => true} />
@@ -4309,7 +4309,7 @@ export default function PeopleWorkspace({
               <div className="people-deleted-list">
                 {archivedPeople.map((record) => (
                   <article data-people-deleted-row key={record.id}>
-                    <PeopleProfileAvatar
+                    <PeopleProfileAvatar organization={record.className === "org"}
                       label={record.title}
                       initials={getInitials(record)}
                       photoUrl={record.profile?.photoUrl}
@@ -4356,7 +4356,7 @@ export default function PeopleWorkspace({
                 ))}
               </div>
             )}
-            {activeSidebarView === "duplicates" && <div className="people-duplicate-review">{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):null}<section className="people-duplicate-summary"><h3>{duplicateMatches.length === 0 ? "Zero" : duplicateMatches.length} detected duplicate {duplicateMatches.length === 1 ? "pair" : "pairs"} across People and Organizations</h3><p>We scan these details for duplicates, keeping your information private and secure.</p><ul>{["Names", "Email addresses", "Phone numbers", "Social profiles", "Websites"].map(label => <li key={label}><PeopleIcon name="check" />{label}</li>)}</ul><div className="people-duplicate-key"><span><UnigentamosIcon role="duplicates" size={20} />Green: no duplicates detected</span><span><UnigentamosIcon role="duplicates-warning" size={20} />Red: possible duplicates to review</span></div></section></div>}
+            {activeSidebarView === "duplicates" && <div className="people-duplicate-review">{duplicateMatches.length?duplicateMatches.map(match=><article key={match.left.id+match.right.id}><header><strong>{match.confidence}</strong><span>{match.left.className === "org"?"Organizations":"People"}</span></header><p>{match.reasons.join(" · ")}</p><div>{[match.left,match.right].map(record=><button key={record.id} type="button" onClick={()=>{setUtilityNotice("");setActiveSidebarView(record.className === "org"?"organizations":"all");selectPerson(record,record.className === "org"?"organizations":"all");}}><PeopleProfileAvatar organization={record.className === "org"} label={record.title} initials={getInitials(record)} photoUrl={record.profile?.photoUrl} compact/><span><strong>{record.title}</strong><small>{record.profile?.primaryEmail || record.profile?.phoneNumber || record.profile?.website || "Review profile"}</small></span><PeopleIcon name="chevron"/></button>)}</div></article>):null}<section className="people-duplicate-summary"><h3>{duplicateMatches.length === 0 ? "Zero" : duplicateMatches.length} detected duplicate {duplicateMatches.length === 1 ? "pair" : "pairs"} across People and Organizations</h3><p>We scan these details for duplicates, keeping your information private and secure.</p><ul>{["Names", "Email addresses", "Phone numbers", "Social profiles", "Websites"].map(label => <li key={label}><PeopleIcon name="check" />{label}</li>)}</ul><div className="people-duplicate-key"><span><UnigentamosIcon role="duplicates" size={20} />Green: no duplicates detected</span><span><UnigentamosIcon role="duplicates-warning" size={20} />Red: possible duplicates to review</span></div></section></div>}
             {(activeSidebarView === "import-export" || activeSidebarView === "import" || activeSidebarView === "export") && (
               <PeopleTransfer key={activeSidebarView} mode={activeSidebarView === "export" ? "export" : "import"} people={people} onBusy={setTransferBusy} onChanged={records=>setPeople(records.filter(record=>record.className === "person" || record.className === "org"))}/>
             )}
@@ -4384,7 +4384,7 @@ export default function PeopleWorkspace({
                     aria-pressed={selectedPerson?.id === record.id}
                     onClick={() => selectPerson(record)}
                   >
-                    <PeopleProfileAvatar
+                    <PeopleProfileAvatar organization={record.className === "org"}
                       label={record.title}
                       initials={getInitials(record)}
                       photoUrl={profile.photoUrl}
@@ -4446,7 +4446,7 @@ export default function PeopleWorkspace({
             {!addingPerson && (
               <>
               <header className="people-profile-header" data-profile-status={selectedPerson.status}>
-              <PeopleProfileAvatar
+              <PeopleProfileAvatar organization={selectedPerson.className === "org"}
                 label={selectedPerson.title}
                 initials={getInitials(selectedPerson)}
                 photoUrl={profilePhotoDraft || selectedProfile.photoUrl}
@@ -4859,7 +4859,7 @@ export default function PeopleWorkspace({
                     <div className="people-links-directory">
                       {peopleConnections.length > 0 ? peopleConnections.map((connection) => (
                           <button type="button" onClick={() => selectPerson(connection.target!)} key={connection.label}>
-                            <PeopleProfileAvatar
+                            <PeopleProfileAvatar organization={connection.target!.className === "org"}
                               label={connection.target!.title}
                               initials={getInitials(connection.target!)}
                               photoUrl={connection.target!.profile?.photoUrl}
@@ -4880,7 +4880,7 @@ export default function PeopleWorkspace({
                     <div className="people-links-directory is-organizations">
                       {organizationConnections.length > 0 ? organizationConnections.map((connection) => (
                         <button type="button" onClick={() => selectPerson(connection.target!)} key={connection.label}>
-                          <PeopleProfileAvatar
+                          <PeopleProfileAvatar organization={connection.target!.className === "org"}
                             label={connection.target!.title}
                             initials={getInitials(connection.target!)}
                             photoUrl={connection.target!.profile?.photoUrl}
@@ -4927,11 +4927,11 @@ export default function PeopleWorkspace({
                     </header>
                     <div className="people-object-links">
                       {selectedNativeObjectLinks.length > 0 ? selectedNativeObjectLinks.map(({ link, object }) => {
-                        const person = object.module === "people" && object.objectType === "person" ? people.find(record => record.id === object.objectId && record.className === "person") : undefined;
+                        const person = object.module === "people" && ["person", "organization"].includes(object.objectType) ? people.find(record => record.id === object.objectId) : undefined;
                         return (
                         <div key={link.id}>
                           <a href={object.route}>
-                            {person ? <span className="people-linked-person-avatar"><PeopleProfileAvatar label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /></span> : <span className="people-object-glyph"><UnigentamosIcon role={objectTargetIcon(object)} size={20} /></span>}
+                            {person ? <span className="people-linked-person-avatar"><PeopleProfileAvatar organization={person?.className === "org"} label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /></span> : <span className="people-object-glyph"><UnigentamosIcon role={objectTargetIcon(object)} size={20} /></span>}
                             <span><strong>{object.label}</strong><small>{labelize(object.objectType)} · {labelize(link.relationship)}</small></span>
                           </a>
                           <button type="button" onClick={() => void removeObjectLink(link)} disabled={objectLinkSaving} aria-label={`Remove link to ${object.label}`} data-icon-button="standard"><PeopleIcon name="close" /></button>
@@ -5178,7 +5178,7 @@ export default function PeopleWorkspace({
                           ? Array.from(new Set([...current, record.id]))
                           : current.filter((id) => id !== record.id))}
                       />
-                      <PeopleProfileAvatar
+                      <PeopleProfileAvatar organization={record.className === "org"}
                         label={record.title}
                         initials={getInitials(record)}
                         photoUrl={record.profile?.photoUrl}

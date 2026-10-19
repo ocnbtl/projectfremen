@@ -54,7 +54,7 @@ export function RelatedRecordsView({ items, error, loaded, hideEmpty = false, co
               href={ref.route}
               title={compact ? `${ref.label}${detail ? ` · ${detail}` : ""}` : undefined}
             >
-              {compact ? <EventObjectIdentity record={ref} /> : <UnigentamosIcon
+              {compact || ref.objectType === "organization" ? <EventObjectIdentity record={ref} /> : <UnigentamosIcon
                 role={`module-${ref.module === "personal_ops" ? "personal" : ref.module}`}
                 size={20}
               />}

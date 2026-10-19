@@ -5,6 +5,7 @@ import UnigentamosIcon from "../icons/UnigentamosIcon";
 import PeopleObjectPicker, { objectTargetKey } from "../people/PeopleObjectPicker";
 import { PersonAvatar } from "./EventPeople";
 import { EventObjectIdentity } from "./EventObjects";
+import { organizationLogoStyle } from "../people/organization-logo";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 export default function RecordLinks({
   refs,
@@ -122,6 +123,8 @@ function RecordIdentity({ record }: { record: PreviewRef }) {
       {safe && !failed ? (
         <img
           src={url}
+          data-organization-logo={record.objectType === "organization" || undefined}
+          style={record.objectType === "organization" ? organizationLogoStyle : undefined}
           alt=""
           referrerPolicy="no-referrer"
           onError={() => setFailed(true)}

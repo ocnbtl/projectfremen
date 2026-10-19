@@ -4,6 +4,7 @@ import type { EventOccurrence } from "../../lib/modules/planning/types";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import styles from "./EventObjects.module.css";
+import { organizationLogoStyle } from "../people/organization-logo";
 
 type PreviewRef = NativeObjectRef & { preview?: { imageUrl?: string; imageUpdatedAt?: string } };
 export function eventObjectRefs(event: EventOccurrence, available: NativeObjectRef[] = []) {
@@ -23,7 +24,7 @@ export function EventObjectIdentity({ record }: { record: PreviewRef }) {
   const [failed, setFailed] = useState("");
   const icon = record.module === "map" ? "location" : record.objectType === "organization" ? "organization" : record.module === "personal_ops" ? "module-personal" : "module-" + record.module;
   return <span className={styles.visual} data-location={!source && record.module === "map" || undefined} data-organization={record.objectType === "organization" || undefined}>
-    {source && failed !== source ? <img src={source} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(source)} /> : <UnigentamosIcon role={icon} size={14} />}
+    {source && failed !== source ? <img src={source} alt="" loading="lazy" data-organization-logo={record.objectType === "organization" || undefined} style={record.objectType === "organization" ? organizationLogoStyle : undefined} referrerPolicy="no-referrer" onError={() => setFailed(source)} /> : <UnigentamosIcon role={icon} size={14} />}
   </span>;
 }
 

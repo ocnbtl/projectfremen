@@ -1,5 +1,6 @@
 "use client";
 import { useState, type ReactNode } from "react";
+import { organizationLogoStyle } from "./organization-logo";
 import type { exportContactData } from "../../lib/modules/people/transfer";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 
@@ -47,7 +48,7 @@ export default function ContactExportPreview({ preview }: { preview: ExportPrevi
   return <section className="people-export-preview" aria-label="Export preview">
     <header><UnigentamosIcon role="show" size={22} /><div><h4>Your export preview</h4><p>{preview.contacts.length} {preview.contacts.length === 1 ? "profile" : "profiles"} · {preview.format.toUpperCase()} · about {Math.max(1, Math.ceil(preview.bytes / 1024))} KB</p></div></header>
     <p>Review the included information below. Your contact app may display standard fields differently; additional details travel as structured data.</p>
-    {preview.contacts.map(contact => <PreviewDetails key={contact.id} initiallyOpen={preview.contacts.length === 1} summary={<>{photos?.[contact.id] && <img src={photos[contact.id]} width={36} height={36} alt="" />}<span>{contact.name}<small>{contact.type === "organization" ? "Organization" : "Person"}</small></span></>}>
+    {preview.contacts.map(contact => <PreviewDetails key={contact.id} initiallyOpen={preview.contacts.length === 1} summary={<>{photos?.[contact.id] && <img src={photos[contact.id]} width={36} height={36} alt="" data-organization-logo={contact.type === "organization" || undefined} style={contact.type === "organization" ? {...organizationLogoStyle,width:36,height:36,padding:6} : undefined} />}<span>{contact.name}<small>{contact.type === "organization" ? "Organization" : "Person"}</small></span></>}>
       <PreviewFields value={readableContact(contact)} />
     </PreviewDetails>)}
     {Object.values(context).some(hasValue) && <PreviewDetails summary="Included interactions and object links"><PreviewFields value={context}/></PreviewDetails>}

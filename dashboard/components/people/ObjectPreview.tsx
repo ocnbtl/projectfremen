@@ -4,6 +4,7 @@ import type { NativeObjectRef } from "../../lib/native-objects/types";
 import type { VaultObjectSnapshot, VaultMediaManifest } from "../../lib/local-first/types";
 import type { PersonalResourceGradient } from "../../lib/personal-records-store";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import { organizationLogoStyle } from "./organization-logo";
 import { resourceGradientStyle } from "../resources/ResourceVisual";
 import { readCanonicalMetadata } from "../../lib/local-first/canonical-record";
 
@@ -42,7 +43,7 @@ export default function ObjectPreview({ target, preview, icon }: { target: Nativ
   const initials = target.label.trim().split(/\s+/).slice(0, 2).map(word => word[0]).join("");
   const type = preview?.mediaType?.startsWith("video/") ? "Video" : preview?.mediaType?.startsWith("audio/") ? "Audio" : preview?.mediaType === "application/pdf" ? "PDF" : "File";
   return <span ref={box} className="people-object-picker-result-icon" data-preview-kind={target.objectType} style={preview?.gradient ? resourceGradientStyle(preview.gradient) : undefined}>
-    {source && failed !== source ? <img src={source} alt="" loading="lazy" referrerPolicy="no-referrer" onError={() => setFailed(source)} />
+    {source && failed !== source ? <img src={source} alt="" loading="lazy" data-organization-logo={target.objectType === "organization" || undefined} style={target.objectType === "organization" ? organizationLogoStyle : undefined} referrerPolicy="no-referrer" onError={() => setFailed(source)} />
       : target.module === "people" || target.module === "projects" ? <span className="object-preview-initials">{initials}</span>
       : <><UnigentamosIcon role={icon} size={20} />{target.module === "media" && <small>{type}</small>}</>}
   </span>;

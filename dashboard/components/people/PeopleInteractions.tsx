@@ -48,7 +48,7 @@ function InteractionDetail({ item, people, explicitSelection, empty, error, onBa
         <section aria-label="Participants"><h3>Participants</h3><div className="people-interaction-detail-participants">{item.participantIds.map(id => {
           const person = people.find(p => p.id === id);
           return person && !person.archivedAt ? <button key={id} onClick={() => onOpenPerson(person)}>
-            <PeopleProfileAvatar label={person.title} initials={initials(person.title)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact />
+            <PeopleProfileAvatar organization={person?.className === "org"} label={person.title} initials={initials(person.title)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact />
             <span className="people-interaction-participant-name"><span>{person.title}</span>
               <span className="people-latest-contact-mark" data-included={Boolean(item.updatesLastContact)} role="img" aria-label={`Latest contact: ${item.updatesLastContact ? "included" : "not included"}`} title={item.updatesLastContact ? "Counts toward this profile's latest contact date" : "Does not update this profile's latest contact date"}><UnigentamosIcon role={item.updatesLastContact ? "check" : "close"} size={16} /><span>Latest contact</span></span>
             </span><UnigentamosIcon role="chevron-right" size={16} /></button>
@@ -148,7 +148,7 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
         <h2>{month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}</h2><ul>{entries.map(item => <li key={item.id}><button className="people-interaction-row" data-interaction-id={item.id} aria-current={selected?.id === item.id ? "true" : undefined} aria-controls="people-interaction-panel" aria-label={`View interaction: ${item.title}`} onClick={() => navigate({ interaction: item.id }, true)}>
           <span className="people-interaction-row-identity"><span className="people-interaction-row-avatars" aria-hidden="true">{item.participantIds.slice(0, 2).map(id => {
             const person = people.find(person => person.id === id);
-            return <PeopleProfileAvatar key={id} label={person?.title || "Profile unavailable"} initials={person ? initials(person.title) : "?"} photoUrl={person?.profile?.photoUrl} photoUpdatedAt={person?.profile?.photoUpdatedAt} compact />;
+            return <PeopleProfileAvatar organization={person?.className === "org"} key={id} label={person?.title || "Profile unavailable"} initials={person ? initials(person.title) : "?"} photoUrl={person?.profile?.photoUrl} photoUpdatedAt={person?.profile?.photoUpdatedAt} compact />;
           })}{item.participantIds.length > 2 && <span className="people-interaction-extra-participants">+{item.participantIds.length - 2}</span>}</span>
             <span className="people-interaction-row-main"><strong>{item.title}</strong><span>{item.participantIds.map(id => people.find(p => p.id === id)?.title || "Profile unavailable").join(" · ") || "No participants recorded"}</span></span>
           </span>
