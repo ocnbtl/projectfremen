@@ -1,4 +1,5 @@
 import type { Place } from "./types";
+import { areaFlagUrl, isAreaPlace } from "./area-flags";
 
 export function formatPlaceCoordinates(latitude: number, longitude: number) {
   return `${Math.abs(latitude).toFixed(6)}° ${latitude < 0 ? "S" : "N"}, ${Math.abs(longitude).toFixed(6)}° ${longitude < 0 ? "W" : "E"}`;
@@ -26,8 +27,9 @@ export function normalizePlaceImage(value: unknown): string | undefined {
 export type PlaceOrganization = { objectId: string; label: string; href: string; imageUrl?: string; imageUpdatedAt?: string };
 export function placePicture(place: Partial<Place>, organizations: PlaceOrganization[] = []) {
   if (place.image) return place.image;
+  if (isAreaPlace(place)) return areaFlagUrl({name:place.name||"",country:place.countryCode,latitude:place.latitude,longitude:place.longitude});
   const name = placeDisplayName({ name: place.name || "", address: place.address || "" }).toLocaleLowerCase();
-  const organization = organizations.find(org => org.label.toLocaleLowerCase() === name) || (organizations.length === 1 ? organizations[0] : undefined);
+  const organization = organizations.find(org => org.label.toLocaleLowerCase() === name) || (place.tags?.some(tag=>["organization","school"].includes(tag.toLowerCase())) && organizations.length === 1 ? organizations[0] : undefined);
   const url = organization?.imageUrl;
   if (!url || !/^\/api\/people\/photos\/personal-[a-f0-9-]+$/i.test(url)) return undefined;
   return url + (organization.imageUpdatedAt ? `?v=${encodeURIComponent(organization.imageUpdatedAt)}` : "");

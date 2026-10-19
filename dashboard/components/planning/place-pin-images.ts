@@ -31,8 +31,8 @@ export async function placePinImages(selections: Readonly<Record<string, string>
   })));
 }
 
-/** Contain logos and flags inside the same circular, centered pin geometry. */
-export async function placePictureImage(source: string, signal: AbortSignal) {
+/** Area flags keep their rectangular silhouette; other place pictures remain circular. */
+export async function placePictureImage(source: string, signal: AbortSignal, area = false) {
   const image = new Image();
   image.src = source;
   await image.decode();
@@ -40,8 +40,7 @@ export async function placePictureImage(source: string, signal: AbortSignal) {
   const canvas = document.createElement("canvas"); canvas.width = canvas.height = 84;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Place image canvas unavailable");
-  context.beginPath(); context.arc(42, 42, 42, 0, Math.PI * 2); context.clip();
-  context.fillStyle = "white"; context.fillRect(0, 0, 84, 84);
+  if(!area){context.beginPath(); context.arc(42, 42, 42, 0, Math.PI * 2); context.clip();context.fillStyle = "white"; context.fillRect(0, 0, 84, 84);}
   const scale = Math.min(84 / image.naturalWidth, 84 / image.naturalHeight);
   const width = image.naturalWidth * scale, height = image.naturalHeight * scale;
   context.drawImage(image, (84-width)/2, (84-height)/2, width, height);

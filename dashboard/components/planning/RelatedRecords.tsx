@@ -40,7 +40,7 @@ export function RelatedRecordsView({ items, error, loaded, hideEmpty = false, co
   if (hideEmpty && !error && (!loaded || !items.length)) return null;
   return (
     <section className="work-related" data-compact={compact || undefined}>
-      <h3>Linked objects</h3>
+      <h3 style={{display:"flex",alignItems:"center",gap:6}}><UnigentamosIcon role="object" size={16}/>Linked objects</h3>
       {error ? (
         <p>Related records could not load. Your links are preserved.</p>
       ) : !loaded ? (

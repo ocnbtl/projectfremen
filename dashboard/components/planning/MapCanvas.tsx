@@ -3,6 +3,7 @@ import { getIconEntry } from "../../lib/icons/icon-registry";
 import { useIconSelections } from "../icons/IconSystemProvider";
 import { placePinIconRole } from "../../lib/modules/planning/place-tags";
 import { placeDisplayName } from "../../lib/modules/planning/place-presentation";
+import { isAreaPlace } from "../../lib/modules/planning/area-flags";
 import { placePinImages, placePictureImage } from "./place-pin-images";
 import LogoLoader from "../operational/LogoLoader";
 import { motionTokens } from "../../lib/design-system/motion";
@@ -404,29 +405,35 @@ export default function MapCanvas(props: Props) {
         const layer = selected ? "selected-place-icon" : "place-tag-icons";
         if (!instance.getLayer(layer)) continue;
         const fallback: maplibregl.ExpressionSpecification = ["concat","pin-",["get","iconRole"],selected?"-selected":""];
-        const available = props.pinDisplay === "images" ? entries.filter(([id,url])=>pictureCache.current.get(id)===url && instance.hasImage(`picture-${id}`)) : [];
+        const available = props.pinDisplay === "images" ? entries.filter(([id,url])=>pictureCache.current.get(id)===`${url}|${!!isAreaPlace(props.places.find(p=>p.id===id)||{})}` && instance.hasImage(`picture-${id}`)) : [];
         const expression: maplibregl.ExpressionSpecification = available.length ? ["match",["get","id"],available[0][0],`picture-${available[0][0]}`,...available.slice(1).flatMap(([id])=>[id,`picture-${id}`]),fallback] : fallback;
         instance.setLayoutProperty(layer,"icon-image",expression);
+        const flagIds=available.filter(([id])=>isAreaPlace(props.places.find(p=>p.id===id)||{})).map(([id])=>id);
+        const backing=selected?"selected-place":"place-points";
+        const opacity:maplibregl.ExpressionSpecification|number=flagIds.length?["case",["in",["get","id"],["literal",flagIds]],0,1]:1;
+        instance.setPaintProperty(backing,"circle-opacity",opacity);
+        instance.setPaintProperty(backing,"circle-stroke-opacity",opacity);
       }
     };
     apply();
     if (props.pinDisplay === "images") {
-      const queue = entries.filter(([id,url])=>pictureCache.current.get(id)!==url);
+      const queue = entries.filter(([id,url])=>pictureCache.current.get(id)!==`${url}|${!!isAreaPlace(props.places.find(p=>p.id===id)||{})}`);
       void Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{
         while(queue.length && !controller.signal.aborted) {
           const [id,url] = queue.shift()!;
           try {
-            const image = await placePictureImage(url,controller.signal);
+            const area=!!isAreaPlace(props.places.find(p=>p.id===id)||{});
+            const image = await placePictureImage(url,controller.signal,area);
             if(controller.signal.aborted)return;
             const key=`picture-${id}`;
             if(instance.hasImage(key))instance.updateImage(key,image);else instance.addImage(key,image,{pixelRatio:3});
-            pictureCache.current.set(id,url);apply();
+            pictureCache.current.set(id,`${url}|${area}`);apply();
           } catch { /* A missing picture retains the normal tag icon. */ }
         }
       }));
     }
     return ()=>controller.abort();
-  },[ready,iconsReady,props.pinDisplay,props.placeImages]);
+  },[ready,iconsReady,props.pinDisplay,props.placeImages,props.places]);
   useEffect(() => {
     if (!ready) return;
     if (
