@@ -27,6 +27,7 @@ type PhotoEditorDraft = {
   panX: number;
   panY: number;
   outputSize: 256 | 512 | 1024;
+  savedVersion?: string;
 };
 
 const PROFILE_PHOTO_UPLOAD_BUDGET = 700_000;
@@ -103,17 +104,35 @@ async function prepareProfilePhoto(editor: PhotoEditorDraft): Promise<File> {
     context.drawImage(bitmap, sourceX, sourceY, side, side, 0, 0, editor.outputSize, editor.outputSize);
     let prepared: Blob | null = null;
     for (const quality of PROFILE_PHOTO_QUALITY_STEPS) {
-      prepared = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", quality));
+      prepared = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", quality));
       if (prepared && prepared.size <= PROFILE_PHOTO_UPLOAD_BUDGET) break;
     }
     if (!prepared) throw new Error("This browser could not prepare the picture.");
     if (prepared.size > PROFILE_PHOTO_UPLOAD_BUDGET) {
       throw new Error("This picture is still too detailed after preparation. Choose 512 px and try again.");
     }
-    return new File([prepared], "profile-picture.jpg", { type: "image/jpeg" });
+    return new File([prepared], "profile-picture", { type: prepared.type });
   } finally {
     bitmap.close();
   }
+}
+
+async function preparePhotoSource(source: Blob): Promise<Blob> {
+  const bitmap = await createImageBitmap(source);
+  try {
+    const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("This browser could not prepare the picture.");
+    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    for (const quality of PROFILE_PHOTO_QUALITY_STEPS) {
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/webp", quality));
+      if (blob && blob.size <= 1_500_000) return blob;
+    }
+    throw new Error("This picture is too detailed. Try a smaller image.");
+  } finally { bitmap.close(); }
 }
 
 function csrfHeadersWithoutJson(): Record<string, string> {
@@ -128,6 +147,7 @@ export default function PeopleProfilePhotoDialog({
   personId,
   personName,
   hasPhoto,
+  currentPhotoUrl,
   onClose,
   onSaved,
   onRemoved,
@@ -137,6 +157,7 @@ export default function PeopleProfilePhotoDialog({
   personId: string;
   personName: string;
   hasPhoto: boolean;
+  currentPhotoUrl?: string;
   onClose: () => void;
   onSaved: (photo: PhotoMetadata) => Promise<boolean>;
   onRemoved: () => Promise<boolean>;
@@ -149,6 +170,8 @@ export default function PeopleProfilePhotoDialog({
   const previewUrlRef = useRef("");
   const cropFrameRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ pointerId: number; x: number; y: number } | null>(null);
+  const loadVersionRef = useRef(0);
+  const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [confirmRemove, setConfirmRemove] = useState(false);
@@ -195,11 +218,13 @@ export default function PeopleProfilePhotoDialog({
   function closeDialog(force = false) {
     if (saving && !force) return;
     releasePreview();
+    loadVersionRef.current++;
+    setLoading(false);
     setPhotoDraft(null);
     onClose();
   }
 
-  async function beginEditing(source: Blob) {
+  async function beginEditing(source: Blob, initial?: { zoom: number; panX: number; panY: number; outputSize: PhotoEditorDraft["outputSize"]; savedVersion?: string }) {
     if (saving) return;
     setError("");
     if (!source.type.startsWith("image/")) {
@@ -211,17 +236,41 @@ export default function PeopleProfilePhotoDialog({
       return;
     }
     try {
+      const version = ++loadVersionRef.current;
       const bitmap = await createImageBitmap(source);
       const sourceWidth = bitmap.width;
       const sourceHeight = bitmap.height;
       bitmap.close();
+      if (version !== loadVersionRef.current) return;
       releasePreview();
       const previewUrl = URL.createObjectURL(source);
       previewUrlRef.current = previewUrl;
-      setPhotoDraft({ source, previewUrl, sourceWidth, sourceHeight, zoom: 1, panX: 0, panY: 0, outputSize: 512 });
+      setPhotoDraft({ source, previewUrl, sourceWidth, sourceHeight, zoom: 1, panX: 0, panY: 0, outputSize: 512, ...initial });
     } catch {
       setError("This browser could not open that picture.");
     }
+  }
+
+  async function editCurrentPhoto() {
+    const version = ++loadVersionRef.current;
+    setLoading(true);
+    setError("");
+    try {
+      if (onPrepared && currentPhotoUrl) {
+        const response = await fetch(currentPhotoUrl);
+        if (!response.ok) throw new Error("The current picture could not be loaded.");
+        const blob = await response.blob();
+        if (version === loadVersionRef.current) await beginEditing(blob);
+      } else {
+        const response = await fetch(`/api/people/photos/${encodeURIComponent(personId)}?edit=1`, { cache: "no-store" });
+        const payload = await response.json();
+        if (!response.ok || !payload.ok) throw new Error(payload.error || "The current picture could not be loaded.");
+        const blob = await (await fetch(payload.source)).blob();
+        if (version === loadVersionRef.current) await beginEditing(blob, { ...payload.crop, savedVersion: payload.updatedAt });
+      }
+    } catch (error) {
+      if (version === loadVersionRef.current) setError(error instanceof Error ? error.message : "The current picture could not be loaded.");
+    } finally { setLoading(false); }
   }
 
   async function uploadEditedPhoto() {
@@ -229,8 +278,8 @@ export default function PeopleProfilePhotoDialog({
     setSaving(true);
     setError("");
     try {
-      const photo = await prepareProfilePhoto(photoDraft);
       if (onPrepared) {
+        const photo = await prepareProfilePhoto(photoDraft);
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = () => resolve(String(reader.result));
@@ -242,14 +291,19 @@ export default function PeopleProfilePhotoDialog({
         return;
       }
       const formData = new FormData();
-      formData.append("photo", photo);
+      const crop = { zoom: photoDraft.zoom, panX: photoDraft.panX, panY: photoDraft.panY, outputSize: photoDraft.outputSize };
+      if (!photoDraft.savedVersion) {
+        formData.append("source", await preparePhotoSource(photoDraft.source), "profile-source.webp");
+        formData.append("crop", JSON.stringify(crop));
+      }
       const response = await fetch(`/api/people/photos/${encodeURIComponent(personId)}`, {
-        method: "POST",
-        headers: csrfHeadersWithoutJson(),
-        body: formData
+        method: photoDraft.savedVersion ? "PATCH" : "POST",
+        headers: photoDraft.savedVersion ? buildJsonHeadersWithCsrf() : csrfHeadersWithoutJson(),
+        body: photoDraft.savedVersion ? JSON.stringify({ crop, expectedUpdatedAt: photoDraft.savedVersion }) : formData
       });
       const payload = (await response.json().catch(() => ({ ok: false, error: "Invalid server response" }))) as PhotoResponse;
       if (!response.ok || !payload.ok || !payload.photo) throw new Error(payload.error || "Profile picture could not be saved.");
+      setPhotoDraft(current => current ? { ...current, savedVersion: payload.photo!.updatedAt } : current);
       if (!(await onSaved(payload.photo))) throw new Error("The picture was stored, but the profile could not be refreshed. Try saving it again.");
       closeDialog(true);
     } catch (uploadError) {
@@ -344,7 +398,10 @@ export default function PeopleProfilePhotoDialog({
           </div>
           <button type="button" aria-label="Close profile picture options" onClick={() => closeDialog()} disabled={saving} data-icon-button="standard"><UnigentamosIcon role="close" size={18} /></button>
         </header>
-        <p>{photoDraft ? "Drag and zoom to adjust the picture." : "Choose a picture to crop before it is saved to this private profile."}</p>
+        <p>{photoDraft ? "Drag to reposition and adjust the zoom. Your saved crop is used across People, Calendar, and Map." : "Adjust your current picture or choose a new one."}</p>
+        {!photoDraft && hasPhoto && <button type="button" className="people-photo-adjust" onClick={() => void editCurrentPhoto()} disabled={saving || loading}>
+          <UnigentamosIcon role="edit" size={20} /><span><strong>{loading ? "Opening picture…" : "Adjust crop"}</strong><small>Zoom and reposition the current picture</small></span>
+        </button>}
         {!photoDraft && <div className="people-photo-options">
           <button type="button" onClick={() => uploadInputRef.current?.click()} disabled={saving}>
             <span aria-hidden="true"><UnigentamosIcon role="photo-upload" size={19} /></span><strong>Upload</strong><small>Choose a saved picture</small>

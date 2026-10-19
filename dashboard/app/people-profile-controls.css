@@ -300,3 +300,14 @@
 .people-redesign-shell .people-profile-form > [data-profile-section="locations"]:has(.is-organization) { grid-column: 1 / -1; }
 .people-redesign-shell .people-place-row .people-location-remove { width: 32px !important; min-width: 32px !important; max-width: 32px !important; height: 36px; color: var(--text-subtle) !important; background: transparent !important; box-shadow: none !important; }
 .people-redesign-shell .people-place-row .people-location-remove:hover { background: #fff0ec !important; color: #a13e32 !important; }
+
+.people-photo-adjust { display:flex; align-items:center; gap:12px; width:100%; padding:14px; border:1px solid var(--border-strong); border-radius:12px; color:var(--text-strong); background:var(--surface-app-alt); text-align:left; cursor:pointer; }
+.people-photo-adjust > svg { flex:none; }
+.people-photo-adjust > span { display:grid; gap:3px; }
+.people-photo-adjust strong { font-size:14px; }
+.people-photo-adjust small { color:var(--text-subtle); font-size:12px; }
+.people-photo-adjust:focus-visible { outline:2px solid var(--module-accent); outline-offset:3px; }
+.people-photo-adjust:disabled { opacity:.6; cursor:wait; }
+
+.people-photo-editor-actions { position:sticky; bottom:0; z-index:1; padding-block:12px; background:var(--surface-panel,white); }
+@media(max-width:600px) { .people-photo-editor .people-photo-crop-frame { max-width:240px; justify-self:center; } }

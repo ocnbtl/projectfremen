@@ -52,6 +52,6 @@ export default function InlineOrganizationDialog({existingIds,onSaved,onClose,sc
       {discard && <div className="people-inline-discard" role="alert"><span>Discard this organization draft?</span><button type="button" onClick={()=>setDiscard(false)}>Keep editing</button><button type="button" onClick={onClose}>Discard organization</button></div>}
       <footer><button type="button" onClick={close} disabled={busy}>Cancel</button><button type="submit" disabled={busy || !values.name?.trim()}>{busy?"Saving…":"Save organization"}</button></footer>
     </form>
-    <PeopleProfilePhotoDialog open={photoOpen} personId="" personName={values.name || "Organization"} hasPhoto={!!photo} onClose={()=>setPhotoOpen(false)} onSaved={async()=>true} onRemoved={async()=>{setPhoto("");return true;}} onPrepared={data=>{setPhoto(data);setPhotoOpen(false);}}/>
+    <PeopleProfilePhotoDialog open={photoOpen} personId="" personName={values.name || "Organization"} hasPhoto={!!photo} currentPhotoUrl={photo} onClose={()=>setPhotoOpen(false)} onSaved={async()=>true} onRemoved={async()=>{setPhoto("");return true;}} onPrepared={data=>{setPhoto(data);setPhotoOpen(false);}}/>
   </Dialog.Content></Dialog.Portal></Dialog.Root>;
 }

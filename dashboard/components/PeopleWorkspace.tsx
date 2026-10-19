@@ -3867,7 +3867,7 @@ export default function PeopleWorkspace({
           <PeopleProfileAvatar organization={className === "org"} label={name || (className === "org" ? "new organization" : "new person")} initials={name.slice(0, 2).toUpperCase() || "+"} photoUrl={quickPhoto} onSelect={() => setQuickPhotoDialogOpen(true)} />
           <span>{quickPhoto ? "Profile picture ready" : "Add a profile picture"}<small>Saved when you save this profile.</small></span>
         </div>
-        <PeopleProfilePhotoDialog open={quickPhotoDialogOpen} personId="" personName={name || "New profile"} hasPhoto={Boolean(quickPhoto)} onClose={() => setQuickPhotoDialogOpen(false)} onPrepared={setQuickPhoto} onSaved={async () => true} onRemoved={async () => true} />
+        <PeopleProfilePhotoDialog open={quickPhotoDialogOpen} personId="" personName={name || "New profile"} hasPhoto={Boolean(quickPhoto)} currentPhotoUrl={quickPhoto} onClose={() => setQuickPhotoDialogOpen(false)} onPrepared={setQuickPhoto} onSaved={async () => true} onRemoved={async () => true} />
         {className === "person" && (
           <>
             <section className="people-profile-section people-themed-section module-ref-tone-pink people-capture-section" data-profile-section="identity" aria-labelledby="people-create-identity-title">
@@ -5264,6 +5264,7 @@ export default function PeopleWorkspace({
           personId={selectedPerson.id}
           personName={selectedPerson.title}
           hasPhoto={Boolean(profilePhotoDraft || selectedProfile.photoUrl)}
+          currentPhotoUrl={profilePhotoDraft || selectedProfile.photoUrl}
           onPrepared={profilePhotoDraft ? setProfilePhotoDraft : undefined}
           onClose={() => setPhotoDialogOpen(false)}
           onSaved={saveProfilePhoto}

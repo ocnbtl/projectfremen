@@ -1,4 +1,8 @@
-import { deleteJsonFile, readJsonFile, writeJsonFile } from "../../file-store";
+import { deleteJsonFile, mutateJsonFile, readJsonFile, writeJsonFile } from "../../file-store";
+import sharp from "sharp";
+import { photoCrop } from "./photo-crop";
+
+export type SavedPhotoCrop = { zoom: number; panX: number; panY: number; outputSize: number };
 
 const MAX_PROFILE_PHOTO_BYTES = 1_500_000;
 const ALLOWED_PROFILE_PHOTO_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -34,6 +38,8 @@ export type StoredPeopleProfilePhoto = {
   bytesBase64: string;
   byteLength: number;
   updatedAt: string;
+  source?: { mimeType: string; bytesBase64: string };
+  crop?: SavedPhotoCrop;
 };
 
 function assertPersonId(personId: string): string {
@@ -85,4 +91,32 @@ export async function writePeopleProfilePhoto(
 
 export async function removePeopleProfilePhoto(personId: string): Promise<void> {
   await deleteJsonFile(fileName(personId));
+}
+
+/** Keep the source and rendered square together so later edits never crop an earlier crop. */
+export async function cropPeopleProfilePhoto(personId: string, input: unknown, expectedUpdatedAt?: string,
+  replacement?: { mimeType: string; bytes: Uint8Array }): Promise<StoredPeopleProfilePhoto> {
+  const crop = input as SavedPhotoCrop;
+  if (!crop || ![crop.zoom, crop.panX, crop.panY, crop.outputSize].every(Number.isFinite)
+    || crop.zoom < 1 || crop.zoom > 3 || Math.abs(crop.panX) > 1 || Math.abs(crop.panY) > 1
+    || ![256, 512, 1024].includes(crop.outputSize)) throw new Error("Invalid picture crop.");
+  if (replacement && (!ALLOWED_PROFILE_PHOTO_TYPES.has(replacement.mimeType)
+    || !replacement.bytes.length || replacement.bytes.length > MAX_PROFILE_PHOTO_BYTES
+    || !hasExpectedSignature(replacement.bytes, replacement.mimeType))) throw new Error("Invalid source picture. Choose an image under 1.5 MB after preparation.");
+  return mutateJsonFile<StoredPeopleProfilePhoto | null, StoredPeopleProfilePhoto>(fileName(personId), null, async current => {
+    if (!replacement && (!current || !expectedUpdatedAt || current.updatedAt !== expectedUpdatedAt)) {
+      throw new Error("This picture changed. Close the editor and reopen it before saving.");
+    }
+    const source = replacement ? { mimeType: replacement.mimeType, bytesBase64: Buffer.from(replacement.bytes).toString("base64") }
+      : current!.source || { mimeType: current!.mimeType, bytesBase64: current!.bytesBase64 };
+    const normalized = await sharp(Buffer.from(source.bytesBase64, "base64"), { limitInputPixels: 40_000_000 }).rotate().toBuffer({ resolveWithObject: true });
+    const rect = photoCrop({ ...crop, sourceWidth: normalized.info.width, sourceHeight: normalized.info.height });
+    const side = Math.max(1, Math.floor(rect.side));
+    const bytes = await sharp(normalized.data).extract({ left: Math.floor(rect.x), top: Math.floor(rect.y), width: side, height: side })
+      .resize(crop.outputSize, crop.outputSize).webp({ quality: 90 }).toBuffer();
+    const photo: StoredPeopleProfilePhoto = { personId, mimeType: "image/webp", bytesBase64: bytes.toString("base64"), byteLength: bytes.length,
+      updatedAt: new Date(Math.max(Date.now(), Date.parse(current?.updatedAt || "") + 1 || 0)).toISOString(),
+      source, crop: { zoom: crop.zoom, panX: crop.panX, panY: crop.panY, outputSize: crop.outputSize } };
+    return { value: photo, result: photo };
+  });
 }

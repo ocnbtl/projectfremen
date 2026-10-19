@@ -23,7 +23,7 @@
     "test:finance-investments": "node ./scripts/finance-investments-harness.cjs",
     "test:finance-coinbase": "node ./scripts/finance-coinbase-harness.cjs",
     "test:people-transfer": "node ./scripts/people-transfer-harness.cjs",
-    "test:profile-photo": "node ./scripts/profile-photo-crop-harness.mjs",
+    "test:profile-photo": "node ./scripts/profile-photo-crop-harness.mjs && node ./scripts/profile-photo-edit-harness.cjs",
     "test:vault": "node ./scripts/local-first-harness.mjs",
     "test:vault-browser": "node ./scripts/vault-browser-harness.mjs",
     "regress": "node ./scripts/regression-harness.mjs",
