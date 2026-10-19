@@ -4,26 +4,17 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import type { ModuleId, NativeObjectRef } from "../../lib/native-objects/types";
-export default function RelatedRecords({
-  module,
-  type,
-  id,
-  hideEmpty = false,
-}: {
-  module: ModuleId;
-  type: string;
-  id: string;
-  hideEmpty?: boolean;
-}) {
-  const [items, setItems] = useState<
-      { ref: NativeObjectRef; detail: string }[]
-    >([]),
+import { EventObjectIdentity } from "./EventObjects";
+export type RelatedItem = { ref: NativeObjectRef & { preview?: { imageUrl?: string; imageUpdatedAt?: string } }; detail: string };
+export function useRelatedRecords(module: ModuleId, type: string, id: string) {
+  const [items, setItems] = useState<RelatedItem[]>([]),
     [error, setError] = useState(false),
     [loaded, setLoaded] = useState(false);
   useEffect(() => {
     const controller = new AbortController();
     setLoaded(false);
     setError(false);
+    setItems([]);
     void fetch(
       `/api/planning/related?${new URLSearchParams({ module, type, id })}`,
       { signal: controller.signal },
@@ -41,9 +32,14 @@ export default function RelatedRecords({
       });
     return () => controller.abort();
   }, [module, type, id]);
+  return { items, error, loaded };
+}
+export function RelatedRecordsView({ items, error, loaded, hideEmpty = false, compact = false }: {
+  items: RelatedItem[]; error: boolean; loaded: boolean; hideEmpty?: boolean; compact?: boolean;
+}) {
   if (hideEmpty && !error && (!loaded || !items.length)) return null;
   return (
-    <section className="work-related">
+    <section className="work-related" data-compact={compact || undefined}>
       <h3>Linked objects</h3>
       {error ? (
         <p>Related records could not load. Your links are preserved.</p>
@@ -54,16 +50,17 @@ export default function RelatedRecords({
           {items.map(({ ref, detail }) => (
             <Link
               className="work-row"
-              key={`${ref.module}:${ref.objectId}`}
+              key={`${ref.module}:${ref.objectType}:${ref.objectId}`}
               href={ref.route}
+              title={compact ? `${ref.label}${detail ? ` · ${detail}` : ""}` : undefined}
             >
-              <UnigentamosIcon
+              {compact ? <EventObjectIdentity record={ref} /> : <UnigentamosIcon
                 role={`module-${ref.module === "personal_ops" ? "personal" : ref.module}`}
                 size={20}
-              />
+              />}
               <span>
                 <strong>{ref.label}</strong>
-                <small>{detail}</small>
+                {!compact && <small>{detail}</small>}
               </span>
             </Link>
           ))}
@@ -73,4 +70,7 @@ export default function RelatedRecords({
       )}
     </section>
   );
+}
+export default function RelatedRecords({ module, type, id, hideEmpty = false }: { module: ModuleId; type: string; id: string; hideEmpty?: boolean }) {
+  return <RelatedRecordsView {...useRelatedRecords(module, type, id)} hideEmpty={hideEmpty} />;
 }

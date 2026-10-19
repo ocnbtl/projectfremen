@@ -55,7 +55,7 @@ export async function GET(request: Request) {
     if (module === "map" && type === "place")
       for (const record of records)
         if (!record.archivedAt && ["person", "org"].includes(record.className) && record.profile?.locations.some(location => location.placeId === id))
-          items.push({ ref: createNativeObjectRef({ module: "people", objectType: record.className === "org" ? "organization" : "person", objectId: record.id, label: record.title }), detail: record.profile.locations.filter(location => location.placeId === id).map(location => location.label || "Place").join(" · ") });
+          items.push({ ref: createNativeObjectRef({ module: "people", objectType: record.className === "org" ? "organization" : "person", objectId: record.id, label: record.title }), detail: [...new Set(record.profile.locations.filter(location => location.placeId === id).map(location => location.label || "Place"))].join(" · ") });
     for (const e of planning.events)
       if (
         !e.archivedAt &&
@@ -99,8 +99,16 @@ export async function GET(request: Request) {
           detail: `${t.stops.length} stops${t.startDate ? ` · ${t.startDate.slice(0, 10)}` : ""}`,
         });
     const unique = [...new Map(items.map(item => [`${item.ref.module}:${item.ref.objectType}:${item.ref.objectId}`, item])).values()];
+    // Resolve current photos instead of relying on stale previews saved in links.
+    const enriched = unique.slice(0, 100).map(item => {
+      const record = records.find(record => !record.archivedAt && record.id === item.ref.objectId);
+      return { ...item, ref: { ...item.ref, preview: {
+        imageUrl: record?.profile?.photoUrl || record?.resourceProfile?.metadata?.imageUrl || "",
+        imageUpdatedAt: record?.profile?.photoUpdatedAt,
+      } } };
+    });
     return NextResponse.json(
-      { items: unique.slice(0, 100), total: unique.length },
+      { items: enriched, total: unique.length },
       { headers },
     );
   } catch {

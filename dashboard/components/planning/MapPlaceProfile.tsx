@@ -4,33 +4,32 @@ import { motion, useReducedMotion } from "motion/react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import PlaceTagLabel from "./PlaceTagLabel";
-import RelatedRecords from "./RelatedRecords";
+import { RelatedRecordsView, useRelatedRecords } from "./RelatedRecords";
+import { EventObjectIdentity } from "./EventObjects";
+import { placePinIconRole } from "../../lib/modules/planning/place-tags";
 import { hasPlaceCoordinates } from "../../lib/modules/planning/place-identity";
 import type { Place } from "../../lib/modules/planning/types";
 import styles from "./MapPlaceProfile.module.css";
 
 export default function MapPlaceProfile({ place, onEdit, onClose }: { place: Place; onEdit: () => void; onClose: () => void }) {
-  const pinned = hasPlaceCoordinates(place), verification = place.locationVerification;
+  const pinned = hasPlaceCoordinates(place);
   const reduceMotion = useReducedMotion();
-  const status = !pinned ? "Needs a map pin" : verification?.precision === "area" ? "Area reference" : verification?.precision === "approximate" ? "Approximate address pin" : "Saved map pin";
+  const related = useRelatedRecords("map", "place", place.id);
+  // A linked person's portrait is not the identity of their home or workplace.
+  const normalize = (name: string) => name.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim();
+  const identity = related.items.find(({ ref }) => ref.objectType === "organization" && ref.preview?.imageUrl && normalize(ref.label) && (normalize(place.name) === normalize(ref.label) || normalize(place.name).startsWith(normalize(ref.label) + " ")))?.ref;
   return <motion.section className={styles.card} aria-label={`${place.name} place details`} initial={{ opacity: reduceMotion ? 1 : 0, y: reduceMotion ? 0 : 8 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: reduceMotion ? 0 : .2 }}>
     <header className={styles.heading}>
-      <span className={styles.placeIcon}><UnigentamosIcon role="module-map" size={22} /></span>
-      <div><span className={styles.eyebrow}>Saved place</span><h2>{place.name}</h2></div>
+      <span className={styles.placeIcon}>{identity ? <EventObjectIdentity record={identity} /> : <UnigentamosIcon role={placePinIconRole(place.tags, place.primaryTag)} size={22} />}</span>
+      <div><h2 title={place.name}>{place.name}</h2></div>
       <Button intent="quiet" icon="close" aria-label="Close place preview" onClick={onClose} />
     </header>
     <div className={styles.body}>
-      <p className={styles.address}>{place.address || "No address added"}</p>
-      <div className={styles.tags}><span className={styles.status} data-pinned={pinned}>{status}</span>{place.tags.map(tag => <PlaceTagLabel key={tag} tag={tag}/>)}</div>
-      {!pinned && <p className={styles.hint}>The address is saved. Add a confirmed pin to show this place on the map.</p>}
-      {verification?.precision === "area" && <p className={styles.hint}>This pin represents the area, not a specific home or business.</p>}
+      <p className={styles.address}><UnigentamosIcon role="location" size={16} /><span title={place.address}>{place.address || "No address added"}</span></p>
+      <p className={styles.coordinates}><UnigentamosIcon role="location" candidate="current-location" size={16} /><span>{pinned ? `${place.latitude.toFixed(6)}, ${place.longitude.toFixed(6)}` : "No map pin yet"}</span></p>
+      <div className={styles.tags}>{place.tags.map(tag => <PlaceTagLabel key={tag} tag={tag}/>)}</div>
       {place.notes && <p className={styles.notes}>{place.notes}</p>}
-      <RelatedRecords module="map" type="place" id={place.id} />
-      {(verification || pinned) && <details className={styles.verification}><summary>Location details</summary>
-        {verification && <><p>{verification.summary}</p><small>Reviewed {new Date(verification.checkedAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}</small></>}
-        {pinned && <p className={styles.coordinates}>{place.latitude.toFixed(6)}, {place.longitude.toFixed(6)}</p>}
-        {verification?.sourceUrls.map((url, index) => <a key={url} href={url} target="_blank" rel="noreferrer">Source {index + 1} · {new URL(url).hostname.replace(/^www\./, "")}</a>)}
-      </details>}
+      <RelatedRecordsView {...related} compact hideEmpty />
     </div>
     <footer className={styles.actions}>
       <Button intent="primary" icon="edit" onClick={onEdit}>Edit place</Button>
