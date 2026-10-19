@@ -290,7 +290,6 @@
 .people-object-picker-result-icon { width: 40px !important; height: 40px !important; min-width: 40px; overflow: hidden; border-radius: 10px; background: #edf0e4; display: flex; flex-direction: column; align-items: center; justify-content: center; flex-shrink: 0; }
 .people-object-picker-result-icon img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .people-object-picker-result-icon[data-preview-kind="person"] { border-radius: 50%; }
-.people-object-picker-result-icon[data-preview-kind="organization"] img { object-fit: contain; padding: 2px; background: white; }
 .people-object-picker-result-icon[data-preview-kind="project"] { background: var(--module-projects-soft, #e8eef4); color: #375d71; }
 .people-object-picker-result-icon[data-preview-kind="note"] { border-radius: 5px 10px 5px 5px; background: #f4f0e7; color: #8a7553; }
 .people-object-picker-result-icon .object-preview-initials { font-size: 13px; font-weight: 600; }

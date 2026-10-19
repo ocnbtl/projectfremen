@@ -40,8 +40,12 @@ export async function placePictureImage(source: string, signal: AbortSignal, are
   const canvas = document.createElement("canvas"); canvas.width = canvas.height = 84;
   const context = canvas.getContext("2d");
   if (!context) throw new Error("Place image canvas unavailable");
-  if(!area){context.beginPath(); context.arc(42, 42, 42, 0, Math.PI * 2); context.clip();context.fillStyle = "white"; context.fillRect(0, 0, 84, 84);}
-  const scale = Math.min(84 / image.naturalWidth, 84 / image.naturalHeight);
+  if (!area) {
+    context.beginPath();
+    context.arc(42, 42, 42, 0, Math.PI * 2);
+    context.clip();
+  }
+  const scale = (area ? Math.min : Math.max)(84 / image.naturalWidth, 84 / image.naturalHeight);
   const width = image.naturalWidth * scale, height = image.naturalHeight * scale;
   context.drawImage(image, (84-width)/2, (84-height)/2, width, height);
   return context.getImageData(0, 0, 84, 84);
