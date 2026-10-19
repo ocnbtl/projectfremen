@@ -1,0 +1,36 @@
+/* Private, synthetic data only; no live mutations or external geocoding. */
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),os=require('node:os'),ts=require('typescript');
+const data=fs.mkdtempSync(path.join(os.tmpdir(),'fremen-place-identity-'));
+Object.assign(process.env,{FREMEN_DATA_DIR:data,SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',FREMEN_REQUIRE_SUPABASE:'false'});
+require.extensions['.ts']=(module,file)=>module._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true,resolveJsonModule:true}}).outputText,file);
+const {savePlanningRecord:save,readPlanningState:read}=require('../lib/modules/planning/store.ts');
+const {createPlaceOrganization:create}=require('../lib/modules/planning/place-organization.ts');
+const {readPersonalRecords}=require('../lib/personal-records-store.ts');
+const {formatPlaceCoordinates:coordinates,placeDisplayName:name,normalizePlaceImage,placePicture}=require('../lib/modules/planning/place-presentation.ts');
+const {planningWritableKeys}=require('../lib/modules/planning/ownership.ts');
+(async()=>{
+ assert.equal(coordinates(39,-84),'39.000000° N, 84.000000° W');
+ assert.equal(coordinates(-33,151),'33.000000° S, 151.000000° E');
+ assert.equal(coordinates(0,-0),'0.000000° N, 0.000000° E');
+ assert.equal(name({name:'Norris Lake · La Follette, TN',address:'La Follette, TN, United States'}),'Norris Lake');
+ assert.equal(name({name:'School · Main campus',address:'5 Main Street'}),'School · Main campus');
+ const png='data:image/png;base64,'+await require('sharp')({create:{width:128,height:128,channels:4,background:'#123456'}}).png().toBuffer().then(b=>b.toString('base64'));
+ assert.equal(normalizePlaceImage(png),png);
+ for(const bad of ['https://example.com/image.png','data:image/svg+xml;base64,PHN2Zz4=','data:image/png;base64,iVBORw0KGgoAAA'])assert.throws(()=>normalizePlaceImage(bad));
+ const place=await save('places',{name:'Fixture Airport',address:'100 Terminal Drive, Testville',latitude:39,longitude:-84,tags:['Travel','Organization'],primaryTag:'Travel',image:png});
+ assert.equal((await read()).places[0].image,png);
+ assert.ok(planningWritableKeys('places').includes('image'));assert.ok(planningWritableKeys('places').includes('primaryTag'));
+ const concurrent=await Promise.all([create(place.id,place.updatedAt,'Fixture Airport'),create(place.id,place.updatedAt,'Fixture Airport')]);
+ assert.equal(concurrent[0].id,concurrent[1].id);
+ const org=concurrent[0];assert.equal((await readPersonalRecords()).length,1);assert.equal(org.className,'org');assert.equal(org.privacy,'private');
+ assert.equal(org.profile.locations[0].placeId,place.id);assert.equal(org.profile.locations[0].address,place.address);assert.equal(org.profile.locations[0].label,'Address');
+ assert.equal((await create(place.id,place.updatedAt,'Fixture Airport')).id,org.id);
+ await assert.rejects(()=>create(place.id,'stale','Airport'),/changed/);
+ const other=await save('places',{name:'Other',address:'9 Other Street'});
+ await assert.rejects(()=>create(other.id,other.updatedAt,'Fixture Airport'),/already exists/);
+ const cleared=await save('places',{id:place.id,image:''},place.updatedAt);assert.equal(cleared.image,undefined);assert.equal(cleared.address,place.address);
+ const logo={objectId:org.id,label:place.name,href:'/admin/people',imageUrl:`/api/people/photos/${org.id}`,imageUpdatedAt:'version'};
+ assert.equal(placePicture(place,[logo]),png);assert.match(placePicture(cleared,[logo]),/photos\/personal-.*\?v=version/);
+ assert.equal(placePicture(cleared,[{...logo,imageUrl:'javascript:alert(1)'}]),undefined);
+ console.log('PASS: direction labels, title cleanup, bounded images, persistence, removal, offline keys, organization linking, concurrent retry, stale version, duplicate-name protection, picture priority and fallback.');
+})().catch(e=>{console.error(e);process.exitCode=1;}).finally(()=>fs.rmSync(data,{recursive:true,force:true}));

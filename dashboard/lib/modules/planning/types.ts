@@ -23,6 +23,7 @@ export type Place = PlanningBase & {
   notes: string;
   tags: string[];
   primaryTag?: string;
+  image?: string;
   linkedRefs: NativeObjectRef[];
 };
 export type EventGroup = { id: string; name: string; color: string; icon: string; iconSource?: "auto" | "manual" };

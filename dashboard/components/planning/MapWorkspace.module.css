@@ -566,3 +566,7 @@
 @media(prefers-reduced-motion:reduce) { .tagMenu { animation:none; } .tagMenu button,.tagsTrigger { transition:none; } }
 
 @media(max-width:760px) { .tagMenu>input { font-size:16px; } .tagMenu>div>button { min-height:40px; } }
+
+.pinDisplay{border:0;padding:0;margin:0 0 10px}.pinDisplay legend{font-size:12px;margin-bottom:6px}.pinDisplay>div{display:flex;gap:4px;background:var(--module-quiet);padding:3px;border-radius:9px}.pinDisplay button{flex:1;min-height:34px;padding:4px 12px}.pinDisplay button[aria-pressed=true]{background:var(--module-accent);color:white}
+.placeNameRow{display:flex;align-items:center;gap:12px}.placeNameRow>label{flex:1;min-width:0}.placeNameRow>button{margin-top:20px}
+.organizationControl{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.organizationControl>label{flex:1;min-width:170px}.organizationControl>div{display:flex;gap:6px;align-self:flex-end}.organizationControl small{flex-basis:100%;color:#65757b;font-size:12px}.organizationControl :global(.work-button){min-height:36px;padding:6px 10px;font-size:13px}

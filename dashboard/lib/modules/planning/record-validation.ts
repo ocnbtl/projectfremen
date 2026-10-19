@@ -1,3 +1,4 @@
+import { normalizePlaceImage } from "./place-presentation";
 import { GROUP_ICONS } from "./calendar-groups";
 import { validateRepeatAnchor } from "./repeat-language";
 import { MAP_CATALOG, MAP_PALETTES } from "./map-catalog";
@@ -83,6 +84,7 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
     const primaryTag = tags.find(tag => tag.toLowerCase() === requestedPrimary.toLowerCase());
     fields = {
       name: string(raw.name, "Place name", 240, true),
+      image: normalizePlaceImage(raw.image),
       ...(raw.mergedIntoId ? { mergedIntoId: string(raw.mergedIntoId, "Merged place", 300, true) } : {}),
       address: string(raw.address, "Address", 1400),
       ...(raw.countryCode ? { countryCode: normalizeAddressCountry(raw.countryCode) } : {}),

@@ -15,6 +15,8 @@ export function planningWritableKeys(collection: PlanningCollection): string[] {
       "longitude",
       "notes",
       "tags",
+      "primaryTag",
+      "image",
       "linkedRefs",
     ],
     events: [

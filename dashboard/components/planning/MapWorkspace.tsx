@@ -1,5 +1,8 @@
 "use client";
 import PlaceSync from "./PlaceSync";
+import PlaceImagePicker from "./PlaceImagePicker";
+import PlaceOrganizationControl from "./PlaceOrganizationControl";
+import { placePicture, placeDisplayName, formatPlaceCoordinates } from "../../lib/modules/planning/place-presentation";
 import TravelPanel from "./TravelPanel";
 import PlaceTags from "./PlaceTags";
 import PlaceTagLabel from "./PlaceTagLabel";
@@ -65,6 +68,9 @@ type SearchPlace = PlaceSearchResult;
 export default function MapWorkspace() {
   const params = useSearchParams();
   const [travelOpen,setTravelOpen]=useState(false), [directoryQuery,setDirectoryQuery]=useState(""), [directoryPage,setDirectoryPage]=useState(0);
+  const [pinDisplay, setPinDisplay] = useState<"icons" | "images">("icons");
+  useEffect(() => { try { if (localStorage.getItem("map:pin-display") === "images") setPinDisplay("images"); } catch {} }, []);
+  function changePinDisplay(next: "icons" | "images") { setPinDisplay(next); try { localStorage.setItem("map:pin-display", next); } catch {} }
   const [showPhotos, setShowPhotos] = useState(false),
     [photos, setPhotos] = useState<
       Array<{
@@ -225,6 +231,7 @@ export default function MapWorkspace() {
         ),
     [snapshot, query, tag, sort],
   );
+  const placeImages = useMemo(() => Object.fromEntries((snapshot?.state.places || []).map(place => [place.id, placePicture(place, snapshot?.placeOrganizations?.[place.id]) || ""])), [snapshot]);
   const directoryPlaces = useMemo(()=>places.filter(p=>`${p.name} ${p.address} ${p.tags.join(" ")}`.toLowerCase().includes(directoryQuery.toLowerCase())),[places,directoryQuery]);
   useEffect(()=>setDirectoryPage(0),[directoryQuery,query,tag,sort]);
   async function action(work: () => Promise<unknown>, message: string) {
@@ -373,6 +380,7 @@ export default function MapWorkspace() {
       <label className={`work-search ${styles.moduleSearch}`} data-field-shell><UnigentamosIcon role="search" size={16}/><input type="search" aria-label="Search places or addresses" placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)}/></label>
         <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!tag}>Filter{tag ? " (1)" : ""}</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
           <>
+            <fieldset className={styles.pinDisplay}><legend>Map pins</legend><div>{(["icons", "images"] as const).map(mode=><Button key={mode} aria-pressed={pinDisplay===mode} onClick={()=>changePinDisplay(mode)}>{mode==="icons"?"Icons":"Images"}</Button>)}</div></fieldset>
             <label>
               Tag
               <SelectField value={tag} optionIcons={Object.fromEntries((snapshot?.state.places.flatMap(p=>p.tags)||[]).map(t=>[t,placeTagIconRole(t)]))} onChange={(e) => setTag(e.target.value)}>
@@ -520,7 +528,7 @@ export default function MapWorkspace() {
                   }}
                 >
                   <div>
-                    <strong>{p.name}</strong>
+                    <strong>{placeDisplayName(p)}</strong>
                     <small>{p.address}</small>
                   </div>
                 </button>
@@ -541,10 +549,10 @@ export default function MapWorkspace() {
               }}
             >
               <div>
-                <strong>{p.name}</strong>
+                <strong>{placeDisplayName(p)}</strong>
                 <small>
                   {p.address ||
-                    (hasPlaceCoordinates(p) ? `${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}` : "Address saved · pin not set")}
+                    (hasPlaceCoordinates(p) ? formatPlaceCoordinates(p.latitude,p.longitude) : "Address saved · pin not set")}
                 </small>
                 {!hasPlaceCoordinates(p) && p.address && <small>Pin not set</small>}
                 {p.tags.length > 0 && <small className={styles.placeTagList}>{p.tags.map(t=><PlaceTagLabel key={t} tag={t}/>)}</small>}
@@ -587,6 +595,8 @@ export default function MapWorkspace() {
         <div className={styles.map}>
           <MapCanvas
             photos={photos}
+            placeImages={placeImages}
+            pinDisplay={pinDisplay}
             places={places.filter(hasPlaceCoordinates)}
             selected={hasPlaceCoordinates(selected) ? selected : undefined}
             pinning={pinning}
@@ -604,7 +614,7 @@ export default function MapWorkspace() {
             regionGeography={analysisResult?.data[0].geography}
           />
           {analysisResult && <MapDataLegend result={analysisResult} />}
-          {selected && <MapPlaceProfile key={selected.id} place={selected} onEdit={() => setEditor(selected)} onClose={() => setSelectedId("")} />}
+          {selected && <MapPlaceProfile key={selected.id} place={selected} picture={placeImages[selected.id]} onImageChange={async image=>{await savePlanning("places",{id:selected.id,image},selected.updatedAt);await refresh();}} onEdit={() => setEditor(selected)} onClose={() => setSelectedId("")} />}
         </div>
       </div>
       <WorkspaceSheet
@@ -618,7 +628,7 @@ export default function MapWorkspace() {
         {editor && (
           <form id="map-place-editor" className={`work-form ${styles.placeForm}`} onSubmit={savePlace}>
             <WorkspaceFeedback error={error} />
-            <label>
+            <div className={styles.placeNameRow}><PlaceImagePicker place={editor} picture={placePicture(editor, snapshot?.placeOrganizations?.[editor.id || ""])} onChange={image=>setEditor(current=>current?{...current,image}:current)}/><label>
               Name
               <input
                 required
@@ -627,6 +637,7 @@ export default function MapWorkspace() {
                 onChange={(e) => setEditor({ ...editor, name: e.target.value })}
               />
             </label>
+            </div>
             <PlaceLocationFields value={editor} onChange={patch => setEditor(current => current ? { ...current, ...patch } : current)} />
             <div className={styles.placeDetails}><PlaceTags primaryTag={editor.primaryTag} onPrimaryChange={primaryTag=>setEditor({...editor,primaryTag})} value={editor.tags || []} available={[...new Set(snapshot?.state.places.flatMap(p=>p.tags) || [])]} onChange={tags=>setEditor({...editor,tags,primaryTag:tags.includes(editor.primaryTag || "")?editor.primaryTag:undefined})}/>
             <label>
@@ -647,6 +658,12 @@ export default function MapWorkspace() {
               available={snapshot?.refs}
               onChange={(linkedRefs) => setEditor({ ...editor, linkedRefs })}
             />
+            <PlaceOrganizationControl key={editor.id || "new"} name={placeDisplayName({name:editor.name || "",address:editor.address || ""})} organizations={snapshot?.placeOrganizations?.[editor.id || ""] || []} busy={busy} onCreate={name=>action(async()=>{
+              const saved = await savePlanning("places",editor,editor.updatedAt);
+              setEditor(saved);setSelectedId(saved.id);
+              const response = await fetch("/api/planning/place-organization", {method:"POST",headers:buildJsonHeadersWithCsrf(),body:JSON.stringify({placeId:saved.id,expectedUpdatedAt:saved.updatedAt,name})});
+              const result = await response.json();if(!response.ok||!result.ok)throw new Error(result.error || "Unable to create organization");
+            },"Organization created and linked")}/>
             <div className="work-actions">
               {editor.id && (
                 <Button

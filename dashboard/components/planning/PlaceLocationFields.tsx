@@ -1,4 +1,5 @@
 "use client";
+import { formatPlaceCoordinates } from "../../lib/modules/planning/place-presentation";
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
@@ -82,7 +83,7 @@ export default function PlaceLocationFields({ value, onChange, compact = false, 
     <div className={styles.coordinates}>
       {(["latitude", "longitude"] as const).map(axis => <label key={axis}>{axis === "latitude" ? "Latitude" : "Longitude"}<input aria-label={axis === "latitude" ? "Latitude" : "Longitude"} type="number" step="any" min={axis === "latitude" ? -90 : -180} max={axis === "latitude" ? 90 : 180} value={value[axis] ?? ""} onChange={e => { cancelLookup(); pinAddress.current = address; onChange({ [axis]: e.target.value === "" ? undefined : Number(e.target.value) }); }} /></label>)}
       <div ref={trigger}><Popover.Root open={!!matches.length} onOpenChange={open => { if (!open) setMatches([]); }}><Popover.Anchor asChild><Button className={styles.autofill} aria-label="Autofill coordinates" icon="search" type="button" busy={busy} disabled={busy || address.trim().length < 3 || /^https?:\/\//i.test(address)} onClick={() => void lookup()}>Autofill<span className={styles.fullLabel}> coordinates</span></Button></Popover.Anchor>
-      <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={styles.matches} align="end" sideOffset={8} collisionPadding={12} aria-label="Matching addresses" onFocusOutside={e => e.preventDefault()}><strong>Choose the matching place</strong>{matches.map((match, index) => <button key={index} type="button" onClick={() => selectMatch(match)}><strong>{match.name}</strong><span>{match.address}</span><small>{match.latitude?.toFixed(5)}, {match.longitude?.toFixed(5)}</small></button>)}</Popover.Content></Popover.Portal></Popover.Root></div>
+      <Popover.Portal container={trigger.current?.closest<HTMLElement>('[role="dialog"]') || undefined}><Popover.Content className={styles.matches} align="end" sideOffset={8} collisionPadding={12} aria-label="Matching addresses" onFocusOutside={e => e.preventDefault()}><strong>Choose the matching place</strong>{matches.map((match, index) => <button key={index} type="button" onClick={() => selectMatch(match)}><strong>{match.name}</strong><span>{match.address}</span><small>{match.latitude !== undefined && match.longitude !== undefined ? formatPlaceCoordinates(match.latitude,match.longitude) : ""}</small></button>)}</Popover.Content></Popover.Portal></Popover.Root></div>
     </div>
     {message && <p role="status" className={styles.message}>{message}</p>}
   </div>;

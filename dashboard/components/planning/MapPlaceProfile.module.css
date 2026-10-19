@@ -2,7 +2,7 @@
 .heading { display:flex; align-items:center; gap:10px; padding:14px 16px 10px; }
 .heading>div { flex:1; min-width:0; }
 .heading h2 { margin:0; font:600 1rem/1.4 var(--font-heading); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.heading>button { flex:none; }
+.heading>button { flex:none; width:36px; height:36px; min-height:36px; padding:0; display:grid; place-items:center; }
 .placeIcon { display:grid; place-items:center; width:36px; height:36px; flex:none; background:var(--module-quiet,#f3f8ed); color:var(--module-accent,#597342); border-radius:50%; --linked-object-size:36px; }
 .body { padding:0 16px 12px; overflow:auto; overscroll-behavior:contain; min-height:0; }
 .address,.coordinates { display:flex; align-items:center; gap:8px; margin:0; min-width:0; font:400 .8125rem/1.5 var(--font-body); }

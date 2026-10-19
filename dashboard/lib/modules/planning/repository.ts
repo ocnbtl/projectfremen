@@ -32,6 +32,7 @@ import {
 export type PlanningSnapshot = {
   state: PlanningState;
   refs: NativeObjectRef[];
+  placeOrganizations?: Record<string, import("./place-presentation").PlaceOrganization[]>;
   birthdays?: import("./observances").BirthdaySource[];
   trips: PersonalTrip[];
   dated: {

@@ -2,7 +2,8 @@
 import { getIconEntry } from "../../lib/icons/icon-registry";
 import { useIconSelections } from "../icons/IconSystemProvider";
 import { placePinIconRole } from "../../lib/modules/planning/place-tags";
-import { placePinImages } from "./place-pin-images";
+import { placeDisplayName } from "../../lib/modules/planning/place-presentation";
+import { placePinImages, placePictureImage } from "./place-pin-images";
 import LogoLoader from "../operational/LogoLoader";
 import { motionTokens } from "../../lib/design-system/motion";
 import { MODULE_COLOR_SYSTEM } from "../../lib/design-system/color-system";
@@ -16,6 +17,8 @@ import "maplibre-gl/dist/maplibre-gl.css";
 import type { Place } from "../../lib/modules/planning/types";
 import { useMotionPreference } from "../admin-shell/ExperienceProvider";
 type Props = {
+  pinDisplay?: "icons" | "images";
+  placeImages?: Record<string, string>;
   places: (Place & { latitude: number; longitude: number })[];
   photos?: {
     id: string;
@@ -45,6 +48,8 @@ export default function MapCanvas(props: Props) {
     current = useRef(props);
   current.current = props;
   const fitted = useRef(false);
+  const pictureCache = useRef(new Map<string, string>());
+  const [iconsReady, setIconsReady] = useState(0);
   const photoMarkers = useRef<maplibregl.Marker[]>([]);
   const [ready, setReady] = useState(false),
     [error, setError] = useState("");
@@ -385,9 +390,43 @@ export default function MapCanvas(props: Props) {
           paint: { "icon-opacity-transition": { duration: 0 } },
         }, selected ? "trip-route" : "place-labels");
       }
+      setIconsReady(version=>version+1);
     }).catch(() => { /* Keep the usable circle pins if icon loading fails. */ });
     return () => controller.abort();
   }, [ready, iconSelections]);
+  useEffect(() => {
+    if (!ready || !iconsReady || !map.current) return;
+    const instance = map.current, controller = new AbortController();
+    const entries = Object.entries(props.placeImages || {}).filter(([,url])=>!!url);
+    const apply = () => {
+      if (controller.signal.aborted) return;
+      for (const selected of [false,true]) {
+        const layer = selected ? "selected-place-icon" : "place-tag-icons";
+        if (!instance.getLayer(layer)) continue;
+        const fallback: maplibregl.ExpressionSpecification = ["concat","pin-",["get","iconRole"],selected?"-selected":""];
+        const available = props.pinDisplay === "images" ? entries.filter(([id,url])=>pictureCache.current.get(id)===url && instance.hasImage(`picture-${id}`)) : [];
+        const expression: maplibregl.ExpressionSpecification = available.length ? ["match",["get","id"],available[0][0],`picture-${available[0][0]}`,...available.slice(1).flatMap(([id])=>[id,`picture-${id}`]),fallback] : fallback;
+        instance.setLayoutProperty(layer,"icon-image",expression);
+      }
+    };
+    apply();
+    if (props.pinDisplay === "images") {
+      const queue = entries.filter(([id,url])=>pictureCache.current.get(id)!==url);
+      void Promise.all(Array.from({length:Math.min(4,queue.length)},async()=>{
+        while(queue.length && !controller.signal.aborted) {
+          const [id,url] = queue.shift()!;
+          try {
+            const image = await placePictureImage(url,controller.signal);
+            if(controller.signal.aborted)return;
+            const key=`picture-${id}`;
+            if(instance.hasImage(key))instance.updateImage(key,image);else instance.addImage(key,image,{pixelRatio:3});
+            pictureCache.current.set(id,url);apply();
+          } catch { /* A missing picture retains the normal tag icon. */ }
+        }
+      }));
+    }
+    return ()=>controller.abort();
+  },[ready,iconsReady,props.pinDisplay,props.placeImages]);
   useEffect(() => {
     if (!ready) return;
     if (
@@ -405,7 +444,7 @@ export default function MapCanvas(props: Props) {
       type: "FeatureCollection",
       features: props.places.map((p) => ({
         type: "Feature",
-        properties: { id: p.id, name: p.name, iconRole: placePinIconRole(p.tags, p.primaryTag) },
+        properties: { id: p.id, name: placeDisplayName(p), iconRole: placePinIconRole(p.tags, p.primaryTag) },
         geometry: { type: "Point", coordinates: [p.longitude, p.latitude] },
       })),
     });
@@ -420,7 +459,7 @@ export default function MapCanvas(props: Props) {
             features: [
               {
                 type: "Feature",
-                properties: { iconRole: placePinIconRole(p.tags, p.primaryTag) },
+                properties: { id: p.id, iconRole: placePinIconRole(p.tags, p.primaryTag) },
                 geometry: {
                   type: "Point",
                   coordinates: [p.longitude, p.latitude],

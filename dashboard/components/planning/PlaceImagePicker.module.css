@@ -1,0 +1,8 @@
+.trigger{width:36px;height:36px;padding:0;flex:none;border:0;border-radius:50%;position:relative;display:grid;place-items:center;background:var(--module-quiet,#f3f8ed);color:var(--module-accent,#597342);cursor:pointer}
+.trigger>img{width:100%;height:100%;object-fit:contain;border-radius:50%;background:white}
+.trigger>span{position:absolute;bottom:-2px;right:-2px;display:grid;place-items:center;width:15px;height:15px;border:1px solid #d5e2e7;border-radius:50%;background:white}
+.trigger:focus-visible{outline:2px solid var(--module-accent,#597342);outline-offset:3px}
+.menu{z-index:150;width:240px;max-width:calc(100vw - 24px);padding:12px;display:grid;gap:6px;border:1px solid #d5e2e7;border-radius:12px;background:white;color:#172b33;box-shadow:0 8px 24px #172b3320;animation:appear .16s ease-out;transform-origin:var(--radix-popover-content-transform-origin)}
+.menu strong{font-size:14px}.menu small{font-size:12px;line-height:1.5;color:#65757b}
+.menu button{display:flex;align-items:center;gap:8px;min-height:38px;padding:8px;border:0;border-radius:7px;background:#f3f8ed;text-align:left;color:#172b33;font:inherit;font-size:13px;cursor:pointer}.menu button:hover{background:#e6efdd}.menu button:disabled{opacity:.5;cursor:wait}
+@keyframes appear{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:scale(1)}}@media(prefers-reduced-motion:reduce){.menu{animation:none}}
