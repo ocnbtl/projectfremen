@@ -2,36 +2,33 @@
 import { useEffect, useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import type { TravelEntry } from "../../lib/modules/planning/travel-sync";
-import { normalizeTravelVisits, travelStatusLabels, type TravelVisit } from "../../lib/modules/planning/travel";
+import { normalizeTravelVisits, travelStatusLabels, formatVisitDates, visitPrecision, type VisitPrecision, type TravelVisit } from "../../lib/modules/planning/travel";
 import { WorkspaceButton as Button } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import DateField from "../people/DateField";
+import TravelVisitDateField from "./TravelVisitDateField";
+import SelectField from "../ui/SelectField";
 import styles from "./TravelPanel.module.css";
 
-export function visitDates(start:string,end:string) {
-  if(!start)return "Dates to decide";
-  const format=(date:string)=>new Date(`${date}T12:00:00Z`).toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric",timeZone:"UTC"});
-  return `${format(start)}${end&&end!==start?` – ${format(end)}`:""}`;
-}
+export const visitDates=formatVisitDates;
 const emptyVisit=():TravelVisit=>({id:crypto.randomUUID(),startDate:"",endDate:"",note:""});
 
 export default function TravelVisitEditor({entry,busy,addRequest=0,onSave,onTrip,onPlan}:{entry:TravelEntry;busy:boolean;addRequest?:number;onSave:(visits:TravelVisit[])=>Promise<boolean>;onTrip:(id:string)=>void;onPlan:()=>void}) {
-  const [draft,setDraft]=useState<TravelVisit>(),[error,setError]=useState(""),[range,setRange]=useState(false);
+  const [draft,setDraft]=useState<TravelVisit>(),[error,setError]=useState(""),[range,setRange]=useState(false),[precision,setPrecision]=useState<VisitPrecision>("day");
   const reduced=useReducedMotion(), visits=entry.visits||[], hasHistory=!!(visits.length||entry.tripVisits.length);
   const editing=!!draft&&visits.some(v=>v.id===draft.id);
   useEffect(()=>{if(addRequest){setDraft(current=>current||emptyVisit());setError("");}},[addRequest]);
-  function begin(visit?:TravelVisit){setDraft(visit||emptyVisit());setRange(!!visit?.endDate&&visit.endDate!==visit.startDate);setError("");}
+  function begin(visit?:TravelVisit){setPrecision(visit?visitPrecision(visit.startDate):"day");setDraft(visit||emptyVisit());setRange(!!visit?.endDate&&visit.endDate!==visit.startDate);setError("");}
   async function save(){
     if(!draft||busy)return;
-    if(range&&!draft.endDate){setError("Choose an end date, or select One day.");return;}
+    if(range&&!draft.endDate){setError("Choose an end date, or switch to a single date.");return;}
     try {
       const next=normalizeTravelVisits([...visits.filter(v=>v.id!==draft.id),{...draft,endDate:range?draft.endDate:draft.startDate}]);
-      if(await onSave(next)){setDraft(undefined);setError("");}else setError("Your visit wasn’t saved. Your dates are still here — try again.");
+      if(await onSave(next)){setDraft(undefined);setRange(false);setPrecision("day");setError("");}else setError("Your visit wasn’t saved. Your dates are still here — try again.");
     }catch(e){setError(e instanceof Error?e.message:"Check your visit dates");}
   }
   return <section className={styles.visitEditor} aria-label={`Visit dates for ${entry.name}`}>
     <div className={styles.visitHeading}>
-      <div><h4>{draft?editing?"Edit visit":"Record a visit":"Visit dates"}</h4><p>{draft?"Record when you were here. Saved visits appear in Calendar.":hasHistory?"Your recorded visits and linked trips.":"Add dates for a past visit, or plan an upcoming trip."}</p></div>
+      <div><h4>{draft?editing?"Edit visit":"Record a visit":"Visit dates"}</h4><p>{draft?"Exact dates appear in Calendar; approximate dates stay in your travel history.":hasHistory?"Your recorded visits and linked trips.":"Add dates for a past visit, or plan an upcoming trip."}</p></div>
       {!draft&&hasHistory&&<Button intent="secondary" icon="plus" disabled={busy} onClick={()=>begin()}>Add visit</Button>}
     </div>
     {!draft&&!hasHistory&&<div className={styles.visitEmptyActions}><Button intent="primary" icon="calendar" disabled={busy} onClick={()=>begin()}>Record a visit</Button><Button intent="quiet" icon="travel" onClick={onPlan}>Plan a trip</Button></div>}
@@ -40,17 +37,18 @@ export default function TravelVisitEditor({entry,busy,addRequest=0,onSave,onTrip
         <form className={styles.visitForm} onSubmit={e=>{e.preventDefault();void save();}}>
           <fieldset disabled={busy}>
             <legend className={styles.srOnly}>Visit details</legend>
+            <div className={styles.visitOptions}><SelectField contained aria-label="Date detail" value={precision} onChange={e=>{const next=e.target.value as VisitPrecision;const length={day:10,month:7,year:4}[next];setDraft({...draft,startDate:draft.startDate.length>=length?draft.startDate.slice(0,length):"",endDate:draft.endDate.length>=length?draft.endDate.slice(0,length):""});setPrecision(next);setError("");}}><option value="day">Exact dates</option><option value="month">Month &amp; year</option><option value="year">Year only</option></SelectField>
             <div className={styles.visitDuration} role="group" aria-label="Visit duration">
-              {[{value:false,label:"One day"},{value:true,label:"Date range"}].map(option=><button type="button" key={option.label} aria-pressed={range===option.value} onClick={()=>{setRange(option.value);setError("");}}>{option.label}</button>)}
-            </div>
+              {[{value:false,label:precision==="day"?"One day":precision==="month"?"One month":"One year"},{value:true,label:precision==="day"?"Date range":precision==="month"?"Month range":"Year range"}].map(option=><button type="button" key={option.label} aria-pressed={range===option.value} onClick={()=>{setRange(option.value);setError("");}}>{option.label}</button>)}
+            </div></div>
             <div className={styles.visitFields}>
-              <DateField compact label={range?"Start date":"Visit date"} value={draft.startDate} onChange={startDate=>{setDraft({...draft,startDate});setError("");}}/>
-              {range&&<DateField compact label="End date" value={draft.endDate} onChange={endDate=>{setDraft({...draft,endDate});setError("");}}/>}
+              <TravelVisitDateField precision={precision} label={range?"Start":"Visit"} value={draft.startDate} onChange={startDate=>{setDraft({...draft,startDate});setError("");}}/>
+              {range&&<TravelVisitDateField precision={precision} label="End" value={draft.endDate} onChange={endDate=>{setDraft({...draft,endDate});setError("");}}/>}
               <label className={styles.visitNote}>Note <span>Optional</span><input aria-label="Visit note" maxLength={500} value={draft.note} placeholder="A memory or reason for the visit" onChange={e=>setDraft({...draft,note:e.target.value})}/></label>
             </div>
           </fieldset>
           {error&&<p className={styles.visitError} role="alert">{error}</p>}
-          <div className={styles.formActions}><Button type="submit" intent="primary" icon="check" busy={busy} disabled={!draft.startDate||busy}>{editing?"Save changes":"Save visit"}</Button><Button intent="quiet" disabled={busy} onClick={()=>{setDraft(undefined);setError("");}}>Cancel</Button></div>
+          <div className={styles.formActions}><Button type="submit" intent="primary" icon="check" busy={busy} disabled={!draft.startDate||busy}>{editing?"Save changes":"Save visit"}</Button><Button intent="quiet" disabled={busy} onClick={()=>{setDraft(undefined);setRange(false);setPrecision("day");setError("");}}>Cancel</Button></div>
         </form>
       </motion.div>}
     </AnimatePresence>

@@ -68,7 +68,7 @@ export default function TravelPanel({open,onClose,trips,onPlan,onShow,onPlanDest
     try {
       const statuses=visits.length?[...new Set([...(previous?.statuses||[]),"visited" as const])]:previous?.statuses||[];
       const data=await request<{record:TravelRecord}>("/api/map/travel",{method:"PUT",headers:buildJsonHeadersWithCsrf(),body:JSON.stringify({record:{...destination,statuses,visits},expectedUpdatedAt:previous?.updatedAt||null})});
-      setRecords(old=>[...old.filter(r=>r.id!==destination.id),data.record]);setNotice("Visit saved. Calendar is up to date.");return true;
+      setRecords(old=>[...old.filter(r=>r.id!==destination.id),data.record]);setNotice("Visit saved");return true;
     }catch(e){setError(e instanceof Error?e.message:"Could not save visit");return false;}finally{saving.current=false;setBusy("")}
   }
   return <WorkspaceSheet open={open} onClose={onClose} title="Travel" presentation="center" className={styles.sheet}>

@@ -144,7 +144,7 @@
 .savedName h3{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:500 13px/1.4 var(--font-body)}
 .typeTag{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;font:400 11px/1.4 var(--font-body);color:var(--text-secondary)}.typeTag svg{flex:none}
 .savedStatuses{display:flex;flex-wrap:nowrap;gap:7px}.savedStatuses>span{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;font:500 11px/1.4 var(--font-body);color:var(--module-icon)}.savedStatuses[data-multiple=true]>span>span{display:none}.typeTag>small{display:none}
-.savedStatuses [data-status=lived]{color:#59518B}.savedStatuses [data-status=want]{color:#754420}.savedStatuses [data-status=going]{color:#1850A0}
+.savedStatuses [data-status=lived]{color:#59518B}.savedStatuses [data-status=want]{background:#9c6508;color:white}.savedStatuses [data-status=going]{color:#1850A0}
 .sheet .placeList .savedDates{display:flex;align-items:center;gap:5px;text-align:left;color:var(--text-secondary);font:400 11px/1.4 var(--font-body);min-width:0;padding:0;white-space:nowrap}.savedDates svg{flex:none}.fullDate{overflow:hidden;text-overflow:ellipsis}.shortDate{display:none}.visitCount{flex:none;color:var(--module-icon);font-weight:600}
 .savedRow button:focus-visible{outline:2px solid var(--module-icon);outline-offset:3px;border-radius:4px}
 @media(max-width:760px){.placeList .card{padding:6px 0}.placeList .card .savedRow{grid-template-columns:minmax(72px,1fr) 42px 58px 60px 18px;gap:5px}.savedName>svg,.savedName>img,.savedName>span{width:22px!important;height:17px!important}.savedName>span>img{width:22px!important;height:17px!important}.savedName h3{font-size:12px}.typeTag>span,.typeTag>svg,.savedStatuses>span>span,.fullDate{display:none}.typeTag>small{display:block;font-size:10px;overflow:hidden;text-overflow:ellipsis}.shortDate{display:inline}.savedStatuses{gap:2px}.savedStatuses>span{width:13px;height:18px;justify-content:center}.sheet .placeList .savedDates{gap:3px}.savedDates>svg{width:12px}.placeList .card .savedRow>button:last-child{width:18px!important;min-width:18px!important;padding:0!important}}
@@ -173,11 +173,11 @@
 .placeList .card .savedRow{grid-template-columns:minmax(140px,1.4fr) 112px 128px minmax(110px,1fr) 24px}
 .savedStatuses{display:flex;flex-wrap:nowrap;align-items:center;gap:2px;padding:4px 5px;width:128px;min-height:36px}
 .sheet .placeList .savedStatuses>button{display:grid;place-items:center;flex:0 0 28px;width:28px;min-width:28px;height:28px;min-height:28px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--text-secondary);opacity:.55;cursor:pointer;transition:background .2s ease,color .2s ease,opacity .2s ease,transform .2s ease}
-.sheet .placeList .savedStatuses>button[aria-pressed=true]{background:var(--surface,#fff);color:var(--module-icon);opacity:1;box-shadow:0 1px 3px #10202612}
-.sheet .placeList .savedStatuses>button[data-status=lived][aria-pressed=true]{color:#59518b}
-.sheet .placeList .savedStatuses>button[data-status=want][aria-pressed=true]{color:#754420}
-.sheet .placeList .savedStatuses>button[data-status=going][aria-pressed=true]{color:#1850a0}
-.sheet .placeList .savedStatuses>button:not(:disabled):hover{opacity:1;background:color-mix(in srgb,var(--module-icon) 16%,white)}
+.sheet .placeList .savedStatuses>button[aria-pressed=true]{background:#4f772d;color:white;opacity:1;box-shadow:0 1px 3px #10202612}
+.sheet .placeList .savedStatuses>button[data-status=lived][aria-pressed=true]{background:#2862ac;color:white}
+.sheet .placeList .savedStatuses>button[data-status=want][aria-pressed=true]{background:#9c6508;color:white}
+.sheet .placeList .savedStatuses>button[data-status=going][aria-pressed=true]{background:#7252a2;color:white}
+.sheet .placeList .savedStatuses>button[aria-pressed=false]:not(:disabled):hover{opacity:1;background:color-mix(in srgb,var(--module-icon) 16%,white)}
 .sheet .placeList .savedStatuses>button:not(:disabled):active{transform:scale(.92)}
 .sheet .placeList .savedStatuses>button:disabled{cursor:default}
 .sheet .savedFilterMenu fieldset{padding:12px;background:color-mix(in srgb,var(--module-icon) 5%,transparent);border-radius:12px}
@@ -232,3 +232,16 @@
 @media(prefers-reduced-motion:reduce){.sheet .visitDuration>button{transition:none}}
 
 .visitFields>:global(.people-date-field)>span,.visitForm .visitNote{font:400 12px/18px var(--font-body)}
+
+/* Balance the actual label edges around the status column. */
+.savedRow .typeTag{justify-self:end;justify-content:flex-end}
+.visitOptions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.sheet .visitOptions>:global(.app-select-trigger){width:170px;min-height:40px;font-size:12px}
+.approximateDate{flex:0 1 230px;min-width:180px;display:grid;gap:6px;font:400 12px/18px var(--font-body)}
+.approximateDate>div{display:flex;gap:6px;min-width:0}
+.approximateDate[data-precision=year]{flex:0 0 96px;min-width:0}
+.visitForm .approximateDate[data-precision=year] input{flex:1;width:100%}
+.sheet .approximateDate :global(.app-select-trigger){flex:1;min-width:0;width:auto;min-height:42px;font-size:13px}
+.visitForm .approximateDate input{flex:0 0 76px;width:76px;min-width:0;height:42px;margin:0;font-size:13px}
+.sheet .placeList .savedStatuses>button[aria-pressed=true]:not(:disabled):hover{filter:brightness(.92)}
+@media(max-width:760px){.approximateDate{flex:1 1 100%;min-width:0}.visitOptions{gap:8px}.visitForm .approximateDate input{font-size:16px}.savedRow .typeTag{justify-self:end}.sheet .visitOptions>:global(.app-select-trigger){width:100%}}

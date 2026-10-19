@@ -29,7 +29,8 @@ export function buildTravelEntries(records: TravelRecord[], trips: PersonalTrip[
   return [...entries.values()].filter(r => r.statuses.length || r.visits?.length || r.tripVisits.length);
 }
 export function travelCalendarEntries(records: TravelRecord[]) {
-  return records.flatMap(record => (record.visits || []).map(visit => {
+  // Partial dates belong in travel history, not on an invented calendar day.
+  return records.flatMap(record => (record.visits || []).filter(visit=>visit.startDate.length===10&&(visit.endDate||visit.startDate).length===10).map(visit => {
     const end = new Date(`${visit.endDate || visit.startDate}T12:00:00Z`);
     end.setUTCDate(end.getUTCDate()+1);
     return { id: `travel-${record.id}-${visit.id}`, title: `Visit to ${record.name}`, start: visit.startDate, end: end.toISOString().slice(0,10), completed: false,

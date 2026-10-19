@@ -8,6 +8,23 @@ export type TravelStatus = typeof travelStatuses[number];
 export const travelStatusLabels: Record<TravelStatus, string> = { visited: "Visited", lived: "Lived in", want: "Bucket list", going: "Going" };
 export type TravelDestination = { id: string; name: string; kind: TravelKind; country: string; description?: string; source?: string; latitude?: number; longitude?: number };
 export type TravelVisit = { id: string; startDate: string; endDate: string; note: string };
+export type VisitPrecision = "day" | "month" | "year";
+export function visitPrecision(date:string):VisitPrecision { return date.length===4?"year":date.length===7?"month":"day"; }
+export function visitDate(value:unknown):string {
+  if(typeof value!=="string")throw new Error("Choose a valid visit date");
+  if(/^\d{4}$/.test(value)&&value!=="0000")return value;
+  if(/^\d{4}-(0[1-9]|1[0-2])$/.test(value)&&!value.startsWith("0000"))return value;
+  return travelDate(value);
+}
+export function formatVisitDates(start:string,end:string) {
+  if(!start)return "Dates to decide";
+  const format=(date:string)=>{
+    const precision=visitPrecision(date);
+    if(precision==="year")return date;
+    return new Date(`${date}${precision==="month"?"-01":""}T12:00:00Z`).toLocaleDateString("en-US",{month:"short",...(precision==="day"?{day:"numeric" as const}:{}),year:"numeric",timeZone:"UTC"});
+  };
+  return `${format(start)}${end&&end!==start?` – ${format(end)}`:""}`;
+}
 export type TravelRecord = TravelDestination & { statuses: TravelStatus[]; visits?: TravelVisit[]; updatedAt: string };
 
 export function travelDate(value: unknown): string {
@@ -23,7 +40,8 @@ export function normalizeTravelVisits(input: unknown): TravelVisit[] {
   return input.map(v => {
     if (!v || typeof v !== "object" || typeof v.id !== "string" || !/^[a-zA-Z0-9-]{1,80}$/.test(v.id) || ids.has(v.id)) throw new Error("Invalid visit identifier");
     ids.add(v.id);
-    const startDate = travelDate(v.startDate), endDate = travelDate(v.endDate || v.startDate);
+    const startDate = visitDate(v.startDate), endDate = visitDate(v.endDate || v.startDate);
+    if(visitPrecision(startDate)!==visitPrecision(endDate))throw new Error("Use the same date detail for the start and end");
     if (endDate < startDate) throw new Error("The last day must be on or after the first day");
     if (typeof v.note !== "string" || v.note.length > 500) throw new Error("Visit notes can be up to 500 characters");
     return { id: v.id, startDate, endDate, note: v.note.trim() };
