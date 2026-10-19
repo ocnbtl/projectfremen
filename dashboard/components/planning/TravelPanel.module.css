@@ -131,7 +131,7 @@
 .savedFilterMenu header{grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:8px}.savedFilterMenu header strong{font-size:12px;font-weight:500;color:var(--text-secondary)}.sheet .savedFilterMenu header button{width:32px;min-height:32px;height:32px;padding:0;display:grid;place-items:center}
 .savedFilterMenu fieldset{min-width:0;padding:0;border:0;margin:0}.savedFilterMenu legend{font-weight:500;font-size:12px;margin-bottom:7px;color:var(--text-secondary)}.savedFilterMenu fieldset>div{display:flex;flex-wrap:wrap;gap:6px}
 .sheet .savedFilterMenu fieldset button{width:auto;flex:none;display:flex;align-items:center;gap:6px;min-height:38px;border:1px solid var(--module-border);border-radius:8px;background:white;color:inherit;padding:7px 9px;cursor:pointer;font:500 12px/1.4 var(--font-body);transition:background .16s,border-color .16s,color .16s}.savedFilterMenu fieldset button[aria-pressed=true]{background:var(--module-quiet);color:var(--module-icon);border-color:var(--module-icon)}.savedFilterMenu button:focus-visible{outline:2px solid var(--module-icon);outline-offset:2px}
-.filterCheck{display:grid;place-items:center;width:15px;height:15px;border:1px solid var(--module-border);border-radius:4px;flex:none}.savedFilterMenu button[aria-pressed=true] .filterCheck{background:var(--module-icon);border-color:var(--module-icon);color:white}.savedFilterMenu>small{grid-column:1/-1;color:var(--text-secondary);font-size:12px}
+.savedFilterMenu>small{grid-column:1/-1;color:var(--text-secondary);font-size:12px}
 .filterSummary{display:block;font-size:12px;font-weight:400;line-height:1.5;margin-top:3px}.resultHeading strong{font-weight:500;color:var(--text-strong)}.resultHeading{padding:10px 0;align-items:start}.markStatus>span{display:block;font-size:12px;color:var(--text-secondary);margin-bottom:6px}.markStatus .statusPicker{margin-bottom:12px}
 @media(max-width:760px){.sheet .savedFilterMenu fieldset button{min-height:42px}.sheet .travelFilters .savedFilterMenu{grid-template-columns:1fr;gap:12px}.sheet .travelFilters>button{flex:0 0 auto}}
 @media(prefers-reduced-motion:reduce){.savedFilterMenu fieldset button{transition:none}}
@@ -153,7 +153,7 @@
 .placeList .card .savedRow{grid-template-columns:minmax(160px,1.4fr) 112px 88px minmax(135px,1fr) 24px;column-gap:18px}
 .savedStatuses{display:grid;grid-template-columns:repeat(4,16px);gap:7px;align-items:center}
 .savedStatuses>span{display:grid;place-items:center;width:16px;height:20px}
-.savedStatuses>[data-status=visited]{grid-column:1}.savedStatuses>[data-status=lived]{grid-column:2}.savedStatuses>[data-status=want]{grid-column:3}.savedStatuses>[data-status=going]{grid-column:4}
+
 .travelFilters + .cards{margin-top:14px}
 @media(max-width:760px){.placeList .card .savedRow{grid-template-columns:minmax(64px,1fr) 42px 58px 60px 18px;column-gap:6px}.savedName{margin-right:5px}.savedStatuses{grid-template-columns:repeat(4,13px);gap:2px}.savedStatuses>span{width:13px;height:20px}}
 
@@ -168,3 +168,31 @@
  .savedStatuses{grid-template-columns:repeat(4,14px);gap:2px;padding:5px;min-height:30px}
  .savedStatuses>span{width:14px}.savedStatuses svg{width:14px;height:14px}
 }
+
+/* Direct status controls retain the same position, independent of selection order. */
+.placeList .card .savedRow{grid-template-columns:minmax(140px,1.4fr) 112px 128px minmax(110px,1fr) 24px}
+.savedStatuses{display:flex;flex-wrap:nowrap;align-items:center;gap:2px;padding:4px 5px;width:128px;min-height:36px}
+.sheet .placeList .savedStatuses>button{display:grid;place-items:center;flex:0 0 28px;width:28px;min-width:28px;height:28px;min-height:28px;padding:0;border:0;border-radius:6px;background:transparent;color:var(--text-secondary);opacity:.55;cursor:pointer;transition:background .2s ease,color .2s ease,opacity .2s ease,transform .2s ease}
+.sheet .placeList .savedStatuses>button[aria-pressed=true]{background:var(--surface,#fff);color:var(--module-icon);opacity:1;box-shadow:0 1px 3px #10202612}
+.sheet .placeList .savedStatuses>button[data-status=lived][aria-pressed=true]{color:#59518b}
+.sheet .placeList .savedStatuses>button[data-status=want][aria-pressed=true]{color:#754420}
+.sheet .placeList .savedStatuses>button[data-status=going][aria-pressed=true]{color:#1850a0}
+.sheet .placeList .savedStatuses>button:not(:disabled):hover{opacity:1;background:color-mix(in srgb,var(--module-icon) 16%,white)}
+.sheet .placeList .savedStatuses>button:not(:disabled):active{transform:scale(.92)}
+.sheet .placeList .savedStatuses>button:disabled{cursor:default}
+.sheet .savedFilterMenu fieldset{padding:12px;background:color-mix(in srgb,var(--module-icon) 5%,transparent);border-radius:12px}
+.sheet .savedFilterMenu legend{float:left;width:100%;margin:0 0 10px;color:var(--text-strong);font-weight:600}
+.sheet .savedFilterMenu fieldset>div{clear:both;gap:8px}
+.sheet .savedFilterMenu fieldset button{border-radius:999px;padding:8px 12px;background:transparent}
+.sheet .savedFilterMenu fieldset button[aria-pressed=true]{background:var(--module-icon);border-color:var(--module-icon);color:white}
+.searchHelp{margin:8px 0 12px;font:400 12px/1.6 var(--font-body);color:var(--text-secondary);max-width:580px}
+.searchHelp strong{display:block;color:var(--text-strong);font-weight:600;margin-bottom:2px}
+@media(max-width:760px){
+ .placeList .card .savedRow{grid-template-columns:minmax(64px,1fr) 20px 104px 40px 18px;column-gap:4px}
+ .savedStatuses{width:104px;gap:0;padding:4px;min-height:32px}
+ .sheet .placeList .savedStatuses>button{flex-basis:24px;width:24px;min-width:24px;height:24px;min-height:24px}
+ .savedStatuses svg{width:15px;height:15px}
+ .savedDates>svg{display:none}.sheet .placeList .savedDates{gap:2px;font-size:10px}
+ .sheet .travelFilters .savedFilterMenu{gap:10px}
+}
+@media(prefers-reduced-motion:reduce){.sheet .placeList .savedStatuses>button{transition:none}}
