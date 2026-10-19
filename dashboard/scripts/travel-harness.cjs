@@ -6,6 +6,7 @@ require.extensions['.ts']=(module,file)=>module._compile(ts.transpileModule(fs.r
 const {normalizeTravelRecord,countryDestinations,stateDestinations}=require('../lib/modules/planning/travel.ts');
 const {saveTravelRecord,readTravelRecords}=require('../lib/modules/planning/travel-store.ts');
 const {travelCatalogQuery,travelCatalog}=require('../lib/modules/planning/travel-catalog.ts');
+const {filterTravelEntries}=require('../lib/modules/planning/travel-filters.ts');
 const {buildTravelEntries,travelCalendarEntries}=require('../lib/modules/planning/travel-sync.ts');
 const {normalizeTrip}=require('../lib/modules/personal-life/trip-schema.ts');
 (async()=>{
@@ -50,6 +51,17 @@ const {normalizeTrip}=require('../lib/modules/personal-life/trip-schema.ts');
  for(const c of countryDestinations)assert.ok(sprite.includes('flag-'+c.country)||fs.existsSync(path.join(__dirname,'../public/address-flags',c.country+'.svg')),c.country+' flag');
  assert.throws(()=>travelCatalogQuery('park','US". ?s ?p ?o','',0),/catalogue/);
  const query=travelCatalogQuery('park','FR','" } UNION {',1);assert.ok(query.includes('OFFSET 100'));assert.ok(query.includes('\\" } union {'));
+ const filterFixture=[{...france,statuses:['visited','lived']},{...ohio,statuses:['visited']},{id:'city:paris',kind:'city',name:'Paris',country:'FR',statuses:['want']},{id:'park:fixture',kind:'park',name:'Fixture park',country:'US',statuses:['going']}];
+ const filterBefore=JSON.stringify(filterFixture);
+ assert.equal(filterTravelEntries(filterFixture,[],[],'').length,4);
+ assert.deepEqual(filterTravelEntries(filterFixture,['state'],['visited'],'').map(r=>r.name),['Ohio']);
+ assert.deepEqual(filterTravelEntries(filterFixture,['country','state','city'],['visited'],'').map(r=>r.name),['France','Ohio']);
+ assert.deepEqual(filterTravelEntries(filterFixture,['country','state','city'],['lived','want'],'').map(r=>r.name),['France','Paris']);
+ assert.equal(filterTravelEntries(filterFixture,['country','state'],['want'],'').length,0);
+ assert.equal(filterTravelEntries(filterFixture,[],['visited','lived'],'').length,2,'a matching record is never duplicated');
+ assert.equal(filterTravelEntries(filterFixture,[],[],'  PARIS  ')[0].name,'Paris');
+ assert.equal(JSON.stringify(filterFixture),filterBefore,'filters must not mutate records or statuses');
+ assert.ok(filterTravelEntries(buildTravelEntries([], [trip]),['state'],['going'],'').some(e=>e.id===ohio.id),'trip-derived statuses participate in filters');
  const original=global.fetch;
  global.fetch=async()=>({ok:true,json:async()=>({results:{bindings:[{item:{value:'http://www.wikidata.org/entity/Q90'},itemLabel:{value:'Paris'},coord:{value:'Point(2.35 48.85)'}}]}})});
  const catalog=await travelCatalog('park','FR','Paris',0);assert.equal(catalog.items[0].latitude,48.85);assert.equal(catalog.items[0].id,'park:Q90');assert.equal(catalog.hasMore,false);
