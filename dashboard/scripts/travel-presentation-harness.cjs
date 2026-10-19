@@ -1,13 +1,13 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),ts=require('typescript');
 require.extensions['.ts']=(module,file)=>module._compile(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true,resolveJsonModule:true}}).outputText,file);
 const {placePicture}=require('../lib/modules/planning/place-presentation.ts');
-const {fixedAreaFlag,isAreaPlace,areaFlagUrl}=require('../lib/modules/planning/area-flags.ts');
+const {fixedAreaFlag,isAreaPlace,areaFlagUrl,knownCityFlag}=require('../lib/modules/planning/area-flags.ts');
 const {uniqueFlagFile,areaFlagQuery,areaFlagImage}=require('../lib/modules/planning/area-flag-provider.ts');
 const {travelHistory}=require('../lib/modules/planning/travel-history.ts');
 (async()=>{
  const honda={label:'Honda',imageUrl:'/api/people/photos/personal-abcdef',objectId:'personal-abcdef',href:'/'};
  const tokyo={name:'Tokyo',address:'Tokyo, Japan',countryCode:'JP',tags:['Area'],latitude:35.67686,longitude:139.76389};
- assert.match(placePicture(tokyo,[honda]),/^\/api\/map\/flags\?/);assert(!placePicture(tokyo,[honda]).includes('photos'));
+ assert.equal(placePicture(tokyo,[honda]),'/map-flags/cities/Q1490.png');assert(!placePicture(tokyo,[honda]).includes('photos'));
  assert.equal(placePicture({...tokyo,image:'custom'},[honda]),'custom');
  assert.equal(placePicture({name:'Somewhere',address:'',tags:['Travel']},[honda]),undefined);
  assert.equal(placePicture({name:'Honda',address:'',tags:['Organization']},[honda]),honda.imageUrl);
@@ -16,6 +16,13 @@ const {travelHistory}=require('../lib/modules/planning/travel-history.ts');
  assert.deepEqual(fixedAreaFlag('France','FR'),{kind:'country',code:'FR'});
  assert.deepEqual(fixedAreaFlag('Ohio','US'),{kind:'state',code:'oh'});
  assert.equal(fixedAreaFlag('Paris','US','city'),undefined);
+ assert.equal(knownCityFlag('Athens','US',33.96,-83.38).note,'Unofficial city flag');
+ assert.equal(knownCityFlag('Athens','US',39.32,-82.10),undefined);
+ assert.equal(knownCityFlag('Athens','US'),undefined);
+ assert.equal(knownCityFlag('Seattle','US',47.61,-122.33).asset,'seattle.png');
+ assert.equal(knownCityFlag('Columbus','US',39.21,-85.91),undefined);
+ assert.equal(knownCityFlag('Paris','FR',48.85,2.35,'country'),undefined);
+ for(const flag of require('../lib/modules/planning/city-flags.json')){const buffer=await areaFlagImage(flag.name,flag.country,'city',flag.latitude,flag.longitude);const m=await require('sharp')(buffer).metadata();assert(m.width>=m.height,flag.name+' aspect ratio');}
  const row=(id,file)=>({item:{value:`http://www.wikidata.org/entity/${id}`},flag:{value:`http://commons.wikimedia.org/wiki/Special:FilePath/${file}`}});
  assert.equal(uniqueFlagFile([row('Q1490','Flag%20of%20Tokyo%20Metropolis.svg')]),'Flag_of_Tokyo_Metropolis.svg');
  assert.equal(uniqueFlagFile([row('Q1','one.svg'),row('Q2','two.svg')]),undefined);

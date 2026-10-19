@@ -380,7 +380,7 @@ export default function MapWorkspace() {
       <label className={`work-search ${styles.moduleSearch}`} data-field-shell><UnigentamosIcon role="search" size={16}/><input type="search" aria-label="Search places or addresses" placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)}/></label>
         <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!tag}>Filter{tag ? " (1)" : ""}</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
           <>
-            <fieldset className={styles.pinDisplay}><legend>Map pins</legend><div>{(["icons", "images"] as const).map(mode=><Button key={mode} aria-pressed={pinDisplay===mode} onClick={()=>changePinDisplay(mode)}>{mode==="icons"?"Icons":"Images"}</Button>)}</div></fieldset>
+            <fieldset className={styles.pinDisplay}><legend>Map pins</legend><div data-mode={pinDisplay}><span className={styles.pinDisplayIndicator} aria-hidden="true"/>{(["icons", "images"] as const).map(mode=><button type="button" key={mode} aria-pressed={pinDisplay===mode} onClick={()=>changePinDisplay(mode)}><UnigentamosIcon role={mode==="icons"?"location":"module-media"} size={15}/><span>{mode==="icons"?"Icons":"Images"}</span></button>)}</div></fieldset>
             <label>
               Tag
               <SelectField value={tag} optionIcons={Object.fromEntries((snapshot?.state.places.flatMap(p=>p.tags)||[]).map(t=>[t,placeTagIconRole(t)]))} onChange={(e) => setTag(e.target.value)}>
@@ -654,16 +654,17 @@ export default function MapWorkspace() {
             <RecordLinks
               objectPicker
               pickerLabel="Link an object"
-              refs={editor.linkedRefs || []}
-              available={snapshot?.refs}
-              onChange={(linkedRefs) => setEditor({ ...editor, linkedRefs })}
-            />
-            <PlaceOrganizationControl key={editor.id || "new"} name={placeDisplayName({name:editor.name || "",address:editor.address || ""})} organizations={snapshot?.placeOrganizations?.[editor.id || ""] || []} busy={busy} onCreate={name=>action(async()=>{
+              actions={<PlaceOrganizationControl key={editor.id || "new"} name={placeDisplayName({name:editor.name || "",address:editor.address || ""})} organizations={snapshot?.placeOrganizations?.[editor.id || ""] || []} busy={busy} onCreate={name=>action(async()=>{
               const saved = await savePlanning("places",editor,editor.updatedAt);
               setEditor(saved);setSelectedId(saved.id);
               const response = await fetch("/api/planning/place-organization", {method:"POST",headers:buildJsonHeadersWithCsrf(),body:JSON.stringify({placeId:saved.id,expectedUpdatedAt:saved.updatedAt,name})});
               const result = await response.json();if(!response.ok||!result.ok)throw new Error(result.error || "Unable to create organization");
-            },"Organization created and linked")}/>
+            },"Organization created and linked")}/>}
+              refs={editor.linkedRefs || []}
+              available={snapshot?.refs}
+              onChange={(linkedRefs) => setEditor({ ...editor, linkedRefs })}
+            />
+
             <div className="work-actions">
               {editor.id && (
                 <Button

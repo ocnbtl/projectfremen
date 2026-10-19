@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 import entities from "./travel-country-entities.json";
-import { fixedAreaFlag } from "./area-flags";
+import { fixedAreaFlag, knownCityFlag } from "./area-flags";
 
 export function areaFlagQuery(name:string,country:string,latitude?:number,longitude?:number) {
   const entity=(entities as Record<string,string>)[country];
@@ -24,8 +24,10 @@ export function uniqueFlagFile(rows: {item?:{value?:string};flag?:{value?:string
 }
 export async function areaFlagImage(name:string,country:string,kind?:string,latitude?:number,longitude?:number) {
   const fixed=fixedAreaFlag(name,country,kind);
+  const city=knownCityFlag(name,country,latitude,longitude,kind);
   let buffer:Buffer;
-  if(fixed?.kind==="state")buffer=await readFile(path.join(process.cwd(),"public","map-flags",`${fixed.code}.png`));
+  if(city)buffer=await readFile(path.join(process.cwd(),"public","map-flags","cities",city.asset));
+  else if(fixed?.kind==="state")buffer=await readFile(path.join(process.cwd(),"public","map-flags",`${fixed.code}.png`));
   else if(fixed?.kind==="country"){
     const sprite=await readFile(path.join(process.cwd(),"public","country-flags.svg"),"utf8");
     const symbol=sprite.match(new RegExp(`<symbol id="flag-${fixed.code}"[^>]*>([\\s\\S]*?)</symbol>`));

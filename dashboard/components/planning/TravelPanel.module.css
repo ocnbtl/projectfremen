@@ -148,3 +148,11 @@
 .sheet .placeList .savedDates{display:flex;align-items:center;gap:5px;text-align:left;color:var(--text-secondary);font:400 11px/1.4 var(--font-body);min-width:0;padding:0;white-space:nowrap}.savedDates svg{flex:none}.fullDate{overflow:hidden;text-overflow:ellipsis}.shortDate{display:none}.visitCount{flex:none;color:var(--module-icon);font-weight:600}
 .savedRow button:focus-visible{outline:2px solid var(--module-icon);outline-offset:3px;border-radius:4px}
 @media(max-width:760px){.placeList .card{padding:6px 0}.placeList .card .savedRow{grid-template-columns:minmax(72px,1fr) 42px 58px 60px 18px;gap:5px}.savedName>svg,.savedName>img,.savedName>span{width:22px!important;height:17px!important}.savedName>span>img{width:22px!important;height:17px!important}.savedName h3{font-size:12px}.typeTag>span,.typeTag>svg,.savedStatuses>span>span,.fullDate{display:none}.typeTag>small{display:block;font-size:10px;overflow:hidden;text-overflow:ellipsis}.shortDate{display:inline}.savedStatuses{gap:2px}.savedStatuses>span{width:13px;height:18px;justify-content:center}.sheet .placeList .savedDates{gap:3px}.savedDates>svg{width:12px}.placeList .card .savedRow>button:last-child{width:18px!important;min-width:18px!important;padding:0!important}}
+
+/* Stable status columns keep each meaning in the same position across rows. */
+.placeList .card .savedRow{grid-template-columns:minmax(160px,1.4fr) 112px 88px minmax(135px,1fr) 24px;column-gap:18px}
+.savedStatuses{display:grid;grid-template-columns:repeat(4,16px);gap:7px;align-items:center}
+.savedStatuses>span{display:grid;place-items:center;width:16px;height:20px}
+.savedStatuses>[data-status=visited]{grid-column:1}.savedStatuses>[data-status=lived]{grid-column:2}.savedStatuses>[data-status=want]{grid-column:3}.savedStatuses>[data-status=going]{grid-column:4}
+.travelFilters + .cards{margin-top:14px}
+@media(max-width:760px){.placeList .card .savedRow{grid-template-columns:minmax(64px,1fr) 42px 58px 60px 18px;column-gap:6px}.savedName{margin-right:5px}.savedStatuses{grid-template-columns:repeat(4,13px);gap:2px}.savedStatuses>span{width:13px;height:20px}}

@@ -1,0 +1,132 @@
+[
+  {
+    "id": "Q90",
+    "name": "Paris",
+    "country": "FR",
+    "latitude": 48.856666666,
+    "longitude": 2.352222222,
+    "aliases": [],
+    "source": "https://commons.wikimedia.org/wiki/File:Drapeau_des_armes_de_la_ville_de_Paris.svg",
+    "asset": "Q90.png"
+  },
+  {
+    "id": "Q60",
+    "name": "New York City",
+    "country": "US",
+    "latitude": 40.712777777,
+    "longitude": -74.006111111,
+    "aliases": [
+      "New York"
+    ],
+    "source": "https://commons.wikimedia.org/wiki/File:Flag_of_New_York_City.svg",
+    "asset": "Q60.png"
+  },
+  {
+    "id": "Q1490",
+    "name": "Tokyo",
+    "country": "JP",
+    "latitude": 35.689444444,
+    "longitude": 139.691666666,
+    "aliases": [],
+    "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Tokyo_Metropolis.svg",
+    "asset": "Q1490.png"
+  },
+  {
+    "id": "Q1345",
+    "name": "Philadelphia",
+    "country": "US",
+    "latitude": 39.952777777,
+    "longitude": -75.163611111,
+    "aliases": [],
+    "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Philadelphia%2C_Pennsylvania.svg",
+    "asset": "Q1345.png"
+  },
+  {
+    "id": "Q1297",
+    "name": "Chicago",
+    "country": "US",
+    "latitude": 41.881944444,
+    "longitude": -87.627777777,
+    "aliases": [],
+    "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Chicago%2C_Illinois.svg",
+    "asset": "Q1297.png"
+  },
+  {
+    "id": "Q43196",
+    "name": "Cincinnati",
+    "country": "US",
+    "latitude": 39.1,
+    "longitude": -84.5125,
+    "aliases": [],
+    "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Cincinnati%2C_Ohio.svg",
+    "asset": "Q43196.png"
+  },
+  {
+    "id": "Q16567",
+    "name": "Columbus",
+    "country": "US",
+    "latitude": 39.962222222,
+    "longitude": -83.000555555,
+    "aliases": [],
+    "source": "https://commons.wikimedia.org/wiki/File:Flag_of_Columbus%2C_Ohio.svg",
+    "asset": "Q16567.png",
+    "requireCoordinates": true
+  },
+  {
+    "id": "seattle",
+    "name": "Seattle",
+    "country": "US",
+    "latitude": 47.6062,
+    "longitude": -122.3321,
+    "aliases": [],
+    "asset": "seattle.png",
+    "source": "https://www.seattle.gov/city-archives/seattle-facts/city-symbols",
+    "credit": "City of Seattle"
+  },
+  {
+    "id": "athens-ga",
+    "name": "Athens",
+    "country": "US",
+    "latitude": 33.9519,
+    "longitude": -83.3576,
+    "aliases": [],
+    "requireCoordinates": true,
+    "asset": "athens-ga.gif",
+    "source": "https://www.crwflags.com/fotw/flags/us-gaath.html",
+    "note": "Unofficial city flag",
+    "credit": "Jorge Candeias; design by Carrie Gillespie; FOTW Flags Of The World website at https://www.fotw.info/"
+  },
+  {
+    "id": "akron",
+    "name": "Akron",
+    "country": "US",
+    "latitude": 41.0814,
+    "longitude": -81.519,
+    "aliases": [],
+    "asset": "akron.gif",
+    "source": "https://www.crwflags.com/fotw/flags/us-oh-ak.html",
+    "credit": "António Martins; FOTW Flags Of The World website at https://www.fotw.info/"
+  },
+  {
+    "id": "bexley-oh",
+    "name": "Bexley",
+    "country": "US",
+    "latitude": 39.9692,
+    "longitude": -82.9369,
+    "aliases": [],
+    "asset": "bexley-oh.gif",
+    "source": "https://www.crwflags.com/fotw/flags/us-ohbxy.html",
+    "credit": "Blas Delgado Ortiz; FOTW Flags Of The World website at https://www.fotw.info/"
+  },
+  {
+    "id": "pickerington",
+    "name": "Pickerington",
+    "country": "US",
+    "latitude": 39.8842,
+    "longitude": -82.7535,
+    "aliases": [],
+    "asset": "pickerington.gif",
+    "source": "https://www.crwflags.com/fotw/flags/us-ohpkt.html",
+    "credit": "Ethan Dubrow; FOTW Flags Of The World website at https://www.fotw.info/"
+  }
+]

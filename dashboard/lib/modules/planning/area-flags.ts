@@ -1,3 +1,4 @@
+import cityFlags from "./city-flags.json";
 import type { Place } from "./types";
 import { countryDestinations, stateDestinations, type TravelDestination } from "./travel";
 
@@ -11,6 +12,8 @@ export function areaFlagUrl(area: {name:string;country?:string;latitude?:number;
   if(!countryDestinations.some(c=>c.country===country))return undefined;
   const name=area.name.split(/,|\s+·\s+/)[0].trim();
   if(!name)return undefined;
+  const known=knownCityFlag(name,country!,area.latitude,area.longitude,area.kind);
+  if(known)return `/map-flags/cities/${known.asset}`;
   const params=new URLSearchParams({country:country!,name});
   if(area.kind)params.set("kind",area.kind);
   if(Number.isFinite(area.latitude)&&Number.isFinite(area.longitude)){params.set("lat",String(area.latitude));params.set("lon",String(area.longitude));}
@@ -27,4 +30,14 @@ export function fixedAreaFlag(name:string,country:string,kind?:string) {
   if(nation&&(!kind||kind==="country"))return {kind:"country" as const,code:country};
   const state=country==="US"&&(!kind||kind==="state")?stateDestinations.find(s=>s.name.toLocaleLowerCase()===key||s.id.slice(-2).toLowerCase()===key):undefined;
   return state?{kind:"state" as const,code:state.id.slice(-2).toLowerCase()}:undefined;
+}
+
+/** Curated public city identities are matched locally; custom place pictures still win. */
+export function knownCityFlag(name:string,country:string,latitude?:number,longitude?:number,kind?:string) {
+  if(kind && kind!=="city")return undefined;
+  const key=name.split(/,|\s+·\s+/)[0].trim().toLocaleLowerCase();
+  const coordinates=Number.isFinite(latitude)&&Number.isFinite(longitude);
+  const matches=cityFlags.filter(flag=>flag.country===country && [flag.name,...flag.aliases].some(n=>n.toLocaleLowerCase()===key) &&
+    (coordinates ? Math.hypot((latitude!-flag.latitude)*111,(longitude!-flag.longitude)*111*Math.cos(flag.latitude*Math.PI/180))<30 : !flag.requireCoordinates));
+  return matches.length===1?matches[0]:undefined;
 }

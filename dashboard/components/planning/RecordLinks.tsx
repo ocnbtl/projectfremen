@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import PeopleObjectPicker, { objectTargetKey } from "../people/PeopleObjectPicker";
@@ -12,12 +12,14 @@ export default function RecordLinks({
   onChange,
   objectPicker = false,
   pickerLabel,
+  actions,
 }: {
   refs: NativeObjectRef[];
   available?: NativeObjectRef[];
   onChange?: (refs: NativeObjectRef[]) => void;
   objectPicker?: boolean;
   pickerLabel?: string;
+  actions?: ReactNode;
 }) {
   const [query, setQuery] = useState("");
   const key = (ref: NativeObjectRef) =>
@@ -36,7 +38,7 @@ export default function RecordLinks({
       {onChange && objectPicker && <div className="work-object-link-trigger"><PeopleObjectPicker iconOnly showTriggerLabel={Boolean(pickerLabel)} triggerIcon="object-add" triggerLabel={pickerLabel} targets={available.filter((ref) => !refs.some((linked) => key(linked) === key(ref)))} value="" onChange={(value) => {
         const ref = available.find((candidate) => objectTargetKey(candidate) === value);
         if (ref && !refs.some((linked) => key(linked) === key(ref))) onChange([...refs, ref]);
-      }} /></div>}
+      }} />{actions}</div>}
       <div className="work-links">
         {refs.map((ref) => (
           <span key={key(ref)}>
