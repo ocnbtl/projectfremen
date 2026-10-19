@@ -156,3 +156,15 @@
 .savedStatuses>[data-status=visited]{grid-column:1}.savedStatuses>[data-status=lived]{grid-column:2}.savedStatuses>[data-status=want]{grid-column:3}.savedStatuses>[data-status=going]{grid-column:4}
 .travelFilters + .cards{margin-top:14px}
 @media(max-width:760px){.placeList .card .savedRow{grid-template-columns:minmax(64px,1fr) 42px 58px 60px 18px;column-gap:6px}.savedName{margin-right:5px}.savedStatuses{grid-template-columns:repeat(4,13px);gap:2px}.savedStatuses>span{width:13px;height:20px}}
+
+/* Shared icon identities, with a quiet, fixed-width status column. */
+.placeList .card .savedRow{grid-template-columns:minmax(160px,1.4fr) 112px 104px minmax(135px,1fr) 24px}
+.savedStatuses{box-sizing:border-box;min-height:32px;padding:6px 9px;border-radius:8px;background:color-mix(in srgb,var(--module-icon,#597342) 9%,transparent);grid-template-columns:repeat(4,16px);gap:7px}
+.savedStatuses>span{height:20px}
+.savedStatuses svg,.typeTag svg,.statusPicker svg,.savedFilterMenu svg,.statuses svg{display:block;flex:none}
+@media(max-width:760px){
+ .placeList .card .savedRow{grid-template-columns:minmax(64px,1fr) 24px 72px 60px 18px;column-gap:6px}
+ .typeTag{justify-content:center}.typeTag>svg{display:block;width:16px;height:16px}
+ .savedStatuses{grid-template-columns:repeat(4,14px);gap:2px;padding:5px;min-height:30px}
+ .savedStatuses>span{width:14px}.savedStatuses svg{width:14px;height:14px}
+}

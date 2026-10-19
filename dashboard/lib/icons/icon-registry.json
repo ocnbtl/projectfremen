@@ -1,4 +1,13 @@
 [
+  {"id": "travel-kind-country", "label": "Travel: Country", "defaultCandidate": "world", "candidates": ["world", "globe", "world-pin", "flag", "map"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
+  {"id": "travel-kind-state", "label": "Travel: U.S. state", "defaultCandidate": "map-2", "candidates": ["map-2", "map", "map-pin", "flag-2", "route"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
+  {"id": "travel-kind-city", "label": "Travel: City", "defaultCandidate": "building-community", "candidates": ["building-community", "buildings", "building-skyscraper", "building-estate", "building"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
+  {"id": "travel-kind-landmark", "label": "Travel: Landmark", "defaultCandidate": "building-monument", "candidates": ["building-monument", "building-arch", "building-pavilion", "building-castle", "building-bank"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
+  {"id": "travel-kind-park", "label": "Travel: National park", "defaultCandidate": "trees", "candidates": ["trees", "tree", "mountain", "leaf", "tent"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
+  {"id": "travel-status-visited", "label": "Travel: Visited", "defaultCandidate": "circle-check", "candidates": ["circle-check", "check", "checks", "map-check", "flag-check"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
+  {"id": "travel-status-lived", "label": "Travel: Lived in", "defaultCandidate": "home", "candidates": ["home", "home-heart", "home-check", "building-cottage", "door"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
+  {"id": "travel-status-want", "label": "Travel: Bucket list", "defaultCandidate": "star", "candidates": ["star", "heart", "bookmark", "list-check", "sparkles"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
+  {"id": "travel-status-going", "label": "Travel: Going", "defaultCandidate": "plane-departure", "candidates": ["plane-departure", "plane", "luggage", "route", "calendar-event"], "usages": [{"module": "Map", "breadcrumb": "Travel > Been & going"}]},
   {
     "id": "share",
     "label": "Share",
