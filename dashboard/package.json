@@ -26,6 +26,7 @@
     "test:profile-photo": "node ./scripts/profile-photo-crop-harness.mjs && node ./scripts/profile-photo-edit-harness.cjs",
     "test:vault": "node ./scripts/local-first-harness.mjs",
     "test:vault-browser": "node ./scripts/vault-browser-harness.mjs",
+    "test:security": "node ./scripts/security-hardening-harness.cjs && node ./scripts/security-http-harness.cjs && node ./scripts/vault-preview-security-harness.cjs",
     "regress": "node ./scripts/regression-harness.mjs",
     "predev": "node ./scripts/prepare-map-assets.cjs",
     "prebuild": "node ./scripts/prepare-map-assets.cjs",
@@ -52,12 +53,12 @@
     "libphonenumber-js": "^1.13.12",
     "maplibre-gl": "6.11.2",
     "motion": "^12.0.0",
-    "next": "16.3.4",
+    "next": "16.3.8",
     "papaparse": "5.5.3",
     "react": "19.2.7",
     "react-dom": "19.2.7",
     "react-markdown": "10.1.0",
-    "sharp": "0.35.4",
+    "sharp": "0.35.5",
     "topojson-client": "3.1.0",
     "world-atlas": "2.0.2"
   },
@@ -71,12 +72,12 @@
     "@types/topojson-client": "3.1.5",
     "country-flag-icons": "^1.6.20",
     "eslint": "^9.23.0",
-    "eslint-config-next": "16.3.4",
+    "eslint-config-next": "16.3.8",
     "typescript": "^5.8.2"
   },
   "overrides": {
     "nanoid": "3.3.18",
     "postcss": "8.5.25",
-    "sharp": "0.35.4"
+    "sharp": "0.35.5"
   }
 }

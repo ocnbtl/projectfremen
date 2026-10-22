@@ -1,5 +1,6 @@
 "use client";
 import LogoLoader from "./operational/LogoLoader";
+import VaultMediaPreview, { inertPreviewBlob } from "./VaultMediaPreview";
 
 import Link from "next/link";
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
@@ -587,8 +588,9 @@ export default function VaultWorkspace({
   async function previewMedia(snapshot: VaultObjectSnapshot) {
     await run(async () => {
       const opened = await browserVault.openMedia(snapshot, (completed, total) => setMessage(`Preparing preview ${completed} of ${total}â€¦`));
-      const url = URL.createObjectURL(opened.blob);
-      setMediaPreview({ url, mimeType: opened.blob.type || "application/octet-stream", fileName: opened.fileName });
+      const previewBlob = inertPreviewBlob(opened.blob);
+      const url = URL.createObjectURL(previewBlob);
+      setMediaPreview({ url, mimeType: previewBlob.type || "application/octet-stream", fileName: opened.fileName });
       setMessage(`${opened.fileName} is open locally. Its decrypted preview was not uploaded.`);
     });
   }
@@ -1281,10 +1283,7 @@ export default function VaultWorkspace({
                   </div>}
                   {mediaPreview && selectedObject.objectKind === "media" && <div className={styles.mediaPreview}>
                     <div><strong>{mediaPreview.fileName}</strong><button className={styles.quietButton} type="button" onClick={() => setMediaPreview(null)}>Close</button></div>
-                    {mediaPreview.mimeType.startsWith("image/") ? <img src={mediaPreview.url} alt={mediaPreview.fileName} />
-                      : mediaPreview.mimeType.startsWith("audio/") ? <audio controls src={mediaPreview.url} />
-                        : mediaPreview.mimeType.startsWith("video/") ? <video controls src={mediaPreview.url} />
-                          : <iframe src={mediaPreview.url} title={`Preview of ${mediaPreview.fileName}`} />}
+                    <VaultMediaPreview {...mediaPreview} />
                   </div>}
                   {selectedMediaManifest ? <dl className={styles.recordFields}>
                     <div><dt>File name</dt><dd>{String(selectedMediaManifest.fileName || "")}</dd></div>

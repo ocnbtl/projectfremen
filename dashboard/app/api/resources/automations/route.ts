@@ -1,5 +1,4 @@
-import { lookup } from "node:dns/promises";
-import { isIP } from "node:net";
+import { fetchResource as safeFetch } from "../../../../lib/server/resource-fetch";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../../lib/admin-session";
 import { appendAuditEvent, getRequestIp } from "../../../../lib/audit-log";
@@ -22,82 +21,12 @@ const PRIVATE_HEADERS = {
   Pragma: "no-cache",
   Vary: "Cookie"
 };
-const MAX_REDIRECTS = 4;
 const MAX_METADATA_BYTES = 512_000;
 const AUTOMATION_KINDS = ["url_health", "duplicate_scan", "metadata_refresh"] as const;
 type AutomationKind = (typeof AUTOMATION_KINDS)[number];
 
 function json(body: unknown, status = 200) {
   return NextResponse.json(body, { status, headers: PRIVATE_HEADERS });
-}
-
-function isPrivateIpv4(address: string) {
-  const parts = address.split(".").map(Number);
-  if (parts.length !== 4 || parts.some((part) => !Number.isInteger(part) || part < 0 || part > 255)) return true;
-  const [a, b] = parts;
-  return a === 0 || a === 10 || a === 127 || a >= 224 ||
-    (a === 100 && b >= 64 && b <= 127) ||
-    (a === 169 && b === 254) ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && (b === 0 || b === 168)) ||
-    (a === 198 && (b === 18 || b === 19 || b === 51)) ||
-    (a === 203 && b === 0);
-}
-
-function isPrivateAddress(address: string) {
-  if (isIP(address) === 4) return isPrivateIpv4(address);
-  const normalized = address.toLowerCase();
-  if (normalized.startsWith("::ffff:")) return isPrivateIpv4(normalized.slice(7));
-  return normalized === "::" || normalized === "::1" || normalized.startsWith("fc") ||
-    normalized.startsWith("fd") || /^fe[89ab]/.test(normalized);
-}
-
-async function assertSafeUrl(raw: string) {
-  const url = new URL(raw);
-  if ((url.protocol !== "http:" && url.protocol !== "https:") || url.username || url.password) {
-    throw new Error("Only credential-free HTTP or HTTPS URLs can be checked.");
-  }
-  const hostname = url.hostname.toLowerCase().replace(/\.$/, "");
-  if (!hostname || hostname === "localhost" || hostname.endsWith(".localhost") || hostname.endsWith(".local")) {
-    throw new Error("Local or private network URLs cannot be checked.");
-  }
-  const addresses = isIP(hostname) ? [{ address: hostname }] : await lookup(hostname, { all: true, verbatim: true });
-  if (!addresses.length || addresses.some((entry) => isPrivateAddress(entry.address))) {
-    throw new Error("Local or private network URLs cannot be checked.");
-  }
-  return url;
-}
-
-async function safeFetch(raw: string, metadata: boolean) {
-  let url = await assertSafeUrl(raw);
-  for (let redirect = 0; redirect <= MAX_REDIRECTS; redirect += 1) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8_000);
-    try {
-      const response = await fetch(url, {
-        method: "GET",
-        redirect: "manual",
-        cache: "no-store",
-        signal: controller.signal,
-        headers: {
-          Accept: metadata ? "text/html,application/xhtml+xml;q=0.9,*/*;q=0.2" : "*/*",
-          ...(metadata ? {} : { Range: "bytes=0-0" }),
-          "User-Agent": "Project-Fremen-Resource-Check/1.0"
-        }
-      });
-      if ([301, 302, 303, 307, 308].includes(response.status)) {
-        const location = response.headers.get("location");
-        await response.body?.cancel();
-        if (!location || redirect === MAX_REDIRECTS) throw new Error("The URL redirected too many times.");
-        url = await assertSafeUrl(new URL(location, url).toString());
-        continue;
-      }
-      return { response, finalUrl: url.toString() };
-    } finally {
-      clearTimeout(timeout);
-    }
-  }
-  throw new Error("The URL could not be checked.");
 }
 
 function decodeHtml(value: string) {

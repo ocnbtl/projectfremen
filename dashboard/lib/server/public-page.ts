@@ -36,7 +36,7 @@ export type PublicPageTarget = Awaited<ReturnType<typeof resolvePublicPage>>;
 const MAX_BYTES = 512_000;
 
 /** Use only a validated address for the socket; retain the URL hostname for TLS and Host. */
-export function requestPinnedPage({ url, address }: PublicPageTarget, signal: AbortSignal, maxBytes = MAX_BYTES, format: "html" | "json" = "html"): Promise<PageResponse> {
+export function requestPinnedPage({ url, address }: PublicPageTarget, signal: AbortSignal, maxBytes = MAX_BYTES, format: "html" | "json" | "headers" = "html"): Promise<PageResponse> {
   return new Promise((resolve, reject) => {
     const request = (url.protocol === "https:" ? httpsRequest : httpRequest)(url, {
       agent: false, signal, maxHeaderSize: 16_384,
@@ -47,7 +47,7 @@ export function requestPinnedPage({ url, address }: PublicPageTarget, signal: Ab
       const status = response.statusCode || 0;
       const headers = response.headers;
       response.on("error", reject);
-      if (status < 200 || status >= 300) {
+      if (status < 200 || status >= 300 || format === "headers") {
         resolve({ status, headers, html: "" });
         response.destroy();
         return;

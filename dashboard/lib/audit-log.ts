@@ -46,8 +46,8 @@ export function getRequestIp(request: Request): string {
 
 export function getLoginRateLimitKey(request: Request): string {
   const ip = getRequestIp(request);
-  const userAgent = cleanText(request.headers.get("user-agent") || "unknown", 160).toLowerCase();
-  return `${ip}|${userAgent}`;
+  // Client-controlled browser headers must not create fresh attempt buckets.
+  return ip;
 }
 
 export async function appendAuditEvent(event: AuditEvent): Promise<void> {

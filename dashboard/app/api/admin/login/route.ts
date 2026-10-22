@@ -1,3 +1,4 @@
+import { safeLoginPath as sanitizePath } from "../../../../lib/login-redirect";
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { buildSignedAdminSessionToken, getAdminSessionSecret } from "../../../../lib/auth";
@@ -6,18 +7,6 @@ import { buildCsrfToken, ADMIN_CSRF_COOKIE_NAME } from "../../../../lib/csrf";
 import { checkLoginAllowance, recordLoginResult } from "../../../../lib/login-rate-limit";
 
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 12;
-
-function sanitizePath(value: string, fallback: string) {
-  if (!value || !value.startsWith("/")) {
-    return fallback;
-  }
-
-  if (value.startsWith("//")) {
-    return fallback;
-  }
-
-  return value;
-}
 
 function redirectWithError(request: Request, errorPath: string) {
   const target = new URL(errorPath, request.url);

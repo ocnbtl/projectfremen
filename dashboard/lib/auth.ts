@@ -1,10 +1,6 @@
-import { createHash, createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 const SESSION_VERSION = "v1";
-
-function buildLegacySessionDigest(secret: string): string {
-  return createHash("sha256").update(`admin-session:${secret}`).digest("hex");
-}
 
 function safeEqual(left: string, right: string): boolean {
   const a = Buffer.from(left);
@@ -22,15 +18,6 @@ function buildSessionSignature(payload: string, secret: string): string {
 export function getAdminSessionSecret(adminPassword: string): string {
   const configured = process.env.ADMIN_SESSION_SECRET?.trim();
   return configured || adminPassword;
-}
-
-export async function buildAdminSessionToken(secret: string): Promise<string> {
-  return buildLegacySessionDigest(secret);
-}
-
-export function isLegacyAdminSessionTokenValid(token: string, secret: string): boolean {
-  const expected = buildLegacySessionDigest(secret);
-  return safeEqual(token, expected);
 }
 
 export function buildSignedAdminSessionToken(secret: string, maxAgeSeconds: number): string {
