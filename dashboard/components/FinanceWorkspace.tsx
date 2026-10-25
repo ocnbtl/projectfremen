@@ -9,6 +9,7 @@ import { buildFinanceOverview, readOverviewUrl, writeOverviewUrl, type OverviewF
 import FinancePlanningPanel from "./finance/FinancePlanningPanel";
 import FinanceUtilityRail, { type FinanceUtility } from "./finance/FinanceUtilityRail";
 import { HUES } from "./finance/FinancePrimitives";
+import { WorkspaceNavSlot } from "./admin-shell/WorkspaceTopbar";
 import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
@@ -395,14 +396,9 @@ export default function FinanceWorkspace({
   const [inspectorOpen, setInspectorOpen] = useState(false);
 
   const autoSelectionRef = useRef("");
-  const [mobileDetail, setMobileDetail] = useState(false);
+  const mobileDetail = false;
   const [overviewState, setOverviewState] = useState(() => readOverviewUrl(new URLSearchParams(searchParams.toString())));
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 1000px)");
-    const sync = () => setMobileDetail(media.matches);
-    sync(); media.addEventListener("change", sync);
-    return () => media.removeEventListener("change", sync);
-  }, []);
+
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [utility, setUtility] = useState<FinanceUtility | null>(null);
   useEffect(() => {
@@ -847,6 +843,8 @@ export default function FinanceWorkspace({
 
   return (
     <ModuleShell
+      detailOpen={inspectorOpen || showContext}
+      onBack={closeInspector}
       module="finance"
       mode="detail"
       ariaLabel="Finance workspace"
@@ -939,7 +937,7 @@ export default function FinanceWorkspace({
       {mobileSidebarOpen && <button type="button" className="finance-mobile-scrim" onClick={() => setMobileSidebarOpen(false)} aria-label="Close Finance sidebar" />}
       {mobileDetail && (showContext || inspectorOpen) && <button type="button" className="finance-inspector-scrim" onClick={closeInspector} aria-label="Close Finance panel" />}
       <div className="finance-main-workspace">
-        <header className="finance-page-header">
+        <WorkspaceNavSlot kind="actions"><header className="finance-page-header">
           <div className="finance-page-title"><button type="button" className="finance-mobile-menu" onClick={() => setMobileSidebarOpen(true)} aria-label="Open Finance sidebar" aria-expanded={mobileSidebarOpen} aria-controls="finance-module-sidebar" data-icon-button="standard"><UnigentamosIcon role="menu" /></button><h1>{activeSmart?.label || activeView.label}</h1></div>
           <div className="finance-page-actions"><button type="button" className="finance-action" onClick={()=>setArchiveOpen(true)}>Archive</button>{["overview", "budgets", "bills"].includes(view) && <button type="button" aria-label="Plan from history" title="Plan from history" className="finance-action finance-plan-trigger" onClick={() => setPlanning("plan")}><Icon name="Sliders" /><span>Plan from history</span></button>}{view === "transactions" && smartCounts.unreviewed > 0 && <button type="button" aria-label="Approve all transactions" title="Approve all transactions" className="finance-action finance-review-trigger" onClick={() => setPlanning("review")}><Icon name="Check" /><span>Approve all</span></button>}<NativeActionBar
           view={view}
@@ -948,8 +946,8 @@ export default function FinanceWorkspace({
           closeStatus={activeClose?.status || "none"}
           onOperation={(nextOperation) => { setOperationTarget(null); setOperation(nextOperation); }}
         />{view === "accounts" && <button type="button" className="finance-action" onClick={() => { setAiOpen(false); setInspectorOpen(false); setUtility("settings"); }}><Icon name="Link" />Connections</button>}<button type="button" className="finance-action finance-activity-trigger" onClick={() => { setAiOpen(false); setUtility("activity"); }} aria-label="Recent activity" title="Recent activity" aria-expanded={utility === "activity"}><UnigentamosIcon role="clock" /><span>Activity</span></button></div>
-        </header>
-        <div className="finance-search-row"><label className="finance-global-search"><Icon name="Search" /><input type="search" aria-label={view === "overview" ? "Search finance" : view === "bills" ? "Search bills and subscriptions" : view === "review" ? "Search monthly review" : `Search ${view}`} value={query} placeholder={view === "overview" ? "Search transactions, merchants or categories" : `Search ${activeView.label.toLowerCase()}`} onChange={(event) => { setQuery(event.target.value); setCheckedTxnIds(new Set()); updateFinanceUrl({ query: event.target.value }, { native: true }); }} /></label></div>
+        </header></WorkspaceNavSlot>
+        <WorkspaceNavSlot kind="search"><div className="finance-search-row"><label className="finance-global-search"><Icon name="Search" /><input type="search" aria-label={view === "overview" ? "Search finance" : view === "bills" ? "Search bills and subscriptions" : view === "review" ? "Search monthly review" : `Search ${view}`} value={query} placeholder={view === "overview" ? "Search transactions, merchants or categories" : `Search ${activeView.label.toLowerCase()}`} onChange={(event) => { setQuery(event.target.value); setCheckedTxnIds(new Set()); updateFinanceUrl({ query: event.target.value }, { native: true }); }} /></label></div></WorkspaceNavSlot>
 
         {planning && <FinancePlanningPanel key={planning} reviewOnly={planning === "review"} onClose={() => setPlanning(null)} onApplied={(state, message) => { setFinanceState(state); setNotice(message); setPlanning(null); setCheckedTxnIds(new Set()); router.refresh(); }} />}
         {financeError && <div className="finance-notice is-error" role="alert"><Swatch hue="crimson" /><span className="finance-notice__message">{financeError}</span></div>}

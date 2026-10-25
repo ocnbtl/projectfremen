@@ -494,7 +494,7 @@ export default function NotesWorkspace({
   );
   const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(initialMode === "index" && Boolean(firstUrlState.note));
   const [aiOpen, setAiOpen] = useState(firstUrlState.ai);
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -523,7 +523,7 @@ export default function NotesWorkspace({
   const projectLinkFormRef = useRef<HTMLFormElement>(null);
   const dirtyHistoryGuardRef = useRef<string | null>(null);
   const suppressDirtyPopRef = useRef(false);
-  const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
+  const isInspectorOverlay = false;
   const searchParamKey = searchParams.toString();
 
   const selectedNote = useMemo(
@@ -632,7 +632,8 @@ export default function NotesWorkspace({
     setAiOpen(next.ai);
     setSelectedAttachmentItemId(next.item);
     setSelectedLinkId(next.link);
-    if (!initialSelectedId) setSelectedId(next.note || initialNotes[0]?.id || "");
+    if (!initialSelectedId && next.note) setSelectedId(next.note);
+    if (initialMode === "index") setInspectorOpen(Boolean(next.note));
     setActiveTab(initialMode === "detail" && next.tab === "overview" ? "body" : next.tab);
     if (initialMode === "index") setInspectorTab(inspectorTabFor(next.tab));
   }, [initialMode, initialSelectedId, searchParamKey]);
@@ -670,7 +671,7 @@ export default function NotesWorkspace({
     if (visibleNotes.some((note) => note.id === selectedId)) return;
     const nextId = visibleNotes[0].id;
     setSelectedId(nextId);
-    updateUrl({ note: nextId }, { history: "replace" });
+
   }, [filter, initialMode, query, sort, unavailableViewReason, view, visibleNotes.length]);
 
   function destinationFor(
@@ -685,7 +686,7 @@ export default function NotesWorkspace({
         sort,
         density,
         query,
-        note: path === getModuleRoute("notes") ? selectedId : "",
+        note: path === getModuleRoute("notes") && inspectorOpen ? selectedId : "",
         tab: activeTab,
         item: selectedAttachmentItemId,
         link: selectedLinkId,
@@ -2263,6 +2264,8 @@ export default function NotesWorkspace({
     const detailTabsId = currentNote ? `note-detail-${currentNote.id}` : "note-detail";
     return (
       <ModuleShell
+      detailOpen={inspectorOpen}
+      onBack={() => setInspectorOpen(false)}
         module="notes"
         sidebar={sidebar}
         inspector={inspector}
@@ -2393,6 +2396,8 @@ export default function NotesWorkspace({
 
   return (
     <ModuleShell
+      detailOpen={inspectorOpen}
+      onBack={() => { setInspectorOpen(false); if (initialMode === "index") updateUrl({ note: "" }); }}
       module="notes"
       sidebar={sidebar}
       inspector={inspector}

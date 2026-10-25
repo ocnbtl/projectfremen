@@ -1,12 +1,11 @@
 "use client";
 
-import dynamic from "next/dynamic";
+import Navigation from "./AppTopNavSurface";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react";
 import IconSystemProvider from "../icons/IconSystemProvider";
 import type { AppTopNavProps } from "./AppTopNav";
 
-const Navigation = dynamic(() => import("./AppTopNavSurface"));
 type Registration = AppTopNavProps & {
   selections: Readonly<Record<string, string>>;
   reduceMotion: boolean;

@@ -5,6 +5,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import DirectoryPane from "./admin-shell/DirectoryPane";
 import InspectorRail from "./admin-shell/InspectorRail";
+import { WorkspaceNavSlot } from "./admin-shell/WorkspaceTopbar";
 import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
@@ -304,14 +305,14 @@ export default function ResourcesWorkspace({
   const [activeTab, setActiveTab] = useState<ResourcesTab>(firstUrlState.tab);
   const [collection, setCollection] = useState<ResourceCollection>("all");
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(initialMode === "detail");
+  const [inspectorOpen, setInspectorOpen] = useState(initialMode === "detail" || Boolean(firstUrlState.selected));
   const [aiOpen, setAiOpen] = useState(firstUrlState.ai);
   const [editorMode, setEditorMode] = useState<"create" | "edit" | null>(null);
   const [projectAssociationOpen, setProjectAssociationOpen] = useState(false);
   const [propertiesEditRequest, setPropertiesEditRequest] = useState(0);
   const [headerBusy, setHeaderBusy] = useState(false);
   const [objectLinks, setObjectLinks] = useState(initialObjectLinks);
-  const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
+  const isInspectorOverlay = false;
   const isMobile = useMediaQuery("(max-width: 760px)");
   const searchParamKey = searchParams.toString();
   const {
@@ -408,7 +409,8 @@ export default function ResourcesWorkspace({
     setSort(next.sort);
     setActiveTab(next.tab);
     setAiOpen(next.ai);
-    if (!initialSelectedId) setSelectedId(next.selected || resources[0]?.id || "");
+    if (!initialSelectedId && next.selected) setSelectedId(next.selected);
+    if (initialMode === "index") setInspectorOpen(Boolean(next.selected));
   }, [initialSelectedId, resources, searchParamKey]);
 
   useEffect(() => {
@@ -423,14 +425,12 @@ export default function ResourcesWorkspace({
   useEffect(() => {
     if (initialMode !== "index" || unavailableViewReason || !visibleResources.length) return;
     if (visibleResources.some((resource) => resource.id === selectedId)) {
-      if (!parseResourcesUrlState(searchParams).selected) {
-        updateUrl({ selected: selectedId }, { history: "replace" });
-      }
+
       return;
     }
     const nextId = visibleResources[0].id;
     setSelectedId(nextId);
-    updateUrl({ selected: nextId }, { history: "replace" });
+
   }, [initialMode, query, searchParamKey, selectedId, sort, unavailableViewReason, view, visibleResources.length]);
 
   function destinationFor(
@@ -444,7 +444,7 @@ export default function ResourcesWorkspace({
         view,
         sort,
         query,
-        selected: isRoot ? selectedId : "",
+        selected: isRoot && inspectorOpen ? selectedId : "",
         tab: activeTab,
         item: "",
         ai: aiOpen,
@@ -926,6 +926,8 @@ export default function ResourcesWorkspace({
 
   return (
     <ModuleShell
+      detailOpen={inspectorOpen}
+      onBack={() => { setInspectorOpen(false); if (initialMode === "index") updateUrl({ selected: "" }); }}
       module="resources"
       sidebar={sidebar}
       inspector={inspector}
@@ -993,7 +995,7 @@ export default function ResourcesWorkspace({
       )}
       <DirectoryPane className={styles.directory} ariaLabel="Resources directory">
         <div className={styles.mainScroll}>
-          <header className={styles.directoryHeader}>
+          <WorkspaceNavSlot kind="actions"><header className={styles.directoryHeader}>
             <div>
               <div className={styles.resourceTitleLine}>
                 <h1>{collection === "components" ? "Components" : VIEW_LABELS[view]}</h1>
@@ -1011,7 +1013,7 @@ export default function ResourcesWorkspace({
                 <PersonalOpsIcon name="plus" /> Resource
               </button>
             </div>
-          </header>
+          </header></WorkspaceNavSlot>
 
           {view === "needs-review" && !unavailableViewReason && (
             <section className={styles.reviewQueueSummary} aria-label="Resource review queue summary">
@@ -1137,7 +1139,7 @@ export default function ResourcesWorkspace({
             </section>
           )}
 
-          <div className={styles.resourceToolbar}>
+          <WorkspaceNavSlot kind="search"><div className={styles.resourceToolbar}>
             <div className={styles.resourceSearch} role="search">
               <PersonalOpsIcon name="search" />
               <input
@@ -1176,7 +1178,7 @@ export default function ResourcesWorkspace({
                 </div>
               </details>
             </div>
-          </div>
+          </div></WorkspaceNavSlot>
 
           {initialLoadError ? (
             <SystemState variant="error" title="Resources could not be loaded" description={initialLoadError} />

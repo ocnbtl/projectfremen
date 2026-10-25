@@ -159,7 +159,7 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
   }
 
   return (
-    <div className={baseStyles.shell}>
+    <div className={baseStyles.shell} data-personal-pages>
       <PersonalOpsSidebar activeView="style-guide" filter="" pathname="/admin/personal/style-guide" counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
       <main className={baseStyles.directory} aria-label="Style Guide">
         <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)}><PersonalOpsIcon name="menu" /> Personal</button><button type="button" onClick={saveGuide} disabled={busy}><PersonalOpsIcon name="check" /> Save</button></div>

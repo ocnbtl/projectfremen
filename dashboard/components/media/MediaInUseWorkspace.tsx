@@ -217,7 +217,7 @@ export default function MediaInUseWorkspace({
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const inspectorTriggerRef = useRef<HTMLButtonElement>(null);
-  const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
+  const isInspectorOverlay = false;
 
   const selectedRecord = useMemo(
     () => evidence.records.find((record) => record.assetRef.objectId === urlState.selected) || null,
@@ -288,7 +288,7 @@ export default function MediaInUseWorkspace({
 
   function selectRecord(record: MediaUsageEvidenceRecord) {
     setMobileSidebarOpen(false);
-    if (isInspectorOverlay) setInspectorOpen(true);
+    setInspectorOpen(true);
     updateUrl({ selected: record.assetRef.objectId, ai: false }, "push");
   }
 
@@ -704,7 +704,7 @@ export default function MediaInUseWorkspace({
   ) : undefined;
 
   return (
-    <ModuleShell
+    <ModuleShell detailOpen={inspectorOpen} onBack={() => setInspectorOpen(false)}
       module="media"
       sidebar={sidebar}
       inspector={inspector}

@@ -1109,7 +1109,7 @@ export default function ProjectsWorkspace({
   const [reviewsError, setReviewsError] = useState(initialReviewsError);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const isMobile = useMediaQuery("(max-width: 760px)");
-  const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
+  const isInspectorOverlay = false;
   const searchParamKey = searchParams.toString();
 
   const selectedItem = useMemo(
@@ -3221,6 +3221,8 @@ export default function ProjectsWorkspace({
   return (
     <>
       <ModuleShell
+      detailOpen={inspectorOpen}
+      onBack={() => { if (editor) requestCloseEditor(); else setInspectorOpen(false); }}
         module="projects"
         mode={initialDetail ? "detail" : "directory"}
         className={`${styles.shell} ${initialDetail ? styles.detailShell : ""}`}
@@ -3251,7 +3253,7 @@ export default function ProjectsWorkspace({
         />}
       >
         {initialDetail && <button type="button" className={`${styles.iconButton} ${styles.mobileMenuButton}`} onClick={() => setMobileSidebarOpen(true)} aria-label="Open Projects navigation" data-icon-button="standard"><UnigentamosIcon role="menu" size={18} /></button>}
-        {initialDetail && isInspectorOverlay && selectedItem && <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => setInspectorOpen(true)}>{initialDetail ? "Completion" : "Details"}</button>}
+        {initialDetail && selectedItem && <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => setInspectorOpen(true)}>{initialDetail ? "Completion" : "Details"}</button>}
         {initialDetail ? (
           <div className={styles.mainScroll}>
             <div className={styles.mobileToolbar}><Link className={styles.textLink} href={getModuleRoute("projects")}>Back to projects</Link></div>

@@ -479,7 +479,7 @@ export default function MediaWorkspace({
   const [resources, setResources] = useState(initialResources);
   const [batchSelection, setBatchSelection] = useState<Set<string>>(() => new Set());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-  const [inspectorOpen, setInspectorOpen] = useState(false);
+  const [inspectorOpen, setInspectorOpen] = useState(initialMode === "index" && Boolean(initialUrlState.selected));
   const [editorAssetId, setEditorAssetId] = useState<string | null>(null);
   const [reviewScheduleAssetId, setReviewScheduleAssetId] = useState<string | null>(null);
   const [projectAssociationAssetId, setProjectAssociationAssetId] = useState<string | null>(null);
@@ -499,7 +499,7 @@ export default function MediaWorkspace({
   const [aiOpen, setAiOpen] = useState(initialUrlState.ai);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const isMobile = useMediaQuery("(max-width: 760px)");
-  const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
+  const isInspectorOverlay = false;
   const searchParamKey = searchParams.toString();
   const {
     state: projectsState,
@@ -764,7 +764,8 @@ export default function MediaWorkspace({
     setIssue(nextIssue);
     setAiOpen(next.ai);
     if (initialMode === "index") {
-      setSelectedId(nextSelectedId);
+      if (next.selected) setSelectedId(nextSelectedId);
+      setInspectorOpen(Boolean(next.selected));
     }
 
     const viewConflict = Boolean(queueMode && initialView && searchParams.has("view"));
@@ -801,7 +802,7 @@ export default function MediaWorkspace({
         view,
         sort,
         query,
-        selected: initialMode === "index" ? selectedId : "",
+        selected: initialMode === "index" && inspectorOpen ? selectedId : "",
         tab: activeTab,
         issue,
         ai: aiOpen,
@@ -976,7 +977,7 @@ export default function MediaWorkspace({
     if (isLegacyMetadataQueue) setActiveTab("metadata");
     if (isLegacyRightsQueue) setActiveTab("rights");
     if (isInspectorOverlay) setAiOpen(false);
-    setInspectorOpen(isInspectorOverlay);
+    setInspectorOpen(true);
     updateUrl({
       selected: asset.id,
       ...(isInspectorOverlay ? { ai: false } : {}),
@@ -2068,6 +2069,8 @@ export default function MediaWorkspace({
   if (initialMode === "detail") {
     return (
       <ModuleShell
+      detailOpen={inspectorOpen}
+      onBack={() => setInspectorOpen(false)}
         module="media"
         sidebar={sidebar}
         inspector={inspector}
@@ -2134,6 +2137,8 @@ export default function MediaWorkspace({
 
   return (
     <ModuleShell
+      detailOpen={inspectorOpen}
+      onBack={() => { setInspectorOpen(false); if (initialMode === "index") updateUrl({ selected: "" }); }}
       module="media"
       sidebar={sidebar}
       inspector={inspector}

@@ -99,7 +99,7 @@ export default function MediaUploadQueueWorkspace() {
   const dragDepth = useRef(0);
   const searchParamKey = searchParams.toString();
   const isMobile = useMediaQuery("(max-width: 760px)");
-  const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
+  const isInspectorOverlay = false;
 
   const duplicateMatches = useMemo(() => localDuplicateCandidates(candidates), [candidates]);
   const queryScope = useMemo(
@@ -243,7 +243,7 @@ export default function MediaUploadQueueWorkspace() {
     setSelectedId(candidate.localId);
     setActiveTab("intake");
     updateUrl({ tab: "intake" });
-    if (isInspectorOverlay) setInspectorOpen(true);
+    setInspectorOpen(true);
   }
 
   function selectVisible() {
@@ -379,7 +379,7 @@ export default function MediaUploadQueueWorkspace() {
 
   return (
     <>
-      <ModuleShell
+      <ModuleShell detailOpen={inspectorOpen} onBack={() => setInspectorOpen(false)}
         module="media"
         sidebar={sidebar}
         inspector={inspector}

@@ -178,7 +178,7 @@ export default function MediaDuplicatesWorkspace({
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const isInspectorOverlay = useMediaQuery("(max-width: 1240px)");
+  const isInspectorOverlay = false;
 
   const evidence = useMemo(() => buildMediaDuplicateEvidence(initialAssets), [initialAssets]);
   const selectedGroup = useMemo(
@@ -236,7 +236,7 @@ export default function MediaDuplicatesWorkspace({
   function selectGroup(groupId: string) {
     updateUrl({ selected: groupId }, "push");
     setMobileSidebarOpen(false);
-    if (isInspectorOverlay) setInspectorOpen(true);
+    setInspectorOpen(true);
   }
 
   function setChecked(groupId: string, checked: boolean) {
@@ -251,7 +251,7 @@ export default function MediaDuplicatesWorkspace({
   function showSelectedComparison() {
     if (!selectedGroup) return;
     updateUrl({ tab: "compare" });
-    if (isInspectorOverlay) setInspectorOpen(true);
+    setInspectorOpen(true);
   }
 
   const visibleSelectedCount = visibleGroups.filter((group) => batchSelection.has(group.id)).length;
@@ -636,7 +636,7 @@ export default function MediaDuplicatesWorkspace({
   ) : undefined;
 
   return (
-    <ModuleShell
+    <ModuleShell detailOpen={inspectorOpen} onBack={() => setInspectorOpen(false)}
       module="media"
       sidebar={sidebar}
       inspector={inspector}

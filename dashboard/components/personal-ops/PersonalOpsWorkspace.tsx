@@ -58,6 +58,7 @@ import {
   type PersonalOpsMetricItem,
   type PersonalOpsTone
 } from "./PersonalOpsPrimitives";
+import { WorkspaceTopbarProvider } from "../admin-shell/WorkspaceTopbar";
 import PersonalOpsSidebar, {
   PERSONAL_OPS_DOMAIN_LABELS,
   type PersonalOpsSidebarCounts
@@ -1521,7 +1522,7 @@ export default function PersonalOpsWorkspace({
     : "";
 
   return (
-    <div className={`${styles.shell} work-surface`} data-has-inspector={Boolean(selectedItem)}>
+    <WorkspaceTopbarProvider><div className={`${styles.shell} work-surface`} data-has-inspector={Boolean(selectedItem)} data-personal-pages data-detail-open={Boolean(selectedItem && mobileInspectorOpen) || undefined}>
       <PersonalOpsSidebar
         activeView={initialView}
         filter={urlState.filter}
@@ -1641,11 +1642,13 @@ export default function PersonalOpsWorkspace({
           <button className={[styles.scrim, styles.inspectorScrim].join(" ")} data-open={mobileInspectorOpen || undefined} onClick={() => setMobileInspectorOpen(false)} aria-label="Close inspector" />
           <InspectorRail
             className={styles.inspector}
-            overlay
+            overlay={false}
+            hidden={!mobileInspectorOpen}
             overlayOpen={mobileInspectorOpen}
             onRequestClose={() => setMobileInspectorOpen(false)}
             busy={busy}
           >
+            <button type="button" className="workspace-back work-button" onClick={() => setMobileInspectorOpen(false)}>Back</button>
             <header className={styles.inspectorHeader}>
               <div className={styles.inspectorTop}>
                 <span className={styles.objectIcon} aria-hidden="true">{selectedItem.source === "legacy-goal" ? "G" : selectedItem.objectType === "decision" ? "D" : selectedItem.objectType === "obligation" ? "O" : selectedItem.objectType === "follow_up" ? "F" : "G"}</span>
@@ -1852,6 +1855,6 @@ export default function PersonalOpsWorkspace({
           allowedActions: ["Draft a proposal", "Summarize context", "Suggest links for review"]
         }}
       />
-    </div>
+    </div></WorkspaceTopbarProvider>
   );
 }

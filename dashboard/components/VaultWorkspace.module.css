@@ -886,3 +886,14 @@
 .workspaceSync { scroll-margin-top: calc(var(--app-content-offset) + 16px); }
 
 .headerControls { display:flex; align-items:center; justify-content:flex-end; gap:12px; min-width:0; }
+
+/* Records open into a full-width page; returning keeps the draft intact. */
+.objectGrid { display: block; }
+.objectGrid:not([data-record-page]) > .objectEditor,
+.objectGrid:not([data-record-page]) > .historyList,
+.objectGrid[data-record-page] > .objectList { display: none; }
+.objectList { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 10px; max-height: none; }
+.objectEditor { width: 100%; animation: vault-record-in 260ms ease-out; }
+.historyList { max-height: none; margin-top: 20px; }
+@keyframes vault-record-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .objectEditor { animation: none; } }

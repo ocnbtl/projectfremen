@@ -273,6 +273,7 @@ export default function VaultWorkspace({
   const [historyCount, setHistoryCount] = useState(0);
   const [objects, setObjects] = useState<VaultObjectSnapshot[]>([]);
   const [activeKind, setActiveKind] = useState<VaultObjectKind | "all">(initialKind);
+  const [recordPageOpen, setRecordPageOpen] = useState(false);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [objectDraft, setObjectDraft] = useState<Record<string, EditorDraftValue>>({ title: "", body: "" });
   const [objectDraftBaseline, setObjectDraftBaseline] = useState<Record<string, EditorDraftValue>>({ title: "", body: "" });
@@ -714,6 +715,10 @@ export default function VaultWorkspace({
   }
 
   async function selectObject(snapshot: VaultObjectSnapshot, skipDiscardCheck = false): Promise<boolean> {
+    if (!skipDiscardCheck && snapshot.objectId === selectedObjectId && hasUnsavedRecordChanges) {
+      setRecordPageOpen(true);
+      return true;
+    }
     if (
       !skipDiscardCheck
       && snapshot.objectId !== selectedObjectId
@@ -722,6 +727,7 @@ export default function VaultWorkspace({
     ) return false;
     setMediaPreview(null);
     setSelectedObjectId(snapshot.objectId);
+    setRecordPageOpen(true);
     const metadata = readCanonicalMetadata(snapshot.fields);
     const nextDraft = metadata?.editableFields.length
       ? editorDraft(snapshot.fields, metadata.editableFields)
@@ -750,10 +756,11 @@ export default function VaultWorkspace({
     return true;
   }
 
-  function newObject(): boolean {
+  function newObject(open = true): boolean {
     if (hasUnsavedRecordChanges && !window.confirm("Discard the unsaved changes to this record?")) return false;
     setMediaPreview(null);
     setSelectedObjectId(null);
+    setRecordPageOpen(open);
     const nextDraft = { title: "", body: "", email: "", phone: "", location: "", url: "" };
     setObjectDraft(nextDraft);
     setObjectDraftBaseline(nextDraft);
@@ -1180,6 +1187,7 @@ export default function VaultWorkspace({
 
           <section id="vault-records" tabIndex={-1} className={`${styles.panel} ${styles.objectWorkspace}`}>
             <div className={styles.searchRow}>
+              {!recordPageOpen && hasUnsavedRecordChanges && <button type="button" onClick={() => setRecordPageOpen(true)}>Resume draft</button>}
               <label className={styles.recordSearch}><span className={styles.searchLabel}>Search all records</span><input ref={recordSearchRef} type="search" value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} placeholder="Search all records" /></label>
               {recordQuery.trim() && <button className={styles.quietButton} disabled={busy} onClick={() => void saveCurrentSearch()}>Save search</button>}
               {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={() => { void newObject(); }}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
@@ -1193,10 +1201,10 @@ export default function VaultWorkspace({
             </div>}
             <div className={styles.kindTabs} role="tablist" aria-label="Vault object kinds">
               {RECORD_TABS.map((tab) => (
-                <button key={tab.value} role="tab" aria-selected={activeKind === tab.value} onClick={() => { if (newObject()) setActiveKind(tab.value); }}>{tab.label}</button>
+                <button key={tab.value} role="tab" aria-selected={activeKind === tab.value} onClick={() => { if (newObject(false)) setActiveKind(tab.value); }}>{tab.label}</button>
               ))}
             </div>
-            <div className={styles.objectGrid}>
+            <div className={styles.objectGrid} data-record-page={recordPageOpen || undefined}>
               <aside className={styles.objectList} aria-label="Saved records">
                 {visibleObjects.map((item) => (
                   <button key={item.objectId} data-selected={selectedObjectId === item.objectId} onClick={() => void selectObject(item)}>
@@ -1210,6 +1218,7 @@ export default function VaultWorkspace({
                 </button>}
               </aside>
               <div className={styles.objectEditor}>
+                <button type="button" className="workspace-back" onClick={() => setRecordPageOpen(false)}><UnigentamosIcon role="chevron-right" size={18} style={{ transform: "rotate(180deg)" }} />Back to records</button>
                 {canEditRecord ? <>
                   <div className={styles.recordEditorHeader}>
                     <div>

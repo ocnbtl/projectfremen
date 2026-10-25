@@ -615,7 +615,7 @@ export default function ReviewsWorkspace({
   const [queryDraft, setQueryDraft] = useState(urlState.query);
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [mobileInspectorOpen, setMobileInspectorOpen] = useState(initialMode === "index" && Boolean(urlState.review || initialSelectedReviewId));
-  const [inspectorOverlay, setInspectorOverlay] = useState(false);
+  const inspectorOverlay = false;
   const [discardSummaryOpen, setDiscardSummaryOpen] = useState(false);
   const [legacyConversion, setLegacyConversion] = useState<LegacyReviewRunProjection | null>(null);
   const [editor, setEditor] = useState<EditorState | null>(null);
@@ -723,19 +723,10 @@ export default function ReviewsWorkspace({
     if (confirmation && error) confirmationErrorRef.current?.focus();
   }, [confirmation, error]);
 
-  useEffect(() => {
-    const media = window.matchMedia("(max-width: 1180px)");
-    const update = () => {
-      setInspectorOverlay(media.matches);
-      if (!media.matches) setMobileInspectorOpen(false);
-    };
-    update();
-    media.addEventListener("change", update);
-    return () => media.removeEventListener("change", update);
-  }, []);
+
 
   useEffect(() => {
-    if (initialMode !== "index" || !inspectorOverlay) {
+    if (initialMode !== "index") {
       lastSelectedIdRef.current = selectedId;
       return;
     }
@@ -1277,7 +1268,7 @@ export default function ReviewsWorkspace({
       `${result.data.created ? "Converted" : "Reused"} the legacy review as a native ReviewRun without deleting its source.${refreshed ? "" : " The confirmed response is shown, but the collection refresh failed."}`
     );
     updateUrl({ review: result.data.item.id, tab: "overview" }, true);
-    if (inspectorOverlay) setMobileInspectorOpen(true);
+    setMobileInspectorOpen(true);
   }
 
   function selectItem(item: DirectoryItem) {
@@ -1287,7 +1278,7 @@ export default function ReviewsWorkspace({
       } else {
         updateUrl({ review: item.run.id, tab: "overview" }, true);
       }
-      if (inspectorOverlay) setMobileInspectorOpen(true);
+      setMobileInspectorOpen(true);
     });
   }
 
@@ -2021,6 +2012,8 @@ export default function ReviewsWorkspace({
   return (
     <>
       <ModuleShell
+      detailOpen={mobileInspectorOpen}
+      onBack={() => proceedWithNavigation(() => { setMobileInspectorOpen(false); if (initialMode === "index") updateUrl({ review: "" }); })}
         module="reviews"
         sidebar={sidebar}
         inspector={initialMode === "detail" ? detailInspector : inspector}

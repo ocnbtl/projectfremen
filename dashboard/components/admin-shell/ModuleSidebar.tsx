@@ -3,7 +3,9 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useState } from "react";
+import { WorkspaceTopbarContext } from "./WorkspaceTopbar";
+import * as Popover from "@radix-ui/react-popover";
 
 export type ModuleSidebarItem = {
   id: string;
@@ -101,100 +103,44 @@ function SidebarItem({ item, onNavigate }: { item: ModuleSidebarItem; onNavigate
   );
 }
 
-export default function ModuleSidebar({
-  id,
-  title,
-  description,
-  status,
-  sections,
-  footer,
-  mobileOpen = false,
-  onClose,
-  ariaLabel = `${title} navigation`,
-  className
-}: ModuleSidebarProps) {
-  const sidebarRef = useRef<HTMLElement>(null);
-  const onCloseRef = useRef(onClose);
-
+export default function ModuleSidebar({ id, title, sections, footer, status, onClose, ariaLabel = title + " navigation" }: ModuleSidebarProps) {
+  const bar = useContext(WorkspaceTopbarContext);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [compact, setCompact] = useState(false);
   useEffect(() => {
-    onCloseRef.current = onClose;
-  }, [onClose]);
-
-  useEffect(() => {
-    if (!mobileOpen || !sidebarRef.current) return;
-    const previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    const focusable = () => Array.from(
-      sidebarRef.current?.querySelectorAll<HTMLElement>(
-        "button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex='-1'])"
-      ) || []
-    );
-    focusable()[0]?.focus();
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onCloseRef.current?.();
-        return;
-      }
-      if (event.key !== "Tab") return;
-      const controls = focusable();
-      if (!controls.length) return;
-      const first = controls[0];
-      const last = controls[controls.length - 1];
-      if (event.shiftKey && document.activeElement === first) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && document.activeElement === last) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      previousFocus?.focus();
-    };
-  }, [mobileOpen]);
-
-  return (
-    <aside
-      ref={sidebarRef}
-      id={id}
-      className={["module-sidebar", mobileOpen && "is-mobile-open", className].filter(Boolean).join(" ")}
-      aria-label={ariaLabel}
-      role={mobileOpen ? "dialog" : undefined}
-      aria-modal={mobileOpen || undefined}
-      data-mobile-open={mobileOpen || undefined}
-    >
-      <header className="module-sidebar__header">
-        <div>
-          <p className="module-sidebar__eyebrow">Module</p>
-          <p className="module-sidebar__title">{title}</p>
-          {description && <p>{description}</p>}
-        </div>
-        {onClose && (
-          <button type="button" className="module-sidebar__close" onClick={onClose} aria-label={`Close ${title} navigation`} data-icon-button="standard">
-            <UnigentamosIcon role="close" size={20} />
-          </button>
-        )}
-        {status && <div className="module-sidebar__status">{status}</div>}
-      </header>
-
-      <nav className="module-sidebar__navigation" aria-label={ariaLabel}>
-        {sections.map((section) => (
-          <section className="module-sidebar__section" aria-labelledby={section.label ? `module-sidebar-${section.id}` : undefined} key={section.id}>
-            {section.label && <h2 id={`module-sidebar-${section.id}`}>{section.label}</h2>}
-            <ul>
-              {section.items.map((item) => (
-                <li key={item.id}>
-                  <SidebarItem item={item} onNavigate={onClose} />
-                </li>
-              ))}
-            </ul>
-          </section>
-        ))}
-      </nav>
-
-      {footer && <footer className="module-sidebar__footer">{footer}</footer>}
-    </aside>
-  );
+    const query = window.matchMedia("(max-width: 900px)");
+    const sync = () => setCompact(query.matches);
+    sync(); query.addEventListener("change", sync);
+    return () => query.removeEventListener("change", sync);
+  }, []);
+  const [openSection, setOpenSection] = useState<string | null>(null);
+  const close = () => { setOpenSection(null); onClose?.(); };
+  return <nav id={id} className="workspace-topnav" aria-label={ariaLabel}>
+    <h1 className="workspace-topnav__title">{title}</h1>
+    {bar && <div className="workspace-topnav__search" ref={bar.setSearch} />}
+    {compact && sections.length > 0 && <Popover.Root open={openSection === "compact"} onOpenChange={open => setOpenSection(open ? "compact" : null)}>
+      <Popover.Trigger className="workspace-nav-trigger"><UnigentamosIcon role="menu" size={18} /><span>Views</span></Popover.Trigger>
+      <Popover.Portal><Popover.Content className="workspace-nav-menu" align="end" sideOffset={8} collisionPadding={12}>
+        {sections.map(section => <section key={section.id}><p>{section.label}</p><ul>{section.items.map(item => <li key={item.id}><SidebarItem item={item} onNavigate={close} /></li>)}</ul></section>)}
+        {footer}
+      </Popover.Content></Popover.Portal>
+    </Popover.Root>}
+    {!compact && <div className="workspace-topnav__sections">
+      {sections.filter(section => section.items.length).map(section => {
+        const active = section.items.find(item => item.active);
+        return <Popover.Root key={section.id} open={openSection === section.id} onOpenChange={open => setOpenSection(open ? section.id : null)}>
+          <Popover.Trigger className="workspace-nav-trigger" aria-label={section.label || title + " views"}>
+            {active?.icon}<span>{active?.label || section.label || "Views"}</span><UnigentamosIcon role="chevron-down" size={16} />
+          </Popover.Trigger>
+          <Popover.Portal><Popover.Content className="workspace-nav-menu" align="start" sideOffset={8} collisionPadding={12}>
+            {section.label && <p>{section.label}</p>}
+            <ul>{section.items.map(item => <li key={item.id}><SidebarItem item={item} onNavigate={close} /></li>)}</ul>
+          </Popover.Content></Popover.Portal>
+        </Popover.Root>;
+      })}
+    </div>}
+    {status && <div className="workspace-nav-status">{status}</div>}
+    {footer && !compact && <Popover.Root><Popover.Trigger className="workspace-nav-trigger" aria-label={title + " tools"}><UnigentamosIcon role="sliders" size={18} /><span>Tools</span></Popover.Trigger><Popover.Portal><Popover.Content className="workspace-nav-menu" align="end" sideOffset={8} collisionPadding={12}>{footer}</Popover.Content></Popover.Portal></Popover.Root>}
+    {bar && (compact ? <Popover.Root open={actionsOpen} onOpenChange={setActionsOpen}><Popover.Trigger className="workspace-nav-trigger workspace-actions-trigger"><UnigentamosIcon role="plus" size={18} /><span>Actions</span></Popover.Trigger><Popover.Portal forceMount><Popover.Content forceMount className="workspace-nav-menu workspace-actions-menu" align="end" sideOffset={8} collisionPadding={12}><div className="workspace-topnav__actions" ref={bar.setActions} onClick={event => { if ((event.target as HTMLElement).closest("button, a")) setActionsOpen(false); }} /></Popover.Content></Popover.Portal></Popover.Root> : <div className="workspace-topnav__actions" ref={bar.setActions} />)}
+  </nav>;
 }

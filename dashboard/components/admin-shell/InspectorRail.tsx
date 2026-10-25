@@ -1,7 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
+import { WorkspacePageContext } from "./WorkspacePageContext";
 
 export type InspectorRailProps = {
   id?: string;
@@ -38,6 +39,8 @@ export default function InspectorRail({
   showCloseButton = true,
   resolveReturnFocus
 }: InspectorRailProps) {
+  const page = useContext(WorkspacePageContext);
+  if (page) overlay = false;
   const railRef = useRef<HTMLElement>(null);
   const closeRef = useRef(onRequestClose);
   const returnFocusRef = useRef(resolveReturnFocus);

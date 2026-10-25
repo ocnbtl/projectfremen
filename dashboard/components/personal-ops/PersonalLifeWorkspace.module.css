@@ -369,3 +369,11 @@
 .editor[data-trip-editor] footer button {font:500 14px/20px var(--font-body);min-height:42px;border-radius:8px;}
 .editor[data-trip-editor] .coordinateFields legend {font:500 12px/18px var(--font-body);}
 @media(max-width:600px){.editor[data-trip-editor]{padding:16px;}.editor[data-trip-editor] input,.editor[data-trip-editor] select,.editor[data-trip-editor] textarea,.editor[data-trip-editor] :global(.app-select-trigger){font-size:16px;min-height:44px;}}
+
+.notebook { display: block; min-height: 0; }
+.notebook:not([data-list-page]) .listPage, .notebook[data-list-page] .listIndex { display: none; }
+.notebook .listIndex { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); border: 0; gap: 8px; overflow: visible; }
+.notebook .listIndex button { min-height: 50px; border-radius: 10px; }
+.notebook .listPage { animation: list-page-in 260ms ease-out; }
+@keyframes list-page-in { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .notebook .listPage { animation: none; } }

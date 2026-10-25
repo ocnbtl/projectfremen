@@ -1,4 +1,6 @@
 "use client";
+import ModuleShell from "../admin-shell/ModuleShell";
+import ModuleSidebar from "../admin-shell/ModuleSidebar";
 import LogoLoader from "../operational/LogoLoader";
 import Link from "next/link";
 import {
@@ -22,7 +24,6 @@ import {
   WorkspaceToolbar,
   WorkspaceButton as Button,
   WorkspaceFeedback,
-  WorkspaceSheet,
   WorkspaceEmpty,
 } from "../admin-shell/WorkspaceKit";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -416,6 +417,101 @@ export default function MediaLibrary({
     ? visible.findIndex((x) => x.objectId === selected.objectId)
     : -1;
   return (
+    <ModuleShell module="media" detailOpen={Boolean(selected)} onBack={() => setSelected(undefined)} sidebar={<ModuleSidebar title="Media" sections={[]} />} inspector={<section className="media-detail-page">        {selected && profile && (
+          <div className="work-form">
+            <div className={styles.viewer}>
+              {preview ? (
+                profile.manifest.mimeType.startsWith("image/") ? (
+                  <img src={preview} alt={profile.altText || title} />
+                ) : profile.manifest.mimeType.startsWith("video/") ? (
+                  <video src={preview} controls />
+                ) : profile.manifest.mimeType.startsWith("audio/") ? (
+                  <audio src={preview} controls />
+                ) : (
+                  <p>Download to open this file.</p>
+                )
+              ) : (
+                <LogoLoader label="Loading encrypted file" />
+              )}
+            </div>
+            <div className="work-actions">
+              <Button
+                disabled={position <= 0}
+                onClick={() => open(visible[position - 1])}
+              >
+                Previous
+              </Button>
+              <Button
+                disabled={position < 0 || position >= visible.length - 1}
+                onClick={() => open(visible[position + 1])}
+              >
+                Next
+              </Button>
+              {preview && (
+                <a
+                  className="work-button"
+                  href={preview}
+                  download={profile.manifest.fileName}
+                >
+                  Download
+                </a>
+              )}
+            </div>
+            <WorkspaceFeedback error={error} />
+            <label>
+              Name
+              <input value={title} onChange={(e) => setTitle(e.target.value)} />
+            </label>
+            <label>
+              Description
+              <textarea
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </label>
+            <label>
+              Image description
+              <input
+                value={profile.altText}
+                onChange={(e) =>
+                  setProfile({ ...profile, altText: e.target.value })
+                }
+              />
+            </label>
+            {profile.location && (
+              <p className="work-muted">
+                Photo location: {profile.location.latitude.toFixed(5)},{" "}
+                {profile.location.longitude.toFixed(5)} ·{" "}
+                <Link
+                  href={`/admin/map?${new URLSearchParams({ latitude: String(profile.location.latitude), longitude: String(profile.location.longitude), name: title })}`}
+                >
+                  Open location in Map
+                </Link>
+              </p>
+            )}
+            <RecordLinks
+              refs={profile.linkedRefs}
+              available={context?.refs.filter(
+                (ref) => ref.objectId !== selected.fields.id,
+              )}
+              onChange={(refs) => setProfile({ ...profile, linkedRefs: refs })}
+            />
+            <div className="work-actions">
+              <Button intent="primary" busy={busy} onClick={() => void save()}>
+                Save details
+              </Button>
+              <Button
+                busy={busy}
+                onClick={() =>
+                  void save(profile.archivedAt ? "" : new Date().toISOString())
+                }
+              >
+                {profile.archivedAt ? "Restore" : "Archive"}
+              </Button>
+            </div>
+          </div>
+        )}
+</section>}>
     <div className="work-surface">
       <WorkspaceHeader
         title="Media"
@@ -744,106 +840,7 @@ export default function MediaLibrary({
             : "Images, video, audio, and documents keep their encrypted identity across the product."}
         </WorkspaceEmpty>
       )}
-      <WorkspaceSheet
-        open={Boolean(selected)}
-        title={title || "Media preview"}
-        onClose={() => setSelected(undefined)}
-      >
-        {selected && profile && (
-          <div className="work-form">
-            <div className={styles.viewer}>
-              {preview ? (
-                profile.manifest.mimeType.startsWith("image/") ? (
-                  <img src={preview} alt={profile.altText || title} />
-                ) : profile.manifest.mimeType.startsWith("video/") ? (
-                  <video src={preview} controls />
-                ) : profile.manifest.mimeType.startsWith("audio/") ? (
-                  <audio src={preview} controls />
-                ) : (
-                  <p>Download to open this file.</p>
-                )
-              ) : (
-                <LogoLoader label="Loading encrypted file" />
-              )}
-            </div>
-            <div className="work-actions">
-              <Button
-                disabled={position <= 0}
-                onClick={() => open(visible[position - 1])}
-              >
-                Previous
-              </Button>
-              <Button
-                disabled={position < 0 || position >= visible.length - 1}
-                onClick={() => open(visible[position + 1])}
-              >
-                Next
-              </Button>
-              {preview && (
-                <a
-                  className="work-button"
-                  href={preview}
-                  download={profile.manifest.fileName}
-                >
-                  Download
-                </a>
-              )}
-            </div>
-            <WorkspaceFeedback error={error} />
-            <label>
-              Name
-              <input value={title} onChange={(e) => setTitle(e.target.value)} />
-            </label>
-            <label>
-              Description
-              <textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-              />
-            </label>
-            <label>
-              Image description
-              <input
-                value={profile.altText}
-                onChange={(e) =>
-                  setProfile({ ...profile, altText: e.target.value })
-                }
-              />
-            </label>
-            {profile.location && (
-              <p className="work-muted">
-                Photo location: {profile.location.latitude.toFixed(5)},{" "}
-                {profile.location.longitude.toFixed(5)} ·{" "}
-                <Link
-                  href={`/admin/map?${new URLSearchParams({ latitude: String(profile.location.latitude), longitude: String(profile.location.longitude), name: title })}`}
-                >
-                  Open location in Map
-                </Link>
-              </p>
-            )}
-            <RecordLinks
-              refs={profile.linkedRefs}
-              available={context?.refs.filter(
-                (ref) => ref.objectId !== selected.fields.id,
-              )}
-              onChange={(refs) => setProfile({ ...profile, linkedRefs: refs })}
-            />
-            <div className="work-actions">
-              <Button intent="primary" busy={busy} onClick={() => void save()}>
-                Save details
-              </Button>
-              <Button
-                busy={busy}
-                onClick={() =>
-                  void save(profile.archivedAt ? "" : new Date().toISOString())
-                }
-              >
-                {profile.archivedAt ? "Restore" : "Archive"}
-              </Button>
-            </div>
-          </div>
-        )}
-      </WorkspaceSheet>
-    </div>
+
+    </div></ModuleShell>
   );
 }

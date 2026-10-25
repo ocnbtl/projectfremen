@@ -168,6 +168,7 @@ export default function PersonalLifeWorkspace({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState(initialLoadError || "");
+  const [listPageOpen, setListPageOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState(initialState.lists[0]?.id || "");
   const [listDraft, setListDraft] = useState<PersonalList | null>(initialState.lists[0] || null);
   const [listColumnType, setListColumnType] = useState<PersonalListColumnType>("text");
@@ -348,6 +349,7 @@ export default function PersonalLifeWorkspace({
     if (!saved) return;
     if (editor.collection === "lists") {
       setSelectedListId(saved.id);
+      setListPageOpen(true);
       setListDraft(saved as PersonalList);
     }
     if (editor.collection === "trips") setSelectedTripId(saved.id);
@@ -475,8 +477,10 @@ export default function PersonalLifeWorkspace({
   }
 
   function selectList(list: PersonalList) {
+    if (list.id !== selectedListId && listDraft && JSON.stringify(listDraft) !== JSON.stringify(selectedList) && !window.confirm("Discard the unsaved changes to this list?")) return;
+    setListPageOpen(true);
     setSelectedListId(list.id);
-    setListDraft(list);
+    if (list.id !== selectedListId || !listDraft) setListDraft(list);
   }
 
   function updateListDraft(update: (current: PersonalList) => PersonalList) {
@@ -641,12 +645,13 @@ export default function PersonalLifeWorkspace({
   }
 
   function renderLists() {
-    return <div className={styles.notebook}>
+    return <div className={styles.notebook} data-list-page={listPageOpen || undefined}>
       <aside className={styles.listIndex} aria-label="Lists">
         {state.lists.map((list) => <button type="button" data-active={selectedList?.id === list.id || undefined} onClick={() => selectList(list)} key={list.id}><span>{list.title}</span><small>{list.rows.filter((row) => row.completed).length}/{list.rows.length}</small></button>)}
         {!state.lists.length && <p>No lists yet.</p>}
       </aside>
       <section className={styles.listPage}>
+        <button type="button" className="workspace-back" onClick={() => setListPageOpen(false)}>Back to lists</button>
         {workingList && selectedList ? <>
           <header className={styles.listEditorHeader}>
             <div className={styles.listIdentityEditor}>
@@ -742,7 +747,7 @@ export default function PersonalLifeWorkspace({
     setPinFieldVisible(false);
   }
 
-  return <div className={baseStyles.shell}>
+  return <div className={baseStyles.shell} data-personal-pages>
     <PersonalOpsSidebar activeView={initialView} filter="" pathname={`/admin/personal/${initialView}`} counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
     <main className={baseStyles.directory}>
       <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal</button><button type="button" className={initialView === "passwords" ? styles.mobileAddAction : undefined} onClick={() => openCreate()}><PersonalOpsIcon name="plus" /><span>{copy.action}</span></button></div>

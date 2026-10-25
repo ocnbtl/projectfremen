@@ -6,13 +6,16 @@ import {
   useLayoutEffect,
   type CSSProperties,
   useId,
+  useContext,
   useRef,
   useState,
   type ReactNode,
   type ButtonHTMLAttributes,
 } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
+import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import { WorkspaceNavSlot, WorkspaceTopbarContext } from "./WorkspaceTopbar";
 
 export function WorkspaceButton({
   children,
@@ -54,6 +57,8 @@ export function WorkspaceHeader({
   count?: number;
   children?: ReactNode;
 }) {
+  const bar = useContext(WorkspaceTopbarContext);
+  if (bar) return <WorkspaceNavSlot kind="actions"><div className="work-actions">{count !== undefined && <span className="work-count" aria-label={`${count} items`}>{count}</span>}{children}</div></WorkspaceNavSlot>;
   return (
     <header className="work-header">
       <div className="work-title">
@@ -80,9 +85,10 @@ export function WorkspaceToolbar({
   activeFilters?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const bar = useContext(WorkspaceTopbarContext);
   return (
     <>
-      <div className="work-toolbar">
+      <WorkspaceNavSlot kind="search"><div className="work-toolbar">
         <label className="work-search">
           <UnigentamosIcon role="search" size={20} />
           <input
@@ -103,8 +109,8 @@ export function WorkspaceToolbar({
             Filter{activeFilters ? ` (${activeFilters})` : ""}
           </WorkspaceButton>
         )}
-        {children}
-      </div>
+        {bar && children ? <Popover.Root><Popover.Trigger className="workspace-nav-trigger" aria-label="View options"><UnigentamosIcon role="sliders" size={18} /></Popover.Trigger><Popover.Portal><Popover.Content className="workspace-nav-menu workspace-view-options" align="end" sideOffset={8} collisionPadding={12}>{children}</Popover.Content></Popover.Portal></Popover.Root> : children}
+      </div></WorkspaceNavSlot>
       {expanded && <div className="work-filters">{filters}</div>}
     </>
   );

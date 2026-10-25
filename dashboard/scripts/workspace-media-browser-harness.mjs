@@ -685,7 +685,7 @@ try {
     "PASS Durable encrypted upload queue after quota failure, navigation, pause and retry",
   );
   await page.getByRole("button", { name: /fixture-photo.png/ }).click();
-  await page.getByRole("dialog").locator("img").waitFor();
+  await page.locator(".workspace-detail-page").locator("img").waitFor();
   await page
     .getByLabel("Image description", { exact: true })
     .fill("Isolated encrypted photo fixture");
@@ -703,9 +703,12 @@ try {
   }
   await page.getByRole("button", { name: "Save details", exact: true }).click();
   await page
-    .getByRole("button", { name: "Close details", exact: true })
+    .getByRole("button", { name: "Back", exact: true })
     .click();
   await page.getByRole("button", { name: "Add files", exact: true }).waitFor();
+  await page.locator('.module-shell__main').evaluate(async element => {
+    await Promise.all(element.getAnimations().map(animation => animation.finished));
+  });
   await page.waitForFunction(
     () => !document.querySelector('button[aria-busy="true"]'),
   );
@@ -715,7 +718,9 @@ try {
   const beforeSelect = await page
     .getByRole("button", { name: /fixture-photo.png/ })
     .boundingBox();
+  await page.getByRole("button", { name: "View options", exact: true }).click();
   await page.getByRole("button", { name: "Select files", exact: true }).click();
+  await page.keyboard.press("Escape");
   await page
     .getByRole("checkbox", { name: "Select fixture-photo.png", exact: true })
     .check();
@@ -782,7 +787,7 @@ try {
     path: path.join(artifactRoot, "media-photo-reopened.png"),
   });
   await page
-    .getByRole("button", { name: "Close details", exact: true })
+    .getByRole("button", { name: "Back", exact: true })
     .click();
   await page.locator('a[href="/admin/calendar"]').first().click();
   await page.getByRole("button", { name: "Add event", exact: true }).waitFor();

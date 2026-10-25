@@ -17,6 +17,7 @@ import "./scrollbars.css";
 import "./finance-accounts.css";
 import "./field-focus.css";
 import "./icon-buttons.css";
+import "./workspace-pages.css";
 import ServiceWorkerRegistration from "../components/ServiceWorkerRegistration";
 import NavigationHost from "../components/admin-shell/NavigationHost";
 import LoadingHost from "../components/operational/LoadingHost";

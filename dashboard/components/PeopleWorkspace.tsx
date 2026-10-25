@@ -60,6 +60,8 @@ import ConfirmationSheet from "./operational/ConfirmationSheet";
 import DetailTabs from "./operational/DetailTabs";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedProjectsPanel from "./operational/LinkedProjectsPanel";
+import { WorkspaceTopbarProvider, WorkspaceNavSlot } from "./admin-shell/WorkspaceTopbar";
+import ModuleSidebar from "./admin-shell/ModuleSidebar";
 import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import PeopleInteractions from "./people/PeopleInteractions";
@@ -2570,7 +2572,7 @@ export default function PeopleWorkspace({
       ? "directory"
       : "profile";
   const shellClassName = [
-    "people-redesign-shell",
+    "people-redesign-shell", "workspace-people-pages",
     isInteractions ? "is-interactions" : "",
     ["import", "export", "import-export"].includes(activeSidebarView) ? "is-transfer" : "",
     filteringActive ? "is-filtering" : "",
@@ -4075,83 +4077,21 @@ export default function PeopleWorkspace({
   }
 
   return (
-    <section className={shellClassName} aria-label="People workspace">
+    <WorkspaceTopbarProvider><section className={shellClassName} aria-label="People workspace">
       <PlaceSync enabled={!addingPerson && detailMode !== "edit"} onComplete={async () => { const response = await fetch("/api/personal/records", { cache: "no-store" }); const body = await response.json(); if (response.ok && body.ok && !placeSyncEditingRef.current) setPeople(body.items.filter((record: PersonalRecord) => record.className === "person" || record.className === "org")); }} />
       <span id="people-unavailable-actions" className="sr-only">
         This action is intentionally unavailable until its native owner or persistence path is connected.
       </span>
-      {mobileMenuOpen && <button className="people-mobile-menu-backdrop" aria-label="Dismiss people navigation" onClick={() => setMobileMenuOpen(false)} />}
-      <div
-        ref={mobileMenuRef}
-        className={`people-mobile-menu${mobileMenuOpen ? " is-open" : ""}`}
-        role="dialog"
-        aria-modal="true"
-        aria-label="People module navigation"
-        aria-hidden={!mobileMenuOpen}
-        inert={!mobileMenuOpen}
-      >
-        <button type="button" aria-label="Close people menu" onClick={() => setMobileMenuOpen(false)} data-icon-button="standard">
-          <PeopleIcon name="close" />
-        </button>
-        {PEOPLE_SIDEBAR_SECTIONS.map((section) => (
-          <div className={`people-sidebar-section${section.title === "Operational" ? " people-operational-row" : ""}`} key={section.title}>
-            <p>{section.title}</p>
-            {section.items.map((item) => {
-              const count = getSidebarCount(item.id);
-              return (
-                <button
-                  type="button"
-                  className={`${item.tone ? `module-ref-tone-${item.tone}` : ""}${activeSidebarView === item.id ? " is-active" : ""}`}
-                  onClick={() => selectSidebarView(item)}
-                  aria-label={section.title === "Operational" ? (item.id === "duplicates" ? `Duplicates: ${count || 0} possible pairs` : item.id === "recently-deleted" ? `Recently Deleted: ${count || 0}` : item.label) : undefined}
-                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} Possible ${count === 1 ? "Duplicate" : "Duplicates"}` : "No Duplicates Detected" : item.label) : undefined}
-                  aria-current={activeSidebarView === item.id ? "page" : undefined}
-                  data-utility={section.title === "Operational" ? item.id : undefined}
-                  data-icon-button={section.title === "Operational" ? "standard" : undefined}
-                  data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
-                  key={item.id}
-                >
-                  <UnigentamosIcon role={item.id === "duplicates" && count ? "duplicates-warning" : item.icon} candidate={item.id === "duplicates" ? count ? "zoom-cancel" : "zoom-check" : undefined} size={section.title === "Operational" ? 20 : 16} />
-                  <span>{item.label}</span>
-                  {section.title === "Operational" ? item.id === "recently-deleted" && <strong>{count || 0}</strong> : typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </div>
-
-      <aside className="people-desktop-sidebar" aria-label="People navigation">
-        {PEOPLE_SIDEBAR_SECTIONS.map((section) => (
-          <div className={`people-sidebar-section${section.title === "Operational" ? " people-operational-row" : ""}`} key={section.title}>
-            <p>{section.title}</p>
-            {section.items.map((item) => {
-              const count = getSidebarCount(item.id);
-              return (
-                <button
-                  className={`${item.tone ? `module-ref-tone-${item.tone}` : ""}${activeSidebarView === item.id ? " is-active" : ""}`}
-                  type="button"
-                  onClick={() => selectSidebarView(item)}
-                  aria-label={section.title === "Operational" ? (item.id === "duplicates" ? `Duplicates: ${count || 0} possible pairs` : item.id === "recently-deleted" ? `Recently Deleted: ${count || 0}` : item.label) : undefined}
-                  title={section.title === "Operational" ? (item.id === "duplicates" ? count ? `${count} Possible ${count === 1 ? "Duplicate" : "Duplicates"}` : "No Duplicates Detected" : item.label) : undefined}
-                  aria-current={activeSidebarView === item.id ? "page" : undefined}
-                  data-utility={section.title === "Operational" ? item.id : undefined}
-                  data-icon-button={section.title === "Operational" ? "standard" : undefined}
-                  data-duplicate-state={item.id === "duplicates" ? count ? "warning" : "clear" : undefined}
-                  key={item.id}
-                >
-                  <UnigentamosIcon role={item.id === "duplicates" && count ? "duplicates-warning" : item.icon} candidate={item.id === "duplicates" ? count ? "zoom-cancel" : "zoom-check" : undefined} size={section.title === "Operational" ? 20 : 16} />
-                  <span>{item.label}</span>
-                  {section.title === "Operational" ? item.id === "recently-deleted" && <strong>{count || 0}</strong> : typeof count === "number" ? <strong>{count}</strong> : <strong aria-hidden="true">{">"}</strong>}
-                </button>
-              );
-            })}
-          </div>
-        ))}
-      </aside>
+      <ModuleSidebar title="People" sections={PEOPLE_SIDEBAR_SECTIONS.map(section => ({
+        id: section.title, label: section.title, items: section.items.map(item => ({
+          id: item.id, label: item.label, active: activeSidebarView === item.id,
+          icon: <UnigentamosIcon role={item.icon} size={18} />,
+          count: getSidebarCount(item.id), onSelect: () => selectSidebarView(item)
+        }))
+      }))} />
 
       <main className="people-directory-panel" data-total-records={totalRecords}>
-        <header className="people-directory-header">
+        <WorkspaceNavSlot kind="actions"><header className="people-directory-header">
           <div className="people-directory-heading">
             <button type="button" className="people-mobile-nav-trigger" aria-label="Open people navigation" aria-expanded={mobileMenuOpen} onClick={() => setMobileMenuOpen(true)} data-icon-button="standard"><UnigentamosIcon role="menu" size={20} /></button>
             <h1>{activeViewLabel}</h1>
@@ -4169,7 +4109,7 @@ export default function PeopleWorkspace({
             </button>
             </>}
           </div>
-        </header>
+        </header></WorkspaceNavSlot>
 
         {isInteractions ? <PeopleInteractions
           detailTarget={interactionDetailTarget}
@@ -4184,7 +4124,7 @@ export default function PeopleWorkspace({
           onOpenPerson={selectPerson}
           error={initialLoadError}
         /> : <>
-        <div className="people-directory-tools">
+        <WorkspaceNavSlot kind="search"><div className="people-directory-tools">
           <div className="people-primary-search">
             <PeopleIcon name="search" />
             <input
@@ -4298,7 +4238,7 @@ export default function PeopleWorkspace({
             <MorphingViewIcon mode={listMode} />
             <span>View</span>
           </button>
-        </div>
+        </div></WorkspaceNavSlot>
 
         {initialLoadError ? (
           <SystemState
@@ -5362,6 +5302,6 @@ export default function PeopleWorkspace({
           allowedActions: ["Draft a follow-up", "Summarize visible profile context"]
         }}
       />
-    </section>
+    </section></WorkspaceTopbarProvider>
   );
 }

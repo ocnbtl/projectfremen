@@ -93,7 +93,7 @@ export default function DogTrackerWorkspace({ initialState, sidebarCounts, initi
   }
 
   return (
-    <div className={baseStyles.shell}>
+    <div className={baseStyles.shell} data-personal-pages>
       <PersonalOpsSidebar activeView="dog" filter="" pathname="/admin/personal/dog" counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
       <main className={baseStyles.directory} aria-label="Dog care">
         <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)}><PersonalOpsIcon name="menu" /> Personal</button><button type="button" onClick={() => setEditor(draftFor("walk"))}><PersonalOpsIcon name="plus" /> Walk</button></div>

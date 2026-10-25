@@ -10,6 +10,7 @@
     "start": "next start",
     "lint": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
+    "test:workspace-pages": "node ./scripts/workspace-pages-browser-harness.cjs",
     "test:organization-autofill": "node ./scripts/organization-autofill-harness.mjs",
     "test:organization-social-logo": "node ./scripts/organization-social-logo-harness.cjs",
     "test:people-autofill": "node ./scripts/people-autofill-harness.cjs",

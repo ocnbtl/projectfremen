@@ -53,6 +53,7 @@ import {
   type PersonalOpsMetricItem,
   type PersonalOpsTone
 } from "./PersonalOpsPrimitives";
+import { WorkspaceTopbarProvider } from "../admin-shell/WorkspaceTopbar";
 import PersonalOpsSidebar, {
   PERSONAL_OPS_DOMAIN_LABELS,
   type PersonalOpsSidebarCounts
@@ -1408,7 +1409,7 @@ export default function PersonalOpsAdvancedWorkspace({
       : ["Object type", "Required fields", "Usage", "Health", "State"];
 
   return (
-    <div className={styles.shell} data-has-inspector={Boolean(selectedItem)} data-compact={urlState.compact || undefined}>
+    <WorkspaceTopbarProvider><div className={styles.shell} data-has-inspector={Boolean(selectedItem)} data-personal-pages data-detail-open={Boolean(selectedItem && mobileInspectorOpen) || undefined} data-compact={urlState.compact || undefined}>
       <PersonalOpsSidebar
         activeView={initialView}
         filter={urlState.filter}
@@ -1569,12 +1570,14 @@ export default function PersonalOpsAdvancedWorkspace({
           />
           <InspectorRail
             className={styles.inspector}
-            overlay
+            overlay={false}
+            hidden={!mobileInspectorOpen}
             overlayOpen={mobileInspectorOpen}
             onRequestClose={() => setMobileInspectorOpen(false)}
             busy={busy}
             readOnly={isLegacy(selectedItem)}
             ariaLabel={`${selectedItem.title} inspector`}
+            title={<button type="button" className="workspace-back work-button" onClick={() => setMobileInspectorOpen(false)}>Back</button>}
             footer={!isLegacy(selectedItem) ? (
               <div className={styles.actionFooter}>
                 <span>
@@ -1651,7 +1654,7 @@ export default function PersonalOpsAdvancedWorkspace({
               </div>
             ) : (
               <>
-                <header className={styles.inspectorHeader}>
+            <header className={styles.inspectorHeader}>
                   <div className={styles.inspectorTop}>
                     <span className={styles.objectIcon} aria-hidden="true">{selectedItem.objectType === "routine" ? "↻" : selectedItem.objectType === "capture_item" ? "↳" : "▤"}</span>
                     <div>
@@ -1790,6 +1793,6 @@ export default function PersonalOpsAdvancedWorkspace({
           allowedActions: ["Draft a proposal", "Summarize visible context", "Suggest classification for review"]
         }}
       />
-    </div>
+    </div></WorkspaceTopbarProvider>
   );
 }

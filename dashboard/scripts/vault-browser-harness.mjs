@@ -353,6 +353,7 @@ try {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
   await mockVaultRuntime(context);
   page = await context.newPage();
+  page.on("pageerror", error => console.error("[vault-browser] page error:", error.message));
   const unexpectedFailures = [];
   page.on("response", (response) => {
     const pathname = new URL(response.url()).pathname;
@@ -382,9 +383,13 @@ try {
   await page.getByText("Your devices", { exact: true }).waitFor();
 
   await page.getByRole("tab", { name: "Notes" }).click();
+  await page.getByRole("button", { name: "New note", exact: true }).click();
   await page.getByLabel("Title").fill("Offline continuity note");
   await page.getByRole("textbox", { name: "Note", exact: true }).fill("first encrypted version");
   await page.getByText("Unsaved changes").waitFor();
+  await page.getByRole("button", { name: "Back to records", exact: true }).click();
+  await page.getByRole("button", { name: "Resume draft", exact: true }).click();
+  assert.equal(await page.getByLabel("Title").inputValue(), "Offline continuity note");
   await page.getByRole("button", { name: "Create record", exact: true }).click();
   await page.getByText("Saved. The full module will update automatically.").waitFor();
   await page.getByRole("button", { name: "Check now" }).click();
@@ -411,6 +416,7 @@ try {
   assert.equal([...canonicalRecords.values()].find((record) => record.fields.title === "Offline continuity note")?.fields.body, "first encrypted version");
 
   await page.getByRole("tab", { name: "Resources" }).click();
+  await page.getByRole("button", { name: "New resource", exact: true }).click();
   await page.getByLabel("Title").fill("Continuity guide");
   await page.getByLabel("URL").fill("https://example.test/continuity");
   await page.getByRole("button", { name: "Create record", exact: true }).click();
@@ -486,13 +492,15 @@ try {
   await authPage.getByRole("button", { name: "Connect this device" }).click();
   await authPage.getByRole("heading", { name: "Sign in to connect this browser" }).waitFor();
   assert.equal((await authPage.locator("body").innerText()).includes("Unauthorized"), false);
-  assert.equal(await authPage.getByRole("link", { name: "Sign in to sync" }).first().getAttribute("href"), "/admin/login?next=%2Fvault");
+  assert.equal(await authPage.getByRole("link", { name: "Sign in to sync" }).first().getAttribute("href"), "/?next=%2Fvault");
   await authPage.screenshot({ path: path.join(artifactRoot, "vault-sync-sign-in-recovery.png"), fullPage: true });
 
   await authPage.getByRole("link", { name: "Sign in to sync" }).first().click();
-  await authPage.waitForURL(`${baseUrl}/admin/login?next=%2Fvault`);
+  await authPage.waitForURL(`${baseUrl}/?next=%2Fvault`);
+  const signInToggle = authPage.getByRole("button", { name: "Sign in", exact: true });
+  await signInToggle.click();
   assert.equal(await authPage.locator('input[name="successPath"]').getAttribute("value"), "/vault");
-  assert.equal(await authPage.locator('input[name="errorPath"]').getAttribute("value"), "/admin/login?next=%2Fvault");
+  assert.equal(await authPage.locator('input[name="errorPath"]').getAttribute("value"), "/?next=%2Fvault");
   await authPage.getByLabel("Password").fill("isolated-browser-test-password");
   await authPage.getByRole("button", { name: "Enter" }).click();
   await authPage.waitForURL(`${baseUrl}/vault`);
@@ -580,6 +588,7 @@ try {
   await applePage.getByText("Device status updated.").waitFor();
   await page.getByRole("button", { name: "Check now" }).click();
   await page.getByText("Device status updated.").waitFor();
+  await page.getByRole("button", { name: "Back to records", exact: true }).click();
   await page.getByRole("button", { name: /^added-from-iphone\.txt Media/ }).click();
   const windowsPromotedDownloadPromise = page.waitForEvent("download");
   await page.getByRole("button", { name: "Open file" }).click();
@@ -731,6 +740,13 @@ try {
   await page.evaluate(() => navigator.serviceWorker.ready);
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.getByRole("heading", { name: "Unlock your vault" }).waitFor();
+  // Let the online shell finish hydrating and caching its chunks before cutting the connection.
+  await page.getByLabel("Vault password").fill("correct horse battery staple");
+  await page.waitForFunction(() => ![...document.querySelectorAll('button')].find(button => button.textContent === 'Unlock vault')?.disabled);
+  await page.waitForFunction(async () => {
+    const scripts = [...document.scripts].map(script => script.src).filter(url => url.includes('/_next/static/'));
+    return scripts.length > 0 && (await Promise.all(scripts.map(url => caches.match(url)))).every(Boolean);
+  });
   await context.setOffline(true);
   await page.reload({ waitUntil: "domcontentloaded" });
   await page.screenshot({ path: path.join(artifactRoot, "vault-offline-reload.png"), fullPage: true });
