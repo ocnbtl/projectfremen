@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
@@ -332,7 +333,7 @@ export default function ProjectAssociationSheet({
 
                 <label className={styles.field}>
                   Destination Project
-                  <select
+                  <SelectField
                     aria-label="Destination Project"
                     value={draft.projectId}
                     onChange={(event) => {
@@ -349,7 +350,7 @@ export default function ProjectAssociationSheet({
                         {project.name} · {labelize(project.lifecycle)}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                   <small>
                     Completed and archived Projects stay readable but cannot receive new links.
                   </small>
@@ -358,7 +359,7 @@ export default function ProjectAssociationSheet({
                 <div className={styles.fieldGrid}>
                   <label className={styles.field}>
                     Relationship
-                    <select
+                    <SelectField
                       aria-label="Project relationship"
                       value={draft.relationship}
                       onChange={(event) => {
@@ -376,12 +377,12 @@ export default function ProjectAssociationSheet({
                           {relationship.label}
                         </option>
                       ))}
-                    </select>
+                    </SelectField>
                   </label>
 
                   <label className={styles.field}>
                     Relationship strength
-                    <select
+                    <SelectField
                       aria-label="Relationship strength"
                       value={draft.relationshipStrength}
                       onChange={(event) =>
@@ -395,7 +396,7 @@ export default function ProjectAssociationSheet({
                       <option value="weak">Weak</option>
                       <option value="normal">Normal</option>
                       <option value="strong">Strong</option>
-                    </select>
+                    </SelectField>
                   </label>
                 </div>
 

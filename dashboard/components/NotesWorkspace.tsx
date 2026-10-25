@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "./ui/SelectField";
 import { workspaceReturnUrl } from "./admin-shell/useWorkspaceReturn";
 import RelatedRecords from "./planning/RelatedRecords";
 
@@ -1285,7 +1286,7 @@ export default function NotesWorkspace({
               <div className={styles.projectAssociationGrid}>
                 <label className={styles.field}>
                   Destination Project
-                  <select
+                  <SelectField
                     aria-label="Destination Project"
                     value={projectLinkDraft.projectId}
                     onChange={(event) => {
@@ -1302,11 +1303,11 @@ export default function NotesWorkspace({
                         {project.name} · {displayLabel(project.lifecycle)}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={styles.field}>
                   Relationship
-                  <select
+                  <SelectField
                     aria-label="Project relationship"
                     value={projectLinkDraft.relationship}
                     onChange={(event) => {
@@ -1324,11 +1325,11 @@ export default function NotesWorkspace({
                         {relationship.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={styles.field}>
                   Relationship strength
-                  <select
+                  <SelectField
                     aria-label="Relationship strength"
                     value={projectLinkDraft.relationshipStrength}
                     onChange={(event) => setProjectLinkDraft((current) => ({
@@ -1340,7 +1341,7 @@ export default function NotesWorkspace({
                     <option value="weak">Weak</option>
                     <option value="normal">Normal</option>
                     <option value="strong">Strong</option>
-                  </select>
+                  </SelectField>
                 </label>
                 <label className={styles.projectAssociationCheckbox}>
                   <input
@@ -2337,7 +2338,7 @@ export default function NotesWorkspace({
                     </label>
                     <div className={styles.controlRow}>
                       {writableSelectedLifecycle ? (
-                        <label className={styles.field}>Lifecycle<select value={draftLifecycle} onChange={(event) => setDraftLifecycle(event.target.value as NoteWritableLifecycleStatus)}><option value="draft">Draft</option><option value="active">Active</option></select></label>
+                        <label className={styles.field}>Lifecycle<SelectField value={draftLifecycle} onChange={(event) => setDraftLifecycle(event.target.value as NoteWritableLifecycleStatus)}><option value="draft">Draft</option><option value="active">Active</option></SelectField></label>
                       ) : (
                         <label className={styles.field}>Lifecycle<input value={displayLabel(currentNote.lifecycleStatus)} readOnly aria-describedby="note-lifecycle-readonly" /></label>
                       )}
@@ -2424,10 +2425,10 @@ export default function NotesWorkspace({
           </WorkspaceHeader>
           <WorkspaceToolbar query={query} onQuery={value => { setQuery(value); updateUrl({query:value}); }} placeholder="Search Notes" activeFilters={filter === "all" ? 0 : 1}
             filters={<div className={styles.chipRow}>{FILTERS.filter(item => !item.disabledReason).map(item => <WorkspaceButton key={item.id} aria-pressed={filter === item.id} onClick={() => { setFilter(item.id); updateUrl({filter:item.id}); }}>{item.label}</WorkspaceButton>)}</div>}>
-            <select className="work-compact-select" aria-label="Sort Notes" value={sort} onChange={event => { setSort(event.target.value as NotesSort); updateUrl({sort:event.target.value as NotesSort}); }}>
+            <SelectField className="work-compact-select" aria-label="Sort Notes" value={sort} onChange={event => { setSort(event.target.value as NotesSort); updateUrl({sort:event.target.value as NotesSort}); }}>
               <option value="updated-desc">Recently updated</option><option value="updated-asc">Oldest update</option><option value="created-desc">Created date</option><option value="title">Title</option><option value="review">Next review</option>
-            </select>
-            <WorkspaceButton onClick={() => { const next = density === "compact" ? "comfortable" : "compact"; setDensity(next); updateUrl({density:next}); }}>{density === "compact" ? "Comfortable" : "Compact"}</WorkspaceButton>
+            </SelectField>
+            <WorkspaceButton data-toolbar-view icon={density === "compact" ? "view-compact" : "view-comfortable"} aria-label={`View: ${density}`} onClick={() => { const next = density === "compact" ? "comfortable" : "compact"; setDensity(next); updateUrl({density:next}); }}>{density === "compact" ? "Compact" : "Comfortable"}</WorkspaceButton>
           </WorkspaceToolbar>
 
           {view === "all" && captureOpen && (
@@ -2438,8 +2439,8 @@ export default function NotesWorkspace({
               </div>
               <div className={styles.captureGrid}>
                 <label className={styles.field}>Title<input ref={captureTitleRef} value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Decision, meeting, idea, or context" required /></label>
-                <label className={styles.field}>Type<select value={noteType} onChange={(event) => setNoteType(event.target.value as LegacyWritableNoteType)}><option value="idea">Idea</option><option value="meeting">Meeting</option><option value="decision">Decision candidate</option></select></label>
-                <label className={styles.field}>Lifecycle<select value={lifecycle} onChange={(event) => setLifecycle(event.target.value as NoteWritableLifecycleStatus)}><option value="draft">Draft</option><option value="active">Active</option></select></label>
+                <label className={styles.field}>Type<SelectField value={noteType} onChange={(event) => setNoteType(event.target.value as LegacyWritableNoteType)}><option value="idea">Idea</option><option value="meeting">Meeting</option><option value="decision">Decision candidate</option></SelectField></label>
+                <label className={styles.field}>Lifecycle<SelectField value={lifecycle} onChange={(event) => setLifecycle(event.target.value as NoteWritableLifecycleStatus)}><option value="draft">Draft</option><option value="active">Active</option></SelectField></label>
               </div>
               <div className={styles.captureBody}>
                 <label className={styles.field}>Context<textarea value={body} onChange={(event) => setBody(event.target.value)} placeholder="Capture context, next action, and why it matters." /></label>

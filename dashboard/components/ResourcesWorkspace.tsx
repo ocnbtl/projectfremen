@@ -1,4 +1,5 @@
 "use client";
+import UnigentamosIcon from "./icons/UnigentamosIcon";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -294,6 +295,7 @@ export default function ResourcesWorkspace({
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [density, setDensity] = useState<"comfortable" | "compact" | "grid">(() => ["compact", "grid"].includes(searchParams.get("density") || "") ? searchParams.get("density") as "compact" | "grid" : "comfortable");
   const [resources, setResources] = useState(initialResources);
   const [firstUrlState] = useState(() => parseResourcesUrlState(searchParams));
   const [query, setQuery] = useState(firstUrlState.query);
@@ -452,6 +454,8 @@ export default function ResourcesWorkspace({
       },
       searchParams
     );
+    if (density !== "comfortable") params.set("density", density);
+    else params.delete("density");
     return `${path}${params.size ? `?${params.toString()}` : ""}`;
   }
 
@@ -1140,7 +1144,7 @@ export default function ResourcesWorkspace({
           )}
 
           <WorkspaceNavSlot kind="search"><div className={styles.resourceToolbar}>
-            <div className={styles.resourceSearch} role="search">
+            <div className={styles.resourceSearch} role="search" data-field-shell>
               <PersonalOpsIcon name="search" />
               <input
                 value={query}
@@ -1151,8 +1155,9 @@ export default function ResourcesWorkspace({
                 placeholder="Search"
                 aria-label="Search Resources"
               />
+            </div>
               <details className={styles.resourceToolbarMenu}>
-                <summary><PersonalOpsIcon name="filter" /><span>Filter</span></summary>
+                <summary aria-label="Filter Resources" title="Filter" data-icon-button="standard"><PersonalOpsIcon name="filter" /></summary>
                 <div role="menu" aria-label="Filter Resources">
                   <button type="button" aria-pressed={collection === "all" && view === "all"} onClick={(event) => { setCollection("all"); selectLibraryView("all"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>All Resources</button>
                   <button type="button" aria-pressed={collection === "components"} onClick={(event) => { setCollection("components"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>Components</button>
@@ -1161,7 +1166,7 @@ export default function ResourcesWorkspace({
                 </div>
               </details>
               <details className={styles.resourceToolbarMenu}>
-                <summary><PersonalOpsIcon name="sort" /><span>Sort</span></summary>
+                <summary aria-label="Sort Resources" title="Sort" data-icon-button="standard"><PersonalOpsIcon name="sort" /></summary>
                 <div role="menu" aria-label="Sort Resources">
                   {([
                     ["updated-desc", "Recently Updated"],
@@ -1177,7 +1182,7 @@ export default function ResourcesWorkspace({
                   ))}
                 </div>
               </details>
-            </div>
+            <button type="button" className="work-button directory-view-button" aria-label={`View: ${density}`} onClick={() => { const next = density === "comfortable" ? "compact" : density === "compact" ? "grid" : "comfortable"; setDensity(next); const url = new URL(location.href); url.searchParams.set("density",next); history.replaceState(null,"",url); }}><UnigentamosIcon role={density === "grid" ? "view-grid" : density === "compact" ? "view-compact" : "view-comfortable"} size={18}/><span>{density[0].toUpperCase()+density.slice(1)}</span></button>
           </div></WorkspaceNavSlot>
 
           {initialLoadError ? (
@@ -1185,7 +1190,7 @@ export default function ResourcesWorkspace({
           ) : unavailableViewReason ? (
             <SystemState variant="read_only" title="This Resources view is staged" description={unavailableViewReason} />
           ) : visibleResources.length ? (
-            <div className={styles.list} data-density="compact" role="list" aria-label="Resources">
+            <div className={`${styles.list} resource-directory is-${density}`} data-density={density} role="list" aria-label="Resources">
               {visibleResources.map((resource) => {
                 const queueItem = reviewQueue.byResourceId.get(resource.id);
                 const duplicateItem = duplicateEvidence.byResourceId.get(resource.id);
@@ -1204,6 +1209,7 @@ export default function ResourcesWorkspace({
                     leading={<ResourceMark resource={resource} gradient={resource.gradient} imageUrl={resource.metadata.imageUrl} className={resourceStyles.directoryMark} />}
                     description={(resource.metadata.description || resource.body || "").replace(/!?(?:\[([^\]]*)\]\([^)]*\))/g, "$1").replace(/[#*_>`~]/g, "")}
                     metadata={<span className={resourceStyles.directoryMeta}>
+                      {TYPE_LABELS[resource.type] !== "Unspecified" && <span className={resourceStyles.typePill}>{TYPE_LABELS[resource.type]}</span>}
                       {resource.source.canonicalUrl ? <span>{resource.source.displayDomain || resource.source.canonicalUrl}</span> : null}
                       <span>Added {formatDate(resource.createdAt)}</span>
                       {resource.review.nextReviewAt && <span>Review {formatDate(resource.review.nextReviewAt)}</span>}
@@ -1247,9 +1253,7 @@ export default function ResourcesWorkspace({
                               : "signals"}
                           </span>
                         </>
-                      ) : (
-                        <span className={resourceStyles.typePill}>{TYPE_LABELS[resource.type]}</span>
-                      )
+                      ) : null
                     }
                     actions={<ResourceIconButton icon="star" label={resource.pinned ? "Unpin resource" : "Pin resource"} active={resource.pinned === true} onClick={() => {
                       void createResourcesRepository().update(resource.id, { starred: !resource.pinned, expectedUpdatedAt: resource.updatedAt }).then((result) => {

@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "./ui/SelectField";
 import { useWorkspaceReturn } from "./admin-shell/useWorkspaceReturn";
 import LogoLoader from "./operational/LogoLoader";
 import VaultMediaPreview, { inertPreviewBlob } from "./VaultMediaPreview";
@@ -1247,13 +1248,13 @@ export default function VaultWorkspace({
                               rows={field.key === "body" || field.key.includes("summary") ? 10 : 5}
                               value={typeof value === "string" ? value : ""}
                               onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.value }))}
-                            /> : field.control === "select" ? <select
+                            /> : field.control === "select" ? <SelectField
                               value={typeof value === "string" ? value : ""}
                               onChange={(event) => setObjectDraft((current) => ({ ...current, [field.key]: event.target.value }))}
                             >
                               <option value="">{field.required ? "Choose one" : "Not set"}</option>
                               {(field.options || []).map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-                            </select> : <input
+                            </SelectField> : <input
                               type={field.control === "tags" ? "text" : field.control}
                               step={field.control === "number" ? field.step : undefined}
                               value={typeof value === "string" ? value : ""}
@@ -1327,7 +1328,7 @@ export default function VaultWorkspace({
                           <strong>{relationship.target?.label || relationship.targetLabel}</strong>
                           <span>{relationship.direction === "incoming" ? "Linked from" : "Links to"} {relationship.target?.moduleLabel || "another module"} / {relationshipLabel(relationship.relationship)}{relationship.status === "waiting" ? " / Waiting to sync" : relationship.target ? "" : " / Missing on this device"}</span>
                           {editingConnection && <div className={styles.connectionEditor}>
-                            <label>Link label<select value={connectionEditKind} onChange={(event) => setConnectionEditKind(event.target.value)}>{relationshipKindOptions.map((kind) => <option value={kind} key={kind}>{relationshipLabel(kind)}</option>)}</select></label>
+                            <label>Link label<SelectField value={connectionEditKind} onChange={(event) => setConnectionEditKind(event.target.value)}>{relationshipKindOptions.map((kind) => <option value={kind} key={kind}>{relationshipLabel(kind)}</option>)}</SelectField></label>
                             <label>Reason for removal or repair<input value={connectionEditReason} onChange={(event) => setConnectionEditReason(event.target.value)} placeholder="Short audit note" /></label>
                             <div>
                               <button type="button" onClick={() => void queueLinkManagement("relabel", relationship.id)}>Save label</button>
@@ -1368,7 +1369,7 @@ export default function VaultWorkspace({
                       {!relationshipTargets.length && <span className={styles.relationshipEmpty}>No matching records are stored on this device.</span>}
                     </div>
                     {relationshipTarget && <div className={styles.selectedRelationship}><span>Selected</span><strong>{relationshipTarget.label}</strong><button className={styles.quietButton} type="button" onClick={() => setRelationshipTargetId("")}>Clear</button></div>}
-                    {supportsRelationship && relationshipKindOptions.length > 1 && <label>How are they connected?<select value={relationshipKind} onChange={(event) => setRelationshipKind(event.target.value)}>{relationshipKindOptions.map((kind) => <option value={kind} key={kind}>{relationshipLabel(kind)}</option>)}</select></label>}
+                    {supportsRelationship && relationshipKindOptions.length > 1 && <label>How are they connected?<SelectField value={relationshipKind} onChange={(event) => setRelationshipKind(event.target.value)}>{relationshipKindOptions.map((kind) => <option value={kind} key={kind}>{relationshipLabel(kind)}</option>)}</SelectField></label>}
                     {supportsRelationship && <button disabled={busy || !relationshipTargetId} onClick={queueRelationship}>Connect records</button>}
                   </div>}
 
@@ -1515,7 +1516,7 @@ export default function VaultWorkspace({
                   : "Unlock the Vault to check downloaded files on this device."}</p>
                 {mediaCache && <small>{formatBytes(mediaCache.cachedBytes)} downloaded{mediaCache.reclaimableBytes ? " · " + formatBytes(mediaCache.reclaimableBytes) + " ready to clean" : " · nothing ready to clean"}</small>}
                 {mediaCache && <div className={styles.retentionControls}>
-                  <label>Keep unused downloads<select value={mediaCache.retentionDays === null ? "keep" : String(mediaCache.retentionDays)} onChange={(event) => void setMediaRetention(event.target.value === "keep" ? null : Number(event.target.value) as VaultMediaCacheRetentionDays)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="keep">Until I clean up</option></select></label>
+                  <label>Keep unused downloads<SelectField value={mediaCache.retentionDays === null ? "keep" : String(mediaCache.retentionDays)} onChange={(event) => void setMediaRetention(event.target.value === "keep" ? null : Number(event.target.value) as VaultMediaCacheRetentionDays)}><option value="7">7 days</option><option value="30">30 days</option><option value="90">90 days</option><option value="keep">Until I clean up</option></SelectField></label>
                   <button disabled={busy || mediaCache.reclaimableChunks === 0} onClick={cleanupMedia}>Clean up downloads</button>
                 </div>}
               </article>

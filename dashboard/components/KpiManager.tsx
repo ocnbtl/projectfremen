@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "./ui/SelectField";
 import LogoLoader from "./operational/LogoLoader";
 
 import { useEffect, useMemo, useState } from "react";
@@ -360,17 +361,17 @@ export default function KpiManager() {
       <form onSubmit={onSubmit} className="inline-form kpi-form" style={{ marginBottom: 12 }}>
         <label>
           Entity
-          <select value={entity} onChange={(e) => setEntity(e.target.value as EntityName)}>
+          <SelectField value={entity} onChange={(e) => setEntity(e.target.value as EntityName)}>
             {ENTITIES.map((item) => (
               <option key={item} value={item}>
                 {item}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
         <label>
           KPI Name
-          <select
+          <SelectField
             value={name}
             onChange={(e) => setName(e.target.value)}
             required
@@ -380,7 +381,7 @@ export default function KpiManager() {
                 {kpiName}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
         <label className="value-field">
           Value

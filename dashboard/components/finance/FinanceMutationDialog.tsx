@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import { useEffect, useRef, useState } from "react";
 import type { FinanceClosePeriodRecord, FinanceImportPreview, FinanceRecordKind, FinanceState } from "../../lib/modules/finance/native-types";
@@ -47,10 +48,10 @@ function Field(props: React.InputHTMLAttributes<HTMLInputElement> & { label: str
 }
 
 function Select({ label, name, defaultValue, children }: { label: string; name: string; defaultValue?: string; children: React.ReactNode }) {
-  return <label><span>{label}</span><select name={name} defaultValue={defaultValue}>{children}</select></label>;
+  return <label><span>{label}</span><SelectField name={name} defaultValue={defaultValue}>{children}</SelectField></label>;
 }
 
-function AccountOptions({ state }: { state: FinanceState }) {
+function accountOptions(state: FinanceState) {
   return <>{state.accounts.filter((item) => !item.archivedAt).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.entityScope}</option>)}</>;
 }
 
@@ -104,7 +105,7 @@ function EditFields({ state, selection, record }: { state: FinanceState; selecti
   if (selection?.kind === "transaction") return <>
     <Field label="Date" name="occurredOn" type="date" defaultValue={String(record.occurredOn || today())} required />
     <Field label="Merchant or source" name="merchant" defaultValue={String(record.merchant || "")} required maxLength={240} />
-    <Select label="Account" name="accountId" defaultValue={String(record.accountId || "")}><AccountOptions state={state} /></Select>
+    <Select label="Account" name="accountId" defaultValue={String(record.accountId || "")}>{accountOptions(state)}</Select>
     <Select label="Direction" name="direction" defaultValue={String(record.direction || "expense")}><option value="expense">Expense</option><option value="income">Income</option></Select>
     <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" defaultValue={String(record.amount || "")} required />
     <Field label="Category" name="category" defaultValue={String(record.category || "Uncategorized")} maxLength={160} />
@@ -117,7 +118,7 @@ function EditFields({ state, selection, record }: { state: FinanceState; selecti
     <Field label="Bill or subscription" name="name" defaultValue={String(record.name || "")} required maxLength={240} />
     <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" defaultValue={String(record.amount || "")} required />
     <Field label="Due date" name="dueDate" type="date" defaultValue={String(record.dueDate || today())} required />
-    <Select label="Account" name="accountId" defaultValue={String(record.accountId || "")}><AccountOptions state={state} /></Select>
+    <Select label="Account" name="accountId" defaultValue={String(record.accountId || "")}>{accountOptions(state)}</Select>
     <Field label="Category" name="category" defaultValue={String(record.category || "Uncategorized")} maxLength={160} />
     <Select label="Status" name="status" defaultValue={String(record.status || "scheduled")}><option value="scheduled">Scheduled</option><option value="soon">Soon</option><option value="due">Due</option><option value="overdue">Overdue</option></Select>
     <Select label="Repeats" name="recurring" defaultValue={String(record.recurring || "")}><option value="">One-time</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option></Select>
@@ -160,7 +161,7 @@ function Fields({ operation, state, record, selection, importHeaders, onImportFi
   if (operation === "transaction") return <>
     <Field label="Date" name="occurredOn" type="date" defaultValue={today()} required />
     <Field label="Merchant or source" name="merchant" required maxLength={240} />
-    <Select label="Account" name="accountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}><AccountOptions state={state} /></Select>
+    <Select label="Account" name="accountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}>{accountOptions(state)}</Select>
     <Select label="Direction" name="direction" defaultValue="expense"><option value="expense">Expense</option><option value="income">Income</option></Select>
     <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" required />
     <Field label="Category" name="category" defaultValue="Uncategorized" maxLength={160} />
@@ -169,7 +170,7 @@ function Fields({ operation, state, record, selection, importHeaders, onImportFi
   </>;
   if (operation === "transaction_review") return <p>This records review and clears pending status. It does not alter the explicit account balance snapshot.</p>;
   if (operation === "import") return <>
-    <Select label="Destination account" name="accountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}><AccountOptions state={state} /></Select>
+    <Select label="Destination account" name="accountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}>{accountOptions(state)}</Select>
     <Select label="Entity scope" name="entityScope" defaultValue="personal"><option value="personal">Personal</option><option value="business">Business</option></Select>
     <label><span>Choose your bank CSV</span><input name="csv" type="file" accept=".csv,text/csv" required onChange={(event) => onImportFile(event.currentTarget.files?.[0] || null)} /></label>
     {importHeaders.length > 0 && <details className="finance-import-mapping"><summary>Check column matching</summary><div>
@@ -187,8 +188,8 @@ function Fields({ operation, state, record, selection, importHeaders, onImportFi
   if (operation === "transfer" || operation === "savings") return <>
     <Field label="Date" name="occurredOn" type="date" defaultValue={today()} required />
     {operation === "savings" && <Select label="Direction" name="direction" defaultValue="to_savings"><option value="to_savings">To savings</option><option value="from_savings">From savings</option></Select>}
-    <Select label="From account" name="fromAccountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}><AccountOptions state={state} /></Select>
-    <Select label="To account" name="toAccountId"><AccountOptions state={state} /></Select>
+    <Select label="From account" name="fromAccountId" defaultValue={record && "currentBalance" in record ? String(record.id) : undefined}>{accountOptions(state)}</Select>
+    <Select label="To account" name="toAccountId">{accountOptions(state)}</Select>
     <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" required />
     {operation === "savings" && <Field label="Existing transfer ID (optional)" name="transferId" maxLength={240} />}
     <Field label="Memo (optional)" name="memo" maxLength={1000} />
@@ -198,7 +199,7 @@ function Fields({ operation, state, record, selection, importHeaders, onImportFi
     <Field label="Bill or vendor" name="name" required maxLength={240} />
     <Field label="Amount" name="amount" type="number" min="0.01" step="0.01" required />
     <Field label="Due date" name="dueDate" type="date" defaultValue={today()} required />
-    <Select label="Expected account" name="accountId"><AccountOptions state={state} /></Select>
+    <Select label="Expected account" name="accountId">{accountOptions(state)}</Select>
     <Field label="Category" name="category" defaultValue="Uncategorized" maxLength={160} />
     <Select label="Recurrence" name="recurring" defaultValue=""><option value="">One-time</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option><option value="annual">Annual</option></Select>
     <Select label="Entity scope" name="entityScope" defaultValue="personal"><option value="personal">Personal</option><option value="business">Business</option></Select>

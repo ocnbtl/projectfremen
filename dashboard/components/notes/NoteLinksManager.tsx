@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -216,19 +217,19 @@ export default function NoteLinksManager({
               <span>Protected Notes write</span>
             </div>
             <label>Target
-              <select value={targetKey} onChange={(event) => setTargetKey(event.target.value)} disabled={busy} required>
+              <SelectField value={targetKey} onChange={(event) => setTargetKey(event.target.value)} disabled={busy} required>
                 <option value="">Choose a Resource or Media object</option>
                 {availableTargets.map((target) => (
                   <option key={noteLinkTargetKey(target)} value={noteLinkTargetKey(target)}>
                     {label(target.module)} - {target.label}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             <label>Relationship
-              <select value={createRelationship} onChange={(event) => setCreateRelationship(event.target.value as NoteLinkRelationship)} disabled={busy}>
+              <SelectField value={createRelationship} onChange={(event) => setCreateRelationship(event.target.value as NoteLinkRelationship)} disabled={busy}>
                 {NOTE_LINK_RELATIONSHIPS.map((value) => <option key={value} value={value}>{label(value)}</option>)}
-              </select>
+              </SelectField>
             </label>
             <label>Relationship context
               <textarea value={createContextNote} onChange={(event) => setCreateContextNote(event.target.value)} maxLength={4000} disabled={busy} placeholder="Why this source or file matters to the Note." />
@@ -284,9 +285,9 @@ export default function NoteLinksManager({
                   }}>
                     <strong>Edit relationship</strong>
                     <label>Relationship
-                      <select value={editRelationship} onChange={(event) => setEditRelationship(event.target.value as NoteLinkRelationship)} disabled={busy}>
+                      <SelectField value={editRelationship} onChange={(event) => setEditRelationship(event.target.value as NoteLinkRelationship)} disabled={busy}>
                         {NOTE_LINK_RELATIONSHIPS.map((value) => <option key={value} value={value}>{label(value)}</option>)}
-                      </select>
+                      </SelectField>
                     </label>
                     <label>Context
                       <textarea value={editContextNote} onChange={(event) => setEditContextNote(event.target.value)} maxLength={4000} disabled={busy} />
@@ -317,10 +318,10 @@ export default function NoteLinksManager({
                     }}>
                       <strong>Repair or relink</strong>
                       <label>Verified target
-                        <select value={repairTargetKey} onChange={(event) => setRepairTargetKey(event.target.value)} required disabled={busy}>
+                        <SelectField value={repairTargetKey} onChange={(event) => setRepairTargetKey(event.target.value)} required disabled={busy}>
                           <option value="">Choose a verified current target</option>
                           {availableTargets.map((target) => <option key={noteLinkTargetKey(target)} value={noteLinkTargetKey(target)}>{label(target.module)} - {target.label}</option>)}
-                        </select>
+                        </SelectField>
                       </label>
                       <label>Repair explanation
                         <textarea value={reason} onChange={(event) => setReason(event.target.value)} maxLength={4000} required disabled={busy} />

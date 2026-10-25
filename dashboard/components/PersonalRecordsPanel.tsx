@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "./ui/SelectField";
 
 import Link from "next/link";
 import { useMemo, useState, type Dispatch, type SetStateAction } from "react";
@@ -574,7 +575,7 @@ export default function PersonalRecordsPanel({
             <div className="personal-record-form-row personal-record-form-row-compact">
               <label>
                 Class
-                <select
+                <SelectField
                   value={className}
                   onChange={(event) => setClassName(event.target.value as PersonalRecordClass)}
                 >
@@ -583,11 +584,11 @@ export default function PersonalRecordsPanel({
                       {labelize(option)}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </label>
               <label>
                 Status
-                <select
+                <SelectField
                   value={status}
                   onChange={(event) => setStatus(event.target.value as PersonalRecordStatus)}
                 >
@@ -596,7 +597,7 @@ export default function PersonalRecordsPanel({
                       {STATUS_LABELS[option]}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </label>
             </div>
           </div>
@@ -728,21 +729,21 @@ export default function PersonalRecordsPanel({
             <div className="personal-record-form-row">
               <label>
                 Privacy
-                <select value={privacy} onChange={(event) => setPrivacy(event.target.value as "private" | "shared")}>
+                <SelectField value={privacy} onChange={(event) => setPrivacy(event.target.value as "private" | "shared")}>
                   <option value="private">Private</option>
                   <option value="shared">Shared</option>
-                </select>
+                </SelectField>
               </label>
               <label>
                 Stage
-                <select value={stage} onChange={(event) => setStage(event.target.value as PersonalRecordStage)}>
+                <SelectField value={stage} onChange={(event) => setStage(event.target.value as PersonalRecordStage)}>
                   <option value="processed">Processed</option>
                   <option value="unprocessed">Unprocessed</option>
-                </select>
+                </SelectField>
               </label>
               <label>
                 Kind
-                <select
+                <SelectField
                   value={knowledgeShape}
                   onChange={(event) => setKnowledgeShape(event.target.value as PersonalRecordKnowledgeShape)}
                 >
@@ -751,7 +752,7 @@ export default function PersonalRecordsPanel({
                       {labelize(option)}
                     </option>
                   ))}
-                </select>
+                </SelectField>
               </label>
             </div>
             <label>

@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -518,7 +519,7 @@ export default function LinkedProjectsPanel({
         {pendingAction?.kind === "report" && (
           <label className={styles.reasonField}>
             Observed state
-            <select
+            <SelectField
               value={healthState}
               onChange={(event) => setHealthState(event.target.value as "stale" | "broken" | "missing")}
               disabled={mutationBusy}
@@ -526,7 +527,7 @@ export default function LinkedProjectsPanel({
               <option value="stale">Stale</option>
               <option value="broken">Broken</option>
               <option value="missing">Missing</option>
-            </select>
+            </SelectField>
           </label>
         )}
         {(pendingAction?.kind === "remove" || pendingAction?.kind === "report") && (

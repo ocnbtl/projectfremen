@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import type { FormEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -322,7 +323,7 @@ export default function NoteReviewScheduleEditorSheet({
 
                 <label className={styles.field}>
                   <span>Cadence</span>
-                  <select
+                  <SelectField
                     value={form.cadenceChoice}
                     onChange={(event) =>
                       updateForm({
@@ -336,7 +337,7 @@ export default function NoteReviewScheduleEditorSheet({
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                   <small id={`${descriptionId}-cadence`} data-tone="muted">
                     One-time stores only the date. Recurring options preserve the current adapter’s
                     ISO interval without creating a background scheduler.

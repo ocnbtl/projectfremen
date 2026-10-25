@@ -1,0 +1,24 @@
+/* Pure projection checks: no live credentials, stores, or writes. */
+const assert = require('node:assert/strict'), fs = require('node:fs'), ts = require('typescript');
+require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true } }).outputText, filename);
+const { personalCalendarEvents } = require('../lib/modules/planning/personal-calendar.ts');
+const { eventOccurrences } = require('../lib/modules/planning/calendar-model.ts');
+const common = { title:'Check in', lifecycle:'active', linkedRefs:[], createdAt:'2026-10-01T12:00:00Z', updatedAt:'2026-10-02T12:00:00Z' };
+const followUp = { ...common, id:'follow-up-1', objectType:'follow_up', context:'Call about the project', sourceRefs:[], dueAt:'2026-10-25', followUpState:'open' };
+const routine = { ...common, id:'routine-1', objectType:'routine', summary:'Weekly review', cadence:'current', cadenceRule:{timezone:'America/New_York'}, nextRunDate:'2026-10-26', runHistory:[] };
+const state = { followUps:[followUp], routines:[routine] }, before = JSON.stringify(state);
+let events = personalCalendarEvents(state);
+assert.equal(events.length,2); assert.equal(JSON.stringify(state),before,'Reading Calendar must not mutate the source');
+const task = events.find(event=>event.isTask);
+assert.equal(task.start,'2026-10-25'); assert.equal(task.end,'2026-10-26');
+assert.equal(task.workSource.id,followUp.id); assert.equal(task.workSource.updatedAt,followUp.updatedAt);
+assert.equal(task.ownerRef.objectId,followUp.id); assert.match(task.ownerRef.route,/personal/);
+const occurrences = eventOccurrences(events,'2026-10-25','2026-10-28','America/Los_Angeles');
+assert.equal(occurrences.length,2); assert.equal(occurrences[0].workSource.id,followUp.id);
+events = personalCalendarEvents({followUps:[{...followUp,deferredUntil:'2026-11-02',followUpState:'deferred'}],routines:[]});
+assert.equal(events[0].start,'2026-11-02');
+assert.equal(personalCalendarEvents({followUps:[{...followUp,followUpState:'complete'}],routines:[]})[0].completed,true);
+for(const patch of [{archivedAt:'2026-10-24'}, {lifecycle:'archived'}, {dueAt:''}]) assert.equal(personalCalendarEvents({followUps:[{...followUp,...patch}],routines:[]}).length,0);
+for(const patch of [{archivedAt:'2026-10-24'}, {lifecycle:'draft'}, {cadence:'paused'}, {cadence:'dormant'}, {nextRunDate:undefined}]) assert.equal(personalCalendarEvents({followUps:[],routines:[{...routine,...patch}]}).length,0);
+assert.equal(JSON.stringify(state),before);
+console.log('PASS Calendar follow-up and routine projection: source identity, due dates, completion, deferral, archives, paused/draft routines, timezone expansion, and no source writes.');

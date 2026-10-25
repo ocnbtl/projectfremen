@@ -239,6 +239,8 @@ export default function PersonalOpsSidebar({
     ? [commandSection, dataSection]
     : [commandSection, { id: "domains", label: "Domains", items: domainItems }, { id: "smart", label: "Smart Views", items: smartItems }, dataSection];
 
+  sections.splice(1, 0, { id: "personal-systems", label: "Personal", items: ([ ["passwords", "Passwords", "password"], ["lists", "Lists", "list"], ["travel", "Travel", "travel"], ["personal-build", "Personal build", "build"], ["car", "Car", "car"], ["style-guide", "Style guide", "style-guide"], ["dog", "Dog", "dog"] ] as const).map(([view, label, icon]) => ({ id: view, label, href: VIEW_ROUTES[view], active: activeView === view, icon: <PersonalOpsIcon name={icon}/> })) });
+
   return (
     <ModuleSidebar
       title="Personal"

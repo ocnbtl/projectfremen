@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -637,41 +638,41 @@ function AdvancedObjectForm({
               <input data-autofocus value={draft.title} onChange={(event) => update("title", event.target.value)} required={form.family !== "captures"} maxLength={240} />
             </Field>
             <Field label="Domain">
-              <select value={draft.domain} onChange={(event) => update("domain", event.target.value)}>
+              <SelectField value={draft.domain} onChange={(event) => update("domain", event.target.value)}>
                 {PERSONAL_OPS_DOMAIN_LABELS.map((domain) => <option key={domain}>{domain}</option>)}
-              </select>
+              </SelectField>
             </Field>
             {form.family !== "routines" && <Field label="Owner">
               <input value={draft.owner} onChange={(event) => update("owner", event.target.value)} maxLength={160} />
             </Field>}
             {form.family !== "templates" && form.family !== "routines" && (
               <Field label="Health">
-                <select value={draft.health} onChange={(event) => update("health", event.target.value as AdvancedDraft["health"])}>
+                <SelectField value={draft.health} onChange={(event) => update("health", event.target.value as AdvancedDraft["health"])}>
                   <option value="unknown">Unknown</option>
                   <option value="healthy">Healthy</option>
                   <option value="attention">Needs attention</option>
                   <option value="blocked">Blocked</option>
                   <option value="stale">Stale</option>
-                </select>
+                </SelectField>
               </Field>
             )}
             {form.family !== "routines" && <Field label="Review state">
-              <select value={draft.review} onChange={(event) => update("review", event.target.value as AdvancedDraft["review"])}>
+              <SelectField value={draft.review} onChange={(event) => update("review", event.target.value as AdvancedDraft["review"])}>
                 <option value="not_reviewed">Not reviewed</option>
                 <option value="needs_review">Needs review</option>
                 <option value="in_review">In review</option>
                 <option value="reviewed">Reviewed</option>
                 <option value="not_required">Not required</option>
                 <option value="waived">Waived</option>
-              </select>
+              </SelectField>
             </Field>}
 
             {form.family === "routines" && (
               <>
                 <Field label="Frequency">
-                  <select value={draft.frequency} onChange={(event) => update("frequency", event.target.value as AdvancedDraft["frequency"])}>
+                  <SelectField value={draft.frequency} onChange={(event) => update("frequency", event.target.value as AdvancedDraft["frequency"])}>
                     {(["daily", "weekly", "biweekly", "monthly", "quarterly", "annual", "custom"] as const).map((value) => <option value={value} key={value}>{cleanLabel(value)}</option>)}
-                  </select>
+                  </SelectField>
                 </Field>
                 <Field label="Next run date" hint="Optional">
                   <input type="date" value={draft.nextRunDate} onInput={(event) => update("nextRunDate", event.currentTarget.value)} />
@@ -682,12 +683,12 @@ function AdvancedObjectForm({
                 <Field label="Reminder">
                   <span className={styles.compoundField}>
                     <input aria-label="Reminder amount" type="number" min="0" max="525600" value={draft.reminderAmount} onChange={(event) => update("reminderAmount", event.target.value)} />
-                    <select aria-label="Reminder unit" value={draft.reminderUnit} onChange={(event) => update("reminderUnit", event.target.value as AdvancedDraft["reminderUnit"])}>
+                    <SelectField aria-label="Reminder unit" value={draft.reminderUnit} onChange={(event) => update("reminderUnit", event.target.value as AdvancedDraft["reminderUnit"])}>
                       <option value="minutes">M</option>
                       <option value="hours">H</option>
                       <option value="days">D</option>
                       <option value="weeks">W</option>
-                    </select>
+                    </SelectField>
                   </span>
                 </Field>
                 <Field label="Description" full>
@@ -699,12 +700,12 @@ function AdvancedObjectForm({
             {form.family === "captures" && (
               <>
                 <Field label="Triage state">
-                  <select value={draft.triageState} onChange={(event) => update("triageState", event.target.value as AdvancedDraft["triageState"])}>
+                  <SelectField value={draft.triageState} onChange={(event) => update("triageState", event.target.value as AdvancedDraft["triageState"])}>
                     <option value="untriaged">Untriaged</option>
                     <option value="needs_context">Needs context</option>
                     <option value="ready">Ready</option>
                     {form.item?.objectType === "capture_item" && form.item.triageState === "processed" && <option value="processed">Processed</option>}
-                  </select>
+                  </SelectField>
                 </Field>
                 <Field label="Missing context" full hint="One missing fact or source per line.">
                   <textarea value={draft.missingContext} onChange={(event) => update("missingContext", event.target.value)} />
@@ -720,7 +721,7 @@ function AdvancedObjectForm({
                 </Field>
                 <div className={[styles.notice, styles.fullWidth].join(" ")}>Template health is derived from definition validation: drafts begin Unknown, and a successful activation sets Ready. It is not manually edited.</div>
                 <Field label="Destination object">
-                  <select value={draft.templateTarget} onChange={(event) => {
+                  <SelectField value={draft.templateTarget} onChange={(event) => {
                     const target = event.target.value as AdvancedDraft["templateTarget"];
                     const next = { ...draftRef.current, templateTarget: target, templateFields: fieldsToText(defaultFieldsFor(target)) };
                     draftRef.current = next;
@@ -730,7 +731,7 @@ function AdvancedObjectForm({
                     <option value="followUps">Follow-up</option>
                     <option value="obligations">Obligation</option>
                     <option value="goals">Goal</option>
-                  </select>
+                  </SelectField>
                 </Field>
                 <Field label="Field definitions" full hint="One field per line: key | label | required or optional | default. Definitions stay compact and domain-specific.">
                   <textarea value={draft.templateFields} onChange={(event) => update("templateFields", event.target.value)} rows={8} required />
@@ -1440,14 +1441,14 @@ export default function PersonalOpsAdvancedWorkspace({
                 onChange={(event) => changeQuery(event.target.value)}
                 placeholder={`Search ${config.title.toLowerCase()}`}
               />
-              <button type="button" className={styles.button} onClick={() => updateUrl({ filter: urlState.filter === "all" ? initialView === "routines" ? "due-today" : "needs-review" : "all", selected: "" })}>Filter</button>
+              <button type="button" className={styles.button} aria-label="Filter" title="Filter" data-icon-button="standard" onClick={() => updateUrl({ filter: urlState.filter === "all" ? initialView === "routines" ? "due-today" : "needs-review" : "all", selected: "" })}><PersonalOpsIcon name="filter" /></button>
               {initialView === "routines" && <label className={styles.sortControl}>
                 <span className={styles.visuallyHidden}>Sort routines</span>
-                <select value={effectiveSort} onChange={(event) => updateUrl({ sort: event.target.value as PersonalOpsSort, selected: "" })}>
+                <SelectField className="toolbar-icon-select" triggerContent={<PersonalOpsIcon name="sort" />} title="Sort" value={effectiveSort} onChange={(event) => updateUrl({ sort: event.target.value as PersonalOpsSort, selected: "" })}>
                   <option value="due">Next run</option>
                   <option value="title">Title</option>
                   <option value="updated">Recently updated</option>
-                </select>
+                </SelectField>
               </label>}
               <button type="button" className={styles.button} aria-pressed={urlState.compact} onClick={() => updateUrl({ compact: !urlState.compact })}>Compact</button>
               <button type="button" className={styles.primaryButton} onClick={openCreate}><PersonalOpsIcon name="plus" /> {config.singular}</button>

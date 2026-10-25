@@ -1,4 +1,5 @@
 import { taskCompletionPatch } from "../../../lib/modules/planning/calendar-tasks";
+import { personalCalendarEvents } from "../../../lib/modules/planning/personal-calendar";
 import { reconcilePlaces } from "../../../lib/modules/planning/place-reconciliation";
 import { NextResponse } from "next/server";
 import { hasAdminSession } from "../../../lib/admin-session";
@@ -154,14 +155,14 @@ export async function GET() {
       const record = datedSources.find(item => item.id === ref.objectId);
       if (record) Object.assign(ref, { createdAt: record.createdAt, updatedAt: record.updatedAt });
     }
-    const dated = [...(ops?.obligations || []), ...(ops?.followUps || [])]
+    const dated = [...(ops?.obligations || [])]
       .filter((x) => x.dueAt && !x.archivedAt)
       .map((item) => ({
         id: `work-${item.id}`,
         title: item.title,
         start: item.dueAt!.slice(0, 10),
         end: addDays(item.dueAt!.slice(0, 10), 1),
-        completed: (item.objectType === "obligation" ? item.obligationState : item.followUpState) === "complete",
+        completed: item.obligationState === "complete",
         ownerRef: refs.find((x) => x.objectId === item.id),
       }));
     for (const trip of life?.trips || [])
@@ -202,6 +203,7 @@ export async function GET() {
       birthdays: records.filter(record => record.className === "person" && !record.archivedAt && record.profile?.birthday).map(record => ({ ref: refs.find(ref => ref.module === "people" && ref.objectId === record.id)!, birthday: record.profile!.birthday! })),
       trips: life?.trips || [],
       dated,
+      workEvents: personalCalendarEvents({ followUps: ops?.followUps || [], routines: ops?.routines || [] }),
       sourceErrors: sources.flatMap((x, i) =>
         x.status === "rejected"
           ? [["Records", "Personal", "Work", "Projects", "Travel"][i]]

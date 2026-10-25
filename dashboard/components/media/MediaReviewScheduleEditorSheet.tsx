@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import type { FormEvent } from "react";
 import { useEffect, useId, useRef, useState } from "react";
@@ -314,7 +315,7 @@ export default function MediaReviewScheduleEditorSheet({
 
                 <label className={styles.field}>
                   <span>Cadence</span>
-                  <select
+                  <SelectField
                     value={form.cadenceChoice}
                     onChange={(event) =>
                       updateForm({
@@ -333,7 +334,7 @@ export default function MediaReviewScheduleEditorSheet({
                         {option.label}
                       </option>
                     ))}
-                  </select>
+                  </SelectField>
                   <small id={`${descriptionId}-cadence`} data-tone="muted">
                     Recurring options store an ISO interval. They do not start a scheduler,
                     assign a reviewer, or create a ReviewRun.

@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "./ui/SelectField";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -2349,7 +2350,7 @@ export default function MediaWorkspace({
           <div className={styles.sortRow}>
             <label className={styles.field}>
               Sort
-              <select
+              <SelectField
                 value={sort}
                 onChange={(event) => {
                   const next = event.target.value as MediaSort;
@@ -2366,7 +2367,7 @@ export default function MediaWorkspace({
                     {SORT_LABELS[sortValue]}
                   </option>
                 ))}
-              </select>
+              </SelectField>
             </label>
             <span>View · <strong>Compact rows</strong></span>
             <button

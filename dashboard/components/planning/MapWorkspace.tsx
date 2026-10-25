@@ -379,7 +379,7 @@ export default function MapWorkspace() {
       }}>
       <h1 className={styles.moduleTitle}>Map</h1>
       <label className={`work-search ${styles.moduleSearch}`} data-field-shell><UnigentamosIcon role="search" size={16}/><input type="search" aria-label="Search places or addresses" placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)}/></label>
-        <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!tag}>Filter{tag ? " (1)" : ""}</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
+        <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!tag} title="Filter" /></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
           <>
             <fieldset className={styles.pinDisplay}><legend>Map pins</legend><div data-mode={pinDisplay}><span className={styles.pinDisplayIndicator} aria-hidden="true"/>{(["icons", "images"] as const).map(mode=><button type="button" key={mode} aria-pressed={pinDisplay===mode} onClick={()=>changePinDisplay(mode)}><UnigentamosIcon role={mode==="icons"?"location":"module-media"} size={15}/><span>{mode==="icons"?"Icons":"Images"}</span></button>)}</div></fieldset>
             <label>

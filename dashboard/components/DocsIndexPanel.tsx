@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "./ui/SelectField";
 import LogoLoader from "./operational/LogoLoader";
 
 import { useEffect, useMemo, useState } from "react";
@@ -120,14 +121,14 @@ export default function DocsIndexPanel() {
         </label>
         <label>
           Repo
-          <select value={repoFilter} onChange={(e) => setRepoFilter(e.target.value)}>
+          <SelectField value={repoFilter} onChange={(e) => setRepoFilter(e.target.value)}>
             <option value="">All repos</option>
             {repoOptions.map((repo) => (
               <option key={repo} value={repo}>
                 {repo}
               </option>
             ))}
-          </select>
+          </SelectField>
         </label>
       </div>
 

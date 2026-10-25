@@ -30,6 +30,7 @@ import {
 } from "./types";
 
 export type PlanningSnapshot = {
+  workEvents?: import("./personal-calendar").PersonalCalendarEvent[];
   state: PlanningState;
   refs: NativeObjectRef[];
   placeOrganizations?: Record<string, import("./place-presentation").PlaceOrganization[]>;

@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import MetricStrip from "../operational/MetricStrip";
 import QuickActionBar from "../operational/QuickActionBar";
@@ -93,7 +94,7 @@ export default function FinanceMonthlyReviewView({
         </div>
         <label className={styles.sortLabel}>
           Sort
-          <select
+          <SelectField
             className={styles.sortSelect}
             aria-label="Sort monthly close checklist"
             value={displayedSort}
@@ -102,7 +103,7 @@ export default function FinanceMonthlyReviewView({
             <option value="open-first">Open first</option>
             <option value="source-order">Checklist order</option>
             <option value="label-asc">Label A–Z</option>
-          </select>
+          </SelectField>
         </label>
       </div>
 

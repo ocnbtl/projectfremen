@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import { useEffect, useRef, useState } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
@@ -477,7 +478,7 @@ export default function PeopleProfilePhotoDialog({
             </label>
             <label><span>Horizontal crop</span><input aria-label="Horizontal crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panX} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panX: Number(event.target.value) } : current)} /></label>
             <label><span>Vertical crop</span><input aria-label="Vertical crop" type="range" min="-1" max="1" step="0.01" value={photoDraft.panY} onChange={(event) => setPhotoDraft((current) => current ? { ...current, panY: Number(event.target.value) } : current)} /></label>
-            <label><span>Resize output</span><select aria-label="Resize output" value={photoDraft.outputSize} onChange={(event) => setPhotoDraft((current) => current ? { ...current, outputSize: Number(event.target.value) as PhotoEditorDraft["outputSize"] } : current)}><option value="256">256 px</option><option value="512">512 px</option><option value="1024">1024 px</option></select></label>
+            <label><span>Resize output</span><SelectField aria-label="Resize output" value={photoDraft.outputSize} onChange={(event) => setPhotoDraft((current) => current ? { ...current, outputSize: Number(event.target.value) as PhotoEditorDraft["outputSize"] } : current)}><option value="256">256 px</option><option value="512">512 px</option><option value="1024">1024 px</option></SelectField></label>
           </fieldset>
           <div className="people-photo-editor-meta"><span>{photoDraft.sourceWidth} × {photoDraft.sourceHeight} source</span><button type="button" disabled={saving} onClick={() => setPhotoDraft((current) => current ? { ...current, zoom: 1, panX: 0, panY: 0 } : current)}>Center crop</button></div>
         </section>}

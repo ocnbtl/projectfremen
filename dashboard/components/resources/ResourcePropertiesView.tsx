@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import { useEffect, useMemo, useState, type PointerEvent } from "react";
 import { createResourcesRepository } from "../../lib/modules/resources/repository";
@@ -163,8 +164,8 @@ export default function ResourcePropertiesView({ resource, editRequest = 0, onSa
         <header className={styles.sectionHeading}><div><PersonalOpsIcon name="resource" /><h3>Details</h3></div></header>
         <div className={styles.fieldGrid}>
           <label className={`${styles.field} ${styles.wide}`}><span>Title</span><input value={form.title} disabled={!editing} onChange={(event) => update("title", event.target.value)} /></label>
-          <label className={styles.field}><span>Type</span><select value={form.type} disabled={!editing} onChange={(event) => update("type", event.target.value as ResourceType)}>{RESOURCE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
-          <label className={styles.field}><span>Lifecycle</span><select value={form.lifecycle} disabled={!editing} onChange={(event) => update("lifecycle", event.target.value as ResourceLifecycleState)}>{LIFECYCLES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <label className={styles.field}><span>Type</span><SelectField value={form.type} disabled={!editing} onChange={(event) => update("type", event.target.value as ResourceType)}>{RESOURCE_TYPES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</SelectField></label>
+          <label className={styles.field}><span>Lifecycle</span><SelectField value={form.lifecycle} disabled={!editing} onChange={(event) => update("lifecycle", event.target.value as ResourceLifecycleState)}>{LIFECYCLES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</SelectField></label>
           <label className={`${styles.field} ${styles.wide}`}><span>URL</span><input type="url" value={form.url} disabled={!editing} placeholder="https://" onChange={(event) => update("url", event.target.value)} /></label>
           <label className={`${styles.field} ${styles.wide}`}><span>Source domain <small>(optional)</small></span><input value={form.sourceDomain} disabled={!editing} placeholder="example.com" onChange={(event) => update("sourceDomain", event.target.value)} /></label>
         </div>
@@ -199,7 +200,7 @@ export default function ResourcePropertiesView({ resource, editRequest = 0, onSa
           <div className={styles.slider}><label>Trust<input type="range" min="1" max="10" value={form.trust} disabled={!editing} onChange={(event) => update("trust", Number(event.target.value))} /></label><output>{form.trust}</output></div>
         </div>
         <div className={styles.fieldGrid}>
-          <label className={styles.field}><span>Cadence</span><select value={form.cadence} disabled={!editing} onChange={(event) => update("cadence", event.target.value)}>{CADENCES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</select></label>
+          <label className={styles.field}><span>Cadence</span><SelectField value={form.cadence} disabled={!editing} onChange={(event) => update("cadence", event.target.value)}>{CADENCES.map(([value, label]) => <option value={value} key={value}>{label}</option>)}</SelectField></label>
           <label className={styles.field}><span>Next review</span><input type="date" value={form.nextReviewAt} disabled={!editing} onChange={(event) => update("nextReviewAt", event.target.value)} /></label>
         </div>
         <div className={styles.freshnessFacts}>

@@ -12853,7 +12853,7 @@ async function main() {
         personalOpsIconSource.includes("ICON_ROLE") &&
         !personalOpsIconSource.includes("<path") &&
         personalOpsWorkspaceSource.includes('placeholder="Search personal records"') &&
-        personalOpsWorkspaceSource.includes('aria-label="Personal systems"') &&
+        personalOpsSidebarSource.includes('id: "personal-systems"') &&
         !personalOpsWorkspaceSource.includes('aria-label="Personal quick actions"') &&
         !personalOpsSidebarSource.includes('label: "Passwords"') &&
         sharedAiDockSource.includes('<UnigentamosIcon role="message"') &&

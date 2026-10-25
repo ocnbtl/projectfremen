@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
@@ -532,7 +533,7 @@ export default function NoteDecisionsView({
             </label>
             <label>
               Reversibility
-              <select
+              <SelectField
                 value={draft.reversibility}
                 onChange={(event) => setDraft((current) => ({
                   ...current,
@@ -544,11 +545,11 @@ export default function NoteDecisionsView({
                 <option value="reversible">Reversible</option>
                 <option value="reversible_costly">Reversible, with cost</option>
                 <option value="irreversible">Irreversible</option>
-              </select>
+              </SelectField>
             </label>
             <label>
               Risk
-              <select
+              <SelectField
                 value={draft.risk}
                 onChange={(event) => setDraft((current) => ({
                   ...current,
@@ -561,7 +562,7 @@ export default function NoteDecisionsView({
                 <option value="medium">Medium</option>
                 <option value="high">High</option>
                 <option value="critical">Critical</option>
-              </select>
+              </SelectField>
             </label>
             <label>
               Owner

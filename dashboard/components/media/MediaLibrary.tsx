@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 import { accountFile, mediaSnapshot, openMediaFile, saveMediaDetails, uploadAccountFile } from "../../lib/modules/media/account-client";
 import ModuleShell from "../admin-shell/ModuleShell";
 import ModuleSidebar from "../admin-shell/ModuleSidebar";
@@ -565,7 +566,8 @@ export default function MediaLibrary({
         }
         activeFilters={archive ? 1 : 0}
       >
-        <select
+        <SelectField
+          data-toolbar-view
           className="work-compact-select"
           aria-label="Media view"
           value={view}
@@ -573,7 +575,7 @@ export default function MediaLibrary({
         >
           <option value="gallery">Gallery</option>
           <option value="list">List</option>
-        </select>
+        </SelectField>
         {(<Button
             aria-pressed={selectionMode}
             onClick={() => {

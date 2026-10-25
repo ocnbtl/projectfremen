@@ -127,6 +127,7 @@ export type PlanningState = { schemaVersion: 1; bookingData?: import("./booking-
   [K in PlanningCollection]: PlanningCollections[K][];
 };
 export type EventOccurrence = EventFields & {
+  workSource?: { family: "followUps" | "routines"; id: string; updatedAt: string };
   id: string;
   eventId: string;
   occurrenceKey: string;

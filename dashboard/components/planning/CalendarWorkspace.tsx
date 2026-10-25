@@ -1,4 +1,5 @@
 "use client";
+import { createPersonalOpsRepository } from "../../lib/modules/personal-ops/repository";
 import PlaceSync from "./PlaceSync";
 import CalendarSharePanel from "./CalendarSharePanel";
 import LogoLoader from "../operational/LogoLoader";
@@ -384,8 +385,8 @@ export default function CalendarWorkspace() {
         `${item.title} ${item.description} ${item.location}`
           .toLowerCase()
           .includes(query.trim().toLowerCase()),
-    ), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
-  }, [showCompleted, expanded.items, snapshot?.state.calendars, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
+    ), ...eventOccurrences(showDated ? snapshot?.workEvents || [] : [], range.start, range.end, zone).filter(item => (showCompleted || !item.completed) && item.title.toLowerCase().includes(query.trim().toLowerCase())), ...calendarObservances(snapshot?.birthdays || [], holidayData?.holidays || [], observanceSettings, range.start, range.end, zone).filter(item => item.title.toLowerCase().includes(query.trim().toLowerCase()))];
+  }, [showCompleted, showDated, expanded.items, snapshot?.state.calendars, snapshot?.workEvents, snapshot?.birthdays, query, holidayData, observanceSettings, range, zone]);
   const dated = showDated
     ? (snapshot?.dated || []).filter(
         (x) =>
@@ -561,6 +562,15 @@ export default function CalendarWorkspace() {
   }
   async function completeTask(item: EventOccurrence) {
     if (busy) return;
+    if (item.workSource?.family === "followUps") {
+      const source = item.workSource;
+      await action(async () => {
+        const result = await createPersonalOpsRepository().update("followUps", source.id, { followUpState: item.completed ? "open" : "complete", lifecycle: item.completed ? "active" : "complete" }, source.updatedAt);
+        if (!result.ok) throw new Error(result.error.message);
+        setPreviewOpen(false);
+      }, item.completed ? "Follow-up reopened" : "Follow-up completed");
+      return;
+    }
     const original = confirmed.current?.state.events.find(event => event.id === item.eventId);
     if (!original) return;
     await action(() => savePlanning("events", taskCompletionPatch(original, item.occurrenceKey, !item.completed), original.updatedAt), item.completed ? "Task reopened" : "Task completed");

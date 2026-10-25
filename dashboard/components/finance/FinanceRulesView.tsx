@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import { useState } from "react";
 import MetricStrip from "../operational/MetricStrip";
@@ -186,9 +187,9 @@ export default function FinanceRulesRouteView({
         <button type="button" className={styles.auditButton} onClick={onRunVisibleTests}>Test rules</button>
         <label className={styles.sortLabel}>
           Sort
-          <select value={model.sort} onChange={(event) => onSortChange(event.target.value as FinanceSort)}>
+          <SelectField value={model.sort} onChange={(event) => onSortChange(event.target.value as FinanceSort)}>
             {SORTS.map((option) => <option value={option.id} key={option.id}>{option.label}</option>)}
-          </select>
+          </SelectField>
         </label>
         {filtersExpanded ? (
           <div className={styles.filterGroup} role="group" aria-label="Rule filters">

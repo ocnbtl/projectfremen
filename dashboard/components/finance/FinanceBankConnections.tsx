@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 import LogoLoader from "../operational/LogoLoader";
 
 import { useEffect, useRef, useState } from "react";
@@ -43,10 +44,10 @@ function AccountMatching({ connection, state, busy, onSave }: { connection: Bank
     <p>{connection.product === "investments" ? "Review the suggested matches, choose a new account, or skip an account. Connecting retrieves balances, holdings and up to 90 days of investment activity. Your first sync may take a couple of minutes." : "Match each account to a record you already keep, create a new one, or skip it. Connecting updates its balance and imports up to 90 days of available transactions."}</p>
     {connection.accounts.map(account => <label key={account.id}><span><strong>{account.name}</strong>{account.mask ? ` · ••${account.mask}` : ""}</span>
       <small>{account.kind} · {account.currency}{account.balance !== null ? ` · ${money(account.balance, { cents: true })}` : " · Balance unavailable"}</small>
-      {account.supported ? <select aria-label={`Match ${account.name}`} required disabled={busy} value={choices[account.id] || ""} onChange={event => setChoices({ ...choices, [account.id]: event.target.value })}>
+      {account.supported ? <SelectField aria-label={`Match ${account.name}`} required disabled={busy} value={choices[account.id] || ""} onChange={event => setChoices({ ...choices, [account.id]: event.target.value })}>
         <option value="">Choose where this belongs</option><option value="skip">Skip this account</option><option value="new">Create a new Finance account</option>
         {matchingAccounts(connection, account, state).map(item => <option key={item.id} value={item.id}>{item.name}{item.mask ? ` · ••${item.mask}` : ""}</option>)}
-      </select> : <small>{connection.product === "investments" ? "Only USD investment accounts are supported here." : "USD checking, savings and credit-card accounts are supported here."}</small>}
+      </SelectField> : <small>{connection.product === "investments" ? "Only USD investment accounts are supported here." : "USD checking, savings and credit-card accounts are supported here."}</small>}
     </label>)}
     <button type="submit" className="finance-action" disabled={busy || !connection.accounts.some(item => item.supported)}>Save matches & sync</button>
   </form>;

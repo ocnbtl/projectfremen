@@ -118,9 +118,9 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
   }
   return <section className={`people-interactions-workspace is-${density}`} aria-label="Interaction history">
     <WorkspaceNavSlot kind="search"><div className="people-interactions-tools">
-      <div className="people-primary-search"><UnigentamosIcon role="search" size={18} /><input aria-label="Search interactions" placeholder="Search" value={query} onChange={event => onQueryChange(event.target.value)} />{query && <button type="button" className="people-search-clear" aria-label="Clear interaction search" onClick={() => onQueryChange("")} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}
-        <div className="people-search-controls">
-          <Popover.Root open={filtersOpen} onOpenChange={open => { setFiltersOpen(open); if (open) setSortOpen(false); }}><Popover.Trigger asChild><button type="button" className="people-control-trigger" aria-label={filtersOpen ? "Hide filters" : "Show filters"}><UnigentamosIcon role="filter" size={18} /><span>Filter</span>{filterCount > 0 && <strong>{filterCount}</strong>}</button></Popover.Trigger>
+      <div className="people-primary-search" data-field-shell><UnigentamosIcon role="search" size={18} /><input aria-label="Search interactions" placeholder="Search" value={query} onChange={event => onQueryChange(event.target.value)} />{query && <button type="button" className="people-search-clear" aria-label="Clear interaction search" onClick={() => onQueryChange("")} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}
+      </div><div className="people-search-controls">
+          <Popover.Root open={filtersOpen} onOpenChange={open => { setFiltersOpen(open); if (open) setSortOpen(false); }}><Popover.Trigger asChild><button type="button" className="people-control-trigger" aria-label={filtersOpen ? "Hide filters" : "Show filters"}><UnigentamosIcon role="filter" size={18} />{filterCount > 0 && <strong>{filterCount}</strong>}</button></Popover.Trigger>
             <Popover.Portal><Popover.Content className="app-select-menu people-interactions-menu people-interactions-filters" sideOffset={10} align="end" collisionPadding={12} aria-label="Filter interactions" onEscapeKeyDown={event => event.stopImmediatePropagation()}>
               <header><UnigentamosIcon role="filter" size={18} /><h2>Filters</h2></header>
               <div className="people-interactions-filter-fields">
@@ -131,7 +131,7 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
               <footer><button type="button" onClick={() => navigate({ kind: "", approach: "", contact: "" })}>Reset</button><button type="button" onClick={() => setFiltersOpen(false)}>Show results</button></footer>
             </Popover.Content></Popover.Portal>
           </Popover.Root>
-          <Popover.Root open={sortOpen} onOpenChange={open => { setSortOpen(open); if (open) setFiltersOpen(false); }}><Popover.Trigger asChild><button type="button" className="people-control-trigger" aria-label={sortOpen ? "Hide sorting" : "Show sorting"}><UnigentamosIcon role="sort" size={18} /><span>Sort</span></button></Popover.Trigger>
+          <Popover.Root open={sortOpen} onOpenChange={open => { setSortOpen(open); if (open) setFiltersOpen(false); }}><Popover.Trigger asChild><button type="button" className="people-control-trigger" aria-label={sortOpen ? "Hide sorting" : "Show sorting"}><UnigentamosIcon role="sort" size={18} /></button></Popover.Trigger>
             <Popover.Portal><Popover.Content className="app-select-menu people-interactions-menu people-interactions-sort" sideOffset={10} align="end" collisionPadding={12} aria-label="Sort interactions" onEscapeKeyDown={event => event.stopImmediatePropagation()}>
               <header><UnigentamosIcon role="sort" size={18} /><h2>Sort interactions</h2></header>
               <div className="people-sort-options" role="menu" aria-label="Sort interactions" onKeyDown={event => {
@@ -141,9 +141,7 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
               }}><span className="people-sort-selection" aria-hidden="true" style={{ transform: `translateY(${order === "oldest" ? 42 : 0}px)` }} />{([['newest', 'Newest first'], ['oldest', 'Oldest first']] as const).map(([value, title]) => <button type="button" role="menuitemradio" key={value} aria-checked={order === value} onClick={() => navigate({ order: value === "newest" ? "" : value })}><span>{title}</span><span className={`people-sort-check${order === value ? " is-visible" : ""}`} aria-hidden="true"><UnigentamosIcon role="check" size={16} /></span></button>)}</div>
             </Popover.Content></Popover.Portal>
           </Popover.Root>
-        </div>
-      </div>
-      {viewControl}
+        </div>{viewControl}
     </div>
     </WorkspaceNavSlot>
     {error ? <div role="alert" className="notes-empty-state"><h2>Interactions could not be loaded</h2><p>{error}</p><button onClick={() => window.location.reload()}>Reload</button></div> : <>

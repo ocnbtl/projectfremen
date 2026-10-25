@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
@@ -116,8 +117,8 @@ export default function ResourceLinksView({ resource, links, targets, evidenceTa
       </div>
       {feedback ? <p className={styles.feedback} data-error="true" role="alert">{feedback}</p> : null}
       {adding ? <form className={styles.linkComposer} onSubmit={saveLink}>
-        <label className={styles.field}><span>Object</span><select required value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">Select an object</option>{Array.from(new Set(available.map((target) => target.module))).map((module) => <optgroup label={module.replace("_", " ")} key={module}>{available.filter((target) => target.module === module).map((target) => <option value={refKey(target)} key={refKey(target)}>{target.label}</option>)}</optgroup>)}</select></label>
-        <label className={styles.field}><span>Relationship</span><select value={relationship} onChange={(event) => setRelationship(event.target.value)}><option value="related">Related</option><option value="source">Source</option><option value="supports">Supports</option><option value="reference">Reference</option></select></label>
+        <label className={styles.field}><span>Object</span><SelectField required value={targetId} onChange={(event) => setTargetId(event.target.value)}><option value="">Select an object</option>{Array.from(new Set(available.map((target) => target.module))).map((module) => <optgroup label={module.replace("_", " ")} key={module}>{available.filter((target) => target.module === module).map((target) => <option value={refKey(target)} key={refKey(target)}>{target.label}</option>)}</optgroup>)}</SelectField></label>
+        <label className={styles.field}><span>Relationship</span><SelectField value={relationship} onChange={(event) => setRelationship(event.target.value)}><option value="related">Related</option><option value="source">Source</option><option value="supports">Supports</option><option value="reference">Reference</option></SelectField></label>
         <div className={styles.editActions}><button type="button" className={styles.secondaryButton} onClick={() => setAdding(false)}>Cancel</button><button type="submit" className={styles.primaryButton} disabled={!targetId || busy}>{busy ? "Linking…" : "Link"}</button></div>
       </form> : null}
       <div className={styles.linksGrid}>

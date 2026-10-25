@@ -1,6 +1,7 @@
 "use client";
 import type { FinanceState } from "../../lib/modules/finance/native-types";
 import { DEFAULT_OVERVIEW_FILTERS, overviewDate, type FinanceOverviewModel, type OverviewFilters, type OverviewSelection } from "../../lib/modules/finance/overview-model";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 import DateField from "../people/DateField";
 import { Icon, IconTile, money, Panel } from "./FinancePrimitives";
@@ -35,7 +36,7 @@ export default function FinanceOverviewView({ state, model, filters, selection, 
     </Panel>
     <Panel className="finance-spending-breakdown">
       <div className="finance-panel-heading"><div><h2>Where money went</h2><p>{model.spendingGroups.length} categories · same chart filters</p></div><strong>{money(model.spending, { cents: true })}</strong></div>
-      <div className="finance-spending-sort"><label>Sort<SelectField aria-label="Sort spending categories" value={filters.spendingSort} onChange={event => change({ spendingSort: event.target.value as OverviewFilters["spendingSort"] })}><option value="amount-desc">Largest amount</option><option value="amount-asc">Smallest amount</option><option value="count">Most transactions</option><option value="name">Category A–Z</option></SelectField></label></div>
+      <div className="finance-spending-sort"><label><SelectField title="Sort" className="toolbar-icon-select" triggerContent={<UnigentamosIcon role="sort" size={20}/>} aria-label="Sort spending categories" value={filters.spendingSort} onChange={event => change({ spendingSort: event.target.value as OverviewFilters["spendingSort"] })}><option value="amount-desc">Largest amount</option><option value="amount-asc">Smallest amount</option><option value="count">Most transactions</option><option value="name">Category A–Z</option></SelectField></label></div>
       <ol>{model.spendingGroups.map(group => <li key={group.category}><button type="button" aria-pressed={selection.kind === "category" && selection.id === group.category} onClick={() => onSelect({ kind: "category", id: group.category })}><span><strong>{group.category}</strong><small>{group.count} transaction{group.count === 1 ? "" : "s"}</small></span><span><strong>{money(group.amount, { cents: true })}</strong><small>{model.spending ? Math.round(group.amount / model.spending * 100) : 0}%</small></span><meter aria-label={`${group.category} share of spending`} min={0} max={model.spending || 1} value={group.amount} /></button></li>)}</ol>
       {!model.spendingGroups.length && <p className="finance-inline-empty">No spending matches these filters. Try another range, category or transaction type.</p>}
     </Panel>

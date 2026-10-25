@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type DragEvent } from "react";
@@ -549,7 +550,7 @@ export default function MediaUploadQueueWorkspace() {
             <div className={baseStyles.sortRow}>
               <label className={baseStyles.field}>
                 Sort
-                <select
+                <SelectField
                   value={sort}
                   onChange={(event) => {
                     const next = event.target.value as MediaUploadSort;
@@ -560,7 +561,7 @@ export default function MediaUploadQueueWorkspace() {
                   {(Object.keys(SORT_LABELS) as MediaUploadSort[]).map((value) => (
                     <option value={value} key={value}>{SORT_LABELS[value]}</option>
                   ))}
-                </select>
+                </SelectField>
               </label>
               <span>Scope · <strong>{visibleCandidates.length} shown</strong></span>
               <button

@@ -1,4 +1,6 @@
 "use client";
+import UnigentamosIcon from "../icons/UnigentamosIcon";
+import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -743,15 +745,15 @@ export default function MediaDuplicatesWorkspace({
           <div className={baseStyles.sortRow}>
             <span><strong>{visibleGroups.length}</strong> exact-source evidence group{visibleGroups.length === 1 ? "" : "s"}</span>
             <label className={styles.sortControl}>
-              <span>Sort</span>
-              <select
+
+              <SelectField aria-label="Sort duplicate media" title="Sort" className="toolbar-icon-select" triggerContent={<UnigentamosIcon role="sort" size={20} />}
                 value={urlState.sort}
                 onChange={(event) => updateUrl({ sort: event.target.value as MediaDuplicateSort })}
               >
                 {(Object.keys(SORT_LABELS) as MediaDuplicateSort[]).map((sort) => (
                   <option value={sort} key={sort}>{SORT_LABELS[sort]}</option>
                 ))}
-              </select>
+              </SelectField>
             </label>
           </div>
 

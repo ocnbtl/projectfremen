@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
 import type { FormEvent } from "react";
@@ -351,11 +352,11 @@ export default function ResourceEditorSheet({
                   </label>
                   <label className={styles.field}>
                     <span>Collection</span>
-                    <select aria-label="Collection" value={form.collection} onChange={(event) => updateField("collection", event.target.value as ResourceEditorForm["collection"])}>
+                    <SelectField aria-label="Collection" value={form.collection} onChange={(event) => updateField("collection", event.target.value as ResourceEditorForm["collection"])}>
                       <option value="reference">Reference</option>
                       <option value="design-library">Design library</option>
                       <option value="component">Component</option>
-                    </select>
+                    </SelectField>
                   </label>
                 </div>
 

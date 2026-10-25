@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 import QuickActionBar from "../operational/QuickActionBar";
 
@@ -308,7 +309,8 @@ function followUpTiming(state: FormDraft["followUpState"], dueAt: string): FormD
 
 function formatDate(value?: string, fallback = "No date") {
   if (!value) return fallback;
-  const date = new Date(value);
+  // A due date is a calendar day, not midnight UTC on the previous local day.
+  const date = new Date(/^\d{4}-\d{2}-\d{2}$/.test(value) ? `${value}T12:00:00` : value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
@@ -830,25 +832,25 @@ function ObjectForm({
                   <textarea value={draft.description} onChange={(event) => update("description", event.target.value)} />
                 </Field>
                 <Field label="Status">
-                  <select value={draft.followUpState} onChange={(event) => update("followUpState", event.target.value as FormDraft["followUpState"])}>
+                  <SelectField value={draft.followUpState} onChange={(event) => update("followUpState", event.target.value as FormDraft["followUpState"])}>
                     <option value="open">Open</option>
                     <option value="scheduled">Scheduled</option>
                     <option value="waiting">Waiting</option>
                     <option value="deferred">Deferred</option>
                     <option value="complete">Complete</option>
                     <option value="carried_forward">Carried forward</option>
-                  </select>
+                  </SelectField>
                 </Field>
                 <Field label="Due date">
                   <input type="date" value={draft.dueAt} onChange={(event) => update("dueAt", event.target.value)} />
                 </Field>
                 <Field label="Priority">
-                  <select value={draft.priority} onChange={(event) => update("priority", event.target.value as FormDraft["priority"])}>
+                  <SelectField value={draft.priority} onChange={(event) => update("priority", event.target.value as FormDraft["priority"])}>
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
                     <option value="critical">Critical</option>
-                  </select>
+                  </SelectField>
                 </Field>
                 <Field label="Outcome (optional)" full hint="Add the result now or after the follow-up. You can complete it without one.">
                   <textarea value={draft.followUpOutcome} onChange={(event) => update("followUpOutcome", event.target.value)} />
@@ -867,53 +869,53 @@ function ObjectForm({
             ) : (
               <>
                 <Field label="Domain">
-                  <select aria-label="Domain" value={draft.domain} onChange={(event) => update("domain", event.target.value)}>
+                  <SelectField aria-label="Domain" value={draft.domain} onChange={(event) => update("domain", event.target.value)}>
                     {!PERSONAL_OPS_DOMAIN_LABELS.some((domain) => domain === draft.domain) && <option value={draft.domain}>{draft.domain}</option>}
                     {PERSONAL_OPS_DOMAIN_LABELS.map((domain) => <option key={domain}>{domain}</option>)}
-                  </select>
+                  </SelectField>
                 </Field>
                 <Field label="Due date">
                   <input aria-label="Due date" type="date" value={draft.dueAt} onChange={(event) => update("dueAt", event.target.value)} />
                 </Field>
                 <Field label="Priority">
-                  <select aria-label="Priority" value={draft.priority} onChange={(event) => update("priority", event.target.value as FormDraft["priority"])}>
+                  <SelectField aria-label="Priority" value={draft.priority} onChange={(event) => update("priority", event.target.value as FormDraft["priority"])}>
                     <option value="low">Low</option>
                     <option value="medium">Medium</option>
                     <option value="high">High</option>
                     <option value="critical">Critical</option>
-                  </select>
+                  </SelectField>
                 </Field>
                 {form.family !== "decisions" && (
                   <Field label="Health">
-                    <select value={draft.health} onChange={(event) => update("health", event.target.value as FormDraft["health"])}>
+                    <SelectField value={draft.health} onChange={(event) => update("health", event.target.value as FormDraft["health"])}>
                       <option value="unknown">Unknown</option>
                       <option value="healthy">Healthy</option>
                       <option value="attention">Needs attention</option>
                       <option value="blocked">Blocked</option>
                       <option value="stale">Stale</option>
-                    </select>
+                    </SelectField>
                   </Field>
                 )}
                 <Field label="Review state">
-                  <select aria-label="Review state" value={draft.review} onChange={(event) => update("review", event.target.value as FormDraft["review"])}>
+                  <SelectField aria-label="Review state" value={draft.review} onChange={(event) => update("review", event.target.value as FormDraft["review"])}>
                     <option value="not_reviewed">Not reviewed</option>
                     <option value="needs_review">Needs review</option>
                     <option value="in_review">In review</option>
                     <option value="reviewed">Reviewed</option>
                     <option value="not_required">Not required</option>
                     <option value="waived">Waived</option>
-                  </select>
+                  </SelectField>
                 </Field>
                 {form.family !== "decisions" && (
                   <>
                     <Field label="Cadence">
-                      <select value={draft.cadence} onChange={(event) => update("cadence", event.target.value as FormDraft["cadence"])}>
+                      <SelectField value={draft.cadence} onChange={(event) => update("cadence", event.target.value as FormDraft["cadence"])}>
                         <option value="dormant">No cadence</option>
                         <option value="current">Current</option>
                         <option value="due_soon">Due soon</option>
                         <option value="overdue">Overdue</option>
                         <option value="paused">Paused</option>
-                      </select>
+                      </SelectField>
                     </Field>
                     <Field label="Cadence rule" full hint="Plain-language reminder only; automatic creation is not enabled.">
                       <input value={draft.cadenceRule} onChange={(event) => update("cadenceRule", event.target.value)} placeholder="Example: review every Friday" />
@@ -949,7 +951,7 @@ function ObjectForm({
                   <textarea aria-label="Decision" value={draft.finalDecision} onChange={(event) => update("finalDecision", event.target.value)} required={draft.decisionState === "decided"} />
                 </Field>
                 <Field label="Decision state">
-                  <select
+                  <SelectField
                     aria-label="Decision state"
                     value={draft.decisionState}
                     onChange={(event) => {
@@ -964,15 +966,15 @@ function ObjectForm({
                     <option value="open">Open</option>
                     <option value="decided">Decided</option>
                     <option value="deferred">Deferred</option>
-                  </select>
+                  </SelectField>
                 </Field>
                 <Field label="Reversibility">
-                  <select aria-label="Reversibility" value={draft.reversibility} onChange={(event) => update("reversibility", event.target.value as FormDraft["reversibility"])}>
+                  <SelectField aria-label="Reversibility" value={draft.reversibility} onChange={(event) => update("reversibility", event.target.value as FormDraft["reversibility"])}>
                     <option value="unknown">Unknown</option>
                     <option value="reversible">Reversible</option>
                     <option value="reversible_costly">Reversible, costly</option>
                     <option value="irreversible">Irreversible</option>
-                  </select>
+                  </SelectField>
                 </Field>
                 {draft.decisionState === "deferred" && (
                   <>
@@ -999,12 +1001,12 @@ function ObjectForm({
             {form.family === "obligations" && (
               <>
                 <Field label="Current state">
-                  <select value={draft.obligationState} onChange={(event) => update("obligationState", event.target.value as FormDraft["obligationState"])}>
+                  <SelectField value={draft.obligationState} onChange={(event) => update("obligationState", event.target.value as FormDraft["obligationState"])}>
                     <option value="open">Open</option>
                     <option value="waiting">Waiting</option>
                     <option value="blocked">Blocked</option>
                     <option value="complete">Complete</option>
-                  </select>
+                  </SelectField>
                 </Field>
                 <Field label="Consequence" full hint="What happens if this commitment is missed?">
                   <textarea value={draft.consequence} onChange={(event) => update("consequence", event.target.value)} required />
@@ -1541,19 +1543,9 @@ export default function PersonalOpsWorkspace({
             <QuickActionBar maxVisible={1} actions={(initialView === "command" ? ["followUps","decisions","obligations","goals"] as const : [primaryFamily]).map((family,index)=>({id:family,label:`Add ${FAMILY_LABELS[family].toLowerCase()}`,onSelect:()=>openCreate(family),intent:index===0?"primary" as const:undefined}))}/>
           </WorkspaceHeader>
           <WorkspaceToolbar query={queryDraft} onQuery={changeQuery} placeholder="Search personal records" activeFilters={urlState.filter!=="all"?1:0} filters={<>{filterItems.map(item=><WorkspaceButton key={item.id} aria-pressed={item.active} onClick={item.onSelect}>{item.label}</WorkspaceButton>)}</>}>
-            <select className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</select>
+            <SelectField className="work-compact-select" aria-label="Sort personal records" value={urlState.sort} onChange={e=>updateUrl({sort:e.target.value as typeof urlState.sort})}>{PERSONAL_OPS_SORT_OPTIONS.map(item=><option key={item.id} value={item.id}>{item.label}</option>)}</SelectField>
           </WorkspaceToolbar>
 
-          {initialView === "command" && (
-            <nav className={styles.personalSystemsDock} aria-label="Personal systems">
-              {PERSONAL_SYSTEM_LINKS.map((item) => (
-                <Link href={item.href} aria-label={item.label} title={item.label} key={item.href}>
-                  <PersonalOpsIcon name={item.icon} />
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-            </nav>
-          )}
 
 
 

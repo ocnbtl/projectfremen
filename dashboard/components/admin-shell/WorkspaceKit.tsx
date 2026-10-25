@@ -1,6 +1,8 @@
 "use client";
 
 import {
+  Children,
+  cloneElement,
   isValidElement,
   useEffect,
   useLayoutEffect,
@@ -15,6 +17,7 @@ import {
 import * as Dialog from "@radix-ui/react-dialog";
 import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import SelectField from "../ui/SelectField";
 import { WorkspaceNavSlot, WorkspaceTopbarContext } from "./WorkspaceTopbar";
 
 export function WorkspaceButton({
@@ -29,6 +32,8 @@ export function WorkspaceButton({
   intent?: "primary" | "secondary" | "quiet" | "danger";
   busy?: boolean;
 }) {
+  const toolbarAction = typeof children === "string" && /^(filter|sort)$/i.test(children.trim());
+  if (toolbarAction && typeof children === "string") { icon = children.trim().toLowerCase(); props["aria-label"] ||= children; props.title ||= children; children = undefined; }
   const childIsIcon = isValidElement(children) && children.type === UnigentamosIcon;
   const iconOnly = (Boolean(icon) && children == null) || childIsIcon;
   return (
@@ -86,10 +91,14 @@ export function WorkspaceToolbar({
 }) {
   const [expanded, setExpanded] = useState(false);
   const bar = useContext(WorkspaceTopbarContext);
+  const choices = Children.toArray(children);
+  const sortChoices = choices.filter(child => isValidElement<{"aria-label"?: string}>(child) && /^sort\b/i.test(child.props["aria-label"] || ""));
+  const viewChoices = choices.filter(child => isValidElement<{"data-toolbar-view"?: boolean}>(child) && child.props["data-toolbar-view"]);
+  const otherChoices = choices.filter(child => !sortChoices.includes(child) && !viewChoices.includes(child));
   return (
     <>
       <WorkspaceNavSlot kind="search"><div className="work-toolbar">
-        <label className="work-search">
+        <label className="work-search" data-field-shell>
           <UnigentamosIcon role="search" size={20} />
           <input
             type="search"
@@ -100,18 +109,17 @@ export function WorkspaceToolbar({
           />
         </label>
         {filters && (
-          <WorkspaceButton
+          <Popover.Root open={expanded} onOpenChange={setExpanded}><Popover.Trigger asChild><WorkspaceButton
             icon="filter"
+            title="Filter"
             aria-label={activeFilters ? `Filter (${activeFilters} active)` : "Filter"}
             aria-expanded={expanded}
-            onClick={() => setExpanded(!expanded)}
-          >
-            Filter{activeFilters ? ` (${activeFilters})` : ""}
-          </WorkspaceButton>
+          /></Popover.Trigger><Popover.Portal><Popover.Content className="app-select-menu workspace-filter-menu" sideOffset={8} collisionPadding={12} aria-label="Filters">{filters}</Popover.Content></Popover.Portal></Popover.Root>
         )}
-        {bar && children ? <Popover.Root><Popover.Trigger className="workspace-nav-trigger" aria-label="View options"><UnigentamosIcon role="sliders" size={18} /></Popover.Trigger><Popover.Portal><Popover.Content className="workspace-nav-menu workspace-view-options" align="end" sideOffset={8} collisionPadding={12}>{children}</Popover.Content></Popover.Portal></Popover.Root> : children}
+        {sortChoices.map((child, index) => isValidElement<React.ComponentProps<typeof SelectField>>(child) ? cloneElement(child, { key: index, className: "toolbar-icon-select", title: "Sort", triggerContent: <UnigentamosIcon role="sort" size={20}/> }) : child)}
+        {viewChoices}
+        {bar && otherChoices.length ? <Popover.Root><Popover.Trigger className="workspace-nav-trigger" aria-label="View options"><UnigentamosIcon role="sliders" size={18} /></Popover.Trigger><Popover.Portal><Popover.Content className="workspace-nav-menu workspace-view-options" align="end" sideOffset={8} collisionPadding={12}>{otherChoices}</Popover.Content></Popover.Portal></Popover.Root> : otherChoices}
       </div></WorkspaceNavSlot>
-      {expanded && <div className="work-filters">{filters}</div>}
     </>
   );
 }

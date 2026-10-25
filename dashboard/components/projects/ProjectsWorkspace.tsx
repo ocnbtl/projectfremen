@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 import { workspaceReturnUrl } from "../admin-shell/useWorkspaceReturn";
 import RelatedRecords from "../planning/RelatedRecords";
 
@@ -995,8 +996,8 @@ function ConnectionInspectionEditor({
           <label className={styles.field}>Role<input value={role} onChange={(event) => { setRole(event.target.value); setDirty(true); }} disabled={readOnly || busy} placeholder="e.g. Client, designer" /></label>
         ) : (
           <>
-            <label className={styles.field}>Relationship<select value={relationship} onChange={(event) => { setRelationship(event.target.value as ProjectLinkRelationship); setDirty(true); }} disabled={readOnly || busy}>{LINK_RELATIONSHIPS.map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</select></label>
-            <label className={styles.field}>Strength<select value={strength} onChange={(event) => { setStrength(event.target.value as ProjectLink["relationshipStrength"]); setDirty(true); }} disabled={readOnly || busy}>{["weak", "normal", "strong"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</select></label>
+            <label className={styles.field}>Relationship<SelectField value={relationship} onChange={(event) => { setRelationship(event.target.value as ProjectLinkRelationship); setDirty(true); }} disabled={readOnly || busy}>{LINK_RELATIONSHIPS.map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</SelectField></label>
+            <label className={styles.field}>Strength<SelectField value={strength} onChange={(event) => { setStrength(event.target.value as ProjectLink["relationshipStrength"]); setDirty(true); }} disabled={readOnly || busy}>{["weak", "normal", "strong"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</SelectField></label>
           </>
         )}
         <label className={styles.field} data-wide="true">Description<textarea value={description} onChange={(event) => { setDescription(event.target.value); setDirty(true); }} disabled={readOnly || busy} placeholder="How this person or object supports the project" /></label>
@@ -2739,7 +2740,7 @@ export default function ProjectsWorkspace({
                 });
               }}
             >
-              <label className={styles.field}>Event type<select name="eventType" defaultValue={timelineEvent.eventType} disabled={parentReadOnly || mutationBusy}>{PROJECT_TIMELINE_EVENT_TYPES.map((eventType) => <option value={eventType} key={eventType}>{displayLabel(eventType)}</option>)}</select></label>
+              <label className={styles.field}>Event type<SelectField name="eventType" defaultValue={timelineEvent.eventType} disabled={parentReadOnly || mutationBusy}>{PROJECT_TIMELINE_EVENT_TYPES.map((eventType) => <option value={eventType} key={eventType}>{displayLabel(eventType)}</option>)}</SelectField></label>
               <label className={styles.field}>Occurred<input name="occurredAt" type="datetime-local" defaultValue={toLocalDateTimeInput(new Date(timelineEvent.occurredAt))} disabled={parentReadOnly || mutationBusy} required /></label>
               {!parentReadOnly && <button type="submit" className={styles.button} data-primary="true" disabled={mutationBusy}>{mutationBusy ? "Saving…" : "Save event details"}</button>}
             </form>
@@ -2890,10 +2891,10 @@ export default function ProjectsWorkspace({
             <legend>People</legend>
             <div className={styles.peopleEditorRows}>
               {(editor.people || []).map((person, index) => <div className={styles.personEditorRow} key={person.id}>
-                <label>Person<select value={person.personId} onChange={(event) => updateEditorPerson(person.id, { personId: event.target.value })} aria-label={`Person ${index + 1}`}>
+                <label>Person<SelectField value={person.personId} onChange={(event) => updateEditorPerson(person.id, { personId: event.target.value })} aria-label={`Person ${index + 1}`}>
                   <option value="">Choose a People profile</option>
                   {initialPeople.map((candidate) => <option value={candidate.id} key={candidate.id}>{candidate.profile?.fullName || candidate.title}</option>)}
-                </select></label>
+                </SelectField></label>
                 <label>Role<input value={person.role} onChange={(event) => updateEditorPerson(person.id, { role: event.target.value })} placeholder="e.g. Client, designer" /></label>
                 <label>Context<input value={person.context} onChange={(event) => updateEditorPerson(person.id, { context: event.target.value })} placeholder="Optional context" /></label>
                 <button type="button" className={styles.iconButton} onClick={() => {
@@ -2907,15 +2908,15 @@ export default function ProjectsWorkspace({
               setEditorDirty(true);
             }}><UnigentamosIcon role="plus" size={16} /> Add person</button>
           </fieldset>}
-          <label className={styles.field}>Status<select name="lifecycle" value={value("lifecycle")} onChange={(event) => changeEditorValue("lifecycle", event.target.value)}>
+          <label className={styles.field}>Status<SelectField name="lifecycle" value={value("lifecycle")} onChange={(event) => changeEditorValue("lifecycle", event.target.value)}>
             {!(["idea", "developing", "active", "monitoring", "dormant"] as string[]).includes(value("lifecycle")) && <option value={value("lifecycle")}>{displayLabel(value("lifecycle"))} (legacy)</option>}
             {["idea", "developing", "active", "monitoring", "dormant"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}
-          </select></label>
-          <label className={styles.field}>Review cadence<select name="defaultCadence" value={value("defaultCadence")} onChange={(event) => changeEditorValue("defaultCadence", event.target.value)}>
+          </SelectField></label>
+          <label className={styles.field}>Review cadence<SelectField name="defaultCadence" value={value("defaultCadence")} onChange={(event) => changeEditorValue("defaultCadence", event.target.value)}>
             <option value="">Not set</option>
             {value("defaultCadence") && !PROJECT_REVIEW_CADENCES.some((option) => option.value === value("defaultCadence")) && <option value={value("defaultCadence")}>{displayLabel(value("defaultCadence"))} (legacy)</option>}
             {PROJECT_REVIEW_CADENCES.map((option) => <option value={option.value} key={option.value}>{option.label}</option>)}
-          </select></label>
+          </SelectField></label>
           <label className={styles.field} data-wide="true">Completion target<textarea name="completionTarget" value={value("completionTarget")} onChange={(event) => changeEditorValue("completionTarget", event.target.value)} placeholder="What does done look like?" /></label>
         </div>
       );
@@ -2942,7 +2943,7 @@ export default function ProjectsWorkspace({
       return <div className={styles.formGrid}>
         <label className={styles.field} data-wide="true">Blocker title<input value={value("title")} onChange={(event) => changeEditorValue("title", event.target.value)} required autoFocus /></label>
         <label className={styles.field} data-wide="true">Blocking condition<textarea value={value("condition")} onChange={(event) => changeEditorValue("condition", event.target.value)} required /></label>
-        <label className={styles.field}>Severity<select value={value("severity")} onChange={(event) => changeEditorValue("severity", event.target.value)}>{["low", "medium", "high", "critical"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</select></label>
+        <label className={styles.field}>Severity<SelectField value={value("severity")} onChange={(event) => changeEditorValue("severity", event.target.value)}>{["low", "medium", "high", "critical"].map((option) => <option value={option} key={option}>{displayLabel(option)}</option>)}</SelectField></label>
         <label className={styles.field}>Owner<input value={value("owner")} onChange={(event) => changeEditorValue("owner", event.target.value)} /></label>
         <label className={styles.field}>Due date<input type="date" value={value("dueAt")} onChange={(event) => changeEditorValue("dueAt", event.target.value)} /></label>
       </div>;
@@ -2965,22 +2966,22 @@ export default function ProjectsWorkspace({
         <div className={styles.connectionIdentity} data-wide="true"><span>{editingPerson ? "Person" : "Linked object"}</span><strong>{link?.source.label || "Unavailable connection"}</strong></div>
         {editingPerson && <label className={styles.field}>Role<input value={value("role")} onChange={(event) => changeEditorValue("role", event.target.value)} autoFocus placeholder="e.g. Client, designer" /></label>}
         {!editingPerson && <>
-          <label className={styles.field}>Relationship<select value={value("relationship")} onChange={(event) => changeEditorValue("relationship", event.target.value)}>{LINK_RELATIONSHIPS.map((relationship) => <option value={relationship} key={relationship}>{displayLabel(relationship)}</option>)}</select></label>
-          <label className={styles.field}>Strength<select value={value("relationshipStrength")} onChange={(event) => changeEditorValue("relationshipStrength", event.target.value)}>{["weak", "normal", "strong"].map((strength) => <option value={strength} key={strength}>{displayLabel(strength)}</option>)}</select></label>
+          <label className={styles.field}>Relationship<SelectField value={value("relationship")} onChange={(event) => changeEditorValue("relationship", event.target.value)}>{LINK_RELATIONSHIPS.map((relationship) => <option value={relationship} key={relationship}>{displayLabel(relationship)}</option>)}</SelectField></label>
+          <label className={styles.field}>Strength<SelectField value={value("relationshipStrength")} onChange={(event) => changeEditorValue("relationshipStrength", event.target.value)}>{["weak", "normal", "strong"].map((strength) => <option value={strength} key={strength}>{displayLabel(strength)}</option>)}</SelectField></label>
         </>}
         <label className={styles.field} data-wide="true">Description<textarea value={value("projectSpecificNote")} onChange={(event) => changeEditorValue("projectSpecificNote", event.target.value)} autoFocus={!editingPerson} /></label>
       </div>;
     }
     if (editor.kind === "link-health") {
       return <div className={styles.formGrid}>
-        <label className={styles.field}>Observed state<select value={value("healthState")} onChange={(event) => changeEditorValue("healthState", event.target.value)} autoFocus>{["stale", "broken", "missing"].map((state) => <option value={state} key={state}>{displayLabel(state)}</option>)}</select></label>
+        <label className={styles.field}>Observed state<SelectField value={value("healthState")} onChange={(event) => changeEditorValue("healthState", event.target.value)} autoFocus>{["stale", "broken", "missing"].map((state) => <option value={state} key={state}>{displayLabel(state)}</option>)}</SelectField></label>
         <label className={styles.field} data-wide="true">Health explanation<textarea value={value("healthReason")} onChange={(event) => changeEditorValue("healthReason", event.target.value)} maxLength={2000} required placeholder="What was checked, and why can this association no longer be trusted?" /><span>{value("healthReason").length}/2000 · preserved if the save fails</span></label>
         <div className={styles.boundary} data-wide="true"><strong>The link stays visible</strong>Broken and missing associations remain inspectable until you repair or explicitly remove them. The native source object is never deleted by this action.</div>
       </div>;
     }
     if (editor.kind === "link-repair") {
       return <div className={styles.formGrid}>
-        <label className={styles.field}>Owner module<select value={value("sourceModule")} onChange={(event) => changeEditorValues({ sourceModule: event.target.value, sourceObjectType: "", sourceObjectId: "", sourceContainerObjectId: "", sourceLabel: "" })} autoFocus>{LINK_MODULES.map((module) => <option value={module} key={module}>{displayLabel(module)}</option>)}</select></label>
+        <label className={styles.field}>Owner module<SelectField value={value("sourceModule")} onChange={(event) => changeEditorValues({ sourceModule: event.target.value, sourceObjectType: "", sourceObjectId: "", sourceContainerObjectId: "", sourceLabel: "" })} autoFocus>{LINK_MODULES.map((module) => <option value={module} key={module}>{displayLabel(module)}</option>)}</SelectField></label>
         <label className={styles.field}>Object type<input value={value("sourceObjectType")} onChange={(event) => changeEditorValue("sourceObjectType", event.target.value)} required /></label>
         <label className={styles.field}>Stable object ID<input value={value("sourceObjectId")} onChange={(event) => changeEditorValue("sourceObjectId", event.target.value)} required /></label>
         <label className={styles.field}>Parent / container ID<input value={value("sourceContainerObjectId")} onChange={(event) => changeEditorValue("sourceContainerObjectId", event.target.value)} placeholder="Required for nested Project or Review objects" /></label>
@@ -3007,7 +3008,7 @@ export default function ProjectsWorkspace({
       {linkingPeople ? (
         <label className={styles.field} data-wide="true">
           People identity
-          <select
+          <SelectField
             aria-label="People identity"
             value={value("sourceObjectId")}
             onChange={(event) => {
@@ -3023,11 +3024,11 @@ export default function ProjectsWorkspace({
           >
             <option value="">Choose an existing People identity</option>
             {initialPeople.map((person) => <option value={person.id} key={person.id}>{person.profile?.fullName || person.title}</option>)}
-          </select>
+          </SelectField>
         </label>
       ) : (
         <>
-          {!linkingNote && <label className={styles.field}>Object type<select value={value("sourceModule")} onChange={(event) => changeEditorValues({
+          {!linkingNote && <label className={styles.field}>Object type<SelectField value={value("sourceModule")} onChange={(event) => changeEditorValues({
             sourceModule: event.target.value,
             sourceObjectType: "",
             sourceObjectId: "",
@@ -3038,8 +3039,8 @@ export default function ProjectsWorkspace({
             <option value="media">Files & media</option>
             <option value="resources">Resources</option>
             <option value="reviews">Reviews</option>
-          </select></label>}
-          <label className={styles.field} data-wide="true">{linkingNote ? "Note" : "Object"}<select value={value("sourceObjectId")} onChange={(event) => {
+          </SelectField></label>}
+          <label className={styles.field} data-wide="true">{linkingNote ? "Note" : "Object"}<SelectField value={value("sourceObjectId")} onChange={(event) => {
             const selected = objectOptions.find((option) => option.objectId === event.target.value);
             changeEditorValues({
               sourceObjectId: selected?.objectId || "",
@@ -3050,7 +3051,7 @@ export default function ProjectsWorkspace({
           }} required autoFocus>
             <option value="">Choose an existing {linkingNote ? "note" : "object"}</option>
             {objectOptions.map((option) => <option value={option.objectId} key={`${option.module}-${option.objectId}`}>{option.label}</option>)}
-          </select></label>
+          </SelectField></label>
         </>
       )}
       {linkingPeople ? <>
@@ -3111,13 +3112,13 @@ export default function ProjectsWorkspace({
             {(["all", "active", "due", "due-month", "needs-review", "blocked", "linked", "missing-owner"] as const).map((value) =>
               <WorkspaceButton key={value} aria-pressed={filter === value} onClick={() => { setFilter(value); updateUrl({ filter: value }); }}>{FILTER_LABELS[value]}</WorkspaceButton>)}
           </div>}>
-          <select className={styles.selectControl} value={sort} onChange={(event) => { const value = event.target.value as ProjectSort; setSort(value); updateUrl({ sort: value }); }} aria-label="Sort projects">
+          <SelectField className={styles.selectControl} value={sort} onChange={(event) => { const value = event.target.value as ProjectSort; setSort(value); updateUrl({ sort: value }); }} aria-label="Sort projects">
             {Object.entries(SORT_LABELS).filter(([value]) => value !== "priority").map(([value, label]) => <option value={value} key={value}>{label}</option>)}
-          </select>
-          <select className={styles.layoutSelect} value={grid ? "grid" : compact ? "compact" : "comfortable"} aria-label="Project layout" onChange={event => {
+          </SelectField>
+          <SelectField data-toolbar-view className={styles.layoutSelect} value={grid ? "grid" : compact ? "compact" : "comfortable"} aria-label="Project layout" onChange={event => {
             const nextGrid = event.target.value === "grid", nextCompact = event.target.value === "compact";
             setGrid(nextGrid); setCompact(nextCompact); updateUrl({ grid: nextGrid, compact: nextCompact });
-          }}><option value="comfortable">List</option><option value="compact">Compact</option><option value="grid">Grid</option></select>
+          }}><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="grid">Grid</option></SelectField>
         </WorkspaceToolbar>
         {visibleProjects.length ? (
           <div className={grid ? styles.projectGrid : styles.list} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">

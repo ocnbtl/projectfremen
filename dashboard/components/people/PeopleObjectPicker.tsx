@@ -117,7 +117,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
           <SelectField aria-label="Object type" value={kind} onChange={e=>setKind(e.target.value as Kind)} optionIcons={Object.fromEntries(kinds.map(item=>[item.id,item.icon]))} triggerContent={<><UnigentamosIcon role={currentKind.icon} size={16}/><span>{kind === "all" ? "Type" : currentKind.label}</span></>}>
             {kinds.filter(item=>item.id === "all" || targets.some(target=>kindOf(target) === item.id)).map(item=><option key={item.id} value={item.id}>{item.id === "all" ? "All types" : item.label}</option>)}
           </SelectField>
-          <SelectField aria-label="Sort objects" value={sort} onChange={e=>setSort(e.target.value)} triggerContent={<><UnigentamosIcon role="filter" size={16}/><span>Sort</span></>}>
+          <SelectField aria-label="Sort objects" title="Sort" className="toolbar-icon-select" value={sort} onChange={e=>setSort(e.target.value)} triggerContent={<UnigentamosIcon role="sort" size={20}/>}>
             <option value="alphabetical">Alphabetical</option><option value="created">Recently created</option><option value="edited">Recently edited</option>
           </SelectField>
         </div>

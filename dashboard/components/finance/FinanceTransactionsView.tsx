@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 
 import MetricStrip from "../operational/MetricStrip";
 import SystemState from "../operational/SystemState";
@@ -70,7 +71,7 @@ export default function FinanceTransactionsView({
         </div>
         <label className={styles.sortLabel}>
           Sort
-          <select
+          <SelectField
             className={styles.sortSelect}
             aria-label="Sort transactions"
             value={displayedSort}
@@ -81,7 +82,7 @@ export default function FinanceTransactionsView({
             <option value="amount-desc">Amount high to low</option>
             <option value="amount-asc">Amount low to high</option>
             <option value="merchant-asc">Merchant A–Z</option>
-          </select>
+          </SelectField>
         </label>
       </div>
 

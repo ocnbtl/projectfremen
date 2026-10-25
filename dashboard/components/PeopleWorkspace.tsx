@@ -4104,14 +4104,14 @@ export default function PeopleWorkspace({
             <button type="button" aria-label="Log interaction" onClick={() => openInteractionComposer()}>
               <PeopleIcon name="interaction" /><span>Interaction</span>
             </button>
-            <details className="people-create-menu"><summary><UnigentamosIcon role="plus" size={18} /><span>Add</span><UnigentamosIcon role="chevron-down" size={14} /></summary><div>
-            <button type="button" aria-label="Add organization" onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); openAddPerson("org"); }}>
+
+            <button type="button" aria-label="Add organization" onClick={() => openAddPerson("org")}>
               <UnigentamosIcon role="organization-add" size={18} /><span>Organization</span>
             </button>
-            <button type="button" aria-label="Add person" onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); openAddPerson("person"); }}>
+            <button type="button" aria-label="Add person" onClick={() => openAddPerson("person")}>
               <PeopleIcon name="new-person" /><span>Person</span>
             </button>
-            </div></details>
+
           </div>
         </header></WorkspaceNavSlot>
 
@@ -4125,13 +4125,13 @@ export default function PeopleWorkspace({
           people={people}
           query={query}
           density={listMode}
-          viewControl={<button type="button" className="people-view-cycle" aria-label={`View: ${VIEW_LABELS[listMode]}. Switch to ${VIEW_LABELS[VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]]}`} onClick={() => { const next = VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]; setListMode(next); updatePeopleUrl({ view: next }, { native: true }); }}><MorphingViewIcon mode={listMode} /><span>View</span></button>}
+          viewControl={<button type="button" className="people-view-cycle" aria-label={`View: ${VIEW_LABELS[listMode]}. Switch to ${VIEW_LABELS[VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]]}`} onClick={() => { const next = VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]; setListMode(next); updatePeopleUrl({ view: next }, { native: true }); }}><MorphingViewIcon mode={listMode} /><span>{VIEW_LABELS[listMode]}</span></button>}
           onQueryChange={value => { setQuery(value); updatePeopleUrl({ query: value }, { native: true }); }}
           onOpenPerson={selectPerson}
           error={initialLoadError}
         /> : <>
         <WorkspaceNavSlot kind="search"><div className="people-directory-tools">
-          <div className="people-primary-search">
+          <div className="people-primary-search" data-field-shell>
             <PeopleIcon name="search" />
             <input
               ref={searchInputRef}
@@ -4148,6 +4148,7 @@ export default function PeopleWorkspace({
                 <PeopleIcon name="close" />
               </button>
             )}
+          </div>
             <div className="people-search-controls">
               <button
                 ref={filterTriggerRef}
@@ -4158,7 +4159,7 @@ export default function PeopleWorkspace({
                 aria-controls="people-filter-sheet"
                 onClick={() => { setFiltersOpen((current) => !current); setSortOpen(false); }}
               >
-                <PeopleIcon name="filter" /><span>Filter</span>
+                <PeopleIcon name="filter" />
                 {activeFilterCount > 0 && <strong>{activeFilterCount}</strong>}
               </button>
               <button
@@ -4170,7 +4171,7 @@ export default function PeopleWorkspace({
                 aria-controls="people-sort-menu"
                 onClick={() => { setSortOpen((current) => !current); setFiltersOpen(false); }}
               >
-                <PeopleIcon name="sort" /><span>Sort</span>
+                <PeopleIcon name="sort" />
               </button>
 
               {filtersOpen && (
@@ -4229,7 +4230,6 @@ export default function PeopleWorkspace({
                 </div>
               )}
             </div>
-          </div>
           <button
             type="button"
             className="people-view-cycle"
@@ -4242,7 +4242,7 @@ export default function PeopleWorkspace({
             }}
           >
             <MorphingViewIcon mode={listMode} />
-            <span>View</span>
+            <span>{VIEW_LABELS[listMode]}</span>
           </button>
         </div></WorkspaceNavSlot>
 
@@ -4348,23 +4348,15 @@ export default function PeopleWorkspace({
                       photoUpdatedAt={profile.photoUpdatedAt}
                       compact={listMode === "compact"}
                     />
-                    <span className="people-row-main">
+                    <span className="people-row-content">
                       <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>aka {profile.nickname}</em>}</span>
-                      <small>{record.className === "org"
-                        ? [profile.organizationType, profile.industry].filter(Boolean).join(" · ") || profile.context || getPrimaryGroup(record)
-                        : [profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at ") || profile.context || getPrimaryGroup(record)}</small>
-                      <span>
-                        {[getPrimaryGroup(record), ...record.projects.slice(0, 1)].filter(Boolean).map((tag) => (
-                          <em key={tag}>{tag}</em>
-                        ))}
-                      </span>
+                      <span className="people-row-tags"><PeopleActivityMarker status={record.status} compact />{[getPrimaryGroup(record), ...record.projects.slice(0,1)].filter(Boolean).map(tag => <em key={tag}>{tag}</em>)}{record.starred && <span className="people-row-star is-starred" aria-label="Starred"><PeopleIcon name="star" /></span>}</span>
+                      {(getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) || record.time.nextReview) && <span className="people-row-dates">
+                        {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="interaction" />{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>}
+                        {record.time.nextReview && <span title="Follow-up"><PeopleIcon name="follow-up" />{getDirectoryNextContactLabel(record)}</span>}
+                      </span>}
+                      {(profile.context || profile.primaryOccupation || profile.primaryEmployer || profile.organizationType || profile.industry) && <span className="people-row-description">{profile.context || (record.className === "org" ? [profile.organizationType, profile.industry].filter(Boolean).join(" · ") : [profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at "))}</span>}
                     </span>
-                    <span className={`people-row-date${getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) ? "" : " is-unknown"}`}>
-                      <PeopleActivityMarker status={record.status} compact />
-                      <span>{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>
-                    </span>
-                    <span className="people-row-next">{getDirectoryNextContactLabel(record)}</span>
-                    <span className={`people-row-star${record.starred ? " is-starred" : ""}`} data-people-starred={record.starred || undefined} aria-label={record.starred ? "Starred" : "Not starred"}><PeopleIcon name="star" /></span>
                   </button>
                 </article>
               );

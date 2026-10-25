@@ -1,4 +1,5 @@
 "use client";
+import SelectField from "../ui/SelectField";
 import LogoLoader from "../operational/LogoLoader";
 
 import { useEffect, useState } from "react";
@@ -50,10 +51,10 @@ export default function FinanceCoinbaseConnection({ state, onChanged }: { state:
       }}>
         <label>API key name<input name="keyName" autoComplete="off" placeholder="organizations/…/apiKeys/…" maxLength={240} required disabled={busy} spellCheck={false} /></label>
         <label>Private key<textarea className="finance-coinbase-secret" name="privateKey" autoComplete="new-password" placeholder="Paste the complete ECDSA private key" rows={3} maxLength={4000} required disabled={busy} spellCheck={false} /></label>
-        <label>Finance account<select name="accountId" aria-label="Finance account" required disabled={busy} defaultValue=""><option value="">Choose where this belongs</option>
+        <label>Finance account<SelectField name="accountId" aria-label="Finance account" required disabled={busy} defaultValue=""><option value="">Choose where this belongs</option>
           {state.accounts.filter(item => !item.archivedAt && item.entityScope === "personal" && item.kind === "Brokerage" && !item.bankLink).map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
           <option value="new">Create a Coinbase brokerage account</option>
-        </select></label>
+        </SelectField></label>
         <label className="finance-coinbase-consent"><input type="checkbox" name="personalUse" required disabled={busy} /><span>This is my own Coinbase account.</span></label>
         <button className="finance-action" type="submit" disabled={busy}><Icon name="Link" />{busy ? "Checking Coinbase…" : "Connect Coinbase"}</button>
       </form>
