@@ -18,6 +18,7 @@ import MapDataExplorer, {
   type AnalysisResult,
 } from "./MapDataExplorer";
 import type { MapAnalysisSettings } from "../../lib/modules/planning/map-analysis";
+import { MAP_CATALOG } from "../../lib/modules/planning/map-catalog";
 import MapPlaceProfile from "./MapPlaceProfile";
 import { browserVault } from "../../lib/local-first/browser-engine";
 import { smallPreview } from "../../lib/modules/media/thumbnail";
@@ -414,9 +415,9 @@ export default function MapWorkspace() {
             </Button>
           </>
         </Popover.Content></Popover.Portal></Popover.Root>
-        <Popover.Root><Popover.Trigger asChild><Button icon="build" aria-label="Explore data">Explore data{analysis.metrics.length ? ' (' + analysis.metrics.length + ')' : ''}</Button></Popover.Trigger>
+        <Popover.Root><Popover.Trigger asChild><Button icon="build" aria-label="Explore data"><span className={styles.exploreDesktopLabel}>Explore data</span><span className={styles.exploreMobileLabel}>Explore</span></Button></Popover.Trigger>
           <Popover.Portal forceMount><Popover.Content forceMount className={styles.dataPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="end" aria-label="Explore map data" onOpenAutoFocus={e => e.preventDefault()}>
-            <header className={styles.explorerHeader}><div><strong>Explore data</strong><small>Compare places through geographic data</small></div><Popover.Close asChild><Button aria-label="Close data explorer" icon="close">Close</Button></Popover.Close></header>
+            <header className={styles.explorerHeader}><strong>Explore data</strong><Popover.Close asChild><Button aria-label="Close data explorer" icon="close">Close</Button></Popover.Close></header>
           <MapDataExplorer
             level={level}
             state={stateCode}
@@ -440,6 +441,7 @@ export default function MapWorkspace() {
 
           </Popover.Content></Popover.Portal>
         </Popover.Root>
+        {analysisResult && <div className={styles.appliedData} aria-label="Applied data layers">{analysisResult.metrics.map(metric=><button type="button" key={metric.metric} aria-label={`Remove ${MAP_CATALOG[metric.metric].name} layer`} onClick={()=>{setAnalysis(current=>({...current,metrics:current.metrics.filter(m=>m.metric!==metric.metric)}));setView(undefined);}}><span>{MAP_CATALOG[metric.metric].name}{metric.min!==undefined||metric.max!==undefined?<small>{metric.min!==undefined?` ≥ ${metric.min.toLocaleString()}`:""}{metric.max!==undefined?` ≤ ${metric.max.toLocaleString()}`:""}</small>:null}</span><UnigentamosIcon role="close" size={14}/></button>)}<button type="button" className={styles.clearData} onClick={()=>{setAnalysis(current=>({...current,metrics:[]}));setAnalysisResult(undefined);setView(undefined);}} aria-label="Clear all data layers">Clear all</button></div>}
         <Button icon="location" aria-label={pinning ? "Cancel pin" : "Drop pin"} aria-pressed={pinning} onClick={() => setPinning(!pinning)}>
           {pinning ? "Cancel pin" : "Drop pin"}
         </Button>
