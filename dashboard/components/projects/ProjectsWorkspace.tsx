@@ -9,6 +9,7 @@ import DirectoryPane from "../admin-shell/DirectoryPane";
 import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 import InspectorRail from "../admin-shell/InspectorRail";
 import ModuleShell from "../admin-shell/ModuleShell";
+import { useClientTimeZone } from "../admin-shell/useClientTimeZone";
 import ModuleSidebar, { type ModuleSidebarSection } from "../admin-shell/ModuleSidebar";
 import SharedAIDock from "../admin-shell/SharedAIDock";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -243,28 +244,30 @@ function reviewCadenceLabel(value?: string) {
   return PROJECT_REVIEW_CADENCES.find((option) => option.value === value)?.label || displayLabel(value);
 }
 
-function formatDate(value?: string, fallback = "Not recorded") {
+function formatDateInZone(value?: string, fallback = "Not recorded", timeZone = "UTC") {
   if (!value) return fallback;
   const dateOnly = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   const date = dateOnly
-    ? new Date(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3]))
+    ? new Date(Date.UTC(Number(dateOnly[1]), Number(dateOnly[2]) - 1, Number(dateOnly[3])))
     : new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: dateOnly ? "UTC" : timeZone,
     month: "short",
     day: "numeric",
-    year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric"
+    year: date.getUTCFullYear() === new Date().getUTCFullYear() ? undefined : "numeric"
   }).format(date);
 }
 
-function formatTimestamp(value?: string, fallback = "Not recorded") {
+function formatTimestampInZone(value?: string, fallback = "Not recorded", timeZone = "UTC") {
   if (!value) return fallback;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
+    timeZone,
     month: "short",
     day: "numeric",
-    year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric",
+    year: date.getUTCFullYear() === new Date().getUTCFullYear() ? undefined : "numeric",
     hour: "numeric",
     minute: "2-digit"
   }).format(date);
@@ -1051,6 +1054,9 @@ export default function ProjectsWorkspace({
   initialReviewsError = ""
 }: ProjectsWorkspaceProps) {
   const router = useRouter();
+  const displayTimeZone = useClientTimeZone();
+  const formatDate = (value?: string, fallback?: string) => formatDateInZone(value, fallback, displayTimeZone);
+  const formatTimestamp = (value?: string, fallback?: string) => formatTimestampInZone(value, fallback, displayTimeZone);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const repository = useMemo(() => createProjectsRepository(), []);

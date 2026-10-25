@@ -5,7 +5,7 @@ const app=path.resolve(__dirname,'..');
 const artifactRoot=path.join(app,'output','playwright','workspace-pages');fs.mkdirSync(artifactRoot,{recursive:true});
 const {chromium}=require(path.join(app,'node_modules/@playwright/test'));
 const data=fs.mkdtempSync(path.join(os.tmpdir(),'fremen-workspace-pages-')),base='http://localhost:3226',secret='isolated-pages-secret';
-const server=spawn(process.execPath,[path.join(app,'node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port','3226'],{cwd:app,env:{...process.env,ADMIN_PASSWORD:'isolated-password',ADMIN_SESSION_SECRET:secret,FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',RESEND_API_KEY:'',VERCEL:''},stdio:'ignore'});
+const server=spawn(process.execPath,[path.join(app,'node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port','3226'],{cwd:app,env:{...process.env,TZ:'UTC',ADMIN_PASSWORD:'isolated-password',ADMIN_SESSION_SECRET:secret,FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',RESEND_API_KEY:'',VERCEL:''},stdio:'ignore'});
 let browser;
 (async()=>{
 for(let i=0;i<100;i++){try{if((await fetch(base)).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
@@ -18,6 +18,12 @@ for(const [name,viewport]of [['desktop',{width:1440,height:1000}],['mobile',{wid
  }
  const page=await context.newPage();let errors=[];page.on('pageerror',e=>errors.push(e.message));
  if(name==='desktop') {
+ for(const file of ['personal-records.json']) {
+ const target=path.join(data,file);
+ const fixture=JSON.parse(fs.readFileSync(target,'utf8'));
+ const setBoundaryDate=value=>{if(value&&typeof value==='object'){for(const key of Object.keys(value)){if(key==='updatedAt')value[key]='2026-10-25T01:00:00.000Z';else setBoundaryDate(value[key]);}}};
+ setBoundaryDate(fixture);fs.writeFileSync(target,JSON.stringify(fixture));
+ }
  for(const [route,data] of [['/api/reviews/runs',{input:{cadence:'weekly',title:'Layout QA review',periodStart:'2026-10-19',periodEnd:'2026-10-25'}}],['/api/personal/life',{collection:'lists',input:{title:'Layout QA list',description:'',kind:'custom',items:[],columns:[],rows:[]}}]]) {
  const response=await context.request.post(base+route,{headers:{'x-csrf-token':'isolated-csrf-token',origin:base},data});assert(response.ok(),await response.text());
  }
@@ -25,6 +31,8 @@ for(const [name,viewport]of [['desktop',{width:1440,height:1000}],['mobile',{wid
  for(const module of ['people','projects','notes','media','personal','reviews','resources','finance','vault']){
  await page.goto(base+(module==='vault'?'/vault':'/admin/'+module),{waitUntil:'domcontentloaded'});await page.waitForTimeout(800); if(module==='vault') await page.getByRole('heading',{name:'Connect to your vault',exact:true}).waitFor({timeout:30000});
  await page.screenshot({path:path.join(artifactRoot,'pages-'+module+'-'+name+'.png')});
+ assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,module+' overflow');
+ if(module==='notes') assert(await page.getByText('Updated Oct 24',{exact:true}).isVisible());
  console.log(JSON.stringify({module,name,errors,metrics:await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,nav:[...document.querySelectorAll('.workspace-topnav')].map(e=>({w:e.clientWidth,h:e.clientHeight})),main:[...document.querySelectorAll('.module-shell__main, .people-directory-panel, [data-personal-pages]>main')].map(e=>({w:e.clientWidth,h:e.clientHeight})),buttons:[...document.querySelectorAll('main button')].filter(e=>e.getClientRects().length).map(e=>e.getAttribute('aria-label')||e.textContent.trim()).slice(0,12)}))}));
  if(['projects','notes','resources','finance','personal'].includes(module)){
  const title=module==='projects'?/Project Pint/:module==='notes'?/Layout QA note/:module==='resources'?/Layout QA resource/:module==='finance'?/Inspect selected range/:/Keep all 12/;

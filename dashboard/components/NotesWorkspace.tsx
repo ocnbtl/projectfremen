@@ -7,6 +7,7 @@ import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "./admin-shel
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import ModuleShell from "./admin-shell/ModuleShell";
+import { useClientTimeZone } from "./admin-shell/useClientTimeZone";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import DirectoryPane from "./admin-shell/DirectoryPane";
 import InspectorRail from "./admin-shell/InspectorRail";
@@ -219,14 +220,15 @@ const FILTERS: ReadonlyArray<{
   { id: "needs-review", label: "Needs review", tone: "purple" }
 ];
 
-function formatDate(value?: string, fallback = "Not recorded") {
+function formatDateInZone(value?: string, fallback = "Not recorded", timeZone = "UTC") {
   if (!value) return fallback;
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
   return new Intl.DateTimeFormat("en-US", {
+    timeZone: /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : timeZone,
     month: "short",
     day: "numeric",
-    year: date.getFullYear() === new Date().getFullYear() ? undefined : "numeric"
+    year: date.getUTCFullYear() === new Date().getUTCFullYear() ? undefined : "numeric"
   }).format(date);
 }
 
@@ -449,6 +451,8 @@ export default function NotesWorkspace({
   initialReviewsError = ""
 }: NotesWorkspaceProps) {
   const router = useRouter();
+  const displayTimeZone = useClientTimeZone();
+  const formatDate = (value?: string, fallback?: string) => formatDateInZone(value, fallback, displayTimeZone);
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const repository = useMemo(() => createNotesRepository(), []);
