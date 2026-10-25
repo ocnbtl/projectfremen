@@ -1094,7 +1094,9 @@ function legacyTimelineItems(record: PersonalRecord): PeopleTimelineItem[] {
 
 function daysUntil(value?: string) {
   if (!value) return null;
-  const date = parseDisplayDate(value);
+  // Follow-up dates have no time zone. Use the same date boundary during server
+  // rendering and hydration, rather than the machine's local midnight.
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(value) ? new Date(`${value}T00:00:00Z`) : new Date(value);
   if (Number.isNaN(date.getTime())) return null;
   return Math.ceil((date.getTime() - Date.now()) / 86400000);
 }
