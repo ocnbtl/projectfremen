@@ -1,6 +1,7 @@
 "use client";
+import { WorkspaceNavSlot } from "../admin-shell/WorkspaceTopbar";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { usePathname, useSearchParams } from "next/navigation";
 import type { PersonalRecord } from "../../lib/personal-records-store";
@@ -64,9 +65,10 @@ function InteractionDetail({ item, people, explicitSelection, empty, error, onBa
   </div>;
 }
 
-export default function PeopleInteractions({ items, people, query, onQueryChange, onOpenPerson, error, detailTarget }: {
+export default function PeopleInteractions({ items, people, query, onQueryChange, onOpenPerson, error, detailTarget, viewControl, density = "list" }: {
   items: InteractionEntry[]; people: PersonalRecord[]; query: string; onQueryChange: (value: string) => void;
   onOpenPerson: (person: PersonalRecord) => void; error?: string; detailTarget: HTMLElement | null;
+  viewControl?: ReactNode; density?: string;
 }) {
   const params = useSearchParams(), pathname = usePathname();
   const selectedId = params.get("interaction") || "";
@@ -114,9 +116,9 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
     const key = validDate(item.date) ? item.date!.slice(0, 7) : "unknown";
     groups.set(key, [...(groups.get(key) || []), item]);
   }
-  return <section className="people-interactions-workspace" aria-label="Interaction history">
-    <div className="people-interactions-tools">
-      <div className="people-primary-search"><UnigentamosIcon role="search" size={18} /><input aria-label="Search interactions" placeholder="Search interactions, notes or participants…" value={query} onChange={event => onQueryChange(event.target.value)} />{query && <button type="button" className="people-search-clear" aria-label="Clear interaction search" onClick={() => onQueryChange("")} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}
+  return <section className={`people-interactions-workspace is-${density}`} aria-label="Interaction history">
+    <WorkspaceNavSlot kind="search"><div className="people-interactions-tools">
+      <div className="people-primary-search"><UnigentamosIcon role="search" size={18} /><input aria-label="Search interactions" placeholder="Search" value={query} onChange={event => onQueryChange(event.target.value)} />{query && <button type="button" className="people-search-clear" aria-label="Clear interaction search" onClick={() => onQueryChange("")} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}
         <div className="people-search-controls">
           <Popover.Root open={filtersOpen} onOpenChange={open => { setFiltersOpen(open); if (open) setSortOpen(false); }}><Popover.Trigger asChild><button type="button" className="people-control-trigger" aria-label={filtersOpen ? "Hide filters" : "Show filters"}><UnigentamosIcon role="filter" size={18} /><span>Filter</span>{filterCount > 0 && <strong>{filterCount}</strong>}</button></Popover.Trigger>
             <Popover.Portal><Popover.Content className="app-select-menu people-interactions-menu people-interactions-filters" sideOffset={10} align="end" collisionPadding={12} aria-label="Filter interactions" onEscapeKeyDown={event => event.stopImmediatePropagation()}>
@@ -141,7 +143,9 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
           </Popover.Root>
         </div>
       </div>
+      {viewControl}
     </div>
+    </WorkspaceNavSlot>
     {error ? <div role="alert" className="notes-empty-state"><h2>Interactions could not be loaded</h2><p>{error}</p><button onClick={() => window.location.reload()}>Reload</button></div> : <>
       <p className="people-visually-hidden" role="status">{filtered.length} matching interactions</p>
       {filtered.length ? <div className="people-interaction-groups">{[...groups].map(([month, entries]) => <section key={month} aria-label={month === "unknown" ? "Date not recorded" : dateLabel(`${month}-01`, true)}>

@@ -5,7 +5,8 @@ import { createNativeObjectRef } from "../../native-objects/routes";
 
 export type MediaProfile = {
   version: 1;
-  manifest: VaultMediaManifest;
+  manifest: VaultMediaManifest | (Omit<VaultMediaManifest, "format" | "digestAlgorithm"> & { format: "unigentamos-account-media-v1"; digestAlgorithm: "sha256" });
+  accountFile?: { id: string; sha256: string; byteLength: number; chunkSize: number; totalChunks: number };
   linkedRefs: NativeObjectRef[];
   altText: string;
   archivedAt?: string;
@@ -26,11 +27,11 @@ export function normalizeMediaProfile(
   if (
     raw.version !== 1 ||
     !m ||
-    m.format !== "unigentamos-vault-media-v1" ||
-    m.digestAlgorithm !== "chunk-root-v1" ||
+    !["unigentamos-vault-media-v1", "unigentamos-account-media-v1"].includes(m.format) ||
+    m.digestAlgorithm !== (m.format === "unigentamos-account-media-v1" ? "sha256" : "chunk-root-v1") ||
     !/^[a-f\d]{64}$/i.test(m.contentRoot)
   )
-    throw new Error("Invalid encrypted media manifest");
+    throw new Error("Invalid media manifest");
   if (
     ![m.mediaId, m.objectId].every(
       (id) => typeof id === "string" && /^[a-z\d-]{16,80}$/i.test(id),
@@ -56,6 +57,9 @@ export function normalizeMediaProfile(
     throw new Error("Invalid media description");
   if (!Array.isArray(raw.linkedRefs) || raw.linkedRefs.length > 100)
     throw new Error("Use no more than 100 linked records");
+  const file = raw.accountFile;
+  if (file && (!/^[a-f\d-]{36}$/i.test(file.id) || !/^[a-f\d]{64}$/i.test(file.sha256) || file.byteLength !== m.byteLength || file.chunkSize !== 1048576 || file.totalChunks !== Math.ceil(file.byteLength / file.chunkSize))) throw new Error("Invalid account media file");
+  if (m.format === "unigentamos-account-media-v1" && !file) throw new Error("Account file is required");
   const linkedRefs = raw.linkedRefs.map((ref) => {
     if (
       !ref ||
@@ -98,8 +102,9 @@ export function normalizeMediaProfile(
       chunkSize: m.chunkSize,
       totalChunks: m.totalChunks,
       createdAt: m.createdAt,
-    },
+    } as MediaProfile["manifest"],
     linkedRefs,
+    ...(file ? { accountFile: { id: file.id, sha256: file.sha256, byteLength: file.byteLength, chunkSize: file.chunkSize, totalChunks: file.totalChunks } } : {}),
     altText: typeof raw.altText === "string" ? raw.altText.slice(0, 2000) : "",
     ...(raw.archivedAt
       ? { archivedAt: String(raw.archivedAt).slice(0, 40) }

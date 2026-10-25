@@ -1,4 +1,5 @@
 "use client";
+import { workspaceReturnUrl } from "../admin-shell/useWorkspaceReturn";
 import RelatedRecords from "../planning/RelatedRecords";
 
 import Link from "next/link";
@@ -3262,7 +3263,7 @@ export default function ProjectsWorkspace({
         {initialDetail && selectedItem && <button type="button" className={`${styles.button} ${styles.mobileInspectorButton}`} onClick={() => setInspectorOpen(true)}>{initialDetail ? "Completion" : "Details"}</button>}
         {initialDetail ? (
           <div className={styles.mainScroll}>
-            <div className={styles.mobileToolbar}><Link className={styles.textLink} href={getModuleRoute("projects")}>Back to projects</Link></div>
+            <div className={styles.mobileToolbar}><Link className={styles.textLink} href={workspaceReturnUrl("projects", getModuleRoute("projects"))}>Back to projects</Link></div>
             {selectedItem ? <>{renderProjectHeader(selectedItem, "h1")}{renderProjectBody(selectedItem)}</> : <SystemState variant="error" title="Project not found" description="The requested project identity is not available in the current native or legacy snapshot." />}
           </div>
         ) : directory}

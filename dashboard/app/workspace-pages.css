@@ -122,12 +122,6 @@ button.workspace-back { display: inline-flex; align-items: center; gap: 7px; wid
 .workspace-topnav .people-header-actions button { width: auto; min-height: 38px; padding: 7px 9px; }
 .workspace-topnav .people-view-cycle { width: auto; }
 .workspace-topnav .people-control-popover { z-index: 100; }
-.workspace-pages[data-detail-open] .workspace-topnav__search,
-.workspace-pages[data-detail-open] .workspace-topnav__actions,
-[data-personal-pages][data-detail-open] .workspace-topnav__search,
-[data-personal-pages][data-detail-open] .workspace-topnav__actions,
-.workspace-people-pages:not(.is-mobile-directory) .workspace-topnav__search,
-.workspace-people-pages:not(.is-mobile-directory) .workspace-topnav__actions { display: none; }
 .workspace-people-pages .people-profile-panel { display: flex; flex-direction: column; gap: 14px; }
 .workspace-people-pages .people-profile-panel > * { flex-shrink: 0; }
 .workspace-people-pages .people-mobile-profile-back { color: var(--text-strong, #233840); padding: 4px 8px; }
@@ -167,9 +161,78 @@ button.workspace-back { display: inline-flex; align-items: center; gap: 7px; wid
 .workspace-topnav .quick-action-bar__actions > * { width: auto; flex: 0 0 auto; }
 .workspace-topnav .quick-action-bar__action { min-height: 38px; padding: 7px 10px; }
 .workspace-view-options { display: grid; gap: 8px; }
+/* Stable controls, with search first and management/actions at the far end. */
+.workspace-topnav__sections { margin-right: auto; }
+.workspace-topnav__actions { margin-left: 0; }
+.workspace-topnav .people-interactions-tools { width: 100%; margin: 0; padding: 0; }
+.workspace-topnav :is(.work-search,.people-primary-search,.finance-global-search,[class*="resourceSearch"]) {
+  display: flex; align-items: center; gap: 8px; height: 40px; min-height: 40px;
+  padding: 0 10px; border: 1px solid var(--border-soft, #dce1e5); border-radius: 10px;
+  background: transparent; box-shadow: none; overflow: visible;
+  transition: border-color 180ms ease, box-shadow 180ms ease;
+}
+.workspace-topnav :is(.work-search,.people-primary-search,.finance-global-search,[class*="resourceSearch"]):focus-within {
+  border-color: var(--module-accent, #5d548d); box-shadow: 0 0 0 3px color-mix(in srgb, var(--module-accent, #5d548d) 16%, transparent);
+}
+.workspace-topnav :is(.work-search,.people-primary-search,.finance-global-search,[class*="resourceSearch"]) input {
+  flex: 1; width: 100%; min-width: 0; height: 36px; min-height: 0; padding: 0;
+  margin: 0; border: 0; border-radius: 0; background: transparent; outline: 0; box-shadow: none;
+  font: 400 13px/1.4 var(--font-body); text-align: left;
+}
+.workspace-topnav .people-search-controls { position: static; display: flex; align-items: center; flex: 0 0 auto; }
+.workspace-topnav .people-primary-search { padding-right: 4px; }
+.workspace-topnav .people-control-trigger { min-height: 32px; padding: 5px 6px; }
+.workspace-nav-menu .module-sidebar__item { position: relative; isolation: isolate; }
+.workspace-nav-menu .module-sidebar__item::before,
+.workspace-nav-menu .module-sidebar__item::after { display: none !important; }
+.workspace-nav-menu .module-sidebar__item.is-active { background: transparent; box-shadow: none; border-left: 0; }
+.workspace-nav-selection { position: absolute; inset: 0; z-index: -1; border-radius: 9px; background: var(--selected-bg, #edf1f6); pointer-events: none; }
+.people-tools-menu section > p { margin: 8px; font-size: 12px; color: var(--text-muted); }
+.people-duplicates-indicator { color: #387957 !important; }
+.people-duplicates-indicator[data-warning] { color: #a54444 !important; }
+.workspace-people-pages .people-profile-view-bar { justify-content: space-between; gap: 16px; }
+.workspace-people-pages .people-profile-view-bar .people-profile-tabs { display: flex; flex: 0 1 auto; width: fit-content; max-width: 100%; gap: 4px; }
+.workspace-people-pages .people-profile-tabs button { flex: 0 0 auto; width: auto; padding-inline: 16px; }
+.workspace-people-pages .people-active-tab-panel { overflow: visible !important; flex: 1; }
+.workspace-people-pages .people-edit-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: 20px; }
+.workspace-people-pages .people-edit-form .people-profile-section { min-width: 0; margin: 0; }
+.workspace-people-pages .people-edit-form > :not(section) { grid-column: 1 / -1; }
+.workspace-people-pages .people-directory-list { flex: 0 0 auto; }
+.workspace-people-pages .people-directory-list.is-list .people-directory-row-body { min-height: 76px; padding: 10px 14px; }
+.workspace-people-pages .people-directory-list.is-compact .people-directory-row-body { min-height: 48px; padding: 5px 12px; gap: 10px; }
+.workspace-people-pages .people-directory-list.is-compact .people-row-avatar { width: 32px; height: 32px; }
+.workspace-people-pages .people-directory-list.is-compact .people-row-main > span:not(.people-row-name),
+.workspace-people-pages .people-directory-list.is-compact .people-row-main > small { display: none; }
+.workspace-people-pages .people-directory-list.is-compact .people-row-name { font-size: 13px; }
+@media (max-width: 1000px) { .workspace-people-pages .people-edit-form { grid-template-columns: minmax(0, 1fr); } }
+@media (max-width: 700px) {
+  .workspace-people-pages .people-profile-tabs button { padding-inline: 10px; font-size: 12px; }
+  .workspace-people-pages .people-directory-list.is-list .people-directory-row-body { min-height: 74px; }
+  .workspace-topnav :is(.work-search,.people-primary-search,.finance-global-search,[class*="resourceSearch"]) input { font-size: 16px; }
+}
 @media (max-width: 900px) {
   .workspace-topnav { padding: 8px 10px; gap: 6px; }
   .workspace-topnav__search { flex: 1 1 100%; order: 3; max-width: none; }
   .workspace-topnav .workspace-topnav__title { margin-right: auto; }
   .workspace-actions-trigger { order: 1; }
 }
+
+.workspace-topnav input::placeholder { text-align: left !important; }
+.workspace-topnav [class*="resourceSearch"] input { text-align: left !important; }
+.workspace-topnav .work-count { display: none; }
+.people-create-menu { position: relative; }
+.people-create-menu summary { display: flex; align-items: center; justify-content: center; gap: 7px; list-style: none; min-height: 38px; padding: 7px 12px; border-radius: 9px; color: #fff; background: var(--brand-primary, #183d53); cursor: pointer; font-size: 13px; }
+.people-create-menu summary::-webkit-details-marker { display: none; }
+.people-create-menu > div { position: absolute; right: 0; top: calc(100% + 8px); width: 200px; display: grid; gap: 4px; padding: 8px; border: 1px solid var(--border-soft); border-radius: 12px; background: var(--surface-panel, #fff); box-shadow: 0 12px 30px #16344920; z-index: 150; animation: workspace-menu-in 180ms ease-out; }
+.people-create-menu > div button { justify-content: flex-start; background: transparent !important; color: var(--text-strong, #233840) !important; }
+.workspace-topnav .people-header-actions > button[aria-label="Log interaction"] { background: transparent; color: var(--text-strong); border: 1px solid var(--border-soft); }
+.workspace-actions-menu .people-create-menu > div { position: static; width: 100%; box-shadow: none; margin-top: 6px; }
+.people-create-menu summary, .people-create-menu summary :is(span,svg) { color: #fff !important; opacity: 1; }
+.workspace-topnav .people-header-actions > button[aria-label="Log interaction"] { background: transparent !important; color: var(--text-strong) !important; }
+.workspace-topnav .people-interactions-tools { display: flex; gap: 6px; }
+.people-interactions-workspace.is-compact .people-interaction-row { min-height: 52px; padding-block: 6px; }
+.people-interactions-workspace.is-compact .people-interaction-row-notes { display: none; }
+.people-interactions-workspace.is-grid .people-interaction-groups ul { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(280px, 100%), 1fr)); gap: 10px; }
+.workspace-pages .dense-object-row.is-selected { box-shadow: none; }
+.workspace-people-pages .people-edit-form > section { grid-column: auto !important; }
+.workspace-people-pages .people-edit-form > section:has(.people-group-picker) { grid-column: 1 / -1 !important; }

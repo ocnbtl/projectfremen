@@ -3572,7 +3572,8 @@ export default function PeopleWorkspace({
     setDetailMode("profile");
     setActiveView(editorReturnView);
     await releaseDirtyHistoryGuard();
-    router.replace(`${getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id })}?tab=${editorReturnView}`);
+    const returnUrl = buildPeopleDestination({ tab: editorReturnView, person: "" }, { path: getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id }) });
+    commitPeopleRoute(returnUrl, { selectedId: selectedPerson.id, view: editorReturnView, mode: editorReturnView === "timeline" ? "timeline" : editorReturnView === "links" ? "workspace" : "profile" }, "replace");
   }
 
   function openAddPerson(type: "person" | "org" = "person") {
@@ -3718,14 +3719,17 @@ export default function PeopleWorkspace({
     if (addingPerson || !selectedPerson) {
       setAddingPerson(false);
       setDetailMode("profile");
-      router.replace(destination || getModuleRoute("people"));
+      router.replace(destination || buildPeopleDestination({ person: "", tab: "overview" }, { path: getModuleRoute("people") }), { scroll: false });
       return;
     }
     setProfileDraft(getProfile(selectedPerson));
     setProfileGroups(selectedPerson.subjects);
     setDetailMode("profile");
     setActiveView(editorReturnView);
-    router.replace(destination || `${getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id })}?tab=${editorReturnView}`);
+    const returnPath = getNativeObjectRoute({ module: "people", objectType: selectedPerson.className === "org" ? "organization" : "person", objectId: selectedPerson.id });
+    const returnUrl = destination || buildPeopleDestination({ tab: editorReturnView, person: "" }, { path: returnPath });
+    if (destination) router.replace(returnUrl, { scroll: false });
+    else commitPeopleRoute(returnUrl, { selectedId: selectedPerson.id, view: editorReturnView, mode: editorReturnView === "timeline" ? "timeline" : editorReturnView === "links" ? "workspace" : "profile" }, "replace");
   }
 
   function requestCancelEditor() {
@@ -4082,13 +4086,13 @@ export default function PeopleWorkspace({
       <span id="people-unavailable-actions" className="sr-only">
         This action is intentionally unavailable until its native owner or persistence path is connected.
       </span>
-      <ModuleSidebar title="People" sections={PEOPLE_SIDEBAR_SECTIONS.map(section => ({
+      <ModuleSidebar title="People" keepSelectionOpen sections={PEOPLE_SIDEBAR_SECTIONS.slice(0, 1).map(section => ({
         id: section.title, label: section.title, items: section.items.map(item => ({
           id: item.id, label: item.label, active: activeSidebarView === item.id,
           icon: <UnigentamosIcon role={item.icon} size={18} />,
           count: getSidebarCount(item.id), onSelect: () => selectSidebarView(item)
         }))
-      }))} />
+      }))} footer={<div className="people-tools-menu">{PEOPLE_SIDEBAR_SECTIONS.slice(1).map(section => <section key={section.title}><p>{section.title === "Operational" ? "Manage" : section.title}</p>{section.items.filter(item => item.id !== "duplicates").map(item => <button type="button" className="module-sidebar__item" key={item.id} onClick={() => selectSidebarView(item)}><UnigentamosIcon role={item.icon} size={18} /><span>{item.label}</span></button>)}</section>)}</div>} status={<button type="button" className="workspace-nav-trigger people-duplicates-indicator" data-warning={duplicateMatches.length > 0 || undefined} aria-label={duplicateMatches.length ? `${duplicateMatches.length} possible duplicate pairs` : "No duplicates detected"} title={duplicateMatches.length ? `${duplicateMatches.length} possible duplicate pairs` : "No duplicates detected"} onClick={() => selectSidebarView(PEOPLE_SIDEBAR_SECTIONS[2].items.find(item => item.id === "duplicates")!)}><UnigentamosIcon role={duplicateMatches.length ? "duplicates-warning" : "duplicates"} size={18} />{duplicateMatches.length > 0 && <small>{duplicateMatches.length}</small>}</button>} />
 
       <main className="people-directory-panel" data-total-records={totalRecords}>
         <WorkspaceNavSlot kind="actions"><header className="people-directory-header">
@@ -4100,14 +4104,14 @@ export default function PeopleWorkspace({
             <button type="button" aria-label="Log interaction" onClick={() => openInteractionComposer()}>
               <PeopleIcon name="interaction" /><span>Interaction</span>
             </button>
-            {!isInteractions && <>
-            <button type="button" aria-label="Add organization" onClick={() => openAddPerson("org")}>
+            <details className="people-create-menu"><summary><UnigentamosIcon role="plus" size={18} /><span>Add</span><UnigentamosIcon role="chevron-down" size={14} /></summary><div>
+            <button type="button" aria-label="Add organization" onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); openAddPerson("org"); }}>
               <UnigentamosIcon role="organization-add" size={18} /><span>Organization</span>
             </button>
-            <button type="button" aria-label="Add person" onClick={() => openAddPerson("person")}>
+            <button type="button" aria-label="Add person" onClick={event => { event.currentTarget.closest("details")?.removeAttribute("open"); openAddPerson("person"); }}>
               <PeopleIcon name="new-person" /><span>Person</span>
             </button>
-            </>}
+            </div></details>
           </div>
         </header></WorkspaceNavSlot>
 
@@ -4120,6 +4124,8 @@ export default function PeopleWorkspace({
           }))}
           people={people}
           query={query}
+          density={listMode}
+          viewControl={<button type="button" className="people-view-cycle" aria-label={`View: ${VIEW_LABELS[listMode]}. Switch to ${VIEW_LABELS[VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]]}`} onClick={() => { const next = VIEW_ORDER[(VIEW_ORDER.indexOf(listMode) + 1) % VIEW_ORDER.length]; setListMode(next); updatePeopleUrl({ view: next }, { native: true }); }}><MorphingViewIcon mode={listMode} /><span>View</span></button>}
           onQueryChange={value => { setQuery(value); updatePeopleUrl({ query: value }, { native: true }); }}
           onOpenPerson={selectPerson}
           error={initialLoadError}
@@ -4135,7 +4141,7 @@ export default function PeopleWorkspace({
                 setQuery(event.target.value);
                 updatePeopleUrl({ query: event.target.value }, { native: true });
               }}
-              placeholder="Search people..."
+              placeholder="Search"
             />
             {query && (
               <button type="button" className="people-search-clear" aria-label="Clear search" onClick={() => { setQuery(""); updatePeopleUrl({ query: "" }, { native: true }); }} data-icon-button="standard">

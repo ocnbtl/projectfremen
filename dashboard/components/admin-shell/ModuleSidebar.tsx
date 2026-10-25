@@ -3,7 +3,8 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useState, useId } from "react";
+import { LayoutGroup, motion } from "motion/react";
 import { WorkspaceTopbarContext } from "./WorkspaceTopbar";
 import * as Popover from "@radix-ui/react-popover";
 
@@ -37,6 +38,7 @@ export type ModuleSidebarProps = {
   onClose?: () => void;
   ariaLabel?: string;
   className?: string;
+  keepSelectionOpen?: boolean;
 };
 
 function SidebarItem({ item, onNavigate }: { item: ModuleSidebarItem; onNavigate?: () => void }) {
@@ -44,6 +46,7 @@ function SidebarItem({ item, onNavigate }: { item: ModuleSidebarItem; onNavigate
   const reason = item.disabledReason ?? (unavailable ? `${item.label} is not available yet.` : undefined);
   const content = (
     <>
+      {item.active && <motion.span className="workspace-nav-selection" layoutId="selection" transition={{ type: "spring", stiffness: 400, damping: 36 }} aria-hidden="true" />}
       {item.icon && (
         <span className="module-sidebar__item-icon" aria-hidden="true">
           {item.icon}
@@ -103,7 +106,8 @@ function SidebarItem({ item, onNavigate }: { item: ModuleSidebarItem; onNavigate
   );
 }
 
-export default function ModuleSidebar({ id, title, sections, footer, status, onClose, ariaLabel = title + " navigation" }: ModuleSidebarProps) {
+export default function ModuleSidebar({ id, title, sections, footer, status, onClose, keepSelectionOpen = false, ariaLabel = title + " navigation" }: ModuleSidebarProps) {
+  const layoutId = useId();
   const bar = useContext(WorkspaceTopbarContext);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [compact, setCompact] = useState(false);
@@ -114,14 +118,14 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
     return () => query.removeEventListener("change", sync);
   }, []);
   const [openSection, setOpenSection] = useState<string | null>(null);
-  const close = () => { setOpenSection(null); onClose?.(); };
+  const close = () => { if (!keepSelectionOpen) { setOpenSection(null); onClose?.(); } };
   return <nav id={id} className="workspace-topnav" aria-label={ariaLabel}>
     <h1 className="workspace-topnav__title">{title}</h1>
     {bar && <div className="workspace-topnav__search" ref={bar.setSearch} />}
     {compact && sections.length > 0 && <Popover.Root open={openSection === "compact"} onOpenChange={open => setOpenSection(open ? "compact" : null)}>
       <Popover.Trigger className="workspace-nav-trigger"><UnigentamosIcon role="menu" size={18} /><span>Views</span></Popover.Trigger>
       <Popover.Portal><Popover.Content className="workspace-nav-menu" align="end" sideOffset={8} collisionPadding={12}>
-        {sections.map(section => <section key={section.id}><p>{section.label}</p><ul>{section.items.map(item => <li key={item.id}><SidebarItem item={item} onNavigate={close} /></li>)}</ul></section>)}
+        {sections.map(section => <LayoutGroup id={`${layoutId}-${section.id}`} key={section.id}><section><p>{section.label}</p><ul>{section.items.map(item => <li key={item.id}><SidebarItem item={item} onNavigate={close} /></li>)}</ul></section></LayoutGroup>)}
         {footer}
       </Popover.Content></Popover.Portal>
     </Popover.Root>}
@@ -134,7 +138,7 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
           </Popover.Trigger>
           <Popover.Portal><Popover.Content className="workspace-nav-menu" align="start" sideOffset={8} collisionPadding={12}>
             {section.label && <p>{section.label}</p>}
-            <ul>{section.items.map(item => <li key={item.id}><SidebarItem item={item} onNavigate={close} /></li>)}</ul>
+            <LayoutGroup id={`${layoutId}-${section.id}`}><ul>{section.items.map(item => <li key={item.id}><SidebarItem item={item} onNavigate={close} /></li>)}</ul></LayoutGroup>
           </Popover.Content></Popover.Portal>
         </Popover.Root>;
       })}

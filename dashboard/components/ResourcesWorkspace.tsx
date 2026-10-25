@@ -1148,7 +1148,7 @@ export default function ResourcesWorkspace({
                   setQuery(event.target.value);
                   updateUrl({ query: event.target.value });
                 }}
-                placeholder="Search…"
+                placeholder="Search"
                 aria-label="Search Resources"
               />
               <details className={styles.resourceToolbarMenu}>

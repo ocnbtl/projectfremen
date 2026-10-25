@@ -120,7 +120,7 @@ export async function GET() {
       readFinanceState(),
       readNoteLinksState(), readPlanningState(), readPersonalLifeState()
     ]);
-    const personalObjects: BootstrapObject[] = personalRecords.map((record) => ({
+    const personalObjects: BootstrapObject[] = personalRecords.filter(record => record.mediaProfile?.manifest.format !== "unigentamos-account-media-v1").map((record) => ({
       canonicalId: `personal-records:${record.className}:${record.id}`,
       objectKind: objectKindForPersonalCollection(record.className),
       fields: canonicalVaultFields({

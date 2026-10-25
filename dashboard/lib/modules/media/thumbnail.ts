@@ -1,4 +1,5 @@
 "use client";
+import { accountFile, openMediaFile } from "./account-client";
 import { browserVault } from "../../local-first/browser-engine";
 import type {
   VaultObjectSnapshot,
@@ -20,7 +21,7 @@ export async function smallPreview(object: VaultObjectSnapshot) {
     await new Promise<void>((resolve) => thumbnailWaiters.push(resolve));
   thumbnailWorkers++;
   try {
-    const { blob } = await browserVault.openMedia(object);
+    const { blob } = await openMediaFile(object);
     const bitmap = await createImageBitmap(blob);
     const scale = Math.min(1, 384 / Math.max(bitmap.width, bitmap.height)),
       canvas = document.createElement("canvas");
@@ -40,7 +41,7 @@ export async function smallPreview(object: VaultObjectSnapshot) {
         0.8,
       ),
     );
-    if (!browserVault.isUnlocked() || generation !== started)
+    if ((!accountFile(object) && !browserVault.isUnlocked()) || generation !== started)
       throw new Error("Vault locked");
     thumbnailCache.set(key, small);
     while (thumbnailCache.size > 60)

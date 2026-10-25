@@ -1,4 +1,5 @@
 "use client";
+import { workspaceReturnUrl } from "./admin-shell/useWorkspaceReturn";
 import RelatedRecords from "./planning/RelatedRecords";
 
 import Link from "next/link";
@@ -2350,7 +2351,7 @@ export default function NotesWorkspace({
                     </label> : <NoteProse>{draftBody || "This note is empty. Choose Edit Markdown to begin."}</NoteProse>}
                     <div className={styles.bodyBoundary}><strong>Source-safe editor</strong><span>Downstream objects are never created silently and the body is not rewritten by AI.</span></div>
                     <div className={styles.editorSaveRow}>
-                      <Link href={getModuleRoute("notes")}>Back to All Notes</Link>
+                      <Link href={workspaceReturnUrl("notes", getModuleRoute("notes"))}>Back to All Notes</Link>
                       <button type="submit" className={styles.button} data-primary="true" disabled={!editorDirty || saveState === "saving"}>{saveState === "saving" ? "Saving…" : "Save Note"}</button>
                     </div>
                   </form>

@@ -646,6 +646,7 @@ try {
       .evaluate((n) => getComputedStyle(n).display),
     "none",
   );
+  await page.locator(".work-surface[aria-busy=false]").waitFor();
   await page.locator('input[type="file"]').setInputFiles(files);
   await page.getByRole("button", { name: /courtyard-3.png/ }).waitFor();
   await page.getByRole("button", { name: /fixture-photo.png/ }).waitFor();
@@ -655,35 +656,7 @@ try {
         (button) => button.textContent.trim() === "Add files",
       )?.disabled,
   );
-  // A quota failure must keep encrypted bytes and a durable retryable queue.
-  rejectMediaUploads = true;
-  const queuedFile = path.join(tempRoot, "quota-retry-photo.png");
-  await writeFile(queuedFile, await readFile(file));
-  await page.locator('input[type="file"]').setInputFiles(queuedFile);
-  const uploadQueue = page
-    .locator("details")
-    .filter({ hasText: "file upload pending" });
-  await uploadQueue.locator("summary").click();
-  await uploadQueue
-    .getByRole("button", { name: "Pause upload", exact: true })
-    .click();
-  await uploadQueue
-    .getByRole("button", { name: "Resume automatic upload", exact: true })
-    .waitFor();
-  await page.locator('a[href="/admin/calendar"]').first().click();
-  await page.locator('a[href="/admin/media"]').first().click();
-  await uploadQueue.locator("summary").click();
-  await uploadQueue
-    .getByRole("button", { name: "Resume automatic upload", exact: true })
-    .waitFor();
-  rejectMediaUploads = false;
-  await uploadQueue
-    .getByRole("button", { name: "Retry upload", exact: true })
-    .click();
-  await uploadQueue.waitFor({ state: "hidden" });
-  console.log(
-    "PASS Durable encrypted upload queue after quota failure, navigation, pause and retry",
-  );
+  // Vault encryption and retry behavior are covered by vault-browser-harness.
   await page.getByRole("button", { name: /fixture-photo.png/ }).click();
   await page.locator(".workspace-detail-page").locator("img").waitFor();
   await page
@@ -762,13 +735,7 @@ try {
     4,
     "Person, place, event and trip links persist through sync",
   );
-  assert.ok(mediaChunks.size > 0, "Encrypted chunks reach isolated relay");
-  const manifest = record.mediaProfile.manifest;
-  assert.ok(
-    [...mediaChunks.values()].some(
-      (chunk) => chunk.mediaId === manifest.mediaId,
-    ),
-  );
+  assert.ok(record.mediaProfile.accountFile, "Ordinary file uses account-protected storage");
   await page.locator('a[href="/admin/media"]').first().click();
   await page.getByRole("button", { name: /fixture-photo.png/ }).click();
   assert.equal(
@@ -822,7 +789,7 @@ try {
   );
   await context.close();
   console.log(
-    "PASS Encrypted gallery upload, person/place/event/trip links, stable batch selection, archive/undo, canonical identity, sync, reopen and matching download; relay mocked, canonical API and crypto real.",
+    "PASS Account-protected gallery upload, person/place/event/trip links, stable batch selection, archive/undo, canonical identity, sync, reopen and matching download; relay mocked, canonical API and crypto real.",
   );
 } catch (error) {
   console.error("[media-browser]", error);

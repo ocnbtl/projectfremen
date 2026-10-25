@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceReturn } from "../admin-shell/useWorkspaceReturn";
 import LogoLoader from "../operational/LogoLoader";
 import TravelModeField from "../planning/TravelModeField";
 
@@ -168,6 +169,8 @@ export default function PersonalLifeWorkspace({
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [error, setError] = useState(initialLoadError || "");
+  const [returnRoot, setReturnRoot] = useState<HTMLDivElement | null>(null);
+  useWorkspaceReturn(returnRoot);
   const [listPageOpen, setListPageOpen] = useState(false);
   const [selectedListId, setSelectedListId] = useState(initialState.lists[0]?.id || "");
   const [listDraft, setListDraft] = useState<PersonalList | null>(initialState.lists[0] || null);
@@ -645,7 +648,7 @@ export default function PersonalLifeWorkspace({
   }
 
   function renderLists() {
-    return <div className={styles.notebook} data-list-page={listPageOpen || undefined}>
+    return <div ref={setReturnRoot} data-workspace-return="personal-lists" className={styles.notebook} data-list-page={listPageOpen || undefined}>
       <aside className={styles.listIndex} aria-label="Lists">
         {state.lists.map((list) => <button type="button" data-active={selectedList?.id === list.id || undefined} onClick={() => selectList(list)} key={list.id}><span>{list.title}</span><small>{list.rows.filter((row) => row.completed).length}/{list.rows.length}</small></button>)}
         {!state.lists.length && <p>No lists yet.</p>}

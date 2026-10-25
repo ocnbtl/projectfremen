@@ -94,7 +94,7 @@ export function WorkspaceToolbar({
           <input
             type="search"
             aria-label={placeholder}
-            placeholder={placeholder}
+            placeholder="Search"
             value={query}
             onChange={(e) => onQuery(e.target.value)}
           />

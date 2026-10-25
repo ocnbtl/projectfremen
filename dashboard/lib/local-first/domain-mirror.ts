@@ -28,6 +28,7 @@ export async function mirrorVaultRecord(
 }
 
 export async function mirrorPersonalRecord(record: PersonalRecord): Promise<boolean> {
+  if (record.mediaProfile?.manifest.format === "unigentamos-account-media-v1") return false;
   return mirrorCanonicalRecord("personal-records", record.className, personalKind(record), record as unknown as Record<string, unknown>);
 }
 

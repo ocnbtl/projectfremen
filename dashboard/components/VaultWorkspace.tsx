@@ -1,4 +1,5 @@
 "use client";
+import { useWorkspaceReturn } from "./admin-shell/useWorkspaceReturn";
 import LogoLoader from "./operational/LogoLoader";
 import VaultMediaPreview, { inertPreviewBlob } from "./VaultMediaPreview";
 
@@ -273,6 +274,8 @@ export default function VaultWorkspace({
   const [historyCount, setHistoryCount] = useState(0);
   const [objects, setObjects] = useState<VaultObjectSnapshot[]>([]);
   const [activeKind, setActiveKind] = useState<VaultObjectKind | "all">(initialKind);
+  const [returnRoot, setReturnRoot] = useState<HTMLDivElement | null>(null);
+  useWorkspaceReturn(returnRoot);
   const [recordPageOpen, setRecordPageOpen] = useState(false);
   const [selectedObjectId, setSelectedObjectId] = useState<string | null>(null);
   const [objectDraft, setObjectDraft] = useState<Record<string, EditorDraftValue>>({ title: "", body: "" });
@@ -1204,7 +1207,7 @@ export default function VaultWorkspace({
                 <button key={tab.value} role="tab" aria-selected={activeKind === tab.value} onClick={() => { if (newObject(false)) setActiveKind(tab.value); }}>{tab.label}</button>
               ))}
             </div>
-            <div className={styles.objectGrid} data-record-page={recordPageOpen || undefined}>
+            <div ref={setReturnRoot} data-workspace-return="vault-records" className={styles.objectGrid} data-record-page={recordPageOpen || undefined}>
               <aside className={styles.objectList} aria-label="Saved records">
                 {visibleObjects.map((item) => (
                   <button key={item.objectId} data-selected={selectedObjectId === item.objectId} onClick={() => void selectObject(item)}>

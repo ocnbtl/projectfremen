@@ -1,4 +1,5 @@
 "use client";
+import { accountFile, mediaSnapshot, openMediaFile, saveMediaDetails, uploadAccountFile } from "../../lib/modules/media/account-client";
 import ModuleShell from "../admin-shell/ModuleShell";
 import ModuleSidebar from "../admin-shell/ModuleSidebar";
 import LogoLoader from "../operational/LogoLoader";
@@ -138,6 +139,7 @@ export default function MediaLibrary({
     }>
   >([]);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [catalogueLoaded, setCatalogueLoaded] = useState(false);
   const [selectionMode, setSelectionMode] = useState(false);
   const [checked, setChecked] = useState<Set<string>>(new Set());
   const [undoBatch, setUndoBatch] = useState<
@@ -166,36 +168,34 @@ export default function MediaLibrary({
     [context, setContext] = useState<PlanningSnapshot>();
   const refresh = useCallback(async () => {
     setUnlocked(browserVault.isUnlocked());
-    if (!browserVault.isUnlocked()) {
-      clearThumbnailCache();
-      setObjects([]);
-      setTransfers([]);
-      setSelected(undefined);
-      setProfile(undefined);
-      setTitle("");
-      setDescription("");
-      setPreview("");
-      setChecked(new Set());
-      setUndoBatch([]);
-      return;
-    }
-    const items = await browserVault.listObjects(["media"]);
-    const media = items.filter((item) => !item.tombstone && manifestFor(item));
+    if (!browserVault.isUnlocked()) clearThumbnailCache();
+    let canonical = records;
+    try {
+      const response = await fetch("/api/personal/records", { cache: "no-store" });
+      if (!response.ok) throw new Error("Media catalogue could not be loaded");
+      canonical = (await response.json()).items;
+    } catch (error) { if (!browserVault.isUnlocked()) throw error; }
+    const catalogue = canonical.filter(item => item.className === "file" && item.mediaProfile).map(mediaSnapshot);
+    const local = browserVault.isUnlocked() ? await browserVault.listObjects(["media"]) : [];
+    const media = catalogue.map(item => accountFile(item) ? item : local.find(other => other.fields.id === item.fields.id && !other.tombstone) || item);
+    media.push(...local.filter(item => !item.tombstone && manifestFor(item) && !media.some(other => other.fields.id === item.fields.id)));
     setObjects(media);
+    setCatalogueLoaded(true);
     const pending = [];
     for (const object of media) {
+      if (accountFile(object) || !browserVault.isUnlocked()) continue;
       const state = await browserVault.mediaTransferState(object);
       if (state && state.local > state.uploaded)
         pending.push({ object, ...state });
     }
     setTransfers(pending);
-  }, []);
+  }, [records]);
   useEffect(() => {
     let active = true;
     void (async () => {
       if (browserVault.isUnlocked())
         for (const record of records)
-          if (record.mediaProfile) await mirrorPersonalRecord(record);
+          if (record.mediaProfile && !record.mediaProfile.accountFile) await mirrorPersonalRecord(record);
       if (active) await refresh();
     })().catch((e) => setError(e.message));
     const update = () => void refresh().catch((e) => setError(e.message));
@@ -251,8 +251,8 @@ export default function MediaLibrary({
     if (!selected) return;
     let active = true,
       url = "";
-    void browserVault
-      .openMedia(selected)
+    if (!accountFile(selected) && !browserVault.isUnlocked()) return;
+    void openMediaFile(selected)
       .then((result) => {
         if (active) {
           url = URL.createObjectURL(result.blob);
@@ -266,7 +266,7 @@ export default function MediaLibrary({
       active = false;
       if (url) URL.revokeObjectURL(url);
     };
-  }, [selected?.objectId]);
+  }, [selected?.objectId, selected && accountFile(selected)?.id, unlocked]);
   async function upload(files: FileList | null) {
     if (!files?.length) return;
     setBusy(true);
@@ -276,25 +276,12 @@ export default function MediaLibrary({
       for (const file of Array.from(files)) {
         controller.current.signal.throwIfAborted();
         setProgress({ name: file.name, phase: "Reading", done: 0, total: 1 });
-        const result = await browserVault.addMedia(
-          file,
-          (phase, done, total) =>
-            setProgress({ name: file.name, phase, done, total }),
-          {
-            canonicalRecordId: `personal-${crypto.randomUUID()}`,
-            signal: controller.current.signal,
-            location: readLocation
-              ? await (
-                  await import("../../lib/modules/media/exif-gps")
-                ).embeddedPhotoLocation(file)
-              : undefined,
-          },
-        );
-        setNotice(
-          result.cloudCached
-            ? "Encrypted file uploaded. Record synchronization is checked in Vault."
-            : "Saved encrypted on this device. Upload will retry during synchronization.",
-        );
+        const uploaded = await uploadAccountFile(file, (done, total) => setProgress({ name: file.name, phase: "Uploading", done, total }), controller.current.signal);
+        if (readLocation) {
+          const location = await (await import("../../lib/modules/media/exif-gps")).embeddedPhotoLocation(file);
+          if (location) await saveMediaDetails(uploaded, { mediaProfile: { ...profileFor(uploaded), location } });
+        }
+        setNotice("File saved to Media.");
         await refresh();
       }
     } catch (e) {
@@ -314,7 +301,7 @@ export default function MediaLibrary({
     setBusy(true);
     setError("");
     try {
-      const saved = await browserVault.saveCanonicalFields(selected, {
+      const saved = await saveMediaDetails(selected, {
         title,
         body: description,
         mediaProfile: {
@@ -333,7 +320,7 @@ export default function MediaLibrary({
         current?.objectId === saved.objectId ? saved : current,
       );
       setNotice(
-        "Saved encrypted on this device. Pending changes sync when connected.",
+        accountFile(saved) ? "Saved." : "Saved on this device. Changes sync when connected.",
       );
       await refresh();
       if (archivedAt !== undefined)
@@ -353,7 +340,7 @@ export default function MediaLibrary({
       [];
     const failed = new Set<string>();
     try {
-      const latest = await browserVault.listObjects(["media"]);
+      const latest = objects;
       const targets = undo ? undoBatch.map((item) => item.id) : [...checked];
       for (const id of targets) {
         try {
@@ -370,7 +357,7 @@ export default function MediaLibrary({
             : archive
               ? ""
               : new Date().toISOString();
-          await browserVault.saveCanonicalFields(object, {
+          await saveMediaDetails(object, {
             mediaProfile: { ...prior, archivedAt: applied } as never,
           });
           completed.push({ id, previous, applied });
@@ -385,7 +372,7 @@ export default function MediaLibrary({
         setChecked(failed);
       }
       setNotice(
-        `${completed.length} file${completed.length === 1 ? "" : "s"} ${undo ? "returned to their previous archive state" : archive ? "restored" : "archived"}. Saved encrypted on this device.`,
+        `${completed.length} file${completed.length === 1 ? "" : "s"} ${undo ? "returned to their previous archive state" : archive ? "restored" : "archived"}.`,
       );
       if (failed.size)
         setError(
@@ -431,7 +418,7 @@ export default function MediaLibrary({
                   <p>Download to open this file.</p>
                 )
               ) : (
-                <LogoLoader label="Loading encrypted file" />
+                !accountFile(selected) && !unlocked ? <div className={styles.unlock}><strong>Encrypted original</strong><p>Unlock Vault once to copy this file into account-accessible Media. Its encrypted original stays intact.</p><Link href="/vault" className="work-button">Unlock Vault</Link></div> : <LogoLoader label="Loading file" />
               )}
             </div>
             <div className="work-actions">
@@ -457,6 +444,7 @@ export default function MediaLibrary({
                 </a>
               )}
             </div>
+            {!accountFile(selected) && unlocked && <Button busy={busy} onClick={async () => { setBusy(true); setError(""); try { const { blob } = await browserVault.openMedia(selected); const copy = await uploadAccountFile(new File([blob], profile.manifest.fileName, { type: profile.manifest.mimeType }), () => {}, undefined, selected); setSelected(copy); setProfile(profileFor(copy)); await refresh(); setNotice("Available through your account. Encrypted original preserved."); } catch (e) { setError((e as Error).message); } finally { setBusy(false); } }}>Enable account access</Button>}
             <WorkspaceFeedback error={error} />
             <label>
               Name
@@ -512,17 +500,16 @@ export default function MediaLibrary({
           </div>
         )}
 </section>}>
-    <div className="work-surface">
+    <div className="work-surface" aria-busy={!catalogueLoaded}>
       <WorkspaceHeader
         title="Media"
-        count={unlocked ? visible.length + legacy.length : undefined}
+        count={visible.length + legacy.length}
       >
-        {unlocked ? (
-          <>
+        {<>
             <Button
               intent="primary"
               icon="photo-upload"
-              disabled={!unlocked || busy}
+              disabled={busy || !catalogueLoaded}
               onClick={() => fileInput.current?.click()}
             >
               Add files
@@ -537,12 +524,7 @@ export default function MediaLibrary({
                 e.target.value = "";
               }}
             />
-          </>
-        ) : (
-          <Link className="work-button work-button--primary" href="/vault">
-            Unlock Vault
-          </Link>
-        )}
+          </>}
       </WorkspaceHeader>
       <WorkspaceToolbar
         query={query}
@@ -592,8 +574,7 @@ export default function MediaLibrary({
           <option value="gallery">Gallery</option>
           <option value="list">List</option>
         </select>
-        {unlocked && (
-          <Button
+        {(<Button
             aria-pressed={selectionMode}
             onClick={() => {
               setSelectionMode(!selectionMode);
@@ -718,18 +699,6 @@ export default function MediaLibrary({
           ))}
         </details>
       )}
-      {!unlocked && (
-        <div className={styles.unlock}>
-          <strong>Unlock your encrypted media</strong>
-          <p>
-            Files and previews become available after unlocking Vault on this
-            device.
-          </p>
-          <Link className="work-button" href="/vault">
-            Open Vault
-          </Link>
-        </div>
-      )}
       {progress && (
         <div className={styles.upload} role="status">
           <div>
@@ -825,7 +794,8 @@ export default function MediaLibrary({
           </Link>
         ))}
       </div>
-      {!visible.length && !legacy.length && unlocked && (
+      {!catalogueLoaded && !error && <LogoLoader label="Loading Media" />}
+      {!visible.length && !legacy.length && catalogueLoaded && (
         <WorkspaceEmpty
           title={
             query
@@ -837,7 +807,7 @@ export default function MediaLibrary({
         >
           {query
             ? "Try a filename or a word from its description."
-            : "Images, video, audio, and documents keep their encrypted identity across the product."}
+            : "Images, video, audio, and documents, available when you sign in."}
         </WorkspaceEmpty>
       )}
 
