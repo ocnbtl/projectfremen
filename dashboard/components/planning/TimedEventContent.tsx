@@ -42,7 +42,7 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   const objectLimit = Math.max(0,Math.floor((objectRoom + 5) / 27));
   const inlineObjects = vertical && narrow && compact && detailRoom && hasObjects && width >= (place ? 64 : 47);
   const showObjects = !inlineObjects && hasObjects && (vertical ? objectRoom >= 22 : width >= 210);
-  return <div ref={root} className={styles.content} data-vertical={vertical} data-tiny={height < 26} data-narrow={narrow} data-completed={event.completed || undefined}>
+  return <div ref={root} className={styles.content} data-vertical={vertical} data-tiny={height < 26} data-narrow={narrow} data-completed={event.completed || undefined} onClick={e => { if (!(e.target as HTMLElement).closest("button,a")) onOpen(); }}>
     <motion.div layout="position" transition={{layout:layoutTransition}} ref={heading} className={styles.heading}>
       <TaskCheck event={event} onComplete={onComplete}/>
       <button className={styles.open} type="button" draggable={!event.system} onDragStart={onDragStart} onDragEnd={onDragEnd} onClick={onOpen} aria-label={`${event.title} · ${timing}${place ? ` · ${place}` : ""}`} title={title}>

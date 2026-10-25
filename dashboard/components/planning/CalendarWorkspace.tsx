@@ -252,10 +252,12 @@ export default function CalendarWorkspace() {
     void refresh();
     const timer = setInterval(() => setNow(Date.now()), 60000);
     window.addEventListener("online", refresh);
+    window.addEventListener("focus", refresh);
     window.addEventListener("unigentamos-planning-changed", refresh);
     return () => {
       clearInterval(timer);
       window.removeEventListener("online", refresh);
+      window.removeEventListener("focus", refresh);
       window.removeEventListener("unigentamos-planning-changed", refresh);
     };
   }, [refresh, params]);

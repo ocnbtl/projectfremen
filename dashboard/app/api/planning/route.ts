@@ -54,7 +54,7 @@ export async function GET() {
       projects = sources[3].status === "fulfilled" ? sources[3].value : null;
     const refs = records
       .filter((record) =>
-        ["person", "org", "interaction", "note", "file", "resource"].includes(
+        !record.archivedAt && !record.mediaProfile?.archivedAt && ["person", "org", "interaction", "note", "file", "resource"].includes(
           record.className,
         ),
       )
@@ -82,6 +82,8 @@ export async function GET() {
       const record = records.find((r) => r.id === ref.objectId);
       if (!record) continue;
       Object.assign(ref, {
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
         preview: {
           imageUrl:
             record.profile?.photoUrl ||
@@ -98,7 +100,7 @@ export async function GET() {
         },
       });
     }
-    for (const project of projects?.projects || [])
+    for (const project of (projects?.projects || []).filter(project => !project.archivedAt && project.lifecycle !== "archived"))
       refs.push(
         createNativeObjectRef({
           module: "projects",
@@ -111,7 +113,7 @@ export async function GET() {
       ...(ops?.obligations || []),
       ...(ops?.routines || []),
       ...(ops?.followUps || []),
-    ])
+    ].filter(item => !item.archivedAt))
       refs.push(
         createNativeObjectRef({
           module: "personal_ops",
@@ -147,6 +149,11 @@ export async function GET() {
           label: event.title,
         }),
       );
+    const datedSources = [...(projects?.projects || []), ...(ops?.obligations || []), ...(ops?.routines || []), ...(ops?.followUps || []), ...(life?.trips || []), ...state.places, ...state.events];
+    for (const ref of refs) {
+      const record = datedSources.find(item => item.id === ref.objectId);
+      if (record) Object.assign(ref, { createdAt: record.createdAt, updatedAt: record.updatedAt });
+    }
     const dated = [...(ops?.obligations || []), ...(ops?.followUps || [])]
       .filter((x) => x.dueAt && !x.archivedAt)
       .map((item) => ({

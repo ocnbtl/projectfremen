@@ -43,3 +43,7 @@
 .content[data-vertical="true"] .heading > [data-task-check] { margin-top:calc((1lh - var(--event-icon-size)) / 2); }
 .content[data-narrow="true"] .heading { font-size:10px; line-height:1.25; }
 .content[data-tiny="true"] .heading { font-size:10px; line-height:10px; }
+
+/* Blank space between controls still opens the event beneath it. */
+.details,.objects { pointer-events:none; }
+.details button,.objects button { pointer-events:auto; }

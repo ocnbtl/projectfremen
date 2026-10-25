@@ -311,3 +311,20 @@
 
 .people-photo-editor-actions { position:sticky; bottom:0; z-index:1; padding-block:12px; background:var(--surface-panel,white); }
 @media(max-width:600px) { .people-photo-editor .people-photo-crop-frame { max-width:240px; justify-self:center; } }
+/* Compact cross-module link search, using the shared choice controls. */
+.people-object-picker-toolbar { display:flex; align-items:center; gap:7px; min-width:0; }
+.people-object-picker-toolbar .people-object-picker-search { flex:1; min-width:0; }
+.people-object-picker-toolbar .app-select-trigger { flex:none; width:auto; min-height:40px; height:40px; padding:0 10px; gap:6px; font-size:12px; }
+.people-object-picker-search { min-height:40px; padding:3px 10px; transition:border-color .18s,box-shadow .18s; }
+.people-object-picker-search:focus-within { border-color:var(--module-focus,#746ca5); box-shadow:0 0 0 2px color-mix(in srgb,var(--module-focus,#746ca5) 24%,transparent); }
+.people-object-picker-menu .people-object-picker-search input { height:32px; line-height:normal; outline:0!important; box-shadow:none!important; border:0!important; border-radius:0; }
+.people-object-picker-results { grid-template-columns:repeat(2,minmax(0,1fr)); gap:3px 6px; }
+.people-object-picker-results > button { min-height:46px; padding:6px; gap:8px; color:var(--text-strong,#23383f); }
+.people-object-picker-results strong { font-size:13px; line-height:1.3; }
+.people-object-picker-results .people-object-picker-result-icon { width:30px!important; height:30px!important; min-width:30px; flex-basis:30px; }
+.people-object-picker-count { margin:9px 2px 6px; font-size:11px; }
+.people-object-picker-scroll { max-height:360px; scrollbar-width:thin; }
+.people-object-picker-menu { transform-origin:var(--radix-popover-content-transform-origin); animation:object-picker-open .18s ease-out; }
+@keyframes object-picker-open { from { opacity:0; transform:translateY(-4px) scale(.98); } to { opacity:1; transform:none; } }
+@media(max-width:480px) { .people-object-picker-toolbar { flex-wrap:wrap; gap:6px; } .people-object-picker-toolbar .people-object-picker-search { flex-basis:100%; } .people-object-picker-toolbar .app-select-trigger { flex:1; } .people-object-picker-scroll {max-height:300px;} }
+@media(prefers-reduced-motion:reduce) { .people-object-picker-menu {animation:none;} }

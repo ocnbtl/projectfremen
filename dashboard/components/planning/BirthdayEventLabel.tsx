@@ -1,6 +1,6 @@
 import type { EventOccurrence } from "../../lib/modules/planning/types";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
-import { PersonAvatar } from "./EventPeople";
+import { EventObjectPreview } from "./EventLinksPreview";
 import EventGlyph from "./EventGlyph";
 import { eventPreviewTitle } from "./calendar-presentation";
 import { eventObjectRefs } from "./EventObjects";
@@ -11,6 +11,6 @@ export default function BirthdayEventLabel({event,available}:{event:EventOccurre
   const person=eventObjectRefs(event,available).find(ref=>ref.objectType==="person");
   return <span className={styles.identity} data-birthday-label>
     <span className={styles.first}><EventGlyph event={event} size={13}/><span>{first}</span></span>
-    <span className={styles.last}><span>{rest}</span>{person&&<PersonAvatar person={person}/>}</span>
+    <span className={styles.last}><span>{rest}</span>{person&&<EventObjectPreview record={person}/>}</span>
   </span>;
 }

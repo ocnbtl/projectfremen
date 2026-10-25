@@ -16,7 +16,7 @@ export function TaskCheck({ event, onComplete }: { event: EventOccurrence; onCom
 export default function TaskEventCard({ event, onComplete, onClick, children, className, inlineTaskCheck = false, ...props }: Omit<HTMLMotionProps<"div">, "onClick" | "children"> & {
   children?: ReactNode; event: EventOccurrence; onComplete: (event: EventOccurrence) => void; onClick: () => void; inlineTaskCheck?: boolean;
 }) {
-  return <motion.div {...props} className={`${className || ""} ${styles.card}`} data-completed={event.isTask && event.completed || undefined}>
+  return <motion.div {...props} className={`${className || ""} ${styles.card}`} data-completed={event.isTask && event.completed || undefined} onClick={e => { if (!(e.target as HTMLElement).closest("button,a")) onClick(); }}>
     <button className={styles.open} type="button" onClick={onClick} aria-label={String(props["aria-label"] || event.title)} />
     {!inlineTaskCheck && <TaskCheck event={event} onComplete={onComplete} />}{children}
   </motion.div>;

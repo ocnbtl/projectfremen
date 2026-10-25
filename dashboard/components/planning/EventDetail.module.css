@@ -19,3 +19,6 @@
 @keyframes fold { to {opacity:0;transform:scale(.94);} }
 @media(prefers-reduced-motion:reduce) { .panel {animation:none!important;} }
 .trigger {gap:0;overflow:hidden;} .trigger[data-compact] {width:max-content;} .trigger span {display:block;min-width:0;}
+
+.profileLink { display:inline-flex; align-items:center; gap:5px; margin-top:5px; color:var(--module-icon,#59518b); text-decoration:none; font-weight:600; }
+.profileLink:hover { text-decoration:underline; }

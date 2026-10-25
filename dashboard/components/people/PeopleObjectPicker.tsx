@@ -4,6 +4,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
+import SelectField from "../ui/SelectField";
 import ObjectPreview, { type ObjectPreviewData } from "./ObjectPreview";
 
 const kinds = [
@@ -49,7 +50,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
   const [open, setOpen] = useState(false);
   const [kind, setKind] = useState<Kind>("all");
   const [query, setQuery] = useState("");
-  const [limit, setLimit] = useState(60);
+  const [sort, setSort] = useState("alphabetical");
   const search = useRef<HTMLInputElement>(null);
   const results = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -57,10 +58,15 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
   const filtered = useMemo(() => {
     const words = searchable(query).trim().split(/\s+/).filter(Boolean);
     return targets.filter(target => (kind === "all" || kindOf(target) === kind)
-      && words.every(word => searchable(`${target.label} ${objectTargetTypeLabel(target)}`).includes(word)));
-  }, [targets, kind, query]);
+      && words.every(word => searchable(`${target.label} ${objectTargetTypeLabel(target)}`).includes(word))).sort((a,b) => {
+        const byName = a.label.localeCompare(b.label, undefined, {sensitivity:"base", numeric:true});
+        if (sort === "alphabetical") return byName;
+        const field = sort === "created" ? "createdAt" : "updatedAt";
+        return (Date.parse(b[field] || "") || 0) - (Date.parse(a[field] || "") || 0) || byName;
+      });
+  }, [targets, kind, query, sort]);
   const currentKind = kinds.find(item => item.id === kind)!;
-  const shown = filtered.slice(0, limit);
+  const shown = filtered;
   const [previews, setPreviews] = useState<Record<string, ObjectPreviewData>>({});
   const previewIds = shown.filter(target => ["people", "resources", "media"].includes(target.module)).map(target => target.objectId).join("|");
   useEffect(() => {
@@ -83,7 +89,7 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
   const tabTarget = shown.some(target => objectTargetKey(target) === value) ? value : shown[0] ? objectTargetKey(shown[0]) : "";
   const select = (target: NativeObjectRef) => { onChange(objectTargetKey(target)); setOpen(false); };
 
-  return <Popover.Root open={open} onOpenChange={next => { setOpen(next); if (next) { setQuery(""); setKind("all"); setLimit(60); } }}>
+  return <Popover.Root open={open} onOpenChange={next => { setOpen(next); if (next) { setQuery(""); setKind("all"); } }}>
     <Popover.Trigger asChild>
       <button type="button" className="people-object-picker-trigger" data-icon-only={iconOnly && !showTriggerLabel || undefined} data-icon-button={iconOnly && !showTriggerLabel ? "standard" : undefined} aria-label={iconOnly ? triggerLabel : "Object to link"} title={iconOnly ? triggerLabel : undefined} aria-description={selected ? `${selected.label} · ${objectTargetTypeLabel(selected)}` : undefined} aria-haspopup="dialog" disabled={disabled} data-value={value}>
         <UnigentamosIcon role={iconOnly ? triggerIcon : kinds.find(item => item.id === (selected ? kindOf(selected) : "all"))!.icon} size={20} />
@@ -97,20 +103,23 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
         onEscapeKeyDown={event => event.stopImmediatePropagation()}
         onOpenAutoFocus={event => { event.preventDefault(); search.current?.focus(); }}>
         <header><strong>Link an Object</strong><Popover.Close aria-label="Close object search"><UnigentamosIcon role="close" size={18} /></Popover.Close></header>
-        <div className="people-object-picker-types" role="group" aria-label="Object types">
-          {kinds.filter(item => item.id !== "place" || targets.some(target => kindOf(target) === "place")).map(item => <button type="button" key={item.id} aria-label={item.label} title={item.label} aria-pressed={kind === item.id} onClick={() => { setKind(item.id); setLimit(60); }}>
-            <UnigentamosIcon role={item.icon} size={20} /><span>{item.label}</span>
-          </button>)}
-        </div>
-        <div className="people-object-picker-search">
+        <div className="people-object-picker-toolbar">
+        <div className="people-object-picker-search" data-field-shell>
           <UnigentamosIcon role="search" size={18} />
-          <input ref={search} type="search" aria-label="Search objects" placeholder={kind === "all" ? "Search all objects…" : `Search ${currentKind.label.toLowerCase()}…`} value={query}
-            onChange={event => { setQuery(event.target.value); setLimit(60); }}
+          <input ref={search} type="search" aria-label="Search objects" placeholder={kind === "all" ? "Search" : `Search ${currentKind.label.toLowerCase()}`} value={query}
+            onChange={event => { setQuery(event.target.value); }}
             onKeyDown={event => {
               if (event.key === "ArrowDown") { event.preventDefault(); results.current?.querySelector<HTMLButtonElement>('[role="option"]')?.focus(); }
               if (event.key === "Enter") { event.preventDefault(); if (filtered.length === 1) select(filtered[0]); else results.current?.querySelector<HTMLButtonElement>('[role="option"]')?.focus(); }
             }} />
-          {query && <button type="button" aria-label="Clear object search" onClick={() => { setQuery(""); setLimit(60); search.current?.focus(); }} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}
+          {query && <button type="button" aria-label="Clear object search" onClick={() => { setQuery(""); search.current?.focus(); }} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}
+        </div>
+          <SelectField aria-label="Object type" value={kind} onChange={e=>setKind(e.target.value as Kind)} optionIcons={Object.fromEntries(kinds.map(item=>[item.id,item.icon]))} triggerContent={<><UnigentamosIcon role={currentKind.icon} size={16}/><span>{kind === "all" ? "Type" : currentKind.label}</span></>}>
+            {kinds.filter(item=>item.id === "all" || targets.some(target=>kindOf(target) === item.id)).map(item=><option key={item.id} value={item.id}>{item.id === "all" ? "All types" : item.label}</option>)}
+          </SelectField>
+          <SelectField aria-label="Sort objects" value={sort} onChange={e=>setSort(e.target.value)} triggerContent={<><UnigentamosIcon role="filter" size={16}/><span>Sort</span></>}>
+            <option value="alphabetical">Alphabetical</option><option value="created">Recently created</option><option value="edited">Recently edited</option>
+          </SelectField>
         </div>
         <p className="people-object-picker-count" role="status">{filtered.length} {filtered.length === 1 ? "object" : "objects"}{kind !== "all" ? ` · ${currentKind.label}` : ""}</p>
         <div className="people-object-picker-scroll">
@@ -125,12 +134,11 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
             }}>
             {shown.map(target => <button type="button" role="option" tabIndex={objectTargetKey(target) === tabTarget ? 0 : -1} aria-selected={objectTargetKey(target) === value} data-select-value={objectTargetKey(target)} key={objectTargetKey(target)} onClick={() => select(target)}>
               <ObjectPreview target={target} preview={previews[target.objectId]} icon={objectTargetIcon(target)} />
-              <span><strong>{target.label}</strong><small>{objectTargetTypeLabel(target)}</small></span>
+              <span><strong>{target.label}</strong>{kind === "all" && <small>{objectTargetTypeLabel(target)}</small>}</span>
               <UnigentamosIcon role={objectTargetKey(target) === value ? "check" : "plus"} size={16} />
             </button>)}
           </div>
           {!filtered.length && <div className="people-object-picker-empty"><UnigentamosIcon role="search" size={24} /><strong>{query ? "No matching objects" : `No ${currentKind.label.toLowerCase()} available`}</strong><span>{query ? "Try another name or a different object type." : "Linked objects are already excluded from this picker."}</span>{kind !== "all" && <button type="button" onClick={() => setKind("all")}>Search all types</button>}</div>}
-          {filtered.length > limit && <button className="people-object-picker-more" type="button" onClick={() => setLimit(current => current + 60)}>Show more · {filtered.length - limit} remaining</button>}
         </div>
       </Popover.Content>
     </Popover.Portal>

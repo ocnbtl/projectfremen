@@ -39,6 +39,8 @@ export type NativeObjectRef = {
   label: string;
   route: string;
   versionId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 /** Orthogonal state dimensions. Do not collapse these into one broad status field. */

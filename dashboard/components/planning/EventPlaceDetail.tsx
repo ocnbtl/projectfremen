@@ -14,10 +14,10 @@ export function useEventPlace(event: EventOccurrence, available: NativeObjectRef
   const saved = places.find(place => place.id === (event.placeId || ref?.objectId));
   const name = saved?.name || ref?.label || event.location;
   const address = saved?.address || (saved?.addressParts ? formatPlaceAddress(saved.addressParts, saved.countryCode || "US") : "") || event.location;
-  return name ? { name, address: address?.trim().toLowerCase() === name.trim().toLowerCase() ? "" : address } : undefined;
+  return name ? { name, route: saved ? `/admin/map?selected=${encodeURIComponent(saved.id)}` : ref?.route, address: address?.trim().toLowerCase() === name.trim().toLowerCase() ? "" : address } : undefined;
 }
 
 export default function EventPlaceDetail({ event, available, compact = true }: { event: EventOccurrence; available: NativeObjectRef[]; compact?: boolean }) {
   const place = useEventPlace(event, available);
-  return place ? <EventDetail kind="place" text={place.name} address={place.address} eventTitle={event.title} compact={compact} /> : null;
+  return place ? <EventDetail kind="place" text={place.name} address={place.address} href={place.route} eventTitle={event.title} compact={compact} /> : null;
 }
