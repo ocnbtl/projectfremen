@@ -436,11 +436,14 @@ export default function CalendarWorkspace() {
     setError("");
   }
   function update<K extends keyof EventFields>(key: K, value: EventFields[K]) {
-    setEditor((current) =>
-      current
-        ? { ...current, fields: { ...current.fields, [key]: value } }
-        : current,
-    );
+    setEditor((current) => {
+      if (!current) return current;
+      const fields = { ...current.fields, [key]: value };
+      if (!current.original && key === "start" && value !== current.fields.start && !fields.allDay && typeof value === "string" && value.includes("T")) {
+        fields.end = localFor(instantFor(value, fields.timeZone) + 60 * 60 * 1000, fields.timeZone);
+      }
+      return { ...current, fields };
+    });
   }
   async function save(event: FormEvent) {
     event.preventDefault();

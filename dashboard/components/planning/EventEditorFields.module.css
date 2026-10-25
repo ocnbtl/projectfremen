@@ -115,18 +115,17 @@
 .editor .repeatInput .repeatChoices { display:inline-flex; align-items:center; justify-content:center; width:24px; padding:0; background:transparent; color:var(--module-action); }
 .customRepeat { margin-left:102px; }
 @media(min-width:701px) {
-  /* Shared rows keep the description/location and schedule/link controls aligned. */
-  .editor { row-gap:18px; grid-template-rows:auto auto auto; }
-  .left,.right { display:contents; }
-  .title { grid-column:1; grid-row:1; }
-  .description { grid-column:1; grid-row:2; }
-  .editor .description textarea { height:138px; min-height:138px; }
-  .schedule { grid-column:1; grid-row:3; align-self:start; }
-  .calendar { grid-column:2; grid-row:1 / 3; height:auto; min-height:0; margin-bottom:76px; align-self:stretch; }
-  .groupArea { padding-top:24px; }
-  .groupPanel { max-height:142px; }
-  .locationSlot { grid-column:2; grid-row:2; align-self:end; }
-  .links { grid-column:2; grid-row:3; align-self:start; }
+  /* Independent columns keep related controls together without reserved blank rows. */
+  .editor { gap:24px; align-items:start; }
+  .left,.right { gap:14px; }
+  .editor .title { width:100%; }
+  .editor .description textarea { height:68px; min-height:68px; }
+  .calendar { height:auto; min-height:0; align-items:flex-start; }
+  .editor .calendarSelect { align-self:flex-start; }
+  .groupArea { height:auto; min-height:58px; padding-top:22px; align-items:flex-start; }
+  .groupPanel { max-height:96px; }
+  .links :global(.work-object-links) { gap:6px; }
+  .links :global(.work-links:empty) { display:none; }
   .editor .links :global(.work-object-link-trigger) button { min-height:32px; }
 }
 @media(max-width:700px) {
