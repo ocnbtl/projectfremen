@@ -194,7 +194,12 @@
 .people-interaction-dialog { width:min(1040px,calc(100vw - 24px)); }
 .people-dialog-backdrop:has(> .people-interaction-dialog) { padding:12px; }
 .people-interaction-dialog .people-interaction-fields { border-top:0; padding-top:4px; gap:12px; }
-.people-interaction-toolbar { display:grid; grid-template-columns:minmax(205px,1.3fr) minmax(110px,.7fr) 160px minmax(290px,1.7fr); gap:14px; align-items:end; }
+.people-interaction-toolbar { display:grid; grid-template-columns:210px 150px minmax(0,1fr); gap:18px; align-items:end; }
+.people-interaction-toolbar .people-interaction-checkbox { justify-self:end; min-height:42px; }
+.people-interaction-when { display:flex; align-items:end; gap:24px; }
+.people-interaction-when .people-interaction-date { flex:0 0 158px; }
+.people-interaction-when .people-interaction-range { width:280px; max-width:100%; }
+.people-interaction-overnight { padding-bottom:12px; color:var(--text-muted); font-size:11px; }
 .people-interaction-toolbar > label { min-width:0; font-size:12px; font-weight:500; }
 .people-interaction-toolbar .people-approach-switch button { min-height:34px; padding:5px; font-size:12px; }
 .people-interaction-toolbar .app-select-trigger { min-height:42px; }
@@ -214,7 +219,7 @@
 .people-interaction-dialog .people-interaction-participant-picker { border:0; padding:0; margin:0; min-width:0; }
 .people-interaction-participant-picker > .people-participant-columns { padding:0; border:0; border-radius:0; background:transparent; }
 .people-interaction-dialog .people-participant-scroll { height:172px; }
-.people-interaction-dialog .people-participant-box { display:flex; flex-direction:column; height:172px; min-width:0; border:1px solid var(--border-soft); border-radius:12px; overflow:hidden; }
+.people-interaction-dialog .people-participant-box { display:flex; flex-direction:column; height:280px; min-width:0; border:1px solid var(--border-soft); border-radius:12px; overflow:hidden; }
 .people-interaction-dialog .people-participant-box .people-participant-scroll { flex:1; min-height:0; height:auto; border:0; border-radius:0; }
 .people-participant-search { display:flex; align-items:center; flex:none; gap:6px; min-width:0; height:36px; padding:0 8px; border-radius:10px; margin:3px; background:var(--surface-panel-soft); }
 .people-participant-search > svg { flex:none; color:var(--text-muted); }
@@ -230,16 +235,18 @@
 .people-time-wheel-columns .people-loop-wheel button { height:40px; min-height:40px; scroll-snap-align:center; }
 .people-time-wheel-columns .people-loop-wheel button[data-selected="true"],.people-time-wheel-columns .people-loop-wheel button[aria-pressed="true"] { color:var(--module-icon); background:transparent; }
 @media(max-width:1000px) {
- .people-interaction-toolbar { grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:12px; }
+ .people-interaction-toolbar { grid-template-columns:200px 130px minmax(0,1fr); gap:12px; }
  .people-interaction-date { align-self:end; }
- .people-interaction-range { min-width:290px; }
 }
 @media(max-width:600px) {
  .people-interaction-toolbar { grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); gap:10px; }
- .people-interaction-date,.people-interaction-range { grid-column:1/-1; }
+ .people-interaction-toolbar .people-interaction-checkbox { grid-column:1/-1; justify-self:start; min-height:32px; }
+ .people-interaction-when { flex-wrap:wrap; gap:8px 16px; }
+ .people-interaction-when .people-interaction-range { width:280px; }
+ .people-interaction-overnight { padding-bottom:0; }
  .people-interaction-dialog .people-interaction-date input,.people-interaction-dialog .people-time-inline input { font-size:16px; }
  .people-interaction-dialog .people-participant-scroll { height:150px; }
- .people-interaction-dialog .people-participant-box { height:150px; }
+ .people-interaction-dialog .people-participant-box { height:200px; }
  .people-interaction-dialog .people-participant-search input { font-size:16px; }
  .people-interaction-toolbar .people-approach-switch button { font-size:11px; min-height:38px; }
 }

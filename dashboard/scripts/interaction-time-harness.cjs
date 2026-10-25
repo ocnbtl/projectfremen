@@ -1,0 +1,17 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const ts = require('typescript');
+require.extensions['.ts'] = (module, filename) => module._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022,esModuleInterop:true}}).outputText, filename);
+const {newInteractionTimeRange,adjustInteractionTime} = require('../lib/modules/people/interaction-time.ts');
+const normal = {date:'2026-10-25',startTime:'15:30',endTime:'16:30'};
+assert.deepEqual(newInteractionTimeRange(new Date(2026,9,25,16,30)),normal);
+assert.deepEqual(newInteractionTimeRange(new Date(2027,0,1,0,30)),{date:'2026-12-31',startTime:'23:30',endTime:'00:30'});
+assert.deepEqual(adjustInteractionTime(normal,'startTime','18:45'),{...normal,startTime:'18:45',endTime:'19:45'});
+assert.deepEqual(adjustInteractionTime(normal,'endTime','12:15'),{...normal,startTime:'11:15',endTime:'12:15'});
+assert.strictEqual(adjustInteractionTime(normal,'startTime','15:30'),normal);
+assert.deepEqual(adjustInteractionTime(normal,'startTime',''),{...normal,startTime:''});
+const overnight = adjustInteractionTime(normal,'endTime','00:30');
+assert.deepEqual(overnight,{date:'2026-10-24',startTime:'23:30',endTime:'00:30'});
+assert.deepEqual(adjustInteractionTime(overnight,'endTime','01:30'),{date:'2026-10-25',startTime:'00:30',endTime:'01:30'});
+assert.deepEqual(adjustInteractionTime(normal,'startTime','23:30'),{...normal,startTime:'23:30',endTime:'00:30'});
+console.log('Interaction time defaults, linked edits, optional clearing and midnight rollover: passed');

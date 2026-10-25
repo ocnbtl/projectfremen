@@ -43,7 +43,7 @@ function InteractionDetail({ item, people, explicitSelection, empty, error, onBa
       {!error && item ? <>
         <div className="people-interaction-detail-heading"><InteractionTypeBadge kind={item.kind} detail /><h2 ref={headingRef} tabIndex={-1} id="interaction-detail-title">{item.title}</h2>
           <div className="people-interaction-timing"><p className="people-interaction-date-badge"><UnigentamosIcon role="interaction-date" size={18} /><time dateTime={validDate(item.date) ? item.date : undefined}>{dateLabel(item.date)}</time></p>
-            <p className="people-interaction-time-badge"><UnigentamosIcon role="clock" size={18} title={!item.startTime ? "Time not recorded" : undefined} /><span>{item.startTime ? `${timeLabel(item.startTime)}${item.endTime ? ` – ${timeLabel(item.endTime)}` : ""}` : ""}</span></p></div>
+            <p className="people-interaction-time-badge"><UnigentamosIcon role="clock" size={18} title={!item.startTime && !item.endTime ? "Time not recorded" : undefined} /><span>{item.startTime ? `${timeLabel(item.startTime)}${item.endTime ? ` – ${timeLabel(item.endTime)}${item.endTime < item.startTime ? " (next day)" : ""}` : ""}` : item.endTime ? `Ended at ${timeLabel(item.endTime)}` : ""}</span></p></div>
         </div>
         <section aria-label="Participants"><h3>Participants</h3><div className="people-interaction-detail-participants">{item.participantIds.map(id => {
           const person = people.find(p => p.id === id);

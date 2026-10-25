@@ -209,6 +209,7 @@ export type PersonalInteractionDetails = {
   occurredOn: string;
   startTime?: string;
   endTime?: string;
+  endNextDay?: boolean;
   approach?: PersonalInteractionApproach;
   updatesLastContact: boolean;
 };
@@ -691,7 +692,8 @@ function normalizeInteractionDetails(value: unknown, strict = false): PersonalIn
   if (strict && endTime && !timePattern.test(endTime)) {
     throw new Error("Interaction end time is invalid");
   }
-  if (strict && startTime && endTime && endTime < startTime) {
+  const endNextDay = raw.endNextDay === true && timePattern.test(startTime) && timePattern.test(endTime) && endTime < startTime;
+  if (strict && startTime && endTime && endTime < startTime && !endNextDay) {
     throw new Error("Interaction end time must be after the start time");
   }
 
@@ -705,7 +707,8 @@ function normalizeInteractionDetails(value: unknown, strict = false): PersonalIn
     kind,
     occurredOn,
     ...(timePattern.test(startTime) ? { startTime } : {}),
-    ...(timePattern.test(endTime) && (!startTime || timePattern.test(startTime) && endTime >= startTime) ? { endTime } : {}),
+    ...(timePattern.test(endTime) && (!startTime || timePattern.test(startTime) && (endTime >= startTime || endNextDay)) ? { endTime } : {}),
+    ...(endNextDay ? { endNextDay: true } : {}),
     ...(approach ? { approach } : {}),
     updatesLastContact: raw.updatesLastContact !== false
   };

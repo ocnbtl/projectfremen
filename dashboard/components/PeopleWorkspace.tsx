@@ -69,6 +69,7 @@ import { applyPersonAutofill, type PersonAutofillPending, type PersonAutofillRes
 import TeamSizeInput from "./people/TeamSizeInput";
 import SelectField from "./ui/SelectField";
 import TimeField from "./people/TimeField";
+import { adjustInteractionTime, newInteractionTimeRange } from "../lib/modules/people/interaction-time";
 import EventDateSegments from "./planning/EventDateSegments";
 import DateField from "./people/DateField";
 import PlaceLabelPicker from "./people/PlaceLabelPicker";
@@ -812,7 +813,7 @@ function formatInteractionTime(startTime?: string, endTime?: string) {
     return new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" }).format(date);
   };
   if (!startTime) return endTime ? `Ended at ${format(endTime)}` : "";
-  return endTime ? `${format(startTime)}–${format(endTime)}` : `Started at ${format(startTime)}`;
+  return endTime ? `${format(startTime)}–${format(endTime)}${endTime < startTime ? " (next day)" : ""}` : `Started at ${format(startTime)}`;
 }
 
 function splitList(value: string) {
@@ -3020,15 +3021,14 @@ export default function PeopleWorkspace({
   }
 
   function openInteractionComposer(record?: PersonalRecord) {
-    const now = new Date();
-    const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-    setInteractionDate(localDate);
+    const range = newInteractionTimeRange();
+    setInteractionDate(range.date);
     setInteractionKind("meeting");
     setInteractionApproach("");
     setInteractionParticipantIds(record ? [record.id] : []);
     setInteractionParticipantSearch({ person: "", org: "" });
-    setInteractionStartTime("");
-    setInteractionEndTime("");
+    setInteractionStartTime(range.startTime);
+    setInteractionEndTime(range.endTime);
     setInteractionTitle("");
     setInteractionSummary("");
     setInteractionMeaningful(true);
@@ -3036,13 +3036,16 @@ export default function PeopleWorkspace({
     setActionNotice("");
   }
 
+  function changeInteractionTime(field: "startTime" | "endTime", value: string) {
+    const range = adjustInteractionTime({ date: interactionDate, startTime: interactionStartTime, endTime: interactionEndTime }, field, value);
+    setInteractionDate(range.date);
+    setInteractionStartTime(range.startTime);
+    setInteractionEndTime(range.endTime);
+  }
+
   async function saveInteraction(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!interactionDate || !interactionTitle.trim() || interactionParticipantIds.length === 0) return;
-    if (interactionEndTime && interactionStartTime && interactionEndTime < interactionStartTime) {
-      setError("Choose a start time before the end time, and keep the end after the start.");
-      return;
-    }
     setError("");
     setInteractionSaving(true);
     const kindLabel = interactionKind === "catch-up" ? "Catch-up" : labelize(interactionKind);
@@ -3072,6 +3075,7 @@ export default function PeopleWorkspace({
             occurredOn: interactionDate,
             startTime: interactionStartTime || undefined,
             endTime: interactionEndTime || undefined,
+            endNextDay: Boolean(interactionStartTime && interactionEndTime && interactionEndTime < interactionStartTime),
             approach: interactionApproach || undefined,
             updatesLastContact: interactionMeaningful
           }
@@ -5164,10 +5168,13 @@ export default function PeopleWorkspace({
                   <option value="milestone">Milestone</option>
                 </SelectField>
               </label>
-              <div className="people-interaction-date"><EventDateSegments hideLabel label="Interaction date" value={interactionDate} allDay timeZone="UTC" onChange={setInteractionDate} /></div>
-              <div className="people-interaction-range"><TimeField label="Start Time" value={interactionStartTime} onChange={setInteractionStartTime}/><span className="people-interaction-to">to</span><TimeField label="End Time" value={interactionEndTime} onChange={setInteractionEndTime}/></div>
+              <InteractionCheckbox checked={interactionMeaningful} onChange={setInteractionMeaningful} />
               </div>
-              <div className="is-wide"><InteractionCheckbox checked={interactionMeaningful} onChange={setInteractionMeaningful} /></div>
+              <div className="people-interaction-when is-wide">
+              <div className="people-interaction-date"><EventDateSegments hideLabel label="Interaction date" value={interactionDate} allDay timeZone="UTC" onChange={setInteractionDate} /></div>
+              <div className="people-interaction-range"><TimeField label="Start Time" value={interactionStartTime} onChange={value=>changeInteractionTime("startTime",value)}/><span className="people-interaction-to">to</span><TimeField label="End Time" value={interactionEndTime} onChange={value=>changeInteractionTime("endTime",value)}/></div>
+              {interactionStartTime && interactionEndTime && interactionEndTime < interactionStartTime && <span className="people-interaction-overnight">Ends next day</span>}
+              </div>
               <label className="is-wide">
                 Title
                 <input value={interactionTitle} onChange={(event) => setInteractionTitle(event.target.value)} placeholder="Coffee, call, introduction, or shared moment" required />
@@ -5217,7 +5224,7 @@ export default function PeopleWorkspace({
             {error && <p className="personal-record-error">{error}</p>}
             <footer className="people-dialog-actions">
               <button className="people-dialog-action" type="button" onClick={() => setInteractionOpen(false)} disabled={interactionSaving}>Cancel</button>
-              <button className="people-dialog-action is-primary" type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate || interactionParticipantIds.length === 0 || Boolean(interactionEndTime && interactionStartTime && interactionEndTime < interactionStartTime)}>
+              <button className="people-dialog-action is-primary" type="submit" disabled={interactionSaving || !interactionTitle.trim() || !interactionDate || interactionParticipantIds.length === 0}>
                 {interactionSaving ? "Saving..." : "Save interaction"}
               </button>
             </footer>
