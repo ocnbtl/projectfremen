@@ -214,6 +214,17 @@
 .people-interaction-dialog .people-interaction-participant-picker { border:0; padding:0; margin:0; min-width:0; }
 .people-interaction-participant-picker > .people-participant-columns { padding:0; border:0; border-radius:0; background:transparent; }
 .people-interaction-dialog .people-participant-scroll { height:172px; }
+.people-interaction-dialog .people-participant-box { display:flex; flex-direction:column; height:172px; min-width:0; border:1px solid var(--border-soft); border-radius:12px; overflow:hidden; }
+.people-interaction-dialog .people-participant-box .people-participant-scroll { flex:1; min-height:0; height:auto; border:0; border-radius:0; }
+.people-participant-search { display:flex; align-items:center; flex:none; gap:6px; min-width:0; height:36px; padding:0 8px; border-radius:10px; margin:3px; background:var(--surface-panel-soft); }
+.people-participant-search > svg { flex:none; color:var(--text-muted); }
+.people-interaction-dialog .people-participant-search input { flex:1; width:0; min-width:0; min-height:0; height:32px; padding:0; border:0; border-radius:0; background:transparent; box-shadow:none; font-size:13px; line-height:normal; }
+.people-interaction-dialog .people-participant-search input:focus-visible { box-shadow:none; outline:none; }
+.people-participant-search:focus-within { box-shadow:inset 0 0 0 2px var(--module-focus); }
+.people-participant-search input::-webkit-search-cancel-button { display:none; }
+.people-participant-search button { display:flex; align-items:center; justify-content:center; flex:none; width:24px; height:28px; min-height:28px; padding:0; border:0; border-radius:6px; color:var(--text-body); background:transparent; }
+.people-participant-search button:focus-visible { outline:2px solid var(--module-focus); }
+.people-participant-empty { margin:12px 6px; color:var(--text-muted); font-size:12px; }
 .people-time-wheel-columns .people-loop-wheel { height:200px!important; padding-block:80px; box-sizing:border-box; scrollbar-width:none; scroll-snap-type:y mandatory; overflow-anchor:none; background:linear-gradient(to bottom,var(--surface-panel-soft) 40%,var(--module-quiet) 40%,var(--module-quiet) 60%,var(--surface-panel-soft) 60%); }
 .people-loop-wheel::-webkit-scrollbar { display:none; }
 .people-time-wheel-columns .people-loop-wheel button { height:40px; min-height:40px; scroll-snap-align:center; }
@@ -228,5 +239,7 @@
  .people-interaction-date,.people-interaction-range { grid-column:1/-1; }
  .people-interaction-dialog .people-interaction-date input,.people-interaction-dialog .people-time-inline input { font-size:16px; }
  .people-interaction-dialog .people-participant-scroll { height:150px; }
+ .people-interaction-dialog .people-participant-box { height:150px; }
+ .people-interaction-dialog .people-participant-search input { font-size:16px; }
  .people-interaction-toolbar .people-approach-switch button { font-size:11px; min-height:38px; }
 }

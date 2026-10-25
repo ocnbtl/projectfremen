@@ -2069,6 +2069,7 @@ export default function PeopleWorkspace({
   const [interactionKind, setInteractionKind] = useState<InteractionKind>("meeting");
   const [interactionApproach, setInteractionApproach] = useState<"" | PersonalInteractionApproach>("");
   const [interactionParticipantIds, setInteractionParticipantIds] = useState<string[]>([]);
+  const [interactionParticipantSearch, setInteractionParticipantSearch] = useState({ person: "", org: "" });
   const [interactionDate, setInteractionDate] = useState("");
   const [interactionStartTime, setInteractionStartTime] = useState("");
   const [interactionEndTime, setInteractionEndTime] = useState("");
@@ -3025,6 +3026,7 @@ export default function PeopleWorkspace({
     setInteractionKind("meeting");
     setInteractionApproach("");
     setInteractionParticipantIds(record ? [record.id] : []);
+    setInteractionParticipantSearch({ person: "", org: "" });
     setInteractionStartTime("");
     setInteractionEndTime("");
     setInteractionTitle("");
@@ -5175,8 +5177,18 @@ export default function PeopleWorkspace({
                 <textarea value={interactionSummary} onChange={(event) => setInteractionSummary(event.target.value)} rows={2} placeholder="What mattered, what changed, and any context worth remembering." />
               </label>
               <div className="people-interaction-participant-picker is-wide" role="group" aria-label="Participants">
-                <div className="people-participant-columns">{(["person","org"] as const).map(kind=><section key={kind} aria-label={kind === "person" ? "People" : "Organizations"}><div className="people-participant-scroll">
-                  {activePeople.filter(record=>record.className===kind).sort((a,b)=>a.title.localeCompare(b.title)).map((record) => (
+                <div className="people-participant-columns">{(["person","org"] as const).map(kind=>{
+                  const name = kind === "person" ? "people" : "organizations";
+                  const normalize = (value: string) => value.normalize("NFKD").replace(/\p{M}/gu, "").toLowerCase().trim();
+                  const query = normalize(interactionParticipantSearch[kind]);
+                  const matches = activePeople.filter(record=>record.className===kind && normalize(record.title).includes(query)).sort((a,b)=>a.title.localeCompare(b.title));
+                  return <section key={kind} className="people-participant-box" aria-label={kind === "person" ? "People" : "Organizations"}>
+                  <div className="people-participant-search"><UnigentamosIcon role="search" size={15}/><input type="search" aria-label={`Search ${name}`} placeholder="Search" autoComplete="off" value={interactionParticipantSearch[kind]} onChange={event=>{
+                    setInteractionParticipantSearch(current=>({...current,[kind]:event.target.value}));
+                    event.currentTarget.closest("section")?.querySelector(".people-participant-scroll")?.scrollTo({top:0});
+                  }} onKeyDown={event=>{if(event.key === "Enter") event.preventDefault();}}/>{interactionParticipantSearch[kind] && <button type="button" aria-label={`Clear ${name} search`} onClick={event=>{setInteractionParticipantSearch(current=>({...current,[kind]:""}));event.currentTarget.parentElement?.querySelector("input")?.focus();}}><UnigentamosIcon role="close" size={14}/></button>}</div>
+                  <div className="people-participant-scroll">
+                  {matches.map((record) => (
                     <label key={record.id}>
                       <input
                         type="checkbox"
@@ -5196,7 +5208,9 @@ export default function PeopleWorkspace({
                       <span>{record.title}</span>
                     </label>
                   ))}
-                </div></section>)}</div>
+                  {!matches.length && <p className="people-participant-empty" role="status">{query ? `No matching ${name}.` : `No ${name} yet.`}</p>}
+                </div></section>;
+                })}</div>
               </div>
 
             </div>
