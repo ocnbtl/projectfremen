@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import SelectField from "../ui/SelectField";
 import { useWorkspaceReturn } from "../admin-shell/useWorkspaceReturn";
 import LogoLoader from "../operational/LogoLoader";
@@ -589,11 +590,7 @@ export default function PersonalLifeWorkspace({
           <span className={styles.keyringCount} aria-live="polite" aria-atomic="true">{terms.length ? `${matches.length} of ${credentials.length}` : credentials.length}</span>
         </header>
         <div className={styles.credentialSearchToolbar} role="search" aria-label="Credentials">
-          <div className={`${baseStyles.searchControl} ${styles.credentialSearch}`}>
-            <PersonalOpsIcon name="search" />
-            <input ref={credentialSearchRef} type="search" aria-label="Search credentials" placeholder="Search credentials…" autoComplete="off" spellCheck={false} value={credentialQuery} onChange={(event) => setCredentialQuery(event.target.value)} />
-            {credentialQuery && <button type="button" aria-label="Clear credential search" onClick={() => { setCredentialQuery(""); credentialSearchRef.current?.focus(); }} data-icon-button="standard"><PersonalOpsIcon name="close" /></button>}
-          </div>
+          <SearchField ref={credentialSearchRef} aria-label="Search credentials" autoComplete="off" spellCheck={false} value={credentialQuery} onChange={(event) => setCredentialQuery(event.target.value)} className={`${baseStyles.searchControl} ${styles.credentialSearch}`}>{credentialQuery && <button type="button" aria-label="Clear credential search" onClick={() => { setCredentialQuery(""); credentialSearchRef.current?.focus(); }} data-icon-button="standard"><PersonalOpsIcon name="close" /></button>}</SearchField>
         </div>
         <div className={styles.credentialLedger} role="table" aria-label="Credentials">
           <div className={styles.credentialGridHeader} role="row">

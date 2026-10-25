@@ -44,37 +44,38 @@ html[data-active-module] :is(.work-search,.people-primary-search,.finance-global
 .workspace-topnav [class*="resourceSearch"] { flex:1; min-width:100px; }
 .people-header-actions { gap:8px; }
 .people-header-actions button { white-space:nowrap; }
-/* Directory hierarchy stays identical in all densities. */
-.workspace-people-pages .people-directory-list { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
-.workspace-people-pages .people-directory-list.is-compact { grid-template-columns:repeat(2,minmax(0,1fr)); }
-.workspace-people-pages .people-directory-list.is-grid { grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); }
+/* Fixed metadata positions with distinct directory densities. */
+.workspace-people-pages .people-directory-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.workspace-people-pages .people-directory-list.is-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr)); }
 .workspace-people-pages .people-directory-row { min-width:0; padding:0 !important; border:1px solid var(--border-soft); border-radius:14px; overflow:hidden; }
-.workspace-people-pages .people-directory-row-body { display:flex !important; align-items:center; gap:16px; width:100%; padding:14px !important; min-height:108px !important; text-align:left; }
+.workspace-people-pages .people-directory-row-body { display:flex !important; align-items:center; gap:16px; width:100%; padding:16px !important; min-height:124px !important; text-align:left; }
 .workspace-people-pages .people-directory-row-body .people-row-avatar { width:68px !important; height:68px !important; min-width:68px; margin:0; flex:none; border-radius:50%; }
-.workspace-people-pages .people-directory-row-body .people-row-avatar img { width:100%;height:100%;object-fit:cover; }
-.workspace-people-pages .people-row-content { display:flex; flex-direction:column; flex:1; min-width:0; gap:7px; }
-.workspace-people-pages .people-row-name { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px; }
-.workspace-people-pages .people-row-name strong { font-size:15px; line-height:1.4; white-space:normal; }
-.workspace-people-pages .people-row-name em { font-size:12px; color:var(--text-muted); font-style:normal; }
-.workspace-people-pages .people-row-tags { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
-.workspace-people-pages .people-row-tags em { font-style:normal; font-size:11px; line-height:1.4; padding:3px 7px; border-radius:6px; background:var(--module-quiet,#f4f5f4); }
+.workspace-people-pages .people-row-avatar img { width:100%;height:100%;object-fit:cover; }
+.workspace-people-pages .people-row-content { display:flex; flex-direction:column; flex:1; min-width:0; gap:9px; }
+.workspace-people-pages .people-row-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; }
+.workspace-people-pages .people-row-name { display:flex; flex-direction:column; align-items:flex-start; min-width:0; gap:2px; }
+.workspace-people-pages .people-row-name strong { font-size:15px; line-height:1.4; white-space:normal; overflow-wrap:anywhere; }
+.workspace-people-pages .people-row-name em { font-size:11px; color:var(--text-muted); font-style:normal; }
+.workspace-people-pages .people-row-tags { display:grid; grid-template-columns:22px minmax(0,1fr) 20px; align-items:center; gap:7px; min-width:0; }
+.workspace-people-pages .people-row-tags em { max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-style:normal; font-size:11px; line-height:1.4; padding:3px 7px; border-radius:6px; background:var(--module-quiet,#f4f5f4); justify-self:start; }
 .workspace-people-pages .people-row-tags .people-activity-marker { display:inline-flex; width:22px; height:22px; padding:3px; }
-.workspace-people-pages .people-row-tags .people-row-star { position:static !important; margin-left:auto; width:18px; height:18px; display:inline-flex; }
+.workspace-people-pages .people-row-tags .people-row-star { position:static !important; grid-row:auto; grid-column:auto; margin:0; width:20px; height:20px; display:inline-flex; justify-content:center; align-items:center; }
+.workspace-people-pages .people-row-star svg { width:16px; height:16px; }
 .workspace-people-pages .people-row-dates { display:flex; flex-wrap:wrap; gap:6px 14px; color:var(--text-muted,#617680); font-size:11px; }
 .workspace-people-pages .people-row-dates > span { display:inline-flex; align-items:center; gap:5px; }
 .workspace-people-pages .people-row-dates svg { width:14px; height:14px; }
-.workspace-people-pages .people-row-description { font-size:12px; line-height:1.55; color:var(--text-muted,#617680); display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:3; overflow:hidden; }
-.workspace-people-pages .is-grid .people-directory-row-body { align-items:flex-start; min-height:156px !important; }
-.workspace-people-pages .is-grid .people-directory-row-body { display:grid !important; grid-template-columns:60px minmax(0,1fr); gap:8px 12px; align-content:start; }
-.workspace-people-pages .is-grid .people-row-content { display:contents; }
-.workspace-people-pages .is-grid .people-row-avatar { grid-column:1; grid-row:1 / 3; }
-.workspace-people-pages .is-grid .people-row-name { grid-column:2; grid-row:1; }
-.workspace-people-pages .is-grid .people-row-tags { grid-column:2; grid-row:2; }
+.workspace-people-pages .people-row-description { font-size:12px; line-height:1.55; color:var(--text-muted,#617680); display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; }
+.workspace-people-pages .is-grid .people-directory-row-body { display:grid !important; grid-template-columns:68px minmax(0,1fr); grid-template-rows:68px 26px auto; gap:10px 14px; align-content:start; min-height:190px !important; }
+.workspace-people-pages .is-grid :is(.people-row-content,.people-row-heading) { display:contents; }
+.workspace-people-pages .is-grid .people-row-avatar { grid-column:1; grid-row:1; }
+.workspace-people-pages .is-grid .people-row-name { grid-column:2; grid-row:1; align-self:center; }
+.workspace-people-pages .is-grid .people-row-tags { grid-column:1 / -1; grid-row:2; }
 .workspace-people-pages .is-grid :is(.people-row-dates,.people-row-description) { grid-column:1 / -1; }
-.workspace-people-pages .is-grid .people-row-avatar { width:60px !important;height:60px !important;min-width:60px; }
-.workspace-people-pages .is-compact .people-directory-row-body { min-height:86px !important; padding:10px 12px !important; gap:12px; }
-.workspace-people-pages .is-compact .people-row-avatar { width:52px !important;height:52px !important;min-width:52px; }
+.workspace-people-pages .is-grid .people-row-description { -webkit-line-clamp:3; }
+.workspace-people-pages .is-compact .people-directory-row-body { min-height:96px !important; padding:12px !important; gap:12px; }
+.workspace-people-pages .is-compact .people-row-avatar { width:56px !important;height:56px !important;min-width:56px; }
 .workspace-people-pages .is-compact .people-row-description { -webkit-line-clamp:1; }
+@media(max-width:1000px) { .workspace-people-pages .people-directory-list:not(.is-grid) { grid-template-columns:minmax(0,1fr); } }
 .resource-directory { display:grid !important; grid-template-columns:minmax(0,1fr); gap:10px; }
 .resource-directory.is-compact { grid-template-columns:repeat(2,minmax(0,1fr)); }
 .resource-directory.is-grid { grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); }
@@ -97,8 +98,10 @@ html[data-active-module] :is(.work-search,.people-primary-search,.finance-global
 .resource-directory.is-grid .dense-object-row { min-height:128px; }
 .resource-directory.is-compact .dense-object-row { min-height:84px; }
 @media(max-width:700px) {
+  .workspace-people-pages .people-row-heading { grid-template-columns:minmax(0,1fr); gap:6px; }
+  .workspace-people-pages .people-row-tags { grid-template-columns:22px minmax(0,1fr) 20px; width:100%; }
   .workspace-pages[data-module="resources"] [class*="mainScroll"] { padding-top:12px; }
-  .workspace-people-pages .people-directory-list.is-compact,.workspace-people-pages .people-directory-list.is-grid,.resource-directory.is-compact,.resource-directory.is-grid { grid-template-columns:minmax(0,1fr); }
+  .workspace-people-pages .people-directory-list,.workspace-people-pages .people-directory-list.is-grid,.resource-directory.is-compact,.resource-directory.is-grid { grid-template-columns:minmax(0,1fr); }
   .workspace-people-pages .people-directory-row-body { gap:12px; }
   .workspace-topnav .people-directory-tools,.workspace-topnav .people-interactions-tools { gap:6px; }
   .workspace-topnav .people-primary-search { min-width:60px; }

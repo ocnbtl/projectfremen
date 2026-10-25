@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "./ui/SearchField";
 import { WorkspaceSheet, WorkspaceEmpty } from "./admin-shell/WorkspaceKit";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -947,7 +948,7 @@ export default function FinanceWorkspace({
           onOperation={(nextOperation) => { setOperationTarget(null); setOperation(nextOperation); }}
         />{view === "accounts" && <button type="button" className="finance-action" onClick={() => { setAiOpen(false); setInspectorOpen(false); setUtility("settings"); }}><Icon name="Link" />Connections</button>}<button type="button" className="finance-action finance-activity-trigger" onClick={() => { setAiOpen(false); setUtility("activity"); }} aria-label="Recent activity" title="Recent activity" aria-expanded={utility === "activity"}><UnigentamosIcon role="clock" /><span>Activity</span></button></div>
         </header></WorkspaceNavSlot>
-        <WorkspaceNavSlot kind="search"><div className="finance-search-row"><label className="finance-global-search" data-field-shell><Icon name="Search" /><input type="search" aria-label={view === "overview" ? "Search finance" : view === "bills" ? "Search bills and subscriptions" : view === "review" ? "Search monthly review" : `Search ${view}`} value={query} placeholder={view === "overview" ? "Search transactions, merchants or categories" : `Search ${activeView.label.toLowerCase()}`} onChange={(event) => { setQuery(event.target.value); setCheckedTxnIds(new Set()); updateFinanceUrl({ query: event.target.value }, { native: true }); }} /></label></div></WorkspaceNavSlot>
+        <WorkspaceNavSlot kind="search"><div className="finance-search-row"><SearchField aria-label={view === "overview" ? "Search finance" : view === "bills" ? "Search bills and subscriptions" : view === "review" ? "Search monthly review" : `Search ${view}`} value={query} onChange={(event) => { setQuery(event.target.value); setCheckedTxnIds(new Set()); updateFinanceUrl({ query: event.target.value }, { native: true }); }} className="finance-global-search" /></div></WorkspaceNavSlot>
 
         {planning && <FinancePlanningPanel key={planning} reviewOnly={planning === "review"} onClose={() => setPlanning(null)} onApplied={(state, message) => { setFinanceState(state); setNotice(message); setPlanning(null); setCheckedTxnIds(new Set()); router.refresh(); }} />}
         {financeError && <div className="finance-notice is-error" role="alert"><Swatch hue="crimson" /><span className="finance-notice__message">{financeError}</span></div>}

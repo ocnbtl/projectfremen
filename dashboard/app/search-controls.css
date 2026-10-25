@@ -1,0 +1,51 @@
+/* Search geometry is shared by module bars, secondary pages and nested pickers.
+   This layer wins over legacy module !important rules without changing layout owners. */
+@layer search-controls {
+  .app-search-field {
+    display:flex !important; align-items:center !important; gap:9px !important;
+    box-sizing:border-box !important; min-width:0 !important; max-width:100%;
+    height:40px !important; min-height:40px !important; max-height:40px !important;
+    padding:0 12px !important; margin:0 !important; position:relative !important;
+    border:1px solid var(--border-soft,#cad8df) !important; border-radius:12px !important;
+    background:var(--surface-panel,#fff) !important; color:var(--text-muted,#617680);
+    box-shadow:none !important; outline:none !important; overflow:visible !important;
+    transition:border-color .18s ease,box-shadow .18s ease;
+  }
+  .app-search-field:focus-within {
+    border-color:var(--module-focus,#133c5e) !important;
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--module-focus,#133c5e) 20%,transparent) !important;
+  }
+  .app-search-field > .unigentamos-icon { width:18px !important; height:18px !important; flex:none !important; margin:0 !important; }
+  .app-search-field > input {
+    display:block !important; flex:1 1 0 !important; width:0 !important; min-width:0 !important; max-width:none !important;
+    height:100% !important; min-height:0 !important; max-height:none !important;
+    border:0 !important; border-radius:0 !important; padding:0 !important; margin:0 !important;
+    outline:none !important; box-shadow:none !important; background:transparent !important;
+    font:400 14px/20px var(--font-body,"Inter Variable",sans-serif) !important; color:var(--text-strong,#23383f) !important;
+    text-align:left !important; position:static !important; transform:none !important; appearance:none;
+  }
+  .app-search-field > input::placeholder { color:var(--text-muted,#617680); opacity:1; }
+  .app-search-field > input::-webkit-search-cancel-button { display:none; }
+  .app-search-field > button { position:static !important; flex:none; width:26px !important; height:26px !important; min-height:0 !important; padding:0 !important; border:0 !important; border-radius:7px !important; background:transparent !important; }
+  .app-search-field > kbd { flex:none; font-size:10px; }
+  [data-toolbar-action], .toolbar-icon-select, .people-control-trigger {
+    display:inline-flex !important; align-items:center !important; justify-content:center !important;
+    flex:none !important; align-self:center; box-sizing:border-box !important;
+    width:40px !important; min-width:40px !important; max-width:40px !important;
+    height:40px !important; min-height:40px !important; max-height:40px !important;
+    padding:0 !important; margin:0 !important; gap:0 !important; line-height:1 !important;
+    border:1px solid var(--border-soft,#cad8df) !important; border-radius:12px !important;
+    background:var(--surface-panel,#fff) !important; color:var(--text-strong,#23383f) !important;
+  }
+  [data-toolbar-action]:is(:hover,[aria-pressed="true"]), .people-control-trigger[aria-expanded="true"] { background:color-mix(in srgb,var(--module-focus,#133c5e) 9%,white) !important; }
+  @media(max-width:700px) { .app-search-field > input { font-size:16px !important; } }
+  @media(prefers-reduced-motion:reduce) { .app-search-field { transition:none; } }
+}
+.app-search-field { width:100%; }
+.workspace-topnav .app-search-field, .people-object-picker-toolbar .app-search-field { flex:1 1 0; }
+.workspace-topnav [class*="resourceToolbarMenu"] { display:flex; align-items:center; height:40px; margin:0; }
+.app-choice-search .app-search-field { flex:1; }
+.personal-ledger-search { flex:0 0 220px; }
+[class*="headerActions"]:has(> .personal-ledger-search) { flex-wrap:wrap; }
+[class*="pageHeader"]:has(.personal-ledger-search) { grid-template-columns:minmax(0,1fr); }
+.admin-command-search:has(> .app-search-field) { padding:0; border:0; background:transparent; box-shadow:none; }

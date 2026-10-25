@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import { useState, type ReactNode } from "react";
 import Link from "next/link";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -66,12 +67,7 @@ export default function RecordLinks({
       {onChange && !objectPicker && (
         <label>
           Link a record
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Find a person, project, note, place…"
-          />
+          <SearchField value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Find a person, project, note, place…" />
         </label>
       )}
       {options.length > 0 && (

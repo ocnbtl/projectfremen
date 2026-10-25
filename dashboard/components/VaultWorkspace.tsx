@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import { useWorkspaceReturn } from "./admin-shell/useWorkspaceReturn";
 import LogoLoader from "./operational/LogoLoader";
@@ -1192,7 +1193,7 @@ export default function VaultWorkspace({
           <section id="vault-records" tabIndex={-1} className={`${styles.panel} ${styles.objectWorkspace}`}>
             <div className={styles.searchRow}>
               {!recordPageOpen && hasUnsavedRecordChanges && <button type="button" onClick={() => setRecordPageOpen(true)}>Resume draft</button>}
-              <label className={styles.recordSearch}><span className={styles.searchLabel}>Search all records</span><input ref={recordSearchRef} type="search" value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} placeholder="Search all records" /></label>
+              <label className={styles.recordSearch}><span className={styles.searchLabel}>Search all records</span><SearchField ref={recordSearchRef} value={recordQuery} onChange={(event) => setRecordQuery(event.target.value)} aria-label="Search all records" /></label>
               {recordQuery.trim() && <button className={styles.quietButton} disabled={busy} onClick={() => void saveCurrentSearch()}>Save search</button>}
               {(activeKind === "note" || activeKind === "contact" || activeKind === "resource") && <button onClick={() => { void newObject(); }}>New {recordKindLabel(activeKind).toLowerCase()}</button>}
             </div>
@@ -1356,7 +1357,7 @@ export default function VaultWorkspace({
                   {showRecordPicker && <div className={styles.actionGroup}>
                     <strong>{supportsRelationship ? "Search and connect" : "Find supporting evidence"}</strong>
                     <p>Search the records already stored on this device. Connecting them creates a pointer, not another copy.</p>
-                    <label>Find a record<input type="search" value={relationshipQuery} onChange={(event) => setRelationshipQuery(event.target.value)} placeholder="Search notes, people, projects, resources..." /></label>
+                    <label>Find a record<SearchField value={relationshipQuery} onChange={(event) => setRelationshipQuery(event.target.value)} aria-label="Search notes, people, projects, resources..." /></label>
                     <div className={styles.relationshipResults} role="listbox" aria-label="Records you can connect">
                       {relationshipTargets.map((item) => <button
                         className={styles.relationshipResult}

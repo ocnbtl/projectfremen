@@ -1,5 +1,6 @@
 "use client";
 
+import SearchField from "../ui/SearchField";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from "react";
@@ -120,9 +121,7 @@ export default function AppTopNavSurface({ showCommandSearch = true, onCommandSe
       </nav>
       <div className="app-top-nav__utilities">
         {showCommandSearch && <form className="admin-command-search app-top-nav__search" role="search" aria-label="Admin command search" onSubmit={submitSearch}>
-          <UnigentamosIcon role="search" size={16} />
-          <input ref={searchInputRef} value={commandQuery} onChange={event => setCommandQuery(event.target.value)} aria-label="Search notes, files, people, reviews" placeholder="Search notes, files, people, reviews" title="Search the encrypted offline Vault" />
-          <kbd aria-hidden="true">⌘K</kbd>
+          <SearchField ref={searchInputRef} value={commandQuery} onChange={event => setCommandQuery(event.target.value)} aria-label="Search notes, files, people, reviews" title="Search the encrypted offline Vault"><kbd aria-hidden="true">⌘K</kbd></SearchField>
         </form>}
         <PlanningNotifications />{rightSlot}
       </div>

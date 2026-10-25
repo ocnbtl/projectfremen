@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   PersonalRecord,
@@ -645,12 +646,7 @@ export default function PeopleTransfer({
                     </details>
                   )}
                   <div className="people-transfer-toolbar">
-                    <input
-                      aria-label="Search import contacts"
-                      placeholder="Search contacts or employers…"
-                      value={query}
-                      onChange={(e) => setQuery(e.target.value)}
-                    />
+                    <SearchField aria-label="Search import contacts" value={query} onChange={(e) => setQuery(e.target.value)} />
                     <SelectField
                       aria-label="Show import contacts"
                       value={filter}
@@ -988,12 +984,7 @@ export default function PeopleTransfer({
       ) : (
         <>
           <div className="people-transfer-toolbar">
-            <input
-              aria-label="Search export contacts"
-              placeholder="Search people and organizations…"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
+            <SearchField aria-label="Search export contacts" value={query} onChange={(e) => setQuery(e.target.value)} />
             <SelectField
               aria-label="Export profile type"
               value={filter}

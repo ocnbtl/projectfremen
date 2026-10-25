@@ -1,3 +1,4 @@
+import SearchField from "../../../../components/ui/SearchField";
 import Link from "next/link";
 import AdminChrome from "../../../../components/AdminChrome";
 import ReviewEntriesPanel from "../../../../components/ReviewEntriesPanel";
@@ -54,11 +55,7 @@ export default async function WeeklyReviewPage({
             people, finance, resources, media, and system cleanup.
           </p>
         </div>
-        <label className="module-ref-search">
-          <span aria-hidden="true">/</span>
-          <input aria-label="Search reviews" placeholder="Search reviews, queues, checks" />
-          <kbd>review</kbd>
-        </label>
+        <SearchField aria-label="Search reviews" />
       </header>
 
       <section className="module-ref-content">

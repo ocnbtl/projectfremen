@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import SelectField from "../ui/SelectField";
@@ -93,7 +94,7 @@ export default function MapDataExplorer({level,state,states,settings,onLevel,onS
   </div>:<div className={styles.dataResults}>
    <div className={styles.dataSectionHeading}><strong>{result.matched.toLocaleString()} matching <small>/ {result.rows.length.toLocaleString()}</small></strong><span className={styles.dataResultInfo}>{sources}<Button aria-label="Refresh data" busy={busy} disabled={invalidRange} onClick={()=>void load()}>Refresh</Button></span></div>
    {error&&<p role="alert" className={styles.dataError}>{error}</p>}
-   <div className={styles.dataResultsTools}><label className={styles.dataSearch} data-field-shell><UnigentamosIcon role="search" size={16}/><input type="search" aria-label="Search data regions" placeholder="Search" value={regionQuery} onChange={e=>{setRegionQuery(e.target.value);setPage(0);}}/></label>{filterControl(true)}</div>
+   <div className={styles.dataResultsTools}><SearchField aria-label="Search data regions" value={regionQuery} onChange={e=>{setRegionQuery(e.target.value);setPage(0);}} className={styles.dataSearch} />{filterControl(true)}</div>
    {!shown.length&&<p className="work-muted">No regions match. Try another search or reset your filters.</p>}
    {invalidRange&&<p role="alert" className={styles.dataError}>Minimum must be at or below maximum. Adjust your filters to show regions.</p>}<div className={styles.dataRegionGrid}>{(invalidRange?[]:shown).slice(currentPage*pageSize,(currentPage+1)*pageSize).map(r=><article key={r.id} data-match={r.value===null?"missing":r.matches?"yes":"no"}><strong title={r.name}>{r.name}</strong>{r.comparisons.map((c,i)=><div key={i}><span>{c.label}</span><b title={c.value===null?"No data":`${c.value.toLocaleString()} ${c.unit}`}>{c.value===null?"No data":format(c.value)} <small>{c.unit}</small></b><small>{c.year||"Year unavailable"}{c.uncertainty!=null?` · ±${c.uncertainty.toLocaleString()}`:""}</small></div>)}{(r.value===null||!r.matches)&&<small>{r.value===null?"No data":"Outside filters"}</small>}</article>)}</div>
    {shown.length>pageSize&&<div className={styles.dataPagination}><Button icon="back" aria-label="Previous regions" disabled={currentPage===0} onClick={()=>setPage(currentPage-1)}>Previous</Button><span>{currentPage*pageSize+1}–{Math.min((currentPage+1)*pageSize,shown.length)} of {shown.length}</span><Button icon="chevron-right" aria-label="Next regions" disabled={(currentPage+1)*pageSize>=shown.length} onClick={()=>setPage(currentPage+1)}>Next</Button></div>}

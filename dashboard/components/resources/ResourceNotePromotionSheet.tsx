@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import LogoLoader from "../operational/LogoLoader";
 
 import Link from "next/link";
@@ -423,12 +424,7 @@ export default function ResourceNotePromotionSheet({
                         </div>
                         <label className={styles.field}>
                           <span>Search Notes</span>
-                          <input
-                            type="search"
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search title, body, or Note ID"
-                          />
+                          <SearchField value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Search title, body, or Note ID" />
                         </label>
                         {notesState === "loading" || notesState === "idle" ? (
                           <LogoLoader label="Loading Notes" />

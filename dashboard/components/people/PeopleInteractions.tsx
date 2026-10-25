@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import { WorkspaceNavSlot } from "../admin-shell/WorkspaceTopbar";
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -118,8 +119,7 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
   }
   return <section className={`people-interactions-workspace is-${density}`} aria-label="Interaction history">
     <WorkspaceNavSlot kind="search"><div className="people-interactions-tools">
-      <div className="people-primary-search" data-field-shell><UnigentamosIcon role="search" size={18} /><input aria-label="Search interactions" placeholder="Search" value={query} onChange={event => onQueryChange(event.target.value)} />{query && <button type="button" className="people-search-clear" aria-label="Clear interaction search" onClick={() => onQueryChange("")} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}
-      </div><div className="people-search-controls">
+      <SearchField aria-label="Search interactions" value={query} onChange={event => onQueryChange(event.target.value)} className="people-primary-search">{query && <button type="button" className="people-search-clear" aria-label="Clear interaction search" onClick={() => onQueryChange("")} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}</SearchField><div className="people-search-controls">
           <Popover.Root open={filtersOpen} onOpenChange={open => { setFiltersOpen(open); if (open) setSortOpen(false); }}><Popover.Trigger asChild><button type="button" className="people-control-trigger" aria-label={filtersOpen ? "Hide filters" : "Show filters"}><UnigentamosIcon role="filter" size={18} />{filterCount > 0 && <strong>{filterCount}</strong>}</button></Popover.Trigger>
             <Popover.Portal><Popover.Content className="app-select-menu people-interactions-menu people-interactions-filters" sideOffset={10} align="end" collisionPadding={12} aria-label="Filter interactions" onEscapeKeyDown={event => event.stopImmediatePropagation()}>
               <header><UnigentamosIcon role="filter" size={18} /><h2>Filters</h2></header>

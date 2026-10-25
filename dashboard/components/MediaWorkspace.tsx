@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 
 import Link from "next/link";
@@ -2254,13 +2255,7 @@ export default function MediaWorkspace({
             </div>
           )}
 
-          <label className={styles.search}>
-            <span aria-hidden="true">/</span>
-            <input
-              ref={searchInputRef}
-              type="search"
-              value={query}
-              onChange={(event) => {
+          <SearchField ref={searchInputRef} value={query} onChange={(event) => {
                 const next = event.target.value;
                 const partial: Partial<MediaUrlState> = { query: next };
 
@@ -2275,18 +2270,7 @@ export default function MediaWorkspace({
 
                 setQuery(next);
                 updateUrl(partial);
-              }}
-              placeholder={isLegacyReadinessQueue
-                ? "Search review queue, titles, or source references"
-                : isLegacyMetadataQueue
-                  ? "Search titles, sources, projects, or issues"
-                  : isLegacyRightsQueue
-                    ? "Search assets, sources, projects, or context"
-                  : "Search titles, descriptions, projects, or source candidates"}
-              aria-label="Search Media"
-            />
-            <kbd>{isLegacyEvidenceQueue ? "evidence" : "media"}</kbd>
-          </label>
+              }} aria-label="Search Media" className={styles.search}><kbd>{isLegacyEvidenceQueue ? "evidence" : "media"}</kbd></SearchField>
 
           {isLegacyEvidenceQueue ? (
             <div

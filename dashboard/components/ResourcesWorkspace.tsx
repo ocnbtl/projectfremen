@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "./ui/SearchField";
 import UnigentamosIcon from "./icons/UnigentamosIcon";
 
 import Link from "next/link";
@@ -1144,20 +1145,12 @@ export default function ResourcesWorkspace({
           )}
 
           <WorkspaceNavSlot kind="search"><div className={styles.resourceToolbar}>
-            <div className={styles.resourceSearch} role="search" data-field-shell>
-              <PersonalOpsIcon name="search" />
-              <input
-                value={query}
-                onChange={(event) => {
+            <SearchField value={query} onChange={(event) => {
                   setQuery(event.target.value);
                   updateUrl({ query: event.target.value });
-                }}
-                placeholder="Search"
-                aria-label="Search Resources"
-              />
-            </div>
+                }} aria-label="Search Resources" className={styles.resourceSearch} />
               <details className={styles.resourceToolbarMenu}>
-                <summary aria-label="Filter Resources" title="Filter" data-icon-button="standard"><PersonalOpsIcon name="filter" /></summary>
+                <summary data-toolbar-action="filter" aria-label="Filter Resources" title="Filter" data-icon-button="standard"><PersonalOpsIcon name="filter" /></summary>
                 <div role="menu" aria-label="Filter Resources">
                   <button type="button" aria-pressed={collection === "all" && view === "all"} onClick={(event) => { setCollection("all"); selectLibraryView("all"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>All Resources</button>
                   <button type="button" aria-pressed={collection === "components"} onClick={(event) => { setCollection("components"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>Components</button>
@@ -1166,7 +1159,7 @@ export default function ResourcesWorkspace({
                 </div>
               </details>
               <details className={styles.resourceToolbarMenu}>
-                <summary aria-label="Sort Resources" title="Sort" data-icon-button="standard"><PersonalOpsIcon name="sort" /></summary>
+                <summary data-toolbar-action="sort" aria-label="Sort Resources" title="Sort" data-icon-button="standard"><PersonalOpsIcon name="sort" /></summary>
                 <div role="menu" aria-label="Sort Resources">
                   {([
                     ["updated-desc", "Recently Updated"],

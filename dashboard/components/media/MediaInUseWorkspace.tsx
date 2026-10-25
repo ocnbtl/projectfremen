@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 
@@ -792,18 +793,7 @@ export default function MediaInUseWorkspace({
             ]}
           />
 
-          <label className={baseStyles.search}>
-            <span aria-hidden="true">⌕</span>
-            <input
-              ref={searchInputRef}
-              type="search"
-              value={urlState.query}
-              onChange={(event) => updateScope({ query: event.target.value })}
-              placeholder="Search asset, owner location, project, review, or retained relation ID"
-              aria-label="Search Media reference evidence"
-            />
-            <kbd>/</kbd>
-          </label>
+          <SearchField ref={searchInputRef} value={urlState.query} onChange={(event) => updateScope({ query: event.target.value })} aria-label="Search Media reference evidence" className={baseStyles.search}><kbd>/</kbd></SearchField>
 
           <div className={baseStyles.chipRow} aria-label="Media reference evidence filters">
             {FILTERS.map((filter) => (

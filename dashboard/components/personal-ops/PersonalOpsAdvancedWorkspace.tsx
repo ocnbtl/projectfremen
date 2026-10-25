@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import SelectField from "../ui/SelectField";
 
 import Link from "next/link";
@@ -1433,14 +1434,7 @@ export default function PersonalOpsAdvancedWorkspace({
             </div>
             <div className={styles.headerActions}>
               <label className={styles.visuallyHidden} htmlFor={`personal-ops-${initialView}-search`}>Search {config.title}</label>
-              <input
-                id={`personal-ops-${initialView}-search`}
-                className={styles.button}
-                type="search"
-                value={queryDraft}
-                onChange={(event) => changeQuery(event.target.value)}
-                placeholder={`Search ${config.title.toLowerCase()}`}
-              />
+              <SearchField className="personal-ledger-search" id={`personal-ops-${initialView}-search`} value={queryDraft} onChange={(event) => changeQuery(event.target.value)} />
               <button type="button" className={styles.button} aria-label="Filter" title="Filter" data-icon-button="standard" onClick={() => updateUrl({ filter: urlState.filter === "all" ? initialView === "routines" ? "due-today" : "needs-review" : "all", selected: "" })}><PersonalOpsIcon name="filter" /></button>
               {initialView === "routines" && <label className={styles.sortControl}>
                 <span className={styles.visuallyHidden}>Sort routines</span>

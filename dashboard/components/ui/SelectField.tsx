@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "./SearchField";
 import { Children, isValidElement, useEffect, useId, useLayoutEffect, useRef, useState, type ChangeEvent, type ReactNode, type SelectHTMLAttributes } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
@@ -50,7 +51,7 @@ export default function SelectField({ value, defaultValue, onChange, children, c
         if (delta || event.key === "Home" || event.key === "End") {event.preventDefault(); const next = event.key === "Home" ? 0 : event.key === "End" ? items.length-1 : index < 0 ? 0 : Math.max(0,Math.min(items.length-1,index+delta)); items[next]?.focus();}
         else if (!inSearch && event.key.length === 1 && !event.ctrlKey && !event.metaKey && event.key !== " ") items.find(item => item.textContent?.toLowerCase().startsWith(event.key.toLowerCase()))?.focus();
       }}>
-      {searchable && <div className="app-choice-search"><input ref={search} aria-label={`Search ${label}`} placeholder="Search…" value={query} onChange={event => setQuery(event.target.value)} />{onCreate && <button type="button" aria-label={createLabel} title={createLabel} onClick={() => {setOpen(false); onCreate();}} data-icon-button="standard"><UnigentamosIcon role="plus" size={18} /></button>}</div>}
+      {searchable && <div className="app-choice-search"><SearchField ref={search} aria-label={`Search ${label}`} value={query} onChange={event => setQuery(event.target.value)} />{onCreate && <button type="button" aria-label={createLabel} title={createLabel} onClick={() => {setOpen(false); onCreate();}} data-icon-button="standard"><UnigentamosIcon role="plus" size={18} /></button>}</div>}
       <div id={listId} role="listbox" aria-label={label} className="app-choice-options" style={{gridTemplateColumns:`repeat(${columns}, minmax(0, 1fr))`}}>{filtered.map(option => <button type="button" role="option" tabIndex={option.value === chosen ? 0 : -1} aria-selected={option.value === chosen} data-select-value={option.value} data-press-pointed={pointed===option.value || undefined} title={option.title} disabled={option.disabled} className="app-select-item" key={option.value} onClick={() => select(option.value)}>{option.label}{option.value === chosen && <UnigentamosIcon role="check" size={14} />}</button>)}</div>
       {!filtered.length && <p className="app-choice-empty">No matches</p>}
     </Popover.Content></Popover.Portal>

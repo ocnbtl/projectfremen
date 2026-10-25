@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import SelectField from "../ui/SelectField";
 
@@ -712,18 +713,7 @@ export default function MediaDuplicatesWorkspace({
             ]}
           />
 
-          <label className={baseStyles.search}>
-            <span aria-hidden="true">⌕</span>
-            <input
-              ref={searchInputRef}
-              type="search"
-              value={urlState.query}
-              onChange={(event) => updateUrl({ query: event.target.value })}
-              placeholder="Search evidence groups by record, title, ID, or accepted source"
-              aria-label="Search duplicate evidence"
-            />
-            <kbd>/</kbd>
-          </label>
+          <SearchField ref={searchInputRef} value={urlState.query} onChange={(event) => updateUrl({ query: event.target.value })} aria-label="Search duplicate evidence" className={baseStyles.search}><kbd>/</kbd></SearchField>
 
           <div className={baseStyles.chipRow} aria-label="Duplicate evidence filters">
             {FILTERS.map((filter) => (

@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "./ui/SearchField";
 import SelectField from "./ui/SelectField";
 import LogoLoader from "./operational/LogoLoader";
 
@@ -113,11 +114,7 @@ export default function DocsIndexPanel() {
       <div className="inline-form">
         <label>
           Search
-          <input
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="title, path, projects, subjects"
-          />
+          <SearchField value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search documents" />
         </label>
         <label>
           Repo

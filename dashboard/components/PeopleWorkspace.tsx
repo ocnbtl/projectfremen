@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "./ui/SearchField";
 import PlaceSync from "./planning/PlaceSync";
 import ProfilePlaceField from "./planning/ProfilePlaceField";
 import { planningRequest, type PlanningSnapshot } from "../lib/modules/planning/repository";
@@ -4131,24 +4132,14 @@ export default function PeopleWorkspace({
           error={initialLoadError}
         /> : <>
         <WorkspaceNavSlot kind="search"><div className="people-directory-tools">
-          <div className="people-primary-search" data-field-shell>
-            <PeopleIcon name="search" />
-            <input
-              ref={searchInputRef}
-              aria-label="Search people"
-              value={query}
-              onChange={(event) => {
+          <SearchField ref={searchInputRef} aria-label="Search people" value={query} onChange={(event) => {
                 setQuery(event.target.value);
                 updatePeopleUrl({ query: event.target.value }, { native: true });
-              }}
-              placeholder="Search"
-            />
-            {query && (
+              }} className="people-primary-search">{query && (
               <button type="button" className="people-search-clear" aria-label="Clear search" onClick={() => { setQuery(""); updatePeopleUrl({ query: "" }, { native: true }); }} data-icon-button="standard">
                 <PeopleIcon name="close" />
               </button>
-            )}
-          </div>
+            )}</SearchField>
             <div className="people-search-controls">
               <button
                 ref={filterTriggerRef}
@@ -4349,10 +4340,12 @@ export default function PeopleWorkspace({
                       compact={listMode === "compact"}
                     />
                     <span className="people-row-content">
+                      <span className="people-row-heading">
                       <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>aka {profile.nickname}</em>}</span>
-                      <span className="people-row-tags"><PeopleActivityMarker status={record.status} compact />{[getPrimaryGroup(record), ...record.projects.slice(0,1)].filter(Boolean).map(tag => <em key={tag}>{tag}</em>)}{record.starred && <span className="people-row-star is-starred" aria-label="Starred"><PeopleIcon name="star" /></span>}</span>
+                      <span className="people-row-tags"><PeopleActivityMarker status={record.status} compact /><em title={getPrimaryGroup(record)}>{getPrimaryGroup(record)}</em><span className={`people-row-star${record.starred ? " is-starred" : ""}`} aria-label={record.starred ? "Starred" : undefined} aria-hidden={!record.starred}>{record.starred && <PeopleIcon name="star" />}</span></span>
+                      </span>
                       {(getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) || record.time.nextReview) && <span className="people-row-dates">
-                        {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="interaction" />{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>}
+                        {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="communication" />{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>}
                         {record.time.nextReview && <span title="Follow-up"><PeopleIcon name="follow-up" />{getDirectoryNextContactLabel(record)}</span>}
                       </span>}
                       {(profile.context || profile.primaryOccupation || profile.primaryEmployer || profile.organizationType || profile.industry) && <span className="people-row-description">{profile.context || (record.className === "org" ? [profile.organizationType, profile.industry].filter(Boolean).join(" · ") : [profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at "))}</span>}
@@ -5128,10 +5121,10 @@ export default function PeopleWorkspace({
                   const query = normalize(interactionParticipantSearch[kind]);
                   const matches = activePeople.filter(record=>record.className===kind && normalize(record.title).includes(query)).sort((a,b)=>a.title.localeCompare(b.title));
                   return <section key={kind} className="people-participant-box" aria-label={kind === "person" ? "People" : "Organizations"}>
-                  <div className="people-participant-search"><UnigentamosIcon role="search" size={15}/><input type="search" aria-label={`Search ${name}`} placeholder="Search" autoComplete="off" value={interactionParticipantSearch[kind]} onChange={event=>{
+                  <SearchField aria-label={`Search ${name}`} autoComplete="off" value={interactionParticipantSearch[kind]} onChange={event=>{
                     setInteractionParticipantSearch(current=>({...current,[kind]:event.target.value}));
                     event.currentTarget.closest("section")?.querySelector(".people-participant-scroll")?.scrollTo({top:0});
-                  }} onKeyDown={event=>{if(event.key === "Enter") event.preventDefault();}}/>{interactionParticipantSearch[kind] && <button type="button" aria-label={`Clear ${name} search`} onClick={event=>{setInteractionParticipantSearch(current=>({...current,[kind]:""}));event.currentTarget.parentElement?.querySelector("input")?.focus();}}><UnigentamosIcon role="close" size={14}/></button>}</div>
+                  }} onKeyDown={event=>{if(event.key === "Enter") event.preventDefault();}} className="people-participant-search">{interactionParticipantSearch[kind] && <button type="button" aria-label={`Clear ${name} search`} onClick={event=>{setInteractionParticipantSearch(current=>({...current,[kind]:""}));event.currentTarget.parentElement?.querySelector("input")?.focus();}}><UnigentamosIcon role="close" size={14}/></button>}</SearchField>
                   <div className="people-participant-scroll">
                   {matches.map((record) => (
                     <label key={record.id}>

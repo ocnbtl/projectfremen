@@ -1,3 +1,4 @@
+import SearchField from "../../../../components/ui/SearchField";
 import Link from "next/link";
 import AdminChrome from "../../../../components/AdminChrome";
 import ReviewEntriesPanel from "../../../../components/ReviewEntriesPanel";
@@ -49,11 +50,7 @@ export default async function MonthlyReviewPage({
             habits, and the health of the operating system.
           </p>
         </div>
-        <label className="module-ref-search">
-          <span aria-hidden="true">/</span>
-          <input aria-label="Search monthly reviews" placeholder="Search monthly checks" />
-          <kbd>month</kbd>
-        </label>
+        <SearchField aria-label="Search monthly reviews" />
       </header>
 
       <section className="module-ref-content">

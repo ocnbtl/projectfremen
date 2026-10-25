@@ -1,5 +1,6 @@
 "use client";
 
+import SearchField from "../ui/SearchField";
 import {
   Children,
   cloneElement,
@@ -46,6 +47,7 @@ export function WorkspaceButton({
       disabled={props.disabled || busy}
       aria-busy={busy || undefined}
       data-icon-button={iconOnly ? "standard" : undefined}
+      data-toolbar-action={iconOnly && (icon === "filter" || icon === "sort") ? icon : undefined}
     >
       {icon && <UnigentamosIcon role={icon} size={20} />}
       {childIsIcon ? children : children != null && <span>{children}</span>}
@@ -98,16 +100,7 @@ export function WorkspaceToolbar({
   return (
     <>
       <WorkspaceNavSlot kind="search"><div className="work-toolbar">
-        <label className="work-search" data-field-shell>
-          <UnigentamosIcon role="search" size={20} />
-          <input
-            type="search"
-            aria-label={placeholder}
-            placeholder="Search"
-            value={query}
-            onChange={(e) => onQuery(e.target.value)}
-          />
-        </label>
+        <SearchField aria-label={placeholder} value={query} onChange={(e) => onQuery(e.target.value)} className="work-search" />
         {filters && (
           <Popover.Root open={expanded} onOpenChange={setExpanded}><Popover.Trigger asChild><WorkspaceButton
             icon="filter"

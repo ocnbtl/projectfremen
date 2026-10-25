@@ -49,7 +49,7 @@ if(module==='reviews') {
  assert(await page.locator('.workspace-detail-page').isVisible());await page.getByRole('button',{name:'Back',exact:true}).first().click();
 }
 if(module==='people'){
- await page.getByRole('textbox',{name:'Search people',exact:true}).fill('Jordan');
+ await page.getByRole('searchbox',{name:'Search people',exact:true}).fill('Jordan');
  await page.getByRole('button',{name:/Jordan Lee/}).click();await page.waitForTimeout(400); await page.screenshot({path:path.join(artifactRoot,'pages-profile-'+name+'.png')});
  assert.equal(await page.locator('.people-directory-panel').isVisible(),false);
  await page.getByRole('tab',{name:'Properties',exact:true}).click();await page.waitForTimeout(300);
@@ -57,23 +57,23 @@ if(module==='people'){
  if(name==='desktop')assert.equal(await page.locator('.people-edit-form').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),2);
  await page.getByRole('button',{name:'Cancel',exact:true}).first().click();
  await page.getByRole('button',{name:/Back to/}).click();await page.waitForTimeout(300);assert(await page.locator('.people-directory-panel').isVisible());
- assert.equal(await page.getByRole('textbox',{name:'Search people',exact:true}).inputValue(),'Jordan');
- await page.getByRole('textbox',{name:'Search people',exact:true}).fill('Return person');
+ assert.equal(await page.getByRole('searchbox',{name:'Search people',exact:true}).inputValue(),'Jordan');
+ await page.getByRole('searchbox',{name:'Search people',exact:true}).fill('Return person');
  await page.waitForTimeout(200);
  const list=page.locator('.people-directory-panel');
  await list.evaluate(el=>{el.scrollTop=el.scrollHeight;});
  const last=page.locator('.people-directory-row-body').last(); await last.scrollIntoViewIfNeeded();
  const before=await list.evaluate(el=>el.scrollTop);
  await last.click();await page.getByRole('button',{name:/Back to/}).click();await page.waitForTimeout(400);
- assert.equal(await page.getByRole('textbox',{name:'Search people',exact:true}).inputValue(),'Return person');
+ assert.equal(await page.getByRole('searchbox',{name:'Search people',exact:true}).inputValue(),'Return person');
  assert(Math.abs(await list.evaluate(el=>el.scrollTop)-before)<3,'People list scroll preserved');
  assert(before>0,'Fixture exercises actual scrolling');
- await page.getByRole('textbox',{name:'Search people',exact:true}).fill('');
+ await page.getByRole('searchbox',{name:'Search people',exact:true}).fill('');
  const trigger=page.locator('.workspace-topnav').getByRole('button',{name:name==='mobile'?'Views':'People',exact:true});await trigger.click();
  const menu=page.locator('.workspace-nav-menu[data-state="open"]').first();
  await menu.getByRole('button',{name:/^Interactions/}).click();
  assert(await menu.isVisible(),'View menu stays open'); await page.keyboard.press('Escape');
- assert(await page.locator('.workspace-topnav').getByRole('textbox',{name:'Search interactions'}).isVisible());
+ assert(await page.locator('.workspace-topnav').getByRole('searchbox',{name:'Search interactions'}).isVisible());
  await page.screenshot({path:path.join(artifactRoot,'pages-interactions-'+name+'.png')});
  }
  }

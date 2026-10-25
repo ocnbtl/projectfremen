@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import SelectField from "../ui/SelectField";
 
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -513,20 +514,10 @@ export default function MediaUploadQueueWorkspace() {
 
             <p className="sr-only" role="status" aria-live="polite">{announcement}</p>
 
-            <label className={baseStyles.search}>
-              <span aria-hidden="true">/</span>
-              <input
-                type="search"
-                value={query}
-                onChange={(event) => {
+            <SearchField value={query} onChange={(event) => {
                   const next = event.target.value;
                   setQuery(next);
-                }}
-                placeholder="Search local filenames, browser types, extensions…"
-                aria-label="Search local intake preview"
-              />
-              <kbd>local</kbd>
-            </label>
+                }} aria-label="Search local intake preview" className={baseStyles.search}><kbd>local</kbd></SearchField>
 
             <div className={baseStyles.chipRow} aria-label="Local intake evidence segments">
               {FILTERS.map((segment) => (

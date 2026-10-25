@@ -1,5 +1,6 @@
 "use client";
 
+import SearchField from "../ui/SearchField";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import type { NativeObjectRef } from "../../lib/native-objects/types";
@@ -104,16 +105,10 @@ export default function PeopleObjectPicker({ targets, value, onChange, disabled 
         onOpenAutoFocus={event => { event.preventDefault(); search.current?.focus(); }}>
         <header><strong>Link an Object</strong><Popover.Close aria-label="Close object search"><UnigentamosIcon role="close" size={18} /></Popover.Close></header>
         <div className="people-object-picker-toolbar">
-        <div className="people-object-picker-search" data-field-shell>
-          <UnigentamosIcon role="search" size={18} />
-          <input ref={search} type="search" aria-label="Search objects" placeholder={kind === "all" ? "Search" : `Search ${currentKind.label.toLowerCase()}`} value={query}
-            onChange={event => { setQuery(event.target.value); }}
-            onKeyDown={event => {
+        <SearchField ref={search} aria-label="Search objects" value={query} onChange={event => { setQuery(event.target.value); }} onKeyDown={event => {
               if (event.key === "ArrowDown") { event.preventDefault(); results.current?.querySelector<HTMLButtonElement>('[role="option"]')?.focus(); }
               if (event.key === "Enter") { event.preventDefault(); if (filtered.length === 1) select(filtered[0]); else results.current?.querySelector<HTMLButtonElement>('[role="option"]')?.focus(); }
-            }} />
-          {query && <button type="button" aria-label="Clear object search" onClick={() => { setQuery(""); search.current?.focus(); }} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}
-        </div>
+            }} className="people-object-picker-search">{query && <button type="button" aria-label="Clear object search" onClick={() => { setQuery(""); search.current?.focus(); }} data-icon-button="compact"><UnigentamosIcon role="close" size={16} /></button>}</SearchField>
           <SelectField aria-label="Object type" value={kind} onChange={e=>setKind(e.target.value as Kind)} optionIcons={Object.fromEntries(kinds.map(item=>[item.id,item.icon]))} triggerContent={<><UnigentamosIcon role={currentKind.icon} size={16}/><span>{kind === "all" ? "Type" : currentKind.label}</span></>}>
             {kinds.filter(item=>item.id === "all" || targets.some(target=>kindOf(target) === item.id)).map(item=><option key={item.id} value={item.id}>{item.id === "all" ? "All types" : item.label}</option>)}
           </SelectField>

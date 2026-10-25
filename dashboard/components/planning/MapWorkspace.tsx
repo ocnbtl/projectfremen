@@ -1,4 +1,5 @@
 "use client";
+import SearchField from "../ui/SearchField";
 import PlaceSync from "./PlaceSync";
 import PlaceImagePicker from "./PlaceImagePicker";
 import PlaceOrganizationControl from "./PlaceOrganizationControl";
@@ -378,7 +379,7 @@ export default function MapWorkspace() {
         if (e.key === "Enter" && e.target instanceof HTMLInputElement && e.target.closest(".work-search") && query.trim().length >= 3 && !busy) { e.preventDefault(); void search(); }
       }}>
       <h1 className={styles.moduleTitle}>Map</h1>
-      <label className={`work-search ${styles.moduleSearch}`} data-field-shell><UnigentamosIcon role="search" size={16}/><input type="search" aria-label="Search places or addresses" placeholder="Search" value={query} onChange={e=>setQuery(e.target.value)}/></label>
+      <SearchField aria-label="Search places or addresses" value={query} onChange={e=>setQuery(e.target.value)} className={`work-search ${styles.moduleSearch}`} />
         <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!tag} title="Filter" /></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
           <>
             <fieldset className={styles.pinDisplay}><legend>Map pins</legend><div data-mode={pinDisplay}><span className={styles.pinDisplayIndicator} aria-hidden="true"/>{(["icons", "images"] as const).map(mode=><button type="button" key={mode} aria-pressed={pinDisplay===mode} onClick={()=>changePinDisplay(mode)}><UnigentamosIcon role={mode==="icons"?"location":"module-media"} size={15}/><span>{mode==="icons"?"Icons":"Images"}</span></button>)}</div></fieldset>
@@ -448,7 +449,7 @@ export default function MapWorkspace() {
         <span className={styles.toolbarSpacer}/>
         <Button icon="travel" onClick={()=>setTravelOpen(true)}>Travel</Button>
         <Popover.Root open={mobileList} onOpenChange={setMobileList}><Popover.Trigger asChild><Button icon="list" aria-label="Saved places" className={styles.listToggle} aria-pressed={mobileList}>Places</Button></Popover.Trigger><Popover.Portal><Popover.Content className={styles.placesPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Saved places" onOpenAutoFocus={e => e.preventDefault()}><header className={styles.explorerHeader}><strong>Saved places</strong><Popover.Close asChild><Button icon="close" aria-label="Close saved places">Close</Button></Popover.Close></header>        <div className={styles.placesDirectory}>
-          <label className={styles.directorySearch} data-field-shell><UnigentamosIcon role="search" size={16}/><input type="search" placeholder="Find a saved place" aria-label="Find a saved place" value={directoryQuery} onChange={e=>setDirectoryQuery(e.target.value)}/></label>
+          <SearchField aria-label="Find a saved place" value={directoryQuery} onChange={e=>setDirectoryQuery(e.target.value)} className={styles.directorySearch} />
           <p className={styles.directoryCount}>{directoryPlaces.length} {directoryPlaces.length===1?"place":"places"}</p>
 
           <details className={styles.savedViews}>

@@ -1,5 +1,6 @@
 "use client";
 
+import SearchField from "../ui/SearchField";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type {
@@ -335,11 +336,7 @@ export default function NoteAttachmentsView({
         <div className={styles.tools}>
           <label className={styles.search}>
             <span>Search evidence</span>
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Title, owner, relationship, or source field"
-            />
+            <SearchField value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Search attachments" />
           </label>
           <div className={styles.filters} role="group" aria-label="Evidence owner filter">
             {FILTERS.map((item) => (
