@@ -440,7 +440,9 @@ export default function CalendarWorkspace() {
       if (!current) return current;
       const fields = { ...current.fields, [key]: value };
       if (!current.original && key === "start" && value !== current.fields.start && !fields.allDay && typeof value === "string" && value.includes("T")) {
-        fields.end = localFor(instantFor(value, fields.timeZone) + 60 * 60 * 1000, fields.timeZone);
+        // These fields store wall-clock values, so keep the displayed end one hour later,
+        // including the repeated hour when daylight saving time ends.
+        fields.end = Temporal.PlainDateTime.from(value).add({ hours: 1 }).toString({ smallestUnit: "minute" });
       }
       return { ...current, fields };
     });
