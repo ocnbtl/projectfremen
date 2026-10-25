@@ -48,11 +48,11 @@ html[data-active-module] :is(.work-search,.people-primary-search,.finance-global
 .workspace-people-pages .people-directory-list { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
 .workspace-people-pages .people-directory-list.is-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr)); }
 .workspace-people-pages .people-directory-row { min-width:0; padding:0 !important; border:1px solid var(--border-soft); border-radius:14px; overflow:hidden; }
-.workspace-people-pages .people-directory-row-body { display:flex !important; align-items:center; gap:16px; width:100%; padding:16px !important; min-height:124px !important; text-align:left; }
+.workspace-people-pages .people-directory-row-body { display:flex !important; align-items:flex-start; gap:16px; width:100%; padding:16px !important; min-height:124px !important; text-align:left; }
 .workspace-people-pages .people-directory-row-body .people-row-avatar { width:68px !important; height:68px !important; min-width:68px; margin:0; flex:none; border-radius:50%; }
 .workspace-people-pages .people-row-avatar img { width:100%;height:100%;object-fit:cover; }
 .workspace-people-pages .people-row-content { display:flex; flex-direction:column; flex:1; min-width:0; gap:9px; }
-.workspace-people-pages .people-row-heading { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; }
+.workspace-people-pages .people-row-heading { display:grid; grid-template-columns:minmax(0,1fr) 196px; align-items:start; gap:12px; }
 .workspace-people-pages .people-row-name { display:flex; flex-direction:column; align-items:flex-start; min-width:0; gap:2px; }
 .workspace-people-pages .people-row-name strong { font-size:15px; line-height:1.4; white-space:normal; overflow-wrap:anywhere; }
 .workspace-people-pages .people-row-name em { font-size:11px; color:var(--text-muted); font-style:normal; }
