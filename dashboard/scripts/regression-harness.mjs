@@ -6575,9 +6575,10 @@ async function checkPeopleMemoryBrowserState(
       assert(
         (await fieldOptions(interactionDialog.getByLabel("Type"))).includes("Catch-up") &&
           (await fieldOptions(interactionDialog.getByLabel("Type"))).includes("Memory") &&
-          await interactionDialog.getByLabel("Start", { exact:true }).count() === 1 &&
-          await interactionDialog.getByLabel("End", { exact:true }).count() === 1 &&
-          await interactionDialog.getByLabel("End", { exact:true }).isEnabled(),
+          (await fieldOptions(interactionDialog.getByLabel("Type"))).includes("Ran into") &&
+          await interactionDialog.getByLabel("Start Time", { exact:true }).count() === 1 &&
+          await interactionDialog.getByLabel("End Time", { exact:true }).count() === 1 &&
+          await interactionDialog.getByLabel("End Time", { exact:true }).isEnabled(),
         `Interaction composer omitted Catch-up or Memory at ${viewport.label}`
       );
       const interactionComposerState = {
@@ -6600,41 +6601,33 @@ async function checkPeopleMemoryBrowserState(
       assert(await interactionDialog.getByRole("radio", { name: "Unspecified" }).getAttribute("aria-checked") === "true", "Approach must begin unspecified");
       await interactionDialog.getByRole("radio", { name: "Warm", exact: true }).click();
       async function chooseTime(label, hour, period) {
-        await interactionDialog.getByLabel(label, { exact: true }).click();
-        const wheel = page.getByRole("dialog", { name: `${label} time`, exact: true });
-        await wheel.getByRole("group", { name: `${label} hour`, exact: true }).getByRole("button", { name: hour, exact: true }).click();
-        await wheel.getByRole("group", { name: `${label} am/pm`, exact: true }).getByRole("button", { name: period, exact: true }).click();
-        await wheel.getByRole("button", { name: "Done", exact: true }).click();
+        const input = interactionDialog.getByRole("textbox", { name: label, exact: true });
+        await input.fill(hour + ":00 " + period);
+        await input.press("Tab");
       }
-      await chooseTime("Start", "12", "AM");
-      assert(await interactionDialog.getByLabel("Start", { exact: true }).getAttribute("data-value") === "00:00", "Midnight must store as 00:00");
-      await chooseTime("Start", "12", "PM");
-      assert(await interactionDialog.getByLabel("Start", { exact: true }).getAttribute("data-value") === "12:00", "Noon must store as 12:00");
-      await chooseTime("Start", "3", "PM");
-      await chooseTime("End", "4", "PM");
-      await interactionDialog.getByLabel("Date", { exact: true }).click();
-      const calendar = page.getByRole("dialog", { name: "Choose date", exact: true });
-      await calendar.getByLabel("Calendar year").fill("2024");
-      const calendarControls = await calendar.evaluate(element => ['input[aria-label="Calendar year"]', 'button[aria-label="Calendar month"]'].map(selector => { const node = element.querySelector(selector), rect = node.getBoundingClientRect(); return { height: rect.height, top: rect.top, radius: getComputedStyle(node).borderRadius }; }));
-      assert(Math.abs(calendarControls[0].height - calendarControls[1].height) < 1 && Math.abs(calendarControls[0].top - calendarControls[1].top) < 1 && calendarControls[0].radius === calendarControls[1].radius, `Calendar month and year controls do not align: ${JSON.stringify(calendarControls)}`);
-      await calendar.getByLabel("Calendar month").click();
-      await page.getByRole("option", { name: "February", exact: true }).click();
-      await calendar.getByRole("button", { name: "February 29, 2024", exact: true }).click();
-      assert(await interactionDialog.getByLabel("Date", { exact: true }).getAttribute("data-value") === "2024-02-29", "Calendar did not retain leap day");
-      await interactionDialog.getByLabel("Date", { exact: true }).click();
-      await calendar.getByRole("button", { name: "February 29, 2024", exact: true }).press("ArrowRight");
+      await chooseTime("Start Time", "12", "AM");
+      assert(await interactionDialog.getByLabel("Start Time", {exact:true}).inputValue() === "12:00 am", "Midnight should remain editable");
+      await chooseTime("Start Time", "12", "PM");
+      assert(await interactionDialog.getByLabel("Start Time", {exact:true}).inputValue() === "12:00 pm", "Noon should remain editable");
+      await chooseTime("Start Time", "3", "PM");
+      await chooseTime("End Time", "4", "PM");
+      for (const [part, value] of [["year", "2024"], ["month", "02"], ["day", "29"]]) {
+        const field = interactionDialog.getByRole("textbox", {name: "Interaction date " + part, exact:true});
+        await field.fill(value); await field.press("Tab");
+      }
+      await interactionDialog.getByRole("button", {name:"Choose interaction date date",exact:true}).click();
+      const calendar = page.getByRole("dialog", {name:"Interaction date date",exact:true});
+      await calendar.getByRole("button", {name:"Thursday, February 29, 2024",exact:true}).press("ArrowRight");
       await page.keyboard.press("Enter");
-      assert(await interactionDialog.getByLabel("Date", { exact: true }).getAttribute("data-value") === "2024-03-01", "Calendar keyboard navigation did not cross the month");
-      await interactionDialog.getByLabel("Date", { exact: true }).click();
-      await calendar.waitFor({ state: "visible" });
       await page.keyboard.press("Escape");
-      await calendar.waitFor({ state: "hidden" });
+      await calendar.waitFor({state:"hidden"});
+      assert(await interactionDialog.getByRole("textbox",{name:"Interaction date day",exact:true}).inputValue() === "01", "Date keyboard navigation should cross the month");
       assert(await interactionDialog.isVisible(), "Closing the calendar closed the composer");
       assert(
         await interactionDialog.getByLabel("Type").getAttribute("data-value") === "catch-up" &&
           await interactionDialog.getByRole("radio", { name: "Warm", exact: true }).getAttribute("aria-checked") === "true" &&
-          await interactionDialog.getByLabel("Start", { exact:true }).getAttribute("data-value") === "15:00" &&
-          await interactionDialog.getByLabel("End", { exact:true }).getAttribute("data-value") === "16:00",
+          await interactionDialog.getByLabel("Start Time", { exact:true }).inputValue() === "3:00 pm" &&
+          await interactionDialog.getByLabel("End Time", { exact:true }).inputValue() === "4:00 pm",
         `Interaction composer did not accept Catch-up and Warm approach at ${viewport.label}`
       );
       const participantGeometry = await interactionDialog.locator(".people-interaction-participant-picker label").evaluateAll((labels) => labels.map((label) => {
@@ -6673,12 +6666,13 @@ async function checkPeopleMemoryBrowserState(
       await interactionDialog.getByLabel("Use this as the latest contact date", { exact: true }).uncheck();
       await interactionDialog.getByLabel("Title", { exact: true }).fill(`Interaction controls ${viewport.label}`);
       await interactionDialog.getByRole("radio", { name: "Unspecified", exact: true }).click();
+      await chooseField(interactionDialog.getByLabel("Type"), "ran-into");
       const controlSave = page.waitForResponse(response => response.url().endsWith('/api/personal/records') && response.request().method() === 'POST');
       await interactionDialog.getByRole("button", { name: "Save interaction", exact: true }).click();
       assert((await controlSave).ok(), "Interaction control save failed");
       await interactionDialog.waitFor({ state: "hidden" });
       const savedControls = (await (await context.request.get(`${baseUrl}/api/personal/records`)).json()).items.find(item => item.title === `Interaction controls ${viewport.label}`);
-      assert(savedControls?.interaction?.occurredOn === '2024-03-01' && savedControls.interaction.startTime === '15:00' && savedControls.interaction.endTime === '16:00' && savedControls.interaction.updatesLastContact === false && !savedControls.interaction.approach, "Saved interaction did not preserve calendar, AM/PM, unspecified approach and unchecked contact state");
+      assert(savedControls?.interaction?.kind === 'ran-into' && savedControls.interaction.occurredOn === '2024-03-01' && savedControls.interaction.startTime === '15:00' && savedControls.interaction.endTime === '16:00' && savedControls.interaction.updatesLastContact === false && !savedControls.interaction.approach, "Saved interaction did not preserve calendar, AM/PM, unspecified approach and unchecked contact state");
       await page.goto(`${baseUrl}/admin/people?sidebar=interactions&interaction=${encodeURIComponent(savedControls.id)}`, { waitUntil: "networkidle" });
       const savedControlDetail = page.getByRole("region", { name: `Interaction controls ${viewport.label}`, exact: true });
       assert(await savedControlDetail.locator('.people-interaction-detail-participants').getByRole('img', {name:'Latest contact: not included',exact:true}).count() === 1, 'Participant latest-contact marker did not reflect its saved setting');

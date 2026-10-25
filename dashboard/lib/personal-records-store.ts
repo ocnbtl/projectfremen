@@ -196,6 +196,7 @@ export type PersonalInteractionKind =
   | "email"
   | "meeting"
   | "catch-up"
+  | "ran-into"
   | "note"
   | "memory"
   | "milestone";
@@ -650,6 +651,7 @@ const PERSONAL_INTERACTION_KINDS: readonly PersonalInteractionKind[] = [
   "email",
   "meeting",
   "catch-up",
+  "ran-into",
   "note",
   "memory",
   "milestone"

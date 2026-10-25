@@ -6,6 +6,7 @@ const types: Record<string, { label: string; icon: string }> = {
   email: { label: "Email", icon: "interaction-email" },
   meeting: { label: "Meeting", icon: "interaction-meeting" },
   "catch-up": { label: "Catch-up", icon: "interaction-catch-up" },
+  "ran-into": { label: "Ran into", icon: "interaction-meeting" },
   note: { label: "Note", icon: "interaction-note" },
   memory: { label: "Memory", icon: "interaction-memory" },
   milestone: { label: "Milestone", icon: "interaction-milestone" }

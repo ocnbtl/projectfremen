@@ -15,7 +15,7 @@ export type InteractionEntry = {
   participantIds: string[]; startTime?: string; endTime?: string;
   approach?: string; updatesLastContact?: boolean; source: "record" | "profile";
 };
-const kinds = ["call", "message", "email", "meeting", "catch-up", "note", "memory", "milestone"];
+const kinds = ["call", "message", "email", "meeting", "catch-up", "ran-into", "note", "memory", "milestone"];
 const label = (value: string) => value ? value[0].toUpperCase() + value.slice(1).replace(/-/g, " ") : "Interaction";
 const initials = (value: string) => value.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join("").toUpperCase();
 const validDate = (value?: string) => Boolean(value && /^\d{4}-\d{2}-\d{2}$/.test(value) && Number.isFinite(Date.parse(`${value}T12:00:00Z`)));

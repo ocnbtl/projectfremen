@@ -69,6 +69,7 @@ import { applyPersonAutofill, type PersonAutofillPending, type PersonAutofillRes
 import TeamSizeInput from "./people/TeamSizeInput";
 import SelectField from "./ui/SelectField";
 import TimeField from "./people/TimeField";
+import EventDateSegments from "./planning/EventDateSegments";
 import DateField from "./people/DateField";
 import PlaceLabelPicker from "./people/PlaceLabelPicker";
 import InteractionApproach from "./people/InteractionApproach";
@@ -151,7 +152,7 @@ type PeopleSortMode = "last-name" | "recent-contact" | "next-follow-up";
 type PeopleListMode = "list" | "compact" | "grid";
 type RelationshipStatus = "active" | "idea" | "inactive";
 type PeopleLastContactFilter = "any" | "7d" | "30d" | "90d" | "none";
-type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "note" | "memory" | "milestone";
+type InteractionKind = "call" | "message" | "email" | "meeting" | "catch-up" | "ran-into" | "note" | "memory" | "milestone";
 type ContactMethodId = "email" | "phone" | "website" | "instagram" | "tiktok" | "x" | "linkedin" | "youtube";
 
 type ContactMethod = {
@@ -1016,6 +1017,8 @@ const INTERACTION_KIND_LABELS = new Set([
   "meeting",
   "catch-up",
   "catch up",
+  "ran-into",
+  "ran into",
   "note",
   "memory",
   "milestone"
@@ -5141,7 +5144,8 @@ export default function PeopleWorkspace({
               <button className="people-dialog-close" type="button" aria-label="Close interaction composer" onClick={() => setInteractionOpen(false)} disabled={interactionSaving} data-icon-button="standard"><UnigentamosIcon role="close" size={18} /></button>
             </header>
             <div className="people-interaction-fields">
-              <div className="people-interaction-settings is-wide"><InteractionApproach value={interactionApproach} onChange={setInteractionApproach} /><InteractionCheckbox checked={interactionMeaningful} onChange={setInteractionMeaningful} /></div>
+              <div className="people-interaction-toolbar is-wide">
+              <InteractionApproach value={interactionApproach} onChange={setInteractionApproach} />
               <label>
                 Type
                 <SelectField value={interactionKind} onChange={(event) => setInteractionKind(event.target.value as InteractionKind)}>
@@ -5150,24 +5154,26 @@ export default function PeopleWorkspace({
                   <option value="email">Email</option>
                   <option value="meeting">Meeting</option>
                   <option value="catch-up">Catch-up</option>
+                  <option value="ran-into">Ran into</option>
                   <option value="note">Note</option>
                   <option value="memory">Memory</option>
                   <option value="milestone">Milestone</option>
                 </SelectField>
               </label>
-              <DateField label="Date" value={interactionDate} onChange={setInteractionDate} />
-              <fieldset className="people-interaction-time is-wide"><legend>Time <span>Optional</span></legend><div><TimeField label="Start" value={interactionStartTime} onChange={setInteractionStartTime}/><TimeField label="End" value={interactionEndTime} onChange={setInteractionEndTime}/></div></fieldset>
+              <div className="people-interaction-date"><EventDateSegments hideLabel label="Interaction date" value={interactionDate} allDay timeZone="UTC" onChange={setInteractionDate} /></div>
+              <div className="people-interaction-range"><TimeField label="Start Time" value={interactionStartTime} onChange={setInteractionStartTime}/><span className="people-interaction-to">to</span><TimeField label="End Time" value={interactionEndTime} onChange={setInteractionEndTime}/></div>
+              </div>
+              <div className="is-wide"><InteractionCheckbox checked={interactionMeaningful} onChange={setInteractionMeaningful} /></div>
               <label className="is-wide">
                 Title
                 <input value={interactionTitle} onChange={(event) => setInteractionTitle(event.target.value)} placeholder="Coffee, call, introduction, or shared moment" required />
               </label>
               <label className="is-wide">
                 Summary
-                <textarea value={interactionSummary} onChange={(event) => setInteractionSummary(event.target.value)} rows={4} placeholder="What mattered, what changed, and any context worth remembering." />
+                <textarea value={interactionSummary} onChange={(event) => setInteractionSummary(event.target.value)} rows={2} placeholder="What mattered, what changed, and any context worth remembering." />
               </label>
-              <fieldset className="people-interaction-participant-picker is-wide">
-                <legend>People and organizations</legend>
-                <div className="people-participant-columns">{(["person","org"] as const).map(kind=><section key={kind}><h4>{kind === "person"?"People":"Organizations"}</h4><div className="people-participant-scroll">
+              <div className="people-interaction-participant-picker is-wide" role="group" aria-label="Participants">
+                <div className="people-participant-columns">{(["person","org"] as const).map(kind=><section key={kind} aria-label={kind === "person" ? "People" : "Organizations"}><div className="people-participant-scroll">
                   {activePeople.filter(record=>record.className===kind).sort((a,b)=>a.title.localeCompare(b.title)).map((record) => (
                     <label key={record.id}>
                       <input
@@ -5189,7 +5195,7 @@ export default function PeopleWorkspace({
                     </label>
                   ))}
                 </div></section>)}</div>
-              </fieldset>
+              </div>
 
             </div>
             {error && <p className="personal-record-error">{error}</p>}
