@@ -281,6 +281,8 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
       name: string(raw.name, "View name", 120, true),
       query: string(raw.query, "Search"),
       tag: string(raw.tag, "Tag", 80),
+      organizationType: string(raw.organizationType, "Organization type", 80),
+      industry: string(raw.industry, "Industry", 80),
       layer: string(raw.layer, "Layer", 80),
       level: ["country", "state", "county", "place", "tract"].includes(
         String(raw.level),
@@ -293,7 +295,7 @@ export function normalizePlanningRecord<K extends PlanningCollection>(
         : {}),
       center: [coordinate(center[0], 180), coordinate(center[1], 90)],
       zoom: Math.max(0, Math.min(20, Number(raw.zoom) || 3)),
-      sort: raw.sort === "updated" ? "updated" : "name",
+      sort: ["updated", "organizationType", "industry"].includes(String(raw.sort)) ? raw.sort : "name",
       dateFrom: string(raw.dateFrom, "From", 10),
       dateTo: string(raw.dateTo, "To", 10),
     };

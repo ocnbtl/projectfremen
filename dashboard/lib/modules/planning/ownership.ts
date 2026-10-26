@@ -48,6 +48,8 @@ export function planningWritableKeys(collection: PlanningCollection): string[] {
       "name",
       "query",
       "tag",
+      "organizationType",
+      "industry",
       "layer",
       "level",
       "stateCode",

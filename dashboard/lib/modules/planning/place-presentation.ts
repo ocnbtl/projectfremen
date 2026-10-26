@@ -1,3 +1,4 @@
+import { organizationLabels } from "../people/organization-labels";
 import type { Place } from "./types";
 import { areaFlagUrl, isAreaPlace } from "./area-flags";
 
@@ -24,7 +25,7 @@ export function normalizePlaceImage(value: unknown): string | undefined {
   return value;
 }
 
-export type PlaceOrganization = { objectId: string; label: string; href: string; imageUrl?: string; imageUpdatedAt?: string; hasProfileLocation?: boolean };
+export type PlaceOrganization = { objectId: string; label: string; href: string; imageUrl?: string; imageUpdatedAt?: string; hasProfileLocation?: boolean; organizationType?: string; industry?: string };
 export function placePicture(place: Partial<Place>, organizations: PlaceOrganization[] = []) {
   if (place.image) return place.image;
   if (isAreaPlace(place)) return areaFlagUrl({name:place.name||"",country:place.countryCode,latitude:place.latitude,longitude:place.longitude});
@@ -35,4 +36,12 @@ export function placePicture(place: Partial<Place>, organizations: PlaceOrganiza
   const url = organization?.imageUrl;
   if (!url || !/^\/api\/people\/photos\/personal-[a-f0-9-]+$/i.test(url)) return undefined;
   return url + (organization.imageUpdatedAt ? `?v=${encodeURIComponent(organization.imageUpdatedAt)}` : "");
+}
+
+/** An area linked to an employer must not inherit that employer's industry. */
+export function placeClassification(place: Partial<Place>, organizations: PlaceOrganization[] = []) {
+  if (isAreaPlace(place)) return { type: "", industry: "" };
+  const name = placeDisplayName({ name: place.name || "", address: place.address || "" }).toLocaleLowerCase();
+  const organization = organizations.find(org => org.label.toLocaleLowerCase() === name) || (organizations.length === 1 && (organizations[0].hasProfileLocation || place.tags?.some(tag => ["organization", "school"].includes(tag.toLowerCase()))) ? organizations[0] : undefined);
+  return organizationLabels(organization);
 }

@@ -3,7 +3,7 @@ import SearchField from "../ui/SearchField";
 import PlaceSync from "./PlaceSync";
 import PlaceImagePicker from "./PlaceImagePicker";
 import PlaceOrganizationControl from "./PlaceOrganizationControl";
-import { placePicture, placeDisplayName, formatPlaceCoordinates } from "../../lib/modules/planning/place-presentation";
+import { placeClassification, placePicture, placeDisplayName, formatPlaceCoordinates } from "../../lib/modules/planning/place-presentation";
 import TravelPanel from "./TravelPanel";
 import PlaceTags from "./PlaceTags";
 import PlaceTagLabel from "./PlaceTagLabel";
@@ -148,7 +148,9 @@ export default function MapWorkspace() {
     [busy, setBusy] = useState(false);
   const [query, setQuery] = useState(""),
     [tag, setTag] = useState(""),
-    [sort, setSort] = useState<"name" | "updated">("name"),
+    [organizationType, setOrganizationType] = useState(""),
+    [industry, setIndustry] = useState(""),
+    [sort, setSort] = useState<"name" | "updated" | "organizationType" | "industry">("name"),
     [selectedId, setSelectedId] = useState(""),
     [pinning, setPinning] = useState(false),
     [mobileList, setMobileList] = useState(false),
@@ -215,6 +217,7 @@ export default function MapWorkspace() {
   const selected = requestedPlace?.mergedIntoId
     ? snapshot?.state.places.find((p) => p.id === requestedPlace.mergedIntoId && !p.archivedAt)
     : requestedPlace?.archivedAt ? undefined : requestedPlace;
+  const classifications = useMemo(() => Object.fromEntries((snapshot?.state.places || []).filter(p => !p.archivedAt).map(p => [p.id, placeClassification(p, snapshot?.placeOrganizations?.[p.id])])), [snapshot]);
   const places = useMemo(
     () =>
       (snapshot?.state.places || [])
@@ -222,20 +225,22 @@ export default function MapWorkspace() {
           (p) =>
             !p.archivedAt &&
             (!tag || p.tags.includes(tag)) &&
-            `${p.name} ${p.address} ${p.notes} ${p.tags.join(" ")}`
+            (!organizationType || classifications[p.id]?.type === organizationType) &&
+            (!industry || classifications[p.id]?.industry === industry) &&
+            `${p.name} ${p.address} ${p.notes} ${p.tags.join(" ")} ${classifications[p.id]?.type || ""} ${classifications[p.id]?.industry || ""}`
               .toLowerCase()
               .includes(query.toLowerCase()),
         )
         .sort((a, b) =>
-          sort === "name"
-            ? a.name.localeCompare(b.name)
-            : b.updatedAt.localeCompare(a.updatedAt),
+          sort === "updated" ? b.updatedAt.localeCompare(a.updatedAt)
+            : sort === "name" ? a.name.localeCompare(b.name)
+            : (classifications[a.id]?.[sort === "organizationType" ? "type" : "industry"] || "~").localeCompare(classifications[b.id]?.[sort === "organizationType" ? "type" : "industry"] || "~") || a.name.localeCompare(b.name),
         ),
-    [snapshot, query, tag, sort],
+    [snapshot, query, tag, sort, organizationType, industry, classifications],
   );
   const placeImages = useMemo(() => Object.fromEntries((snapshot?.state.places || []).map(place => [place.id, placePicture(place, snapshot?.placeOrganizations?.[place.id]) || ""])), [snapshot]);
-  const directoryPlaces = useMemo(()=>places.filter(p=>`${p.name} ${p.address} ${p.tags.join(" ")}`.toLowerCase().includes(directoryQuery.toLowerCase())),[places,directoryQuery]);
-  useEffect(()=>setDirectoryPage(0),[directoryQuery,query,tag,sort]);
+  const directoryPlaces = useMemo(()=>places.filter(p=>`${p.name} ${p.address} ${p.tags.join(" ")} ${classifications[p.id]?.type || ""} ${classifications[p.id]?.industry || ""}`.toLowerCase().includes(directoryQuery.toLowerCase())),[places,directoryQuery,classifications]);
+  useEffect(()=>setDirectoryPage(0),[directoryQuery,query,tag,sort,organizationType,industry]);
   async function action(work: () => Promise<unknown>, message: string) {
     setBusy(true);
     setError("");
@@ -380,12 +385,12 @@ export default function MapWorkspace() {
       }}>
       <h1 className={styles.moduleTitle}>Map</h1>
       <SearchField aria-label="Search places or addresses" value={query} onChange={e=>setQuery(e.target.value)} className={`work-search ${styles.moduleSearch}`} />
-        <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!tag} title="Filter" /></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
+        <Popover.Root><Popover.Trigger asChild><Button icon="filter" aria-label="Filter" aria-pressed={!!(tag || organizationType || industry)} title="Filter" /></Popover.Trigger><Popover.Portal><Popover.Content className={styles.filterPopover} style={moduleThemeVariables("map") as CSSProperties} sideOffset={8} collisionPadding={12} align="start" aria-label="Filter saved places" onOpenAutoFocus={e => e.preventDefault()}>
           <>
             <fieldset className={styles.pinDisplay}><legend>Map pins</legend><div data-mode={pinDisplay}><span className={styles.pinDisplayIndicator} aria-hidden="true"/>{(["icons", "images"] as const).map(mode=><button type="button" key={mode} aria-pressed={pinDisplay===mode} onClick={()=>changePinDisplay(mode)}><UnigentamosIcon role={mode==="icons"?"location":"module-media"} size={15}/><span>{mode==="icons"?"Icons":"Images"}</span></button>)}</div></fieldset>
             <label>
               Tag
-              <SelectField value={tag} optionIcons={Object.fromEntries((snapshot?.state.places.flatMap(p=>p.tags)||[]).map(t=>[t,placeTagIconRole(t)]))} onChange={(e) => setTag(e.target.value)}>
+              <SelectField searchable value={tag} optionIcons={Object.fromEntries((snapshot?.state.places.flatMap(p=>p.tags)||[]).map(t=>[t,placeTagIconRole(t)]))} onChange={(e) => setTag(e.target.value)}>
                 <option value="">All tags</option>
                 {[
                   ...new Set(
@@ -396,19 +401,24 @@ export default function MapWorkspace() {
                 ))}
               </SelectField>
             </label>
-            <label>
-              Sort
+            <label>Organization type<SelectField searchable value={organizationType} onChange={e => {setOrganizationType(e.target.value); setIndustry("");}}><option value="">All organization types</option>{[...new Set(Object.values(classifications).map(c => c.type).filter(Boolean))].sort().map(value => <option key={value} value={value}>{value}</option>)}</SelectField></label>
+            <label>Industry<SelectField searchable value={industry} onChange={e => setIndustry(e.target.value)}><option value="">All industries</option>{[...new Set(Object.values(classifications).filter(c => !organizationType || c.type === organizationType).map(c => c.industry).filter(Boolean))].sort().map(value => <option key={value} value={value}>{value}</option>)}</SelectField></label>
+            <label>Sort
               <SelectField
                 value={sort}
                 onChange={(e) => setSort(e.target.value as typeof sort)}
               >
                 <option value="name">Name</option>
                 <option value="updated">Recently updated</option>
+                <option value="organizationType">Organization type</option>
+                <option value="industry">Industry</option>
               </SelectField>
             </label>
             <Button
               onClick={() => {
                 setTag("");
+                setOrganizationType("");
+                setIndustry("");
                 setQuery("");
               }}
             >
@@ -463,6 +473,8 @@ export default function MapWorkspace() {
                     onClick={() => {
                       setQuery(x.query);
                       setTag(x.tag);
+                      setOrganizationType(x.organizationType || "");
+                      setIndustry(x.industry || "");
                       setSort(x.sort);
                       setLevel(
                         x.level ||
@@ -500,6 +512,8 @@ export default function MapWorkspace() {
                         name: viewName,
                         query,
                         tag,
+                        organizationType,
+                        industry,
                         sort,
                         layer: analysis.metrics[0]?.metric || "none",
                         analysis,
@@ -558,7 +572,7 @@ export default function MapWorkspace() {
                     (hasPlaceCoordinates(p) ? formatPlaceCoordinates(p.latitude,p.longitude) : "Address saved · pin not set")}
                 </small>
                 {!hasPlaceCoordinates(p) && p.address && <small>Pin not set</small>}
-                {p.tags.length > 0 && <small className={styles.placeTagList}>{p.tags.map(t=><PlaceTagLabel key={t} tag={t}/>)}</small>}
+                {(p.tags.length > 0 || classifications[p.id]?.type) && <small className={styles.placeTagList}>{p.tags.filter(t => !classifications[p.id]?.type || !["organization", "school"].includes(t.toLowerCase())).map(t=><PlaceTagLabel key={t} tag={t}/>)}{Object.values(classifications[p.id] || {}).filter(Boolean).map(value => <span key={value}>{value}</span>)}</small>}
               </div>
             </button>
           ))}
@@ -617,7 +631,7 @@ export default function MapWorkspace() {
             regionGeography={analysisResult?.data[0].geography}
           />
           {analysisResult && <MapDataLegend result={analysisResult} />}
-          {selected && <MapPlaceProfile key={selected.id} place={selected} picture={placeImages[selected.id]} onImageChange={async image=>{await savePlanning("places",{id:selected.id,image},selected.updatedAt);await refresh();}} onEdit={() => setEditor(selected)} onClose={() => setSelectedId("")} />}
+          {selected && <MapPlaceProfile key={selected.id} place={selected} classification={classifications[selected.id]} picture={placeImages[selected.id]} onImageChange={async image=>{await savePlanning("places",{id:selected.id,image},selected.updatedAt);await refresh();}} onEdit={() => setEditor(selected)} onClose={() => setSelectedId("")} />}
         </div>
       </div>
       <WorkspaceSheet

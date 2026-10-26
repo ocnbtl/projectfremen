@@ -27,7 +27,7 @@ let browser;const expectedTimes=new Map();
   if(viewportName==='desktop') {
    const people=[];
    for(let i=0;i<6;i++) {const title=`Person ${i}`;const r=await post({domain:'family',className:'person',title,status:i%2?'inactive':'active',starred:i%2===0,subjects:['Friend'],time:{nextReview:i%2?'2026-12-01':undefined},profile:{nickname:i<2?'Alf':undefined,lastContact:'2025-01-02',primaryOccupation:i===0?'Industrial designer with a longer occupation title':i===1?'':'Designer',context:'A useful description of this person.'}});people.push(r.items.find(x=>x.title===title).id);}
-   for(let i=0;i<24;i++) {const [name,type]=[['Example school','University / School'],['Example cafe','Restaurant'],['Example agency','Agency']][i%3];await post({domain:'family',className:'org',title:`${name} ${i}`,status:'active',areas:['Relationships'],profile:{organizationType:type,headquarters:'Cincinnati, OH',associatedPeople:people.slice(0,4)}});}
+   for(let i=0;i<24;i++) {const [name,type]=[['Example school','University / School'],['Example cafe','Business'],['Example agency','Agency']][i%3];await post({domain:'family',className:'org',title:`${name} ${i}`,status:'active',areas:['Relationships'],profile:{organizationType:type,industry:type==='Business'?'Hospitality & travel':type==='Agency'?'Talent / modeling':'College / university',headquarters:i%2?'Cincinnati, OH':'',associatedPeople:people.slice(0,4)}});}
    for(let i=0;i<6;i++) {const start=['09:00','23:15',undefined,'14:30',undefined,'10:00'][i],end=['10:00','00:15','13:00',undefined,undefined,'11:30'][i];const title=i===0?'A longer interaction title that wraps over more than one line without moving the timing row':`Interaction ${i}`;
     const r=await post({domain:'notes-docs',className:'interaction',title,status:'completed',body:i%2?'A longer conversation summary that should stay inside its own row, wrap cleanly, and never displace the date, time range, or interaction type.':'',interaction:{participantIds:people.slice(0,i%3+1),kind:['catch-up','call','meeting','memory','note','ran-into'][i],occurredOn:'2026-10-20',startTime:start,endTime:end,endNextDay:i===1,updatesLastContact:true}});expectedTimes.set(r.items.find(x=>x.title===title).id,interactionTimeLabel(start,end));
    }
@@ -60,7 +60,9 @@ let browser;const expectedTimes=new Map();
      }
      else {
       assert.equal(await rows.locator('.people-row-linked').count(),24);assert(!((await rows.allTextContents()).join(' ').includes('Relationships')));assert.equal(await rows.locator('.people-row-linked .people-profile-photo').first().evaluate(el=>el.getBoundingClientRect().width),24);
-      assert.equal(await rows.locator('.people-row-location').count(),24);
+      assert.equal(await rows.locator('.people-row-location').count(),12);
+      assert.equal(await rows.locator('[title="Organization type"]').count(),24);assert.equal(await rows.locator('[title="Industry"]').count(),24);assert.equal(await rows.locator('.people-row-description').count(),0,'No duplicate classification description');
+      if(mode==='grid'){const y=await rows.evaluateAll(items=>items.map(el=>el.querySelector('.people-row-title').getBoundingClientRect().top-el.getBoundingClientRect().top));assert(y.every(v=>Math.abs(v-y[0])<1),'Organization title baselines: '+y);}
       assert.equal(await rows.locator('button button').count(),0,'No nested interactive controls');
       assert.equal(await rows.locator('.people-row-contact').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 245, 237)');
       if(viewportName==='desktop')assert(await rows.first().locator('.people-row-linked-person').evaluateAll(items=>items.every(item=>Math.abs(item.getBoundingClientRect().y-items[0].getBoundingClientRect().y)<1)),'Linked people stay on one row when they fit');

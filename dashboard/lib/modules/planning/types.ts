@@ -99,13 +99,15 @@ export type SavedMapView = PlanningBase & {
   name: string;
   query: string;
   tag: string;
+  organizationType?: string;
+  industry?: string;
   layer: string;
   level?: string;
   stateCode?: string;
   analysis?: import("./map-analysis").MapAnalysisSettings;
   center: [number, number];
   zoom: number;
-  sort: "name" | "updated";
+  sort: "name" | "updated" | "organizationType" | "industry";
   dateFrom?: string;
   dateTo?: string;
 };

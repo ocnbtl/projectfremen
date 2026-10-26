@@ -10,7 +10,7 @@ import { hasPlaceCoordinates } from "../../lib/modules/planning/place-identity";
 import type { Place } from "../../lib/modules/planning/types";
 import styles from "./MapPlaceProfile.module.css";
 
-export default function MapPlaceProfile({ place, picture, onImageChange, onEdit, onClose }: { place: Place; picture?: string; onImageChange: (image: string) => Promise<void>; onEdit: () => void; onClose: () => void }) {
+export default function MapPlaceProfile({ place, picture, classification, onImageChange, onEdit, onClose }: { place: Place; picture?: string; classification?: { type: string; industry: string }; onImageChange: (image: string) => Promise<void>; onEdit: () => void; onClose: () => void }) {
   const pinned = hasPlaceCoordinates(place);
   const reduceMotion = useReducedMotion();
   const related = useRelatedRecords("map", "place", place.id);
@@ -23,7 +23,7 @@ export default function MapPlaceProfile({ place, picture, onImageChange, onEdit,
     <div className={styles.body}>
       <p className={styles.address}><UnigentamosIcon role="location" size={16} /><span title={place.address}>{place.address || "No address added"}</span></p>
       <p className={styles.coordinates}><UnigentamosIcon role="location" candidate="current-location" size={16} /><span>{pinned ? formatPlaceCoordinates(place.latitude, place.longitude) : "No map pin yet"}</span></p>
-      <div className={styles.tags}>{place.tags.map(tag => <PlaceTagLabel key={tag} tag={tag}/>)}</div>
+      <div className={styles.tags}>{place.tags.filter(tag => !classification?.type || !["organization", "school"].includes(tag.toLowerCase())).map(tag => <PlaceTagLabel key={tag} tag={tag}/>)}{Object.values(classification || {}).filter(Boolean).map(value => <span key={value}>{value}</span>)}</div>
       {place.notes && <p className={styles.notes}>{place.notes}</p>}
       <RelatedRecordsView {...related} compact hideEmpty />
     </div>

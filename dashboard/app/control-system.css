@@ -220,3 +220,11 @@ html[data-active-module] :is(.work-search,.people-primary-search,.finance-global
 .workspace-people-pages .people-row-location > span { display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
 .workspace-people-pages .is-grid [data-record-kind="org"] .people-directory-row-body { grid-template-rows:minmax(88px,auto) auto auto; }
 @media(prefers-reduced-motion:reduce) { .workspace-people-pages .people-row-linked-person { transition:none; transform:none; } }
+
+/* Organization identity starts at a fixed baseline whether or not a location exists. */
+.workspace-people-pages .is-grid [data-record-kind="org"] .people-row-name { align-self:start; }
+.workspace-people-pages .people-classification-tags { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; min-width:0; }
+.workspace-people-pages .people-classification-tags em { display:inline-flex; align-items:center; gap:4px; white-space:normal; }
+.workspace-people-pages .people-classification-tags svg { flex:none; width:13px; height:13px; }
+.workspace-people-pages .people-classification-tags em[title="Industry"] { color:var(--text-muted); }
+.workspace-people-pages .people-classification-tags em[title="Industry"]::before { content:"·"; color:var(--module-icon); }
