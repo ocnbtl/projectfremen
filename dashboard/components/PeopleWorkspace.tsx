@@ -66,7 +66,7 @@ import ModuleSidebar from "./admin-shell/ModuleSidebar";
 import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import PeopleInteractions from "./people/PeopleInteractions";
-import { organizationCategory, occupationLabel } from "../lib/modules/people/directory-presentation";
+import { organizationCategory, occupationLabel, organizationLocationLabel } from "../lib/modules/people/directory-presentation";
 import { placeTagIconRole } from "../lib/modules/planning/place-tags";
 import OrganizationAutofill from "./people/OrganizationAutofill";
 import PersonAutofill from "./people/PersonAutofill";
@@ -4341,21 +4341,18 @@ export default function PeopleWorkspace({
               const category = record.className === "org" ? organizationCategory(record, initialPlaces) : getPrimaryGroup(record);
               const occupation = record.className === "person" ? occupationLabel(record) : "";
               const linkedPeople = directoryOrganizationPeople.get(record.id) || [];
+              const location = record.className === "org" ? organizationLocationLabel(record, initialPlaces) : "";
               const description = profile.context || (record.className === "org"
                 ? [profile.organizationType, profile.industry].filter(value => value && value !== getPrimaryGroup(record)).join(" · ")
                 : "");
               return (
                 <article
                   className={`people-directory-row module-ref-tone-${getPeopleTone(record)}${selectedPerson?.id === record.id ? " is-selected" : ""}`}
-                  data-record-kind={record.className}
+                  data-record-kind={record.className} data-record-id={record.id}
                   key={record.id}
                 >
-                  <button
-                    type="button"
-                    className="people-directory-row-body"
-                    aria-pressed={selectedPerson?.id === record.id}
-                    onClick={() => selectPerson(record)}
-                  >
+                  <div className="people-directory-row-body">
+                    <button type="button" className="people-card-open" aria-label={`Open ${record.title}`} aria-pressed={selectedPerson?.id === record.id} onClick={() => selectPerson(record)} />
                     <PeopleProfileAvatar organization={record.className === "org"}
                       label={record.title}
                       initials={getInitials(record)}
@@ -4365,7 +4362,7 @@ export default function PeopleWorkspace({
                     />
                     <span className="people-row-content">
                       <span className="people-row-heading">
-                      <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>aka {profile.nickname}</em>}{occupation && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" />{occupation}</span>}</span>
+                      <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>aka {profile.nickname}</em>}{occupation && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" />{occupation}</span>}{location && <span className="people-row-location" title={location}><PeopleIcon name="location" /><span>{location}</span></span>}</span>
                       <span className="people-row-contact"><span className="people-row-tags"><PeopleActivityMarker status={record.status} compact /><em title={category}>{record.className === "org" && <UnigentamosIcon role={placeTagIconRole(category)} size={13} />}{category}</em><span className={`people-row-star${record.starred ? " is-starred" : ""}`} aria-label={record.starred ? "Starred" : undefined} aria-hidden={!record.starred}>{record.starred && <PeopleIcon name="star" />}</span></span>
                       {(getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) || record.time.nextReview) && <span className="people-row-dates">
                         {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="communication" />{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>}
@@ -4373,9 +4370,9 @@ export default function PeopleWorkspace({
                       </span>}
                       </span></span>
                       {description && <span className="people-row-description">{description}</span>}
-                      {linkedPeople.length > 0 && <span className="people-row-linked" aria-label="Linked people">{linkedPeople.slice(0, 3).map(person => <span className="people-row-linked-person" key={person.id} title={person.title}><PeopleProfileAvatar label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /><span>{person.title}</span></span>)}{linkedPeople.length > 3 && <span title={linkedPeople.slice(3).map(person => person.title).join(", ")}>+{linkedPeople.length - 3}</span>}</span>}
+                      {linkedPeople.length > 0 && <span className="people-row-linked" aria-label="Linked people">{linkedPeople.slice(0, 3).map(person => <button type="button" className="people-row-linked-person" key={person.id} aria-label={`Open ${person.title}`} onClick={() => selectPerson(person)}><PeopleProfileAvatar label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /><span>{person.title}</span></button>)}{linkedPeople.length > 3 && <span title={linkedPeople.slice(3).map(person => person.title).join(", ")}>+{linkedPeople.length - 3}</span>}</span>}
                     </span>
-                  </button>
+                  </div>
                 </article>
               );
             })}

@@ -21,6 +21,17 @@ export function occupationLabel(record: PersonalRecord): string {
   return [...new Set(current)].join(" · ") || record.profile?.primaryOccupation || "";
 }
 
+/** Read saved organization locations only; never infer an address from its name. */
+export function organizationLocationLabel(record: PersonalRecord, places: readonly Place[] = []): string {
+  const available = places.filter(place => !place.archivedAt && !place.mergedIntoId);
+  const placeLabel = (place?: Place) => place && ([place.addressParts?.city, place.addressParts?.region].filter(Boolean).join(", ") || place.address);
+  const locations = (record.profile?.locations || []).map(entry =>
+    placeLabel(available.find(place => place.id === entry.placeId)) || entry.location || entry.address || "");
+  if (!locations.some(Boolean) && record.profile?.headquarters) locations.push(record.profile.headquarters);
+  if (!locations.some(Boolean)) locations.push(...available.filter(place => place.linkedRefs.some(ref => ref.module === "people" && ref.objectId === record.id)).map(place => placeLabel(place) || ""));
+  return [...new Set(locations.map(value => value.trim()).filter(Boolean))].join(" · ");
+}
+
 export function interactionTimeLabel(start?: string, end?: string): string {
   const format = (value?: string) => {
     if (!value || !/^(?:[01]\d|2[0-3]):[0-5]\d$/.test(value)) return "";
