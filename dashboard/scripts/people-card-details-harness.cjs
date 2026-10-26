@@ -26,7 +26,7 @@ let browser;const expectedTimes=new Map();
   const headers={origin:base,'x-csrf-token':'cards-csrf'},post=async(body)=>{const r=await context.request.post(base+'/api/personal/records',{headers,data:body});assert(r.ok(),await r.text());return r.json();};
   if(viewportName==='desktop') {
    const people=[];
-   for(let i=0;i<6;i++) {const title=`Person ${i}`;const r=await post({domain:'family',className:'person',title,status:i%2?'inactive':'active',starred:i%2===0,subjects:['Friend'],time:{nextReview:i%2?'2026-12-01':undefined},profile:{primaryOccupation:i===0?'Industrial designer with a longer occupation title':'Designer',context:i%2?'A useful description of this person.':''}});people.push(r.items.find(x=>x.title===title).id);}
+   for(let i=0;i<6;i++) {const title=`Person ${i}`;const r=await post({domain:'family',className:'person',title,status:i%2?'inactive':'active',starred:i%2===0,subjects:['Friend'],time:{nextReview:i%2?'2026-12-01':undefined},profile:{nickname:i<2?'Alf':undefined,lastContact:'2025-01-02',primaryOccupation:i===0?'Industrial designer with a longer occupation title':'Designer',context:i%2?'A useful description of this person.':''}});people.push(r.items.find(x=>x.title===title).id);}
    for(let i=0;i<24;i++) {const [name,type]=[['Example school','University / School'],['Example cafe','Restaurant'],['Example agency','Agency']][i%3];await post({domain:'family',className:'org',title:`${name} ${i}`,status:'active',areas:['Relationships'],profile:{organizationType:type,headquarters:'Cincinnati, OH',associatedPeople:people.slice(0,4)}});}
    for(let i=0;i<6;i++) {const start=['09:00','23:15',undefined,'14:30',undefined,'10:00'][i],end=['10:00','00:15','13:00',undefined,undefined,'11:30'][i];const title=i===0?'A longer interaction title that wraps over more than one line without moving the timing row':`Interaction ${i}`;
     const r=await post({domain:'notes-docs',className:'interaction',title,status:'completed',body:i%2?'A longer conversation summary that should stay inside its own row, wrap cleanly, and never displace the date, time range, or interaction type.':'',interaction:{participantIds:people.slice(0,i%3+1),kind:['catch-up','call','meeting','memory','note','ran-into'][i],occurredOn:'2026-10-20',startTime:start,endTime:end,endNextDay:i===1,updatesLastContact:true}});expectedTimes.set(r.items.find(x=>x.title===title).id,interactionTimeLabel(start,end));
@@ -46,12 +46,19 @@ let browser;const expectedTimes=new Map();
      assert(positions.every(p=>!p.overlap&&p.heights.every(h=>h===28)),JSON.stringify(positions));assert(positions.every(p=>Math.abs(p.y-positions[0].y)<1),'Timing rows align');
     } else {
      assert.equal(await rows.locator('.people-row-dates:not(.people-row-contact .people-row-dates)').count(),0);
-     if(kind==='all')assert.equal(await rows.locator('.people-row-occupation').count(),mode==='compact'?0:6);
+     if(kind==='all') {
+      assert.equal(await rows.locator('.people-row-occupation').count(),mode==='compact'?0:6);
+      assert.equal(await rows.locator('.people-row-title em').count(),2);
+      assert(await rows.locator('.people-row-title em').evaluateAll(items=>items.every(el=>{const name=el.previousElementSibling.getBoundingClientRect(),nick=el.getBoundingClientRect();return nick.left>=name.right-1&&Math.abs(nick.bottom-name.bottom)<5;})),'Nicknames stay beside the name');
+      const dates=await rows.locator('[title="Last contact"]').allTextContents();assert(dates.includes('10/20/26')&&dates.includes('01/02/25'));assert(dates.every(t=>/^\d{2}\/\d{2}\/\d{2}$/.test(t)));
+      assert.equal(await rows.locator('.people-row-tags em').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)');
+      await rows.first().hover();await page.waitForTimeout(200);assert.equal(await rows.first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 224, 192)');await page.mouse.move(0,0);
+     }
      else {
       assert.equal(await rows.locator('.people-row-linked').count(),24);assert(!((await rows.allTextContents()).join(' ').includes('Relationships')));assert.equal(await rows.locator('.people-row-linked .people-profile-photo').first().evaluate(el=>el.getBoundingClientRect().width),24);
       assert.equal(await rows.locator('.people-row-location').count(),24);
       assert.equal(await rows.locator('button button').count(),0,'No nested interactive controls');
-      assert.equal(await rows.locator('.people-row-contact').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 224, 192)');
+      assert.equal(await rows.locator('.people-row-contact').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 245, 237)');
       if(viewportName==='desktop')assert(await rows.first().locator('.people-row-linked-person').evaluateAll(items=>items.every(item=>Math.abs(item.getBoundingClientRect().y-items[0].getBoundingClientRect().y)<1)),'Linked people stay on one row when they fit');
       const linked=rows.last().getByRole('button',{name:'Open Person 0',exact:true});await linked.scrollIntoViewIfNeeded();await linked.focus();
       const scroll=await page.locator('.people-directory-panel').evaluate(el=>el.scrollTop);assert(scroll>0);

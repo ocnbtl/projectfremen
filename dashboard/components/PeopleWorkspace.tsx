@@ -1326,13 +1326,12 @@ function getLastContactValue(record: PersonalRecord, interactionDate = ""): stri
   return Number.isNaN(profileTimestamp) || interactionTimestamp > profileTimestamp ? interactionDate : profileDate;
 }
 
-function formatLastContact(record: PersonalRecord, full = false, interactionDate = ""): string {
+function formatLastContact(record: PersonalRecord, interactionDate = ""): string {
   const value = getLastContactValue(record, interactionDate);
   if (!value) return "N/A";
-  if (full) return formatFullDate(value);
   const date = parseDisplayDate(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.getFullYear() === new Date().getFullYear() ? formatDate(value) : formatFullDate(value);
+  return `${String(date.getMonth() + 1).padStart(2, "0")}/${String(date.getDate()).padStart(2, "0")}/${String(date.getFullYear()).slice(-2)}`;
 }
 
 function lastContactTimestamp(record: PersonalRecord, interactionDate = ""): number {
@@ -4362,10 +4361,10 @@ export default function PeopleWorkspace({
                     />
                     <span className="people-row-content">
                       <span className="people-row-heading">
-                      <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>aka {profile.nickname}</em>}{occupation && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" />{occupation}</span>}{location && <span className="people-row-location" title={location}><PeopleIcon name="location" /><span>{location}</span></span>}</span>
+                      <span className="people-row-name"><span className="people-row-title"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>, aka {profile.nickname}</em>}</span>{occupation && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" />{occupation}</span>}{location && <span className="people-row-location" title={location}><PeopleIcon name="location" /><span>{location}</span></span>}</span>
                       <span className="people-row-contact"><span className="people-row-tags"><PeopleActivityMarker status={record.status} compact /><em title={category}>{record.className === "org" && <UnigentamosIcon role={placeTagIconRole(category)} size={13} />}{category}</em><span className={`people-row-star${record.starred ? " is-starred" : ""}`} aria-label={record.starred ? "Starred" : undefined} aria-hidden={!record.starred}>{record.starred && <PeopleIcon name="star" />}</span></span>
                       {(getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) || record.time.nextReview) && <span className="people-row-dates">
-                        {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="communication" />{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>}
+                        {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="communication" />{formatLastContact(record, latestInteractionDateByParticipant.get(record.id))}</span>}
                         {record.time.nextReview && <span title="Follow-up"><PeopleIcon name="follow-up" />{getDirectoryNextContactLabel(record)}</span>}
                       </span>}
                       </span></span>
@@ -4748,7 +4747,7 @@ export default function PeopleWorkspace({
                       ) : (
                         <article className="people-timeline-interaction" data-interaction-id={item.id} key={item.id}>
                           <div className="people-timeline-entry-meta">
-                            <span className="people-timeline-date">{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) ? formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id)) : "Date unknown"}</span>{formatInteractionTime(item.interaction.startTime, item.interaction.endTime) && <span className="people-timeline-time">{formatInteractionTime(item.interaction.startTime, item.interaction.endTime)}</span>}
+                            <span className="people-timeline-date">{item.date ? formatFullDate(item.date) : getLastContactValue(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) ? formatLastContact(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id)) : "Date unknown"}</span>{formatInteractionTime(item.interaction.startTime, item.interaction.endTime) && <span className="people-timeline-time">{formatInteractionTime(item.interaction.startTime, item.interaction.endTime)}</span>}
                             {item.interaction.kind && <span className="people-timeline-kind">{item.interaction.kind === "catch-up" ? "Catch-up" : labelize(item.interaction.kind)}</span>}
                             {item.interaction.approach && <span className={`people-approach-badge is-${item.interaction.approach}`}>{labelize(item.interaction.approach)}</span>}
                           </div>
@@ -4775,7 +4774,7 @@ export default function PeopleWorkspace({
                     <section className="people-relationship-rhythm">
                       <h3>{selectedPerson.className === "org" ? "Organization rhythm" : "Relationship rhythm"}</h3>
                       {[
-                        ["Last contact", formatLastContact(selectedPerson, true, latestInteractionDateByParticipant.get(selectedPerson.id))],
+                        ["Last contact", formatLastContact(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id))],
                         ["Next follow-up", getNextContactLabel(selectedPerson)],
                         ["Cadence", getCadenceLabel(selectedPerson.time.reviewCadence)],
                         [selectedPerson.className === "org" ? "Status" : "Health", getRelationshipHealth(selectedPerson, latestInteractionDateByParticipant.get(selectedPerson.id))]
