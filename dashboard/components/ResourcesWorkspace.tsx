@@ -8,10 +8,11 @@ import { useEffect, useMemo, useState } from "react";
 import DirectoryPane from "./admin-shell/DirectoryPane";
 import InspectorRail from "./admin-shell/InspectorRail";
 import { WorkspaceNavSlot } from "./admin-shell/WorkspaceTopbar";
+import { workspaceReturnUrl } from "./admin-shell/useWorkspaceReturn";
 import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
 import SharedAIDock from "./admin-shell/SharedAIDock";
-import DenseObjectRow from "./operational/DenseObjectRow";
+import ResourceDirectoryCard from "./resources/ResourceDirectoryCard";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
 import LinkedNotesPanel from "./operational/LinkedNotesPanel";
@@ -932,7 +933,11 @@ export default function ResourcesWorkspace({
   return (
     <ModuleShell
       detailOpen={inspectorOpen}
-      onBack={() => { setInspectorOpen(false); if (initialMode === "index") updateUrl({ selected: "" }); }}
+      onBack={() => {
+        setInspectorOpen(false);
+        if (initialMode === "detail") router.replace(workspaceReturnUrl("resources", getModuleRoute("resources")), { scroll: false });
+        else updateUrl({ selected: "" });
+      }}
       module="resources"
       sidebar={sidebar}
       inspector={inspector}
@@ -1196,17 +1201,15 @@ export default function ResourcesWorkspace({
                       ) || []
                   : [];
                 return (
-                  <DenseObjectRow
-                    id={resource.id}
-                    title={resource.title}
-                    leading={<ResourceMark resource={resource} gradient={resource.gradient} imageUrl={resource.metadata.imageUrl} className={resourceStyles.directoryMark} />}
+                  <ResourceDirectoryCard
+                    resource={resource}
+                    typeLabel={TYPE_LABELS[resource.type]}
                     description={(resource.metadata.description || resource.body || "").replace(/!?(?:\[([^\]]*)\]\([^)]*\))/g, "$1").replace(/[#*_>`~]/g, "")}
-                    metadata={<span className={resourceStyles.directoryMeta}>
-                      {TYPE_LABELS[resource.type] !== "Unspecified" && <span className={resourceStyles.typePill}>{TYPE_LABELS[resource.type]}</span>}
-                      {resource.source.canonicalUrl ? <span>{resource.source.displayDomain || resource.source.canonicalUrl}</span> : null}
-                      <span>Added {formatDate(resource.createdAt)}</span>
-                      {resource.review.nextReviewAt && <span>Review {formatDate(resource.review.nextReviewAt)}</span>}
-                    </span>}
+                    metadata={<>
+                      {resource.source.canonicalUrl && <span className="resource-card-source" title={resource.source.canonicalUrl}><UnigentamosIcon role="link" size={14} />{resource.source.displayDomain || resource.source.canonicalUrl}</span>}
+                      <span title="Date added"><UnigentamosIcon role="calendar" size={14} />Added {formatDate(resource.createdAt)}</span>
+                      {resource.review.nextReviewAt && <span title="Next review"><UnigentamosIcon role="clock" size={14} />Review {formatDate(resource.review.nextReviewAt)}</span>}
+                    </>}
                     trailing={
                       view === "needs-review" && queueItem ? (
                         <>
@@ -1255,13 +1258,6 @@ export default function ResourcesWorkspace({
                     }} />}
                     selected={selectedResource?.id === resource.id}
                     onSelect={() => selectResource(resource)}
-                    className={
-                      view === "needs-review" ||
-                      view === "duplicate-urls" ||
-                      linkedContextModule
-                        ? `${styles.reviewQueueRow} ${resourceStyles.resourceRow}`
-                        : resourceStyles.resourceRow
-                    }
                     key={resource.id}
                   />
                 );

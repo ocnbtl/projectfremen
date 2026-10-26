@@ -24,14 +24,14 @@ export function resourceGradientStyle(gradient: ResourceGradient): CSSProperties
 }
 
 export function ResourceMark({ gradient, className = "", label, imageUrl, resource }: { resource?: ResourceRecord; gradient: ResourceGradient; className?: string; label?: string; imageUrl?: string }) {
-  const [failed,setFailed]=useState(false);
+  const [failedSource,setFailedSource]=useState("");
   // The chosen gradient remains editable in Properties. Record identity uses its source image or a semantic fallback.
   void gradient;
   const role = resource?.provenance.subjects.find(t=>t.startsWith("Icon role:"))?.slice(10).trim();
   const icon = resource?.provenance.subjects.find(t=>t.startsWith("Icon:"))?.slice(5).trim();
   const selectedIcon = role && ICON_REGISTRY_BY_ID.has(role) ? <UnigentamosIcon role={role} size={24}/> : icon && PERSONAL_OPS_ICON_LIBRARY.some(i=>i.name===icon) ? <PersonalOpsIcon name={icon as PersonalOpsIconName}/> : null;
   let safe="";try{const u=new URL(imageUrl || "");if(u.protocol==="https:"&&!u.username&&!u.password)safe=u.href;}catch{}
-  return <span className={[styles.resourceMark,className].filter(Boolean).join(" ")} aria-label={label} aria-hidden={label?undefined:true}>{selectedIcon || (safe&&!failed?<img src={safe} alt="" referrerPolicy="no-referrer" onError={()=>setFailed(true)}/>:<UnigentamosIcon role="resource" size={24}/>)}</span>;
+  return <span className={[styles.resourceMark,className].filter(Boolean).join(" ")} aria-label={label} aria-hidden={label?undefined:true}>{selectedIcon || (safe&&failedSource!==safe?<img key={safe} src={safe} alt="" referrerPolicy="no-referrer" ref={image=>{if(image?.complete && image.naturalWidth===0)setFailedSource(safe);}} onError={()=>setFailedSource(safe)}/>:<UnigentamosIcon role="resource" size={24}/>)}</span>;
 }
 
 export function ResourceIconButton({
@@ -59,6 +59,7 @@ export function ResourceIconButton({
       data-active={active || undefined}
       data-destructive={destructive || undefined}
       aria-label={label}
+      aria-pressed={icon === "star" ? active : undefined}
       title={label}
       disabled={disabled}
       onClick={onClick}

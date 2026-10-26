@@ -1194,7 +1194,7 @@ function getSearchText(record: PersonalRecord) {
 }
 
 function getPrimaryGroup(record: PersonalRecord) {
-  return record.subjects[0] || record.areas[0] || (record.className === "org" ? "Organization" : "Contact");
+  return record.subjects[0] || record.areas[0] || (record.className === "org" ? record.profile?.organizationType || "Organization" : "Contact");
 }
 
 function getCadenceLabel(value?: string) {
@@ -4321,9 +4321,13 @@ export default function PeopleWorkspace({
           <div className={`people-directory-list is-${listMode}`}>
             {visiblePeople.map((record) => {
               const profile = getProfile(record);
+              const description = profile.context || (record.className === "org"
+                ? [profile.organizationType, profile.industry].filter(value => value && value !== getPrimaryGroup(record)).join(" · ")
+                : [profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at "));
               return (
                 <article
                   className={`people-directory-row module-ref-tone-${getPeopleTone(record)}${selectedPerson?.id === record.id ? " is-selected" : ""}`}
+                  data-record-kind={record.className}
                   key={record.id}
                 >
                   <button
@@ -4348,7 +4352,7 @@ export default function PeopleWorkspace({
                         {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="communication" />{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>}
                         {record.time.nextReview && <span title="Follow-up"><PeopleIcon name="follow-up" />{getDirectoryNextContactLabel(record)}</span>}
                       </span>}
-                      {(profile.context || profile.primaryOccupation || profile.primaryEmployer || profile.organizationType || profile.industry) && <span className="people-row-description">{profile.context || (record.className === "org" ? [profile.organizationType, profile.industry].filter(Boolean).join(" · ") : [profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at "))}</span>}
+                      {description && <span className="people-row-description">{description}</span>}
                     </span>
                   </button>
                 </article>
