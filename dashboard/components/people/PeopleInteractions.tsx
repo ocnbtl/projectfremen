@@ -11,6 +11,7 @@ import * as Popover from "@radix-ui/react-popover";
 import SelectField from "../ui/SelectField";
 import { PeopleProfileAvatar } from "./PeopleProfilePhoto";
 import InteractionTypeBadge from "./InteractionTypeBadge";
+import { interactionTimeLabel } from "../../lib/modules/people/directory-presentation";
 
 export type InteractionEntry = {
   id: string; date?: string; kind: string; title: string; summary?: string;
@@ -155,7 +156,7 @@ export default function PeopleInteractions({ items, people, query, onQueryChange
             <span className="people-interaction-row-main"><strong>{item.title}</strong><span>{item.participantIds.map(id => people.find(p => p.id === id)?.title || "Profile unavailable").join(" · ") || "No participants recorded"}</span></span>
           </span>
           {item.summary && <span className="people-interaction-row-notes">{item.summary}</span>}
-          <span className="people-interaction-row-footer"><span className="people-interaction-row-date"><time dateTime={validDate(item.date) ? item.date : undefined}>{validDate(item.date) ? new Date(`${item.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "Undated"}</time>{item.startTime && <small>{timeLabel(item.startTime)}</small>}</span><InteractionTypeBadge kind={item.kind} /><UnigentamosIcon role="chevron-right" size={16} /></span>
+          <span className="people-interaction-row-footer"><span className="people-interaction-row-date"><time dateTime={validDate(item.date) ? item.date : undefined}><UnigentamosIcon role="interaction-date" size={14} />{validDate(item.date) ? new Date(`${item.date}T12:00:00Z`).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" }) : "Undated"}</time>{interactionTimeLabel(item.startTime, item.endTime) && <small><UnigentamosIcon role="clock" size={14} />{interactionTimeLabel(item.startTime, item.endTime)}</small>}<InteractionTypeBadge kind={item.kind} /></span><UnigentamosIcon role="chevron-right" size={16} /></span>
         </button></li>)}</ul>
       </section>)}</div> : <div className="notes-empty-state"><UnigentamosIcon role="interaction-history" size={26} /><h2>{items.length ? "No matching interactions" : "Your history starts here"}</h2><p>{items.length ? "Try another name, phrase or filter." : "Log an interaction above to keep conversations, meetings and memories together."}</p>{(query || filterCount > 0) && <button onClick={() => { onQueryChange(""); navigate({ kind: "", approach: "", contact: "", query: "" }); }}>Clear filters</button>}</div>}
       {filtered.length > limit && <button className="people-interactions-more" onClick={() => setLimit(current => current + 50)}>Show more · {filtered.length - limit} remaining</button>}

@@ -66,6 +66,8 @@ import ModuleSidebar from "./admin-shell/ModuleSidebar";
 import SystemState from "./operational/SystemState";
 import PeopleProfilePhotoDialog, { PeopleProfileAvatar } from "./people/PeopleProfilePhoto";
 import PeopleInteractions from "./people/PeopleInteractions";
+import { organizationCategory, occupationLabel } from "../lib/modules/people/directory-presentation";
+import { placeTagIconRole } from "../lib/modules/planning/place-tags";
 import OrganizationAutofill from "./people/OrganizationAutofill";
 import PersonAutofill from "./people/PersonAutofill";
 import { applyPersonAutofill, type PersonAutofillPending, type PersonAutofillResult } from "../lib/modules/people/person-autofill";
@@ -119,6 +121,7 @@ type PeopleWorkspaceProps = {
   initialProjectsError?: string;
   initialObjectLinks: ObjectLink[];
   initialObjectTargets: NativeObjectRef[];
+  initialPlaces?: Place[];
 };
 
 type PeopleFilter = "all" | "due" | "week" | "active" | "dormant" | "orgs";
@@ -1194,7 +1197,7 @@ function getSearchText(record: PersonalRecord) {
 }
 
 function getPrimaryGroup(record: PersonalRecord) {
-  return record.subjects[0] || record.areas[0] || (record.className === "org" ? record.profile?.organizationType || "Organization" : "Contact");
+  return record.className === "org" ? organizationCategory(record) : record.subjects[0] || record.areas[0] || "Contact";
 }
 
 function getCadenceLabel(value?: string) {
@@ -1959,7 +1962,8 @@ export default function PeopleWorkspace({
   initialProjectsState,
   initialProjectsError = "",
   initialObjectLinks,
-  initialObjectTargets
+  initialObjectTargets,
+  initialPlaces = []
 }: PeopleWorkspaceProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -2414,6 +2418,19 @@ export default function PeopleWorkspace({
       .sort((left, right) => left.title.localeCompare(right.title)),
     [activePeople]
   );
+  const directoryOrganizationPeople = useMemo(() => {
+    const result = new Map<string, PersonalRecord[]>();
+    for (const organization of activePeople.filter(record => record.className === "org")) {
+      const ids = new Set(resolveAssociatedPersonIds(organization.profile?.associatedPeople || [], personOptions));
+      for (const person of personOptions) if ((person.profile?.occupations || []).some(entry => entry.organizationId === organization.id) || (person.profile?.education || []).some(entry => entry.organizationId === organization.id)) ids.add(person.id);
+      for (const link of objectLinks.filter(isUsableObjectLink)) {
+        if (link.source.module === "people" && link.source.objectId === organization.id && link.target.module === "people") ids.add(link.target.objectId);
+        if (link.target.module === "people" && link.target.objectId === organization.id && link.source.module === "people") ids.add(link.source.objectId);
+      }
+      result.set(organization.id, personOptions.filter(person => ids.has(person.id)));
+    }
+    return result;
+  }, [activePeople, personOptions, objectLinks]);
   const archivedPeople = useMemo(
     () => people.filter((record) => Boolean(record.archivedAt)).sort((left, right) => (right.archivedAt || "").localeCompare(left.archivedAt || "")),
     [people]
@@ -4321,9 +4338,12 @@ export default function PeopleWorkspace({
           <div className={`people-directory-list is-${listMode}`}>
             {visiblePeople.map((record) => {
               const profile = getProfile(record);
+              const category = record.className === "org" ? organizationCategory(record, initialPlaces) : getPrimaryGroup(record);
+              const occupation = record.className === "person" ? occupationLabel(record) : "";
+              const linkedPeople = directoryOrganizationPeople.get(record.id) || [];
               const description = profile.context || (record.className === "org"
                 ? [profile.organizationType, profile.industry].filter(value => value && value !== getPrimaryGroup(record)).join(" · ")
-                : [profile.primaryOccupation, profile.primaryEmployer].filter(Boolean).join(" at "));
+                : "");
               return (
                 <article
                   className={`people-directory-row module-ref-tone-${getPeopleTone(record)}${selectedPerson?.id === record.id ? " is-selected" : ""}`}
@@ -4345,14 +4365,15 @@ export default function PeopleWorkspace({
                     />
                     <span className="people-row-content">
                       <span className="people-row-heading">
-                      <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>aka {profile.nickname}</em>}</span>
-                      <span className="people-row-tags"><PeopleActivityMarker status={record.status} compact /><em title={getPrimaryGroup(record)}>{getPrimaryGroup(record)}</em><span className={`people-row-star${record.starred ? " is-starred" : ""}`} aria-label={record.starred ? "Starred" : undefined} aria-hidden={!record.starred}>{record.starred && <PeopleIcon name="star" />}</span></span>
-                      </span>
+                      <span className="people-row-name"><strong>{record.title}</strong>{record.className === "person" && profile.nickname && <em>aka {profile.nickname}</em>}{occupation && listMode !== "compact" && <span className="people-row-occupation"><PeopleIcon name="occupation" />{occupation}</span>}</span>
+                      <span className="people-row-contact"><span className="people-row-tags"><PeopleActivityMarker status={record.status} compact /><em title={category}>{record.className === "org" && <UnigentamosIcon role={placeTagIconRole(category)} size={13} />}{category}</em><span className={`people-row-star${record.starred ? " is-starred" : ""}`} aria-label={record.starred ? "Starred" : undefined} aria-hidden={!record.starred}>{record.starred && <PeopleIcon name="star" />}</span></span>
                       {(getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) || record.time.nextReview) && <span className="people-row-dates">
                         {getLastContactValue(record, latestInteractionDateByParticipant.get(record.id)) && <span title="Last contact"><PeopleIcon name="communication" />{formatLastContact(record, false, latestInteractionDateByParticipant.get(record.id))}</span>}
                         {record.time.nextReview && <span title="Follow-up"><PeopleIcon name="follow-up" />{getDirectoryNextContactLabel(record)}</span>}
                       </span>}
+                      </span></span>
                       {description && <span className="people-row-description">{description}</span>}
+                      {linkedPeople.length > 0 && <span className="people-row-linked" aria-label="Linked people">{linkedPeople.slice(0, 3).map(person => <span className="people-row-linked-person" key={person.id} title={person.title}><PeopleProfileAvatar label={person.title} initials={getInitials(person)} photoUrl={person.profile?.photoUrl} photoUpdatedAt={person.profile?.photoUpdatedAt} compact /><span>{person.title}</span></span>)}{linkedPeople.length > 3 && <span title={linkedPeople.slice(3).map(person => person.title).join(", ")}>+{linkedPeople.length - 3}</span>}</span>}
                     </span>
                   </button>
                 </article>

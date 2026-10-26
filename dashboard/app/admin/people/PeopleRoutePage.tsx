@@ -140,6 +140,7 @@ export default async function PeopleRoutePage({
       />
       <PeopleWorkspace
         initialPeople={people}
+        initialPlaces={places}
         initialInteractions={interactions}
         totalRecords={records.length}
         initialSelectedId={personId}
