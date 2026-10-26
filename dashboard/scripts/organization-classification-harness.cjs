@@ -5,6 +5,7 @@ const {placeClassification} = require('../lib/modules/planning/place-presentatio
 assert.deepEqual(organizationLabels({organizationType:'Airport', industry:'Arts & culture'}), {type:'',industry:''});
 assert.deepEqual(organizationLabels({organizationType:'constructor', industry:'Other'}), {type:'',industry:''});
 assert.deepEqual(organizationLabels({organizationType:'Government', industry:'Transportation'}), {type:'Government',industry:'Transportation'});
+assert.deepEqual(organizationLabels({organizationType:'Business', industry:'Wellness & personal care'}), {type:'Business',industry:'Wellness & personal care'});
 assert.deepEqual(organizationLabels({organizationType:'Business', industry:'Arts & culture'}), {type:'Business',industry:''});
 const org = {label:'Cincinnati/Northern Kentucky International Airport (CVG)',organizationType:'Government',industry:'Transportation',hasProfileLocation:true};
 assert.deepEqual(placeClassification({name:'CVG',tags:['Travel']},[org]), {type:'Government',industry:'Transportation'});

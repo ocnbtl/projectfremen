@@ -8,6 +8,7 @@ export const ORGANIZATION_INDUSTRY_OPTIONS: Record<OrganizationType, readonly st
     "Retail & consumer",
     "Finance & insurance",
     "Healthcare",
+    "Wellness & personal care",
     "Media & entertainment",
     "Manufacturing",
     "Construction & real estate",
