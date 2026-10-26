@@ -20,13 +20,13 @@ let browser;const expectedTimes=new Map();
 (async()=>{
  for(let i=0;i<100;i++){try{if((await fetch(base)).ok)break;}catch{}await new Promise(r=>setTimeout(r,100));}
  browser=await chromium.launch({headless:true});
- for(const [viewportName,viewport] of [['desktop',{width:1440,height:1000}],['tablet',{width:820,height:1180}],['mobile',{width:390,height:844}]]) {
+ for(const [viewportName,viewport] of [['desktop',{width:1440,height:1000}],['ultrawide',{width:3440,height:1440}],['wide',{width:1920,height:1080}],['tablet',{width:820,height:1180}],['mobile',{width:390,height:844}]]) {
   const context=await browser.newContext({viewport}),payload=`v1.${Date.now()+3600000}.${crypto.randomBytes(12).toString('base64url')}`;
   await context.addCookies([{name:'admin_session',value:payload+'.'+crypto.createHmac('sha256',secret).update(payload).digest('base64url'),url:base},{name:'admin_csrf',value:'cards-csrf',url:base}]);
   const headers={origin:base,'x-csrf-token':'cards-csrf'},post=async(body)=>{const r=await context.request.post(base+'/api/personal/records',{headers,data:body});assert(r.ok(),await r.text());return r.json();};
   if(viewportName==='desktop') {
    const people=[];
-   for(let i=0;i<6;i++) {const title=`Person ${i}`;const r=await post({domain:'family',className:'person',title,status:i%2?'inactive':'active',starred:i%2===0,subjects:['Friend'],time:{nextReview:i%2?'2026-12-01':undefined},profile:{nickname:i<2?'Alf':undefined,lastContact:'2025-01-02',primaryOccupation:i===0?'Industrial designer with a longer occupation title':'Designer',context:i%2?'A useful description of this person.':''}});people.push(r.items.find(x=>x.title===title).id);}
+   for(let i=0;i<6;i++) {const title=`Person ${i}`;const r=await post({domain:'family',className:'person',title,status:i%2?'inactive':'active',starred:i%2===0,subjects:['Friend'],time:{nextReview:i%2?'2026-12-01':undefined},profile:{nickname:i<2?'Alf':undefined,lastContact:'2025-01-02',primaryOccupation:i===0?'Industrial designer with a longer occupation title':i===1?'':'Designer',context:'A useful description of this person.'}});people.push(r.items.find(x=>x.title===title).id);}
    for(let i=0;i<24;i++) {const [name,type]=[['Example school','University / School'],['Example cafe','Restaurant'],['Example agency','Agency']][i%3];await post({domain:'family',className:'org',title:`${name} ${i}`,status:'active',areas:['Relationships'],profile:{organizationType:type,headquarters:'Cincinnati, OH',associatedPeople:people.slice(0,4)}});}
    for(let i=0;i<6;i++) {const start=['09:00','23:15',undefined,'14:30',undefined,'10:00'][i],end=['10:00','00:15','13:00',undefined,undefined,'11:30'][i];const title=i===0?'A longer interaction title that wraps over more than one line without moving the timing row':`Interaction ${i}`;
     const r=await post({domain:'notes-docs',className:'interaction',title,status:'completed',body:i%2?'A longer conversation summary that should stay inside its own row, wrap cleanly, and never displace the date, time range, or interaction type.':'',interaction:{participantIds:people.slice(0,i%3+1),kind:['catch-up','call','meeting','memory','note','ran-into'][i],occurredOn:'2026-10-20',startTime:start,endTime:end,endNextDay:i===1,updatesLastContact:true}});expectedTimes.set(r.items.find(x=>x.title===title).id,interactionTimeLabel(start,end));
@@ -47,8 +47,12 @@ let browser;const expectedTimes=new Map();
     } else {
      assert.equal(await rows.locator('.people-row-dates:not(.people-row-contact .people-row-dates)').count(),0);
      if(kind==='all') {
-      assert.equal(await rows.locator('.people-row-occupation').count(),mode==='compact'?0:6);
-      assert.equal(await rows.locator('.people-row-title em').count(),2);
+      assert.equal(await rows.locator('.people-row-occupation').count(),mode==='compact'?0:5);
+      assert.equal(await rows.locator('.people-row-title em').count(),2);      if(viewport.width>=1800&&mode!=='grid')assert.equal(await page.locator('.people-directory-list').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),mode==='compact'?3:2);
+      if(mode!=='grid'&&viewport.width>=1000) {
+       const offsets=await rows.evaluateAll(items=>items.map(el=>el.querySelector('.people-row-description').getBoundingClientRect().top-el.querySelector('.people-row-name').getBoundingClientRect().top));
+       assert(offsets.every(y=>Math.abs(y-offsets[0])<1),'Descriptions align with and without occupations or contact dates: '+offsets);
+      }
       assert(await rows.locator('.people-row-title em').evaluateAll(items=>items.every(el=>{const name=el.previousElementSibling.getBoundingClientRect(),nick=el.getBoundingClientRect();return nick.left>=name.right-1&&Math.abs(nick.bottom-name.bottom)<5;})),'Nicknames stay beside the name');
       const dates=await rows.locator('[title="Last contact"]').allTextContents();assert(dates.includes('10/20/26')&&dates.includes('01/02/25'));assert(dates.every(t=>/^\d{2}\/\d{2}\/\d{2}$/.test(t)));
       assert.equal(await rows.locator('.people-row-tags em').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)');
@@ -61,7 +65,7 @@ let browser;const expectedTimes=new Map();
       assert.equal(await rows.locator('.people-row-contact').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(255, 245, 237)');
       if(viewportName==='desktop')assert(await rows.first().locator('.people-row-linked-person').evaluateAll(items=>items.every(item=>Math.abs(item.getBoundingClientRect().y-items[0].getBoundingClientRect().y)<1)),'Linked people stay on one row when they fit');
       const linked=rows.last().getByRole('button',{name:'Open Person 0',exact:true});await linked.scrollIntoViewIfNeeded();await linked.focus();
-      const scroll=await page.locator('.people-directory-panel').evaluate(el=>el.scrollTop);assert(scroll>0);
+      const scroll=await page.locator('.people-directory-panel').evaluate(el=>el.scrollTop);if(viewport.width<1800)assert(scroll>0);
       await linked.press('Enter');await page.getByRole('button',{name:'Back to Organizations',exact:true}).waitFor();
       assert(await page.locator('.people-profile-panel').innerText().then(t=>t.includes('Person 0')));
       await page.getByRole('button',{name:'Back to Organizations',exact:true}).click();await rows.last().waitFor();await page.waitForTimeout(300);

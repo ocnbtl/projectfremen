@@ -171,6 +171,20 @@ html[data-active-module] :is(.work-search,.people-primary-search,.finance-global
 .workspace-people-pages .people-row-linked .people-profile-photo { width:24px !important; height:24px !important; min-width:24px !important; flex:0 0 24px !important; font-size:9px; }
 @media(max-width:700px) { .workspace-people-pages .people-row-heading { grid-template-columns:minmax(0,1fr); gap:8px; } }
 
+/* Contact dates must not move the biography in the neighboring identity column. */
+@media(min-width:701px) {
+  .workspace-people-pages .people-directory-list:not(.is-grid) .people-row-content { display:grid; grid-template-columns:minmax(0,1fr) 224px; grid-template-rows:min-content min-content min-content; align-content:start; gap:9px 12px; }
+  .workspace-people-pages .people-directory-list:not(.is-grid) .people-row-heading { display:contents; }
+  .workspace-people-pages .people-directory-list:not(.is-grid) .people-row-name { grid-column:1; grid-row:1; min-height:48px; }
+  .workspace-people-pages .people-directory-list:not(.is-grid) .people-row-contact { grid-column:2; grid-row:1 / span 3; align-self:start; }
+  .workspace-people-pages .people-directory-list:not(.is-grid) .people-row-description { grid-column:1; grid-row:2; }
+  .workspace-people-pages .people-directory-list:not(.is-grid) .people-row-linked { grid-column:1; grid-row:3; }
+  .workspace-people-pages .people-directory-list.is-compact .people-row-name { min-height:22px; }
+}
+@media(min-width:1800px) {
+  .workspace-people-pages .people-directory-list.is-compact { grid-template-columns:repeat(3,minmax(0,1fr)); }
+}
+
 /* Interaction identity and timing have fixed positions in every density. */
 .people-interactions-workspace .people-interaction-groups ul { grid-template-columns:repeat(2,minmax(0,1fr)); align-items:stretch; }
 .people-interactions-workspace.is-grid .people-interaction-groups ul { grid-template-columns:repeat(auto-fill,minmax(min(100%,360px),1fr)); }
