@@ -13,6 +13,6 @@ export default function EventRowContent({ event, available, icon, zone, onComple
   const place = eventObjectRefs(event,available).find(ref => ref.module === "map")?.label;
   return <div className={styles.content} data-task={event.isTask || undefined}>
     <div className={styles.heading}><TaskCheck event={event} onComplete={onComplete}/><EventGlyph event={event} icon={icon} size={16}/><strong>{eventPreviewTitle(event)}</strong><EventLinksPreview event={event} available={available}/></div>
-    <div className={styles.metadata}><span className={styles.timing}><EventTiming event={event} zone={zone} showDate stacked/></span>{place && <EventPlaceDetail event={event} available={available} compact={false}/>}</div>
+    <div className={styles.metadata}><span className={styles.timing}><EventTiming event={event} zone={zone} showDate stacked respectDisplayPreferences/></span>{place && <EventPlaceDetail event={event} available={available} compact={false}/>}</div>
   </div>;
 }

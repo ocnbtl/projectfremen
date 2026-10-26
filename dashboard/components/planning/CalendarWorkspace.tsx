@@ -21,6 +21,7 @@ import EventQuickView from "./EventQuickView";
 import { CalendarPlacesContext } from "./EventPlaceDetail";
 import eventRowStyles from "./EventRowContent.module.css";
 import TaskEventCard from "./TaskEventCard";
+import { CalendarDisplayContext, useCalendarDisplayPreferences } from "./CalendarDisplayPreferences";
 import { taskCompletionPatch, resizedEventTime } from "../../lib/modules/planning/calendar-tasks";
 import { timeChange, timeChangePatch, canUndoTimeChange, type EventTimeChange } from "../../lib/modules/planning/event-time-history";
 import { calendarDateLabel } from "./CalendarMiniMonth";
@@ -134,6 +135,7 @@ export default function CalendarWorkspace() {
   const previousDate = useRef("");
   const swipe = useRef<{ x: number; y: number } | undefined>(undefined);
   const [agendaDays, setAgendaDays] = useState(30);
+  const [details, setDetails] = useCalendarDisplayPreferences();
   const [early, setEarly] = useState(false), [late, setLate] = useState(false);
   const [draft, setDraft] = useState<EventDraft | undefined>(
     () => retainedDraft,
@@ -634,7 +636,7 @@ export default function CalendarWorkspace() {
   if (!snapshot && !error) return <LogoLoader label="Loading calendar" viewport />;
 
   return (
-    <CalendarPlacesContext.Provider value={snapshot?.state.places || []}><div
+    <CalendarDisplayContext.Provider value={details}><CalendarPlacesContext.Provider value={snapshot?.state.places || []}><div
       className={`work-surface ${styles.shell}`}
       onClickCapture={e=>{const card=(e.target as HTMLElement).closest<HTMLElement>('[data-morph-event]');if(card){const box=card.getBoundingClientRect();previewAnchor.current=new DOMRect(e.clientX || box.x+box.width/2,e.clientY || box.y,1,1);}}}
       style={moduleThemeVariables("calendar") as CSSProperties}
@@ -661,9 +663,9 @@ export default function CalendarWorkspace() {
             {(["day", "3-day", "week", "month", "year", "agenda"] as View[]).map(v => <option key={v} value={v}><span className={styles.viewChoice}><UnigentamosIcon role={viewIcons[v]} size={16} />{v === "3-day" ? "3 days" : v[0].toUpperCase() + v.slice(1)}</span></option>)}
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
-            <Popover.Trigger asChild><Button data-calendar-options-trigger icon={compact ? undefined : "sliders"} aria-label={compact ? "Calendar tools" : "Options"} data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? <UnigentamosIcon role="sliders" candidate="settings" size={18} /> : "Options"}</Button></Popover.Trigger>
-            <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar view options">
-              <div className={styles.optionsHeading}><UnigentamosIcon role="sliders" candidate="settings" size={16}/><strong>Settings</strong><div className={styles.optionsActions}><Button icon="calendar" data-calendar-settings-trigger onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button><Button icon="share" aria-label="Share calendar" title="Share calendars and take bookings" onClick={() => { setFilters(false); setSharing(true); }} /></div></div>
+            <Popover.Trigger asChild><Button data-calendar-options-trigger icon="settings" aria-label="Settings" data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? null : "Settings"}</Button></Popover.Trigger>
+            <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar settings">
+              <div className={styles.optionsHeading}><UnigentamosIcon role="settings" size={16}/><strong>Settings</strong><div className={styles.optionsActions}><Button icon="calendar" data-calendar-settings-trigger onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button><Button icon="share" aria-label="Share calendar" title="Share calendars and take bookings" onClick={() => { setFilters(false); setSharing(true); }}>Share</Button></div></div>
               <div className={styles.viewOptionSection}>
                 <ViewToggle label="Widen today" icon="today" checked={widenToday} onChange={next => morph(() => setWidenToday(next))} />
                 <ViewToggle label="Show weekends" icon="week" checked={showWeekends} onChange={next => morph(() => setShowWeekends(next))} />
@@ -677,6 +679,12 @@ export default function CalendarWorkspace() {
                   {[...new Set([zone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(z => <option key={z} value={z}>{z.replaceAll("_", " ").replaceAll("/", " / ")}</option>)}
                 </SelectField>
               </label>
+              <div className={styles.viewOptionSection} aria-label="Event details">
+                <ViewToggle label="Detailed time" icon="clock" checked={details.time} onChange={time => setDetails(current => ({...current,time}))}/>
+                <ViewToggle label="Detailed address" icon="location" checked={details.address} onChange={address => setDetails(current => ({...current,address}))}/>
+                <ViewToggle label="Detailed people" icon="person" checked={details.people} onChange={people => setDetails(current => ({...current,people}))}/>
+                <ViewToggle label="Detailed objects" icon="object" checked={details.objects} onChange={objects => setDetails(current => ({...current,objects}))}/>
+              </div>
               {draft && !editor && <div className={styles.mobileToolActions}><DraftNotice onResume={() => { setFilters(false); setEditor(draft); }} onDiscard={() => finishEditing()} /></div>}
             </Popover.Content></Popover.Portal>
           </Popover.Root>
@@ -940,7 +948,7 @@ export default function CalendarWorkspace() {
         open={connections}
         onClose={() => setConnections(false)}
         presentation="page"
-        title="Calendar" titleIcon="calendar" className={styles.settingsSheet}
+        title="Calendars" titleIcon="calendar" className={styles.settingsSheet}
         returnFocusSelector="[data-calendar-options-trigger]"
       >
         <div className={`work-form ${styles.calendarSettingsForm}`}>
@@ -1144,7 +1152,7 @@ export default function CalendarWorkspace() {
           ],
         }}
       />
-    </div></CalendarPlacesContext.Provider>
+    </div></CalendarPlacesContext.Provider></CalendarDisplayContext.Provider>
   );
 }
 

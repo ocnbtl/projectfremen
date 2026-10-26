@@ -12,6 +12,7 @@ import { eventObjectRefs } from "./EventObjects";
 import { TaskCheck } from "./TaskEventCard";
 import { eventPreviewTitle } from "./calendar-presentation";
 import styles from "./TimedEventContent.module.css";
+import { useCalendarDetails } from "./CalendarDisplayPreferences";
 
 export default function TimedEventContent({ event, timing, icon, height, available, singleDay, onOpen, onComplete, onDragStart, onDragEnd }: {
   event: EventOccurrence; timing: string; icon?: string; height: number; available: NativeObjectRef[]; singleDay: boolean;
@@ -20,6 +21,7 @@ export default function TimedEventContent({ event, timing, icon, height, availab
 }) {
   const root = useRef<HTMLDivElement>(null), heading = useRef<HTMLDivElement>(null);
   const {reduced,layoutTransition}=useCalendarMotion();
+  const details = useCalendarDetails();
   const [width,setWidth] = useState(300), [headingHeight,setHeadingHeight] = useState(0);
   useLayoutEffect(() => {
     const element = root.current, header = heading.current; if (!element || !header) return;
@@ -33,8 +35,8 @@ export default function TimedEventContent({ event, timing, icon, height, availab
   const title = eventPreviewTitle(event), vertical = height >= 58, narrow = width < 90;
   const hasObjects = eventObjectRefs(event,available).some(ref => ref.module !== "map");
   const inlineFits = width >= title.length * 6.5 + timing.length * 5.4 + (place ? place.length * 5.4 + 24 : 0) + 82 + (hasObjects ? 30 : 0);
-  const compactTime = vertical ? width < timing.length * 5.4 + 26 : !inlineFits;
-  const compactPlace = vertical ? width < (place?.length || 0) * 5.4 + 26 : !inlineFits;
+  const compactTime = !details.time || (vertical ? width < timing.length * 5.4 + 26 : !inlineFits);
+  const compactPlace = !details.address || (vertical ? width < (place?.length || 0) * 5.4 + 26 : !inlineFits);
   const compact = compactTime && (!place || compactPlace);
   // Reserve the title first, then independent time/place controls, then people/objects.
   const detailRoom = vertical ? height - headingHeight - 14 >= 22 : width >= 72;

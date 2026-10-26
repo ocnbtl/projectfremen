@@ -10,6 +10,8 @@ import { calendarDateLabel as label } from "./CalendarMiniMonth";
 import { useCalendarMotion } from "./CalendarMotion";
 import EventLinksPreview from "./EventLinksPreview";
 import EventPlaceDetail from "./EventPlaceDetail";
+import EventDetail from "./EventDetail";
+import { useCalendarDetails } from "./CalendarDisplayPreferences";
 import { eventObjectRefs } from "./EventObjects";
 import EventGlyph from "./EventGlyph";
 import EventContinuation from "./EventContinuation";
@@ -20,6 +22,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
   zone: string; showWeekends: boolean; onDay: (day: string) => void; onMore: (day: string) => void; onOpen: (event: EventOccurrence) => void; onComplete: (event: EventOccurrence) => void;
 }) {
   const { layoutTransition } = useCalendarMotion(), columns = showWeekends ? 7 : 5;
+  const details = useCalendarDetails();
   const container = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   useLayoutEffect(() => {
@@ -57,7 +60,7 @@ export default function CalendarMonthView({ days, date, today, events, calendars
             data-morph-event={event.id} data-month-event={event.id} data-compact-continuation={compactContinuation || undefined} data-continues-before={continuesBefore || undefined} data-continues-after={continuesAfter || undefined}
             aria-label={`${event.title}${timing ? `, ${timing}` : ""}${continuation}`} title={`${event.title}${timing ? ` · ${timing}` : ""}${continuation}`} onClick={() => onOpen(event)}>
             {(continuesBefore || continuesAfter) && <EventContinuation before={continuesBefore} after={continuesAfter} />}
-            <div className={styles.copy} data-task={event.isTask || undefined}><div className={styles.heading}><TaskCheck event={event} onComplete={onComplete}/><EventGlyph event={event} icon={group?.icon} size={16} /><strong>{eventPreviewTitle(event)}</strong></div>{timing && !compactContinuation && <small>{timing}</small>}</div>
+            <div className={styles.copy} data-task={event.isTask || undefined}><div className={styles.heading}><TaskCheck event={event} onComplete={onComplete}/><EventGlyph event={event} icon={group?.icon} size={16} /><strong>{eventPreviewTitle(event)}</strong></div>{timing && !compactContinuation && (details.time ? <small>{timing}</small> : <EventDetail kind="time" text={timing} eventTitle={event.title}/>)}</div>
             {!compactContinuation && <EventLinksPreview event={event} available={refs} />}
             {!compactContinuation && place && <EventPlaceDetail event={event} available={refs}/>}
 
