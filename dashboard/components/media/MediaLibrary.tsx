@@ -1,5 +1,6 @@
 "use client";
 import SelectField from "../ui/SelectField";
+import DirectoryCard from "../operational/DirectoryCard";
 import { accountFile, mediaSnapshot, openMediaFile, saveMediaDetails, uploadAccountFile } from "../../lib/modules/media/account-client";
 import ModuleShell from "../admin-shell/ModuleShell";
 import ModuleSidebar from "../admin-shell/ModuleSidebar";
@@ -574,7 +575,9 @@ export default function MediaLibrary({
           onChange={(e) => setView(e.target.value)}
         >
           <option value="gallery">Gallery</option>
-          <option value="list">List</option>
+          <option value="comfortable">Comfortable</option>
+          <option value="compact">Compact</option>
+          <option value="grid">Grid</option>
         </SelectField>
         {(<Button
             aria-pressed={selectionMode}
@@ -736,65 +739,25 @@ export default function MediaLibrary({
             </Button>
           </div>
         )}
-      <div className={view === "gallery" ? styles.gallery : styles.list}>
-        {visible.map((object) => (
-          <div
-            className={styles.assetFrame}
-            key={object.objectId}
-            data-selected={checked.has(object.objectId)}
-          >
-            <label className={styles.selectionCheck} hidden={!selectionMode}>
-              <input
-                type="checkbox"
-                aria-label={`Select ${String(object.fields.title || manifestFor(object).fileName)}`}
-                checked={checked.has(object.objectId)}
-                onChange={(event) =>
-                  setChecked((prior) => {
-                    const next = new Set(prior);
-                    if (event.target.checked) next.add(object.objectId);
-                    else next.delete(object.objectId);
-                    return next;
-                  })
-                }
-              />
-            </label>
-            <button
-              type="button"
-              className={styles.asset}
-              key={object.objectId}
-              onClick={() => open(object)}
-            >
-              <AssetThumbnail object={object} />
-              <span className={styles.caption}>
-                <strong>
-                  {String(object.fields.title || manifestFor(object).fileName)}
-                </strong>
-                <small>
-                  {size(manifestFor(object).byteLength)} ·{" "}
-                  {pendingCanonicalCommands(object).length
-                    ? "Saved on this device"
-                    : "Saved"}
-                </small>
-              </span>
-            </button>
-          </div>
-        ))}
-        {legacy.map((record) => (
-          <Link
-            className={styles.asset}
-            key={record.id}
-            href={`/admin/media/${encodeURIComponent(record.id)}`}
-          >
-            <div className={styles.thumbnail}>
-              <UnigentamosIcon role="module-media" size={28} />
-              <span>File reference</span>
-            </div>
-            <span className={styles.caption}>
-              <strong>{record.title}</strong>
-              <small>No encrypted file attached</small>
-            </span>
-          </Link>
-        ))}
+      <div className={`resource-directory media-directory ${view === "grid" || view === "gallery" ? "is-grid" : view === "compact" ? "is-compact" : ""}`} role="list" aria-label="Media assets">
+        {visible.map(object => {
+          const manifest = manifestFor(object), pending = pendingCanonicalCommands(object).length > 0;
+          return <DirectoryCard key={object.objectId} id={object.objectId}
+            title={String(object.fields.title || manifest.fileName)}
+            picture={<AssetThumbnail object={object} />} gallery={view === "gallery"}
+            status={profileFor(object).archivedAt ? "Archived" : pending ? "Saved on this device" : "Saved"}
+            statusIcon={profileFor(object).archivedAt ? "archive" : pending ? "information" : "active"}
+            tag={manifest.mimeType.split("/")[0].replace(/^./, letter => letter.toUpperCase()) || "File"}
+            description={String(object.fields.body || "") || undefined}
+            metadata={<><span>{size(manifest.byteLength)}</span>{pending && <span>Saved on this device</span>}</>}
+            selected={checked.has(object.objectId)} onSelect={() => void open(object)}
+            checkbox={selectionMode ? {label:`Select ${String(object.fields.title || manifest.fileName)}`,checked:checked.has(object.objectId),onCheckedChange: value => setChecked(prior => {const next = new Set(prior);if(value)next.add(object.objectId);else next.delete(object.objectId);return next;})} : undefined}
+          />;
+        })}
+        {legacy.map(record => <DirectoryCard key={record.id} id={record.id} title={record.title}
+          icon="module-media" gallery={view === "gallery"} status="File reference" statusIcon="information" tag="File reference"
+          description={record.body || undefined} metadata="No file attached"
+          href={`/admin/media/${encodeURIComponent(record.id)}`} />)}
       </div>
       {!catalogueLoaded && !error && <LogoLoader label="Loading Media" />}
       {!visible.length && !legacy.length && catalogueLoaded && (

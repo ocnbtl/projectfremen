@@ -12,7 +12,7 @@ import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSi
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import MediaMetadataEditorSheet from "./media/MediaMetadataEditorSheet";
 import MediaReviewScheduleEditorSheet from "./media/MediaReviewScheduleEditorSheet";
-import DenseObjectRow from "./operational/DenseObjectRow";
+import DirectoryCard from "./operational/DirectoryCard";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import EvidenceChecklist from "./operational/EvidenceChecklist";
 import LinkedFollowUpsPanel from "./operational/LinkedFollowUpsPanel";
@@ -2455,11 +2455,11 @@ export default function MediaWorkspace({
                       </div>
                       <strong>{group.assets.length}</strong>
                     </header>
-                    <div className={styles.list} data-density="compact" role="list">
+                    <div className="resource-directory is-compact" data-density="compact" role="list">
                       {group.assets.map((asset) => {
                         const evidence = rightsEvidenceById.get(asset.id) || buildMediaRightsEvidence(asset);
                         return (
-                          <DenseObjectRow
+                          <DirectoryCard icon="module-media" status={displayLabel(asset.lifecycleState)} statusIcon={asset.lifecycleState === "archived" ? "archive" : "information"} tag={displayLabel(asset.type)}
                             id={asset.id}
                             title={asset.title}
                             description={`${evidence.canonicalStateLabel} · ${evidence.scopeLabel}`}
@@ -2513,12 +2513,12 @@ export default function MediaWorkspace({
                       </div>
                       <strong>{group.assets.length}</strong>
                     </header>
-                    <div className={styles.list} data-density="compact" role="list">
+                    <div className="resource-directory is-compact" data-density="compact" role="list">
                       {group.assets.map((asset) => {
                         const checks = legacyReadinessChecks(asset);
                         const supported = checks.filter((check) => check.supported).length;
                         return (
-                          <DenseObjectRow
+                          <DirectoryCard icon="module-media" status={displayLabel(asset.lifecycleState)} statusIcon={asset.lifecycleState === "archived" ? "archive" : "information"} tag={displayLabel(asset.type)}
                             id={asset.id}
                             title={asset.title}
                             description={asset.source.resourceReferences.length
@@ -2570,11 +2570,11 @@ export default function MediaWorkspace({
                       </div>
                       <strong>{group.assets.length}</strong>
                     </header>
-                    <div className={styles.list} data-density="compact" role="list">
+                    <div className="resource-directory is-compact" data-density="compact" role="list">
                       {group.assets.map((asset) => {
                         const evidence = metadataEvidenceById.get(asset.id) || buildMediaMetadataEvidence(asset);
                         return (
-                          <DenseObjectRow
+                          <DirectoryCard icon="module-media" status={displayLabel(asset.lifecycleState)} statusIcon={asset.lifecycleState === "archived" ? "archive" : "information"} tag={displayLabel(asset.type)}
                             id={asset.id}
                             title={asset.title}
                             description={asset.source.resourceReferences.length
@@ -2621,9 +2621,9 @@ export default function MediaWorkspace({
               }
             />
           ) : (
-            <div className={styles.list} data-density="compact" role="list" aria-label="Media assets">
+            <div className="resource-directory is-compact" data-density="compact" role="list" aria-label="Media assets">
               {visibleAssets.map((asset) => (
-                <DenseObjectRow
+                <DirectoryCard icon="module-media" status={displayLabel(asset.lifecycleState)} statusIcon={asset.lifecycleState === "archived" ? "archive" : "information"} tag={displayLabel(asset.type)}
                   id={asset.id}
                   title={asset.title}
                   description={summarizeBody(asset.body)}

@@ -15,7 +15,7 @@ import DirectoryPane from "./admin-shell/DirectoryPane";
 import InspectorRail from "./admin-shell/InspectorRail";
 import SharedAIDock from "./admin-shell/SharedAIDock";
 import UnigentamosIcon from "./icons/UnigentamosIcon";
-import DenseObjectRow from "./operational/DenseObjectRow";
+import DirectoryCard from "./operational/DirectoryCard";
 import ObjectHeader from "./operational/ObjectHeader";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "./operational/DetailTabs";
 import MetricStrip from "./operational/MetricStrip";
@@ -2428,7 +2428,7 @@ export default function NotesWorkspace({
             <SelectField className="work-compact-select" aria-label="Sort Notes" value={sort} onChange={event => { setSort(event.target.value as NotesSort); updateUrl({sort:event.target.value as NotesSort}); }}>
               <option value="updated-desc">Recently updated</option><option value="updated-asc">Oldest update</option><option value="created-desc">Created date</option><option value="title">Title</option><option value="review">Next review</option>
             </SelectField>
-            <WorkspaceButton data-toolbar-view icon={density === "compact" ? "view-compact" : "view-comfortable"} aria-label={`View: ${density}`} onClick={() => { const next = density === "compact" ? "comfortable" : "compact"; setDensity(next); updateUrl({density:next}); }}>{density === "compact" ? "Compact" : "Comfortable"}</WorkspaceButton>
+            <SelectField data-toolbar-view value={density} aria-label="Notes layout" onChange={event => { const next = event.target.value as typeof density; setDensity(next); updateUrl({density:next}); }}><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="grid">Grid</option></SelectField>
           </WorkspaceToolbar>
 
           {view === "all" && captureOpen && (
@@ -2607,7 +2607,7 @@ export default function NotesWorkspace({
           ) : unavailableViewReason ? (
             <SystemState variant="read_only" title="This Notes view is staged" description={unavailableViewReason} />
           ) : visibleNotes.length ? (
-            <div className={styles.list} data-density={density} role="list" aria-label="Notes">
+            <div className={`resource-directory ${density === "grid" ? "is-grid" : density === "compact" ? "is-compact" : ""}`} data-density={density} role="list" aria-label="Notes">
               {visibleNotes.map((note) => {
                 const item = noteRecordToDirectoryItem(note);
                 const propertyItem = propertyQueue.byNoteId.get(note.id);
@@ -2629,7 +2629,8 @@ export default function NotesWorkspace({
                     )
                   : null;
                 return (
-                  <DenseObjectRow
+                  <DirectoryCard
+                    icon="module-notes" status={displayLabel(note.lifecycleStatus)} statusIcon={note.lifecycleStatus === "archived" ? "archive" : note.lifecycleStatus === "draft" ? "edit" : "active"} tag={displayLabel(note.type)}
                     id={note.id}
                     title={note.title}
                     description={item.bodyExcerpt.replace(/!?(?:\[([^\]]*)\]\([^)]*\))/g, "$1").replace(/[#*_>`~]/g, "")}

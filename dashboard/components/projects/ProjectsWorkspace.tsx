@@ -16,7 +16,7 @@ import ModuleSidebar, { type ModuleSidebarSection } from "../admin-shell/ModuleS
 import SharedAIDock from "../admin-shell/SharedAIDock";
 import UnigentamosIcon from "../icons/UnigentamosIcon";
 import ConfirmationSheet from "../operational/ConfirmationSheet";
-import DenseObjectRow from "../operational/DenseObjectRow";
+import DirectoryCard from "../operational/DirectoryCard";
 import DetailTabs, { DetailTabPanel, type DetailTab } from "../operational/DetailTabs";
 import QuickActionBar, { type QuickAction } from "../operational/QuickActionBar";
 import SystemState from "../operational/SystemState";
@@ -3121,7 +3121,7 @@ export default function ProjectsWorkspace({
           }}><option value="comfortable">Comfortable</option><option value="compact">Compact</option><option value="grid">Grid</option></SelectField>
         </WorkspaceToolbar>
         {visibleProjects.length ? (
-          <div className={grid ? styles.projectGrid : styles.list} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">
+          <div className={`resource-directory ${grid ? "is-grid" : compact ? "is-compact" : ""}`} data-density={compact ? "compact" : "comfortable"} role="list" aria-label="Projects">
             {visibleProjects.map((item) => {
               const milestone = nextMilestone(item);
               const attention = item.attentionReasons.find(reason=>!/objectives.*not defined/i.test(reason));
@@ -3132,33 +3132,19 @@ export default function ProjectsWorkspace({
                 <span title={`${peopleCount} linked ${peopleCount === 1 ? "person" : "people"}`}><PeopleCountIcon />{peopleCount}</span>
                 <span title={`Updated ${formatTimestamp(item.project.updatedAt)}`}><ClockIcon />{formatDate(item.project.updatedAt)}</span>
               </span>;
-              if (grid) return (
-                <article className={styles.projectCard} data-selected={selectedProjectId === item.project.id || undefined} role="listitem" key={item.project.id}>
-                  <button type="button" className={styles.projectCardBody} onClick={() => selectProject(item)} aria-pressed={selectedProjectId === item.project.id}>
-                    <span className={styles.projectCardTop}><span className={styles.rowAvatar} aria-hidden="true">{initials(item.project.name)}</span><span className={styles.rowState} data-tone={stateTone(item.project.lifecycle)}>{displayLabel(item.project.lifecycle)}</span></span>
-                    <strong>{item.project.name}</strong>
-                    <span className={styles.projectCardDescription}>{excerpt(item.project.description || item.project.objective || "No project context recorded.", 120)}</span>
-                    {projectMeta}
-                    <span className={styles.projectCardSignal}>{attention || (milestone ? `Next ${formatDate(milestone.dueAt)}` : "No immediate checks")}</span>
-                  </button>
-                </article>
-              );
-              return (
-                <DenseObjectRow
-                  id={item.project.id}
-                  title={item.project.name}
-                  description={item.project.objective || item.project.description ? excerpt(item.project.objective || item.project.description) : undefined}
-                  leading={<span className={styles.rowAvatar} aria-label={`${item.project.name} initials`}>{initials(item.project.name)}</span>}
-                  metadata={projectMeta}
-                  trailing={<>
-                    <span className={styles.rowState} data-tone={stateTone(item.project.lifecycle)}>{displayLabel(item.project.lifecycle)}</span>
-                    {(attention || milestone) && <span>{attention || `Next ${formatDate(milestone!.dueAt)}`}</span>}
-                  </>}
-                  selected={selectedProjectId === item.project.id}
-                  onSelect={() => selectProject(item)}
-                  key={item.project.id}
-                />
-              );
+              return <DirectoryCard
+                key={item.project.id} id={item.project.id} title={item.project.name}
+                picture={<span aria-hidden="true">{initials(item.project.name)}</span>}
+                status={displayLabel(item.project.lifecycle)}
+                statusIcon={item.project.lifecycle === "archived" ? "archive" : "active"}
+                tag={displayLabel(item.project.lifecycle)}
+                description={item.project.objective || item.project.description || undefined}
+                metadata={projectMeta}
+                trailing={attention || (milestone ? `Next ${formatDate(milestone.dueAt)}` : undefined)}
+                selected={selectedProjectId === item.project.id}
+                onSelect={() => selectProject(item)}
+                actions={<button type="button" onClick={() => void toggleStar(item)} disabled={!item.project.editable || mutationBusy || ["complete", "archived"].includes(item.project.lifecycle)} aria-label={item.project.starred ? "Remove star" : "Star project"} aria-pressed={item.project.starred} data-active={item.project.starred || undefined}><UnigentamosIcon role="star" size={16} /></button>}
+              />;
             })}
           </div>
         ) : (
