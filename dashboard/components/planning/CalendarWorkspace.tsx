@@ -683,11 +683,10 @@ export default function CalendarWorkspace() {
                 <legend>Details</legend>
                 <div className={styles.detailOptions}>
                   {([{key: "time", label: "Time", icon: "clock"}, {key: "address", label: "Address", icon: "location"}, {key: "people", label: "People", icon: "person"}, {key: "objects", label: "Objects", icon: "object"}] as const).map(({key, label, icon}) => (
-                    <label key={key} className={styles.detailOption}>
+                    <button key={key} type="button" className={styles.detailOption} aria-label={`Detailed ${key}`} aria-pressed={details[key]} onClick={() => setDetails(current => ({...current, [key]: !current[key]}))}>
                       <UnigentamosIcon role={icon} size={17} />
-                      <input type="checkbox" aria-label={`Detailed ${key}`} checked={details[key]} onChange={event => setDetails(current => ({...current, [key]: event.target.checked}))} />
                       <span>{label}</span>
-                    </label>
+                    </button>
                   ))}
                 </div>
               </fieldset>

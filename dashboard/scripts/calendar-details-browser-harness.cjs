@@ -21,12 +21,18 @@ let browser;
   const chooseView=async(view)=>{if(name==='mobile'){await page.getByRole('combobox',{name:'Calendar view',exact:true}).click();await page.getByRole('option',{name:view,exact:true}).click();}else await page.getByRole('radio',{name:view,exact:true}).click();await page.waitForTimeout(400);};
   await openSettings();assert.equal(await page.locator('[data-calendar-options-trigger] svg').getAttribute('data-icon-candidate'),'settings');
   assert(await settings().getByRole('button',{name:'Share calendar',exact:true}).innerText().then(t=>t==='Share'));
-  const labels=['Detailed time','Detailed address','Detailed people','Detailed objects'];for(const label of labels)assert(await settings().getByRole('checkbox',{name:label,exact:true}).isChecked());
+  const labels=['Detailed time','Detailed address','Detailed people','Detailed objects'];for(const label of labels)assert(await settings().getByRole('button',{name:label,exact:true}).getAttribute('aria-pressed').then(value=>value==='true'));
+  const detailGroup=settings().getByRole('group',{name:'Details',exact:true}),timeToggle=detailGroup.getByRole('button',{name:'Detailed time',exact:true});
+  assert.equal(await detailGroup.getByRole('checkbox').count(),0,'Details use toggle buttons without checkboxes');
+  await timeToggle.focus();await page.keyboard.press('Space');assert.equal(await timeToggle.getAttribute('aria-pressed'),'false');
+  await page.waitForTimeout(200);const offColor=await timeToggle.evaluate(node=>getComputedStyle(node).backgroundColor);
+  await page.keyboard.press('Enter');assert.equal(await timeToggle.getAttribute('aria-pressed'),'true');
+  await page.waitForTimeout(200);assert.notEqual(await timeToggle.evaluate(node=>getComputedStyle(node).backgroundColor),offColor,'Shading communicates the selected state');
   const geometry=await settings().evaluate(root=>{const sections=[...root.querySelectorAll('[class*="viewOptionSection"]')],zone=root.querySelector('[class*="zoneControl"]'),button=root.querySelector('[data-calendar-settings-trigger]'),icon=button.querySelector('svg').getBoundingClientRect(),text=button.querySelector('span').getBoundingClientRect();return {gap1:sections[1].getBoundingClientRect().top-sections[0].getBoundingClientRect().bottom,gap2:zone.getBoundingClientRect().top-sections[1].getBoundingClientRect().bottom,align:Math.abs(icon.y+icon.height/2-text.y-text.height/2),overflow:root.scrollWidth>root.clientWidth};});
   assert(Math.abs(geometry.gap1-geometry.gap2)<1,JSON.stringify(geometry));assert(geometry.align<2);assert(!geometry.overflow);
   await page.waitForTimeout(350);await page.screenshot({path:path.join(out,`calendar-settings-${name}.png`)});
   await settings().getByRole('button',{name:'Calendars',exact:true}).click();await page.getByRole('heading',{name:'Calendars',exact:true}).waitFor();await page.getByRole('dialog').getByRole('button',{name:'Close details',exact:true}).click();
-  await openSettings();for(const label of labels)await settings().getByRole('checkbox',{name:label,exact:true}).uncheck();await page.keyboard.press('Escape');
+  await openSettings();for(const label of labels)await settings().getByRole('button',{name:label,exact:true}).click();await page.keyboard.press('Escape');
   for(const view of ['Day','3 days','Week','Month','Agenda']) {
    await chooseView(view);
    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'Page overflow');
@@ -42,9 +48,9 @@ let browser;
    }
    await page.screenshot({path:path.join(out,`calendar-icons-${view.replaceAll(' ','-')}-${name}.png`)});console.log(`${name} ${view}: simplified details PASS`);
   }
-  await page.reload({waitUntil:'domcontentloaded'});await openSettings();for(const label of labels)assert(!(await settings().getByRole('checkbox',{name:label,exact:true}).isChecked()),'Saved '+label);
-  await settings().getByRole('checkbox',{name:'Detailed people',exact:true}).check();await page.keyboard.press('Escape');await chooseView('Day');assert.equal(await page.locator('[data-linked-summary="people"]').count(),0);assert(await page.locator('[data-linked-summary="objects"]').count()>0,'Independent objects setting');
-  await openSettings();for(const label of labels)await settings().getByRole('checkbox',{name:label,exact:true}).check();await page.keyboard.press('Escape');await chooseView('Agenda');assert.equal(await page.locator('[data-linked-summary]').count(),0);assert.equal(await page.locator('[data-event-detail="place"]').first().getAttribute('data-compact'),null);
+  await page.reload({waitUntil:'domcontentloaded'});await openSettings();for(const label of labels)assert(!(await settings().getByRole('button',{name:label,exact:true}).getAttribute('aria-pressed').then(value=>value==='true')),'Saved '+label);
+  await settings().getByRole('button',{name:'Detailed people',exact:true}).click();await page.keyboard.press('Escape');await chooseView('Day');assert.equal(await page.locator('[data-linked-summary="people"]').count(),0);assert(await page.locator('[data-linked-summary="objects"]').count()>0,'Independent objects setting');
+  await openSettings();for(const label of labels){const toggle=settings().getByRole('button',{name:label,exact:true});if(await toggle.getAttribute('aria-pressed')==='false')await toggle.click();};await page.keyboard.press('Escape');await chooseView('Agenda');assert.equal(await page.locator('[data-linked-summary]').count(),0);assert.equal(await page.locator('[data-event-detail="place"]').first().getAttribute('data-compact'),null);
   assert.deepEqual(errors,[]);console.log(name+': settings, labels, popovers, independent preferences and persistence PASS');await context.close();
  }
 })().catch(error=>{console.error(error);process.exitCode=1}).finally(async()=>{await browser?.close();server.kill();});
