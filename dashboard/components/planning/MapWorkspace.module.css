@@ -593,11 +593,6 @@ html[data-product-motion=reduce] .pinDisplayIndicator,html[data-product-motion=r
 /* Explore data: compact setup, explicit help, and a separate region browser. */
 .dataPopover { width:min(720px,calc(100vw - 24px)); max-height:min(820px,var(--radix-popover-content-available-height,calc(100dvh - 110px))); }
 .dataPopover .layers { display:block; }
-.dataTabs { position:relative; isolation:isolate; display:grid; grid-template-columns:1fr 1fr; padding:4px; width:fit-content; min-width:240px; border-radius:10px; background:var(--module-quiet); margin-bottom:18px; }
-.dataTabs > span { position:absolute; z-index:-1; left:4px; top:4px; bottom:4px; width:calc((100% - 8px)/2); background:white; border-radius:7px; box-shadow:0 1px 4px #10202612; transition:transform 240ms cubic-bezier(.2,.8,.2,1); }
-.dataTabs button { display:flex; align-items:center; justify-content:center; gap:7px; border:0; border-radius:7px; padding:8px 12px; min-height:36px; background:transparent; color:var(--text-body); font:500 12px var(--font-body); cursor:pointer; }
-.dataTabs button[aria-pressed=true] { color:var(--module-icon); }
-.dataTabs button:disabled { opacity:.45; cursor:default; }
 .dataSetup,.dataResults { display:grid; gap:14px; font:400 12px/1.45 var(--font-body); animation:dataReveal 180ms ease-out; }
 .dataGeography { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(0,1fr) 30px; align-items:center; gap:8px; }
 .dataSetup :global(.app-select-trigger),.dataFilterMenu :global(.app-select-trigger) { width:100%; min-width:0; min-height:38px; font-size:12px; }
@@ -608,9 +603,15 @@ html[data-product-motion=reduce] .pinDisplayIndicator,html[data-product-motion=r
 .dataCategories { display:flex; flex-wrap:wrap; gap:6px; }
 .dataCategories button { display:flex; align-items:center; gap:7px; padding:8px 10px; min-height:38px; border:0; border-radius:8px; color:var(--text-body); background:transparent; font:500 12px var(--font-body); cursor:pointer; transition:background 180ms,color 180ms; }
 .dataCategories button[aria-pressed=true] { background:var(--module-quiet); color:var(--module-icon); }
-.dataLayerChoices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px 12px; min-height:84px; align-content:start; }
-.dataLayerChoices button { display:flex; align-items:center; justify-content:space-between; gap:5px; min-height:40px; padding:8px 10px; text-align:left; border:0; border-radius:7px; background:transparent; color:var(--text-body); font:400 13px/1.4 var(--font-body); cursor:pointer; transition:background 180ms,color 180ms; }
-.dataLayerChoices button:hover,.dataLayerChoices button[aria-pressed=true] { background:var(--module-quiet); color:var(--module-icon); }
+.dataNavigation { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; font-size:12px; }
+.dataNavigation button { display:inline-flex; align-items:center; gap:6px; }
+.dataNavigation small { margin-left:4px; color:var(--text-muted); font-weight:400; }
+.dataLayerChoices { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; align-content:start; }
+.dataLayerChoices button { display:flex; align-items:center; justify-content:space-between; gap:5px; min-height:40px; padding:8px 10px; text-align:left; border:1px solid var(--module-border); border-radius:9px; background:var(--surface-panel,white); color:var(--text-body); font:400 13px/1.4 var(--font-body); cursor:pointer; transition:background 180ms,color 180ms,border-color 180ms; }
+.dataLayerChoices button:hover,.dataLayerChoices button[aria-pressed=true] { background:var(--module-quiet); color:var(--module-icon); border-color:var(--module-icon); transform:none; box-shadow:none; }
+.dataLayerChoices button:focus-visible { outline:2px solid var(--module-icon); outline-offset:2px; }
+.dataLayerChoices button > span { display:grid; gap:2px; }
+.dataLayerChoices button small { color:var(--text-muted); font-size:10px; }
 .dataLayerChoices button:disabled { opacity:.4; cursor:default; }
 .dataLayerChoices svg { flex:none; }
 .dataSelectedLayers { display:flex; flex-wrap:wrap; gap:6px; }
@@ -661,12 +662,12 @@ html[data-product-motion=reduce] .pinDisplayIndicator,html[data-product-motion=r
 .dataCategories button,.dataSelectedLayers button,.appliedData button,.dataTextButton { width:auto; flex:none; box-shadow:none; transform:none; }
 .dataCategories button:hover,.dataSelectedLayers button:hover,.appliedData button:hover,.dataLayerChoices button:hover { box-shadow:none; transform:none; }
 .exploreMobileLabel { display:none; }
-:is(.dataSetup,.dataTabs,.dataResults,.dataFilterMenu,.dataHelp,.appliedData) button:focus-visible { outline:2px solid var(--module-focus); outline-offset:2px; }
+:is(.dataSetup,.dataNavigation,.dataResults,.dataFilterMenu,.dataHelp,.appliedData) button:focus-visible { outline:2px solid var(--module-focus); outline-offset:2px; }
 @media(max-width:760px) {
  .dataPopover { padding:12px; }
  .dataSetup { gap:10px; }
  .dataPopover .explorerHeader { margin-bottom:10px; }
- .dataTabs { margin-bottom:12px; }
+ .dataNavigation { margin-bottom:10px; }
  .dataCategories { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:3px; }
  .dataCategories button { flex-direction:column; justify-content:center; padding:6px 2px; font-size:10px; gap:4px; }
  .dataGeography { grid-template-columns:minmax(0,1.3fr) minmax(0,1fr) 28px; gap:5px; }
@@ -681,4 +682,4 @@ html[data-product-motion=reduce] .pinDisplayIndicator,html[data-product-motion=r
  .exploreDesktopLabel { display:none; }
  .exploreMobileLabel { display:inline; }
 }
-@media(prefers-reduced-motion:reduce) { .dataTabs > span,.dataCategories button,.dataLayerChoices button { transition:none; } .dataSetup,.dataResults,.dataHelp,.dataFilterMenu { animation:none; } }
+@media(prefers-reduced-motion:reduce) { .dataCategories button,.dataLayerChoices button { transition:none; } .dataSetup,.dataResults,.dataHelp,.dataFilterMenu { animation:none; } }

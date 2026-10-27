@@ -48,6 +48,48 @@ server cache. No external requests are needed for these regional layers.
 Global national indicators continue to use World Bank WDI; U.S. local layers
 use the existing ACS providers. Dataset availability is not silently inferred.
 
+### Additional regional indicators (prepared October 27, 2026)
+
+`regional-indicators/*.json.gz` adds six public statistical layers to the existing
+ADM1/ADM2 boundaries: population shares under 15, ages 15–64, ages 65+, female,
+urban, and rural. The first four use the 2020 WorldPop age/sex fields in the
+population CSV above. Age bands 0, 1, 5, 10 cover ages 0–14; bands 15–60 cover
+15–64; bands 65–80 cover 65 and older. These are modeled demographic shares,
+not counts from a current census or employment rates.
+
+Urban/rural shares use the World Bank GHS-SMOD/GHS-Pop summary:
+https://datacatalogfiles.worldbank.org/ddh-published/0066820/DR0095357/adm2_urbanization_ghssmod.csv
+Classes 21, 22, 23, 30 comprise suburban areas, urban clusters and urban centres;
+classes 11–13 comprise rural areas. Shares divide these class populations by
+`ghs_total_pop`, not WorldPop population. The CSV and STAC metadata do not supply
+an observation year, so the UI explicitly shows it as unavailable. June 2025 is
+the publication date, not a claimed observation year. Definitions:
+https://raw.githubusercontent.com/worldbank/DECAT_Space2Stats/refs/heads/main/space2stats_api/src/space2stats_ingest/METADATA/stac/space2stats-collection/urbanization_ghssmod/urbanization_ghssmod.json
+
+Run `node scripts/prepare-regional-indicators.cjs SOURCE_DIR` with `population.csv`
+and `urbanization.csv` downloaded from these public sources. The preparation is
+offline and only adds public data sidecars; it does not change existing geometry,
+population values or private records. Source SHA-256 hashes and rejected rows are
+in `regional-indicators/sources.json`. Data retain the source's CC BY 4.0 license.
+
+Only exact IDs within the same ISO3 country are joined. Missing, negative,
+nonfinite or invalid percentage observations remain null. Provincial shares use
+sums of numerators and denominators across every child district, never averages
+of district shares; a missing/invalid child makes its provincial share null.
+Published zero-population districts have no percentage (0/0), but their known
+zero counts can contribute to a valid provincial total. They are recorded in
+the source manifest separately from missing values.
+One source observation exceeding 100% was rejected (USA023066, ages 65+).
+`regional-indicator-coverage.json` reports actual non-null counts per metric and
+level for 245 boundary-covered countries/territories. This does not imply every
+country or region has every indicator. National GDP, income, life expectancy,
+etc. must not be copied into provinces or districts to fill gaps.
+
+For Canada, valid coverage is 287–293 of 295 districts and 9–12 of 13 provinces,
+depending on the new layer. All gaps remain visible as no data. At runtime only
+the selected country's small sidecar is read, in a bounded 12-country cache.
+No new live provider calls, scheduled refreshes or runtime spatial joins are used.
+
 ## Flag assets
 
 `public/map-flags` includes 50 U.S. state flags and Puerto Rico downloaded
