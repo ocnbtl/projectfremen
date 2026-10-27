@@ -1,5 +1,5 @@
 const fs=require('node:fs'),path=require('node:path'),os=require('node:os'),crypto=require('node:crypto'),assert=require('node:assert/strict'),{spawn}=require('node:child_process');
-const {chromium}=require('@playwright/test'),app=path.resolve(__dirname,'..'),out=process.env.CONTROL_QA_OUTPUT||fs.mkdtempSync(path.join(os.tmpdir(),'calendar-details-'));
+const {chromium,expect}=require('@playwright/test'),app=path.resolve(__dirname,'..'),out=process.env.CONTROL_QA_OUTPUT||fs.mkdtempSync(path.join(os.tmpdir(),'calendar-details-'));
 const base='http://localhost:3237',secret='isolated-calendar-details',data=fs.mkdtempSync(path.join(os.tmpdir(),'calendar-details-data-'));
 const server=spawn(process.execPath,[path.join(app,'node_modules/next/dist/bin/next'),'start','--hostname','127.0.0.1','--port','3237'],{cwd:app,env:{...process.env,ADMIN_PASSWORD:'fixture',ADMIN_SESSION_SECRET:secret,FREMEN_DATA_DIR:data,FREMEN_REQUIRE_SUPABASE:'false',SUPABASE_URL:'',SUPABASE_SERVICE_ROLE_KEY:'',VERCEL:''},stdio:'ignore'});
 const person={module:'people',objectType:'person',objectId:'person-fixture',label:'Fixture Person',route:'/admin/people'},object={module:'projects',objectType:'project',objectId:'project-fixture',label:'Fixture Project',route:'/admin/projects'},place={id:'place-fixture',name:'Fixture Venue',address:'123 Main Street, Cincinnati, OH 45202',tags:[],linkedRefs:[]};
@@ -21,6 +21,16 @@ let browser;
   const chooseView=async(view)=>{if(name==='mobile'){await page.getByRole('combobox',{name:'Calendar view',exact:true}).click();await page.getByRole('option',{name:view,exact:true}).click();}else await page.getByRole('radio',{name:view,exact:true}).click();await page.waitForTimeout(400);};
   await openSettings();assert.equal(await page.locator('[data-calendar-options-trigger] svg').getAttribute('data-icon-candidate'),'settings');
   assert(await settings().getByRole('button',{name:'Share calendar',exact:true}).innerText().then(t=>t==='Share'));
+  assert.equal(await settings().getByRole('checkbox').count(),0,'Calendar settings consistently use shaded toggles');
+  for(const label of ['Widen today','Show weekends','Display completed tasks','Linked work and trips']) {
+   const toggle=settings().getByRole('button',{name:label,exact:true}),initial=await toggle.getAttribute('aria-pressed');
+   await toggle.click();await expect(toggle).toHaveAttribute('aria-pressed',initial==='true'?'false':'true');
+   await toggle.focus();await page.keyboard.press('Space');await expect(toggle).toHaveAttribute('aria-pressed',initial);
+  }
+  await page.waitForTimeout(450);
+  const optionBoxes=await settings().locator('[class*="settingOption"]').evaluateAll(nodes=>nodes.map(node=>{const r=node.getBoundingClientRect();return {top:r.top,width:r.width,height:r.height,overflow:node.scrollWidth>node.clientWidth};}));
+  assert.equal(optionBoxes.length,4);assert(optionBoxes.every(box=>!box.overflow&&box.height>=44&&Math.abs(box.width-optionBoxes[0].width)<1));
+  assert(Math.abs(optionBoxes[0].top-optionBoxes[1].top)<1&&Math.abs(optionBoxes[2].top-optionBoxes[3].top)<1,'Two compact aligned rows: '+JSON.stringify(optionBoxes));
   const labels=['Detailed time','Detailed address','Detailed people','Detailed objects'];for(const label of labels)assert(await settings().getByRole('button',{name:label,exact:true}).getAttribute('aria-pressed').then(value=>value==='true'));
   const detailGroup=settings().getByRole('group',{name:'Details',exact:true}),timeToggle=detailGroup.getByRole('button',{name:'Detailed time',exact:true});
   assert.equal(await detailGroup.getByRole('checkbox').count(),0,'Details use toggle buttons without checkboxes');

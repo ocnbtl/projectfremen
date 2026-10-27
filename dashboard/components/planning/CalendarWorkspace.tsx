@@ -671,8 +671,8 @@ export default function CalendarWorkspace() {
                 <ViewToggle label="Show weekends" icon="week" checked={showWeekends} onChange={next => morph(() => setShowWeekends(next))} />
               </div>
               <div className={styles.viewOptionSection}>
-                <ViewToggle label="Display completed tasks" icon="check" checked={showCompleted} onChange={setShowCompleted} />
-                <ViewToggle label="Linked work and trips" icon="link" checked={showDated} onChange={setShowDated} />
+                <ViewToggle label="Display completed tasks" shortLabel="Completed tasks" icon="check" checked={showCompleted} onChange={setShowCompleted} />
+                <ViewToggle label="Linked work and trips" shortLabel="Work & trips" icon="link" checked={showDated} onChange={setShowDated} />
               </div>
               <label className={styles.zoneControl}><span className={styles.viewChoice}><UnigentamosIcon role="clock" size={16} />Display time zone</span>
                 <SelectField searchable aria-label="Display time zone" value={zone} menuClassName={styles.calendarChoiceMenu} onChange={e => setZone(e.target.value)}>
@@ -1227,8 +1227,8 @@ function CalendarSettings({
   );
 }
 
-function ViewToggle({ label, icon, checked, onChange }: { label: string; icon: string; checked: boolean; onChange: (value: boolean) => void }) {
-  return <label className={styles.calendarToggle}><UnigentamosIcon role={icon} size={17} /><span>{label}</span><input type="checkbox" checked={checked} onChange={event => onChange(event.target.checked)} /></label>;
+function ViewToggle({ label, shortLabel, icon, checked, onChange }: { label: string; shortLabel?: string; icon: string; checked: boolean; onChange: (value: boolean) => void }) {
+  return <button type="button" className={`${styles.detailOption} ${styles.settingOption}`} aria-label={label} aria-pressed={checked} onClick={() => onChange(!checked)}><UnigentamosIcon role={icon} size={17} /><span>{shortLabel ?? label}</span></button>;
 }
 
 function SettingsPopover({ label, mobileLabel, icon, children }: { label: string; mobileLabel: string; icon: string; children: ReactNode }) {
