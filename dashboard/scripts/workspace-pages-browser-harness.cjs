@@ -37,7 +37,11 @@ for(const [name,viewport]of [['desktop',{width:1440,height:1000}],['mobile',{wid
  console.log(JSON.stringify({module,name,errors,metrics:await page.evaluate(()=>({overflow:document.documentElement.scrollWidth>innerWidth,nav:[...document.querySelectorAll('.workspace-topnav')].map(e=>({w:e.clientWidth,h:e.clientHeight})),main:[...document.querySelectorAll('.module-shell__main, .people-directory-panel, [data-personal-pages]>main')].map(e=>({w:e.clientWidth,h:e.clientHeight})),buttons:[...document.querySelectorAll('main button')].filter(e=>e.getClientRects().length).map(e=>e.getAttribute('aria-label')||e.textContent.trim()).slice(0,12)}))}));
  if(['projects','notes','resources','finance','personal'].includes(module)){
  const title=module==='projects'?/Project Pint/:module==='notes'?/Layout QA note/:module==='resources'?/Layout QA resource/:module==='finance'?/Inspect selected range/:/Keep all 12/;
- const row=page.getByRole('button',{name:title}).first(); await row.click(); await page.waitForTimeout(500);
+ const row=page.getByRole('button',{name:title}).first();
+ // Resource cards delegate clicks from their content to the article. On mobile
+ // a tag can sit over the full-card button, so exercise the actual card surface.
+ if(module==='resources') await row.locator('..').click(); else await row.click();
+ await page.waitForTimeout(500);
  const stage=page.locator(module==='personal'?'[data-personal-pages] > .inspector-rail':'.workspace-detail-page');
  // Mobile project rows may use their existing deep route instead.
  if(module==='projects'&&name==='mobile'){assert(page.url().includes('/admin/projects/')); await page.getByRole('link',{name:'Back to projects',exact:true}).first().click();}

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { createHash } from "node:crypto";
 import { hasAdminSession } from "../../../../../lib/admin-session";
 import { appendAuditEvent, getRequestIp } from "../../../../../lib/audit-log";
 import { isCsrfRequestValid } from "../../../../../lib/csrf";
@@ -8,7 +9,7 @@ import {
   removePeopleProfilePhoto,
   writePeopleProfilePhoto
 } from "../../../../../lib/modules/people/profile-photos";
-import { readPersonalRecords } from "../../../../../lib/personal-records-store";
+import { hasPeoplePhotoProfile } from "../../../../../lib/modules/people/profile-photo-access";
 
 export const runtime = "nodejs";
 
@@ -23,10 +24,8 @@ function privateJson(body: unknown, init?: ResponseInit) {
 
 async function requirePeopleProfile(context: RouteContext) {
   const { personId } = await context.params;
-  const records = await readPersonalRecords();
-  const profile = records.find((record) => record.id === personId && (record.className === "person" || record.className === "org"));
-  if (!profile) throw new Error("People profile not found");
-  return { personId, profile };
+  if (!(await hasPeoplePhotoProfile(personId))) throw new Error("People profile not found");
+  return { personId };
 }
 
 export async function GET(request: Request, context: RouteContext) {
@@ -40,13 +39,23 @@ export async function GET(request: Request, context: RouteContext) {
       return privateJson({ ok: true, source: `data:${source.mimeType};base64,${source.bytesBase64}`, updatedAt: photo.updatedAt,
         crop: photo.crop || { zoom: 1, panX: 0, panY: 0, outputSize: 512 } });
     }
+    // Reuse the browser's bytes only after fresh session/profile/photo checks.
+    // No shared CDN caching or stale authorization window, including after logout.
+    const etag = `"${createHash("sha256").update(photo.mimeType).update(photo.bytesBase64).digest("hex")}"`;
+    const headers = {
+      "Content-Type": photo.mimeType,
+      "Cache-Control": "private, no-cache, max-age=0, must-revalidate",
+      Vary: "Cookie",
+      ETag: etag,
+      "X-Content-Type-Options": "nosniff"
+    };
+    const validators = request.headers.get("if-none-match")?.split(",").map(value => value.trim().replace(/^W\//, "")) || [];
+    if (validators.includes(etag) || validators.includes("*")) return new NextResponse(null, { status: 304, headers });
     return new NextResponse(Buffer.from(photo.bytesBase64, "base64"), {
       status: 200,
       headers: {
-        "Content-Type": photo.mimeType,
-        "Cache-Control": "private, no-store, max-age=0",
-        "Content-Length": String(photo.byteLength),
-        "X-Content-Type-Options": "nosniff"
+        ...headers,
+        "Content-Length": String(photo.byteLength)
       }
     });
   } catch (error) {

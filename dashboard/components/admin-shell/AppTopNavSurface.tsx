@@ -91,7 +91,7 @@ export default function AppTopNavSurface({ showCommandSearch = true, onCommandSe
 
   return (
     <header className={`admin-global-topnav app-top-nav ${className || ""}`} data-active-module={moduleColorIdForPathname(pathname) || "home"}>
-      <Link href="/admin" className="admin-global-brand app-top-nav__brand" aria-label="Unigentamos home" onClick={() => setLogoRotation(value => value + 360)}>
+      <Link href="/admin" prefetch={false} className="admin-global-brand app-top-nav__brand" aria-label="Unigentamos home" onClick={() => setLogoRotation(value => value + 360)}>
         <motion.img src="/unigentamos-logo.svg" alt="" width="32" height="32" initial={false}
           animate={{ rotate: reduceMotion ? 0 : logoRotation }}
           transition={reduceMotion ? { duration: 0 } : { type: "spring", duration: 1.85, bounce: 0.24, delay: 0.22 }} />
@@ -110,7 +110,7 @@ export default function AppTopNavSurface({ showCommandSearch = true, onCommandSe
             const href = item.href || "/admin";
             const moduleId = moduleColorIdForPathname(href);
             const palette = moduleId ? MODULE_COLOR_SYSTEM[moduleId] : null;
-            return <Link href={href} key={item.label} aria-label={item.label} title={item.label}
+            return <Link href={href} prefetch={false} key={item.label} aria-label={item.label} title={item.label}
               className={`admin-global-nav-link${activeHref === href ? " is-active" : ""}`}
               aria-current={activeHref === href ? "page" : undefined} data-module={moduleId || undefined}
               style={palette ? { "--nav-module-accent": palette.tokens.icon, "--nav-module-surface": palette.tokens.quiet, "--nav-module-border": palette.tokens.border } as CSSProperties : undefined}>

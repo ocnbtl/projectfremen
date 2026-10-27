@@ -60,6 +60,8 @@ export function PeopleProfileAvatar({
       key={source}
       src={source}
       alt=""
+      loading={onSelect ? "eager" : "lazy"}
+      decoding="async"
       ref={element => {
         // Cached images can finish before hydration attaches load/error handlers.
         if (element?.complete) {
