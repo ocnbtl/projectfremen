@@ -664,7 +664,7 @@ export default function CalendarWorkspace() {
           </SelectField>
           <Popover.Root open={filters} onOpenChange={setFilters}>
             <Popover.Trigger asChild><Button data-calendar-options-trigger icon="settings" aria-label="Settings" data-has-draft={compact && Boolean(draft && !editor) || undefined} className={`${styles.toolbarUtility} ${styles.optionsButton}`}>{compact ? null : "Settings"}</Button></Popover.Trigger>
-            <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={moduleThemeVariables("calendar") as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar settings">
+            <Popover.Portal><Popover.Content className={[styles.calendarPopover, styles.viewOptions].join(" ")} style={{...moduleThemeVariables("calendar"), viewTransitionName: "calendar-settings"} as CSSProperties} sideOffset={8} collisionPadding={12} aria-label="Calendar settings">
               <div className={styles.optionsHeading}><UnigentamosIcon role="settings" size={16}/><strong>Settings</strong><div className={styles.optionsActions}><Button icon="calendar" data-calendar-settings-trigger onClick={() => { setFilters(false); setConnections(true); }}>Calendars</Button><Button icon="share" aria-label="Share calendar" title="Share calendars and take bookings" onClick={() => { setFilters(false); setSharing(true); }}>Share</Button></div></div>
               <div className={styles.viewOptionSection}>
                 <ViewToggle label="Widen today" icon="today" checked={widenToday} onChange={next => morph(() => setWidenToday(next))} />
@@ -680,7 +680,7 @@ export default function CalendarWorkspace() {
                 </SelectField>
               </label>
               <fieldset className={styles.detailPreferences}>
-                <legend>Details</legend>
+                <legend>Details Displayed</legend>
                 <div className={styles.detailOptions}>
                   {([{key: "time", label: "Time", icon: "clock"}, {key: "address", label: "Address", icon: "location"}, {key: "people", label: "People", icon: "person"}, {key: "objects", label: "Objects", icon: "object"}] as const).map(({key, label, icon}) => (
                     <button key={key} type="button" className={styles.detailOption} aria-label={`Detailed ${key}`} aria-pressed={details[key]} onClick={() => setDetails(current => ({...current, [key]: !current[key]}))}>
