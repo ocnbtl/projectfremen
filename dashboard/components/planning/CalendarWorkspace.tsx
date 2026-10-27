@@ -679,12 +679,18 @@ export default function CalendarWorkspace() {
                   {[...new Set([zone, "UTC", ...Intl.supportedValuesOf("timeZone")])].map(z => <option key={z} value={z}>{z.replaceAll("_", " ").replaceAll("/", " / ")}</option>)}
                 </SelectField>
               </label>
-              <div className={styles.viewOptionSection} aria-label="Event details">
-                <ViewToggle label="Detailed time" icon="clock" checked={details.time} onChange={time => setDetails(current => ({...current,time}))}/>
-                <ViewToggle label="Detailed address" icon="location" checked={details.address} onChange={address => setDetails(current => ({...current,address}))}/>
-                <ViewToggle label="Detailed people" icon="person" checked={details.people} onChange={people => setDetails(current => ({...current,people}))}/>
-                <ViewToggle label="Detailed objects" icon="object" checked={details.objects} onChange={objects => setDetails(current => ({...current,objects}))}/>
-              </div>
+              <fieldset className={styles.detailPreferences}>
+                <legend>Details</legend>
+                <div className={styles.detailOptions}>
+                  {([{key: "time", label: "Time", icon: "clock"}, {key: "address", label: "Address", icon: "location"}, {key: "people", label: "People", icon: "person"}, {key: "objects", label: "Objects", icon: "object"}] as const).map(({key, label, icon}) => (
+                    <label key={key} className={styles.detailOption}>
+                      <UnigentamosIcon role={icon} size={17} />
+                      <input type="checkbox" aria-label={`Detailed ${key}`} checked={details[key]} onChange={event => setDetails(current => ({...current, [key]: event.target.checked}))} />
+                      <span>{label}</span>
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
               {draft && !editor && <div className={styles.mobileToolActions}><DraftNotice onResume={() => { setFilters(false); setEditor(draft); }} onDiscard={() => finishEditing()} /></div>}
             </Popover.Content></Popover.Portal>
           </Popover.Root>
