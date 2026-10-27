@@ -3779,10 +3779,10 @@ html[data-calendar-morph]::view-transition-old(.calendar-date-header) { animatio
 html[data-calendar-morph]::view-transition-new(.calendar-date-header) { animation: none; opacity: 1; }
 html[data-calendar-morph]::view-transition-image-pair(*) { overflow: clip; }
 /* A normal popover z-index cannot rise above the browser's snapshot layer.
-   Keep Settings opaque above the dates and events while the calendar morphs. */
-html[data-calendar-morph]::view-transition-group(calendar-settings) { z-index: 1; animation: none; }
-html[data-calendar-morph]::view-transition-old(calendar-settings) { display: none; }
-html[data-calendar-morph]::view-transition-new(calendar-settings) { animation: none; }
+   Keep floating controls opaque above dates and events while the calendar morphs. */
+html[data-calendar-morph]::view-transition-group(.calendar-overlay) { z-index: 1; animation: none; }
+html[data-calendar-morph]::view-transition-old(.calendar-overlay) { animation: none; opacity: 0; }
+html[data-calendar-morph]::view-transition-new(.calendar-overlay) { animation: none; }
 @keyframes calendar-date-arrive { 0%, 45% { opacity: 0; } 100% { opacity: 1; } }
 html[data-calendar-morph]::view-transition-new(.calendar-entering-date) { animation: calendar-date-arrive 640ms ease both; }
 /* Month navigation keeps shared events visible from departure to arrival. */

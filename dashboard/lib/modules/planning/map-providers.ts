@@ -1,4 +1,5 @@
 import { MAP_CATALOG } from "./map-catalog";
+import { acsIndicators } from "./acs-indicators";
 import { parsePlaceSearch } from "./place-search";
 import { feature } from "topojson-client";
 import world from "world-atlas/countries-110m.json";
@@ -106,6 +107,10 @@ export async function demographics(
   level: string,
   state: string,
 ) {
+  if (metric.startsWith("us-")) {
+    if (!Object.hasOwn(MAP_CATALOG, metric) || !["state", "county", "place", "tract"].includes(level) || level !== "state" && !/^\d{2}$/.test(state)) throw new Error("Choose a supported U.S. region and layer.");
+    return acsIndicators(metric, level, state, await censusGeometry(level, state));
+  }
   if (metric.startsWith("world-") && MAP_CATALOG[metric]?.indicator) {
     if (level !== "country") throw new Error("This dataset is available at country level");
     const indicator = MAP_CATALOG[metric].indicator;

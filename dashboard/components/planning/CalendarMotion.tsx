@@ -66,9 +66,22 @@ export function useCalendarMorph(root: RefObject<HTMLElement | null>) {
     if (reduced || !document.startViewTransition || !root.current) { update(); return; }
     const names = new Map<string, string>(), touched = new Map<HTMLElement, string>(), classes = new Map<HTMLElement, string>();
     const outgoing = new Map<string, HTMLElement>(), fromMonth = root.current.dataset.view === "month";
+    const overlays = new Map<HTMLElement, string>();
+    const overlaySelector = '[data-radix-popper-content-wrapper] > [data-state="open"], .work-sheet[role="dialog"]';
+    let overlayObserver: MutationObserver | undefined;
     const mark = (node: HTMLElement, name: string) => { if (!classes.has(node)) classes.set(node,node.style.getPropertyValue("view-transition-class")); node.style.setProperty("view-transition-class",name); };
     const capture = (incoming = false) => {
       const surface = root.current; if (!surface) return;
+      // Portaled menus are otherwise flattened into the root snapshot, below
+      // individually animated events. Capture floating surfaces independently.
+      for (const node of document.querySelectorAll<HTMLElement>(overlaySelector)) {
+        const box = node.getBoundingClientRect();
+        if (!box.width || !box.height || getComputedStyle(node).visibility === "hidden") continue;
+        if (!overlays.has(node)) overlays.set(node, `calendar-overlay-${overlays.size}`);
+        if (!touched.has(node)) touched.set(node, node.style.viewTransitionName);
+        node.style.viewTransitionName = overlays.get(node)!;
+        mark(node, "calendar-overlay");
+      }
       const monthChange = fromMonth && surface.dataset.view === "month";
       if (incoming && monthChange) document.documentElement.dataset.calendarMonthMorph = "true";
       const rect = surface.getBoundingClientRect(), used = new Set<string>();
@@ -101,11 +114,20 @@ export function useCalendarMorph(root: RefObject<HTMLElement | null>) {
       }
     };
     document.documentElement.dataset.calendarMorph = "true";
-    cleanup.current = () => { for (const [node, name] of touched) node.style.viewTransitionName = name; for (const [node, value] of classes) node.style.setProperty("view-transition-class", value); delete document.documentElement.dataset.calendarMorph; delete document.documentElement.dataset.calendarMonthMorph; };
+    cleanup.current = () => { overlayObserver?.disconnect(); for (const [node, name] of touched) node.style.viewTransitionName = name; for (const [node, value] of classes) node.style.setProperty("view-transition-class", value); delete document.documentElement.dataset.calendarMorph; delete document.documentElement.dataset.calendarMonthMorph; };
     capture();
     const transition = document.startViewTransition(() => { if (version !== revision.current) return; flushSync(update); capture(true); });
     active.current = transition;
-    void transition.ready.catch(() => {}); // Unsupported/hidden documents still apply the update.
+    void transition.ready.then(() => {
+      if (version !== revision.current) return;
+      // A newly opened menu cannot be added to an already captured snapshot.
+      // Finish that snapshot immediately so its live controls remain on top.
+      overlayObserver = new MutationObserver(() => {
+        const current = [...document.querySelectorAll<HTMLElement>(overlaySelector)].filter(node => node.getBoundingClientRect().width && getComputedStyle(node).visibility !== "hidden");
+        if (current.some(node => !overlays.has(node)) || [...overlays.keys()].some(node => !current.includes(node))) transition.skipTransition();
+      });
+      overlayObserver.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ["data-state"] });
+    }).catch(() => {}); // Unsupported/hidden documents still apply the update.
     void transition.finished.finally(() => { if (version === revision.current) { cleanup.current(); active.current = null; } }).catch(() => {});
   };
 }

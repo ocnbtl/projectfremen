@@ -354,7 +354,7 @@ function normalizeAnalysis(value: unknown) {
         throw new Error("Choose distinct supported map layers");
       seen.add(m.metric);
       for (const value of [m.min, m.max])
-        if (value !== undefined && (!Number.isFinite(value) || value < 0))
+        if (value !== undefined && (!Number.isFinite(value) || value < (m.metric === "regional-lights-change" ? -100 : 0)))
           throw new Error("Choose valid map filter values");
       if (m.min !== undefined && m.max !== undefined && m.min > m.max)
         throw new Error("Map minimum must be below maximum");

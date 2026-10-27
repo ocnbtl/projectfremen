@@ -43,20 +43,21 @@ export async function worldRegions(metric: string, level: string, country: strin
   const extra = !["regional-population", "regional-density"].includes(metric);
   const values = extra ? (await regionalIndicators(entry.code))[level]?.[metric] : undefined;
   const urban = ["regional-urban", "regional-rural"].includes(metric);
+  const lights = metric === "regional-lights-change", flood = metric === "regional-flood";
   const rows = geometry.features.map((f) => ({
     id: String(f.properties?.GEOID),
     name: level === "county" ? `${f.properties?.NAME} · ${f.properties?.parentName}` : String(f.properties?.NAME),
     value: extra ? values?.[String(f.properties?.GEOID)] ?? null : typeof f.properties?.[field] === "number" ? f.properties[field] as number : null,
-    year: urban ? "Reference year unavailable" : "2020",
+    year: lights ? "2014–2024" : urban ? "Reference year unavailable" : "2020",
   }));
   const missing = rows.filter((r) => r.value === null).length;
   return {
     rows, geometry,
-    source: `World Bank Space2Stats · ${urban ? "GHS-SMOD / GHS-Pop" : "WorldPop"}`,
+    source: `World Bank Space2Stats · ${lights ? "VIIRS / Light Every Night" : flood ? "Fathom 3.0 / gridded population" : urban ? "GHS-SMOD / GHS-Pop" : "WorldPop"}`,
     sourceUrl: "https://datacatalog.worldbank.org/search/dataset/0066820/space2stats-database",
     period: "Space2Stats June 2025 release · September 2026 boundaries",
     unit: MAP_CATALOG[metric].unit,
     geography: `${entry.name} · ${level === "state" ? "States / provinces (ADM1)" : "Counties / districts (ADM2)"}`,
-    geometryNote: `${urban ? "GHS settlement classes 21–30 are urban; 11–13 are rural. The published summary does not specify the observation year; June 2025 is its release date, not its observation year. These shares use GHS population, not WorldPop totals." : "Modeled 2020 population, not current census counts. Density uses geodesic boundary area."} Provincial shares use summed source counts, not averages of district percentages; incomplete provinces remain no data. Administrative levels vary by country. ${missing ? `${missing} of ${rows.length} regions lack valid matching estimates and are shown as no data. ` : ""}Generalized World Bank boundaries, CC BY 4.0; boundary depiction does not imply endorsement.`,
+    geometryNote: `${lights ? "Change in summed VIIRS nighttime brightness from 2014 to 2024. This is an activity proxy, not GDP or income; lighting technology and observation conditions affect it. Zero baseline has no defined percentage change." : flood ? "Modeled 2020 population exposed to flood depths over 15 cm in the Fathom 3.0 1-in-100-year hazard scenario. A regional exposure estimate, not a forecast or property risk assessment. Computed from summed exposed and total population counts." : urban ? "GHS settlement classes 21–30 are urban; 11–13 are rural. The published summary does not specify the observation year; June 2025 is its release date, not its observation year. These shares use GHS population, not WorldPop totals." : "Modeled 2020 population, not current census counts. Density uses geodesic boundary area."} Provincial shares use summed source counts, not averages of district percentages; incomplete provinces remain no data. Administrative levels vary by country. ${missing ? `${missing} of ${rows.length} regions lack valid matching estimates and are shown as no data. ` : ""}Generalized World Bank boundaries, CC BY 4.0; boundary depiction does not imply endorsement.`,
   };
 }

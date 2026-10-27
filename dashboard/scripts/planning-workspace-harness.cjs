@@ -1422,6 +1422,10 @@ async function check(label, run) {
     const saved = normalizePlanningRecord("savedViews", {id:"data-view", createdAt:stamp, updatedAt:stamp, name:"Access", center:[0,0], zoom:2, layer:"world-internet", level:"country", analysis:settings});
     assert.equal(saved.analysis.palette, "indigo");
     assert.deepEqual(saved.analysis.metrics, settings.metrics);
+    const lights = {...saved, layer:"regional-lights-change", level:"state", analysis:{...settings,countryCode:"CAN",metrics:[{metric:"regional-lights-change",min:-50,max:0}]}};
+    assert.equal(normalizePlanningRecord("savedViews",lights).analysis.metrics[0].min,-50);
+    assert.throws(()=>normalizePlanningRecord("savedViews",{...lights,analysis:{...lights.analysis,metrics:[{metric:"regional-lights-change",min:-101}]}}),/valid map filter/);
+    assert.throws(()=>normalizePlanningRecord("savedViews",{...saved,analysis:{...settings,metrics:[{metric:"us-rent",min:-1}]}}),/valid map filter/);
   });
   await check("country address layouts preserve international order and entered fields", () => {
     const { formatPlaceAddress, addressFields, normalizeAddressCountry, addressCountries } = require("../lib/modules/planning/place-address.ts");

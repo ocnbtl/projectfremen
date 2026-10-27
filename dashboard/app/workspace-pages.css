@@ -236,3 +236,25 @@ button.workspace-back { display: inline-flex; align-items: center; gap: 7px; wid
 .workspace-pages .dense-object-row.is-selected { box-shadow: none; }
 .workspace-people-pages .people-edit-form > section { grid-column: auto !important; }
 .workspace-people-pages .people-edit-form > section:has(.people-group-picker) { grid-column: 1 / -1 !important; }
+
+/* Mobile: identity and a concise search first; view/filter/action controls second. */
+@media(max-width:700px) {
+ .workspace-topnav {display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;align-items:center;}
+ .workspace-topnav .workspace-topnav__title {order:0;flex:0 0 94px;margin:0;font-size:16px;}
+ body .workspace-topnav__search,body .workspace-topnav .work-toolbar,body .workspace-topnav .people-directory-tools,body .workspace-topnav .people-interactions-tools,body .workspace-topnav .people-search-controls,body .workspace-topnav .finance-search-row,body .workspace-topnav [class*="resourceToolbar"]:not([class*="resourceToolbarMenu"]) {display:contents!important;}
+ body .workspace-topnav .app-search-field {order:1;flex:1 0 calc(100% - 100px);width:auto;min-width:0;max-width:none;height:40px;min-height:40px;margin:0;padding-inline:9px;}
+ .workspace-topnav .app-search-field input {font-size:16px;}
+ .workspace-topnav .app-search-field kbd {display:none;}
+ .workspace-topnav :is(.work-button,.app-select-trigger,.people-control-trigger,.people-view-cycle,[class*="resourceToolbarMenu"],.workspace-nav-trigger,.workspace-nav-status) {order:2;flex:none;margin:0;}
+ .workspace-topnav :is(.work-button,.app-select-trigger,.people-control-trigger,.people-view-cycle,.workspace-nav-trigger) {height:40px;min-height:40px;padding:5px 7px;font-size:11px;}
+ .workspace-topnav :is([data-toolbar-action],.people-control-trigger,.toolbar-icon-select,.workspace-nav-trigger) {width:36px;min-width:36px;padding:0;justify-content:center;}
+ .workspace-topnav .workspace-nav-trigger {order:3;}
+ .workspace-topnav .workspace-nav-trigger > span {display:none;}
+ .workspace-topnav .workspace-actions-trigger {order:5;margin-left:auto;}
+ .workspace-topnav .workspace-nav-status {order:4;}
+ .workspace-topnav .workspace-nav-status button {width:32px;min-width:32px;}
+ .workspace-topnav .work-toolbar > [data-toolbar-view] {padding-inline:7px;}
+ .workspace-topnav [class*="resourceToolbarMenu"] > summary {width:36px;height:40px;min-height:40px;padding:0;}
+ .workspace-topnav [class*="resourceToolbarMenu"] > [role="menu"] {left:0;right:auto;max-width:calc(100vw - 76px);}
+ .workspace-topnav .finance-native-action-bar,.workspace-topnav .people-directory-heading {display:none;}
+}

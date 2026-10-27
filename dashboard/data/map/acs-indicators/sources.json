@@ -1,0 +1,50 @@
+{
+  "us-per-capita-income": {
+    "url": "https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData/acsdt5y2024-b19301.dat",
+    "sha256": "9fc107e98fee7fa49bb8314560205569184fad65fb64b80adb5c5bdd83ccc409",
+    "table": "B19301",
+    "column": "001",
+    "period": "2020–2024",
+    "rows": 120341
+  },
+  "us-home-value": {
+    "url": "https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData/acsdt5y2024-b25077.dat",
+    "sha256": "89eb2153764a2330b23959d8bbc29b3a8f3016f087b990f2a8ea0d5096d9a816",
+    "table": "B25077",
+    "column": "001",
+    "period": "2020–2024",
+    "rows": 120986
+  },
+  "us-rent": {
+    "url": "https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData/acsdt5y2024-b25064.dat",
+    "sha256": "b36e6dc1fcef36b8b307d31b37517b64c80d8b9c70d48c9b1894242860f42eb0",
+    "table": "B25064",
+    "column": "001",
+    "period": "2020–2024",
+    "rows": 120986
+  },
+  "us-housing-units": {
+    "url": "https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData/acsdt5y2024-b25001.dat",
+    "sha256": "c0833c328f5db6510541e112e6d6b7688cbadd186c2cf24ddb3c41114ec950ef",
+    "table": "B25001",
+    "column": "001",
+    "period": "2020–2024",
+    "rows": 120986
+  },
+  "us-households": {
+    "url": "https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData/acsdt5y2024-b11001.dat",
+    "sha256": "77200c3d9c0d99773bc7f78208bc96f25170e5d4d175a5de320620b478ceaff5",
+    "table": "B11001",
+    "column": "001",
+    "period": "2020–2024",
+    "rows": 120986
+  },
+  "us-household-size": {
+    "url": "https://www2.census.gov/programs-surveys/acs/summary_file/2024/table-based-SF/data/5YRData/acsdt5y2024-b25010.dat",
+    "sha256": "69482d4f74b6d1dfe00a12b100d0d3c74a3b734f5f5cf1070ac4ec22096d67ff",
+    "table": "B25010",
+    "column": "001",
+    "period": "2020–2024",
+    "rows": 120986
+  }
+}

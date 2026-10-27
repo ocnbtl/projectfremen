@@ -123,7 +123,7 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
     <h1 className="workspace-topnav__title">{title}</h1>
     {bar && <div className="workspace-topnav__search" ref={bar.setSearch} />}
     {compact && sections.length > 0 && <Popover.Root open={openSection === "compact"} onOpenChange={open => setOpenSection(open ? "compact" : null)}>
-      <Popover.Trigger className="workspace-nav-trigger"><UnigentamosIcon role="menu" size={18} /><span>Views</span></Popover.Trigger>
+      <Popover.Trigger className="workspace-nav-trigger" aria-label={`${title} views`} title="Views"><UnigentamosIcon role="menu" size={18} /><span>Views</span></Popover.Trigger>
       <Popover.Portal><Popover.Content className="workspace-nav-menu" align="end" sideOffset={8} collisionPadding={12}>
         {sections.map(section => <LayoutGroup id={`${layoutId}-${section.id}`} key={section.id}><section><p>{section.label}</p><ul>{section.items.map(item => <li key={item.id}><SidebarItem item={item} onNavigate={close} /></li>)}</ul></section></LayoutGroup>)}
         {footer}
@@ -145,6 +145,6 @@ export default function ModuleSidebar({ id, title, sections, footer, status, onC
     </div>}
     {status && <div className="workspace-nav-status">{status}</div>}
     {footer && !compact && <Popover.Root><Popover.Trigger className="workspace-nav-trigger" aria-label={title + " tools"}><UnigentamosIcon role="sliders" size={18} /><span>Tools</span></Popover.Trigger><Popover.Portal><Popover.Content className="workspace-nav-menu" align="end" sideOffset={8} collisionPadding={12}>{footer}</Popover.Content></Popover.Portal></Popover.Root>}
-    {bar && (compact ? <Popover.Root open={actionsOpen} onOpenChange={setActionsOpen}><Popover.Trigger className="workspace-nav-trigger workspace-actions-trigger"><UnigentamosIcon role="plus" size={18} /><span>Actions</span></Popover.Trigger><Popover.Portal forceMount><Popover.Content forceMount className="workspace-nav-menu workspace-actions-menu" align="end" sideOffset={8} collisionPadding={12}><div className="workspace-topnav__actions" ref={bar.setActions} onClick={event => { if ((event.target as HTMLElement).closest("button, a")) setActionsOpen(false); }} /></Popover.Content></Popover.Portal></Popover.Root> : <div className="workspace-topnav__actions" ref={bar.setActions} />)}
+    {bar && (compact ? <Popover.Root open={actionsOpen} onOpenChange={setActionsOpen}><Popover.Trigger className="workspace-nav-trigger workspace-actions-trigger" aria-label={`${title} actions`} title="Actions"><UnigentamosIcon role="plus" size={18} /><span>Actions</span></Popover.Trigger><Popover.Portal forceMount><Popover.Content forceMount className="workspace-nav-menu workspace-actions-menu" align="end" sideOffset={8} collisionPadding={12}><div className="workspace-topnav__actions" ref={bar.setActions} onClick={event => { if ((event.target as HTMLElement).closest("button, a")) setActionsOpen(false); }} /></Popover.Content></Popover.Portal></Popover.Root> : <div className="workspace-topnav__actions" ref={bar.setActions} />)}
   </nav>;
 }

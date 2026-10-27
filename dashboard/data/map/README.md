@@ -104,3 +104,39 @@ separate from the module's leaf-green UI palette. Quantiles are the default;
 equal intervals remain available. Legends and region details show actual
 values, units, source year, and missing-data status. Thematic fills sit beneath
 water, roads, administrative lines and labels; attribution remains accessible.
+
+## Additional U.S. Census indicators (October 27, 2026)
+
+`acs-indicators/*.json.gz` bundles six public 2024 ACS 5-year estimates and their
+90% margins of error: per capita income (B19301), median owner-occupied home value
+(B25077), median gross rent (B25064), housing units (B25001), households (B11001),
+and average household size (B25010). All use published column 001. Gross rent
+includes utilities; home value is not a recent sale price. Dollar amounts are
+inflation-adjusted to 2024. Negative Census sentinels remain null.
+
+Sources: https://www.census.gov/programs-surveys/acs/data/summary-file.2024.html
+Run `node scripts/prepare-acs-indicators.mjs` to rebuild the public extracts.
+`sources.json` records the exact official URL, SHA-256, table and row count.
+157 small geographic files cover states, counties, places and census tracts.
+Only the selected scope is loaded, with a bounded twelve-file cache. No private
+records are modified, and no new live downloads are needed for these estimates.
+Geometry uses the existing TIGERweb ACS2024 service. Data gaps and unmatched IDs
+remain explicit; these layers cannot combine with different ACS release years.
+
+## Regional light change and flood exposure
+
+The same World Bank Space2Stats release supplies two additional ADM2 summaries:
+- `adm2_VIIRS.csv` (DR0095356): summed annual VIIRS night lights. Displayed change
+  is 100 * (2024 / 2014 - 1). A zero baseline has no defined percentage. This is
+  a proxy for nighttime activity, not a GDP estimate.
+- `adm2_flood_exposure_15cm_1in100.csv` (DR0095355): gridded 2020 population exposed
+  to modeled flooding deeper than 15 cm under a 1-in-100-year scenario. The share
+  is computed from the published exposed and total population counts, not the
+  ambiguous `pop_flood_pct` column. It is not a forecast or property risk score.
+
+Download these as `nightlights.csv` and `flood.csv` alongside `population.csv` and
+`urbanization.csv` before running `prepare-regional-indicators.cjs`. Source hashes
+and zero denominators are retained in the manifest. Provincial values aggregate
+counts before computing rates. Missing child observations keep a province null.
+The two additions bring international regional choices to ten; coverage varies
+by country and layer. The twelve existing country-level indicators are retained.

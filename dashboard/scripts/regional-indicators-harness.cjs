@@ -13,7 +13,7 @@ const read=f=>JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(__dirname,'..
   for(const [level,number] of [['state',1],['county',2]]){
    const features=read(`world/${country.code}-${number}.json.gz`).features,ids=features.map(f=>f.properties.GEOID).sort();
    for(const metric of extra){const rows=values[level][metric];assert.deepEqual(Object.keys(rows).sort(),ids);
-    assert(Object.values(rows).every(v=>v===null||Number.isFinite(v)&&v>=0&&v<=100));
+    assert(Object.values(rows).every(v=>v===null||Number.isFinite(v)&&(metric==='regional-lights-change'?v>=-100:v>=0&&v<=100)));
     assert.equal(Object.values(rows).filter(v=>v!==null).length,coverage[country.code][level][metric]);checked+=ids.length;
    }
    for(const id of ids){const urban=values[level]['regional-urban'][id],rural=values[level]['regional-rural'][id];if(urban!==null&&rural!==null)assert(Math.abs(urban+rural-100)<.03);}
@@ -23,7 +23,7 @@ const read=f=>JSON.parse(zlib.gunzipSync(fs.readFileSync(path.join(__dirname,'..
    const childIds=children.filter(f=>f.properties.parent===parent).map(f=>f.properties.GEOID);
    // A published zero population has no percentage (0/0) but can legitimately
    // contribute zero to its provincial counts. It is not a missing observation.
-   const zeros=zeroDenominators[['regional-urban','regional-rural'].includes(metric)?'urbanization':'population'];
+   const zeros=zeroDenominators[metric==='regional-lights-change'?'nightlights':metric==='regional-flood'?'flood':['regional-urban','regional-rural'].includes(metric)?'urbanization':'population'];
    if(!childIds.length||childIds.some(id=>values.county[metric][id]===null&&!zeros.includes(id)))assert.equal(values.state[metric][parent],null,'Incomplete province '+country.code+' '+parent+' '+metric);
   }
  }

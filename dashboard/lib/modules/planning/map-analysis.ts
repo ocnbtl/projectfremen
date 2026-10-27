@@ -30,7 +30,7 @@ export function mapAnalysis(data: MapData[], settings: MapAnalysisSettings) {
       (d) =>
         d.geography !== primary.geography ||
         (!settings.metrics[0].metric.startsWith("world-") &&
-          d.period !== primary.period),
+          d.period.replaceAll("–", "-") !== primary.period.replaceAll("–", "-")),
     )
   )
     throw new Error(

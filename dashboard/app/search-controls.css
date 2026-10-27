@@ -39,6 +39,7 @@
   }
   [data-toolbar-action]:is(:hover,[aria-pressed="true"]), .people-control-trigger[aria-expanded="true"] { background:color-mix(in srgb,var(--module-focus,#133c5e) 9%,white) !important; }
   @media(max-width:700px) { .app-search-field > input { font-size:16px !important; } }
+  @media(max-width:760px) { [aria-label="Calendar controls"] .app-search-field { padding-inline:6px !important; gap:4px !important; } }
   @media(prefers-reduced-motion:reduce) { .app-search-field { transition:none; } }
 }
 .app-search-field { width:100%; }
