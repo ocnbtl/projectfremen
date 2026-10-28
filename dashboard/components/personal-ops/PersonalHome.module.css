@@ -1,5 +1,5 @@
 .home { padding:16px 20px; display:grid; gap:20px; }
-.sectionHeader { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.sectionHeader { display:flex; align-items:center; justify-content:flex-end; gap:8px; }
 .sectionHeader h2 { margin:0; font-size:18px; }
 .shortcuts { display:flex; flex-wrap:wrap; gap:16px 24px; }
 .shortcuts a { display:grid; justify-items:center; align-content:start; gap:8px; width:84px; color:var(--text-strong); text-align:center; font-size:12px; text-decoration:none; }
@@ -14,6 +14,12 @@
 .operations small { color:var(--text-muted); font-size:12px; }
 .operations b { font-size:20px; font-variant-numeric:tabular-nums; }
 .operations a { display:grid; grid-template-columns:24px minmax(0,1fr) auto; }
+.customizeSheet:global(.work-sheet) { width:min(650px,calc(100vw - 24px)); overflow:visible; }
+.customizeSheet :global(.work-sheet-header) { border:0; padding:18px 20px 10px; }
+.customizeSheet :global(.work-sheet-header h2) { display:flex; align-items:center; gap:10px; font-size:19px; line-height:1.4; }
+.customizeSheet :global(.work-sheet-header h2 svg) {flex:none;}
+.customizeSheet :global(.work-sheet-body) {border-radius:0 0 18px 18px;}
+.customizeSheet :global(.app-select-menu) {max-width:calc(100vw - 32px);}
 .customize { display:grid; gap:18px; }
 .customize p { margin:0 0 10px; color:var(--text-muted); font-size:13px; }
 .customize h3 { margin:0 0 8px; font-size:15px; }
@@ -42,3 +48,22 @@
   .operations a > b { grid-column:2; grid-row:1; justify-self:end; line-height:24px; }
   .operations a > span { grid-column:1 / -1; grid-row:2; }
 }
+.newSection { display:grid; grid-template-columns:180px minmax(0,1fr); gap:12px; }
+.newSection label {display:grid;gap:6px;min-width:0; font-size:12px;color:var(--text-muted);}
+.newSection input {width:100%;min-width:0;padding:10px 12px;border:1px solid var(--border);border-radius:10px; background:var(--surface-panel);color:var(--text-strong);}
+.newSection :global(.app-select-trigger), .sectionEdit :global(.app-select-trigger) {height:44px;min-height:44px;min-width:0;width:100%;font-size:13px;padding:8px 10px;justify-content:space-between;}
+.customize .sectionEdit {grid-template-columns:170px minmax(0,1fr) 78px 38px;align-items:center;}
+.customize .sectionEdit input {height:44px;}
+.customize :is(input,button):focus-visible {outline:2px solid var(--module-focus);outline-offset:2px;}
+@media(max-width:600px) {
+ .customize .sectionEdit {grid-template-columns:140px minmax(0,1fr) 38px;gap:8px;}
+ .newSection {grid-template-columns:minmax(0,1fr);}
+ .customizeSheet :global(.work-sheet-header) {padding:14px 16px 8px;gap:8px;}
+ .customizeSheet :global(.work-sheet-header h2) {font-size:16px;gap:8px;}
+ .customizeSheet :global(.work-sheet-header-actions .work-button) {padding-inline:10px;}
+ .customize .sectionEdit > input {grid-column:1/-1;grid-row:1;}
+ .customize .sectionEdit > button:first-child {grid-column:1;grid-row:2;}
+ .customize .sectionEdit > button[aria-pressed] {grid-column:2;grid-row:2;}
+}
+
+.customizeSheet :global(.work-button--primary) {background:var(--module-action);border-color:var(--module-action);color:var(--module-action-contrast);}

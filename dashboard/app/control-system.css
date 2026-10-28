@@ -292,3 +292,34 @@ html[data-active-module] button.workspace-actions-trigger:is(:hover,[data-state=
 @media(max-width:700px) {
   .resource-directory.is-grid .resource-card-title { -webkit-line-clamp:2; }
 }
+
+/* Resources: stable identity, classification, and supporting information in every view. */
+.resource-directory[data-library] .resource-directory-card {align-items:start;border-radius:14px;min-height:0;padding:16px;gap:14px;}
+.resource-directory[data-library] .resource-card-content {gap:8px;}
+.resource-directory[data-library] .resource-card-heading {grid-template-columns:minmax(0,1fr);gap:8px;}
+.resource-directory[data-library] .resource-card-tags {grid-template-columns:22px minmax(0,1fr) 28px;padding:5px 8px;background:var(--module-quiet);border-radius:9px;min-height:36px;}
+.resource-directory[data-library] .resource-card-tag {background:transparent;padding:0;max-width:100%;}
+.resource-directory[data-library] .resource-card-picture {align-self:center;width:64px;height:64px;}
+.resource-directory[data-library] .resource-card-source {flex-basis:auto;}
+.resource-directory[data-library] .resource-card-description {font-size:13px;line-height:1.5;}
+.resource-directory[data-library].is-compact .resource-directory-card {grid-template-columns:44px minmax(0,1fr);padding:12px;gap:10px;}
+.resource-directory[data-library].is-compact .resource-card-picture {width:44px;height:44px;}
+.resource-directory[data-library].is-compact .resource-card-title {font-size:14px;}
+.resource-directory[data-library].is-compact .resource-card-description {-webkit-line-clamp:1;}
+.resource-directory[data-library].is-grid .resource-directory-card {grid-template-columns:52px minmax(0,1fr);grid-template-rows:minmax(52px,auto) auto auto auto;gap:10px;align-content:start;}
+.resource-directory[data-library].is-grid .resource-card-picture {width:52px;height:52px;}
+.resource-directory[data-library].is-grid .resource-card-tags {grid-row:2;}
+.resource-directory[data-library].is-grid .resource-card-title {-webkit-line-clamp:2;align-self:start;}
+.resource-directory[data-library].is-grid .resource-card-description {-webkit-line-clamp:3;}
+@media(min-width:1800px){.resource-directory[data-library].is-compact{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:700px){
+ .resource-directory[data-library].is-grid .resource-directory-card{grid-template-columns:minmax(0,1fr);grid-template-rows:44px minmax(38px,auto) auto auto;padding:12px;}
+ .resource-directory[data-library].is-grid .resource-card-picture{grid-column:1;grid-row:1;width:44px;height:44px;justify-self:start;}
+ .resource-directory[data-library].is-grid .resource-card-title{grid-column:1;grid-row:2;font-size:13px;}
+ .resource-directory[data-library].is-grid .resource-card-tags{grid-row:3;grid-template-columns:18px minmax(0,1fr) 20px;gap:4px;padding:4px;}
+ .resource-directory[data-library].is-grid .resource-card-description{font-size:12px;}
+}
+/* One continuous module header, without a second dividing rule. */
+.admin-global-topnav,.app-top-nav,.workspace-topnav {border-bottom:0!important;box-shadow:none;}
+.work-sheet-header h2 {display:flex;align-items:center;gap:10px;}
+.work-sheet-header h2 > svg {flex:none;}

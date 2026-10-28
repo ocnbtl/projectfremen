@@ -1,3 +1,4 @@
+import { WorkspaceTopbarProvider } from "../../../components/admin-shell/WorkspaceTopbar";
 import AdminChrome from "../../../components/AdminChrome";
 import DogTrackerWorkspace from "../../../components/personal-ops/DogTrackerWorkspace";
 import PersonalStyleGuideWorkspace from "../../../components/personal-ops/PersonalStyleGuideWorkspace";
@@ -57,13 +58,13 @@ export default async function PersonalUtilityRoutePage({ view }: { view: Persona
   const errors = [opsResult.ok ? "" : opsResult.error, lifeResult.ok ? "" : lifeResult.error, styleResult.ok ? "" : styleResult.error, dogResult.ok ? "" : dogResult.error, recordsResult.ok ? "" : recordsResult.error].filter(Boolean).join(" ");
 
   return (
-    <div className="shell admin-chrome-main module-ref-shell personal-ops-module-shell native-module-shell">
+    <WorkspaceTopbarProvider><div className="shell admin-chrome-main module-ref-shell personal-ops-module-shell native-module-shell">
       <AdminChrome showCommandSearch={false} showPageSidebar={false} sidebarTitle="Personal" sidebarSummary="Private command surfaces and personal systems." />
       {view === "style-guide" ? (
         <PersonalStyleGuideWorkspace initialState={style} initialResources={resources} sidebarCounts={counts} initialLoadError={errors || undefined} />
       ) : (
         <DogTrackerWorkspace initialState={dog} sidebarCounts={counts} initialLoadError={errors || undefined} />
       )}
-    </div>
+    </div></WorkspaceTopbarProvider>
   );
 }

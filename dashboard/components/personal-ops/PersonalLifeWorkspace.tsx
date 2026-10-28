@@ -1,5 +1,6 @@
 "use client";
-import SearchField from "../ui/SearchField";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "../admin-shell/WorkspaceKit";
+import ViewCycleButton, { type DirectoryView } from "../ui/ViewCycleButton";
 import SelectField from "../ui/SelectField";
 import { useWorkspaceReturn } from "../admin-shell/useWorkspaceReturn";
 import LogoLoader from "../operational/LogoLoader";
@@ -166,6 +167,9 @@ export default function PersonalLifeWorkspace({
   initialLoadError?: string;
 }) {
   const [state, setState] = useState(initialState);
+  const [query, setQuery] = useState("");
+  const [listView, setListView] = useState<DirectoryView>("comfortable");
+  const matches = (...values: (string | undefined)[]) => !query.trim() || values.join(" ").toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const [editor, setEditor] = useState<LifeEditor | null>(null);
   const [busy, setBusy] = useState(false);
@@ -177,7 +181,9 @@ export default function PersonalLifeWorkspace({
   const [selectedListId, setSelectedListId] = useState(initialState.lists[0]?.id || "");
   const [listDraft, setListDraft] = useState<PersonalList | null>(initialState.lists[0] || null);
   useEffect(() => {
-    const listId = new URLSearchParams(window.location.search).get("list");
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("kind") === "packing") setQuery("packing");
+    const listId = params.get("list") || params.get("selected");
     const list = initialState.lists.find(item => item.id === listId);
     if (list) { setSelectedListId(list.id); setListDraft(list); setListPageOpen(true); }
   }, [initialState.lists]);
@@ -185,11 +191,17 @@ export default function PersonalLifeWorkspace({
   const [tripFilters, setTripFilters] = useState<Set<TripStatus>>(() => new Set(["been", "want", "lived", "planned"]));
   const [selectedTripId, setSelectedTripId] = useState(initialState.trips[0]?.id || "");
   const [selectedVehicleId, setSelectedVehicleId] = useState(initialState.vehicles[0]?.id || "");
+  useEffect(() => {
+    const id = new URLSearchParams(window.location.search).get("selected");
+    if (initialView === "travel" && initialState.trips.some(item => item.id === id)) setSelectedTripId(id!);
+    const build = initialView === "personal-build" ? initialState.buildItems.find(item => item.id === id) : undefined;
+    if (build) openEdit("buildItems", build);
+    if (initialView === "car" && initialState.vehicles.some(item => item.id === id)) setSelectedVehicleId(id!);
+  }, [initialView, initialState.trips, initialState.vehicles, initialState.buildItems]);
   const [modDraft, setModDraft] = useState("");
   const [modStatus, setModStatus] = useState<VehicleModificationStatus>("idea");
   const [credentials, setCredentials] = useState<CredentialSummary[]>(initialCredentials);
   const [credentialQuery, setCredentialQuery] = useState("");
-  const credentialSearchRef = useRef<HTMLInputElement>(null);
   const [credentialSecrets, setCredentialSecrets] = useState<Record<string, { secret: string; pin: string }>>({});
   const [passwordsMasked, setPasswordsMasked] = useState(true);
   const [credentialDraft, setCredentialDraft] = useState<CredentialDraft | null>(null);
@@ -208,8 +220,8 @@ export default function PersonalLifeWorkspace({
     function focusCredentialSearch(event: KeyboardEvent) {
       if ((event.ctrlKey || event.metaKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "f") {
         event.preventDefault();
-        credentialSearchRef.current?.focus();
-        credentialSearchRef.current?.select();
+        document.querySelector<HTMLInputElement>('[aria-label="Search passwords"]')?.focus();
+        document.querySelector<HTMLInputElement>('[aria-label="Search passwords"]')?.select();
       }
     }
     window.addEventListener("keydown", focusCredentialSearch);
@@ -561,7 +573,7 @@ export default function PersonalLifeWorkspace({
       const selectedKey = cell.ref ? linkKey(cell.ref) : "";
       return <div className={styles.linkCell}>
         <PersonalOpsIcon name={type} />
-        <SelectField aria-label={label} value={selectedKey} onChange={(event) => {
+        <SelectField searchable autoFocusSearch={false} aria-label={label} value={selectedKey} onChange={(event) => {
           const option = options.find((candidate) => linkKey(candidate.ref) === event.target.value);
           updateListCell(row.id, columnId, option ? { value: option.ref.label, ref: option.ref } : { value: "" });
         }}>
@@ -594,9 +606,7 @@ export default function PersonalLifeWorkspace({
           <strong>Encrypted credentials</strong>
           <span className={styles.keyringCount} aria-live="polite" aria-atomic="true">{terms.length ? `${matches.length} of ${credentials.length}` : credentials.length}</span>
         </header>
-        <div className={styles.credentialSearchToolbar} role="search" aria-label="Credentials">
-          <SearchField ref={credentialSearchRef} aria-label="Search credentials" autoComplete="off" spellCheck={false} value={credentialQuery} onChange={(event) => setCredentialQuery(event.target.value)} className={`${baseStyles.searchControl} ${styles.credentialSearch}`}>{credentialQuery && <button type="button" aria-label="Clear credential search" onClick={() => { setCredentialQuery(""); credentialSearchRef.current?.focus(); }} data-icon-button="standard"><PersonalOpsIcon name="close" /></button>}</SearchField>
-        </div>
+
         <div className={styles.credentialLedger} role="table" aria-label="Credentials">
           <div className={styles.credentialGridHeader} role="row">
             <span className={styles.credentialAccountHeading} role="columnheader">Account</span>
@@ -652,12 +662,13 @@ export default function PersonalLifeWorkspace({
 
   function renderLists() {
     return <div ref={setReturnRoot} data-workspace-return="personal-lists" className={styles.notebook} data-list-page={listPageOpen || undefined}>
-      <aside className={styles.listIndex} aria-label="Lists">
-        {state.lists.map((list) => <button type="button" data-active={selectedList?.id === list.id || undefined} onClick={() => selectList(list)} key={list.id}><span>{list.title}</span><small>{list.rows.filter((row) => row.completed).length}/{list.rows.length}</small></button>)}
+      <aside className={styles.listIndex} aria-label="Lists" data-view={listView}>
+        {state.lists.filter(list => matches(list.title,list.description,list.kind)).map((list) => <button type="button" data-active={selectedList?.id === list.id || undefined} onClick={() => selectList(list)} key={list.id}><PersonalOpsIcon name="list"/><span className={styles.listCardTitle}>{list.title}</span><span className={styles.listKind}>{list.kind === "shopping" ? "Shopping" : list.kind.charAt(0).toUpperCase()+list.kind.slice(1)}</span>{list.description && <p>{list.description}</p>}<small>{list.rows.filter((row) => row.completed).length} of {list.rows.length} complete</small></button>)}
+        {state.lists.length > 0 && !state.lists.some(list => matches(list.title,list.description,list.kind)) && <p>No lists match your search.</p>}
         {!state.lists.length && <p>No lists yet.</p>}
       </aside>
       <section className={styles.listPage}>
-        <button type="button" className="workspace-back" onClick={() => setListPageOpen(false)}>Back to lists</button>
+        <WorkspaceButton icon="chevron-left" intent="quiet" onClick={() => setListPageOpen(false)}>Back to lists</WorkspaceButton>
         {workingList && selectedList ? <>
           <header className={styles.listEditorHeader}>
             <div className={styles.listIdentityEditor}>
@@ -690,7 +701,7 @@ export default function PersonalLifeWorkspace({
   }
 
   function renderTravel() {
-    const visibleTrips = state.trips.filter((trip) => tripFilters.has(trip.status));
+    const visibleTrips = state.trips.filter((trip) => tripFilters.has(trip.status) && matches(trip.name,trip.place,trip.region,trip.notes));
     return <div className={styles.atlas}>
       <section className={styles.mapPanel}>
         <div className={styles.mapToolbar} aria-label="Travel map layers">{(Object.keys(TRIP_LABELS) as TripStatus[]).map((status) => <button type="button" data-status={status} data-active={tripFilters.has(status) || undefined} aria-pressed={tripFilters.has(status)} onClick={() => setTripFilters((current) => { const next = new Set(current); if (next.has(status)) next.delete(status); else next.add(status); return next; })} key={status}><span />{TRIP_LABELS[status]}</button>)}</div>
@@ -703,8 +714,8 @@ export default function PersonalLifeWorkspace({
         />
       </section>
       <section className={styles.tripLedger}>
-        <header><h2>Trip ledger</h2><span>{visibleTrips.length} shown</span></header>
-        <div>{visibleTrips.map((trip) => <article data-selected={selectedTrip?.id === trip.id || undefined} key={trip.id} onClick={() => setSelectedTripId(trip.id)}><span className={styles.tripStatus} data-status={trip.status}>{TRIP_LABELS[trip.status]}</span><strong>{trip.name}</strong><p>{trip.place}{trip.region ? ` · ${trip.region}` : ""}</p><small>{trip.travelMode} · {trip.startDate ? formatDate(trip.startDate) : "Date open"}</small><div className={styles.rowActions}><a href={`/admin/map?trip=${encodeURIComponent(trip.id)}`} onClick={event=>event.stopPropagation()}>Map and stops</a><a href={`/admin/calendar?date=${trip.startDate.slice(0,10)}`} onClick={event=>event.stopPropagation()}>Calendar</a><button type="button" onClick={(event) => { event.stopPropagation(); openEdit("trips", trip); }}>Edit</button><button type="button" onClick={(event) => { event.stopPropagation(); void removeObject("trips", trip); }}>Delete</button></div></article>)}</div>
+        <header><h2>Your trips</h2><span>{visibleTrips.length}</span></header>
+        <div>{visibleTrips.map((trip) => <article data-selected={selectedTrip?.id === trip.id || undefined} key={trip.id} onClick={() => setSelectedTripId(trip.id)}><span className={styles.tripStatus} data-status={trip.status}>{TRIP_LABELS[trip.status]}</span><button type="button" className={styles.tripSelect} aria-pressed={selectedTrip?.id === trip.id} onClick={() => setSelectedTripId(trip.id)}>{trip.name}</button><p>{trip.place}{trip.region ? ` · ${trip.region}` : ""}</p><small>{trip.travelMode} · {trip.startDate ? formatDate(trip.startDate) : "Dates open"}{trip.endDate && trip.endDate !== trip.startDate ? " – " + formatDate(trip.endDate) : ""}</small><div className={styles.rowActions}><a href={`/admin/map?trip=${encodeURIComponent(trip.id)}`} onClick={event=>event.stopPropagation()}>Map and stops</a><a href={`/admin/calendar?date=${trip.startDate.slice(0,10)}`} onClick={event=>event.stopPropagation()}>Calendar</a><button type="button" onClick={(event) => { event.stopPropagation(); openEdit("trips", trip); }}>Edit</button><button type="button" onClick={(event) => { event.stopPropagation(); void removeObject("trips", trip); }}>Delete</button></div></article>)}</div>
       </section>
     </div>;
   }
@@ -712,8 +723,8 @@ export default function PersonalLifeWorkspace({
   function renderBuild() {
     const lanes = (["wanted", "researching", "acquired"] as BuildItemStatus[]);
     return <div className={styles.loadout}>
-      <header className={styles.loadoutHeader}><span>LOADOUT / 01</span><strong>{state.buildItems.filter((item) => item.status === "acquired").length}</strong><p>pieces acquired</p></header>
-      <div className={styles.loadoutLanes}>{lanes.map((status) => <section key={status}><header><h2>{BUILD_LABELS[status]}</h2><span>{state.buildItems.filter((item) => item.status === status).length}</span></header><div>{state.buildItems.filter((item) => item.status === status).map((item) => <article key={item.id}><span>{item.category || "Unsorted"}</span><strong>{item.name}</strong>{item.notes && <p>{item.notes}</p>}<small>{item.targetDate ? formatDate(item.targetDate) : "No target"}{item.budget ? ` · ${item.budget}` : ""}</small><div className={styles.rowActions}><button type="button" onClick={() => openEdit("buildItems", item)}>Edit</button><button type="button" onClick={() => void removeObject("buildItems", item)}>Delete</button></div></article>)}</div></section>)}</div>
+      <header className={styles.loadoutHeader}><PersonalOpsIcon name="build"/><div><h2>Your collection</h2><p>{state.buildItems.filter((item) => item.status === "acquired").length} acquired · {state.buildItems.filter(item => item.status !== "retired").length} active items</p></div><a href="/admin/resources">Research in Resources</a></header>
+      <div className={styles.loadoutLanes}>{lanes.map((status) => <section key={status}><header><h2>{BUILD_LABELS[status]}</h2><span>{state.buildItems.filter((item) => item.status === status).length}</span></header><div>{state.buildItems.filter((item) => item.status === status && matches(item.name,item.category,item.notes)).map((item) => <article key={item.id}><span>{item.category || "Unsorted"}</span><strong>{item.name}</strong>{item.notes && <p>{item.notes}</p>}<small>{item.targetDate ? formatDate(item.targetDate) : "No target"}{item.budget ? ` · ${item.budget}` : ""}</small><div className={styles.rowActions}><button type="button" onClick={() => openEdit("buildItems", item)}>Edit</button><button type="button" onClick={() => void removeObject("buildItems", item)}>Delete</button></div></article>)}</div></section>)}</div>
       {state.buildItems.some((item) => item.status === "retired") && <p className={styles.retiredNote}>{state.buildItems.filter((item) => item.status === "retired").length} retired item(s) remain in the record.</p>}
     </div>;
   }
@@ -721,7 +732,7 @@ export default function PersonalLifeWorkspace({
   function renderCar() {
     const modLanes = (["idea", "researching", "planned", "installed"] as VehicleModificationStatus[]);
     return <div className={styles.garage}>
-      <nav className={styles.vehicleTabs} aria-label="Vehicles">{state.vehicles.map((vehicle) => <button type="button" data-active={selectedVehicle?.id === vehicle.id || undefined} onClick={() => setSelectedVehicleId(vehicle.id)} key={vehicle.id}><span>{vehicle.status}</span><strong>{vehicle.name}</strong></button>)}</nav>
+      <nav className={styles.vehicleTabs} aria-label="Vehicles">{state.vehicles.filter(vehicle => matches(vehicle.name,vehicle.make,vehicle.model)).map((vehicle) => <button type="button" data-active={selectedVehicle?.id === vehicle.id || undefined} onClick={() => setSelectedVehicleId(vehicle.id)} key={vehicle.id}><span>{vehicle.status}</span><strong>{vehicle.name}</strong></button>)}</nav>
       {selectedVehicle ? <>
         <header className={styles.vehicleHero}><div><span>{selectedVehicle.status} vehicle</span><h2>{selectedVehicle.name}</h2><p>{[selectedVehicle.year, selectedVehicle.make, selectedVehicle.model, selectedVehicle.trim].filter(Boolean).join(" ") || "Build profile"}</p></div><div className={styles.rowActions}><button type="button" onClick={() => openEdit("vehicles", selectedVehicle)}>Edit vehicle</button><button type="button" onClick={() => void removeObject("vehicles", selectedVehicle)}>Delete</button></div></header>
         <div className={styles.modComposer}><input value={modDraft} onChange={(event) => setModDraft(event.target.value)} placeholder="Add modification…" aria-label="Modification name" /><SelectField aria-label="Modification status" value={modStatus} onChange={(event) => setModStatus(event.target.value as VehicleModificationStatus)}>{modLanes.map((status) => <option value={status} key={status}>{MOD_LABELS[status]}</option>)}</SelectField><button type="button" onClick={() => void addModification(selectedVehicle)}>Add</button></div>
@@ -756,9 +767,15 @@ export default function PersonalLifeWorkspace({
   return <div className={baseStyles.shell} data-personal-pages>
     <PersonalOpsSidebar activeView={initialView} filter="" pathname={`/admin/personal/${initialView}`} counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
     <main className={baseStyles.directory}>
-      <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)} aria-expanded={mobileSidebarOpen}><PersonalOpsIcon name="menu" /> Personal</button><button type="button" className={initialView === "passwords" ? styles.mobileAddAction : undefined} onClick={() => openCreate()}><PersonalOpsIcon name="plus" /><span>{copy.action}</span></button></div>
       <div className={styles.scroll}>
-        <header className={styles.pageHeader}><div>{initialView !== "passwords" && <span>Personal / Command</span>}<h1>{copy.title}</h1>{copy.description && <p>{copy.description}</p>}</div><div className={styles.headerActions}>{initialView === "passwords" && <button type="button" className={styles.privacyToggle} aria-label={passwordsMasked ? "Unblur password page" : "Blur password page"} aria-pressed={!passwordsMasked} onClick={() => void togglePasswordPrivacy()} disabled={busy} title={passwordsMasked ? "Unblur page" : "Blur page"}>{passwordsMasked ? <PersonalOpsIcon name="show" /> : <PersonalOpsIcon name="hide" />}<span>{passwordsMasked ? "Unblur" : "Blur"}</span></button>}<button type="button" className={`${styles.primaryButton} ${initialView === "passwords" ? styles.addAction : ""}`} onClick={() => openCreate()}><PersonalOpsIcon name="plus" /><span>{copy.action}</span></button></div></header>
+        <WorkspaceHeader title={copy.title}>
+          {initialView === "passwords" && <WorkspaceButton icon={passwordsMasked ? "show" : "hide"} aria-label={passwordsMasked ? "Unblur password page" : "Blur password page"} aria-pressed={!passwordsMasked} onClick={() => void togglePasswordPrivacy()} disabled={busy}>{passwordsMasked ? "Unblur" : "Blur"}</WorkspaceButton>}
+          <WorkspaceButton intent="primary" icon="plus" onClick={() => openCreate()}>{copy.action}</WorkspaceButton>
+        </WorkspaceHeader>
+        <WorkspaceToolbar query={initialView === "passwords" ? credentialQuery : query} onQuery={initialView === "passwords" ? setCredentialQuery : setQuery} placeholder={`Search ${copy.title.toLowerCase()}`}>
+          {initialView === "lists" && <ViewCycleButton data-toolbar-view value={listView} onChange={setListView}/>}
+        </WorkspaceToolbar>
+        {initialView === "travel" && <nav className={styles.connectedLinks} aria-label="Connected travel tools"><a href="/admin/map"><PersonalOpsIcon name="travel"/>Map &amp; destinations</a><a href="/admin/personal/lists?kind=packing"><PersonalOpsIcon name="list"/>Packing lists</a><a href="/admin/calendar"><PersonalOpsIcon name="today"/>Calendar</a></nav>}
         {error && <p className={styles.error} role="alert">{error}</p>}
         {notice && <div className={styles.notice} role="status"><span>{notice}</span><button type="button" aria-label="Dismiss notification" title="Dismiss" onClick={() => setNotice("")} data-icon-button="standard"><PersonalOpsIcon name="close" /></button></div>}
         <div className={styles.workspace} data-view={initialView}>

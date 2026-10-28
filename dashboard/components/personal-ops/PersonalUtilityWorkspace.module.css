@@ -1202,3 +1202,28 @@
     border-radius: 12px 12px 0 0;
   }
 }
+
+/* Personal utility pages use the same spacing and fields as the workspace. */
+.utilityScroll {padding:12px 20px 40px;}
+.sectionNav {position:relative;top:auto;margin:0;padding:0 0 16px;border:0;background:transparent;gap:8px;flex-wrap:wrap;overflow:visible;}
+.sectionNav a {min-height:40px;padding:8px 12px;border:1px solid var(--border);border-radius:10px;font:500 13px/1.4 var(--font-body);color:var(--text-strong);}
+.identityBand {border:1px solid var(--border);border-radius:14px;padding:16px;background:var(--module-primary-50);gap:16px;}
+.guideSection {border:1px solid var(--border);border-radius:16px;margin-block:18px;padding:18px;background:var(--surface-panel,#fff);scroll-margin-top:16px;}
+.guideSection > header {padding:0 0 16px;border:0;gap:12px;}
+.guideSection h2 {font-size:18px;line-height:1.4;}
+.guideSection header p {font-size:13px;}
+.guideSection :is(input,textarea,select),.identityBand input,.editorFields :is(input,textarea) {border:1px solid var(--border);border-radius:9px;font-family:var(--font-body);min-height:40px;}
+.specimenRail {grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px;}
+.typeSpecimen,.componentCard {border-radius:12px;box-shadow:none;}
+.carePulse {border:0;background:transparent;gap:12px;}
+.carePulse::before {display:none;}
+.carePulse article {border:1px solid var(--border)!important;border-radius:14px;background:var(--module-primary-50);padding:16px;}
+.careTimeline > article {border:1px solid var(--border);border-radius:12px;padding:14px;background:var(--surface-panel,#fff);margin-bottom:10px;}
+@media(max-width:600px) {.utilityScroll{padding:12px 10px 32px;}.guideSection{padding:12px;margin-block:12px;}.sectionNav{gap:6px;}.sectionNav a{padding:8px;font-size:12px;}.guideSection > header{flex-wrap:wrap;}.identityBand{grid-template-columns:minmax(0,1fr);}.carePulse{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;}.carePulse article{padding:12px;}}
+/* Each specimen owns its controls; no columns spill into adjacent cards. */
+.typeSpecimen {min-width:0;grid-template-columns:minmax(0,1fr);align-content:start;align-items:start;border:1px solid var(--border-soft);padding:14px;}
+.typeSpecimen:last-child {border-bottom:1px solid var(--border-soft);}
+.typeControls {grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
+.typeControls .deleteIcon {grid-column:2;justify-self:end;}
+.specimenPreview {min-height:48px;display:flex;align-items:center;gap:8px;}
+.utilityScroll .addButton {background:var(--module-action);color:var(--module-action-contrast);}

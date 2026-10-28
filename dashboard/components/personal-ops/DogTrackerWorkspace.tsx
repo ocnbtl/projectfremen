@@ -1,5 +1,6 @@
 "use client";
 import SelectField from "../ui/SelectField";
+import { WorkspaceHeader, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 
 import { useMemo, useState, type FormEvent } from "react";
 import { buildJsonHeadersWithCsrf } from "../../lib/client-csrf";
@@ -97,12 +98,8 @@ export default function DogTrackerWorkspace({ initialState, sidebarCounts, initi
     <div className={baseStyles.shell} data-personal-pages>
       <PersonalOpsSidebar activeView="dog" filter="" pathname="/admin/personal/dog" counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
       <main className={baseStyles.directory} aria-label="Dog care">
-        <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)}><PersonalOpsIcon name="menu" /> Personal</button><button type="button" onClick={() => setEditor(draftFor("walk"))}><PersonalOpsIcon name="plus" /> Walk</button></div>
         <div className={[baseStyles.mainScroll, styles.utilityScroll].join(" ")}>
-          <header className={styles.utilityHeader}>
-            <div><span className={styles.kicker}>Daily care</span><h1>Dog</h1><p>A lightweight record of walks, meals, and bathroom breaks.</p></div>
-            <div className={styles.headerActions}><button type="button" className={styles.primaryButton} onClick={() => setEditor(draftFor("walk"))}><PersonalOpsIcon name="plus" /> Walk</button><button type="button" className={styles.secondaryButton} onClick={() => setEditor(draftFor("feed"))}><PersonalOpsIcon name="plus" /> Feed</button></div>
-          </header>
+          <WorkspaceHeader title="Dog"><WorkspaceButton intent="primary" icon="walk" onClick={() => setEditor(draftFor("walk"))}>Walk</WorkspaceButton><WorkspaceButton icon="feed" onClick={() => setEditor(draftFor("feed"))}>Feed</WorkspaceButton></WorkspaceHeader>
           {error && <div className={styles.error} role="alert">{error}</div>}
           {notice && <div className={styles.notice} role="status">{notice}<button type="button" onClick={() => setNotice("")} aria-label="Dismiss" data-icon-button="standard"><PersonalOpsIcon name="close" /></button></div>}
 

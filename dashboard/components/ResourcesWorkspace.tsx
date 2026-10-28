@@ -1,6 +1,7 @@
 "use client";
 import ViewCycleButton from "./ui/ViewCycleButton";
-import SearchField from "./ui/SearchField";
+import SelectField from "./ui/SelectField";
+import { WorkspaceHeader, WorkspaceToolbar, WorkspaceButton } from "./admin-shell/WorkspaceKit";
 import UnigentamosIcon from "./icons/UnigentamosIcon";
 
 import Link from "next/link";
@@ -8,7 +9,6 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import DirectoryPane from "./admin-shell/DirectoryPane";
 import InspectorRail from "./admin-shell/InspectorRail";
-import { WorkspaceNavSlot } from "./admin-shell/WorkspaceTopbar";
 import { workspaceReturnUrl } from "./admin-shell/useWorkspaceReturn";
 import ModuleShell from "./admin-shell/ModuleShell";
 import ModuleSidebar, { type ModuleSidebarSection } from "./admin-shell/ModuleSidebar";
@@ -1006,25 +1006,7 @@ export default function ResourcesWorkspace({
       )}
       <DirectoryPane className={styles.directory} ariaLabel="Resources directory">
         <div className={styles.mainScroll}>
-          <WorkspaceNavSlot kind="actions"><header className={styles.directoryHeader}>
-            <div>
-              <div className={styles.resourceTitleLine}>
-                <h1>{collection === "components" ? "Components" : VIEW_LABELS[view]}</h1>
-                <span>{unavailableViewReason ? "–" : visibleResources.length}</span>
-              </div>
-            </div>
-            <div className={styles.headerActions}>
-              <button
-                type="button"
-                className={styles.button}
-                data-primary="true"
-                aria-label="Add Resource"
-                onClick={() => openResourceEditor("create")}
-              >
-                <PersonalOpsIcon name="plus" /> Resource
-              </button>
-            </div>
-          </header></WorkspaceNavSlot>
+          <WorkspaceHeader title="Resources" count={visibleResources.length}><WorkspaceButton intent="primary" icon="plus" aria-label="Add Resource" onClick={() => openResourceEditor("create")}>Resource</WorkspaceButton></WorkspaceHeader>
 
           {view === "needs-review" && !unavailableViewReason && (
             <section className={styles.reviewQueueSummary} aria-label="Resource review queue summary">
@@ -1150,46 +1132,22 @@ export default function ResourcesWorkspace({
             </section>
           )}
 
-          <WorkspaceNavSlot kind="search"><div className={styles.resourceToolbar}>
-            <SearchField value={query} onChange={(event) => {
-                  setQuery(event.target.value);
-                  updateUrl({ query: event.target.value });
-                }} aria-label="Search Resources" className={styles.resourceSearch} />
-              <details className={styles.resourceToolbarMenu}>
-                <summary data-toolbar-action="filter" aria-label="Filter Resources" title="Filter" data-icon-button="standard"><PersonalOpsIcon name="filter" /></summary>
-                <div role="menu" aria-label="Filter Resources">
-                  <button type="button" aria-pressed={collection === "all" && view === "all"} onClick={(event) => { setCollection("all"); selectLibraryView("all"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>All Resources</button>
-                  <button type="button" aria-pressed={collection === "components"} onClick={(event) => { setCollection("components"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>Components</button>
-                  <button type="button" aria-pressed={collection === "all" && view === "needs-review"} onClick={(event) => { setCollection("all"); selectLibraryView("needs-review"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>Needs Review</button>
-                  <button type="button" aria-pressed={collection === "all" && view === "duplicate-urls"} onClick={(event) => { setCollection("all"); selectLibraryView("duplicate-urls"); event.currentTarget.closest("details")?.removeAttribute("open"); }}>Duplicate URLs</button>
-                </div>
-              </details>
-              <details className={styles.resourceToolbarMenu}>
-                <summary data-toolbar-action="sort" aria-label="Sort Resources" title="Sort" data-icon-button="standard"><PersonalOpsIcon name="sort" /></summary>
-                <div role="menu" aria-label="Sort Resources">
-                  {([
-                    ["updated-desc", "Recently Updated"],
-                    ["updated-asc", "Oldest Update"],
-                    ["title", "Title"],
-                    ["review", "Evidence Gaps First"]
-                  ] as const).map(([id, label]) => (
-                    <button type="button" aria-pressed={sort === id} onClick={(event) => {
-                      setSort(id);
-                      updateUrl({ sort: id });
-                      event.currentTarget.closest("details")?.removeAttribute("open");
-                    }} key={id}>{label}</button>
-                  ))}
-                </div>
-              </details>
-            <ViewCycleButton value={density} onChange={next => { setDensity(next); const url = new URL(location.href); url.searchParams.set("density",next); history.replaceState(null,"",url); }} />
-          </div></WorkspaceNavSlot>
+          <WorkspaceToolbar query={query} onQuery={value=>{setQuery(value);updateUrl({query:value});}} placeholder="Search Resources" activeFilters={collection !== "all" || view !== "all" ? 1 : 0} filters={<>
+            <WorkspaceButton aria-pressed={collection === "all" && view === "all"} onClick={()=>{setCollection("all");selectLibraryView("all");}}>All Resources</WorkspaceButton>
+            <WorkspaceButton aria-pressed={collection === "components"} onClick={()=>setCollection("components")}>Components</WorkspaceButton>
+            <WorkspaceButton aria-pressed={collection === "all" && view === "needs-review"} onClick={()=>{setCollection("all");selectLibraryView("needs-review");}}>Needs Review</WorkspaceButton>
+            <WorkspaceButton aria-pressed={collection === "all" && view === "duplicate-urls"} onClick={()=>{setCollection("all");selectLibraryView("duplicate-urls");}}>Duplicate URLs</WorkspaceButton>
+          </>}>
+            <SelectField aria-label="Sort Resources" value={sort} onChange={event=>{const next=event.target.value as typeof sort;setSort(next);updateUrl({sort:next});}}><option value="updated-desc">Recently updated</option><option value="updated-asc">Oldest update</option><option value="title">Alphabetical</option><option value="review">Evidence gaps first</option></SelectField>
+            <ViewCycleButton data-toolbar-view value={density} onChange={next => { setDensity(next); const url = new URL(location.href); url.searchParams.set("density",next); history.replaceState(null,"",url); }} />
+          </WorkspaceToolbar>
 
           {initialLoadError ? (
             <SystemState variant="error" title="Resources could not be loaded" description={initialLoadError} />
           ) : unavailableViewReason ? (
             <SystemState variant="read_only" title="This Resources view is staged" description={unavailableViewReason} />
           ) : visibleResources.length ? (
-            <div className={`${styles.list} resource-directory is-${density}`} data-density={density} role="list" aria-label="Resources">
+            <div className={`${styles.list} resource-directory is-${density}`} data-density={density} data-library role="list" aria-label="Resources">
               {visibleResources.map((resource) => {
                 const queueItem = reviewQueue.byResourceId.get(resource.id);
                 const duplicateItem = duplicateEvidence.byResourceId.get(resource.id);

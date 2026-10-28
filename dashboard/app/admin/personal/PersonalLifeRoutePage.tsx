@@ -1,3 +1,4 @@
+import { WorkspaceTopbarProvider } from "../../../components/admin-shell/WorkspaceTopbar";
 import AdminChrome from "../../../components/AdminChrome";
 import PersonalLifeWorkspace, { type PersonalLifeLinkOption, type PersonalLifeView } from "../../../components/personal-ops/PersonalLifeWorkspace";
 import { createNativeObjectRef } from "../../../lib/native-objects/routes";
@@ -62,9 +63,16 @@ export default async function PersonalLifeRoutePage({ view }: { view: PersonalLi
         return [];
       }).sort((left, right) => left.ref.label.localeCompare(right.ref.label))
     : [];
+  if (view === "lists" && lifeResult.ok) {
+    // Link to the existing objects rather than making a second trip or collection.
+    for (const trip of lifeResult.state.trips) linkOptions.push({kind:"object",ref:createNativeObjectRef({module:"personal_ops",objectType:"trip",objectId:trip.id,label:trip.name})});
+    for (const item of lifeResult.state.buildItems) linkOptions.push({kind:"object",ref:createNativeObjectRef({module:"personal_ops",objectType:"build_item",objectId:item.id,label:item.name})});
+    for (const vehicle of lifeResult.state.vehicles) linkOptions.push({kind:"object",ref:createNativeObjectRef({module:"personal_ops",objectType:"vehicle",objectId:vehicle.id,label:vehicle.name})});
+    linkOptions.sort((a,b)=>a.ref.label.localeCompare(b.ref.label));
+  }
 
   return (
-    <div className="shell admin-chrome-main module-ref-shell personal-ops-module-shell native-module-shell">
+    <WorkspaceTopbarProvider><div className="shell admin-chrome-main module-ref-shell personal-ops-module-shell native-module-shell">
       <AdminChrome showCommandSearch={false} showPageSidebar={false} showLocalAi={false} sidebarTitle="Personal" sidebarSummary="Private command surfaces for lists, travel, personal gear, vehicles, and encrypted credentials." />
       <PersonalLifeWorkspace
         initialView={view}
@@ -74,6 +82,6 @@ export default async function PersonalLifeRoutePage({ view }: { view: PersonalLi
         initialLinkOptions={linkOptions}
         initialLoadError={errors.length ? errors.join(" ") : undefined}
       />
-    </div>
+    </div></WorkspaceTopbarProvider>
   );
 }

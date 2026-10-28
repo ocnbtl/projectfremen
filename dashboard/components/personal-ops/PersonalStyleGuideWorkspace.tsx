@@ -1,5 +1,6 @@
 "use client";
 import SelectField from "../ui/SelectField";
+import { WorkspaceHeader, WorkspaceButton } from "../admin-shell/WorkspaceKit";
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -163,9 +164,8 @@ export default function PersonalStyleGuideWorkspace({ initialState, initialResou
     <div className={baseStyles.shell} data-personal-pages>
       <PersonalOpsSidebar activeView="style-guide" filter="" pathname="/admin/personal/style-guide" counts={sidebarCounts} mobileOpen={mobileSidebarOpen} onClose={() => setMobileSidebarOpen(false)} />
       <main className={baseStyles.directory} aria-label="Style Guide">
-        <div className={baseStyles.mobileToolbar}><button type="button" onClick={() => setMobileSidebarOpen(true)}><PersonalOpsIcon name="menu" /> Personal</button><button type="button" onClick={saveGuide} disabled={busy}><PersonalOpsIcon name="check" /> Save</button></div>
         <div className={[baseStyles.mainScroll, styles.utilityScroll].join(" ")}>
-          <header className={styles.utilityHeader}><div><span className={styles.kicker}>Design system · V1.1</span><h1>Style Guide</h1><p>The approved shared Navy, neutral foundations, and nine module identities in one implementation reference.</p></div><button type="button" className={styles.primaryButton} onClick={saveGuide} disabled={busy}><PersonalOpsIcon name="check" /> Save guide</button></header>
+          <WorkspaceHeader title="Style Guide"><WorkspaceButton intent="primary" icon="check" onClick={saveGuide} busy={busy}>Save guide</WorkspaceButton></WorkspaceHeader>
           <nav className={styles.sectionNav} aria-label="Style Guide sections"><a href="#typography"><PersonalOpsIcon name="font" /> Type</a><a href="#colors"><PersonalOpsIcon name="palette" /> System colors</a><a href="#modules"><PersonalOpsIcon name="style-guide" /> Modules</a><a href="#components"><PersonalOpsIcon name="component" /> Components</a><a href="#icons"><PersonalOpsIcon name="object" /> Icons</a></nav>
           {error && <div className={styles.error} role="alert">{error}</div>}
           {notice && <div className={styles.notice} role="status">{notice}<button type="button" onClick={() => setNotice("")} aria-label="Dismiss" data-icon-button="standard"><PersonalOpsIcon name="close" /></button></div>}
